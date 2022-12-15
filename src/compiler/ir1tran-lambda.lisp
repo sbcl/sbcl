@@ -995,11 +995,7 @@
               lambda-list))
     (setf (functional-documentation res) doc)
     (when (boundp '*lambda-conversions*)
-      ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
-      ;; keeps things less confusing to users of TIME, where this
-      ;; count gets used.
-      (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
-        (incf *lambda-conversions*)))
+      (incf *lambda-conversions*))
     res))
 
 (defun wrap-forms-in-debug-catch (forms)

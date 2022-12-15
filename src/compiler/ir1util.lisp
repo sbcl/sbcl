@@ -2165,7 +2165,6 @@
   (let ((original-kind (functional-kind clambda))
         (bind (lambda-bind clambda)))
     (aver (not (logtest original-kind (functional-kind-attributes deleted toplevel))))
-    (aver (not (functional-has-external-references-p clambda)))
     (aver (or (eql original-kind (functional-kind-attributes zombie)) bind))
     (setf (functional-kind clambda) (functional-kind-attributes deleted))
     (setf (lambda-bind clambda) nil)
@@ -2309,8 +2308,7 @@
              ((nil let mv-let assignment escape cleanup)
               (delete-lambda leaf))
              (external
-              (unless (functional-has-external-references-p leaf)
-                (delete-lambda leaf)))
+              (delete-lambda leaf))
              ((deleted zombie optional))))
           (optional-dispatch
            (unless (functional-kind-eq leaf deleted)

@@ -347,19 +347,15 @@
             (component-reanalyze *current-component*) t
             (leaf-type xep) (definition-type fun))
       (reoptimize-component *current-component* :maybe)
-      (locall-analyze-xep-entry-point fun)
+      (etypecase fun
+        (clambda
+         (locall-analyze-fun-1 fun))
+        (optional-dispatch
+         (dolist (ep (optional-dispatch-entry-points fun))
+           (locall-analyze-fun-1 (force ep)))
+         (when (optional-dispatch-more-entry fun)
+           (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
       xep)))
-
-(defun locall-analyze-xep-entry-point (fun)
-  (declare (type functional fun))
-  (etypecase fun
-    (clambda
-     (locall-analyze-fun-1 fun))
-    (optional-dispatch
-     (dolist (ep (optional-dispatch-entry-points fun))
-       (locall-analyze-fun-1 (force ep)))
-     (when (optional-dispatch-more-entry fun)
-       (locall-analyze-fun-1 (optional-dispatch-more-entry fun))))))
 
 ;;; Notice a REF that is not in a local-call context. If the REF is
 ;;; already to an XEP, then do nothing, otherwise change it to the

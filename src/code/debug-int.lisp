@@ -18,8 +18,7 @@
   ;; Compilation to memory stores each toplevel form given to %COMPILE.
   ;; That form can generate multiple functions, and those functions can
   ;; be in one or more code components. They all point at the same form.
-  form
-  (function nil :read-only t))
+  form)
 
 ;;; FIXME: There are an awful lot of package prefixes in this code.
 ;;; Couldn't we have SB-DI use the SB-C and SB-VM packages?

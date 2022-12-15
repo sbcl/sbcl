@@ -22,10 +22,25 @@
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)
+  ;; A hashtable translating ENTRY-INFO structures to a list of pairs
+  ;; (<code object> . <offset>) describing the places that need to be
+  ;; backpatched to point to the function for ENTRY-INFO.
+  (patch-table (make-hash-table :test 'eq) :type hash-table)
   ;; A list of all the DEBUG-INFO objects created, kept so that we can
   ;; backpatch with the source info.
   (debug-info () :type list))
 
+
+;;; Note the existence of FUNCTION.
+(defun note-fun (info function object)
+  (declare (type function function)
+           (type core-object object))
+  (let ((patch-table (core-object-patch-table object)))
+    (dolist (patch (gethash info patch-table))
+      (setf (code-header-ref (car patch) (the index (cdr patch))) function))
+    (remhash info patch-table))
+  (setf (gethash info (core-object-entry-table object)) function)
+  (values))
 
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
@@ -138,6 +153,19 @@
                        real-code-obj callees))))
       (finish-fixups code-obj callees retained-fixups))))
 
+;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
+;;; function hasn't been compiled yet, make a note in the patch table.
+(defun reference-core-fun (code-obj i fun object set-code-header-ref)
+  (declare (type core-object object) (type functional fun)
+           (type index i))
+  (let* ((info (leaf-info fun))
+         (found (gethash info (core-object-entry-table object))))
+    (if found
+        (funcall set-code-header-ref found code-obj i)
+        (push (cons code-obj i)
+              (gethash info (core-object-patch-table object)))))
+  (values))
+
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
 (defun make-core-component (component assembly object)
@@ -189,32 +217,39 @@
 
     ;; Don't need code pinned now
     ;; (It will implicitly be pinned on the conservatively scavenged backends)
-    (macrolet ((set-boxed-word (i val)
-                 #+darwin-jit
-                 `(setf (svref boxed-data (- ,i ,sb-vm:code-constants-offset)) ,val)
-                 #-darwin-jit
-                 `(setf (code-header-ref code-obj ,i) ,val)))
-
+    (flet (((setf code-header-ref) (new-val code-obj i)
+             #+darwin-jit
+             (declare (ignore code-obj))
+             #+darwin-jit
+             (setf (svref boxed-data (- i sb-vm:code-constants-offset)) new-val)
+             #-darwin-jit
+             (setf (code-header-ref code-obj i) new-val)))
+      (declare (inline (setf code-header-ref)))
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
         (dolist (entry-info entries)
           (let ((fun (%code-entry-point code-obj (decf fun-index))))
             (aver (functionp fun)) ; in case %CODE-ENTRY-POINT returns NIL
-            (setf (gethash entry-info (core-object-entry-table object)) fun))))
+            (note-fun entry-info fun object))))
 
       (do ((index const-patch-start-index (1+ index)))
           ((>= index n-boxed-words))
         (let ((const (aref constants index)))
-          (set-boxed-word index
-                (if (constant-p const)
-                    (constant-value const)
-                    (destructuring-bind (kind payload) const
-                      (ecase kind
-                        (:fdefinition payload)
-                        (:entry
-                         (the function (gethash (leaf-info payload)
-                                                (core-object-entry-table object))))
-                        (:known-fun (%coerce-name-to-fun payload))))))))
+          (etypecase const
+            (constant
+             (setf (code-header-ref code-obj index)
+                   (constant-value const)))
+            (list
+             (destructuring-bind (kind payload) const
+               (ecase kind
+                 (:entry
+                  (reference-core-fun code-obj index payload object #'(setf code-header-ref)))
+                 (:fdefinition
+                  (setf (code-header-ref code-obj index)
+                        payload))
+                 (:known-fun
+                  (setf (code-header-ref code-obj index)
+                        (%coerce-name-to-fun payload)))))))))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
@@ -231,10 +266,10 @@
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
 ;;; SOURCE-INFO list. We also check that there are no outstanding
 ;;; forward references to functions.
-(defun fix-core-source-info (info object &optional function)
+(defun fix-core-source-info (info object &optional store-source)
   (declare (type core-object object))
-  (declare (type (or null function) function))
-  (let ((source (debug-source-for-info info :function function)))
+  (aver (zerop (hash-table-count (core-object-patch-table object))))
+  (let ((source (debug-source-for-info info :core store-source)))
     (dolist (info (core-object-debug-info object))
       (setf (debug-info-source info) source)))
   (setf (core-object-debug-info object) nil)

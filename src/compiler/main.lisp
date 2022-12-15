@@ -302,20 +302,26 @@ Examples:
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
 ;;; WARNINGS-P and FAILURE-P are as in CL:COMPILE or CL:COMPILE-FILE.
-(defmacro with-compilation-values (&body body)
-  `(let ((*finite-sbs*
-          (vector
-           ,@(loop for sb across *backend-sbs*
-                   unless (eq (sb-kind sb) :non-packed)
-                   collect
-                   (let ((size (sb-size sb)))
-                     `(make-finite-sb
-                       (make-array ,size :initial-element #())
-                       (make-array ,size :initial-element #*)
-                       (make-array ,size :initial-element nil)))))))
-     (let ((*warnings-p* nil)
-           (*failure-p* nil))
-       (values (progn ,@body) *warnings-p* *failure-p*))))
+(defmacro with-compilation-values ((&key just-values) &body body)
+  (let ((gensym (gensym)))
+    `(let ((*finite-sbs*
+             (vector
+              ,@(loop for sb across *backend-sbs*
+                      unless (eq (sb-kind sb) :non-packed)
+                        collect
+                        (let ((size (sb-size sb)))
+                          `(make-finite-sb
+                            (make-array ,size :initial-element #())
+                            (make-array ,size :initial-element #*)
+                            (make-array ,size :initial-element nil)))))))
+       (let ((*warnings-p* nil)
+             (*failure-p* nil))
+         (flet ((,gensym ()
+                  (progn ,@body)))
+           (if ,just-values
+               (,gensym)
+               (values (,gensym)
+                       *warnings-p* *failure-p*)))))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
@@ -655,8 +661,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; normally causes the components to be combined.
 (defun delete-if-no-entries (component)
   (dolist (fun (component-lambdas component) (delete-component component))
-    (when (functional-has-external-references-p fun)
-      (return))
     (functional-kind-case fun
       (toplevel (return))
       (external
@@ -834,11 +838,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
 (defun make-lisp-source-info (form &key parent)
-  (make-source-info
-   :file-info (make-file-info :%truename :lisp
-                              :forms (vector form)
-                              :positions '#(0))
-   :parent parent))
+  (let ((file-info (make-file-info :%truename :lisp :positions '#(0))))
+    (vector-push-extend form (file-info-forms file-info))
+    (make-source-info
+     :file-info file-info
+     :parent parent)))
 
 ;;; Walk up the SOURCE-INFO list until we either reach a SOURCE-INFO
 ;;; with no parent (e.g., from a REPL evaluation) or until we reach a
@@ -909,7 +913,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     ;; special case for COMPILE-FORM-TO-FILE
     (return-from %do-forms-from-info
       (let* ((forms (file-info-forms (source-info-file-info info)))
-             (form (shiftf (svref forms 0) nil)))
+             (form (shiftf (aref forms 0) nil)))
         (when form
           (funcall function form :current-index 0)))))
   (let* ((file-info (source-info-file-info info))
@@ -1629,7 +1633,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (sb-impl::*eval-source-context* nil))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
-          (with-compilation-values
+          (with-compilation-values ()
             (with-compilation-unit ()
               (handler-bind ((compiler-error #'compiler-error-handler)
                              (style-warning #'compiler-style-warning-handler)

@@ -402,6 +402,10 @@
                    `(lambda ,@(cddr lambda))
                    lambda)))
 
+(defun sb-c:eval-with-compile-in-lexenv (lambda &rest rest)
+  (declare (ignore rest))
+  (funcall (compile nil lambda)))
+
 ;;; The compiler calls this with forms in EVAL-WHEN (:COMPILE-TOPLEVEL) situations.
 (defun eval-tlf (form index &optional lexenv)
   (declare (ignore index lexenv))

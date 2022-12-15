@@ -51,7 +51,6 @@
                     superclassoid-name condition)))
          nil))
 
-  ;; We don't warn about redefinition of WARN, apparently (not sure why)
   (defun warn (datum &rest arguments)
   "Warn about a situation by signalling a condition formed by DATUM and
    ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart

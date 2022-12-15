@@ -416,7 +416,8 @@ returns values returned by FUNCTION.
       Number of calls to EVAL. (Omitted if zero.)
 
   :LAMBDAS-CONVERTED
-      Number of lambdas converted. (Omitted if zero.)
+      Number of (potentially compiler introduced) lambdas converted to
+      IR. (Omitted if zero.)
 
   :PAGE-FAULTS
       Number of page faults. (Omitted if zero.)

@@ -2682,6 +2682,7 @@ be submitted as a CDR")
            "DO-FORMS-FROM-INFO"
            "EMIT-BLOCK-HEADER"
            "ENVIRONMENT-DEBUG-LIVE-TN" "ENVIRONMENT-LIVE-TN"
+           "EVAL-WITH-COMPILE-IN-LEXENV"
            "FAST-SYMBOL-VALUE"
            "FAST-SYMBOL-GLOBAL-VALUE"
            "FIXUP-NOTE-KIND"

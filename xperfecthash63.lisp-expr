@@ -1706,5 +1706,8 @@
   (let ((b (& (>> val 5) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(EA1E569 42D83FFB 6634E9C8 825503B8 8D9B0A28 ADDD7F24)
+ "(:ALLOW-OTHER-KEYS :FORM :PLIST :START-POSITIONS :CREATED :NAMESTRING)"
+ "((& (^ (>> val 10) (>> val 28)) 7))")
 )
 ;; EOF

@@ -45,20 +45,24 @@
                              `(lambda ,args-copy . ,body))))))))
     (sb-vm:without-arena "pcl-compile"
      (let* ((base-policy sb-c::*policy*)
+            (pcl-policy
+             (sb-c::process-optimize-decl
+              '(optimize (sb-c:store-source-form 0) (sb-c::store-xref-data 0))
+              base-policy))
             (lexenv
              (sb-c::make-almost-null-lexenv
               (ecase safety
                 ;; Stepping invokes the printer on forms, which might
                 ;; invoke print-object, which might require dispatch
                 ;; function recompilation.
-                (:safe (if (sb-c:policy base-policy (= sb-c:insert-step-conditions 0))
-                           base-policy
+                (:safe (if (sb-c:policy pcl-policy (= sb-c:insert-step-conditions 0))
+                           pcl-policy
                            (sb-c::process-optimize-decl '(optimize (sb-c:insert-step-conditions 0))
-                                                        base-policy)))
+                                                        pcl-policy)))
                 (:unsafe (sb-c::process-optimize-decl
                           '(optimize (space 1) (compilation-speed 1)
                             (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
-                          base-policy)))
+                          pcl-policy)))
               ;; I suspect that INHIBIT-WARNINGS precludes them from happening
               (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
                     (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))

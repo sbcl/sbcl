@@ -94,16 +94,14 @@ guaranteed to never be modified, so it can be put in read-only storage."
               ;; versus do both in the null environment. The distinction is in whether
               ;;  (LET ((X 3)) (MACROLET ((M () (HAIR))) (LOAD-TIME-VALUE (THING)))
               ;; can make use of M. We choose to say that it can't.
-              (let ((value (let ((thunk ; Pass T for the EPHEMERAL flag.
-                                   (compile-in-lexenv `(lambda ()
-                                                         (declare (local-optimize (verify-arg-count 0)))
-                                                         ,form)
-                                                      (make-null-lexenv)
-                                                      nil nil nil t nil)))
-                             (handler-case (funcall thunk)
-                               (error (condition)
-                                 (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
-                                                 condition))))))
+              (let ((value (handler-case
+                               ;; Pass T for the EPHEMERAL flag.
+                               (eval-with-compile-in-lexenv form
+                                                            (make-null-lexenv)
+                                                            nil nil t)
+                             (error (condition)
+                               (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
+                                               condition)))))
                 (if read-only-p
                     (ir1-convert start next result `',value)
                     #+cheneygc

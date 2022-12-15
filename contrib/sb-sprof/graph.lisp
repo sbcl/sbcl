@@ -262,7 +262,7 @@
          (clean-name (name)
            (if (and (consp name)
                     (member (first name)
-                            '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
+                            '(sb-c::xep sb-c::&more-processor
                               sb-c::top-level-form
                               sb-c::&optional-processor)))
                (second name)

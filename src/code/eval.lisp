@@ -13,49 +13,17 @@
 
 (defparameter *eval-calls* 0)
 
-;;;; Turns EXPR into a lambda-form we can pass to COMPILE. Returns
-;;;; a secondary value of T if we must call the resulting function
-;;;; to evaluate EXPR -- if EXPR is already a lambda form, there's
-;;;; no need.
-(defun make-eval-lambda (expr)
-  (let ((lambda (if (typep expr '(cons (eql function) (cons t null)))
-                    (cadr expr)
-                    expr)))
-    (if (typep lambda '(cons (member lambda named-lambda)))
-        (values lambda nil)
-        (values `(lambda ()
-                 ;; why PROGN? So that attempts to eval free declarations
-                 ;; signal errors rather than return NIL. -- CSR, 2007-05-01
-                 ;; But only force in a PROGN if it's actually needed to flag
-                 ;; that situation as an error. Macros can't expand into DECLARE,
-                 ;; so anything other than DECLARE can be left alone.
-                   ,(if (and (consp expr) (eq (car expr) 'declare))
-                        `(progn ,expr)
-                        expr))
-                t))))
-
-;;; FIXME: what does "except in that it can't handle toplevel ..." mean?
-;;; Is there anything wrong with the implementation, or is the comment obsolete?
-;;; general case of EVAL (except in that it can't handle toplevel
-;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
+;;; general case of EVAL: Delegate to #'COMPILE.
 (defun %simple-eval (expr lexenv)
-  (multiple-value-bind (lambda call) (make-eval-lambda expr)
-    (let ((fun
-            ;; This tells the compiler where the lambda comes from, in case it
-            ;; wants to report any problems.
-            (let ((sb-c::*source-form-context-alist*
-                    (acons lambda *eval-source-context*
-                           sb-c::*source-form-context-alist*)))
-              (handler-bind (;; Compiler notes just clutter up the REPL:
-                             ;; anyone caring about performance should not
-                             ;; be using EVAL.
-                             (compiler-note #'muffle-warning))
-                (sb-c:compile-in-lexenv lambda lexenv nil *eval-source-info*
-                                        *eval-tlf-index* nil (not call))))))
-      (declare (function fun))
-      (if call
-          (funcall fun)
-          fun))))
+  (let ((sb-c::*source-form-context-alist*
+          (acons expr *eval-source-context*
+                 sb-c::*source-form-context-alist*)))
+    (handler-bind (;; Compiler notes just clutter up the REPL:
+                   ;; anyone caring about performance should not
+                   ;; be using EVAL.
+                   (compiler-note #'muffle-warning))
+      (sb-c:eval-with-compile-in-lexenv expr lexenv *eval-source-info*
+                                        *eval-tlf-index* nil))))
 
 ;;; Handle PROGN and implicit PROGN.
 #-sb-fasteval
@@ -181,10 +149,6 @@
                   (if (and (legal-fun-name-p name)
                            (not (consp (sb-c:lexenv-find name funs :lexenv lexenv))))
                       (%coerce-name-to-fun name)
-                      ;; FIXME: This is a bit wasteful: it would be nice to call
-                      ;; COMPILE-IN-LEXENV with the lambda-form directly, but
-                      ;; getting consistent source context and muffling compiler notes
-                      ;; is easier this way.
                       (%simple-eval original-exp lexenv))))
                ((quote)
                 (unless (= n-args 1)

@@ -4613,61 +4613,6 @@
                                (f)))))))
                    :allow-notes 'code-deletion-note))
 
-(declaim (ftype (function (&key (:a fixnum)) t) ftype-test-key)
-         (ftype (function (&optional fixnum) t) ftype-test-opt)
-         (ftype (function (&optional fixnum &key (:b integer)) t) ftype-test-opt-key))
-(defun ftype-test-key (&key (a nil))
-  a)
-(defun ftype-test-opt (&optional (a nil))
-  a)
-(defun ftype-test-opt-key (&optional (a nil) &key (b nil))
-  (declare (muffle-conditions style-warning))
-  (values a b))
-
-(compile 'ftype-test-key)
-(compile 'ftype-test-opt)
-(compile 'ftype-test-opt-key)
-
-(with-test (:name :ftype-optional)
-  (checked-compile-and-assert
-   ()
-   `(lambda ()
-      (ftype-test-opt))
-   (() nil))
-  (checked-compile-and-assert
-   ()
-   `(lambda ()
-      (ftype-test-key))
-   (() nil))
-  (checked-compile-and-assert
-   ()
-   `(lambda (a)
-      (ftype-test-key :a a))
-   ((nil) (condition 'type-error)))
-  (checked-compile-and-assert
-   ()
-   `(lambda (a)
-      (ftype-test-opt a))
-   ((nil) (condition 'type-error)))
-  (checked-compile-and-assert
-    ()
-   `(lambda (a)
-      (ftype-test-opt-key a))
-   ((nil) (condition 'type-error)))
-  (checked-compile-and-assert
-    ()
-   `(lambda (a b)
-      (ftype-test-opt-key a :b b))
-   ((0 nil) (condition 'type-error)))
-  (assert (type-specifiers-equal
-           (caddr
-            (sb-kernel:%simple-fun-type #'ftype-test-key))
-           '(values (or null fixnum) &optional)))
-  (assert (type-specifiers-equal
-           (caddr
-            (sb-kernel:%simple-fun-type #'ftype-test-opt))
-           '(values (or null fixnum) &optional))))
-
 ;;; This trivial function failed to compile due to rev 88d078fe
 (with-test (:name :make-list-reduce)
   (checked-compile
@@ -5126,17 +5071,6 @@
     ((8) t)
     ((0) nil)))
 
-(declaim (ftype (function (&key (:a integer)) t) ftype-key-default-type))
-(with-test (:name :ftype-key-default-type)
-  (assert-type
-   (sb-int:named-lambda ftype-key-default-type (&key (a (isqrt *)))
-     a)
-   integer)
-  (assert-type
-   (sb-int:named-lambda ftype-key-default-type (&key (a 1))
-     a)
-   integer))
-
 (with-test (:name :deleted-node-in-derive-type)
   (checked-compile
    `(lambda (a)
@@ -5152,3 +5086,38 @@
                   (lambda (a) (+ a 1)))
               1))
    (integer 2 3)))
+
+(with-test (:name :compile-name-correct)
+  (let ((gensym (gensym)))
+    (assert (eq (sb-kernel:%fun-name
+                 (symbol-function
+                  (checked-compile
+                   `(lambda (a)
+                      (declare ((simple-array nil (9)) a))
+                      (setf (aref a 0) 1)
+                      a)
+                   :name gensym)))
+                gensym))))
+
+(declaim (ftype function self-call))
+(with-test (:name :compile-self-call-policy.1)
+  (let ((fun (symbol-function
+              (checked-compile
+               `(lambda (a)
+                  (declare (optimize (sb-c::recognize-self-calls 0)))
+                  (if (zerop a)
+                      2
+                      (self-call (1- a))))
+               :name 'self-call))))
+    (assert (member 'self-call (ctu:find-named-callees fun)))))
+
+(with-test (:name :compile-self-call-policy.1)
+  (let ((fun (symbol-function
+              (checked-compile
+               `(lambda (a)
+                  (declare (optimize sb-c::recognize-self-calls))
+                  (if (zerop a)
+                      2
+                      (self-call (1- a))))
+               :name 'self-call))))
+    (assert (not (member 'self-call (ctu:find-named-callees fun))))))

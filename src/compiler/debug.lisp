@@ -428,7 +428,8 @@
      (let ((leaf (ref-leaf node)))
        (when (functional-p leaf)
          (if (functional-kind-eq leaf toplevel-xep)
-             (unless (component-toplevelish-p (block-component (node-block node)))
+             (unless (eq (component-kind (block-component (node-block node)))
+                         :toplevel)
                (barf ":TOPLEVEL-XEP ref in non-top-level component: ~S"
                      node))
              (check-fun-reached leaf node)))))

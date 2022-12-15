@@ -92,13 +92,11 @@
   (let* ((method (find-method #'read-a-struct-x nil (list (find-class 'a-struct))))
          (mf (sb-mop:method-function method))
          (fmf (sb-pcl::%method-function-fast-function mf))
-         (callees (ctu:find-named-callees fmf))
-         (pcl-callees '(sb-pcl::method-function-from-fast-function sb-pcl::%make-method-function)))
+         (callees (ctu:find-named-callees fmf)))
     (ecase sb-ext:*evaluator-mode*
       (:interpret)
       (:compile
-       (assert (null (set-difference pcl-callees callees)))
-       (assert (null (set-difference callees pcl-callees)))))))
+       (assert (null callees))))))
 
 (with-test (:name :structure-missing-slot-value-in-method-calls-global
             :skipped-on (not (or :x86 :x86-64)))
@@ -110,13 +108,11 @@
   (let* ((method (find-method #'read-a-struct-y nil (list (find-class 'a-struct))))
          (mf (sb-mop:method-function method))
          (fmf (sb-pcl::%method-function-fast-function mf))
-         (callees (ctu:find-named-callees fmf))
-         (pcl-callees '(sb-pcl::method-function-from-fast-function sb-pcl::%make-method-function)))
+         (callees (ctu:find-named-callees fmf)))
     (ecase sb-ext:*evaluator-mode*
       (:interpret)
       (:compile
-       (assert (null (set-difference pcl-callees callees)))
-       (assert (equal (set-difference callees pcl-callees) '(sb-pcl::structure-slot-value)))))))
+       (assert (equal callees '(sb-pcl::structure-slot-value)))))))
 
 (define-condition a-condition () ((a :initarg :a)))
 (defmethod sb-mop:slot-value-using-class :around (class (c a-condition) slotd)

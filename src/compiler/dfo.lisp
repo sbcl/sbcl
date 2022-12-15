@@ -14,8 +14,6 @@
 
 ;;; An entry point is reachable if:
 ;;;   - Its home lambda is of KIND :TOPLEVEL.
-;;;   - Its home lambda is LAMBDA-HAS-EXTERNAL-REFERENCES-P true (from
-;;;     COMPILE or possibly other causes).
 ;;;   - Its home lambda is either referenced from a reachable block in
 ;;;     the same component or referenced from a different component.
 (defun entry-point-reached-p (ep)
@@ -24,7 +22,6 @@
     (if (bind-p start-node)
         (let ((fun (bind-lambda start-node)))
           (or (functional-kind-eq fun toplevel)
-              (lambda-has-external-references-p fun)
               (let ((component (block-component ep)))
                 (some (lambda (ref)
                         ;; The REF could have been deleted, in which
@@ -208,9 +205,8 @@
 ;;; to XEP lambdas. We can ignore references to XEPs that appear in
 ;;; :TOPLEVEL components, since environment analysis goes to special
 ;;; effort to allow closing over of values from a separate top level
-;;; component. (And now that HAS-EXTERNAL-REFERENCES-P-ness
-;;; generalizes :TOPLEVEL-ness, we ignore those too.) All other
-;;; references must cause components to be joined.
+;;; component. All other references must cause components to be
+;;; joined.
 ;;;
 ;;; References in deleted functions are also ignored, since this code
 ;;; will be deleted eventually.
@@ -218,11 +214,8 @@
   (collect ((res))
     (dolist (ref (leaf-refs fun))
       (let* ((home (node-home-lambda ref))
-             (home-kind (functional-kind home))
-             (home-externally-visible-p
-               (or (eql home-kind (functional-kind-attributes toplevel))
-                   (functional-has-external-references-p home))))
-        (unless (or (and home-externally-visible-p
+             (home-kind (functional-kind home)))
+        (unless (or (and (eql home-kind (functional-kind-attributes toplevel))
                          (functional-kind-eq fun external))
                     (eql home-kind (functional-kind-attributes deleted)))
           (res home))))
@@ -355,21 +348,8 @@
       (unless (eq (block-next (component-head component))
                   (component-tail component))
         (let* ((funs (component-lambdas component))
-               (has-top (find (functional-kind-attributes toplevel) funs :key #'functional-kind))
-               (has-external-references
-                 (some #'functional-has-external-references-p funs)))
-          (cond (;; The FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P concept
-                 ;; is newer than the rest of this function, and
-                 ;; doesn't really seem to fit into its mindset. Here
-                 ;; we mark components which contain such FUNCTIONs
-                 ;; them as :COMPLEX-TOPLEVEL, since they do get
-                 ;; executed at run time, and since it's not valid to
-                 ;; delete them just because they don't have any
-                 ;; references from pure :TOPLEVEL components. -- WHN
-                 has-external-references
-                 (setf (component-kind component) :complex-toplevel)
-                 (non-top component))
-                ((or (some #'has-xep-or-nlx funs)
+               (has-top (find (functional-kind-attributes toplevel) funs :key #'functional-kind)))
+          (cond ((or (some #'has-xep-or-nlx funs)
                      (and has-top (rest funs)))
                  (setf (component-name component) (find-component-name component))
                  (non-top component)

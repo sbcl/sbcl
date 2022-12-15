@@ -108,16 +108,14 @@ missing MAKE-LOAD-FORM methods?")
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear
-;;; in top level or externally-referenced components, changing to
-;;; :TOPLEVEL-XEP FUNCTIONALs. If the cross-component ref is not in a
-;;; :TOPLEVEL/externally-referenced component, or is to a closure,
-;;; then substitution is suppressed.
+;;; in top level components, changing to :TOPLEVEL-XEP FUNCTIONALs. If
+;;; the cross-component ref is not in a :TOPLEVEL component, or is to
+;;; a closure, then substitution is suppressed.
 ;;;
 ;;; When a cross-component ref is not substituted, we return T to
 ;;; indicate that early deletion of this component's IR1 should not be
-;;; done. We also return T if this component contains
-;;; :TOPLEVEL/externally-referenced lambdas (though it is not a
-;;; :TOPLEVEL component.)
+;;; done. We also return T if this component contains :TOPLEVEL
+;;; lambdas (though it is not a :TOPLEVEL component.)
 ;;;
 ;;; We deliberately don't use the normal reference deletion, since we
 ;;; don't want to trigger deletion of the XEP (although it shouldn't
@@ -128,31 +126,30 @@ missing MAKE-LOAD-FORM methods?")
     (dolist (lambda (component-lambdas component))
       (functional-kind-case lambda
         (external
-         (unless (lambda-has-external-references-p lambda)
-           (let* ((ef (functional-entry-fun lambda))
-                  (new (make-functional
-                        :kind (functional-kind-attributes toplevel-xep)
-                        :info (leaf-info lambda)
-                        :%source-name (functional-%source-name ef)
-                        :%debug-name (functional-%debug-name ef)
-                        :lexenv (make-null-lexenv)))
-                  (main-entry (main-entry ef))
-                  (closure (and
-                            ;; It may have been deleted due to none of
-                            ;; the optional entries reaching it.
-                            (not (functional-kind-eq main-entry deleted))
-                            (environment-closure (lambda-environment main-entry)))))
-             (dolist (ref (leaf-refs lambda))
-               (let ((ref-component (node-component ref)))
-                 (cond ((eq ref-component component))
-                       ((or (not (component-toplevelish-p ref-component))
-                            closure)
-                        (setq res t))
-                       (t
-                        (setf (ref-leaf ref) new)
-                        (push ref (leaf-refs new))
-                        (setf (leaf-refs lambda)
-                              (delq1 ref (leaf-refs lambda))))))))))
+         (let* ((ef (functional-entry-fun lambda))
+                (new (make-functional
+                      :kind (functional-kind-attributes toplevel-xep)
+                      :info (leaf-info lambda)
+                      :%source-name (functional-%source-name ef)
+                      :%debug-name (functional-%debug-name ef)
+                      :lexenv (make-null-lexenv)))
+                (main-entry (main-entry ef))
+                (closure (and
+                          ;; It may have been deleted due to none of
+                          ;; the optional entries reaching it.
+                          (neq (functional-kind main-entry) :deleted)
+                          (environment-closure (lambda-environment main-entry)))))
+           (dolist (ref (leaf-refs lambda))
+             (let ((ref-component (node-component ref)))
+               (cond ((eq ref-component component))
+                     ((or (not (eq (component-kind ref-component) :toplevel))
+                          closure)
+                      (setq res t))
+                     (t
+                      (setf (ref-leaf ref) new)
+                      (push ref (leaf-refs new))
+                      (setf (leaf-refs lambda)
+                            (delq1 ref (leaf-refs lambda)))))))))
         (toplevel
          (setq res t))))
     res))

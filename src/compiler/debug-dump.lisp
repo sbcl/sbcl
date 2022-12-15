@@ -413,11 +413,11 @@
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
-(defun debug-source-for-info (info &key function)
+(defun debug-source-for-info (info &key core)
   (declare (type source-info info))
   (let ((file-info (get-toplevelish-file-info info)))
     (multiple-value-call
-        (if function 'sb-di::make-core-debug-source 'make-debug-source)
+        (if core 'sb-di::make-core-debug-source 'make-debug-source)
      :namestring (or *source-namestring*
                      (make-file-info-namestring
                       (let ((pathname
@@ -441,11 +441,10 @@
                          file-write-date))
       :start-positions (coerce-to-smallest-eltype
                         (file-info-positions file-info))
-     (if function
+     (if core
          (values :form (let ((direct-file-info (source-info-file-info info)))
                          (when (eq :lisp (file-info-%truename direct-file-info))
-                           (elt (file-info-forms direct-file-info) 0)))
-                 :function function)
+                           (elt (file-info-forms direct-file-info) 0))))
          (values)))))
 
 (defun smallest-element-type (integer negative)
@@ -768,7 +767,7 @@
          (name (leaf-debug-name fun))
          (name (if (consp name)
                    (case (car name)
-                     ((xep tl-xep)
+                     ((xep)
                       (aver (eql kind :external))
                       (second name))
                      (&optional-processor

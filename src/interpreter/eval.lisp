@@ -227,16 +227,9 @@
           (sb-kernel:lexenv (if (sb-c::null-lexenv-p env) nil (env-from-lexenv env)))
           (t env))))
     (if (eq interpreter-env :compile)
-        (funcall (handler-case
-                     ;; Final arg of T means signal errors immediately rather
-                     ;; than returning a function that signals when called.
-                     (sb-c:compile-in-lexenv `(lambda () ,form) env nil nil nil nil t)
-                  (error ()
-                     ;; Whatever went wrong, just say "too complex"
-                   (error 'compiler-environment-too-complex-error
-                          :format-control
-                          "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
-                          :format-arguments (list env)))))
+        ;; Final arg of T means signal errors immediately rather than
+        ;; returning a function that signals when called.
+        (sb-c:eval-with-compile-in-lexenv form env nil nil t)
         ;; FIXME: should this be (OR INTERPRETER-ENV (CAPTURE-TOPLEVEL-ENV)) ?
         ;; Whether we decide to capture the policy here or not, there will always
         ;; be some use-case that comes out wrong. Capturing it is necessary for

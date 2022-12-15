@@ -71,7 +71,9 @@
                        (let ((sb-c::*compile-to-memory-space* :immobile))
                          (compile nil lambda)))
                      (end-count (count-code-objects)))
-                (assert (= end-count (1+ start-count)))
+                ;; 2 components because the load time component used
+                ;; to return the actual function is included as well.
+                (assert (= end-count (+ start-count 2)))
                 result))))
     (sb-ext:gc :full t)
     ;; Test 1: simple macrolet
@@ -258,3 +260,21 @@
      (specialized-xep-ignored-var 1 d))
   ((2d0) 2d0)
   ((-2d0) -2d0)))
+
+;;; Check that non-COMPILE-FILE'd evaluated forms do not retain any
+;;; toplevel code.
+(let ((x 4))
+  (print x)
+  (print (+ x x))
+  (print (* x x x))
+  (defun eval-top-level-test (z)
+    z))
+
+(with-test (:name :eval-top-level-code-separate-component
+                  :skipped-on :interpreter)
+  ;; Check there's no top level code hanging out.
+  (assert (= 1 (sb-kernel::code-n-entries
+                (sb-kernel::fun-code-header
+                 (sb-kernel::%closure-fun
+                  (symbol-function 'eval-top-level-test))))))
+  (assert (= (funcall 'eval-top-level-test 4) 4)))

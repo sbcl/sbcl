@@ -211,23 +211,78 @@
   (defun component-xep-references.4 ()
     (component-xep-references-mi 1)))
 
-(declaim (ftype (function (&key (:a fixnum)) t) compiled-ftype-test-key)
-         (ftype (function (&optional fixnum) t) compiled-ftype-test-opt))
+(declaim (ftype (function (&key (:a fixnum)) t) ftype-test-key)
+         (ftype (function (&optional fixnum) t) ftype-test-opt)
+         (ftype (function (&optional fixnum &key (:b integer)) t) ftype-test-opt-key))
+(defun ftype-test-key (&key (a nil))
+  a)
+(defun ftype-test-opt (&optional (a nil))
+  a)
+(defun ftype-test-opt-key (&optional (a nil) &key (b nil))
+  (declare (muffle-conditions style-warning))
+  (values a b))
 
-(defun compiled-ftype-test-key (&key a)
-  a)
-(defun compiled-ftype-test-opt (&optional (a nil))
-  a)
+(compile 'ftype-test-key)
+(compile 'ftype-test-opt)
+(compile 'ftype-test-opt-key)
 
 (with-test (:name :ftype-optional)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (ftype-test-opt))
+   (() nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (ftype-test-key))
+   (() nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (ftype-test-key :a a))
+   ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (ftype-test-opt a))
+   ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+    ()
+   `(lambda (a)
+      (ftype-test-opt-key a))
+   ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+    ()
+   `(lambda (a b)
+      (ftype-test-opt-key a :b b))
+   ((0 nil) (condition 'type-error)))
   (assert (type-specifiers-equal
            (caddr
-            (sb-kernel:%simple-fun-type #'compiled-ftype-test-key))
+            (sb-kernel:%simple-fun-type #'ftype-test-key))
            '(values (or null fixnum) &optional)))
   (assert (type-specifiers-equal
            (caddr
-            (sb-kernel:%simple-fun-type #'compiled-ftype-test-opt))
+            (sb-kernel:%simple-fun-type #'ftype-test-opt))
            '(values (or null fixnum) &optional))))
+
+(declaim (ftype (function (&key (:a integer)) t)
+                ftype-key-default-type
+                ftype-key-default-type-2))
+(defun ftype-key-default-type (&key (a (isqrt *)))
+  a)
+
+(defun ftype-key-default-type-2 (&key (a 1))
+  a)
+(with-test (:name :ftype-key-default-type)
+  (assert (type-specifiers-equal
+           (caddr
+            (sb-kernel:%simple-fun-type #'ftype-key-default-type))
+           '(values integer &optional)))
+  (assert (type-specifiers-equal
+           (caddr
+            (sb-kernel:%simple-fun-type #'ftype-key-default-type-2))
+           '(values integer &optional))))
 
 (defun ltv-constants ()
   (load-time-value (char-code #\a)))
