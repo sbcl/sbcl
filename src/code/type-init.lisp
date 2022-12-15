@@ -19,6 +19,44 @@
 
 ;;; built-in classes
 (/show0 "beginning type-init.lisp")
+
+;; We want to assign SAETP-CTYPE for each SAETP instance, but we can't do it
+;; just yet because CHARACTER and FIXNUM are not acceptable to SPECIFIER-TYPE.
+;; The reason they're not is that each is a builtin classoid with a translation
+;; that can be given to SPECIFIER-TYPE as it has a translator:
+;;  CHARACTER =  (CHARACTER-SET)
+;;  FIXNUM = `(INTEGER ,MOST-NEGATIVE-FIXNUM ,MOST-POSITIVE-FIXNUM)
+;; but the classoid's TRANSLATION slot isn't set yet.
+;; So ideally we could commence with the loop over *builtin-classoids*
+;; assigning each their translation, and then come back to filling in SAETP-CTYPE.
+;; That's where we hit a circularity: You can't parse BIT-VECTOR because while we
+;; know that it's (ARRAY BIT (*)), in order to parse (ARRAY <x>) you have to call
+;; %UPGRADED-ARRAY-ELEMENT-TYPE with the parse of <x>, looking for the first SAETP
+;; whosed -CTYPE is a supertype of <x>. But the SAETP-CTYPEs aren't filled in!
+;; The solution I favor is to process CHARACTER and FIXNUM in *builtin-classoids*,
+;; then assign all SAETP-CTYPES, then do the rest of *builtin-classoids*.
+(dolist (spec '(character fixnum))
+  (let* ((bic-entry (assoc spec *builtin-classoids*))
+         (translation (getf (cdr bic-entry) :translation))
+         (classoid (find-classoid spec)))
+    (aver classoid)
+    ;; In cold-init, the TRANSLATION is already in its internal representation
+    ;; as though SPECIFIER-TYPE were called. This is extremely convenient
+    ;; because parsing doesn't work. See the call to !MAKE-BUILT-IN-CLASSOID
+    ;; in class.lisp - it sets :TRANSLATION to :INITIALIZING only in the host.
+    (let ((ctype #+sb-xc-host (specifier-type translation)
+                 #-sb-xc-host translation))
+      (aver (ctype-p ctype))
+      (aver (not (unknown-type-p ctype)))
+      (setf (built-in-classoid-translation classoid) ctype)
+      (setf (info :type :builtin spec) ctype))))
+
+(dovector (saetp sb-vm:*specialized-array-element-type-properties*)
+  (let* ((spec (sb-vm:saetp-specifier saetp))
+         (ctype (specifier-type spec)))
+    (aver (not (unknown-type-p ctype)))
+    (setf (sb-vm:saetp-ctype saetp) ctype)))
+
 #+sb-xc-host
 (dolist (x *builtin-classoids*)
   (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)

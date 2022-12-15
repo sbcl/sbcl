@@ -286,10 +286,6 @@
 (declaim (inline type-hash-value))
 (defun type-hash-value (ctype) (ldb (byte ctype-hash-nbits 0) (type-%bits ctype)))
 
-;;; Represent an index into *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
-;;; if applicable. For types which are not array specializations,
-;;; the bits are arbitrary.
-(defmacro type-saetp-index (ctype) `(ldb (byte 5 22) (type-%bits ,ctype)))
 ;;; TODO: remove the "interned" bit. No two internal representations can exist
 ;;; for the same structures that are EQUALP. Except for ALIEN-TYPE-TYPE (FIXME)
 (defmacro type-bits-internedp (bits) `(logbitp 20 ,bits))
@@ -342,12 +338,10 @@
         (error "~S is not a defined type class." name))))
 
 ;;; For system build-time only
-(defun pack-interned-ctype-bits (type-class &optional hash saetp-index)
+(defun pack-interned-ctype-bits (type-class &optional hash)
   (let ((hash (or hash (ctype-random))))
     (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
-            (if saetp-index
-                (logior (ash saetp-index 22) (ldb (byte 20 0) hash))
-                (logand hash +type-hash-mask+))
+            (logand hash +type-hash-mask+)
             ;; type= optimization is valid if not an array-type
             (if (eq type-class 'array) 0 +type-admits-type=-optimization+)
             +type-internedp+)))

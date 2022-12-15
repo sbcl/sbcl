@@ -351,7 +351,7 @@
 (with-test (:name :numeric-type-hash-mixer)
   (let* ((hs sb-kernel::*numeric-type-hashset*)
          (pre (compute-max-psl hs)))
-    (assert (<= pre 6))
+    (assert (<= pre 7))
     (loop for i = 1 then (ash i 1)
           for tp = `(real ,(- i) 0)
           repeat 200

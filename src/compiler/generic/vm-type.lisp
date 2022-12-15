@@ -112,11 +112,11 @@
              (contains-unknown-type-p eltype))
          *wild-type*)
         (t
-         (dovector (stype
-                    (literal-ctype-vector *parsed-specialized-array-element-types*)
-                    *universal-type*)
-           (when (csubtypep eltype stype)
-             (return stype))))))
+         (dovector (saetp sb-vm:*specialized-array-element-type-properties*
+                          *universal-type*)
+           (let ((stype (sb-vm:saetp-ctype saetp)))
+             (when (csubtypep eltype stype)
+               (return stype)))))))
 
 (defun upgraded-array-element-type (spec &optional environment)
   "Return the element type that will actually be used to implement an array

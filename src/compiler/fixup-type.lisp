@@ -3,9 +3,8 @@
 (!begin-collecting-cold-init-forms)
 
 (!cold-init-forms
+ #-sb-xc-host
  (dovector (saetp sb-vm:*specialized-array-element-type-properties*)
-   (setf (sb-vm:saetp-ctype saetp) (specifier-type (sb-vm:saetp-specifier saetp)))
-   #-sb-xc-host
    (setf (aref sb-vm::*saetp-widetag-ctype* (ash (- (sb-vm:saetp-typecode saetp) 128) -2))
          (sb-vm:saetp-ctype saetp)))
   ;; This seems so weird and random. I really wanted to remove it, but

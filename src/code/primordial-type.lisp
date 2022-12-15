@@ -23,11 +23,7 @@
                                      (subseq string 0 22) (reverse (subseq string 22)))))
                     (bits `(pack-interned-ctype-bits
                             'named
-                            ,(parse-integer perturbed-bit-string :radix 2)
-                            ,(case type
-                               ((*) 31)
-                               ((nil t) (sb-vm::saetp-index-or-lose type))
-                               (t nil)))))
+                            ,(parse-integer perturbed-bit-string :radix 2))))
                (declare (ignorable bits)) ; not used in XC
                `(progn
                   #+sb-xc-host

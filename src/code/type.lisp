@@ -2558,39 +2558,6 @@ expansion happened."
         (values t low)
         (values nil nil))))
 
-(defun interned-numeric-type (specifier &key class format (complexp :real) low high)
-  (!alloc-numeric-type
-   (pack-interned-ctype-bits 'number nil
-                             (when specifier (sb-vm::saetp-index-or-lose specifier)))
-   (get-numtype-aspects complexp class format)
-   low high))
-
-#+sb-xc-host
-(progn
-  ;; Work around an ABCL bug. This fails to load:
-  ;;   (macrolet ((foo-it (x) `(- ,x))) (defvar *var* (foo-it 3)))
-  (defvar *interned-signed-byte-types*)
-  (defvar *interned-unsigned-byte-types*)
-  (macrolet ((int-type (low high)
-               `(interned-numeric-type (when (sb-c::find-saetp spec) spec)
-                                       :class 'integer
-                                       :low ,low :high ,high)))
-    (setq *interned-signed-byte-types*
-          (do ((v (make-array sb-vm:n-word-bits))
-               (i 1 (1+ i))
-               (j -1))
-              ((> i sb-vm:n-word-bits) v)
-            (let ((spec (if (= i sb-vm:n-fixnum-bits)
-                            'fixnum
-                            `(signed-byte ,i))))
-              (setf (svref v (1- i)) (int-type j (lognot j))
-                    j (ash j 1)))))
-    (setq *interned-unsigned-byte-types*
-          (let ((v (make-array (1+ sb-vm:n-word-bits))))
-            (dotimes (i (length v) v)
-              (let ((spec (if (= i 1) 'bit `(unsigned-byte ,i))))
-                (setf (svref v i) (int-type 0 (1- (ash 1 i))))))))))
-
 ;;; Coerce a numeric type bound to the given type while handling
 ;;; exclusive bounds.
 (defun coerce-numeric-bound (bound type)
@@ -2700,71 +2667,17 @@ expansion happened."
                    (sb-xc:>= (type-bound-number low) (type-bound-number high))
                    (sb-xc:> low high)))
       (return-from make-numeric-type *empty-type*))
+    ;; Just about all NUMERIC-TYPES are in the hashset except NUMBER itself.
+    ;; Cold-init fails without this hardwired case and I don't know why.
+    (unless class
+      (return-from make-numeric-type
+        (literal-ctype (!alloc-numeric-type (pack-interned-ctype-bits 'number)
+                                            (get-numtype-aspects nil nil nil)
+                                            nil nil)
+                       number)))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
-    ;; Either lookup the canonical interned object for
-    ;; a point in the type lattice, or construct a new one.
-    (or (case class
-          (float
-           (macrolet ((float-type (fmt complexp
-                                   &aux (spec (if (eq complexp :complex)
-                                                  `(complex ,fmt) fmt)))
-                        `(literal-ctype (interned-numeric-type ',spec
-                                                               :class 'float :complexp ,complexp
-                                                               :format ',fmt)
-                             ,spec)))
-             (when (bounds-unbounded-p low high)
-               (ecase format
-                 (single-float
-                  (case complexp
-                    (:real    (float-type single-float :real))
-                    (:complex (float-type single-float :complex))))
-                 (double-float
-                  (case complexp
-                    (:real    (float-type double-float :real))
-                    (:complex (float-type double-float :complex))))))))
-          (integer
-           (macrolet ((int-type (low high)
-                        `(literal-ctype
-                             (interned-numeric-type nil
-                                                    :class 'integer :low ,low :high ,high)
-                             (integer ,(or low '*) ,(or high '*)))))
-             (cond ((neq complexp :real) nil)
-                   ((and (eql low 0) (eql high (1- array-dimension-limit)))
-                    (int-type 0 #.(1- array-dimension-limit))) ; INDEX type
-                   ((null high)
-                    (cond ((not low) (int-type nil nil))
-                          ((eql low 0) (int-type 0 nil))
-                          ((eql low (1+ most-positive-fixnum))
-                           ;; positive bignum
-                           (int-type #.(1+ most-positive-fixnum) nil))))
-                   ((or (eql high most-positive-word)
-                        ;; is (1+ high) a power-of-2 ?
-                        (and (typep high 'word) (zerop (logand (1+ high) high))))
-                    (cond ((eql low 0)
-                           (svref (literal-ctype-vector *interned-unsigned-byte-types*)
-                                  (integer-length (truly-the word high))))
-                          ((and (< high most-positive-word) (eql low (lognot high)))
-                           (svref (literal-ctype-vector *interned-signed-byte-types*)
-                                  (integer-length (truly-the word high))))))
-                   ((and (not low) (eql high (1- most-negative-fixnum)))
-                    ;; negative bignum
-                    (int-type nil #.(1- most-negative-fixnum))))))
-          (rational
-           (cond ((and (eq complexp :real) (bounds-unbounded-p low high))
-                  (literal-ctype (interned-numeric-type nil :class 'rational)
-                      rational))
-                 ((and (eq complexp :complex) (bounds-unbounded-p low high))
-                  (literal-ctype (interned-numeric-type nil :complexp :complex
-                                                            :class 'rational)
-                      (complex rational)))))
-          ((nil)
-           (and (not format)
-                (not complexp)
-                (bounds-unbounded-p low high)
-                (literal-ctype (interned-numeric-type nil :complexp nil) number))))
-        (let ((aspects (get-numtype-aspects complexp class format)))
-          (new-ctype numeric-type aspects low high)))))
+    (new-ctype numeric-type (get-numtype-aspects complexp class format) low high)))
 
 (defun modified-numeric-type (base
                               &key
@@ -3495,10 +3408,10 @@ used for a COMPLEX component.~:@>"
     (unless pairs
       (return-from make-character-set-type *empty-type*))
     (unless (cdr pairs)
-      (macrolet ((range (low high &optional saetp-index)
+      (macrolet ((range (low high)
                    `(return-from make-character-set-type
                       (literal-ctype (!alloc-character-set-type
-                                      (pack-interned-ctype-bits 'character-set nil ,saetp-index)
+                                      (pack-interned-ctype-bits 'character-set)
                                       '((,low . ,high)))
                                      (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
@@ -3506,86 +3419,15 @@ used for a COMPLEX component.~:@>"
                (high (cdr pair)))
           (cond ((eql high (1- char-code-limit))
                  (cond ((eql low 0)
-                        (range 0 #.(1- char-code-limit)
-                               (sb-vm::saetp-index-or-lose 'character)))
+                        (range 0 #.(1- char-code-limit)))
                        #+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
                                #.(1- char-code-limit)))))
                 #+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
-                 (range 0 #.(1- base-char-code-limit)
-                        (sb-vm::saetp-index-or-lose 'base-char)))))))
+                 (range 0 #.(1- base-char-code-limit)))))))
     (new-ctype character-set-type pairs)))
-
-;; For all ctypes which are the element types of specialized arrays,
-;; 3 ctype objects are stored for the rank-1 arrays of that specialization,
-;; one for each of simple, maybe-simple, and non-simple (in that order),
-;; and 2 ctype objects for unknown-rank arrays, one each for simple
-;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
-#+sb-xc-host
-(progn
-(defvar *interned-array-types*
-  (labels ((make-1 (type-index dims complexp type)
-             (aver (= (type-saetp-index type) type-index))
-             (!alloc-array-type (pack-interned-ctype-bits 'array)
-                                dims complexp type type))
-           (make-all (element-type type-index array)
-             (replace array
-                      (list (make-1 type-index '(*) nil    element-type)
-                            (make-1 type-index '(*) :maybe element-type)
-                            (make-1 type-index '(*) t      element-type)
-                            (make-1 type-index '*   nil    element-type)
-                            (make-1 type-index '*   :maybe element-type))
-                      :start1 (* type-index 5)))
-           (integer-range (low high)
-             (make-numeric-type :class 'integer :complexp :real
-                                :low low :high high)))
-    (let ((array (make-array (* 32 5)))
-          (index 0))
-      ;; Index 31 is available to store *WILD-TYPE*
-      ;; because there are fewer than 32 array widetags.
-      (make-all *wild-type* 31 array)
-      (dovector (saetp sb-vm:*specialized-array-element-type-properties*
-                       (progn (aver (< index 31)) array))
-        (make-all
-         (let ((x (sb-vm:saetp-specifier saetp)))
-           ;; Produce element-type representation without parsing a spec.
-           ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
-           ;; The MAKE- constructors return an interned object as appropriate.
-           (etypecase x
-             ((cons (eql unsigned-byte))
-              (integer-range 0 (1- (ash 1 (second x)))))
-             ((cons (eql signed-byte))
-              (let ((lim (ash 1 (1- (second x)))))
-                (integer-range (- lim) (1- lim))))
-             ((eql bit) (integer-range 0 1))
-             ;; FIXNUM is its own thing, why? See comment in vm-array
-             ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
-             ((eql fixnum) ; One good kludge deserves another.
-              (integer-range most-negative-fixnum
-                             most-positive-fixnum))
-             ((member single-float double-float)
-              (make-numeric-type :class 'float :format x :complexp :real))
-             ((cons (eql complex))
-              (make-numeric-type :class 'float :format (cadr x)
-                                 :complexp :complex))
-             ((eql character)
-              (make-character-set-type `((0 . ,(1- char-code-limit)))))
-             #+sb-unicode
-             ((eql base-char)
-              (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
-             ((eql t) *universal-type*)
-             ((eql nil) *empty-type*)))
-         index
-         array)
-        (incf index)))))
-(defvar *parsed-specialized-array-element-types*
-  (let ((a (make-array (length sb-vm:*specialized-array-element-type-properties*))))
-    (loop for i below (length a)
-          do (setf (aref a i) (array-type-specialized-element-type
-                               (aref *interned-array-types* (* i 5)))))
-    a)))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -3593,17 +3435,7 @@ used for a COMPLEX component.~:@>"
                            ctype) make-array-type))
 (defun make-array-type (dimensions &key (complexp :maybe) element-type
                                         (specialized-element-type *wild-type*))
-  (if (and (eq element-type specialized-element-type)
-           (or (and (eq dimensions '*) (neq complexp t))
-               (typep dimensions '(cons (eql *) null))))
-      (let ((res (svref (literal-ctype-vector *interned-array-types*)
-                        (+ (* (type-saetp-index element-type) 5)
-                           (if (listp dimensions) 0 3)
-                           (ecase complexp ((nil) 0) ((:maybe) 1) ((t) 2))))))
-        (aver (eq (array-type-element-type res) element-type))
-        res)
-      (%make-array-type dimensions
-                        complexp element-type specialized-element-type)))
+  (%make-array-type dimensions complexp element-type specialized-element-type))
 
 (define-type-method (array :simple-=) (type1 type2)
   (cond ((not (and (equal (array-type-dimensions type1)
