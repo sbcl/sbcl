@@ -15,6 +15,85 @@
 
 ;;;; CL:COMPILE
 
+(defun ir1-toplevel-for-compile (form name path)
+  (let* ((*current-path* path)
+         (component (make-empty-component))
+         (*current-component* component)
+         (debug-name-tail (or name (name-lambdalike form)))
+         (source-name (or name '.anonymous.)))
+    (setf (component-name component) (debug-name 'initial-component debug-name-tail)
+          (component-kind component) :initial)
+    (let* ((fun (let ((*allow-instrumenting* t))
+                  (ir1-convert-lambdalike form
+                                          :source-name source-name)))
+           ;; Convert the XEP using the policy of the real function. Otherwise
+           ;; the wrong policy will be used for deciding whether to type-check
+           ;; the parameters of the real function (via CONVERT-CALL /
+           ;; PROPAGATE-TO-ARGS). -- JES, 2007-02-27
+           (*lexenv* (make-lexenv :policy (lexenv-policy (functional-lexenv fun))))
+           (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
+                                    :source-name source-name
+                                    :debug-name (debug-name 'tl-xep debug-name-tail))))
+      (when name
+        (assert-global-function-definition-type name fun))
+      (setf (functional-kind xep) :external
+            (functional-entry-fun xep) fun
+            (functional-entry-fun fun) xep
+            (component-reanalyze component) t
+            (functional-has-external-references-p xep) t)
+      (reoptimize-component component :maybe)
+      (locall-analyze-xep-entry-point fun)
+      ;; Any leftover REFs to FUN outside local calls get replaced with the
+      ;; XEP.
+      (substitute-leaf-if (lambda (ref)
+                            (let* ((lvar (ref-lvar ref))
+                                   (dest (when lvar (lvar-dest lvar)))
+                                   (kind (when (basic-combination-p dest)
+                                           (basic-combination-kind dest))))
+                              (neq :local kind)))
+                          xep
+                          fun)
+      xep)))
+
+;;; Compile LAMBDA-EXPRESSION and return the compiled FUNCTION value.
+;;;
+;;; If NAME is provided, then we try to use it as the name of the
+;;; function for debugging/diagnostic information.
+(defun %compile (form ephemeral name tlf)
+  (when name
+    (legal-fun-name-or-type-error name))
+  (with-ir1-namespace
+    (let* ((*lexenv* (make-lexenv
+                      :policy *policy*
+                      :handled-conditions *handled-conditions*
+                      :disabled-package-locks *disabled-package-locks*))
+           (*compile-object* (make-core-object ephemeral))
+           (path `(original-source-start 0 ,tlf))
+           (lambda (ir1-toplevel-for-compile form name path)))
+
+      ;; FIXME: The compile-it code from here on is sort of a
+      ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
+      ;; better to find a way to share the code there; or
+      ;; alternatively, to use this code to replace the code there.
+      ;; (The second alternative might be pretty easy if we used
+      ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
+      ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
+
+      (locall-analyze-clambdas-until-done (list lambda))
+
+      (dolist (component (find-initial-dfo (list lambda)))
+        (compile-component component))
+
+      (let ((object *compile-object*))
+        (multiple-value-bind (res found-p)
+            (gethash (leaf-info lambda) (core-object-entry-table object))
+          (aver found-p)
+          (fix-core-source-info *source-info* object
+                                (and (policy (lambda-bind lambda)
+                                         (> store-source-form 0))
+                                     res))
+          res)))))
+
 ;;; Handle the following:
 ;;;  - CL:COMPILE when the argument is not already a compiled function.
 ;;;  - %SIMPLE-EVAL in "pretend we don't have an interpreter" mode
@@ -92,9 +171,7 @@
                          ;; the error came from, not how the compiler got there.
                          (go :error))))
                  (return
-                     (%compile form (make-core-object ephemeral)
-                               :name name
-                               :path `(original-source-start 0 ,tlf)))))
+                   (%compile form ephemeral name tlf))))
            :error
              ;; Either signal the error right away, or return a function that
              ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so
