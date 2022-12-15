@@ -1310,8 +1310,7 @@
 (defun maybe-let-convert (clambda &optional component)
   (declare (type clambda clambda)
            (type (or null component) component))
-  (unless (or (declarations-suppress-let-conversion-p clambda)
-              (functional-has-external-references-p clambda))
+  (unless (declarations-suppress-let-conversion-p clambda)
     ;; We only convert to a LET when the function is a normal local
     ;; function, has no XEP, and is referenced in exactly one local
     ;; call. Conversion is also inhibited if the only reference is in
@@ -1439,7 +1438,6 @@
   (declare (type clambda fun))
   (when (and (not (functional-kind fun))
              (not (functional-entry-fun fun))
-             (not (functional-has-external-references-p fun))
              ;; If a functional is explicitly inlined, we don't want
              ;; to assignment convert it, as more call-site
              ;; specialization can be done with inlining.
