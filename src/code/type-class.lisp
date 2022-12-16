@@ -1376,7 +1376,7 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (assert (= (length permtypes) (- 13 #-sb-unicode 1)))
+  (assert (= (length permtypes) (+ 13 #-sb-unicode -1)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
