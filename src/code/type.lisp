@@ -1853,16 +1853,32 @@ expansion happened."
          (t (values min :maybe))))
     ()))
 
+;;; Return T if TYPE is one defined in the language spec, and whose representation
+;;; in SBCL's type-class taxonomy entails that of an INTERSECTION-TYPE.
+;;; This function can be called no sooner than 'deftypes-for-targets' gets loaded,
+;;; so that we don't see undefined types.
+;;; In make-host-2 this is easy because everything is defined, and SPECIFIER-TYPE is
+;;; constant-folded. In make-host-1, a simple inline cache avoids parsing more than
+;;; one time per specifier. It doesn't work to just put this into 'deftypes-for-target'
+;;; and use the obvious LOAD-TIME-VALUE form, because that would have a dependency
+;;; on the order of evaluation of L-T-V versus other TLFs in the file.
+(macrolet ((specifier-type-once-only (spec)
+             #+sb-xc-host `(let ((cell (load-time-value (list nil))))
+                             (or (car cell)
+                                 (setf (car cell)
+                                       (the intersection-type (specifier-type ',spec)))))
+             #-sb-xc-host `(specifier-type ',spec)))
+(defun cl-std-intersection-type-p (type)
+  (cond ((eq type (specifier-type-once-only keyword)) 'keyword)
+        ((eq type (specifier-type-once-only compiled-function)) 'compiled-function)
+        ((eq type (specifier-type-once-only ratio)) 'ratio))))
+
 (define-type-method (named :complex-=) (type1 type2)
   (cond
     ((and (eq type2 *empty-type*)
           (or (and (intersection-type-p type1)
-                   ;; not allowed to be unsure on these... FIXME: keep
-                   ;; the list of CL types that are intersection types
-                   ;; once and only once.
-                   (not (or (type= type1 (specifier-type 'ratio))
-                            (type= type1 (specifier-type 'compiled-function))
-                            (type= type1 (specifier-type 'keyword)))))
+                   ;; not allowed to be unsure on these...
+                   (not (cl-std-intersection-type-p type1)))
               (and (cons-type-p type1)
                    (cons-type-might-be-empty-type type1))))
      ;; things like (AND (EQL 0) (SATISFIES ODDP)) or (AND FUNCTION
@@ -4063,16 +4079,8 @@ used for a COMPLEX component.~:@>"
 ;;; mechanically unparsed.
 (define-type-method (intersection :unparse) (type)
   (declare (type ctype type))
-  ;; If magic intersection types were interned, then
-  ;; we could compare by EQ here instead of calling TYPE=
-  (cond ((type= type (literal-ctype (specifier-type 'keyword) keyword))
-         'keyword)
-        ((type= type (literal-ctype (specifier-type 'ratio) ratio))
-         'ratio)
-        ((type= type (literal-ctype (specifier-type 'compiled-function) compiled-function))
-         'compiled-function)
-        (t
-         `(and ,@(mapcar #'type-specifier (intersection-type-types type))))))
+  (or (cl-std-intersection-type-p type)
+      `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
 
 (define-type-method (intersection :singleton-p) (type)
   (loop for constituent in (intersection-type-types type)
