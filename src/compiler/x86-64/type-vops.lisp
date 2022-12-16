@@ -930,7 +930,10 @@
   (:info target not-p type-codes)
   (:generator 1
     (move temp value :dword)
-    (%test-headers nil temp target not-p nil type-codes
+    (%test-headers nil temp target not-p nil
+      (if (every #'integerp type-codes)
+          (canonicalize-widetags type-codes)
+          type-codes)
       :load-widetag nil)))
 
 (macrolet ((read-depthoid ()

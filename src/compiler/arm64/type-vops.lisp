@@ -591,7 +591,10 @@
   (:args (value :scs (unsigned-reg)))
   (:info target not-p type-codes)
   (:generator 1
-    (%test-headers value nil target not-p nil type-codes)))
+    (%test-headers value nil target not-p nil
+      (if (every #'integerp type-codes)
+          (canonicalize-widetags type-codes)
+          type-codes))))
 
 (define-vop (load-instance-layout)
   (:args (object :scs (any-reg descriptor-reg)))
