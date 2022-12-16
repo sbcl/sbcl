@@ -727,22 +727,23 @@
              (defun ,(second public-ctor) ,public-ctor-args
                (new-ctype ,name ,@(cdr private-ctor-args))))))))
 
-;;; The "clipped hash" is just the host's SXHASH but ensuring that the result
-;;; is an unsigned fixnum for the target. This ensures that it is legal to use MIX
-;;; on the value. We don't really care what the hash is, so we don't need to use
-;;; SB-XC:SXHASH. It's needlyly tedious to fully emulate our SXHASH on BIGNUM
-;;; and RATIONAL (which can appear in numeric bounds)
+;;; The "clipped hash" is just some stable hash that may rely on the host's SXHASH
+;;; but always ensuring that the result is an unsigned fixnum for the target,
+;;; so that we can call our MIX on the value. It's needlessly tedious to fully
+;;; replicate our SXHASH on BIGNUM and RATIO which can appear in numeric bounds.
 #+sb-xc-host
 (defun clipped-sxhash (x)
   (typecase x
-    ((or bignum rational) ; numeric-type high,low bound
+    (rational ; numeric-type high,low bound; array dimensions, etc
+     ;; All integers can fall through to the host because it would be silly to restrict
+     ;; this case to exactly (OR (AND INTEGER (NOT SB-XC:FIXNUM)) RATIO).
      (logand (cl:sxhash x) sb-xc:most-positive-fixnum))
     (cons
      (if (eq (car x) 'satisfies)
          (sb-xc:sxhash (cadr x)) ; it's good enough
          (error "please no: ~S" x)))
     (t
-     (sb-xc:sxhash x)))) ; FLOAT representation as struct, or FIXNUM or SYMBOL
+     (sb-xc:sxhash x)))) ; FLOAT representation as struct, or SYMBOL
 #-sb-xc-host (defmacro clipped-sxhash (x) `(sxhash ,x))
 
 (defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
@@ -1088,7 +1089,7 @@
 (macrolet ((numbound-hash (b)
              ;; It doesn't matter what the hash of a number is, as long as it's stable.
              ;; Use the host's SXHASH for convenience.
-             ;; We aren't obliged to fully emulate own behavior on RATIONAL and BIGNUM,
+             ;; We aren't obliged to fully emulate own behavior on numbers,
              ;; but we can't trust the host to do the right thing on our proxy floats.
              `(let ((x ,b))
                 (block nil
