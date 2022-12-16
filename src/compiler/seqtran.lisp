@@ -1027,6 +1027,8 @@
       (give-up-ir1-transform)))
 
 (defun check-sequence-test (item test node)
+  (declare (ignore item test node))
+  #+nil
   (when (constant-lvar-p item)
     (let ((item (lvar-value item))
           (test (if test
