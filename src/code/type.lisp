@@ -3852,7 +3852,8 @@ used for a COMPLEX component.~:@>"
   (let ((presence 0)
         (unpaired nil)
         (float-types nil))
-    (when fp-zeroes ; avoid doing two passes of nothing
+    (cond
+     (fp-zeroes ; avoid doing two passes of nothing
       (dotimes (pass 2)
         (dolist (z fp-zeroes)
           (let ((sign (float-sign-bit z))
@@ -3871,6 +3872,17 @@ used for a COMPLEX component.~:@>"
                       ;; in your cache lookup so you can cache while you cache.)
                       (push (ctype-of z) float-types))
                     (push z unpaired)))))))
+     ((and (= (xset-count xset) 1)
+           (eq (car (xset-members xset)) nil))
+      ;; Bypass the cache for type NULL because it's so important
+      (return-from make-member-type
+        #-sb-xc-host (specifier-type 'null) ; dumped as literal
+        #+sb-xc-host
+        (load-time-value
+         (!alloc-member-type (pack-interned-ctype-bits 'member)
+                             (xset-from-list '(nil))
+                             '())
+         t))))
     (let ((member-type
            (case (+ (length unpaired) (xset-count xset))
              (0 nil) ; nil

@@ -258,9 +258,7 @@
   ;; bits  0..19: 20 bits for opaque hash
   ;; bit      20: 1 if interned: specifier -> object is guaranteed unique
   ;; bit      21: 1 if admits type= optimization: NEQ implies (NOT TYPE=)
-  ;; bits 22..26: 5 bits for specialized-array-element-type-properties index.
-  ;;   also usable as hash bits if this ctype is not a character-set
-  ;;   or numeric type or named-type T or NIL
+  ;; bits 22..26: more bits of hash
   ;; bits 27..31: 5 bits for type-class index
   ;; We'll never return the upper 5 bits from a hash mixer, so it's fine
   ;; that this uses all 32 bits for a 32-bit word.
@@ -1345,6 +1343,7 @@
       (cond ((not hashset-symbol)
              ;; There are very few which aren't in a hashset:
              ;; - (6) NAMED-TYPEs
+             ;; - (1) MEMBER-TYPE NULL
              ;; - (3) BASE-CHAR, EXTENDED-CHAR, CHARACTER
              ;; - (1) CONS
              ;; - (1) NUMBER
@@ -1395,7 +1394,7 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (aver (= (length permtypes) (+ 13 #-sb-unicode -2)))
+  (aver (= (length permtypes) (+ 14 #-sb-unicode -2)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
