@@ -54,7 +54,9 @@
   "Return T if X is NIL, otherwise return NIL."
   (not object))
 
-;;; All the primitive type predicate wrappers share a parallel form..
+;;; All the primitive type predicate wrappers share a parallel form.
+;;; These aren't so much "wrappers" as they are the actual installed DEFUNs.
+;;; I supposed they "wrap" a vop or source-transform.
 (macrolet ((def-type-predicate-wrapper (pred)
              (let* ((name (symbol-name pred))
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))

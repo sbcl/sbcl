@@ -1861,6 +1861,7 @@ expansion happened."
                    ;; the list of CL types that are intersection types
                    ;; once and only once.
                    (not (or (type= type1 (specifier-type 'ratio))
+                            (type= type1 (specifier-type 'compiled-function))
                             (type= type1 (specifier-type 'keyword)))))
               (and (cons-type-p type1)
                    (cons-type-might-be-empty-type type1))))
@@ -2177,7 +2178,9 @@ expansion happened."
                 (atom atom)
                 (bit-vector-p bit-vector)
                 (characterp character)
-                (compiled-function-p compiled-function)
+                ;; can't turn (SATISFIES COMPILED-FUNCTION-P) into COMPILED-FUNCTION
+                ;; because COMPILED-FUNCTION is defined in terms of SATISFIES.
+                ;; (compiled-function-p compiled-function)
                 (complexp complex)
                 (consp cons)
                 (floatp float)

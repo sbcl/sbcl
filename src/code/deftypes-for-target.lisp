@@ -118,23 +118,36 @@
 (sb-xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
 
-;;; We'd like tye COMPILED-FUNCTION type to be available as soon it can be,
-;;; because the :UNPARSE type-method on INTERSECTION wants to decide whether its arg
-;;; is TYPE= to one of the standardized types implemented as an intersection of
-;;; types, namely: RATIO, KEYWORD, COMPILED-FUNCTION, so that it can unparse
-;;; to an atom rather than an expression involving the AND and NOT combinators.
-;;; i.e. because unparsing any random thing might need those three, it's best
-;;; that they be defined, lest we work around the parse-unknown condition
-;;; which in general signifies suboptimal compination, if not an outright bug.
-;;; And it's unfortunate if the location of the definition of COMPILED-FUNCTION
-;;; depends on which (if either) of the evaluators is built in.
-;;; This definition just kicks the can down the road a little,
-;;; because we lack a definition of INTERPRETED-FUNCTION until later.
+;;; CLHS says of COMPILED-FUNCTION:
+;;; "(1) All macro calls appearing lexically within the function have already been
+;;;  expanded and will not be expanded again when the function is called"
+;;;  LOAD-TIME-VALUE forms ... will not be evaluated again when the function is called."
+;;;  (2) Implementations are free to classify all functions as COMPILED-FUNCTIONs,
+;;;  provided that all functions satisfy the criteria listed in item (1).
+;;;  It is also permissible for functions that are not COMPILED-FUNCTIONs to satisfy
+;;;  the above criteria."
+;;;
+;;; There is no freedom given to say that things are COMPILED-FUNCTION which
+;;; _do_ contain macro invocations and LOAD-TIME-VALUE. Criterion (1) is not
+;;; met by DEFMETHODs evaluated with *EVALUATOR-MODE* = :INTERPRET.
+;;; We expand macros at least twice - once inside DEFMETHOD itself because the expander
+;;; performs a code walk to detect CALL-NEXT-METHOD and SLOT-VALUE on specialized
+;;; args; and then macros are expanded again when executing, possibly repeatedly
+;;; expanded in sb-eval (but not sb-fasteval).
+;;;
+;;; Therefore returning T from COMPILED-FUNCTION-P too often is the greater error
+;;; than returning NIL when a generic function in fact wholly composed of compiled
+;;; methods. So we should not generally consider GFs to be compiled functions.
+;;; (COMPILED-FUNCTION-P would have to be changed to detect what is inside a GF
+;;; if we really want to give a perfect answer)
+;;; Moreover, sophisticated users who define subtypes of GF might have pieces of the
+;;; function's execution be evaluated by domain-specific-language interpreters
+;;; that quite literally call MACROEXPAND, including but not limited to EVAL per se.
 (sb-xc:deftype compiled-function ()
-  '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
+  '(and function (satisfies compiled-function-p)))
 
 #-(or sb-eval sb-fasteval)
-(sb-xc:deftype interpreted-function ()
+(sb-xc:deftype interpreted-function () ; do we still need this now?
   nil)
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))

@@ -110,7 +110,11 @@
 ;;; bug 12: type system didn't grok nontrivial intersections
 (with-test (:name (subtypep and :bug-12))
   (assert-tri-eq t   t (subtypep '(and symbol (satisfies keywordp)) 'symbol))
+  ;; I'm not sure this next test was saying what it thinks it's saying.
   (assert-tri-eq nil t (subtypep '(and symbol (satisfies keywordp)) 'null))
+  (assert-tri-eq nil t (subtypep '(and symbol (satisfies keywordp)) 'nil))
+  ;; would be nice if this one could say T
+  (assert-tri-eq nil nil (subtypep '(satisfies keywordp) 'nil))
   (assert-tri-eq t   t (subtypep 'keyword 'symbol))
   (assert-tri-eq nil t (subtypep 'symbol 'keyword))
   (assert-tri-eq t   t (subtypep 'ratio 'real))
@@ -591,7 +595,11 @@
                            '(or fixnum vector end-of-file parse-error fixnum simple-string))))
 
 (with-test (:name (subtypep function compiled-function :interpreted-function))
-  (assert-tri-eq t t (subtypep '(and function (not compiled-function)
+  (assert-tri-eq nil t (subtypep 'compiled-function nil)) ; lp#1537003
+  ;; It is no longer the case that COMPILED-FUNCTION and INTERPRETED-FUNCTION
+  ;; form an exhaustive partition of FUNCTION.
+  ;; CLHS: "Implementations are free to define other subtypes of FUNCTION"
+  (assert-tri-eq nil nil (subtypep '(and function (not compiled-function)
                                  (not sb-kernel:interpreted-function))
                                nil)))
 

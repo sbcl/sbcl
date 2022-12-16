@@ -192,6 +192,22 @@
                               :message message
                               :source source)))))))))))
 
+;;; NOTE: COMPILE may be slightly nonconforming regarding generic functions,
+;;; but no more nonconforming than it was prior to the redefinition of
+;;; COMPILED-FUNCTION to exclude GENERIC-FUNCTION.
+;;; The concern stems from http://www.lispworks.com/documentation/HyperSpec/Issues/iss064_w.htm
+;;; which says "(4) Clarify that COMPILE must produce an object of type COMPILED-FUNCTION."
+;;;
+;;; In the case where DEFINITION is given, we're fine: the compiler can only return
+;;; a compiled function. But if only NAME is given, and it is fboundp to a generic-function,
+;;; we don't do anything at all - we don't touch the GF's dispatch function (which is a closure
+;;; over compiled code) and we don't touch the methods. But COMPILE doesn't return a function
+;;; in that case, so it's not wrong that COMPILED-FUNCTION-P is false of the result,
+;;; because the result is a symbol, not a function.
+
+;;; Also note that we lack good regression tests setting expectations around what's supposed
+;;; to happen when DEFINITION is supplied as a generic function. (Does it even make sense?)
+
 (defun compile (name &optional (definition (or (and (symbolp name)
                                                     (macro-function name))
                                                (fdefinition name))))
@@ -216,24 +232,30 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
   (binding*
      ((clock-start (get-thread-virtual-time))
       ((compiled-definition warnings-p failure-p)
-      ;; TODO: generic functions with any interpreted methods
-      ;; should compile the methods and reinstall them.
-      (if (compiled-function-p definition)
-          (values definition nil nil)
+      (if (or (compiled-function-p definition)
+              (sb-pcl::generic-function-p definition))
+          ;; We're not invoking COMPILE. This is a minor bug if this is
+          ;; a GENERIC-FUNCTION whose methods are interpreted.
+          (values (make-unbound-marker) nil nil)
           (multiple-value-bind (sexpr lexenv)
               (if (not (typep definition 'interpreted-function))
                   (values (the cons definition) (make-null-lexenv))
                   #+(or sb-eval sb-fasteval)
                   (prepare-for-compile definition))
-            (sb-vm:without-arena "compile" (compile-in-lexenv sexpr lexenv name nil nil nil nil))))))
+            (sb-vm:without-arena "compile"
+              (compile-in-lexenv sexpr lexenv name nil nil nil nil))))))
     (accumulate-compiler-time '*compile-elapsed-time* clock-start)
     (values (cond (name
-                   (if (and (symbolp name) (macro-function name))
-                       (setf (macro-function name) compiled-definition)
-                       (setf (fdefinition name) compiled-definition))
+                   ;; Do NOT assign anything into the symbol if we did not
+                   ;; actually invoke the compiler
+                   (unless (unbound-marker-p compiled-definition)
+                     (if (and (symbolp name) (macro-function name))
+                         (setf (macro-function name) compiled-definition)
+                         (setf (fdefinition name) compiled-definition)))
                    name)
-                  (t
-                   compiled-definition))
+                  ;; Didn't run the compiler
+                  ((unbound-marker-p compiled-definition) definition)
+                  (t compiled-definition))
             warnings-p
             failure-p)))
 
