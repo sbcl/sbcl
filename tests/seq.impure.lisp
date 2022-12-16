@@ -95,7 +95,7 @@
              (when (not seq)
                (return))
             ;(format t "~&~S~%" lambda-expr)
-            (let ((fun (checked-compile lambda-expr)))
+            (let ((fun (checked-compile lambda-expr :allow-style-warnings t)))
               ;(format t "~&~S ~S~%~S~%~S ~S~%"
               ;        base-seq snippet seq-type declaredness optimization)
               ;(format t "~&(TYPEP SEQ 'SIMPLE-ARRAY)=~S~%"
