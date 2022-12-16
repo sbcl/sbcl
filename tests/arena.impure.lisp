@@ -62,10 +62,13 @@
             (assert arena-ref-p)
             (assert (not arena-ref-p)))))))
 
+(defvar *foo-storage*)
 (test-util:with-test (:name :ctype-cache-force-to-heap)
   (drop-all-hash-caches)
   (test-util:opaque-identity
    (with-arena (*arena*)
+     ;; finder-result will assert that this goes to the heap
+     (setq *foo-storage* (sb-impl::allocate-hashset-storage 128 t))
      ;; for each test, the type specifier itself can not be cached because
      ;; it is a list in the arena. And the internal representation has to
      ;; take care to copy arena-allocated numbers back to dynamic space.

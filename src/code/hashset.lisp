@@ -28,7 +28,7 @@
 ;;; Then we can implement XSET in terms of this hashset.
 
 (defstruct (robinhood-hashset-storage
-            (:constructor make-hashset-storage (cells psl-vector hash-vector hv-inexact))
+            (:constructor !make-hs-storage (cells psl-vector hash-vector hv-inexact))
             (:conc-name hss-)
             (:copier nil)
             (:predicate nil))
@@ -81,8 +81,9 @@
 (defmacro hs-chain-terminator-p (val) `(eq ,val 0))
 
 (defun allocate-hashset-storage (capacity weakp)
+  (declare (type (unsigned-byte 28) capacity)) ; 256M cells maximum
   (declare (ignorable weakp))
-  (declare (sb-c::tlab :system))
+  (declare (sb-c::tlab :system) (inline !make-hs-storage))
   (let* ((len (+ capacity hs-storage-trailer-cells))
          (cells
           #+sb-xc-host (make-array len :initial-element 0)
@@ -104,7 +105,7 @@
     ;; I might instead want the hash-vector's type to
     ;;   (OR (SIMPLE-ARRAY (UNSIGNED-BYTE 16) (*)) (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)))
     ;; but I'm not going there yet.
-    (make-hashset-storage cells psl-vector hash-vector (> capacity 65536))))
+    (!make-hs-storage cells psl-vector hash-vector (> capacity 65536))))
 
 (defun hashset-weakp (hashset)
   #+sb-xc-host (declare (ignore hashset))
