@@ -68,6 +68,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                  result
                  '(sb-c::conset sb-kernel:args-type
                    sb-kernel:array-type
+                   sb-kernel:character-set-type
                    sb-kernel:numeric-type
                    sb-kernel:member-type)))))
 

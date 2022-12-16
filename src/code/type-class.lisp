@@ -732,9 +732,18 @@
 ;;; on the value. We don't really care what the hash is, so we don't need to use
 ;;; SB-XC:SXHASH. It's needlyly tedious to fully emulate our SXHASH on BIGNUM
 ;;; and RATIONAL (which can appear in numeric bounds)
-(defmacro clipped-sxhash (x)
-  #+sb-xc-host `(logand (cl:sxhash ,x) ,sb-xc:most-positive-fixnum)
-  #-sb-xc-host `(sxhash ,x))
+#+sb-xc-host
+(defun clipped-sxhash (x)
+  (typecase x
+    ((or bignum rational) ; numeric-type high,low bound
+     (logand (cl:sxhash x) sb-xc:most-positive-fixnum))
+    (cons
+     (if (eq (car x) 'satisfies)
+         (sb-xc:sxhash (cadr x)) ; it's good enough
+         (error "please no: ~S" x)))
+    (t
+     (sb-xc:sxhash x)))) ; FLOAT representation as struct, or FIXNUM or SYMBOL
+#-sb-xc-host (defmacro clipped-sxhash (x) `(sxhash ,x))
 
 (defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
 ;;; The final mix ensures that all bits affect the masked hash.
@@ -937,9 +946,14 @@
   ;; asked the question "how would an array of <x> be specialized?"
   (specialized-element-type nil :type ctype)))
 
+(macrolet ((hash-ranges (list)
+             `(let ((h 0))
+                (dolist (pair ,list h)
+                  (setq h (mix (sb-xc:sxhash (cdr pair))
+                               (mix h (sb-xc:sxhash (car pair)))))))))
 (def-type-model (character-set-type (:constructor* nil (pairs)))
   ;; these get canonically ordered by the parser
-  (pairs (missing-arg) :type list :test equal))
+  (pairs (missing-arg) :type list :test equal :hasher hash-ranges)))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
@@ -1072,14 +1086,18 @@
         (aref *numeric-aspects-v* (!compute-numtype-aspect-id ,@rest))))
 
 (macrolet ((numbound-hash (b)
-             #+sb-xc-host `(clipped-sxhash ,b)
-             #-sb-xc-host `(let ((x ,b))
-                             (block nil
-                               (multiple-value-bind (h v)
-                                   (if (listp x)
-                                       (if x (values #x55AA55 (car x)) (return 0))
-                                       (values 0 x))
-                                 (logxor h (sb-impl::number-sxhash v))))))
+             ;; It doesn't matter what the hash of a number is, as long as it's stable.
+             ;; Use the host's SXHASH for convenience.
+             ;; We aren't obliged to fully emulate own behavior on RATIONAL and BIGNUM,
+             ;; but we can't trust the host to do the right thing on our proxy floats.
+             `(let ((x ,b))
+                (block nil
+                  (multiple-value-bind (h v)
+                      (if (listp x)
+                          (if x (values #x55AA55 (car x)) (return 0))
+                          (values 0 x))
+                    (logxor h (#+sb-xc-host clipped-sxhash
+                               #-sb-xc-host sb-impl::number-sxhash v))))))
            (numbound-eql (a b)
              ;; Determine whether the 'low' and 'high' slots of two NUMERIC-TYPE instances
              ;; are "the same". It is a stricter test than in the SIMPLE-= method, because
@@ -1376,7 +1394,7 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (assert (= (length permtypes) (+ 13 #-sb-unicode -1)))
+  (aver (= (length permtypes) (+ 13 #-sb-unicode -1)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
