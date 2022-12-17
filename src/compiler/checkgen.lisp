@@ -474,9 +474,7 @@
             (lambda (temp %type)
               (destructuring-bind (not type-to-check
                                    type-to-report) %type
-                (let* ((spec
-                         (let ((*unparse-fun-type-simplify* t))
-                           (type-specifier type-to-check)))
+                (let* ((spec (type-specifier type-to-check t))
                        (test (if not `(not ,spec) spec)))
                   `(progn
                      (unless

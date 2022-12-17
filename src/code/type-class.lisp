@@ -266,10 +266,6 @@
   ;; But it's consistent for genesis to treat it always as a raw slot.
   (%bits (missing-arg) :type sb-vm:word :read-only t))
 
-(defmethod print-object ((ctype ctype) stream)
-  (print-unreadable-object (ctype stream :type t)
-    (prin1 (type-specifier ctype) stream)))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant ctype-hash-nbits 27))
 ;;; take 27 low bits but exclude bits 20 and 21
@@ -404,8 +400,10 @@
          (rebind
           (unless more-methods
             (case method
-              ((:complex-subtypep-arg1 :unparse :negate :singleton-p)
+              ((:complex-subtypep-arg1 :negate :singleton-p)
                `((,first (,operator ,arg-type ,first))))
+              ((:unparse)
+               `((,second (,operator ,arg-type ,second))))
               ((:complex-subtypep-arg2)
                `((,first ,first) ; because there might be a DECLARE IGNORE on it
                  (,second (,operator ,arg-type ,second))))
@@ -419,7 +417,9 @@
          ;; both an ancestor and its descendants on some method.
          ;; Too bad for you- this throws the baby out with the bathwater.
          (error "Can't define-type-method for class ~s: already inherited" ',class))
-       (defun ,name ,lambda-list ,@(if rebind `((let ,rebind ,@body)) body))
+       (defun ,name ,lambda-list
+         ,@(if (eq method :unparse) `((declare (ignorable ,(first lambda-list)))))
+         ,@(if rebind `((let ,rebind ,@body)) body))
        (!cold-init-forms
         ,@(mapcar (lambda (method)
                     `(setf (,(type-class-fun-slot method)
@@ -1630,3 +1630,22 @@
   (dolist (sym (list* '*key-info-hashset* '*key-info-list-hashset*
                       *ctype-hashsets*))
     (sb-impl::hashset-rehash (symbol-value sym) nil)))
+
+;;; a flag that causes TYPE-SPECIFIER to represent UNKNOWN-TYPE
+;;; as itself rather than the symbol naming the type so that the printed
+;;; representation is not confusable for a good type of the same name.
+(defconstant +ctype-unparse-disambiguate+ 1)
+;;; a flag that causes all function types to unparse as FUNCTION.
+;;; This is useful when we want a specifier that we can pass to TYPEP.
+(defconstant +unparse-fun-type-simplify+  2)
+
+(defmethod print-object ((ctype ctype) stream)
+  (cond ((unknown-type-p ctype)
+         (print-unreadable-object (ctype stream :type t)
+           (prin1 (unknown-type-specifier ctype) stream)))
+        (t
+         (let ((expr (funcall (type-class-unparse (type-class ctype))
+                              +ctype-unparse-disambiguate+
+                              ctype)))
+           (print-unreadable-object (ctype stream :type t)
+             (prin1 expr stream))))))

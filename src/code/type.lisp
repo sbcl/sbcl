@@ -302,9 +302,40 @@
 (define-type-method (values :negate) (type)
   (error "NOT VALUES too confusing on ~S" (type-specifier type)))
 
-(define-type-method (values :unparse) (type)
+(defun type-unparse (flags thing)
+  (if (listp thing)
+      (mapcar (lambda (x) (funcall (type-class-unparse (type-class x)) flags x))
+              thing)
+      (funcall (type-class-unparse (type-class thing)) flags thing)))
+
+;;; Return the lambda-list-like type specification corresponding
+;;; to an ARGS-TYPE.
+(defun unparse-args-types (flags type)
+  (collect ((result))
+    (when (args-type-optional type)
+      (result '&optional)
+      (dolist (arg (args-type-optional type))
+        (result (type-unparse flags arg))))
+
+    (when (args-type-rest type)
+      (result '&rest)
+      (result (type-unparse flags (args-type-rest type))))
+
+    (when (args-type-keyp type)
+      (result '&key)
+      (dolist (key (args-type-keywords type))
+        (result (list (key-info-name key)
+                      (type-unparse flags (key-info-type key))))))
+
+    (when (args-type-allowp type)
+      (result '&allow-other-keys))
+
+    (nconc (type-unparse flags (args-type-required type))
+           (result))))
+
+(define-type-method (values :unparse) (flags type)
   (cons 'values
-        (let ((unparsed (unparse-args-types type)))
+        (let ((unparsed (unparse-args-types flags type)))
           (if (or (values-type-optional type)
                   (values-type-rest type))
               unparsed
@@ -331,28 +362,22 @@
 (define-type-method (values :simple-=) (type1 type2)
   (type=-args type1 type2))
 
-;;; a flag that we can bind to cause complex function types to be
-;;; unparsed as FUNCTION. This is useful when we want a type that we
-;;; can pass to TYPEP.
-(defvar *unparse-fun-type-simplify* nil)
-
 (define-type-class function :enumerable nil :might-contain-other-types nil)
 
 (define-type-method (function :negate) (type) (make-negation-type type))
 
-(define-type-method (function :unparse) (type)
+(define-type-method (function :unparse) (flags type)
   (let ((name (if (fun-designator-type-p type)
                   'function-designator
                   'function)))
-    (cond (*unparse-fun-type-simplify*
+    (cond ((logtest flags +unparse-fun-type-simplify+)
            name)
           (t
            (list name
                  (if (fun-type-wild-args type)
                      '*
-                     (unparse-args-types type))
-                 (type-specifier
-                  (fun-type-returns type)))))))
+                     (unparse-args-types flags type))
+                 (type-unparse flags (fun-type-returns type)))))))
 
 ;;; The meaning of this is a little confused. On the one hand, all
 ;;; function objects are represented the same way regardless of the
@@ -524,8 +549,8 @@
 (define-type-method (constant :negate) (type)
   (error "NOT CONSTANT too confusing on ~S" (type-specifier type)))
 
-(define-type-method (constant :unparse) (type)
-  `(constant-arg ,(type-specifier (constant-type-type type))))
+(define-type-method (constant :unparse) (flags type)
+  `(constant-arg ,(type-unparse flags (constant-type-type type))))
 
 (define-type-method (constant :simple-=) (type1 type2)
   (type= (constant-type-type type1) (constant-type-type type2)))
@@ -606,35 +631,6 @@
           (canonicalize-args-type-args required optional rest
                                        (ll-kwds-keyp llks))
         (values llks required optional rest keywords))))))
-
-;;; Return the lambda-list-like type specification corresponding
-;;; to an ARGS-TYPE.
-(declaim (ftype (function (args-type) list) unparse-args-types))
-(defun unparse-args-types (type)
-  (collect ((result))
-
-    (dolist (arg (args-type-required type))
-      (result (type-specifier arg)))
-
-    (when (args-type-optional type)
-      (result '&optional)
-      (dolist (arg (args-type-optional type))
-        (result (type-specifier arg))))
-
-    (when (args-type-rest type)
-      (result '&rest)
-      (result (type-specifier (args-type-rest type))))
-
-    (when (args-type-keyp type)
-      (result '&key)
-      (dolist (key (args-type-keywords type))
-        (result (list (key-info-name key)
-                      (type-specifier (key-info-type key))))))
-
-    (when (args-type-allowp type)
-      (result '&allow-other-keys))
-
-    (result)))
 
 (defun translate-fun-type (context args result
                            &key designator)
@@ -1306,10 +1302,11 @@
 
 ;;; Return a Common Lisp type specifier corresponding to the TYPE
 ;;; object.
-(defun type-specifier (type)
+(defun type-specifier (type &optional simplify-fun-types)
   (declare (type ctype type))
-  (funcall (type-class-unparse (type-class type)) type))
-
+  (funcall (type-class-unparse (type-class type))
+           (if simplify-fun-types +unparse-fun-type-simplify+ 0)
+           type))
 
 ;;; Return the type structure corresponding to a type specifier.
 ;;;
@@ -2079,7 +2076,7 @@ expansion happened."
      (make-negation-type x))
     (t (bug "NAMED type unexpected: ~S" x))))
 
-(define-type-method (named :unparse) (x)
+(define-type-method (named :unparse) (flags x)
   (named-type-name x))
 
 ;;;; hairy and unknown types
@@ -2103,8 +2100,10 @@ expansion happened."
 
 (define-type-method (hairy :negate) (x) (make-negation-type x))
 
-(define-type-method (hairy :unparse) (x)
-  (hairy-type-specifier x))
+(define-type-method (hairy :unparse) (flags x)
+  (if (and (logtest flags +ctype-unparse-disambiguate+) (unknown-type-p x))
+      x
+      (hairy-type-specifier x)))
 
 (define-type-method (hairy :simple-subtypep) (type1 type2)
   (let ((hairy-spec1 (hairy-type-specifier type1))
@@ -2252,10 +2251,10 @@ expansion happened."
 (define-type-method (negation :negate) (x)
   (negation-type-type x))
 
-(define-type-method (negation :unparse) (x)
+(define-type-method (negation :unparse) (flags x)
   (if (type= (negation-type-type x) (specifier-type 'cons))
       'atom
-      `(not ,(type-specifier (negation-type-type x)))))
+      `(not ,(type-unparse flags (negation-type-type x)))))
 
 (define-type-method (negation :simple-subtypep) (type1 type2)
   (csubtypep (negation-type-type type2) (negation-type-type type1)))
@@ -2517,7 +2516,7 @@ expansion happened."
                 :low (if (consp high) (car high) (list high))
                 :high nil))))))))
 
-(define-type-method (number :unparse) (type)
+(define-type-method (number :unparse) (flags type)
   (let* ((complexp (numeric-type-complexp type))
          (low (numeric-type-low type))
          (high (numeric-type-high type))
@@ -3493,7 +3492,7 @@ used for a COMPLEX component.~:@>"
                          (make-array-type '* :element-type *wild-type*)))
       (make-negation-type type)))
 
-(define-type-method (array :unparse) (type)
+(define-type-method (array :unparse) (flags type)
   (let* ((dims (array-type-dimensions type))
          ;; Compare the specialised element type and the
          ;; derived element type.  If the derived type
@@ -3508,7 +3507,8 @@ used for a COMPLEX component.~:@>"
          (stype (array-type-specialized-element-type type))
          (dtype (array-type-element-type type))
          (utype (%upgraded-array-element-type dtype))
-         (eltype (type-specifier (if (type= stype utype)
+         (eltype (type-unparse flags
+                                (if (type= stype utype)
                                      dtype
                                      stype)))
          (complexp (array-type-complexp type)))
@@ -3956,7 +3956,7 @@ used for a COMPLEX component.~:@>"
         ;; Easy case
         (make-negation-type type))))
 
-(define-type-method (member :unparse) (type)
+(define-type-method (member :unparse) (flags type)
   (cond ((eq type (specifier-type 'null)) 'null) ; NULL type is EQ-comparable
         ((eq type (specifier-type 'boolean)) 'boolean) ; so is BOOLEAN
         (t `(member ,@(member-type-members type)))))
@@ -4089,10 +4089,9 @@ used for a COMPLEX component.~:@>"
 
 ;;; A few intersection types have special names. The others just get
 ;;; mechanically unparsed.
-(define-type-method (intersection :unparse) (type)
-  (declare (type ctype type))
+(define-type-method (intersection :unparse) (flags type)
   (or (cl-std-intersection-type-p type)
-      `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
+      `(and ,@(type-unparse flags (intersection-type-types type)))))
 
 (define-type-method (intersection :singleton-p) (type)
   (loop for constituent in (intersection-type-types type)
@@ -4333,7 +4332,7 @@ used for a COMPLEX component.~:@>"
     ;; before considering LIST and extracting 2, etc.
     '(sequence list real float complex bignum)))
 
-(define-type-method (union :unparse) (type)
+(define-type-method (union :unparse) (flags type)
   ;; This logic diverges between +/- sb-xc-host because the machinery
   ;; to parse types is obviously not usable here during make-host-1,
   ;; so the macro has to generate code that is lazier about parsing.
@@ -4414,7 +4413,7 @@ used for a COMPLEX component.~:@>"
                    (rplaca tail nil) ; We'll delete these list elements later
                    (rplaca peer nil))))
       (let ((list (nconc (recognized)
-                         (mapcar #'type-specifier (delete nil remainder)))))
+                         (type-unparse flags (delete nil remainder)))))
         (if (cdr list) `(or ,@list) (car list))))))
 
 ;;; Two union types are equal if they are each subtypes of each
@@ -4575,7 +4574,7 @@ used for a COMPLEX component.~:@>"
 
 (define-type-method (alien :negate) (type) (make-negation-type type))
 
-(define-type-method (alien :unparse) (type)
+(define-type-method (alien :unparse) (flags type)
   `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))
 
 (define-type-method (alien :simple-subtypep) (type1 type2)
@@ -4671,11 +4670,11 @@ used for a COMPLEX component.~:@>"
            (type-negation (cons-type-cdr-type type))))
          (t (bug "Weird CONS type ~S" type))))))
 
-(define-type-method (cons :unparse) (type)
+(define-type-method (cons :unparse) (flags type)
   (if (eq type (specifier-type 'cons))
       'cons
-      `(cons ,(type-specifier (cons-type-car-type type))
-             ,(type-specifier (cons-type-cdr-type type)))))
+      `(cons ,(type-unparse flags (cons-type-car-type type))
+             ,(type-unparse flags (cons-type-cdr-type type)))))
 
 (define-type-method (cons :simple-=) (type1 type2)
   (declare (type cons-type type1 type2))
@@ -4850,7 +4849,7 @@ used for a COMPLEX component.~:@>"
                            (nreverse not-pairs))
                        (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
 
-(define-type-method (character-set :unparse) (type)
+(define-type-method (character-set :unparse) (flags type)
   (cond
     ((eq type (specifier-type 'character)) 'character)
     ((eq type (specifier-type 'base-char)) 'base-char)
@@ -5044,7 +5043,7 @@ used for a COMPLEX component.~:@>"
           not-pack
           (type-union not-pack (%make-simd-pack-type mask)))))
 
-  (define-type-method (simd-pack :unparse) (type)
+  (define-type-method (simd-pack :unparse) (flags type)
     (simd-type-unparser-helper 'simd-pack (simd-pack-type-tag-mask type)))
 
   (define-type-method (simd-pack :simple-=) (type1 type2)
@@ -5087,7 +5086,7 @@ used for a COMPLEX component.~:@>"
           not-pack
           (type-union not-pack (%make-simd-pack-256-type mask)))))
 
-  (define-type-method (simd-pack-256 :unparse) (type)
+  (define-type-method (simd-pack-256 :unparse) (flags type)
     (simd-type-unparser-helper 'simd-pack-256 (simd-pack-256-type-tag-mask type)))
 
   (define-type-method (simd-pack-256 :simple-=) (type1 type2)

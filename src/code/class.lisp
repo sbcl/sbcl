@@ -976,7 +976,7 @@ between the ~A definition and the ~A definition"
 
 (define-type-method (classoid :negate) (type) (make-negation-type type))
 
-(define-type-method (classoid :unparse) (type)
+(define-type-method (classoid :unparse) (flags type)
   (classoid-proper-name type))
 
 ;;;; built-in classes

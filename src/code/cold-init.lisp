@@ -144,7 +144,6 @@
           *trace-output* stream))
   (show-and-call !signal-function-cold-init)
   (show-and-call !printer-control-init) ; needed before first instance of FORMAT or WRITE-STRING
-  (setq *unparse-fun-type-simplify* nil) ; needed by TLFs in target-error.lisp
   (setq sb-unix::*unblock-deferrables-on-enabling-interrupts-p* nil) ; needed by LOAD-LAYOUT called by CLASSES-INIT
   (setq *print-length* 6
         *print-level* 3)
