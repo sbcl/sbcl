@@ -23,8 +23,12 @@
       (eq (lambda-kind clambda) :toplevel)
       (let ((home-component (lambda-component clambda)))
         (some (lambda (ref)
-                (not (eq (node-component ref)
-                         home-component)))
+                ;; The REF could have been deleted, in which case we
+                ;; don't count that as an external reference from
+                ;; another component.
+                (and (not (node-to-be-deleted-p ref))
+                     (not (eq (node-component ref)
+                              home-component))))
               (lambda-refs clambda)))))
 
 (defun dce-analyze-ref (ref)
@@ -110,24 +114,3 @@
     (unless (block-flag block)
       (delete-block-lazily block)))
   (find-dfo component))
-
-;;; Run before find-initial-dfo
-(defun initial-eliminate-dead-code (lambdas)
-  (loop for lambda in lambdas
-        for component = (lambda-component lambda)
-        do
-        (dolist (fun (component-lambdas component))
-          (when (lambda-externally-referenced-p fun)
-            (dce-analyze-one-fun fun))))
-
-  (loop for lambda in lambdas
-        for component = (lambda-component lambda)
-        do
-        (do-blocks (block component)
-          (unless (block-flag block)
-            (delete-block-lazily block))))
-
-  (loop for lambda in lambdas
-        for component = (lambda-component lambda)
-        do
-        (clear-flags component)))
