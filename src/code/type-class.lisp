@@ -877,7 +877,7 @@
   ;; the Common Lisp type-specifier of the type we represent.
   ;; In UNKNOWN types this can only be a symbol.
   ;; For other than an unknown type, this must be a (SATISFIES f) expression.
-  ;; The rason we can't constrain this to
+  ;; The reason we can't constrain this to
   ;;    (OR SYMBOL (CONS (EQL SATISFIES) (CONS SYMBOL NULL)))
   ;; is that apparently we'll store _illegal_ type specifiers in a hairy-type.
   ;; There's an example in the regression test named
@@ -1346,7 +1346,6 @@
              ;; - (1) MEMBER-TYPE NULL
              ;; - (3) BASE-CHAR, EXTENDED-CHAR, CHARACTER
              ;; - (1) CONS
-             ;; - (2) SATISFIES
              (push instance permtypes))
             ;; Mandatory special-case for singleton MEMBER types
             ((and (member-type-p instance) (not (cdr (member-type-members instance))))
@@ -1393,7 +1392,7 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (aver (= (length permtypes) (+ 13 #-sb-unicode -2)))
+  (aver (= (length permtypes) (+ 11 #-sb-unicode -2)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 

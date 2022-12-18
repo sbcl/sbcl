@@ -2081,23 +2081,6 @@ expansion happened."
 
 ;;;; hairy and unknown types
 
-;;; Without some special HAIRY cases, we massively pollute the type caches
-;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
-;;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*))) and
-;;;  (AND (SATISFIES KEYWORDP) CONS). Since the compiler doesn't know
-;;; that they're just *EMPTY-TYPE*, its keeps building more and more complex
-;;; expressions involving them. I'm not sure why those two are so prevalent
-;;; but they definitely seem to be.  We can improve performance by reducing
-;;; them to *EMPTY-TYPE* which means we need a way to recognize those hairy
-;;; types in order reason about them. Interning them is how we recognize
-;;; them, as they can be compared by EQ.
-#+sb-xc-host
-(progn
-  (defvar *satisfies-keywordp-type*
-    (!alloc-hairy-type (pack-interned-ctype-bits 'hairy) '(satisfies keywordp)))
-  (defvar *fun-name-type*
-    (!alloc-hairy-type (pack-interned-ctype-bits 'hairy) '(satisfies legal-fun-name-p))))
-
 (define-type-method (hairy :negate) (x) (make-negation-type x))
 
 (define-type-method (hairy :unparse) (flags x)
@@ -2140,11 +2123,19 @@ expansion happened."
       (type= type1 type2)
       (values nil nil)))
 
+;;; Without some special HAIRY cases, we massively pollute the type caches
+;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
+;;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*))) and
+;;;  (AND (SATISFIES KEYWORDP) CONS). Since the compiler doesn't know
+;;; that they're just *EMPTY-TYPE*, its keeps building more and more complex
+;;; expressions involving them. I'm not sure why those two are so prevalent
+;;; but they definitely seem to be.  We can improve performance by reducing
+;;; them to *EMPTY-TYPE*.
 (define-type-method (hairy :simple-intersection2 :complex-intersection2)
                      (type1 type2)
  (acond ((type= type1 type2)
          type1)
-        ((eq type2 (literal-ctype *satisfies-keywordp-type*))
+        ((eq type2 (specifier-type '(satisfies keywordp)))
          ;; (AND (MEMBER A) (SATISFIES KEYWORDP)) is possibly non-empty
          ;; if A is re-homed as :A. However as a special case that really
          ;; does occur, (AND (MEMBER NIL) (SATISFIES KEYWORDP))
@@ -2154,7 +2145,7 @@ expansion happened."
              (multiple-value-bind (answer certain)
                  (types-equal-or-intersect type1 (specifier-type 'symbol))
                (and (not answer) certain *empty-type*))))
-        ((eq type2 (literal-ctype *fun-name-type*))
+        ((eq type2 (specifier-type '(satisfies legal-fun-name-p)))
          (multiple-value-bind (answer certain)
              (types-equal-or-intersect type1 (specifier-type 'symbol))
            (and (not answer)
@@ -2232,8 +2223,6 @@ expansion happened."
            :format-control "The SATISFIES predicate name is not a symbol: ~S"
            :format-arguments (list predicate-name)))
   (case predicate-name
-   (keywordp (literal-ctype *satisfies-keywordp-type*))
-   (legal-fun-name-p (literal-ctype *fun-name-type*))
    (adjustable-array-p (specifier-type '(and array (not simple-array))))
    (t (let ((type (info :function :predicate-for predicate-name)))
         (if type
