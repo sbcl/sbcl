@@ -877,11 +877,11 @@
   ;; the Common Lisp type-specifier of the type we represent.
   ;; In UNKNOWN types this can only be a symbol.
   ;; For other than an unknown type, this must be a (SATISFIES f) expression.
-  ;; Unfortunately, this can not currently be constrained to
-  ;;  (OR SYMBOL (CONS (EQL SATISFIES) (CONS SYMBOL NULL)))
-  ;; because somewhere in cold-init there is an UNKNOWN-TYPE constructed
-  ;; which has (UNSIGNED-BYTE 8) as the expression, and I  haven't sifted through
-  ;; that logic enough yet to understand why.
+  ;; The rason we can't constrain this to
+  ;;    (OR SYMBOL (CONS (EQL SATISFIES) (CONS SYMBOL NULL)))
+  ;; is that apparently we'll store _illegal_ type specifiers in a hairy-type.
+  ;; There's an example in the regression test named
+  ;;  :single-warning-for-single-undefined-type
   (specifier nil :type t :test equal))
 
 (macrolet ((hash-fp-zeros (x) ; order-insensitive
@@ -1346,7 +1346,6 @@
              ;; - (1) MEMBER-TYPE NULL
              ;; - (3) BASE-CHAR, EXTENDED-CHAR, CHARACTER
              ;; - (1) CONS
-             ;; - (1) NUMBER
              ;; - (2) SATISFIES
              (push instance permtypes))
             ;; Mandatory special-case for singleton MEMBER types
@@ -1394,7 +1393,7 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (aver (= (length permtypes) (+ 14 #-sb-unicode -2)))
+  (aver (= (length permtypes) (+ 13 #-sb-unicode -2)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
@@ -1640,12 +1639,13 @@
 (defconstant +unparse-fun-type-simplify+  2)
 
 (defmethod print-object ((ctype ctype) stream)
-  (cond ((unknown-type-p ctype)
-         (print-unreadable-object (ctype stream :type t)
-           (prin1 (unknown-type-specifier ctype) stream)))
-        (t
-         (let ((expr (funcall (type-class-unparse (type-class ctype))
-                              +ctype-unparse-disambiguate+
-                              ctype)))
-           (print-unreadable-object (ctype stream :type t)
-             (prin1 expr stream))))))
+  (let ((expr
+         (if (unknown-type-p ctype)
+             ;; Don't call the unparse method - it returns the instance itself
+             ;; which would infinitely recurse back into print-object
+             (unknown-type-specifier ctype)
+             (funcall (type-class-unparse (type-class ctype))
+                      +ctype-unparse-disambiguate+
+                      ctype))))
+    (print-unreadable-object (ctype stream :type t)
+      (prin1 expr stream))))

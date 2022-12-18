@@ -2685,14 +2685,6 @@ expansion happened."
                    (sb-xc:>= (type-bound-number low) (type-bound-number high))
                    (sb-xc:> low high)))
       (return-from make-numeric-type *empty-type*))
-    ;; Just about all NUMERIC-TYPES are in the hashset except NUMBER itself.
-    ;; Cold-init fails without this hardwired case and I don't know why.
-    (unless class
-      (return-from make-numeric-type
-        (literal-ctype (!alloc-numeric-type (pack-interned-ctype-bits 'number)
-                                            (get-numtype-aspects nil nil nil)
-                                            nil nil)
-                       number)))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
     (new-ctype numeric-type (get-numtype-aspects complexp class format) low high)))
@@ -2969,10 +2961,15 @@ expansion happened."
              (t nil))))))
 
 
-(!cold-init-forms ;; is !PRECOMPUTE-TYPES not doing the right thing?
+(!cold-init-forms
   (setf (info :type :kind 'number) :primitive)
   (setf (info :type :builtin 'number)
-        (make-numeric-type :complexp nil)))
+        #+sb-xc-host
+        (hashset-insert *numeric-type-hashset*
+                        (!alloc-numeric-type #.(pack-interned-ctype-bits 'number)
+                                             (get-numtype-aspects nil nil nil)
+                                             nil nil))
+        #-sb-xc-host (specifier-type 'number)))
 
 (def-type-translator complex ((:context context) &optional (typespec '*))
   (if (eq typespec '*)
@@ -5000,6 +4997,17 @@ used for a COMPLEX component.~:@>"
 ;;;; SIMD-PACK types
 
 #+sb-simd-pack
+(defmacro parsed-simd-pack-element-type (index)
+  ;; For make-host-1, delay parsing until after 'deftypes-for-target' is loaded,
+  ;; as it contains the needed definitions for SIGNED-BYTE and UNSIGNED-BYTE.
+  ;; make-host-2 can splice in a constant vector.
+  #+sb-xc-host `(specifier-type (aref +simd-pack-element-types+ ,index))
+  #-sb-xc-host `(aref ,(coerce (loop for x across +simd-pack-element-types+
+                                     collect (specifier-type x))
+                               'simple-vector)
+                      ,index))
+
+#+sb-simd-pack
 (progn
 ;;; FIXME: the pretty-print of this error message is just ghastly. How about:
 ;;;  "must be a subtype of ({SIGNED-BYTE|UNSIGNED-BYTE} {8|16|32|64}) or {SINGLE|DOUBLE}-FLOAT"
@@ -5015,7 +5023,7 @@ used for a COMPLEX component.~:@>"
                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
                         ~:;, ~]~}."
                      type-name (coerce +simd-pack-element-types+ 'list)))
-      (when (csubtypep element-type (specifier-type (aref +simd-pack-element-types+ i)))
+      (when (csubtypep element-type (parsed-simd-pack-element-type i))
         (return (funcall ctor (ash 1 i)))))))
 
 (defun simd-type-unparser-helper (base-type mask)
@@ -5463,24 +5471,20 @@ used for a COMPLEX component.~:@>"
       #+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))
-         (svref (load-time-value
-                 (coerce (cons (specifier-type 'simd-pack)
+         (svref #.(coerce (cons (specifier-type 'simd-pack)
                                (map 'list (lambda (x) (specifier-type `(simd-pack ,x)))
                                     +simd-pack-element-types+))
                          'vector)
-                 t)
                 (if (<= 0 tag (1- (length +simd-pack-element-types+)))
                     (1+ tag)
                     0))))
       #+sb-simd-pack-256
       (simd-pack-256
        (let ((tag (%simd-pack-256-tag x)))
-         (svref (load-time-value
-                 (coerce (cons (specifier-type 'simd-pack-256)
+         (svref #.(coerce (cons (specifier-type 'simd-pack-256)
                                (map 'list (lambda (x) (specifier-type `(simd-pack-256 ,x)))
                                     +simd-pack-element-types+))
                          'vector)
-                 t)
                 (if (<= 0 tag (1- (length +simd-pack-element-types+)))
                     (1+ tag)
                     0))))
