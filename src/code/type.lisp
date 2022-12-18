@@ -4837,11 +4837,15 @@ used for a COMPLEX component.~:@>"
 
 (define-type-method (character-set :unparse) (flags type)
   (cond
+    ;; TODO: can we improve unparsing of (OR STANDARD-CHAR (MEMBER #\Tab))
+    ;; to restore it back into itself rather than
+    ;;  #<CHARACTER-SET-TYPE (CHARACTER-SET ((9 . 10) (32 . 126)))> ?
+    ;; Probably need to take TYPE-DIFFERENCE of TYPE with each known
+    ;; character-set type to see if any result is simpler.
     ((eq type (specifier-type 'character)) 'character)
     ((eq type (specifier-type 'base-char)) 'base-char)
     ((eq type (specifier-type 'extended-char)) 'extended-char)
-    ;; standard-char is not an interned type
-    ((type= type (specifier-type 'standard-char)) 'standard-char)
+    ((eq type (specifier-type 'standard-char)) 'standard-char)
     (t
      ;; Unparse into either MEMBER or CHARACTER-SET. We use MEMBER if there
      ;; are at most as many characters as there are character code ranges.
