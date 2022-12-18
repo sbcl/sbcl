@@ -1850,21 +1850,23 @@ expansion happened."
          (t (values min :maybe))))
     ()))
 
+;;; This macro aids in producing a constant ctype instance with less worry about
+;;; execution order of LOAD-TIME-VALUE with respect to toplevel forms.
+;;; In make-host-1, the answer is computed just-in-time and memoized,
+;;; and in make-host-2 it's a literal object at macroexpansion time.
+(defmacro inline-cache-ctype (constructor specifier)
+  (declare (ignorable constructor specifier))
+  #+sb-xc-host `(let ((cell (load-time-value (list nil))))
+                  (or (car cell) (setf (car cell) ,constructor)))
+  #-sb-xc-host (specifier-type specifier))
+
 ;;; Return T if TYPE is one defined in the language spec, and whose representation
 ;;; in SBCL's type-class taxonomy entails that of an INTERSECTION-TYPE.
 ;;; This function can be called no sooner than 'deftypes-for-targets' gets loaded,
 ;;; so that we don't see undefined types.
-;;; In make-host-2 this is easy because everything is defined, and SPECIFIER-TYPE is
-;;; constant-folded. In make-host-1, a simple inline cache avoids parsing more than
-;;; one time per specifier. It doesn't work to just put this into 'deftypes-for-target'
-;;; and use the obvious LOAD-TIME-VALUE form, because that would have a dependency
-;;; on the order of evaluation of L-T-V versus other TLFs in the file.
 (macrolet ((specifier-type-once-only (spec)
-             #+sb-xc-host `(let ((cell (load-time-value (list nil))))
-                             (or (car cell)
-                                 (setf (car cell)
-                                       (the intersection-type (specifier-type ',spec)))))
-             #-sb-xc-host `(specifier-type ',spec)))
+             `(inline-cache-ctype (the intersection-type (specifier-type ',spec))
+                                  ,spec)))
 (defun cl-std-intersection-type-p (type)
   (cond ((eq type (specifier-type-once-only keyword)) 'keyword)
         ((eq type (specifier-type-once-only compiled-function)) 'compiled-function)
@@ -3380,11 +3382,7 @@ used for a COMPLEX component.~:@>"
 ;; clear already ENUMERABLE-P does not mean "possibly a MEMBER type in
 ;; the Lisp-theoretic sense", but means "could be implemented in SBCL
 ;; as a MEMBER type".
-(eval-when (#+sb-xc-host :compile-toplevel :load-toplevel :execute)
-  ;; may not get executed before LITERAL-CTYPE = LOAD-TIME-VALUE on
-  ;; host, since LOAD-TIME-VALUE execution order with respect to top
-  ;; level forms is unspecified.
-  (define-type-class character-set :enumerable nil :might-contain-other-types nil))
+(define-type-class character-set :enumerable nil :might-contain-other-types nil)
 
 (defun make-character-set-type (pairs)
   ; (aver (equal (mapcar #'car pairs)
@@ -3414,10 +3412,10 @@ used for a COMPLEX component.~:@>"
     (unless (cdr pairs)
       (macrolet ((range (low high)
                    `(return-from make-character-set-type
-                      (literal-ctype (!alloc-character-set-type
-                                      (pack-interned-ctype-bits 'character-set)
-                                      '((,low . ,high)))
-                                     (character-set ((,low . ,high)))))))
+                      (inline-cache-ctype
+                       (!alloc-character-set-type (pack-interned-ctype-bits 'character-set)
+                                                  '((,low . ,high)))
+                       (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
                (low (car pair))
                (high (cdr pair)))
@@ -3860,15 +3858,12 @@ used for a COMPLEX component.~:@>"
                     (push z unpaired)))))))
      ((and (= (xset-count xset) 1)
            (eq (car (xset-members xset)) nil))
-      ;; Bypass the cache for type NULL because it's so important
+      ;; Bypass the hashset for type NULL because it's so important
       (return-from make-member-type
-        #-sb-xc-host (specifier-type 'null) ; dumped as literal
-        #+sb-xc-host
-        (load-time-value
-         (!alloc-member-type (pack-interned-ctype-bits 'member)
-                             (xset-from-list '(nil))
-                             '())
-         t))))
+        (inline-cache-ctype (!alloc-member-type (pack-interned-ctype-bits 'member)
+                                                (xset-from-list '(nil))
+                                                '())
+                            null))))
     (let ((member-type
            (case (+ (length unpaired) (xset-count xset))
              (0 nil) ; nil
@@ -4611,13 +4606,11 @@ used for a COMPLEX component.~:@>"
   (cond ((or (eq car-type *empty-type*)
              (eq cdr-type *empty-type*))
          *empty-type*)
-        ;; It's not a requirement that (CONS T T) be interned,
-        ;; but it improves the hit rate in the function caches.
-        ((and (type= car-type *universal-type*)
-              (type= cdr-type *universal-type*))
-         (literal-ctype (!alloc-cons-type (pack-interned-ctype-bits 'cons)
-                                          *universal-type* *universal-type*)
-                        cons))
+        ;; Bypass the hashset for plain CONS
+        ((and (eq car-type *universal-type*) (eq cdr-type *universal-type*))
+         (inline-cache-ctype (!alloc-cons-type (pack-interned-ctype-bits 'cons)
+                                               *universal-type* *universal-type*)
+                             cons))
         (t
          (new-ctype cons-type car-type cdr-type))))
 

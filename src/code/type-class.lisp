@@ -560,23 +560,6 @@
           (funcall (the function method-fun) type2 type1))
         (values nil t))))
 
-;; The following macros expand into either constructor calls,
-;; if building the cross-compiler, or forms which reference
-;; previously constructed objects, if running the cross-compiler.
-#+sb-xc-host
-(defmacro literal-ctype (constructor &optional specifier)
-  (declare (ignore specifier))
-  `(load-time-value ,constructor))
-
-;; Omitting the specifier works only if the unparser method has been
-;; defined in time to use it, and you're sure that constructor's result
-;; can be unparsed - some unparsers may be confused if called on a
-;; non-canonical object, such as an instance of (CONS T T) that is
-;; not EQ to the interned instance.
-#-sb-xc-host
-(defmacro literal-ctype (constructor &optional (specifier nil specifier-p))
-  (if specifier-p (specifier-type specifier) (symbol-value constructor)))
-
 ;;;; miscellany
 
 ;;; Hash two things (types) down to a target fixnum. In CMU CL this was an EQ
