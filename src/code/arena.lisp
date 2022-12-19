@@ -8,12 +8,15 @@
           arena-userdata
           new-arena
           destroy-arena
+          hide-arena
+          unhide-arena
           switch-to-arena
           rewind-arena
           unuse-arena
           thread-current-arena
           in-same-arena
           dump-arena-objects
+          arena-contents
           c-find-heap->arena
           points-to-arena
           show-heap->arena))
@@ -81,6 +84,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
           (arena-growth-amount arena) growth-amount
           (arena-max-extensions arena) max-extensions
           (arena-index arena) index
+          (arena-hidden arena) nil
           (arena-token arena) 1
           (arena-userdata arena) nil)
     arena))
@@ -178,6 +182,24 @@ one or more times, not to exceed MAX-EXTENSIONS times"
           (when (< (sap-int memblk) addr (sap-int (arena-memblk-freeptr memblk)))
             (return-from find-containing-arena arena)))))))
 
+(defun arena-mprotect (arena protect)
+  (alien-funcall (extern-alien "arena_mprotect" (function void unsigned int))
+                 (get-lisp-obj-address arena)
+                 (if protect 1 0))
+  arena)
+
+(defun hide-arena (arena)
+  (aver (not (arena-hidden arena)))
+  ;; Inform GC as of now not to look in the arena
+  (setf (arena-hidden arena) t)
+  (arena-mprotect arena t))
+(defun unhide-arena (arena)
+  (aver (arena-hidden arena))
+  (arena-mprotect arena nil)
+  ;; Inform GC as of now that it can look in the arena
+  (setf (arena-hidden arena) nil)
+  arena)
+
 (defun maybe-show-arena-switch (direction reason)
   (declare (ignore direction reason)))
 #+system-tlabs
@@ -212,7 +234,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
     ;; entire mechanism is still slightly unsafe because the finder returns raw addresses.
     (flet ((find-tls-ref (addr)
              (binding* ((node (sb-thread::avl-find<= addr sb-thread::*all-threads*) :exit-if-null)
-                        (thread-sap (sb-sys:int-sap
+                        (thread-sap (int-sap
                                      (sb-thread::thread-primitive-thread
                                       (sb-thread::avlnode-data node)))))
                (when (and (<= (sap-int thread-sap) addr)
@@ -223,7 +245,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                          :tls symbol)))))
            (find-binding (addr)
              (binding* ((node (sb-thread::avl-find>= addr sb-thread::*all-threads*) :exit-if-null)
-                        (thread-sap (sb-sys:int-sap
+                        (thread-sap (int-sap
                                      (sb-thread::thread-primitive-thread
                                       (sb-thread::avlnode-data node))))
                         (bindstack-base

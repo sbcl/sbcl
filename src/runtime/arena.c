@@ -12,6 +12,7 @@
 #include "gencgc-private.h"
 #include "lispregs.h"
 #include "genesis/arena.h"
+#include "genesis/gc-tables.h"
 #include "thread.h"
 
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
@@ -46,6 +47,8 @@ void ARENA_DISPOSE_MEMORY(void* addr, size_t size)
 }
 #endif
 
+#define CHUNK_ALIGN 4096
+
 lispobj sbcl_new_arena(size_t size)
 {
     // First 3 objects in the arena:
@@ -54,6 +57,7 @@ lispobj sbcl_new_arena(size_t size)
     //   Memblk
     struct arena* arena = ARENA_GET_OS_MEMORY(size);
     memset(arena, 0, sizeof *arena);
+    arena->header = (sizeof (struct arena) / N_WORD_BYTES) << INSTANCE_LENGTH_SHIFT;
     struct arena_memblk* block =
       (void*)((char*)arena + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
     // arenas require threads, but the header for the mutex definition
@@ -68,10 +72,20 @@ lispobj sbcl_new_arena(size_t size)
 #endif
     block = (void*)((char*)block + ALIGN_UP(sizeof *mutex, 2*N_WORD_BYTES));
 #endif
-    block->freeptr = (char*)block + sizeof *block;
-    block->limit = (char*)arena + size;
+    char* mem_base = (char*)block + sizeof *block;
+    // Prevent user allocations from starting at an address that is not
+    // a multiple of 4k. In this manner it is possible to mprotect
+    // all user allocations instead of having to skip the first batch
+    // so that the arena struct always remains accessible.
+    char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
+    memset(mem_base, 0xCC, aligned_mem_base - mem_base);
+    block->freeptr = aligned_mem_base;
+    char *limit = (char*)arena + size;
+    char *aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
+    block->limit = aligned_limit;
     block->next = NULL;
     block->padding = 0;
+    arena->uw_original_size = size;
     arena->uw_length = size;
     arena->uw_current_block = arena->uw_first_block = (uword_t)block;
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
@@ -98,10 +112,11 @@ void arena_release_memblks(lispobj arena_taggedptr)
         block = next;
     }
     arena->uw_current_block = arena->uw_first_block;
-    first->freeptr = (char*)first + sizeof (struct arena_memblk);
+    char* mem_base = (char*)first + sizeof (struct arena_memblk);
+    first->freeptr = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
     first->next = NULL;
     arena->uw_extension_count = 0;
-    arena->uw_length = first->limit - (char*)arena;
+    arena->uw_length = arena->uw_original_size;
     ARENA_MUTEX_RELEASE(arena);
 }
 
@@ -131,7 +146,7 @@ void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
         }
         release_gc_page_table_lock();
     }
-    ARENA_DISPOSE_MEMORY(arena, arena->uw_length);
+    ARENA_DISPOSE_MEMORY(arena, arena->uw_original_size);
 }
 
 void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
@@ -230,8 +245,12 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                     lose("Fatal: arena memory exhausted and could not obtain more memory");
                 }
                 struct arena_memblk* extension= (void*)new_mem;
-                extension->freeptr = new_mem + sizeof (struct arena_memblk);
-                extension->limit = new_mem + a->uw_growth_amount;
+                char* mem_base = new_mem + sizeof (struct arena_memblk);
+                char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
+                extension->freeptr = aligned_mem_base;
+                char* limit = new_mem + a->uw_growth_amount;
+                char* aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
+                extension->limit = aligned_limit;
                 extension->next = NULL;
                 extension->padding = 0;
                 a->uw_length += a->uw_growth_amount; // tally up the total length
@@ -323,16 +342,17 @@ void gc_scavenge_arenas()
     chain = arena_chain;
     if (chain) {
         do {
-            // Trace all objects below the free pointer
+            // Trace all objects below the free pointer, unless hidden
             struct arena* a = (void*)native_pointer(chain);
-            struct arena_memblk* block = (void*)a->uw_first_block;
-            while (block) {
-                // The block is its own lower bound for scavenge.
-                // Its first 4 words look like fixnums, so no need to skip 'em.
-                fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
-                        a, block, block->freeptr);
-                heap_scavenge((lispobj*)block, (lispobj*)block->freeptr);
-                block = block->next;
+            if (a->hidden == NIL) {
+                struct arena_memblk* block = (void*)a->uw_first_block;
+                do {
+                    // The block is its own lower bound for scavenge.
+                    // Its first 4 words look like fixnums, so no need to skip 'em.
+                    fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
+                            a, block, block->freeptr);
+                    heap_scavenge((lispobj*)block, (lispobj*)block->freeptr);
+                } while ((block = block->next) != NULL);
             }
             chain = a->link;
         } while (chain != NIL);
@@ -344,16 +364,15 @@ static struct result {
   int count;
 } searchresult;
 
-static lispobj find_containing_arena(lispobj ptr) {
-    if (!is_lisp_pointer(ptr) || !arena_chain) return 0;
+lispobj find_containing_arena(lispobj ptr) {
+    if (!arena_chain) return 0;
     lispobj chain = arena_chain;
     do {
         struct arena* arena = (void*)INSTANCE(chain);
         struct arena_memblk* block = (void*)arena->uw_first_block;
-        while (block) {
+        do {
             if ((lispobj)block <= ptr && (char*)ptr < block->freeptr) return chain;
-            block = block->next;
-        }
+        } while ((block = block->next) != NULL);
         chain = arena->link;
     } while (chain != NIL);
     return 0;
@@ -362,7 +381,7 @@ static lispobj find_containing_arena(lispobj ptr) {
 static lispobj target_arena;
 static inline boolean interesting_arena_pointer_p(lispobj ptr)
 {
-    lispobj arena = find_containing_arena(ptr);
+    lispobj arena = is_lisp_pointer(ptr) ? find_containing_arena(ptr) : 0;
     if (!arena) return 0; // uninteresting
     // If 'ptr' is exactly to some arena _regardless_ of which arena
     // we're actually interested in, then 'ptr' is not interesting.
@@ -466,7 +485,64 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
     gc_start_the_world();
     searchresult.v = 0;
     int result = searchresult.count;
+    stray_pointer_detector_fn = 0;
     searchresult.count = 0;
     target_arena = 0;
     return result;
+}
+
+void arena_mprotect(lispobj arena, int option)
+{
+    int prot = option ? PROT_NONE : (PROT_READ|PROT_WRITE|PROT_EXEC);
+    struct arena* a = (void*)native_pointer(arena);
+    struct arena_memblk* blk = (void*)a->uw_first_block;
+    do {
+        char* base = PTR_ALIGN_UP((char*)blk + sizeof (struct arena_memblk), CHUNK_ALIGN);
+        char* limit = (void*)blk->limit;
+        mprotect(base, limit-base, prot);
+        // the block itself is not within [base,limit] and so can be read even if prot==PROT_NONE
+        blk = blk->next;
+    } while (blk);
+}
+
+lispobj arena_find_containing_object(lispobj arena, char* ptr)
+{
+    struct arena* a = (void*)native_pointer(arena);
+    struct arena_memblk* blk = (void*)a->uw_first_block;
+    do {
+        lispobj* where = (void*)ALIGN_UP(((uword_t)blk + sizeof (struct arena_memblk)),
+                                         CHUNK_ALIGN);
+        lispobj* limit = (void*)blk->limit;
+        while (where <  limit) {
+            if (*where == (uword_t)-1) { // filler
+                where += 2;
+            } else {
+                sword_t objsize = object_size(where);
+                if (ptr >= (char*)where && ptr < (char*)where + objsize)
+                    return compute_lispobj(where);
+                where += objsize;
+            }
+        }
+        blk = blk->next;
+    } while (blk);
+    return 0;
+}
+
+int diagnose_arena_fault(os_context_t* context, char *addr)
+{
+    lispobj arena = find_containing_arena((lispobj)addr);
+    if (!arena) return 0; // not handled
+    if (arena && ((struct arena*)native_pointer(arena))->hidden == LISP_T) {
+        arena_mprotect(arena, 0); // unprotect it and find the object
+        lispobj obj = arena_find_containing_object(arena, addr);
+        if (obj) {
+            fprintf(stderr, "access @ %p sees hidden arena object @ %p in arena %p\n",
+                    addr, (void*)obj, (void*)arena);
+            fflush(stderr);
+        }
+        //        arena_mprotect(arena, 1); // put it back the way it was
+        lisp_memory_fault_error(context, addr);
+        return 1;
+    }
+    return 0;
 }

@@ -392,6 +392,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 #else
     if (cheneygc_handle_wp_violation(context, addr)) return;
 #endif
+    extern int diagnose_arena_fault(os_context_t*,char*);
+#ifdef LISP_FEATURE_SYSTEM_TLABS
+    if (diagnose_arena_fault(context, addr)) return;
+#endif
     if (!handle_guard_page_triggered(context, addr))
             sbcl_fallback_sigsegv_handler(signal, info, context);
 }

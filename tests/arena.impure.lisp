@@ -342,6 +342,35 @@
         (exit-if-no-arenas))
       (assert (= n-deleted n-arenas)))))
 
+(defvar *another-arena* (new-arena 131072))
+(defun g (n) (make-array (the integer n) :initial-element #\z))
+(defun f (a n) (with-arena (a) (g n)))
+
+(defvar *vect* (f *another-arena* 10))
+(setf (aref *vect* 3) "foo")
+
+;;; "Hiding" an arena asserts that no references will be made to it until
+;;; unhidden and potentially rewound. So any use of it is like a use-after-free bug,
+;;; except that the memory is still there so we can figure out what went wrong
+;;; with user code. This might pass on #+-linux but has not been tested.
+(test-util:with-test (:name :arena-use-after-free :skipped-on (:not :linux))
+  (hide-arena *another-arena*)
+  (let (caught)
+    (block foo
+      (handler-bind
+          ((sb-sys:memory-fault-error
+            (lambda (c)
+              (format t "~&Uh oh spaghetti-o: tried to read @ ~x~%"
+                      (sb-sys:system-condition-address c))
+              (setq caught t)
+              (return-from foo))))
+        (aref *vect* 3)))
+    (assert caught))
+  ;; Assert that it becomes usable again
+  (unhide-arena *another-arena*)
+  (rewind-arena *another-arena*)
+  (dotimes (i 10) (f *another-arena* 1000)))
+
 ;; #+sb-devel preserves some symbols that the test doesn't care about
 ;; as the associated function will never be called.
 (defvar *ignore* '("!EARLY-LOAD-METHOD"))
