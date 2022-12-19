@@ -1856,7 +1856,9 @@ expansion happened."
 ;;; and in make-host-2 it's a literal object at macroexpansion time.
 (defmacro inline-cache-ctype (constructor specifier)
   (declare (ignorable constructor specifier))
-  #+sb-xc-host `(let ((cell (load-time-value (list nil))))
+  ;; CLISP incorrectly coalesces LOAD-TIME-VALUE expressions that are EQUAL,
+  ;; so provide some assurance that they aren't.
+  #+sb-xc-host `(let ((cell (load-time-value (list nil ',specifier))))
                   (or (car cell) (setf (car cell) ,constructor)))
   #-sb-xc-host (specifier-type specifier))
 
