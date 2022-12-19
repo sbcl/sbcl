@@ -3437,34 +3437,34 @@
 (with-test (:name :division-by-multiplication-type-derivation)
   (assert
    (type-specifiers-equal
-          (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (c)
-                (declare (optimize speed))
-                (ceiling
-                 (truncate 65527
-                           (min -78
-                                (if c
-                                    -913097464
-                                    5)))
-                 39)))))
-          '(values (or (integer -21 -20) bit) (integer -38 0) &optional)))
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (c)
+          (declare (optimize speed))
+          (ceiling
+           (truncate 65527
+                     (min -78
+                          (if c
+                              -913097464
+                              5)))
+           39)))))
+    '(values (or (integer -21 -20) bit) (integer -38 0) &optional)))
   (assert
    (type-specifiers-equal
-          (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (c)
-                (declare (optimize speed))
-                (ceiling
-                 (truncate 65527
-                           (min 78
-                                (if c
-                                    913097464
-                                    5)))
-                 39)))))
-          '(values (or (integer 21 22) (integer 336 337)) (integer -38 0) &optional))))
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (c)
+          (declare (optimize speed))
+          (ceiling
+           (truncate 65527
+                     (min 78
+                          (if c
+                              913097464
+                              5)))
+           39)))))
+    '(values (or (integer 21 22) (integer 336 337)) (integer -38 0) &optional))))
 
 (with-test (:name :boundp-ir2-optimizer)
   (checked-compile-and-assert
@@ -3853,18 +3853,21 @@
        (the (integer -504635362412860905 -99686857090873309) (lognand b 11))))))
 
 (with-test (:name :not-folded-vops)
-  (checked-compile-and-assert
-   ()
-   `(lambda ()
-      (floor
-       (dpb 42
-            (byte 15 7)
-            (block b
-              (loop for lv below 1 count
-                    (floor
-                     (flet ((%f (f1)
-                              (- (floor f1 f1) (return-from b -9))))
-                       (multiple-value-call #'%f (values (block b3 lv))))
-                     42))))
-       42))
-   (() (values -99734 19))))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda ()
+          (floor
+           (dpb 42
+                (byte 15 7)
+                (block b
+                  (loop for lv below 1 count
+                        (floor
+                         (flet ((%f (f1)
+                                  (- (floor f1 f1) (return-from b -9))))
+                           (multiple-value-call #'%f (values (block b3 lv))))
+                         42))))
+           42)))))
+    '(values (integer -99734 -99734) (integer 19 19) &optional))))

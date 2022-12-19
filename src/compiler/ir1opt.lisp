@@ -481,6 +481,9 @@
       (typecase node
         (combination
          (ir1-optimize-combination-fast node))
+        (mv-combination
+         (when (eq (basic-combination-kind node) :local)
+           (ir1-optimize-mv-combination node)))
         (cif
          ;; Don't want comparisons of constants against constants
          ;; from reaching the VOPs.

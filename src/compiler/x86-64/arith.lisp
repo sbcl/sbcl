@@ -285,6 +285,8 @@
 
 (defun prepare-alu-operands (x y vop const-tn-xform commutative)
   (let ((arg (vop-args vop)))
+    ;; (when (tn-ref-load-tn arg)
+    ;;   (bug "Shouldn't have a load TN for arg0"))
     (let ((arg (tn-ref-across arg)))
       (when (and arg (tn-ref-load-tn arg))
         (bug "Shouldn't have a load TN for arg1"))))
