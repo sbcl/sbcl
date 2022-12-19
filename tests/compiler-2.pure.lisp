@@ -2892,24 +2892,35 @@
                   2))))
     ((1) 1)))
 
+(with-test (:name :dce-more-often.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (declare (fixnum b))
+      (- (case 0
+           (1
+            (dotimes (i 1 b) (ignore-errors)))
+           (t 0))))
+   ((3) 0)))
+
 (with-test (:name :ir1-optimize-constant-fold-before-giving-up)
   (checked-compile-and-assert
-      ()
-      `(lambda (a)
-         (+ 2 (- (let ((sum 0))
-                   (declare (type fixnum sum))
-                   (block nil
-                     (tagbody
-                      next
-                        (cond ((>= sum '0)
-                               (go end))
-                              (a
-                               (ceiling 1 (unwind-protect 2))
-                               (incf sum)))
-                        (go next)
-                      end))
-                   sum))))
-    ((1) 2)))
+   ()
+   `(lambda (a)
+      (+ 2 (- (let ((sum 0))
+                (declare (type fixnum sum))
+                (block nil
+                  (tagbody
+                   next
+                     (cond ((>= sum '0)
+                            (go end))
+                           (a
+                            (ceiling 1 (unwind-protect 2))
+                            (incf sum)))
+                     (go next)
+                   end))
+                sum))))
+   ((1) 2)))
 
 (with-test (:name :position-case-otherwise)
   (checked-compile-and-assert

@@ -482,6 +482,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                ;; information didn't lead to any new optimizations.
                ;; Don't run constraint-propagate again.
                (return)))
+        (eliminate-dead-code component)
         (dfo-as-needed component)
         (when *constraint-propagate*
           (maybe-mumble "Constraint ")
