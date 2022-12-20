@@ -278,8 +278,8 @@
   (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 33))))
   (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 33))))
   ;; That'd be one strange host, but just in case
-  (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 65))))
-  (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 65)))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2f0 65))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2d0 65)))))
 
 ;; On x86-64, we sometimes forgot to clear the higher order bits of the
 ;; destination register before using it with an instruction that doesn't

@@ -317,7 +317,7 @@
   (macrolet ((truncate-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
                        (divided (/ number float-div))
-                       (res (%unary-truncate divided)))
+                       (res (unary-truncate divided)))
                   (values res
                           (- number
                              (* #-round-float
@@ -365,7 +365,7 @@
       (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
-           (let ((res (%unary-truncate number)))
+           (let ((res (unary-truncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (truncate-float (dispatch-type number))))
       #+long-float

@@ -5,6 +5,7 @@ changes relative to sbcl-2.2.11:
     structure and condition instances.
   * minor incompatible change: compiled-function-p is false of
     generic functions.
+  * optimization: faster out of line float truncation routines.
   * bug fix: type intersections of RATIONAL ranges with (NOT INTEGER) are
     computed more consistently.  (lp#1998008)
 

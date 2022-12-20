@@ -1566,9 +1566,9 @@
                   (- x res)))))
 
 (deftransform %unary-truncate ((x) (single-float))
-  `(%unary-truncate/single-float x))
+  `(values (unary-truncate x)))
 (deftransform %unary-truncate ((x) (double-float))
-  `(%unary-truncate/double-float x))
+  `(values (unary-truncate x)))
 
 (defun value-within-numeric-type (type)
   (labels ((try (x)
@@ -1645,7 +1645,7 @@
                       '(,type
                         ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                         ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                  (let ((truncated (truly-the fixnum (%unary-truncate number))))
+                  (let ((truncated (truly-the fixnum (,(symbolicate '%unary-truncate/ type) number))))
                     (declare (flushable ,(symbolicate "%" type)))
                     (values truncated
                             (- number

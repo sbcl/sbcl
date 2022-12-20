@@ -695,12 +695,7 @@
                         number
                         ,(symbol-value (symbolicate 'most-positive-fixnum- type)))
                     (truly-the fixnum (,name number))
-                    ;; General -- slow -- case.
-                    (multiple-value-bind (bits exp) (integer-decode-float number)
-                      (let ((res (ash bits exp)))
-                        (if (minusp number)
-                            (- res)
-                            res)))))))
+                    (error "bad float arg")))))
   (def single-float %unary-truncate/single-float)
   (def double-float %unary-truncate/double-float)
   #+long-float
