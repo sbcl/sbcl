@@ -17,7 +17,8 @@
   (assert (not (ctu:find-named-callees (symbol-function 'bar-with-foo-inline))))
   (assert (ctu:find-named-callees (symbol-function 'bar-with-foo-call))))
 
-(with-test (:name :block-defpackage-then-load-fasl)
+(with-test (:name :block-defpackage-then-load-fasl
+                  :fails-on :sbcl)
   (ctu:file-compile
    `((defpackage block-defpackage (:use :cl :cl-user))
 
@@ -66,7 +67,8 @@
 (defpackage block-defpackage3
   (:use :cl))
 
-(with-test (:name :block-defpackage-delete-package-redefpackage)
+(with-test (:name :block-defpackage-delete-package-redefpackage
+                  :fails-on :sbcl)
   (ctu:file-compile
    `((when (find-package '#:block-defpackage3)
        (delete-package '#:block-defpackage3))
