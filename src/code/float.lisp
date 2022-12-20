@@ -763,25 +763,30 @@
   (declare (explicit-check))
   (number-dispatch ((x real))
     (((foreach single-float double-float #+long-float long-float))
-     (multiple-value-bind (bits exp) (integer-decode-float x)
+     (multiple-value-bind (bits exp sign) (integer-decode-float x)
        (if (eql bits 0)
            0
-           (let ((int (if (minusp x) (- bits) bits)))
-             (if (minusp exp)
-                 ;; Instead of division (which also involves GCD)
-                 ;; find the first set bit of the numerator and shift accordingly,
-                 ;; as the denominator is a power of two.
-                 (let* ((pexp (- exp))
-                        (set (first-bit-set bits))
-                        (shifted (ash int (- set))))
-                   (if (> pexp set)
-                       (%make-ratio shifted
-                                    (let ((shift (- pexp set)))
-                                      (if (< shift sb-vm:n-fixnum-bits)
-                                          (ash 1 shift)
-                                          (bignum-ashift-left-fixnum 1 shift))))
-                       (ash int exp)))
-                 (ash int exp))))))
+           (let ((int (if (minusp sign) (- bits) bits)))
+             (cond ((minusp exp)
+                    ;; Instead of division (which also involves GCD)
+                    ;; find the first set bit of the numerator and shift accordingly,
+                    ;; as the denominator is a power of two.
+                    (let* ((pexp (- exp))
+                           (set (first-bit-set bits)))
+                      (if (> pexp set)
+                          (%make-ratio (ash int (- set))
+                                       (let ((shift (- pexp set)))
+                                         (cond #-64-bit
+                                               ((>= shift sb-vm:n-fixnum-bits)
+                                                (bignum-ashift-left-fixnum 1 shift))
+                                               (t
+                                                (ash 1 (truly-the (integer 0 (#.sb-vm:n-fixnum-bits)) shift))))))
+                          (ash int exp))))
+                   (t
+                    #+64-bit
+                    (bignum-ashift-left-fixnum int exp)
+                    #-64-bit
+                    (ash int exp)))))))
     ((rational) x)))
 
 #+64-bit
