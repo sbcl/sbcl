@@ -349,8 +349,11 @@
 (defknown unary-truncate (real) (values integer real)
   (movable foldable flushable no-verify-arg-count))
 
+;;; KLUDGE: Don't fold these, the compiler may call it on floats that
+;;; do not truncate into a bignum, and the functions do not check
+;;; their input values and produce corrupted memory.
 (defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
-   (foldable movable flushable fixed-args))
+    (#+(or) foldable movable flushable fixed-args))
 (defknown unary-truncate-double-float-to-bignum (double-float)
     (values #+64-bit bignum #-64-bit integer
             (and
@@ -358,12 +361,12 @@
                     (not (or riscv ppc64))) ;; they can't survive cold-init
              (eql $0d0)
              double-float))
-   (foldable movable flushable fixed-args))
+   (#+(or) foldable movable flushable fixed-args))
 
 (defknown %unary-truncate-single-float-to-bignum (single-float) bignum
-   (foldable movable flushable fixed-args))
+   (#+(or) foldable movable flushable fixed-args))
 (defknown %unary-truncate-double-float-to-bignum (double-float) bignum
-   (foldable movable flushable fixed-args))
+   (#+(or) foldable movable flushable fixed-args))
 
 (defknown sxhash-bignum-double-float (double-float) hash-code
   (foldable movable flushable fixed-args))
