@@ -275,8 +275,8 @@
 
 ;; Leakage from the host could result in wrong values for truncation.
 (with-test (:name :truncate)
-  (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 33))))
-  (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 33))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2f0 33))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2d0 33))))
   ;; That'd be one strange host, but just in case
   (assert (plusp (sb-kernel:%unary-truncate (expt 2f0 65))))
   (assert (plusp (sb-kernel:%unary-truncate (expt 2d0 65)))))
