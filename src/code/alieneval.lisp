@@ -1471,6 +1471,11 @@
 ;;; Each alien-type gets its own hashset. The comparator function is universal.
 ;;; Because of that, the hashset aren't defined until all classes are defined,
 ;;; or else the accessors would use inefficient full calls.
+;;; KLUDGE: ALIEN-FUN-TYPE can memoize an object of type COMPILED-FUNCTION,
+;;; which means that if the compiler picks up a hash-consed instance
+;;; that was used in a not-compile-time-optimized ALIEN-FUNCALL
+;;; (see target-alieneval), the STUB slot will contain an undumpable object,
+;;; and the compiler will croak on it.
 (macrolet
   ((define-caching-constructors ()
      (flet
@@ -1514,9 +1519,11 @@
                                                 type-hash-nbits)
                                           (ldb (byte type-hash-nbits 0)
                                                (mix size-hash data-hash)))))
-                   (dx-let ((key (,alloc hash ,@alloc-args)))
-                     (hashset-insert-if-absent ,hashset-var key
-                                               #'sys-copy-struct)))))
+                   ,(if (eq ctor 'make-alien-fun-type)
+                        `(,alloc hash ,@alloc-args)
+                        `(dx-let ((key (,alloc hash ,@alloc-args)))
+                           (hashset-insert-if-absent ,hashset-var key
+                                               #'sys-copy-struct))))))
              (globals hashset-var)))))))
   (define-caching-constructors))
 (defun show-alien-type-caches ()
