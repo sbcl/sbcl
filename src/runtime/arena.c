@@ -532,6 +532,7 @@ lispobj arena_find_containing_object(lispobj arena, char* ptr)
 
 int diagnose_arena_fault(os_context_t* context, char *addr)
 {
+#ifndef LISP_FEATURE_WIN32
     lispobj arena = find_containing_arena((lispobj)addr);
     if (!arena) return 0; // not handled
     if (arena && ((struct arena*)native_pointer(arena))->hidden == LISP_T) {
@@ -547,4 +548,5 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
         return 1;
     }
     return 0;
+#endif
 }
