@@ -113,10 +113,14 @@
 
 (defun xset-intersection (a b)
   (let ((intersection (alloc-xset)))
+    ;; Under the assumption that lookup time is constant in either set,
+    ;; you should scan the * smaller * set to see if each item
+    ;; is in the larger set, thereby doing fewer constant-time steps.
+    ;; SOURCE is the set to scan; LOOKUP is the set to check membership in.
     (multiple-value-bind (source lookup)
-        (if (< (xset-list-size a) (xset-list-size b))
-            (values b a)
-            (values a b))
+        (if (< (xset-count a) (xset-count b))
+            (values a b)
+            (values b a))
       (let ((data (xset-data lookup)))
         (map-xset (if (listp data)
                       (lambda (elt)
