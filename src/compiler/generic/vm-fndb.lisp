@@ -835,3 +835,10 @@
 (defknown sb-vm::fastrem-64 ((unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64))
   (unsigned-byte 64)
   (flushable))
+
+;;; +-modfx is useful for computing a hash that is commutative in its inputs.
+;;; These architectures lack a complete set of modular operations; they have operations
+;;; which are modular in N-WORD-BITS, but not that accept fixnums.
+#+(or arm mips ppc sparc)
+(defknown sb-vm::+-modfx (integer integer) fixnum
+          (movable foldable flushable always-translatable))

@@ -497,3 +497,16 @@
   (:results (res :scs (descriptor-reg)))
   (:generator 0
     (move res object)))
+
+;;; By pure coincidence, almost all the architectures that lack a +-MODFX vop
+;;; have an instruction named ADD with the same argument order.
+;;; MIPS needs to use ADDU to avoid trapping on overflow.
+#+(or arm mips ppc sparc)
+(define-vop (+-modfx)
+  (:translate +-modfx)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg)) (y :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:results (res :scs (any-reg)))
+  (:result-types fixnum)
+  (:generator 1 (inst #+mips addu #-mips add res x y)))

@@ -172,6 +172,8 @@
             xset)
   t)
 
+#-sb-xc-host (defmacro plus-mod-fixnum (a b) `(sb-vm::+-modfx ,a ,b))
+
 ;;; Produce a hash that helps decide whether two xsets could be considered equivalent
 ;;; as order-insensitive sets comparing elements by EQL. This shouldn't use EQL-HASH
 ;;; because the intent is that it be useful for both host and target. SXHASH is fine
@@ -179,14 +181,25 @@
 ;;; (SXHASH being the hash function for EQUAL). The target can include STRUCTURE-OBJECT
 ;;; because we have stable hashes that do not depend on the slots. But it's no good
 ;;; to mix in STRING, BIT-VECTOR, CONS, or other type where SXHASH reads the contents.
+;;; Use modular addition since it is commutative and associative, and the low bits
+;;; come out the same no matter the order of operations.
 (defun xset-elts-hash (xset)
   (let ((h 0))
+    (declare (fixnum h))
     (map-xset (lambda (x)
+                ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
+                ;; allow bits to rollover into the sign bit
                 (when (typep x '(or symbol number character #-sb-xc-host instance))
-                  ;; Addition is commutative and associative, and the low bits come out
-                  ;; the same no matter the order of operations. XORing would also work
-                  ;; but I think adding has a greater degree of randomness.
-                  (setq h (logand (+ h (sb-xc:sxhash x))
-                                  sb-xc:most-positive-fixnum))))
+                  (setq h (plus-mod-fixnum (sb-xc:sxhash x) h))))
               xset)
-    h))
+    ;; Now mix the bits thoroughly and then mask to a positive fixnum.
+    ;; I think this does not need to be compatible between host and target.
+    ;; But I'm trying to make it compatible anyway because I'm not 100% sure
+    ;; what will happen if it isn't. While the hash installed in a CTYPE instance
+    ;; is pseudorandom, the hash used for locating in a hashset is content-based.
+    ;; However, all hashsets are rebuilt in PRELOAD-CTYPE-HASHSETS without regard
+    ;; for what index an element was in during cross-compilation.
+    (let ((word-bits
+           #+sb-xc-host (ldb (byte sb-vm:n-word-bits 0) (ash h sb-vm:n-fixnum-tag-bits))
+           #-sb-xc-host (get-lisp-obj-address h)))
+      (logand (sb-impl::murmur3-fmix-word word-bits) most-positive-fixnum))))
