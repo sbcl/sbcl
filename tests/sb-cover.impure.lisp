@@ -2,9 +2,9 @@
 (require :sb-cover)
 (defparameter *source-directory* (truename #P"../contrib/sb-cover/"))
 
-;;; sb-cover uses weak pointers which disappear randomly and make test
-;;; results unreliable.
-(with-test (:name :sb-cover :broken-on :sbcl)
+(with-test (:name :sb-cover)
  (test-util:with-test-directory (coveragedir)
    (defvar cl-user::*coverage-report-directory* coveragedir)
-   (load (merge-pathnames "tests.lisp" *source-directory*))))
+   ;; Weak pointers to toplevel forms need to survive the entire test run
+   (sb-sys:without-gcing
+     (load (merge-pathnames "tests.lisp" *source-directory*)))))
