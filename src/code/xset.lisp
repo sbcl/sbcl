@@ -185,7 +185,7 @@
 ;;; come out the same no matter the order of operations.
 (defun xset-elts-hash (xset)
   (let ((h 0))
-    (declare (fixnum h))
+    (declare (sb-xc:fixnum h))
     (map-xset (lambda (x)
                 ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
                 ;; allow bits to rollover into the sign bit
