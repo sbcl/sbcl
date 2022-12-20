@@ -686,10 +686,9 @@
 
 ;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
 ;;; can't use the round primitive, then we do our own round-to-nearest on the
-;;; result of i-d-f. [Note that this rounding will really only happen with
-;;; double floats, since the whole single-float fraction will fit in a fixnum,
-;;; so all single-floats larger than most-positive-fixnum can be precisely
-;;; represented by an integer.]
+;;; result of i-d-f. [Note that this rounding will really only happen
+;;; with double floats on 32-bit architectures, where there are
+;;; fractional floats past most-x-fixnum]
 (defun %unary-round (number)
   (declare (explicit-check))
   (macrolet ((fits-fixnum (type)
@@ -702,6 +701,13 @@
       (((foreach single-float double-float #+long-float long-float))
        (if (fits-fixnum (dispatch-type number))
            (truly-the fixnum (%unary-round number))
+           #+64-bit
+           (multiple-value-bind (bits exp sign) (integer-decode-float number)
+             (ash (if (minusp sign)
+                      (- bits)
+                      bits)
+                  exp))
+           #-64-bit
            (multiple-value-bind (bits exp) (integer-decode-float number)
              (let* ((shifted (ash bits exp))
                     (rounded (if (minusp exp)
