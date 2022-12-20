@@ -1229,14 +1229,7 @@
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
-          (let ((debug (%code-debug-info code)))
-            (atomic-push (if (and debug
-                                  (typep (sb-c::debug-info-name debug) '(cons (eql sb-c::top-level-form))))
-                             ;; Top level forms are not anchored to
-                             ;; anything, don't use weak pointers or
-                             ;; they won't appear in the report.
-                             code
-                             (make-weak-pointer code)) (cdr *code-coverage-info*))))
+          (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
         (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
