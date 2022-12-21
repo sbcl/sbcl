@@ -5016,7 +5016,8 @@
                                           (typep x '(member 1 3 15))
                                           t))))
                  `(function (t) (values (member t) &optional))))
-  (assert (equal (sb-kernel:%simple-fun-type
+  (assert (type-specifiers-equal
+                 (sb-kernel:%simple-fun-type
                   (checked-compile `(lambda (x)
                                       (declare (type (member 1 3) x))
                                       (typep x '(member 1 3 15)))))
