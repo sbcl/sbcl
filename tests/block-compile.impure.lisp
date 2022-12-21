@@ -68,9 +68,8 @@
 
 (with-test (:name :block-defpackage-delete-package-redefpackage)
   (ctu:file-compile
-   `((eval-when (:compile-toplevel :load-toplevel :execute)
-       (when (find-package '#:block-defpackage3)
-         (delete-package '#:block-defpackage3)))
+   `((when (find-package '#:block-defpackage3)
+       (delete-package '#:block-defpackage3))
      (defpackage block-defpackage3
        (:use :cl))
      (in-package block-defpackage3)
@@ -86,8 +85,9 @@
 ;;; Similar to the above test case, but with RENAME-PACKAGE. This is
 ;;; probably, strictly speaking, non-conforming code according to ANSI
 ;;; 3.2.4.4 under item 1 for symbol, taking package "same"ness to mean
-;;; EQness.
-(with-test (:name :block-defpackage-rename-package-redefpackage)
+;;; EQness. We don't expect this to work under block compilation.
+(with-test (:name :block-defpackage-rename-package-redefpackage
+                  :fails-on :sbcl)
   (ctu:file-compile
    `((eval-when (:compile-toplevel :load-toplevel :execute)
        (when (find-package "BLOCK-DEFPACKAGE4")
@@ -102,7 +102,9 @@
   (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE4"))
               :external)))
 
-(with-test (:name :block-defpackage-rename-package)
+;;; Doesn't work yet.
+(with-test (:name :block-defpackage-rename-package
+                  :fails-on :sbcl)
   (ctu:file-compile
    `((eval-when (:compile-toplevel :load-toplevel :execute)
        (cond
@@ -122,7 +124,8 @@
    :load t)
   (assert (find-symbol "STABLE-UNION" "BLOCK-DEFPACKAGE-BAR")))
 
-(with-test (:name :block-defpackage-rename-package-symbol-conflict)
+(with-test (:name :block-defpackage-rename-package-symbol-conflict
+                  :fails-on :sbcl)
   (with-scratch-file (fasl2 "fasl")
     (compile-file "package-test-2.lisp" :output-file fasl2
                                         :block-compile t)
@@ -137,7 +140,8 @@
               :good))
   (delete-package "BAR"))
 
-(with-test (:name :block-defpackage-rename-package-preserve-externals)
+(with-test (:name :block-defpackage-rename-package-preserve-externals
+                  :fails-on :sbcl)
   (with-scratch-file (fasl4 "fasl")
     (compile-file "package-test-4.lisp" :output-file fasl4
                                         :block-compile t)

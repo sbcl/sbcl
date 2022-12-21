@@ -1134,7 +1134,8 @@ if a restart was invoked."
               :external))
   (delete-package "FOO-NEW"))
 
-(with-test (:name :defpackage-delete-package-redefpackage-fasloader)
+(with-test (:name :defpackage-delete-package-redefpackage-fasloader
+            :fails-on :sbcl)
   (with-scratch-file (fasl5 "fasl")
     (compile-file "package-test-5.lisp" :output-file fasl5)
     (load fasl5)

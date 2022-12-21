@@ -731,12 +731,13 @@
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
   (let ((fasl-input (make-fasl-input stream print)))
-    (unwind-protect
-         (loop while (load-fasl-group fasl-input))
-      ;; Nuke the table and stack to avoid keeping garbage on
-      ;; conservatively collected platforms.
-      (nuke-fop-vector (%fasl-input-table fasl-input))
-      (nuke-fop-vector (%fasl-input-stack fasl-input))))
+    (with-loader-package-names
+      (unwind-protect
+           (loop while (load-fasl-group fasl-input))
+        ;; Nuke the table and stack to avoid keeping garbage on
+        ;; conservatively collected platforms.
+        (nuke-fop-vector (%fasl-input-table fasl-input))
+        (nuke-fop-vector (%fasl-input-stack fasl-input)))))
   t)
 
 
@@ -888,7 +889,8 @@
 (define-fop 83 :not-host (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
     (read-char-string-as-varints (fasl-input-stream) package-name)
-    (push-fop-table (find-package package-name) (fasl-input))))
+    (push-fop-table (find-or-maybe-make-deferred-package package-name)
+                    (fasl-input))))
 
 ;;;; fops for loading numbers
 

@@ -2038,6 +2038,100 @@ PACKAGE."
               (or (null pkg) (and (packagep pkg) (package-%name pkg)))))
 
 
+;;;; special package hacks for the loader
+
+(defvar *deferred-package-names*)
+
+;;; A deferred package is a package which is not added to the normal
+;;; package database until some later point in time. The current
+;;; purpose for deferred packages is so that the loader symbol fasl
+;;; ops can intern symbols into packages, without the packages
+;;; necessarily being created yet. This is important for deferred
+;;; top-level form loading, as to not cause loading symbols (which may
+;;; appear as literal code constants) to fail early. Since the
+;;; deferred package is not added to the normal package database until
+;;; the package is actually created, we preserve package environment
+;;; semantics at runtime, and give a reasonable error if the package
+;;; has not been created by the end of the load.
+(defun find-or-maybe-make-deferred-package (name)
+  (or (find-package name)
+      (progn
+        (unless *deferred-package-names* ; bind on demand
+          (setq *deferred-package-names*
+                (make-info-hashtable :comparator #'pkg-name=
+                                     :hash-function #'sxhash)))
+        (or (%get-package name *deferred-package-names*)
+            (let ((package (%make-package (make-symbol-hashset 0)
+                                          (make-symbol-hashset 0))))
+              (%register-package *deferred-package-names* name package)
+              (setf (package-%name package) name)
+              package)))))
+
+;;; Return the deferred package object for NAME if it exists, otherwise
+;;; return NIL.
+(defun resolve-deferred-package (name)
+  (and (boundp '*deferred-package-names*)
+       *deferred-package-names*
+       (let ((package (%get-package name *deferred-package-names*)))
+         (when package
+           ;; To simulate remhash.
+           (setf (info-gethash name *deferred-package-names*) :deleted))
+         package)))
+
+(defvar *rehoming-package-names*)
+
+;;; When we are in the loader, DELETE-PACKAGE installs a rehoming
+;;; package in the SYMBOL-PACKAGE of its internal symbols. This has
+;;; the effect that when a package of the same name is newly redefined
+;;; later in the compiled file, the package gets updated and those
+;;; internal symbols get rehomed properly.
+(defun make-rehoming-package (package)
+  (and (boundp '*rehoming-package-names*)
+       (let ((name (package-%name package)))
+         (unless *rehoming-package-names* ; bind on demand
+           (setq *rehoming-package-names*
+                 (make-info-hashtable :comparator #'pkg-name=
+                                      :hash-function #'sxhash)))
+         (aver (not (%get-package name *rehoming-package-names*)))
+         (let ((package (%make-package (package-internal-symbols package)
+                                       (package-external-symbols package))))
+           (%register-package *rehoming-package-names* name package)
+           (setf (package-%name package) name)
+           package))))
+
+;;; Return the rehoming object for NAME if it exists, otherwise return
+;;; NIL.
+(defun resolve-rehoming-package (name)
+  (and (boundp '*rehoming-package-names*)
+       *rehoming-package-names*
+       (let ((package (%get-package name *rehoming-package-names*)))
+         (when package
+           ;; To simulate remhash.
+           (setf (info-gethash name *rehoming-package-names*) :deleted))
+         package)))
+
+;;; Bind the deferred and rehoming package name tables and test to see
+;;; if the deferred package table still has any unresolved entries
+;;; after FUNCTION is called.
+(defun call-with-loader-package-names (function)
+  (let* ((boundp (boundp '*deferred-package-names*))
+         ;; bind on demand
+         (*deferred-package-names* (if boundp *deferred-package-names* nil))
+         (*rehoming-package-names* (if boundp *rehoming-package-names* nil)))
+    (funcall function)
+    (when (and (not boundp) *deferred-package-names*)
+      (info-maphash
+       (lambda (name package)
+         (unless (eq package :deleted)
+           (dovector (sym (symtbl-cells (package-internal-symbols package)))
+             (when (symbolp sym)
+               (error 'simple-package-error
+                      :format-control
+                      "The loader tried loading the symbol named ~a ~
+                       into the package named ~a, but the package did ~
+                       not get defined, and does not exist."
+                      :format-arguments (list (symbol-name sym) name))))))
+       *deferred-package-names*))))
 
 ;;; We don't benefit from these transforms because any time we have a constant
 ;;; package in our code, we refer to it via #.(FIND-PACKAGE).
