@@ -65,7 +65,8 @@
                 mf)
              plist ,arg-info simple-next-method-call t)
            source-loc))))))
-(!install-cross-compiled-methods 'make-load-form :except '(wrapper))
+(!install-cross-compiled-methods 'make-load-form
+                                 :except '(wrapper sb-alien-internals:alien-type))
 
 (defmethod make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
@@ -85,8 +86,9 @@
              (wrapper-classoid object)))
     `(classoid-wrapper (find-classoid ',pname))))
 
-(defmethod make-load-form ((object sb-alien-internals:alien-fun-type) &optional env)
-  (sb-alien::make-type-load-form object env))
+(defmethod make-load-form ((object sb-alien-internals:alien-type) &optional env)
+  (or (sb-alien::make-type-load-form object env)
+      (make-load-form-saving-slots object :environment env)))
 
 ;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.
 (defun dont-know-how-to-dump (object)

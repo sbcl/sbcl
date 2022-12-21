@@ -1551,17 +1551,40 @@
 ;;; but then it doesn't know about hash-consing.
 #-sb-xc-host
 (defun make-type-load-form (x env)
-  (if (acyclic-type-p x)
-      ;; hash-cons it
-      `(make-alien-fun-type :convention ',(alien-fun-type-convention x)
-                            :result-type ,(alien-fun-type-result-type x)
-                            :arg-types ',(alien-fun-type-arg-types x)
-                            :varargs ,(alien-fun-type-varargs x))
-      ;; there is some cycle involving this type
-      (make-load-form-saving-slots
-       x
-       :slot-names '(hash bits alignment result-type arg-types varargs convention)
-       :environment env)))
+  ;; For now this deals with only a few categories of types:
+  ;; 1) Atoms INTEGER, BOOLEAN, SYSTEM-AREA-POINTER, C-STRING, FLOAT
+  ;;    but without whacky redefining behavior - so no ENUM.
+  ;; 2) FUN-TYPE
+  (cond
+    ((and (alien-integer-type-p x) (not (alien-enum-type-p x)))
+     (if (alien-boolean-type-p x)
+         `(make-alien-boolean-type :bits ,(alien-boolean-type-bits x)
+                                   :signed nil)
+         `(make-alien-integer-type :bits ,(alien-integer-type-bits x)
+                                   :signed ,(alien-integer-type-signed x))))
+    ((alien-float-type-p x)
+     (ecase (alien-float-type-type x)
+       (single-float `(parse-alien-type 'single-float nil))
+       (double-float `(parse-alien-type 'double-float nil))))
+    ((eq (sb-kernel:%instance-layout x)
+         #.(sb-kernel:find-layout 'alien-system-area-pointer-type)) ; not its subtypes
+     `(parse-alien-type 'system-area-pointer nil))
+    ((alien-c-string-type-p x)
+     `(load-alien-c-string-type ',(alien-c-string-type-element-type x)
+                                ',(alien-c-string-type-external-format x)
+                                ',(alien-c-string-type-not-null x)))
+    ((alien-fun-type-p x)
+     (if (acyclic-type-p x)
+         ;; hash-cons it
+         `(make-alien-fun-type :convention ',(alien-fun-type-convention x)
+                               :result-type ,(alien-fun-type-result-type x)
+                               :arg-types ',(alien-fun-type-arg-types x)
+                               :varargs ,(alien-fun-type-varargs x))
+         ;; there is some cycle involving this type
+         (make-load-form-saving-slots
+          x
+          :slot-names '(hash bits alignment result-type arg-types varargs convention)
+          :environment env)))))
 
 (defun show-alien-type-caches ()
   (dolist (var *alien-type-hashsets*)
