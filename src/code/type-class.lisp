@@ -285,7 +285,7 @@
 (defmacro type-bits-internedp (bits) `(logbitp 20 ,bits))
 (defmacro type-bits-admit-type=-optimization (bits) `(logbitp 21 ,bits))
 
-(defvar *ctype-hashsets* nil)
+(defglobal *ctype-hashsets* nil)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +type-internedp+ (ash 1 20))
   (defconstant +type-admits-type=-optimization+ (ash 1 21))
@@ -1262,6 +1262,7 @@
                               `',(symbolicate "*" instance-type "-HASHSET*")))))))))
     (generate)))
 
+(defglobal *alien-type-hashsets* nil)
 (export 'show-ctype-ctor-cache-metrics)
 ;;; The minimum hashset storage size is 64 elements, so a bunch of the caches
 ;;; start out with too-low load-factor, being somewhat oversized.
@@ -1271,50 +1272,63 @@
 ;;; So it's extremely unexpected that List starts out with a load-factor of 12%.
 ;;; Probably should investigate, though it's harmless.
 (defun show-ctype-ctor-cache-metrics ()
-  (let (caches (total 0))
-    (push (list "List" *ctype-list-hashset*) caches)
-    (push (list "Set" *ctype-set-hashset*) caches)
-    (push (list "Key-Info" *key-info-hashset*) caches)
-    (push (list "Key-Info-List" *key-info-list-hashset*) caches)
-    (push (list "EQL" *eql-type-cache*) caches)
-    (dolist (symbol *ctype-hashsets*)
-      (push (list (subseq (string symbol) 1
-                          (- (length (string symbol)) (length "-TYPE-HASHSET*")))
-                  (symbol-value symbol))
-            caches))
-    (flet ((tablecount (x)
-             (if (hash-table-p x) (hash-table-count x) (sb-impl::hashset-count x))))
+  (labels
+      ((tablecount (x)
+         (if (hash-table-p x) (hash-table-count x) (sb-impl::hashset-count x)))
+       (display (caches &aux (total 0))
+         (dolist (cache (sort caches #'> ; decreasing cout
+                              :key (lambda (x) (tablecount (second x)))))
+           (binding*
+               ((name (first cache))
+                (table (second cache))
+                (count (tablecount table))
+                ((load seeks hit psl mask)
+                 (if (hash-table-p table)
+                     (values #+sb-xc-host nil
+                             #-sb-xc-host
+                             (/ count
+                                (ash (length (sb-impl::hash-table-pairs table)) -1))
+                             nil nil nil nil nil) ; FIXME: compute PSL and mask
+                     (let* ((cells (sb-impl::hss-cells (sb-impl::hashset-storage table)))
+                            (psl (sb-impl::hs-cells-max-psl cells))
+                            (mask (sb-impl::hs-cells-mask cells))
+                            (lf (/ count (1+ mask))))
+                       #-hashset-metrics (values lf nil nil psl mask)
+                       #+hashset-metrics
+                       (let ((seeks (sb-impl::hashset-count-finds table)))
+                         (values lf seeks
+                                 (when (plusp seeks)
+                                   (/ (sb-impl::hashset-count-find-hits table) seeks))
+                                 psl mask))))))
+               (incf total count)
+               (apply #'format t
+                      "  ~16a: ~7D ~5,1,2F%~#[~:; ~:[        ~;~:*~8D~]  ~:[     ~;~:*~4,1,2f%~]~
+ ~6D ~6X~]~%"
+                      name count load
+                      (unless (hash-table-p table) (list seeks hit psl mask)))))
+         (format t "  ~16A: ~7D~%" "Total" total)))
+    (let (caches)
+      (push (list "List" *ctype-list-hashset*) caches)
+      (push (list "Set" *ctype-set-hashset*) caches)
+      (push (list "Key-Info" *key-info-hashset*) caches)
+      (push (list "Key-Info-List" *key-info-list-hashset*) caches)
+      (push (list "EQL" *eql-type-cache*) caches)
+      (dolist (symbol *ctype-hashsets*)
+        (push (list (subseq (string symbol) 1
+                            (- (length (string symbol)) (length "-TYPE-HASHSET*")))
+                    (symbol-value symbol))
+              caches))
       (format t "~&ctype cache metrics:  Count     LF     Seek    Hit maxPSL  Mask~%")
-      (dolist (cache (sort caches #'> ; decreasing cout
-                           :key (lambda (x) (tablecount (second x)))))
-        (binding*
-            ((name (first cache))
-             (table (second cache))
-             (count (tablecount table))
-             ((load seeks hit psl mask)
-              (if (hash-table-p table)
-                  (values #+sb-xc-host nil
-                          #-sb-xc-host
-                          (/ count
-                             (ash (length (sb-impl::hash-table-pairs table)) -1))
-                          nil nil nil nil nil) ; FIXME: compute PSL and mask
-                  (let* ((cells (sb-impl::hss-cells (sb-impl::hashset-storage table)))
-                         (psl (sb-impl::hs-cells-max-psl cells))
-                         (mask (sb-impl::hs-cells-mask cells))
-                         (lf (/ count (1+ mask))))
-                    #-hashset-metrics (values lf nil nil psl mask)
-                    #+hashset-metrics
-                    (let ((seeks (sb-impl::hashset-count-finds table)))
-                      (values lf seeks
-                              (when (plusp seeks)
-                                (/ (sb-impl::hashset-count-find-hits table) seeks))
-                              psl mask))))))
-          (incf total count)
-          (apply #'format t
-                 "  ~16a: ~7D ~5,1,2F%~#[~:; ~:[        ~;~:*~8D~]  ~:[     ~;~:*~4,1,2f%~]~
- ~6D ~6X~]~%" name count load
-              (unless (hash-table-p table) (list seeks hit psl mask))))))
-    (format t "  ~16A: ~7D~%" "Total" total)))
+      (display caches))
+    (let (caches)
+      (format t "~&Alien:~%")
+      (dolist (symbol *alien-type-hashsets*)
+        (let ((name (subseq (string symbol) 1
+                            (- (length (string symbol)) (length "-TYPE-CACHE*")))))
+          (push (list (if (char= (char name 0) #\A) (subseq name 6) name)
+                      (symbol-value symbol))
+              caches)))
+      (display caches))))
 
 #-sb-xc-host
 (progn

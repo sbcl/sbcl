@@ -1500,7 +1500,7 @@
                (values '(hash-alien-type-list values))))))
        (collect ((forms) (globals))
          (dolist (list *hashset-defining-forms*
-                       `(progn (defglobal *alien-type-hashsets*
+                       `(progn (setq *alien-type-hashsets*
                                    '(*struct-type-cache* *union-type-cache*
                                      *enum-type-cache* ,@(globals)))
                                ,@(forms)))
