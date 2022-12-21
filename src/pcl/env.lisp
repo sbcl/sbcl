@@ -85,6 +85,9 @@
              (wrapper-classoid object)))
     `(classoid-wrapper (find-classoid ',pname))))
 
+(defmethod make-load-form ((object sb-alien-internals:alien-fun-type) &optional env)
+  (sb-alien::make-type-load-form object env))
+
 ;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.
 (defun dont-know-how-to-dump (object)
   (error "~@<don't know how to dump ~S (default ~S method called).~>"

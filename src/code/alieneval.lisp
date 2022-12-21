@@ -1519,13 +1519,50 @@
                                                 type-hash-nbits)
                                           (ldb (byte type-hash-nbits 0)
                                                (mix size-hash data-hash)))))
-                   ,(if (eq ctor 'make-alien-fun-type)
-                        `(,alloc hash ,@alloc-args)
-                        `(dx-let ((key (,alloc hash ,@alloc-args)))
-                           (hashset-insert-if-absent ,hashset-var key
-                                               #'sys-copy-struct))))))
+                   (dx-let ((key (,alloc hash ,@alloc-args)))
+                     (hashset-insert-if-absent ,hashset-var key
+                                               #'sys-copy-struct)))))
              (globals hashset-var)))))))
   (define-caching-constructors))
+
+(defun acyclic-type-p (type)
+  (named-let visit ((x type) (stack nil))
+    (aver type)
+    (when (member x stack) (return-from acyclic-type-p nil))
+    (let ((stack (cons x stack)))
+      (typecase x
+        (alien-pointer-type
+         (awhen (alien-pointer-type-to x) (visit it stack)))
+        (alien-array-type
+         (visit (alien-array-type-element-type x) stack))
+        (alien-record-type
+         (mapc (lambda (field) (visit (alien-record-field-type field) stack))
+               (alien-record-type-fields x)))
+        (alien-fun-type
+         (visit (alien-fun-type-result-type x) stack)
+         (dolist (x (alien-fun-type-arg-types x)) (visit x stack)))
+        (alien-values-type
+         (dolist (x (alien-values-type-values x)) (visit x stack))))))
+  t)
+
+;;; TODO: all alien-types loaded from fasl need to be hash-consed.
+;;; That's tricky (or impossible) if structural recursion is involved.
+;;; We can always punt to MAKE-LOAD-FORM-SAVING-SLOTS which handles circularity,
+;;; but then it doesn't know about hash-consing.
+#-sb-xc-host
+(defun make-type-load-form (x env)
+  (if (acyclic-type-p x)
+      ;; hash-cons it
+      `(make-alien-fun-type :convention ',(alien-fun-type-convention x)
+                            :result-type ,(alien-fun-type-result-type x)
+                            :arg-types ',(alien-fun-type-arg-types x)
+                            :varargs ,(alien-fun-type-varargs x))
+      ;; there is some cycle involving this type
+      (make-load-form-saving-slots
+       x
+       :slot-names '(hash bits alignment result-type arg-types varargs convention)
+       :environment env)))
+
 (defun show-alien-type-caches ()
   (dolist (var *alien-type-hashsets*)
     (let ((hs (symbol-value var)))
