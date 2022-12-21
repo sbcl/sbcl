@@ -325,8 +325,8 @@
   (dolist (size '(:byte :word :dword :qword nil))
     (dolist (op '(mul div idiv))
       (if size
-          (try `(,op ,size ,rax-tn ,rbx-tn))
-          (try `(,op ,rax-tn ,rbx-tn))))))
+          (try `(,op ,size ,rbx-tn))
+          (try `(,op ,rbx-tn))))))
 
 #+x86-64
 (test-util:with-test (:name :imul)
