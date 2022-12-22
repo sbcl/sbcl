@@ -2875,22 +2875,23 @@
 
 (with-test (:name :dce-more-often)
   (checked-compile-and-assert
-      ()
-      `(lambda (a)
-         (+ 1
-            (if t
-                0
-                (progn
+   ()
+   `(lambda (a)
+      (+ 1
+         (if t
+             0
+             (progn
+               (tagbody
+                p
                   (tagbody
-                   p
-                     (tagbody
-                        (let ((a (lambda () (go o))))
-                          (declare (special a)))
-                      o)
-                     (when (< a 1)
-                       (go p)))
-                  2))))
-    ((1) 1)))
+                     (let ((a (lambda () (go o))))
+                       (declare (special a)))
+                   o)
+                  (when (< a 1)
+                    (go p)))
+               2))))
+    ((1) 1)
+    (:return-type (values (integer 1 1) &optional))))
 
 (with-test (:name :dce-more-often.2)
   (checked-compile-and-assert
