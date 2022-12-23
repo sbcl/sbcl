@@ -781,9 +781,6 @@
                                              (bignum-ashift-left-fixnum 1 shift))))
                           (ash int exp))))
                    (t
-                    #+64-bit
-                    (bignum-ashift-left-fixnum int exp)
-                    #-64-bit
                     (ash int exp)))))))
     ((rational) x)))
 

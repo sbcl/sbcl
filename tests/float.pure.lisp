@@ -751,3 +751,7 @@
                                  (declare ((double-float 10d0 30d0) f))
                                  (values (truncate f)))))))
              '(integer 10 30))))
+
+(with-test (:name :rational-not-bignum)
+  (assert (equal (type-of (eval '(rational -4.3973217e12)))
+                 (type-of -4397321682944))))
