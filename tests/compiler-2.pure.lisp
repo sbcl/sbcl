@@ -2902,7 +2902,8 @@
            (1
             (dotimes (i 1 b) (ignore-errors)))
            (t 0))))
-   ((3) 0)))
+    ((3) 0)
+    (:return-type (values (integer 0 0) &optional))))
 
 (with-test (:name :ir1-optimize-constant-fold-before-giving-up)
   (checked-compile-and-assert
