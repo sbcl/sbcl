@@ -54,6 +54,7 @@ void jit_copy_code_constants(lispobj lispcode, lispobj constants)
     sigemptyset(&mask);
     sigaddset(&mask, SIG_STOP_FOR_GC);
     thread_sigmask(SIG_BLOCK, &mask, 0);
+    gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
     SET_WRITTEN_FLAG((lispobj*)code);
     memcpy(&code->constants, v->data, vector_len(v) * N_WORD_BYTES);
     thread_sigmask(SIG_UNBLOCK, &mask, 0);
