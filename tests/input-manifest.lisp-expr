@@ -79,7 +79,8 @@
   "tests/package-test-3.lisp"
   "tests/package-test-4.lisp"
   "tests/package-test-5.lisp"
-  "tests/package-test-6.lisp")
+  "tests/package-test-6.lisp"
+  "tests/package-test-7.lisp")
  ("redblack.pure.lisp" "tests/bbtree-test-util.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"
