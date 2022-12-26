@@ -2965,8 +2965,14 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
 {
     if (!ENABLE_PAGE_PROTECTION) return;
     page_index_t i;
-    for (i=first_page+1; i <= last_page; ++i) // last_page is inclusive
+    for (i=first_page; i <= last_page; ++i) {// last_page is inclusive
         gc_assert(is_code(page_table[i].type));
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        if (cardseq_any_sticky_mark(page_to_card_index(i))) {
+            return;
+        }
+#endif
+    }
 
     lispobj* where = start;
     for (; where < limit; where += headerobj_size(where)) {
