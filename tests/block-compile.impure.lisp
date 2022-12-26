@@ -66,7 +66,8 @@
 (defpackage block-defpackage3
   (:use :cl))
 
-(with-test (:name :block-defpackage-delete-package-redefpackage)
+(with-test (:name :block-defpackage-delete-package-redefpackage
+                  :fails-on :sbcl)
   (ctu:file-compile
    `((when (find-package '#:block-defpackage3)
        (delete-package '#:block-defpackage3))
