@@ -469,37 +469,6 @@ Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 \(EVAL-WHEN (:EXECUTE :COMPILE-TOPLEVEL :LOAD-TOPLEVEL) A (FOO A))")))
 
-;; This test doesn't understand that gensyms appear in the expansion
-;; (We either need "string=-modulo-tabspace-and-gensyms" or a sexpr-based comparison)
-(test-util:with-test (:name (:walk multiple-value-bind) :fails-on :sbcl)
-  (assert (string=-modulo-tabspace
-           (with-output-to-string (*standard-output*)
-             (take-it-out-for-a-test-walk (multiple-value-bind (a b)
-                                              (foo a b) (list a b))))
-         "Form: (MULTIPLE-VALUE-BIND (A B) (FOO A B) (LIST A B))   Context: EVAL
-Form: (FOO A B)   Context: EVAL
-Form: 'GLOBAL-FOO   Context: EVAL
-Form: (LIST A B)   Context: EVAL
-Form: A   Context: EVAL; lexically bound
-Form: B   Context: EVAL; lexically bound
-\(MULTIPLE-VALUE-BIND (A B) (FOO A B) (LIST A B))")))
-
-;; This test doesn't understand that gensyms appear in the expansion
-(test-util:with-test (:name (:walk multiple-value-bind special) :fails-on :sbcl)
-  (assert (string=-modulo-tabspace
-           (with-output-to-string (*standard-output*)
-             (take-it-out-for-a-test-walk (multiple-value-bind (a b)
-                                              (foo a b)
-                                            (declare (special a))
-                                            (list a b))))
-         "Form: (MULTIPLE-VALUE-BIND (A B) (FOO A B) (DECLARE (SPECIAL A)) (LIST A B))   Context: EVAL
-Form: (FOO A B)   Context: EVAL
-Form: 'GLOBAL-FOO   Context: EVAL
-Form: (LIST A B)   Context: EVAL
-Form: A   Context: EVAL; lexically bound; declared special
-Form: B   Context: EVAL; lexically bound
-\(MULTIPLE-VALUE-BIND (A B) (FOO A B) (DECLARE (SPECIAL A)) (LIST A B))")))
-
 (test-util:with-test (:name (:walk progn function))
   (assert (string=-modulo-tabspace
            (with-output-to-string (*standard-output*)
@@ -1072,7 +1041,7 @@ Form: C   Context: EVAL; lexically bound
 ;;;; more tests
 
 ;;; Old PCL hung up on this.
-(defmethod #:foo ()
+(defmetho #:foo ()
   (defun #:bar ()))
 
 ;; lp#1912362
