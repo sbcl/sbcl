@@ -15,15 +15,15 @@
 (defvar *current-internal-error-context*)
 
 (defmacro with-pinned-context-code-object
-      ((&optional (context '*current-internal-error-context*))
-       &body body)
-    (declare (ignorable context))
-    #+(or x86 x86-64)
-    `(progn ,@body)
-    #-(or x86 x86-64)
-    `(with-pinned-objects ((with-code-pages-pinned (:dynamic)
-                             (sb-di::code-object-from-context ,context)))
-       ,@body))
+    ((&optional (context '*current-internal-error-context*))
+     &body body)
+  (declare (ignorable context))
+  #+(or x86 x86-64 arm64)
+  `(progn ,@body)
+  #-(or x86 x86-64 arm64)
+  `(with-pinned-objects ((with-code-pages-pinned (:dynamic)
+                           (sb-di::code-object-from-context ,context)))
+     ,@body))
 
 ;;;; OS-CONTEXT-T
 
