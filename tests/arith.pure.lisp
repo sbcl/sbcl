@@ -1132,3 +1132,14 @@
       ((1 2) nil)
       ((1 1) t)
       ((3 0) 3)))
+
+(with-test (:name :integer-fixnum-<)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f b &optional a c d e g h i j k l m n o p q r s)
+      (declare (fixnum f))
+      (eval (list 'list a b c d e f g h i j k l m n o p q r s t))
+      (and (integerp b)
+           (< f b)))
+   ((1 t) nil)
+   ((1 10) t)))
