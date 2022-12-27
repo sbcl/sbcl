@@ -635,12 +635,16 @@
 (defun code-header-from-pc (pc)
   (with-code-pages-pinned (:dynamic)
     (let ((base-ptr
-           (sb-alien:alien-funcall
-            (sb-alien:extern-alien "component_ptr_from_pc"
-                                   (function sb-alien:unsigned system-area-pointer))
-            (etypecase pc
-              (system-area-pointer pc)
-              (word (int-sap pc))))))
+            ;; FIXME: It's accessing *dynspace-codeblob-tree*, which
+            ;; isn't gc-safe when done from C (especially on the
+            ;; precise gc backends).
+            (without-gcing
+              (sb-alien:alien-funcall
+               (sb-alien:extern-alien "component_ptr_from_pc"
+                                      (function sb-alien:unsigned system-area-pointer))
+               (etypecase pc
+                 (system-area-pointer pc)
+                 (word (int-sap pc)))))))
       (unless (= base-ptr 0) (%make-lisp-obj (logior base-ptr other-pointer-lowtag))))))
 
 ;;;; (OR X86 X86-64) support
