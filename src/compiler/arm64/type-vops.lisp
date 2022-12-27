@@ -269,15 +269,13 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:args-var args)
+  (:args-var integer-ref)
   (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :gt)
   (:generator 10
-    (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
-      (setf args (tn-ref-across args)))
-    (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
-           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
+    (let* ((integer-p (csubtypep (tn-ref-type integer-ref) (specifier-type 'integer)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p integer-ref t))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
@@ -294,7 +292,7 @@
               (values not-target target)
               (values target not-target))
         (assemble ()
-          (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+          (when (types-equal-or-intersect (tn-ref-type integer-ref) (specifier-type 'fixnum))
             (cond ((or other-pointer-p
                        (not (and (eql fixnum 0)
                                  (eq comparison :ge))))
@@ -353,6 +351,7 @@
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
   (:arg-types tagged-num (:or integer bignum))
+  (:args-var nil integer-ref)
   (:variant :lt))
 
 (define-vop (<-fixnum-integer >-fixnum-integer)

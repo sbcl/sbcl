@@ -260,7 +260,7 @@
   ;; This is only meaningful in :ARGUMENT and :TEMPORARY operands.
   (target nil :type (or symbol null) :read-only t)
   ;; TEMP is a temporary that holds the TN-REF for this operand.
-  (temp (make-operand-parse-temp) :type symbol :read-only t)
+  (temp (make-operand-parse-temp) :type symbol)
   ;; the time that this operand is first live and the time at which it
   ;; becomes dead again. These are TIME-SPECs, as returned by
   ;; PARSE-TIME-SPEC.
@@ -343,7 +343,7 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
-  (args-var '.args. :type symbol)
+  (args-var nil :type list)
   (results-var '.results. :type symbol)
   (before-load :unspecified :type (or (member :unspecified) list)))
 (declaim (freeze-type vop-parse))
@@ -727,7 +727,6 @@
 (defun make-generator-function (parse)
   (declare (type vop-parse parse))
   (let ((n-vop (vop-parse-vop-var parse))
-        (n-args (vop-parse-args-var parse))
         (n-results (vop-parse-results-var parse))
         (operands (vop-parse-operands parse))
         (n-info (gensym)) (n-variant (gensym))
@@ -754,11 +753,10 @@
           ((:more-argument :more-result))))
 
       `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
-         (let* ((,n-args (vop-args ,n-vop))
-                (,n-results (vop-results ,n-vop))
+         (let* ((,n-results (vop-results ,n-vop))
                 ,@(access-operands (vop-parse-args parse)
                                    (vop-parse-more-args parse)
-                                   n-args)
+                                   `(vop-args ,n-vop))
                 ,@(access-operands (vop-parse-results parse)
                                    (vop-parse-more-results parse)
                                    n-results)
@@ -781,7 +779,7 @@
            (declare (ignore ,@(vop-parse-ignores parse)
                             ,@(and (neq (vop-parse-before-load parse) :unspecified)
                                    `(,dummy)))
-                    (ignorable ,n-args ,n-results))
+                    (ignorable ,n-results))
            ,@(loads)
            ;; RETURN-FROM can exit the ASSEMBLE while continuing on with saves.
            (block ,(vop-parse-name parse)
@@ -797,16 +795,14 @@
     (when (or unused-temps
               conditional)
       (let* ((n-vop (vop-parse-vop-var parse))
-             (n-args (vop-parse-args-var parse))
              (n-results (vop-parse-results-var parse))
              (n-info (gensym))
              (n-variant (gensym))
              (bindings
-               `((,n-args (vop-args ,n-vop))
-                 (,n-results (vop-results ,n-vop))
+               `((,n-results (vop-results ,n-vop))
                  ,@(access-operands (vop-parse-args parse)
                                     (vop-parse-more-args parse)
-                                    n-args)
+                                    `(vop-args ,n-vop))
                  ,@(access-operands (vop-parse-results parse)
                                     (vop-parse-more-results parse)
                                     n-results)
@@ -1075,7 +1071,7 @@
         (:vop-var
          (setf (vop-parse-vop-var parse) (vop-spec-arg spec 'symbol)))
         (:args-var
-         (setf (vop-parse-args-var parse) (vop-spec-arg spec 'symbol)))
+         (setf (vop-parse-args-var parse) (cdr spec)))
         (:results-var
          (setf (vop-parse-results-var parse) (vop-spec-arg spec 'symbol)))
         (:move-args
@@ -1114,6 +1110,11 @@
                        (rest spec))))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
+    (loop with refs = (vop-parse-args-var parse)
+          for arg in (vop-parse-args parse)
+          for ref = (pop refs)
+          when ref
+          do (setf (operand-parse-temp arg) ref))
     (values)))
 
 ;;;; making costs and restrictions

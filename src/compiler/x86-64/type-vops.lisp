@@ -829,14 +829,12 @@
   (:temporary (:sc unsigned-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:args-var args)
+  (:args-var integer-ref)
   (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :g)
   (:generator 8
-    (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
-      (setf args (tn-ref-across args)))
-    (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
+    (let* ((integer-p (csubtypep (tn-ref-type integer-ref) (specifier-type 'integer)))
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum))))
                          (cond ((plausible-signed-imm32-operand-p value)
@@ -850,7 +848,7 @@
               (values not-target target)
               (values target not-target))
         (assemble ()
-          (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+          (when (types-equal-or-intersect (tn-ref-type integer-ref) (specifier-type 'fixnum))
             (generate-fixnum-test integer)
             (inst jmp :nz BIGNUM)
             (if (eql fixnum 0)
@@ -859,7 +857,7 @@
             (inst jmp comparison yep)
             (inst jmp nope))
           bignum
-          (unless (fixnum-or-other-pointer-tn-ref-p args t)
+          (unless (fixnum-or-other-pointer-tn-ref-p integer-ref t)
             (test-type integer temp nope t (other-pointer-lowtag)))
           (loadw temp integer 0 other-pointer-lowtag)
           (unless integer-p
@@ -883,6 +881,7 @@
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
   (:arg-types tagged-num (:or integer bignum))
+  (:args-var nil integer-ref)
   (:variant :l))
 
 (define-vop (<-fixnum-integer >-fixnum-integer)
