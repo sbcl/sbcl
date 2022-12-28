@@ -3,7 +3,7 @@ vpath %.fasl ../obj/sbcl-home/contrib/
 contribs = sb-posix sb-bsd-sockets sb-introspect sb-cltl2 sb-aclrepl \
      sb-sprof sb-capstone sb-md5 sb-capstone sb-executable sb-gmp sb-mpfr \
      sb-queue sb-rotate-byte sb-rt sb-simple-streams sb-concurrency sb-cover \
-     sb-graph sb-simd sb-grovel asdf
+     sb-simd sb-grovel asdf
 
 active_contribs = $(filter-out $(SBCL_CONTRIB_BLOCKLIST),$(contribs))
 
