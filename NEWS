@@ -3,11 +3,22 @@
 changes relative to sbcl-2.2.11:
   * enhancement: support for SLOT-VALUE and friends has been extended to
     structure and condition instances.
-  * minor incompatible change: compiled-function-p is false of
+  * enhancement: the error message for invalid array index conditions is clearer.
+    (lp#1999337, reported by Hadrien Lacour)
+  * minor incompatible change: COMPILED-FUNCTION-P now returns false for
     generic functions.
+  * minor incompatible change: the compiler emit STYLE-WARNING conditions for
+    FIND and POSITION where the item sought can never be present in the
+    sequence.
+  * optimization: support computing the remainder of a constant division by
+    multiplication.
   * optimization: faster out of line float truncation routines.
+  * optimization: faster RATIONAL on 64-bit platforms.
+  * optimization: more compact testing of widetags on x86-64 and arm64.
   * bug fix: type intersections of RATIONAL ranges with (NOT INTEGER) are
     computed more consistently.  (lp#1998008)
+  * bug fix: fix miscompilation of integer/fixnum comparisons where both
+    arguments are on the stack.
 
 changes in sbcl-2.2.11 relative to sbcl-2.2.10:
   * platform support:
