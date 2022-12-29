@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.11:
+changes in sbcl-2.3.0 relative to sbcl-2.2.11:
   * enhancement: support for SLOT-VALUE and friends has been extended to
     structure and condition instances.
   * enhancement: the error message for invalid array index conditions is clearer.
