@@ -1110,7 +1110,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         return;
     hopscotch_insert(seen, ptr, 1);
     lispobj layout, *obj;
-    int nwords, i;
+    sword_t nwords, i;
     if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
         RECURSE(CONS(ptr)->car);
         RECURSE(CONS(ptr)->cdr);
@@ -1163,7 +1163,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             break;
         default:
             if (!leaf_obj_widetag_p(widetag_of(obj))) {
-                int size = headerobj_size(obj);
+                sword_t size = headerobj_size(obj);
                 for(i=1; i<size; ++i) RECURSE(obj[i]);
             }
       }
@@ -1183,7 +1183,7 @@ static void tally(lispobj ptr, struct visitor* v)
     else {
         lispobj* obj = native_pointer(ptr);
         lispobj header = *obj;
-        int words = object_size2(obj, header);
+        sword_t words = object_size2(obj, header);
         int widetag = header_widetag(header);
         int header_index = widetag>>2;
         ++v->headers[header_index].count;

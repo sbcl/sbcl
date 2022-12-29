@@ -610,7 +610,7 @@ static void full_scavenge_immobile_newspace()
         do {
             lispobj* limit = (lispobj*)text_page_address(page) + WORDS_PER_PAGE;
             if (limit > text_space_highwatermark) limit = text_space_highwatermark;
-            int n_words;
+            sword_t n_words;
             for ( ; obj < limit ; obj += n_words ) {
                 lispobj header = *obj;
                 if (immobile_obj_gen_bits(obj) == new_space) {
@@ -717,7 +717,8 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         if (!obj) { ++page; continue; }
         do {
             lispobj* limit = (lispobj*)text_page_address(page) + WORDS_PER_PAGE;
-            int n_words, gen;
+            sword_t n_words;
+            int gen;
             if (limit > text_space_highwatermark) limit = text_space_highwatermark;
             for ( ; obj < limit ; obj += n_words ) {
                 lispobj header = *obj;
@@ -1060,7 +1061,8 @@ sweep_text_pages(int raise)
         // wp_it is 1 if we should try to write-protect it now.
         // If already write-protected, skip the tests.
         int wp_it = ENABLE_PAGE_PROTECTION && text_page_touched(page);
-        int size, gen;
+        sword_t size;
+        int gen;
 
         for ( ; obj < limit ; obj += size ) {
             lispobj word = *obj;
@@ -1182,7 +1184,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
             lispobj header = *obj;
             if (!fixnump(header)) {
                 gc_assert(other_immediate_lowtag_p(*obj));
-                int size = object_size2(obj, header);
+                sword_t size = object_size2(obj, header);
                 fixedobj_pages[page].attr.parts.obj_align = size;
                 fixedobj_pages[page].gens |= 1 << immobile_obj_gen_bits(obj);
                 if (gen != 0 && ENABLE_PAGE_PROTECTION)
@@ -1541,7 +1543,7 @@ static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
     int widetag;
-    long size;
+    sword_t size;
     struct code* code;
 
     while (where < end) {

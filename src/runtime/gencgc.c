@@ -1878,7 +1878,7 @@ lispobj *search_dynamic_space(void *pointer)
             int widetag = widetag_of(found);
             if (widetag != CODE_HEADER_WIDETAG && widetag != FUNCALLABLE_INSTANCE_WIDETAG)
                 lose("header not OK for code page: @ %p = %"OBJ_FMTX"\n", found, *found);
-            int nwords = object_size(found);
+            sword_t nwords = object_size(found);
             lispobj *upper_bound = found + nwords;
             if (pointer < (void*)upper_bound) return found;
         }
@@ -2446,7 +2446,7 @@ static void obliterate_nonpinned_words()
         // If 'obj' spans pages, move its successive page(s) to newspace and
         // ensure that those pages' scan_starts point at the same address
         // that this page's scan start does, which could be this page or earlier.
-        size_t nwords = object_size(obj);
+        sword_t nwords = object_size(obj);
         uword_t obj_end = (uword_t)(obj + nwords); // non-inclusive address bound
         page_index_t end_page_index = find_page_index((char*)obj_end - 1); // inclusive bound
 

@@ -74,7 +74,7 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
         // first 4 slots are header, boxedlen, fixups, debuginfo
         for (i=2; i<boxedlen; ++i) FIX(object[i]);
     } else {
-        int len = object_size(object), i;
+        sword_t len = object_size(object), i;
         for (i=1; i<len; ++i) FIX(object[i]);
     }
 #undef FIX
@@ -150,7 +150,7 @@ static void walk_all_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
 static void ensure_forwarded(lispobj* obj)
 {
     if (forwarding_pointer_p(obj)) return;
-    int nwords = object_size(obj);
+    sword_t nwords = object_size(obj);
     lispobj* copy = read_only_space_free_pointer;
     read_only_space_free_pointer += nwords;
     gc_assert((uword_t)read_only_space_free_pointer <= READ_ONLY_SPACE_END);
@@ -207,7 +207,7 @@ void prepare_readonly_space(int purify, int print)
         last = contiguous_block_final_page(first);
         lispobj* where = (lispobj*)page_address(first);
         lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
-        int nwords;
+        sword_t nwords;
         for ( ; where < limit ; where += nwords ) {
             nwords = object_size(where);
             if ( readonly_unboxed_obj_p(where) ) sum_sizes += nwords;
@@ -282,7 +282,7 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
     // Forward everything in R/O to dynamic space. Record FPs outside of the objects
     // since the space is not writable and we're about to unmap.
     lispobj *where = (lispobj*)READ_ONLY_SPACE_START;
-    int nwords;
+    sword_t nwords;
     for ( ; where < read_only_space_free_pointer ; where += nwords, shadow_cursor += nwords ) {
         nwords = headerobj_size(where);
         lispobj *new = gc_general_alloc(unboxed_region, nwords*N_WORD_BYTES, PAGE_TYPE_BOXED);

@@ -158,7 +158,7 @@ static inline lispobj canonical_obj(lispobj obj)
 static int find_ref(lispobj* source, lispobj target)
 {
     lispobj layout;
-    int scan_limit, i;
+    sword_t scan_limit, i;
 
     lispobj word = *source;
     if (!is_header(word)) {
@@ -563,8 +563,8 @@ static lispobj trace1(lispobj object,
                     if (hopscotch_containsp(visited, (lispobj)ptr))
                         fprintf(stderr, "%p ", ptr);
                     else {
-                        int nwords = object_size(ptr);
-                        fprintf(stderr, "%p+%d ", ptr, nwords);
+                        sword_t nwords = object_size(ptr);
+                        fprintf(stderr, "%p+%ld ", ptr, nwords);
                     }
                     list1 = cell[1];
                 }
