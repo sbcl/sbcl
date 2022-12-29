@@ -4506,6 +4506,13 @@
                      (typecase x
                        (cons (or (car x) (ex)))
                        (t (ex)))))) :foo)
+    (test nil `(lambda (x)
+                 (declare (optimize speed))
+                 (block out
+                   (flet ((ex () (return-from out 'out!)))
+                     (typecase x
+                       (cons (or (car x) (ex)))
+                       (t (ex) 2))))) :foo)
     (test t   `(lambda (x)
                  (declare (optimize speed))
                  (funcall
@@ -4519,7 +4526,7 @@
                      (lambda (x)
                        (typecase x
                          (cons (or (car x) (ex)))
-                         (t (ex))))))) t t)
+                         (t (ex) 3)))))) t t)
     (test t   `(lambda (x)
                  (declare (optimize speed))
                  (flet ((eh (x)
@@ -4527,7 +4534,7 @@
                             (lambda ()
                               (typecase x
                                 (cons (or (car x) (meh)))
-                                (t (meh)))))))
+                                (t (meh) 3))))))
                    (funcall (eh x)))) t t)))
 
 (with-test (:name (compile :bug-1050768 :symptom))
