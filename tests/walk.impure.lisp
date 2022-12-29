@@ -1041,7 +1041,7 @@ Form: C   Context: EVAL; lexically bound
 ;;;; more tests
 
 ;;; Old PCL hung up on this.
-(defmetho #:foo ()
+(defmethod #:foo ()
   (defun #:bar ()))
 
 ;; lp#1912362
