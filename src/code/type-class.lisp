@@ -263,8 +263,7 @@
   ;; We'll never return the upper 5 bits from a hash mixer, so it's fine
   ;; that this uses all 32 bits for a 32-bit word.
   ;; No more than 32 bits are used, even for 64-bit words.
-  ;; But it's consistent for genesis to treat it always as a raw slot.
-  (%bits (missing-arg) :type sb-vm:word :read-only t))
+  (%bits (missing-arg) :type (unsigned-byte 32) :read-only t))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant ctype-hash-nbits 27))
@@ -800,7 +799,7 @@
     #-sb-xc-host
     `(let ((temp (,allocator ,bits ,@initargs)))
        ;; Too many "can't stack-allocate" warnings for most
-       #+c-stack-is-control-stack (declare (truly-dynamic-extent temp))
+       #+(or 64-bit c-stack-is-control-stack) (declare (truly-dynamic-extent temp))
        #+nil ; or #+sb-devel as you see fit
        (unless *hashsets-preloaded*
          (write-string "CTYPE hashset preload failure")
