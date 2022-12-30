@@ -149,40 +149,43 @@
 
 (with-test (:name :type-constraint-joining)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda ()
-                (let ((x 'foo))
-                  (if (read)
-                      (setq x 3)
-                      (setq x 5))
-                  x)))))
-          '(values (or (integer 5 5) (integer 3 3)) &optional))))
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda ()
+          (let ((x 'foo))
+            (if (read)
+                (setq x 3)
+                (setq x 5))
+            x)))))
+    '(values (or (integer 5 5) (integer 3 3)) &optional))))
 
 (with-test (:name :type-constraint-joining.2)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-                (etypecase x
-                  (integer (read))
-                  (float (read)))
-                x))))
-          '(values (or float integer) &optional))))
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (etypecase x
+            (integer (read))
+            (float (read)))
+          x))))
+    '(values (or float integer) &optional))))
 
 (with-test (:name :type-constraint-joining.3)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-                (if (read)
-                    (setq x (random 10))
-                    (setq x (random 10.0)))
-                x))))
-          '(values (or (single-float 0.0 (10.0)) (mod 10)) &optional))))
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (if (read)
+              (setq x (random 10))
+              (setq x (random 10.0)))
+          x))))
+    '(values (or (single-float 0.0 (10.0)) (mod 10)) &optional))))
 
 (with-test (:name :type-constraint-joining-terminates)
   (checked-compile
