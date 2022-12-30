@@ -3811,14 +3811,6 @@ used for a COMPLEX component.~:@>"
 (define-type-class member :enumerable t
                     :might-contain-other-types nil)
 
-(declaim (ftype (sfunction (xset list) ctype) make-member-type))
-(defun member-type-from-list (members)
-  (let ((xset (alloc-xset))
-        (fp-zeroes))
-    (dolist (elt members (make-member-type xset fp-zeroes))
-      (if (fp-zero-p elt)
-          (pushnew elt fp-zeroes)
-          (add-to-xset elt xset)))))
 ;; Return possibly a union of a MEMBER type and a NUMERIC type,
 ;; or just one or the other, or *EMPTY-TYPE* depending on what's in the XSET
 ;; and the FP-ZEROES. XSET must not contains characters or real numbers.
@@ -3845,16 +3837,15 @@ used for a COMPLEX component.~:@>"
                     (single-float 0)
                     (double-float 2
                     #+long-float (long-float 4)))))
-            (if (= pass 0)
-                (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
-                (if (= (ldb (byte 2 pair-idx) presence) #b11)
-                    (when (= sign 0)
-                      ;; FIXME: CTYPE-OF is heavyweight for all of what, 2 cases?
-                      ;; Just a typecase would be better.
-                      ;; ('Sup Dawg, I heard you like caches so I put a cache lookup
-                      ;; in your cache lookup so you can cache while you cache.)
-                      (push (ctype-of z) float-types))
-                    (push z unpaired)))))))
+            (cond ((= pass 0) ; first pass: track presence of +-0 of each float format
+                   (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1))
+                  ;; second pass: if not both signs present, then it's an unpaired zero
+                  ((/= (ldb (byte 2 pair-idx) presence) #b11)
+                   (push z unpaired))
+                  ((= sign 0) ; take the +0 as canonical when both +-0 are present
+                   (push (make-numeric-type :complexp :real :class 'float :low z :high z
+                                            :format (float-format-name z))
+                         float-types)))))))
      ((and (= (xset-count xset) 1)
            (eq (car (xset-members xset)) nil))
       ;; Bypass the hashset for type NULL because it's so important
@@ -4028,20 +4019,23 @@ used for a COMPLEX component.~:@>"
   ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
   ;;  literal symbol *, and does not represent an unspecified value."
   (if members
-      (let (ms numbers char-codes)
-        (dolist (m (remove-duplicates members))
+      (let ((xset (alloc-xset)) fp-zeros nonzero-reals char-codes)
+        ;; Calling REMOVE-DUPLICATES up front as used to be done is wasteful because the XSET can't
+        ;; have dups in it. Elements that don't go in the XSET have to be de-duplicated.
+        ;; There are at most 4 fp-zeros, so calling PUSHNEW is fine. For the rest, we can suppose
+        ;; that DELETE-DUPLICATES is as good as it gets. (It could/should use a hash-table above
+        ;; a cetain length input, but does not)
+        (dolist (m members)
           (typecase m
             (character (push (sb-xc:char-code m) char-codes))
-            (real (if (and (floatp m) (zerop m))
-                      (push m ms)
-                      (push (ctype-of m) numbers)))
-            (t (push m ms))))
+            (real (if (fp-zero-p m) (pushnew m fp-zeros) (push m nonzero-reals)))
+            (t (add-to-xset m xset))))
         (apply #'type-union
-               (member-type-from-list ms)
+               (make-member-type xset fp-zeros)
                ;; Constructor asserts that pairs are properly sorted
                (make-character-set-type (mapcar (lambda (x) (cons x x))
-                                                (sort char-codes #'<)))
-               (nreverse numbers)))
+                                                (sort (delete-duplicates char-codes) #'<)))
+               (mapcar #'ctype-of-number (delete-duplicates nonzero-reals))))
       *empty-type*))
 (defun make-eql-type (elt)
   ;; Start by looking in the hash-table, there's no reason not to.
@@ -4054,16 +4048,17 @@ used for a COMPLEX component.~:@>"
       ;; and further builds up fresh data lists for the constructor(s).
       (typecase elt
         (character
-         ;; just checking an expectation of self-build here
+         ;; just checking an expectation of self-build here, no real reason to prohibit
          #+sb-xc-host (bug "Unexpected singleton character type")
-         (let* ((codepoint (char-code elt))
+         (let* ((codepoint (sb-xc:char-code elt))
                 (pairs (list (cons codepoint codepoint))))
            ;; PAIRS will get copied if needed, but not for the host
            #-sb-xc-host (declare (truly-dynamic-extent pairs))
            (make-character-set-type pairs)))
         (real
-         #+sb-xc-host (bug "Unexpected singleton REAL type") ; likewise
          (unless (fp-zero-p elt)
+           ;; we do see singleton fp zeros in self-build but not other floats
+           #+sb-xc-host (bug "Unexpected singleton REAL type")
            ;; This is a little redundant with CTYPE-OF-NUMBER,
            ;; but imho easier to understand.
            (multiple-value-bind (class format)
