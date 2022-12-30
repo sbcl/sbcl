@@ -1259,15 +1259,20 @@
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
          (b :scs (unsigned-reg))
-         (c :scs (any-reg)))
+         (c :scs (unsigned-reg any-reg immediate)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
             (borrow :scs (unsigned-reg) :from :eval))
   (:optional-results borrow)
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
-    (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
-    (inst sbcs result a b)
+    (cond ((and (sc-is c immediate)
+                (eql (tn-value c) 1))
+           (inst subs result a b))
+          (t
+           (inst cmp c 1)
+           (inst sbcs result a b)))
+
     (unless (eq (tn-kind borrow) :unused)
       (inst cset borrow :cs))))
 
