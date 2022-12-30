@@ -216,12 +216,20 @@
 
 ;;; Return NUMBER-DISPATCH forms for bignum X fixnum.
 (defun bignum-cross-fixnum (fix-op big-op)
-  `(((fixnum fixnum) (,fix-op x y))
-    ((fixnum bignum)
-     (,big-op (make-small-bignum x) y))
-    ((bignum fixnum)
-     (,big-op x (make-small-bignum y)))
-    ((bignum bignum)
-     (,big-op x y))))
+  (if (eq fix-op '+)
+      `(((fixnum fixnum) (,fix-op x y))
+        ((fixnum bignum)
+         (sb-bignum::add-bignum-fixnum y x))
+        ((bignum fixnum)
+         (sb-bignum::add-bignum-fixnum x y))
+        ((bignum bignum)
+         (,big-op x y)))
+      `(((fixnum fixnum) (,fix-op x y))
+        ((fixnum bignum)
+         (,big-op (make-small-bignum x) y))
+        ((bignum fixnum)
+         (,big-op x (make-small-bignum y)))
+        ((bignum bignum)
+         (,big-op x y)))))
 
 ) ; EVAL-WHEN
