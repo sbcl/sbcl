@@ -368,8 +368,12 @@
 (defknown %unary-truncate-double-float-to-bignum (double-float) bignum
    (#+(or) foldable movable flushable fixed-args))
 
-(defknown add-bignums (bignum bignum) integer (movable flushable no-verify-arg-count))
-(defknown add-bignum-fixnum (bignum fixnum) integer (movable flushable no-verify-arg-count))
+(defknown (subtract-bignum add-bignums) (bignum bignum) integer
+    (movable flushable no-verify-arg-count))
+(defknown (add-bignum-fixnum subtract-bignum-fixnum) (bignum fixnum) integer
+    (movable flushable no-verify-arg-count))
+(defknown subtract-fixnum-bignum (fixnum bignum) integer
+    (movable flushable no-verify-arg-count))
 
 (defknown sxhash-bignum-double-float (double-float) hash-code
   (foldable movable flushable fixed-args))
