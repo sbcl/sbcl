@@ -356,6 +356,27 @@
                                    carry)))
         (%normalize-bignum res len-res)))))
 
+(defun add-bignum-fixnum (a b)
+  (declare (type bignum a)
+           (fixnum b)
+           (optimize (safety 0)))
+  (let* ((len-a (%bignum-length a))
+         (len-res (1+ len-a))
+         (res (%allocate-bignum len-res)))
+    (multiple-value-bind (v carry)
+        (%add-with-carry (%bignum-ref a 0) (ldb (byte 64 0) b) 0)
+      (setf (%bignum-ref res 0) v)
+      (do ((sign-digit-b (ash b (- 1 digit-size)))
+           (i 1 (1+ i)))
+          ((= i len-a)
+           (setf (%bignum-ref res len-a)
+                 (%add-with-carry (%sign-digit a len-a) sign-digit-b carry)))
+        (declare (type bignum-index i))
+        (setf (values (%bignum-ref res i)
+                      carry)
+              (%add-with-carry (%bignum-ref a i) sign-digit-b carry))))
+    (%normalize-bignum res len-res)))
+
 ;;; This takes the longer of two bignums and propagates the carry through its
 ;;; remaining high order digits.
 (defun finish-add (a res carry sign-digit-b start end)
