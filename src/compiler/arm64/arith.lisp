@@ -1448,16 +1448,20 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
-      (let (value)
-        (when (sc-is y immediate)
-          (load-immediate-word high (setf value (tn-value y)))
-          (setf y high))
-        (if (and value
-                 (plusp value)
-                 (= (logcount value) 1))
-            (inst lsl r x (1- (integer-length value)))
-            (inst mul r x y))
-        (inst smulh high x y))
+      (let ((value (and (sc-is y immediate)
+                        (tn-value y))))
+        (cond ((and value
+                    (plusp value)
+                    (= (logcount value) 1))
+               (let ((shift (1- (integer-length value))))
+                 (inst lsl r x shift)
+                 (inst asr high x (- 64 shift))))
+              (t
+               (when value
+                 (load-immediate-word high value)
+                 (setf y high))
+               (inst mul r x y)
+               (inst smulh high x y))))
       (inst cmp high (asr r 63))
       (inst b :ne error))))
 
@@ -1476,16 +1480,20 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
-      (let (value)
-        (when (sc-is y immediate)
-          (load-immediate-word high (setf value (tn-value y)))
-          (setf y high))
-        (if (and value
-                 (plusp value)
-                 (= (logcount value) 1))
-            (inst lsl r x (1- (integer-length value)))
-            (inst mul r x y))
-        (inst smulh high x y))
+      (let ((value (and (sc-is y immediate)
+                        (tn-value y))))
+        (cond ((and value
+                    (plusp value)
+                    (= (logcount value) 1))
+               (let ((shift (1- (integer-length value))))
+                 (inst lsl r x shift)
+                 (inst asr high x (- 64 shift))))
+              (t
+               (when value
+                 (load-immediate-word high value)
+                 (setf y high))
+               (inst mul r x y)
+               (inst smulh high x y))))
       (inst cmp high (asr r 63))
       (inst b :ne error))))
 
@@ -1533,16 +1541,20 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 10
-    (let (value)
-      (when (sc-is y immediate)
-        (load-immediate-word high (setf value (tn-value y)))
-        (setf y high))
-      (if (and value
-               (plusp value)
-               (= (logcount value) 1))
-          (inst lsl low x (1- (integer-length value)))
-          (inst mul low x y))
-      (inst smulh high x y))
+    (let ((value (and (sc-is y immediate)
+                      (tn-value y))))
+      (cond ((and value
+                  (plusp value)
+                  (= (logcount value) 1))
+             (let ((shift (1- (integer-length value))))
+               (inst lsl low x shift)
+               (inst asr high x (- 64 shift))))
+            (t
+             (when value
+               (load-immediate-word high value)
+               (setf y high))
+             (inst mul low x y)
+             (inst smulh high x y))))
     (inst mov header (bignum-header-for-length 2))
     (inst cmp high (asr low 63))
     (inst b :ne allocate)
