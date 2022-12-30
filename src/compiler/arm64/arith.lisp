@@ -1238,15 +1238,19 @@
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
          (b :scs (unsigned-reg))
-         (c :scs (any-reg)))
+         (c :scs (unsigned-reg any-reg immediate)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
             (carry :scs (unsigned-reg) :from :eval))
   (:optional-results carry)
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
-    (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
-    (inst adcs result a b)
+    (cond ((and (sc-is c immediate)
+                (zerop (tn-value c)))
+           (inst adds result a b))
+          (t
+           (inst cmp c 1)
+           (inst adcs result a b)))
     (unless (eq (tn-kind carry) :unused)
       (inst cset carry :cs))))
 
@@ -1404,12 +1408,15 @@
   (:translate sb-bignum:%ashr)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg))
-         (count :scs (unsigned-reg)))
+         (count :scs (unsigned-reg immediate)))
   (:arg-types unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (inst asr result digit count)))
+    (inst asr result digit (sc-case count
+                             (immediate
+                              (tn-value count))
+                             (t count)))))
 
 (define-vop (digit-lshr digit-ashr)
   (:translate sb-bignum:%digit-logical-shift-right)
