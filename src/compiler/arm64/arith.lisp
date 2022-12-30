@@ -265,16 +265,31 @@
 ;;; Multiplication
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
-  (:args (x :scs (signed-reg)) ;; one operand needs to be untagged
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg))
+         (y :scs (signed-reg immediate))) ;; one operand needs to be untagged
   (:translate *)
   (:generator 2
-    (inst mul r x y)))
+    (let (value)
+      (cond ((and (sc-is y immediate)
+                  (= (logcount (abs (setf value (tn-value y)))) 1))
+             (let ((shift (1- (integer-length (abs value)))))
+               (if (minusp value)
+                   (inst neg r (lsl x shift))
+                   (inst lsl r x shift))))
+            (t
+             (when value
+               (load-immediate-word tmp-tn value)
+               (setf y tmp-tn))
+             (inst mul r x y))))))
 
-(define-vop (fast-*/signed=>signed fast-signed-binop)
-  (:translate *)
-  (:generator 3
-    (inst mul r x y)))
+(define-vop (fast-*/signed=>signed fast-*/fixnum=>fixnum)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg immediate)))
+  (:arg-types signed-num signed-num)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 64) arithmetic")
+  (:variant-cost 3))
 
 (define-vop (fast-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
