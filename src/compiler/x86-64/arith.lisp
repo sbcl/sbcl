@@ -2450,7 +2450,7 @@
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :target result)
          (b :scs (unsigned-reg unsigned-stack) :to :eval)
-         (c :scs (any-reg unsigned-reg control-stack) :target temp))
+         (c :scs (any-reg unsigned-reg control-stack immediate) :target temp))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 2) :to :eval) temp)
   (:results (result :scs (unsigned-reg) :from (:argument 0))
@@ -2459,9 +2459,14 @@
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
     (move result a)
-    (move temp c)
-    (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
-    (inst adc result b)
+    (cond ((and (sc-is c immediate)
+                (zerop (tn-value c)))
+           (inst add result b))
+          (t
+           (move temp c)
+           (inst neg temp)  ; Set the carry flag to 0 if c=0 else to 1
+           (inst adc result b)))
+
     (unless (eq (tn-kind carry) :unused)
      (inst set :c carry)
      (inst and :dword carry 1))))
@@ -2473,16 +2478,21 @@
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :to :eval :target result)
          (b :scs (unsigned-reg unsigned-stack) :to :result)
-         (c :scs (any-reg unsigned-reg control-stack)))
+         (c :scs (any-reg unsigned-reg control-stack immediate)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg) :from :eval)
             (borrow :scs (unsigned-reg)))
   (:optional-results borrow)
   (:result-types unsigned-num positive-fixnum)
   (:generator 5
-    (inst cmp c 1) ; Set the carry flag to 1 if c=0 else to 0
-    (move result a)
-    (inst sbb result b)
+    (cond ((and (sc-is c immediate)
+                (eql (tn-value c) 1))
+           (move result a)
+           (inst sub result b))
+          (t
+           (inst cmp c 1)   ; Set the carry flag to 1 if c=0 else to 0
+           (move result a)
+           (inst sbb result b)))
     (unless (eq (tn-kind borrow) :unused)
      (inst mov borrow 1)
      (inst sbb :dword borrow 0))))
