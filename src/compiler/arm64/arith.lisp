@@ -276,6 +276,12 @@
                (if (minusp value)
                    (inst neg r (lsl x shift))
                    (inst lsl r x shift))))
+            ((and (typep value '(integer 1))
+                  (= (logcount (1- value)) 1))
+             (inst add r x (lsl x (1- (integer-length (1- value))))))
+            ((and (typep value '(integer * -1))
+                  (= (logcount (- 1 value)) 1))
+             (inst sub r x (lsl x (1- (integer-length (- 1 value))))))
             (t
              (when value
                (load-immediate-word tmp-tn value)
@@ -291,10 +297,14 @@
   (:note "inline (signed-byte 64) arithmetic")
   (:variant-cost 3))
 
-(define-vop (fast-*/unsigned=>unsigned fast-unsigned-binop)
-  (:translate *)
-  (:generator 3
-    (inst mul r x y)))
+(define-vop (fast-*/unsigned=>unsigned fast-*/fixnum=>fixnum)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg immediate)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "inline (unsigned-byte 64) arithmetic")
+  (:variant-cost 3))
 
 ;;; Division
 (define-vop (fast-truncate/signed=>signed fast-safe-arith-op)
