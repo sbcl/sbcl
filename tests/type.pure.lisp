@@ -11,6 +11,10 @@
 
 (enable-test-parallelism)
 
+(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type #\z))))
+(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type 1.0))))
+(assert (sb-kernel:member-type-p (sb-kernel:make-eql-type -0.0s0)))
+
 (with-test (:name (typexpand-1 typexpand typexpand-all :check-lexenv))
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))

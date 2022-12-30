@@ -24,7 +24,6 @@
  (sb-mop:class-finalized-p
   sb-mop:class-prototype
   sb-mop:class-slots
-  sb-pcl::eql-specializer-to-ctype
   sb-pcl::try-finalize-inheritance
   sb-mop:finalize-inheritance
   sb-mop:generic-function-name

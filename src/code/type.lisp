@@ -1490,14 +1490,8 @@
               ;; EQL specializers are are seldom used and not 100% portable,
               ;; though they are part of the AMOP.
               ;; See https://sourceforge.net/p/sbcl/mailman/message/11217378/
-              ;; We implement the notion that an EQL-SPECIALIZER has-a CTYPE.
-              ;; You might think that a cleverer way would be to say that
-              ;; EQL-SPECIALIZER is-a CTYPE, i.e. incorporating EQL-SPECIALIZER
-              ;; objects into the type machinary. Well, that's a problem -
-              ;; it would mess up admissibility of the TYPE= optimization.
-              ;; We don't want to create another way of representing
-              ;; the type NULL = (MEMBER NIL), for example.
-              (sb-pcl::eql-specializer-to-ctype type-specifier))
+              ;; We rely on caching of singleton EQL types to make this efficient.
+              (make-eql-type (sb-mop::eql-specializer-object type-specifier)))
              ((wrapper-p type-specifier)
               (wrapper-classoid type-specifier))
              (t (fail type-specifier))))))
@@ -3387,14 +3381,16 @@ used for a COMPLEX component.~:@>"
 (define-type-class character-set :enumerable nil :might-contain-other-types nil)
 
 (defun make-character-set-type (pairs)
-  ; (aver (equal (mapcar #'car pairs)
-  ;              (sort (mapcar #'car pairs) #'<)))
+  (unless pairs
+    (return-from make-character-set-type *empty-type*))
   ;; aver that the cars of the list elements are sorted into increasing order
-  (when pairs
-    (do ((p pairs (cdr p)))
-        ((null (cdr p)))
-      (aver (<= (caar p) (caadr p)))))
-  (let ((pairs (let (result)
+  (do ((p pairs (cdr p)))
+      ((null (cdr p)))
+    (aver (<= (caar p) (caadr p))))
+  (let ((pairs
+         (if (and (singleton-p pairs) (eql (caar pairs) (cdar pairs)))
+             pairs ; don't need to preprocess the pairs
+             (let (result)
                 (do ((pairs pairs (cdr pairs)))
                     ((null pairs) (nreverse result))
                   (destructuring-bind (low . high) (car pairs)
@@ -3408,9 +3404,7 @@ used for a COMPLEX component.~:@>"
                       ((< high 0))
                       (t (push (cons (max 0 low)
                                      (min high (1- char-code-limit)))
-                               result))))))))
-    (unless pairs
-      (return-from make-character-set-type *empty-type*))
+                               result)))))))))
     (unless (cdr pairs)
       (macrolet ((range (low high)
                    `(return-from make-character-set-type
@@ -3825,16 +3819,19 @@ used for a COMPLEX component.~:@>"
       (if (fp-zero-p elt)
           (pushnew elt fp-zeroes)
           (add-to-xset elt xset)))))
-(defun make-eql-type (elt) (member-type-from-list (list elt)))
 ;; Return possibly a union of a MEMBER type and a NUMERIC type,
 ;; or just one or the other, or *EMPTY-TYPE* depending on what's in the XSET
-;; and the FP-ZEROES. XSET should not contains characters or real numbers.
+;; and the FP-ZEROES. XSET must not contains characters or real numbers.
 (defun make-member-type (xset fp-zeroes)
   ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
   (declare (sb-c::tlab :system))
+  (map-xset (lambda (elt)
+              (when (or (characterp elt) (realp elt))
+                (bug "MEMBER type contains ~S" elt)))
+            xset)
   (let ((presence 0)
         (unpaired nil)
         (float-types nil))
@@ -4046,6 +4043,45 @@ used for a COMPLEX component.~:@>"
                                                 (sort char-codes #'<)))
                (nreverse numbers)))
       *empty-type*))
+(defun make-eql-type (elt)
+  ;; Start by looking in the hash-table, there's no reason not to.
+  ;; i.e. provided that ELT is one that should go in the hash-table, then the key
+  ;; is not a DX instance of the type, unlike for most CTYPES.
+  (or (let ((table *eql-type-cache*))
+        (with-system-mutex ((hash-table-lock table)) (gethash elt table)))
+      ;; It would be less messy to just call the parser for MEMBER, but there's no way
+      ;; to prevent it from consing. It always calls REMOVE-DUPLICATES on its input,
+      ;; and further builds up fresh data lists for the constructor(s).
+      (typecase elt
+        (character
+         ;; just checking an expectation of self-build here
+         #+sb-xc-host (bug "Unexpected singleton character type")
+         (let* ((codepoint (char-code elt))
+                (pairs (list (cons codepoint codepoint))))
+           ;; PAIRS will get copied if needed, but not for the host
+           #-sb-xc-host (declare (truly-dynamic-extent pairs))
+           (make-character-set-type pairs)))
+        (real
+         #+sb-xc-host (bug "Unexpected singleton REAL type") ; likewise
+         (unless (fp-zero-p elt)
+           ;; This is a little redundant with CTYPE-OF-NUMBER,
+           ;; but imho easier to understand.
+           (multiple-value-bind (class format)
+               (typecase elt
+                 (float (values 'float (float-format-name elt)))
+                 (ratio 'rational)
+                 (t 'integer))
+             (make-numeric-type :class class :format format :low elt :high elt)))))
+      ;; The thing is definitely implemented as a MEMBER type. Just a question of
+      ;; whether to put ELT in the XSET.
+      (multiple-value-bind (xset fp-zeros)
+          (if (realp elt) ; is a floating-point zero
+              (values (load-time-value (alloc-xset) t) ; an always-empty XSET
+                      (list elt))
+              (let ((xset (alloc-xset)))
+                (add-to-xset elt xset)
+                (values xset nil)))
+        (make-member-type xset fp-zeros))))
 
 ;;;; intersection types
 ;;;;
@@ -5148,6 +5184,8 @@ used for a COMPLEX component.~:@>"
 
 ;;; This messy case of CTYPE for NUMBER is shared between the
 ;;; cross-compiler and the target system.
+;;; XXX: Is there a bug here with signed zeros, or are we confident that the
+;;; answer is always supposed to be a NUMERIC-TYPE and never (MEMBER -0.0) ?
 ;;; I'm not sure whether NaNs should be numeric types versus MEMBER (like
 ;;; singleton signed zero without the "other" sign), but it may not matter.
 ;;; At a bare minimum this prevents crashing in min/max.

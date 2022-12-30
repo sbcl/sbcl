@@ -566,11 +566,6 @@
                            specializer-with-object)
   ((object :initarg :object :reader specializer-object
            :reader eql-specializer-object)
-   ;; created on demand (if and when needed), the CTYPE is the representation
-   ;; of this metaobject as an internalized type object understood by the
-   ;; kernel's type machinery. The CLOS object is really just a MEMBER-TYPE,
-   ;; but the type system doesn't know that.
-   (sb-kernel:ctype)
    ;; Because EQL specializers are interned, any two putative instances
    ;; of EQL-specializer referring to the same object are in fact EQ to
    ;; each other. Therefore a list of direct methods in the specializer can
