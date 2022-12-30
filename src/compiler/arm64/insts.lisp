@@ -3422,13 +3422,14 @@
        (not (tn-ref-next (sb-c::tn-reads dst1)))
        (let ((vop (tn-ref-vop (sb-c::tn-reads dst1))))
          (and vop
-              (or (not safe-vops)
-                  (memq (vop-name vop) safe-vops))
-              (or (not safe-translates)
-                  (and vop
-                       (memq (car (sb-c::vop-parse-translate
-                                   (sb-c::vop-parse-or-lose (vop-name vop))))
-                             safe-translates))))))))
+              (or
+               (memq (vop-name vop) safe-vops)
+               (and vop
+                    (memq (car (sb-c::vop-parse-translate
+                                (sb-c::vop-parse-or-lose (vop-name vop))))
+                          safe-translates))
+               (and (not safe-vops)
+                    (not safe-translates))))))))
 
 (defun tagged-mask-p (x)
   (and (integerp x)
@@ -3596,6 +3597,37 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+(defpattern "sbfm + ubfm -> sbfm" ((sbfm) (ubfm)) (stmt next)
+  (destructuring-bind (dst1 src1 immr1 imms1) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)
+      (cond ((and (= immr1 0)
+                  (= (1+ imms2) immr2)
+                  (location= dst1 src2)
+                  (stmt-delete-safe-p dst1 dst2
+                                      '(ash
+                                        sb-vm::ash-left-mod64
+                                        sb-vm::ash-left-modfx)
+                                      '(sb-vm::move-from-word/fixnum)))
+             (setf (stmt-mnemonic next) 'sbfm
+                   (stmt-operands next)
+                   (list dst2 src1 immr2 imms1))
+             (add-stmt-labels next (stmt-labels stmt))
+             (delete-stmt stmt)
+             next)
+            ((and (> immr1 imms1)
+                  (= (1+ imms2) immr2)
+                  (location= dst1 src2)
+                  (stmt-delete-safe-p dst1 dst2
+                                      '(ash
+                                        sb-vm::ash-left-mod64
+                                        sb-vm::ash-left-modfx)))
+             (setf (stmt-mnemonic next) 'sbfm
+                   (stmt-operands next)
+                   (list dst2 src1 (mod (+ immr1 immr2) 64) imms1))
+             (add-stmt-labels next (stmt-labels stmt))
+             (delete-stmt stmt)
+             next)))))
 
 ;;; An even number can be shifted right and then negated,
 ;;; and fixnums are even.
