@@ -4019,7 +4019,7 @@ used for a COMPLEX component.~:@>"
   ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
   ;;  literal symbol *, and does not represent an unspecified value."
   (if members
-      (let ((xset (alloc-xset)) fp-zeros nonzero-reals char-codes)
+      (let ((xset (alloc-xset)) fp-zeros other-reals char-codes)
         ;; Calling REMOVE-DUPLICATES up front as used to be done is wasteful because the XSET can't
         ;; have dups in it. Elements that don't go in the XSET have to be de-duplicated.
         ;; There are at most 4 fp-zeros, so calling PUSHNEW is fine. For the rest, we can suppose
@@ -4028,14 +4028,14 @@ used for a COMPLEX component.~:@>"
         (dolist (m members)
           (typecase m
             (character (push (sb-xc:char-code m) char-codes))
-            (real (if (fp-zero-p m) (pushnew m fp-zeros) (push m nonzero-reals)))
+            (real (if (fp-zero-p m) (pushnew m fp-zeros) (push m other-reals)))
             (t (add-to-xset m xset))))
         (apply #'type-union
                (make-member-type xset fp-zeros)
                ;; Constructor asserts that pairs are properly sorted
                (make-character-set-type (mapcar (lambda (x) (cons x x))
                                                 (sort (delete-duplicates char-codes) #'<)))
-               (mapcar #'ctype-of-number (delete-duplicates nonzero-reals))))
+               (mapcar #'ctype-of-number (delete-duplicates other-reals))))
       *empty-type*))
 (defun make-eql-type (elt)
   ;; Start by looking in the hash-table, there's no reason not to.
