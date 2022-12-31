@@ -2368,9 +2368,10 @@ is :ANY, the function name is not checked."
 (defun find-nlx-info (exit)
   (declare (type exit exit))
   (let* ((entry (exit-entry exit))
-         (cleanup (entry-cleanup entry)))
+         (cleanup (entry-cleanup entry))
+         (block (first (block-succ (node-block exit)))))
     (dolist (nlx (environment-nlx-info (node-environment entry)) nil)
-      (when (and (eq (nlx-info-exit nlx) exit)
+      (when (and (eq (nlx-info-block nlx) block)
                  (eq (nlx-info-cleanup nlx) cleanup))
         (return nlx)))))
 

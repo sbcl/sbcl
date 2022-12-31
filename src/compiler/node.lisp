@@ -762,7 +762,7 @@
 ;;; ENVIRONMENT-NLX-INFO.
 (defstruct (nlx-info
             (:copier nil)
-            (:constructor make-nlx-info (cleanup exit)))
+            (:constructor make-nlx-info (cleanup block exit)))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
@@ -778,6 +778,7 @@
   ;; NLX-INFO that corresponds to a given exit. For this purpose, the
   ;; ENTRY must also be used to disambiguate, since exits to different
   ;; places may deliver their result to the same continuation.
+  (block (missing-arg) :type cblock)
   (exit (missing-arg) :type exit)
   ;; the entry stub inserted by environment analysis. This is a block
   ;; containing a call to the %NLX-ENTRY funny function that has the
@@ -790,6 +791,7 @@
   ;; some kind of info used by the back end
   (info nil))
 (defprinter (nlx-info :identity t)
+  block
   exit
   target
   info)
