@@ -3559,8 +3559,24 @@
                  (location= dst1 srcm)
                  (not (location= srcn srcm))
                  (stmt-delete-safe-p dst1 dst2
-                                     '(- sb-vm::--mod64 sb-vm::--modfx)))
+                                     '(- sb-vm::--mod64 sb-vm::--modfx
+                                       %negate)))
         (setf (stmt-operands next) (list dst2 srcn (lsl src1 (- 63 imms))))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
+(defpattern "asr + sub -> sub" ((sbfm) (sub)) (stmt next)
+  (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn srcm) (stmt-operands next)
+      (when (and (= imms 63)
+                 (tn-p srcm)
+                 (location= dst1 srcm)
+                 (not (location= srcn srcm))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(- sb-vm::--mod64 sb-vm::--modfx
+                                       %negate)))
+        (setf (stmt-operands next) (list dst2 srcn (asr src1 immr)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
@@ -3576,7 +3592,8 @@
                  (stmt-delete-safe-p dst1 dst2
                                      '(ash
                                        sb-vm::ash-left-mod64
-                                       sb-vm::ash-left-modfx)))
+                                       sb-vm::ash-left-modfx)
+                                     '(sb-vm::move-from-word/fixnum)))
         (let ((shift (+ (- 63 imms1)
                         (- 63 imms2))))
           (when (<= shift 63)
