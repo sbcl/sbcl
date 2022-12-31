@@ -1027,8 +1027,12 @@
              (or
               (let ((pred (backend-type-predicate ctype)))
                 (when pred `(,pred ,object)))
-              (let ((pred (backend-type-predicate (type-negation ctype))))
-                (when pred `(not (,pred ,object)))))
+              (let* ((negated (type-negation ctype))
+                     (pred (backend-type-predicate negated)))
+                (cond (pred
+                       `(not (,pred ,object)))
+                      ((numeric-type-p negated)
+                       `(not ,(%source-transform-typep object (type-specifier negated)))))))
            #+sb-xc-host
            (sb-kernel::cross-type-warning
              nil))
