@@ -1408,7 +1408,6 @@ many elements are copied."
 ;;; safety is turned off for vectors and lists but kept for generic
 ;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
-  (declare (optimize (sb-c::check-tag-existence 0)))
   (declare (dynamic-extent function))
   (let ((really-fun (%coerce-callable-to-fun function)))
     (etypecase result-sequence

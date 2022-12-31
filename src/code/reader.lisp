@@ -693,7 +693,6 @@ standard Lisp readtable when NIL."
 ;;; Like READ-PRESERVING-WHITESPACE, but doesn't check the read buffer
 ;;; for being set up properly.
 (defun %read-preserving-whitespace (stream eof-error-p eof-value recursive-p)
-  (declare (optimize (sb-c::check-tag-existence 0)))
   (if recursive-p
       ;; a loop for repeating when a macro returns nothing
       (let* ((tracking-p (form-tracking-stream-p stream))
