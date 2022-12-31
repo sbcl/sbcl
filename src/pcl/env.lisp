@@ -87,7 +87,7 @@
     `(classoid-wrapper (find-classoid ',pname))))
 
 (defmethod make-load-form ((object sb-alien-internals:alien-type) &optional env)
-  (or (sb-alien::make-type-load-form object env)
+  (or (sb-alien::make-type-load-form object)
       (make-load-form-saving-slots object :environment env)))
 
 ;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.

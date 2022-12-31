@@ -35,7 +35,6 @@
   ;; to enforce that atoms like {SINGLE,DOUBLE-}FLOAT always have an integer here.
   (bits nil :type (or null unsigned-byte))
   (alignment nil :type (or null unsigned-byte)))
-(!set-load-form-method alien-type (:xc :target))
 
 (in-package "SB-KERNEL")
 

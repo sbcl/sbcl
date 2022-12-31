@@ -729,7 +729,8 @@
     "Write VALUE displaced INDEX words from ADDRESS."
     (write-bits
      (cond ((ltv-patch-p value)
-            (if (= (descriptor-widetag address) sb-vm:code-header-widetag)
+            (if (or (= (descriptor-lowtag address) sb-vm:list-pointer-lowtag)
+                    (= (descriptor-widetag address) sb-vm:code-header-widetag))
                 (push (cold-list (cold-intern :load-time-value-fixup)
                                  address
                                  (number-to-core index)
