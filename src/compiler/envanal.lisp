@@ -214,7 +214,7 @@
                  (setf (lambda-var-explicit-value-cell thing) t)))
               (nlx-info
                (let ((exit (nlx-info-exit thing)))
-                 (unless (policy exit (zerop check-tag-existence))
+                 (unless (policy exit (zerop safety))
                    (setf (nlx-info-safe-p thing) t)
                    (note-exit-check-elision-failure exit)))))))))))
 

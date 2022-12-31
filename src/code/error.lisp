@@ -274,13 +274,12 @@ specification."
                                                  ,(wrap (cdr cases)))
                                                (,fun-name)))))
                              body)))
-                `(flet ((,form-fun ()
+                `(dx-flet ((,form-fun ()
                           #-x86 (progn ,form) ;; no declarations are accepted
                           ;; Need to catch FP errors here!
                           #+x86 (multiple-value-prog1 ,form (float-wait)))
                         ,@(reverse local-funs))
-                   (declare (optimize (sb-c::check-tag-existence 0))
-                            (inline ,form-fun
+                   (declare (inline ,form-fun
                                     ,@(mapcar #'car local-funs)))
                    (block ,block
                      ,(wrap annotated-cases))))))))))

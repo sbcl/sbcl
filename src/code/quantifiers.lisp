@@ -26,8 +26,6 @@
                     `(block ,blockname
                        ;; Does DX actually help? INLINE should win anyway.
                        (dx-flet ((,wrapper (,@elements)
-                                  (declare (optimize
-                                            (sb-c::check-tag-existence 0)))
                                   (let ((,value ,call-it))
                                     (,test ,value
                                       (return-from ,blockname

@@ -32,13 +32,6 @@ modification. Defaults to SAFETY.")
    see \"SBCL User Manual\", Compiler->Handling of Types->
    Implementation Limitations for details).")
 
-(define-optimization-quality check-tag-existence
-    (cond ((= safety 0) 0)
-          (t 3))
-  ("no" "maybe" "yes" "yes")
-  "Control whether GO and RETURN-FROM check liveness of the destination tag.
-Enabling this option can increase heap consing of closures.")
-
 (define-optimization-quality let-conversion
     (if (<= debug speed) 3 0)
   ("off" "maybe" "on" "on")
