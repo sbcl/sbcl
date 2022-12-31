@@ -826,7 +826,7 @@
   (:translate truncate)
   (:args (x :scs (any-reg) :target eax)
          (y :scs (any-reg control-stack)))
-  (:arg-refs args)
+  (:arg-refs nil y-ref)
   (:arg-types tagged-num tagged-num)
   (:temporary (:sc signed-reg :offset rax-offset :target quo
                :from (:argument 0) :to (:result 0)) eax)
@@ -839,7 +839,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 31
-    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
@@ -888,7 +888,7 @@
   (:args (x :scs (unsigned-reg) :target eax)
          (y :scs (unsigned-reg signed-stack)))
   (:arg-types unsigned-num unsigned-num)
-  (:arg-refs args)
+  (:arg-refs nil y-ref)
   (:temporary (:sc unsigned-reg :offset rax-offset :target quo
                :from (:argument 0) :to (:result 0)) eax)
   (:temporary (:sc unsigned-reg :offset rdx-offset :target rem
@@ -900,7 +900,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
@@ -940,7 +940,7 @@
   (:translate truncate)
   (:args (x :scs (signed-reg) :target eax)
          (y :scs (signed-reg signed-stack)))
-  (:arg-refs args)
+  (:arg-refs nil y-ref)
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg :offset rax-offset :target quo
                    :from (:argument 0) :to (:result 0)) eax)
@@ -953,7 +953,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
@@ -1136,11 +1136,11 @@
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:generator 3
     (with-shift-operands
       (move ecx amount)
-      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+      (unless (csubtypep (tn-ref-type amount-ref)
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
         (inst jmp :be OKAY)
@@ -1160,11 +1160,11 @@
 (define-vop (fast-ash-left/unsigned-mod64=>unsigned
              fast-ash-left/unsigned=>unsigned)
   (:translate ash-left-mod64)
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:generator 3
     (with-shift-operands
       (move ecx amount)
-      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+      (unless (csubtypep (tn-ref-type amount-ref)
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
         (inst jmp :be OKAY)
@@ -1228,7 +1228,7 @@
   (:results (result :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:variant-vars check-amount signed)
   (:note "inline ASH")
   (:generator 5
@@ -1237,7 +1237,7 @@
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+    (unless (csubtypep (tn-ref-type amount-ref)
                        (specifier-type `(integer -63 *)))
       (inst cmp ecx 63)
       (inst jmp :be OKAY)
@@ -1253,7 +1253,7 @@
 
     POSITIVE
     (unless (or (not check-amount) ;; The result-type ensures us that this shift will not overflow.
-                (csubtypep (tn-ref-type (tn-ref-across args))
+                (csubtypep (tn-ref-type amount-ref)
                            (specifier-type `(integer * 63))))
       (inst cmp ecx 63)
       (inst jmp :be STILL-OKAY)
@@ -1279,7 +1279,7 @@
          (amount :scs (signed-reg) :target ecx))
   (:arg-types (:or signed-num unsigned-num) signed-num)
   (:results (result :scs (any-reg) :from (:argument 0)))
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:note "inline ASH")
@@ -1289,7 +1289,7 @@
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+    (unless (csubtypep (tn-ref-type amount-ref)
                        (specifier-type `(integer -63 *)))
       (inst cmp ecx 63)
       (inst jmp :be OKAY)
@@ -1307,7 +1307,7 @@
     (inst jmp DONE)
 
     POSITIVE
-    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+    (unless (csubtypep (tn-ref-type amount-ref)
                        (specifier-type `(integer * 63)))
       (inst cmp ecx 63)
       (inst jmp :be STILL-OKAY)

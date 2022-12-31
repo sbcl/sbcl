@@ -312,7 +312,7 @@
   (:args (x :scs (signed-reg) :to :result)
          (y :scs (signed-reg) :to :result))
   (:arg-types signed-num signed-num)
-  (:arg-refs args)
+  (:arg-refs nil y-ref)
   (:results (quo :scs (signed-reg) :from :eval)
             (rem :scs (signed-reg) :from :eval))
   (:optional-results rem)
@@ -321,7 +321,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
         (inst cbz y zero)))
@@ -334,7 +334,7 @@
   (:args (x :scs (unsigned-reg) :to :result)
          (y :scs (unsigned-reg) :to :result))
   (:arg-types unsigned-num unsigned-num)
-  (:arg-refs args)
+  (:arg-refs nil y-ref)
   (:results (quo :scs (unsigned-reg) :from :eval)
             (rem :scs (unsigned-reg) :from :eval))
   (:optional-results rem)
@@ -343,7 +343,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
         (inst cbz y zero)))
@@ -448,13 +448,13 @@
   (:results (result))
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) temp)
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:variant-vars variant)
   (:generator 5
     (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+    (cond ((csubtypep (tn-ref-type amount-ref)
                       (specifier-type `(integer -63 *)))
            (ecase variant
              (:signed (inst asr result number temp))
@@ -474,7 +474,7 @@
 
     (inst b END)
     LEFT
-    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+    (cond ((csubtypep (tn-ref-type amount-ref)
                       (specifier-type `(integer * 63)))
            (inst lsl result number temp))
           (t
@@ -490,7 +490,7 @@
          (amount :scs (signed-reg) :to :save :target temp))
   (:arg-types (:or signed-num unsigned-num) signed-num)
   (:results (result :scs (any-reg)))
-  (:arg-refs args)
+  (:arg-refs nil amount-ref)
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) temp temp-result)
@@ -498,7 +498,7 @@
     (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+    (cond ((csubtypep (tn-ref-type amount-ref)
                       (specifier-type `(integer -63 *)))
            (sc-case number
              (signed-reg (inst asr temp-result number temp))
@@ -518,7 +518,7 @@
 
     (inst b END)
     LEFT
-    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+    (cond ((csubtypep (tn-ref-type amount-ref)
                       (specifier-type `(integer * 63)))
            (inst lsl temp-result number temp))
           (t
@@ -556,13 +556,13 @@
                   ;; For modular variants
                   (:variant-vars cut)
                   (:arg-types ,type positive-fixnum)
-                  (:arg-refs args)
+                  (:arg-refs nil amount-ref)
                   (:results (result :scs (,result-type)))
                   (:result-types ,type)
                   (:policy :fast-safe)
                   (:generator ,cost
                     (cond ((and cut
-                                (not (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                                (not (csubtypep (tn-ref-type amount-ref)
                                                 (specifier-type `(mod ,n-word-bits)))))
                            (inst cmp amount n-word-bits)
                            (cond ((location= amount result)

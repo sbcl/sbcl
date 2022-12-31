@@ -1081,7 +1081,7 @@ redefinition."
     (assert-invalid instance)))
 
 ;; Some other subclass wrinkles have to do with splitting definitions
-;; accross files and compiling and loading things in a funny order.
+;; across files and compiling and loading things in a funny order.
 (with-defstruct-redefinition-test
     :defstruct/subclass-in-other-file-funny-operation-order-continue
     (((defstruct ignore pred1) :class-name redef-test-10 :slots (a))
