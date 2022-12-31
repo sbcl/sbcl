@@ -190,7 +190,7 @@
     (let ((hashes (xset-extra xset)))
       (if (simple-vector-p hashes)
           (dovector (x hashes)
-            (setq h (plus-mod-fixnum h (truly-the fixnum (if (listp x) (cdr x) x)))))
+            (setq h (plus-mod-fixnum h (truly-the sb-xc:fixnum (if (listp x) (cdr x) x)))))
           (map-xset (lambda (x)
                       (when (typep x '(or symbol number character))
                         (setq h (plus-mod-fixnum (sb-xc:sxhash x) h))))
