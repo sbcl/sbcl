@@ -22,25 +22,31 @@
 ;;;; requires a function as the first argument -- not a function
 ;;;; designator.
 ;;;;
-;;;; XSET-LIST-SIZE is true only for XSETs whose data is stored into a
-;;;; list -- XSET-COUNT returns the real value.
-;;;;
 ;;;; Note: XSET always uses EQL as the equivalence test
 
 (in-package "SB-KERNEL")
 
 (defstruct (xset (:constructor alloc-xset)
-                 (:constructor !copy-xset (list-size data))
+                 (:constructor !new-xset (data extra))
                  (:copier nil)
                  (:predicate nil))
-  (list-size 0 :type index)
-  (data nil :type (or list hash-table)))
+  (data nil :type (or list hash-table))
+  ;; EXTRA is a dual-purpose slot: initially it holds the number of items
+  ;; in LIST. If the list becomes a hash-table, then EXTRA becomes 0.
+  ;; An XSET can be optionally have a vector of stable hashes, 1 per element.
+  ;; The hash vector if present goes in EXTRA, and the vector length
+  ;; is the same as the list length. After creating a hash vector, it is forbidden
+  ;; to add more elements to the set. In this manner we can avoid adding a subtype
+  ;; of XSET stably-hashed-xset, or wasting a slot that would almost never be used.
+  ;; (99.999% of all XSETs do not need stable hashes)
+  (extra 0 :type (or simple-vector index)))
 (declaim (freeze-type xset))
 
 (defun xset-count (xset)
   (let ((data (xset-data xset)))
     (if (listp data)
-        (xset-list-size xset)
+        (let ((extra (xset-extra xset)))
+          (if (fixnump extra) extra (length extra)))
         (hash-table-count data))))
 
 (defun map-xset (function xset)
@@ -60,27 +66,20 @@
 
 ;;; Checks that the element is not in the set yet.
 (defun add-to-xset (elt xset)
-  (let ((data (xset-data xset))
-        (size (xset-list-size xset)))
+  (let ((data (xset-data xset)))
     (if (listp data)
-        (if (< size +xset-list-size-limit+)
-            (unless (member elt data :test #'eql)
-              (setf (xset-list-size xset) (1+ size)
-                    (xset-data xset) (cons elt data)))
-            (let ((table (make-hash-table :size (* 2 size) :test #'eql)))
-              (setf (gethash elt table) t)
-              (dolist (x data)
-                (setf (gethash x table) t))
-              (setf (xset-data xset) table)))
+        (let ((size (xset-extra xset)))
+          (if (< size +xset-list-size-limit+)
+              (unless (member elt data :test #'eql)
+                (setf (xset-extra xset) (1+ size)
+                      (xset-data xset) (cons elt data)))
+              (let ((table (make-hash-table :size (* 2 size) :test #'eql)))
+                (setf (gethash elt table) t)
+                (dolist (x data)
+                  (setf (gethash x table) t))
+                (setf (xset-extra xset) 0 ; looks nice to clear it
+                      (xset-data xset) table))))
         (setf (gethash elt data) t))))
-
-;; items must be canonical - no duplicates - and few in number.
-(defun xset-from-list (items)
-  (let ((n (length items)))
-    (aver (<= n +xset-list-size-limit+))
-    (let ((xset (alloc-xset)))
-      (setf (xset-list-size xset) n (xset-data xset) items)
-      xset)))
 
 (defun xset-union (a b)
   (let ((xset (alloc-xset)))
@@ -186,12 +185,16 @@
 (defun xset-elts-hash (xset)
   (let ((h 0))
     (declare (sb-xc:fixnum h))
-    (map-xset (lambda (x)
-                ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
-                ;; allow bits to rollover into the sign bit
-                (when (typep x '(or symbol number character #-sb-xc-host instance))
-                  (setq h (plus-mod-fixnum (sb-xc:sxhash x) h))))
-              xset)
+    ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
+    ;; allow bits to rollover into the sign bit
+    (let ((hashes (xset-extra xset)))
+      (if (simple-vector-p hashes)
+          (dovector (x hashes)
+            (setq h (plus-mod-fixnum h (truly-the fixnum (if (listp x) (cdr x) x)))))
+          (map-xset (lambda (x)
+                      (when (typep x '(or symbol number character))
+                        (setq h (plus-mod-fixnum (sb-xc:sxhash x) h))))
+                    xset)))
     ;; Now mix the bits thoroughly and then mask to a positive fixnum.
     ;; I think this does not need to be compatible between host and target.
     ;; But I'm trying to make it compatible anyway because I'm not 100% sure
@@ -203,3 +206,42 @@
            #+sb-xc-host (ldb (byte sb-vm:n-word-bits 0) (ash h sb-vm:n-fixnum-tag-bits))
            #-sb-xc-host (get-lisp-obj-address h)))
       (logand (sb-impl::murmur3-fmix-word word-bits) most-positive-fixnum))))
+
+;;; Stably-hashed XSETs that have elements which are not nicely EQL-hashable
+;;; rely on a global table that maps any object to a pseudorandom hash.
+;;; The table keys are refcounted so that they can be deleted when no XSET
+;;; references a particular key. Caller MUST provide synchronization.
+(define-load-time-global *xset-stable-hashes* (make-hash-table :test 'eq))
+
+(defun xset-generate-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
+  #-sb-xc-host (declare (notinline sb-impl::eql-hash)) ; forward ref
+  (flet ((get-stable-hash-cell (obj)
+           (let ((cell (gethash obj hashmap)))
+             (cond (cell
+                    (incf (car cell))
+                    cell)
+                   (t
+                    (setf (gethash obj hashmap) (cons 1 (ctype-random))))))))
+    (let ((hashes (make-array (xset-count xset)))
+          (i 0))
+      (map-xset (lambda (elt)
+                  (multiple-value-bind (hashval eq?)
+                      #+sb-xc-host (if (sb-xc:typep elt '(or symbol character number))
+                                       (values (sb-xc:sxhash elt) nil)
+                                       (values 4 ; chosen by algorithm of https://xkcd.com/221/
+                                               t)) ; yes, it's address-based
+                      #-sb-xc-host (sb-impl::eql-hash elt)
+                    (setf (aref hashes i) (if eq? (get-stable-hash-cell elt) hashval))
+                    (incf i)))
+                xset)
+      (setf (xset-extra xset) hashes)))
+  xset)
+(defun xset-delete-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
+  (let ((hashes (the simple-vector (xset-extra xset)))
+        (index -1))
+    ;; Iteration order will be the same as it was in GENERATE-STABLE-HASHES
+    (map-xset (lambda (elt &aux (cell (aref hashes (incf index))))
+                (when (and (listp cell)
+                           (zerop (decf (car cell)))) ; element is not used in any XSET
+                  (remhash elt hashmap)))
+              xset)))

@@ -370,3 +370,33 @@
           collect (list i tp))
     (let ((post (compute-max-psl hs)))
       (assert (<= (- post pre) 2)))))
+
+(defvar a "foo")
+(defvar b '(nil t))
+(defvar c #*101)
+(with-test (:name :hash-cons-member-type)
+  (assert (eq (sb-kernel:specifier-type `(member ,a ,b ,c))
+              (sb-kernel:specifier-type `(member ,c ,a ,b))))
+  (assert (eq (sb-kernel:specifier-type `(member ,a ,b ,c))
+              (sb-kernel:specifier-type `(member ,b ,c ,a)))))
+
+(with-test (:name :hash-cons-member-type-large)
+  (let ((numbers ; force the XSET to be represented as a hash-table
+         (loop for i below 30 collect (complex (coerce i 'single-float) i)))
+        (list '(thing)))
+    (assert (hash-table-p
+             (sb-kernel::xset-data
+              (sb-kernel::member-type-xset
+               (sb-kernel:specifier-type `(member ,@numbers))))))
+    (assert (eq (sb-kernel:specifier-type `(member ,a ,@numbers ,list))
+                (sb-kernel:specifier-type `(member ,list ,a ,@numbers))))))
+
+;(print sb-kernel::*xset-stable-hashes*)
+(gc :full t)
+#+sb-thread (sb-kernel:run-pending-finalizers)
+(with-test (:name :xset-stable-hash-weakness)
+  ;; After running the :MEMBER-TYPE-HASH-MIXER test, there were >5000 entries
+  ;; in the *XSET-STABLE-HASHES* table for me.
+  ;; The preceding GC should have had some effect.
+  (assert (< (hash-table-count sb-kernel::*xset-stable-hashes*)
+             100)))

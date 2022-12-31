@@ -242,7 +242,7 @@ and no value was provided for it." name))))))))))
      (let* ((ctype (lvar-type lvar))
             (int (funcall *ctype-test-fun* ctype type)))
        (cond ((not int)
-              (unless (type= ctype (specifier-type '(member dummy)))
+              (unless (type= ctype (specifier-type '(eql dummy)))
                 (note-lossage "The ~:R argument is a ~S, not a ~S."
                               n (type-specifier ctype) (type-specifier type)))
               nil)

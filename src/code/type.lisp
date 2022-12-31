@@ -341,6 +341,9 @@
               unparsed
               (nconc unparsed '(&optional))))))
 
+#+sb-xc-host ; why only on the host? Shouldn't we always declaim the ftype??
+(declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
+
 ;;; Return true if LIST1 and LIST2 have the same elements in the same
 ;;; positions according to TYPE=. We return NIL, NIL if there is an
 ;;; uncertain comparison.
@@ -3814,6 +3817,13 @@ used for a COMPLEX component.~:@>"
 ;; Return possibly a union of a MEMBER type and a NUMERIC type,
 ;; or just one or the other, or *EMPTY-TYPE* depending on what's in the XSET
 ;; and the FP-ZEROES. XSET must not contains characters or real numbers.
+;; MEMBER types go into one of three hash containers:
+;;  - *EQL-TYPE-CACHE* holds singleton types. A weak hash-table suffices for this.
+;;  - *MEMBER-TYPE-HASHSET* holds types whose members are {NUMBER|CHARACTER|SYMBOL}.
+;;    Intrinsically each element has a stable hash, making it possible to
+;;    hash-cons XSETs without complications for EQ-comparable keys.
+;;  - *MEMBER/EQ-TYPE-HASHSET* is the general case, allowing a mixture of objects
+;;;   hashed by content-dependent hash and/or pseudorandom opaque hash.
 (defun make-member-type (xset fp-zeroes)
   ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
@@ -3851,18 +3861,48 @@ used for a COMPLEX component.~:@>"
       ;; Bypass the hashset for type NULL because it's so important
       (return-from make-member-type
         (inline-cache-ctype (!alloc-member-type (pack-interned-ctype-bits 'member)
-                                                (xset-from-list '(nil))
+                                                (!new-xset '(nil) 1)
                                                 '())
                             null))))
-    (let ((member-type
-           (case (+ (length unpaired) (xset-count xset))
-             (0 nil) ; nil
-             ;; It's slightly suboptimal to use two DX-lets, but to remedy that,
-             ;; a single macro invocation would need to select which hash collection
-             ;; to look in. More easy would be to paste the macro guts here
-             ;; with suitable alteration, which I don't want to do.
-             (1 (new-ctype eql xset unpaired)) ; most common case
-             (t (new-ctype member-type xset unpaired)))))
+    (let* ((count (+ (length unpaired) (xset-count xset)))
+           (member-type
+            (unless (= count 0)
+              (dx-let ((temp (!alloc-member-type (ctype-class-bits 'member)
+                                                 xset unpaired)))
+                (cond
+                  ((= count 1)
+                   (let ((container *eql-type-cache*)
+                         (key (first (or unpaired (xset-data xset)))))
+                     (with-system-mutex ((hash-table-lock container))
+                       ;; This is like ENSURE-GETHASH but it potentially copies the key
+                       (or (gethash key container)
+                           (let ((copy (copy-ctype temp)))
+                             ;; re-fetch KEY from XSET in case it was copied.
+                             ;; hope no off-heap pointers buried within KEY.
+                             (setf (gethash (first (member-type-members copy)) container)
+                                   copy))))))
+                  ((xset-every (lambda (x) (typep x '(or symbol number character))) xset)
+                   (hashset-insert-if-absent *member-type-hashset* temp #'copy-ctype))
+                  (t
+                   (binding*
+                       ((container *member/eq-type-hashset*)
+                        ((result foundp)
+                         (with-system-mutex (*xset-mutex*)
+                           (xset-generate-stable-hashes xset)
+                           (acond ((hashset-find container temp)
+                                   (xset-delete-stable-hashes xset) ; inside the mutex scope
+                                   (values it t))
+                                  (t
+                                   (values (hashset-insert container (copy-ctype temp))
+                                           nil))))))
+                     (unless foundp ; "use" the var binding if #+sb-xc-host
+                       #-sb-xc-host ; attach finalizer (outside the mutex scope)
+                       (let ((xset (member-type-xset result))) ; in case XSET was copied
+                         (finalize
+                          result (lambda ()
+                                   (with-system-mutex (*xset-mutex*)
+                                     (xset-delete-stable-hashes xset))))))
+                     result)))))))
       ;; The actual member-type contains the XSET (with no FP zeroes),
       ;; and a list of unpaired zeroes.
       (if (not float-types)
@@ -4631,8 +4671,6 @@ used for a COMPLEX component.~:@>"
 
 (define-type-class cons :enumerable nil :might-contain-other-types nil)
 
-#+sb-xc-host
-(declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
 (defun make-cons-type (car-type cdr-type)
   (aver (not (or (eq car-type *wild-type*)
                  (eq cdr-type *wild-type*))))

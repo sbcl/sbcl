@@ -1084,6 +1084,8 @@ core and return a descriptor to it."
     (loop (if (cold-null list) (return n))
           (incf n)
           (setq list (cold-cdr list)))))
+(defun cold-push (item symbol)
+  (cold-set symbol (cold-cons item (cold-symbol-value symbol))))
 
 ;;; Make a simple-vector on the target that holds the specified
 ;;; OBJECTS, and return its descriptor.
@@ -1489,13 +1491,18 @@ core and return a descriptor to it."
               (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
                 (write-slots cell :classoid result)))
              ((ctype-p obj)
+              ;; If OBJ belongs in a hash container, then deduce which
               (let* ((hashset (sb-kernel::ctype->hashset-sym obj))
-                     (entry-p (and hashset (hashset-find (symbol-value hashset) obj))))
-                ;; Record for preloading in hashset
-                (cold-set 'sb-kernel::*!initial-ctypes*
-                 (cold-cons (cold-cons result (if entry-p (cold-intern hashset)
-                                                  *nil-descriptor*))
-                            (cold-symbol-value 'sb-kernel::*!initial-ctypes*))))))
+                     (preload
+                      (cond ((and hashset (hashset-find (symbol-value hashset) obj))
+                             hashset)
+                            ((and (member-type-p obj)
+                                  ;; NULL is a hardwired case in the MEMBER type constructor
+                                  (neq obj (specifier-type 'null))
+                                  (type-singleton-p obj))
+                             'sb-kernel::*eql-type-cache*))))
+                (when preload ; Record it
+                  (cold-push (cold-cons result preload) 'sb-kernel::*!initial-ctypes*)))))
        result))))
 
 ;;; Convert a layout to a wrapper and back.

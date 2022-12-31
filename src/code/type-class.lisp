@@ -734,9 +734,10 @@
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
-;;   but src/code/hashset can not use address-based hashes. This limitation is unique
-;;   to MEMBER types because other CTYPE instances are compositions of CTYPES
-;;   where all subparts have assigned hashes.
+;;   but src/code/hashset goes through a lot of rigmarole to handle address-bashed
+;;   hashing, and the end result for a single key would laboriously emulate an EQL table.
+;;   This is especially important for the compiler because each time it asks itself the
+;;   CTYPE-OF a constant leaf, the answer might be a singleton MEMBER type.
 ;; * Symbols have slightly bad SXHASH values (by language requirement):
 ;;    "For any two objects, x and y which are symbols and which are similar
 ;;    (sxhash x) and (sxhash y) yield the same mathematical value even if x and y exist
@@ -747,35 +748,6 @@
 ;;   will cause the hashset to exceed its probe sequence length limit.
 ;;   This isn't to say we couldn't assign some bits of SYMBOL-HASH pseudorandomly,
 ;;   and mask them out in the value returned by CL:SXHASH.
-;;
-;; Also: XSETs containing arbitrary objects such as strings and lists don't have
-;; a good hash at all. There is not really a way to compute a mixed hash
-;; other than by pinning all objects in the XSET and taking their addresses.
-;; Then we'd need to figure out that GC happened, and it becomes a pain.
-;; This seems more complicated than the situation warrants.
-;; So we'll just give up on hash-consing which should fix lp#1999687
-;;
-;; An outline of a better design would be as follows:
-;; - create a global hash-table of objects which were placed in an XSET
-;;   other than the nicely hashable object types. Call this xset-key->hash-mapping.
-;;   This mapping does not need to be weak, because it will have a way of purging it.
-;;   Each value in the table is a cons of a random hash and the number of XSETs
-;;   using the key. Increment the refcount when making a new XSET with that key.
-;; - when hashing the XSET, look up its keys (other than EQL hashable) in the global table
-;; - attach a finalizer to the XSET. The finalizer's job is to decrement the refcount
-;;   on each key in the global mappping. When the count reaches zero there are no
-;;   XSETs that refer to the key, and the random hash can be removed.
-;; Why make a refcounted table? Because otherwise there is no way to remove mapping
-;; entries for objects that outlive the MEMBER-TYPE's use of the object but where the
-;; MEMBER type itself is dead. Worst-case, every object in the lisp image could at some
-;; point appear in a MEMBER type but then never be needed again with regard to type
-;; system operations. So you'd have created a permanent mapping of every object to
-;; a random hash for no good reason.
-
-;; Why the singleton table is so important is that any time the compiler asks itself
-;; the ctype-of a constant leaf, it might yield `(MEMBER ,the-constant).
-;; So then you end up with an assortment of random objects that don't hash
-;; nicely in a ctype hashset, but are OK in a hash-table.
 (define-load-time-global *eql-type-cache* ; like EQL-SPECIALIZER-TABLE in PCL
     (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
 
@@ -784,9 +756,8 @@
        (heap-allocated-p ,obj)))
 
 (defvar *hashsets-preloaded* nil)
-(defmacro new-ctype (pseudonym &rest initargs)
-  (let* ((name (if (eq pseudonym 'eql) 'member-type pseudonym))
-         (allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name))
+(defmacro new-ctype (name &rest initargs)
+  (let* ((allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name))
          (hashset (package-symbolicate "SB-KERNEL" "*" name "-HASHSET*"))
          (bits (ctype-class-bits (ctype-instance->type-class name))))
     #+sb-xc-host ; allocate permanent data, and insert into cache if not found
@@ -803,32 +774,7 @@
        (unless *hashsets-preloaded*
          (write-string "CTYPE hashset preload failure")
          (sb-vm:ldb-monitor))
-       ,(case pseudonym
-          (eql ; as per above remarks: use hash-table, not hashset
-            `(let* ((xset ,(first initargs))
-                    (zeros ,(second initargs))
-                    (key (first (or zeros (xset-data xset))))
-                    (table *eql-type-cache*))
-               (with-system-mutex ((hash-table-lock table))
-                ;; This is like ENSURE-GETHASH but it potentially copies the key
-                (or (gethash key table)
-                    ;; hope no off-heap pointers buried within KEY
-                    (let ((key (cond ((numberp key) (sb-vm:copy-number-to-heap key))
-                                     ((safe-member-type-elt-p key) key)
-                                     (t
-                                      (warn "Off-heap hash-table key @ ~X"
-                                            (get-lisp-obj-address key))
-                                      key))))
-                      (setf (gethash key table) (copy-ctype temp)))))))
-          (member-type ; problem case: don't always know how to hash well
-           `(let ((xset ,(first initargs)))
-              (flet ((hashable (x) (typep x '(or symbol number character instance))))
-                (if (xset-every #'hashable xset)
-                    (hashset-insert-if-absent ,hashset temp #'copy-ctype)
-                    ;; otherwise just copy it always (for now)
-                    (copy-ctype temp)))))
-          (t
-            `(hashset-insert-if-absent ,hashset temp #'copy-ctype))))))
+       (hashset-insert-if-absent ,hashset temp #'copy-ctype))))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -878,6 +824,14 @@
 (def-type-model (member-type (:constructor* nil (xset fp-zeroes)))
   (xset nil :type xset :hasher xset-elts-hash :test xset=)
   (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=)))
+(define-load-time-global *xset-mutex* (or #-sb-xc-host (sb-thread:make-mutex)))
+;;; This hashset is guarded by *XSET-MUTEX*. It is _not_ declared as synchronized
+;;; so that HASHSET-INSERT-IF-ABSENT should not acquire a mutex inside a mutex
+;;; (stable hashes have to be assigned while holding the lock)
+(define-load-time-global *member/eq-type-hashset*
+    (make-hashset 32 #'member-type-equiv #'calc-member-type-hash
+                  :weakness t :synchronized nil))
+(pushnew '*member/eq-type-hashset* *ctype-hashsets*)
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
@@ -1248,6 +1202,8 @@
 
 ;;; Return the name of the global hashset that OBJ (a CTYPE instance)
 ;;; would be stored in, if it were stored in one.
+;;; This is only for bootstrap, and not 100% precise as it does not know
+;;; about the other MEMBER type containers.
 (defun ctype->hashset-sym (obj)
   (macrolet ((generate  ()
                (collect ((clauses))
@@ -1331,25 +1287,21 @@
 #-sb-xc-host
 (progn
 (defglobal *!initial-ctypes* nil)
-(defun preload-ctype-hashsets (&aux permtypes)
-  (declare (ignorable permtypes))
+(defun preload-ctype-hashsets ()
   (dolist (pair (nreverse *!initial-ctypes*))
-    (destructuring-bind (instance . hashset-symbol) pair
-      (cond ((not hashset-symbol)
-             ;; There are very few which aren't in a hashset:
-             ;; - (6) NAMED-TYPEs
-             ;; - (1) MEMBER-TYPE NULL
-             ;; - (3) BASE-CHAR, EXTENDED-CHAR, CHARACTER
-             ;; - (1) CONS
-             (push instance permtypes))
-            ;; Mandatory special-case for singleton MEMBER types
-            ((and (member-type-p instance) (not (cdr (member-type-members instance))))
-             (setf (gethash (car (member-type-members instance)) *eql-type-cache*)
-                   instance))
+    (let ((instance (car pair))
+          (container (symbol-value (cdr pair))))
+      (cond ((hash-table-p container)
+             (aver (member-type-p instance))
+             ;; As of this writing there are only two EQL types to preload:
+             ;; one is in the IR1-transform of FORMAT with stream (EQL T),
+             ;; the other is CHECK-ARG-TYPE looking for (EQL DUMMY) type.
+             (let ((key (first (member-type-members instance))))
+               (aver (not (gethash key container)))
+               (setf (gethash key container) instance)))
             (t
-             (let ((hashset (symbol-value hashset-symbol)))
-               (aver (not (hashset-find hashset instance))) ; instances are dumped bottom-up
-               (hashset-insert hashset instance))))
+             (aver (not (hashset-find container instance))) ; instances are built bottom-up
+             (hashset-insert container instance)))
       (labels ((ensure-interned-list (list hashset)
                  (let ((found (hashset-find hashset list)))
                    (when (and found (neq found list))
@@ -1367,7 +1319,7 @@
                        (bug "genesis dumped bad instance within ~X"
                             (get-lisp-obj-address instance)))))))
         (etypecase instance
-          ((or named-type numeric-type member-type character-set-type ; nothing extra to do
+          ((or numeric-type member-type character-set-type ; nothing extra to do
            #+sb-simd-pack simd-pack-type #+sb-simd-pack-256 simd-pack-256-type
            hairy-type))
           (args-type
@@ -1387,7 +1339,6 @@
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
            (check (negation-type-type instance)))))))
-  (aver (= (length permtypes) (+ 11 #-sb-unicode -2)))
   #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
@@ -1530,10 +1481,16 @@
 
 ;;; Copy X to the heap, give it a random hash, and if it is a MEMBER type
 ;;; then assert that all members are cacheable.
+#+sb-xc-host
+(defun copy-ctype (x)
+  (let ((bits (logior (logand (ctype-random) +type-hash-mask+) (type-%bits x))))
+    (etypecase x
+      (member-type
+       (!alloc-member-type bits (member-type-xset x) (member-type-fp-zeroes x))))))
 #-sb-xc-host
 (defun copy-ctype (x)
   (declare (type ctype x))
-  (declare (sb-c::tlab :system) (inline !copy-xset))
+  (declare (sb-c::tlab :system) (inline !new-xset))
   #+c-stack-is-control-stack (aver (stack-allocated-p x))
   (labels ((copy (x)
              ;; Return a heap copy of X if X was arena or stack-allocated.
@@ -1559,7 +1516,7 @@
                     ;; While we could use (load-time-value) to referece a constant empty xset
                     ;; there's really no point to doing that.
                     (collect ((elts))
-                      (dolist (x data (!copy-xset (xset-list-size xset) (elts)))
+                      (dolist (x data (!new-xset (elts) (xset-extra xset)))
                         (elts (cond ((numberp x) (sb-vm:copy-number-to-heap x))
                                     ((safe-member-type-elt-p x) x)
                                     ;; surely things will go haywire if this occurs
