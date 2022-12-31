@@ -863,14 +863,8 @@ between the ~A definition and the ~A definition"
                  (%ensure-classoid-valid class2 layout2 errorp))
       (return-from %ensure-both-classoids-valid nil))))
 
-;;; Simple methods for TYPE= and SUBTYPEP should never be called when
-;;; the two classes are equal, since there are EQ checks in those
-;;; operations.
-(define-type-method (classoid :simple-=) (type1 type2)
-  (aver (not (eq type1 type2)))
-  (values nil t))
-
 (define-type-method (classoid :simple-subtypep) (class1 class2)
+  ;; Simple method should never be called on EQ args since there is an EQ check higher up
   (aver (not (eq class1 class2)))
   (with-world-lock () ; FIXME: why such coarse lock granularity here?
     (if (%ensure-both-classoids-valid class1 class2)

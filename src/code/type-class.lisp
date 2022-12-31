@@ -416,6 +416,7 @@
          ;; Too bad for you- this throws the baby out with the bathwater.
          (error "Can't define-type-method for class ~s: already inherited" ',class))
        (defun ,name ,lambda-list
+         #-sb-xc-host (declare (optimize (sb-c::verify-arg-count 0)))
          ,@(if (eq method :unparse) `((declare (ignorable ,(first lambda-list)))))
          ,@(if rebind `((let ,rebind ,@body)) body))
        (!cold-init-forms
@@ -511,16 +512,19 @@
                                       (complex-arg1 complex-arg2 complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
    `(let* ((.L ,type1) (id1 (type-class-id .L))
-           (.R ,type2) (id2 (type-class-id .R)))
-      (if (= id1 id2)
-          (funcall (,(type-class-fun-slot simple) (type-id->type-class id1)) .L .R)
-          (acond ((,(type-class-fun-slot complex-arg2) (type-id->type-class id2))
+           (.R ,type2) (id2 (type-class-id .R))
+           (c2 (type-id->type-class id2)))
+      (if (/= id1 id2)
+          (acond ((,(type-class-fun-slot complex-arg2) c2)
                   (funcall it .L .R))
                  ((,(type-class-fun-slot complex-arg1) (type-id->type-class id1))
                    ;; if COMPLEX-ARG1 method was provided, the method accepts
                    ;; the arguments exactly as given. Otherwise, flip them.
                   (funcall it ,@(if complex-arg1-p `(.L .R) `(.R .L))))
-                 (t ,default)))))
+                 (t ,default))
+          ,(if (eq simple :none)
+               '(bug "nope")
+               `(funcall (,(type-class-fun-slot simple) c2) .L .R)))))
 
 ;;; This is a very specialized implementation of CLOS-style
 ;;; CALL-NEXT-METHOD within our twisty little type class object
@@ -965,17 +969,17 @@
              (:predicate nil)
              (:copier nil))
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
-  (complexp :real :type (member :real :complex nil))
+  (complexp :real :read-only t :type (member :real :complex nil))
   ;; the kind of numeric type we have, or NIL if the type is NUMBER.
   ;; The types corresponding to all of REAL or all of COMPLEX are UNION types,
   ;; and no constituent type thereof will have a NIL here.
-  (class nil :type (member integer rational float nil))
+  (class nil :read-only t :type (member integer rational float nil))
   ;; "precision" for a float type (i.e. type specifier for a CPU
   ;; representation of floating point, e.g. 'SINGLE-FLOAT).
   ;; NIL if and only if CLASS is not FLOAT
-  (precision nil :type (member single-float double-float nil))
+  (precision nil :read-only t :type (member single-float double-float nil))
   ;; a value that uniquely identifies this triple of <complexp,class,precision>
-  (id 0 :type (unsigned-byte 8)))
+  (id 0 :read-only t :type (unsigned-byte 8)))
 
 ;;; There legal combinations of (COMPLEXP CLASS PRECISION) are as follows:
 ;;; 0. (NIL NIL NIL)

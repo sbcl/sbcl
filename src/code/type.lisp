@@ -1124,28 +1124,57 @@
 
 (declaim (start-block))
 
+;;; Helper for TYPE= so that we can separately cache the :SIMPLE-= function.
+(defun-cached (%simple-type= :hash-function #'type-cache-hash
+                             :hash-bits 11
+                             :values 2)
+    ((type1 eq) (type2 eq))
+  (declare (type ctype type1 type2))
+  (funcall (type-class-simple-=  (type-id->type-class (type-class-id type1)))
+           type1 type2))
+
 ;;; If two types are definitely equivalent, return true. The second
 ;;; value indicates whether the first value is definitely correct.
 ;;; This should only fail in the presence of HAIRY types.
 (defun-cached (type= :hash-function #'type-cache-hash
-                     :hash-bits 11
+                     :hash-bits 12
                      :memoizer memoize
                      :values 2)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (cond ((eq type1 type2)
-         (values t t))
-        ;; If args are not EQ, but both allow TYPE= optimization,
-        ;; and at least one is interned, then return no and certainty.
-        ;; Most of the interned CTYPEs admit this optimization,
-        ;; NUMERIC and MEMBER types do as well.
-        ((and (logtest +type-internedp+
-                       (logior (type-hash-value type1) (type-hash-value type2)))
-              (logtest +type-admits-type=-optimization+
-                       (logand (type-hash-value type1) (type-hash-value type2))))
-         (values nil t))
-        (t
-         (memoize (invoke-type-method :simple-= :complex-= type1 type2)))))
+  (macrolet ((quick-fail-simple-=-mask ()
+               ;; The set of type-classes for which not EQ implies not TYPE=.
+               (loop for class in '(character-set classoid member named
+                                    #+sb-simd-pack simd-pack
+                                    #+sb-simd-pack-256 simd-pack-256)
+                     sum (ash 1 (type-class-name->id class)))))
+    (if (eq type1 type2)
+        (values t t)
+        (let ((id1 (type-class-id type1))
+              (id2 (type-class-id type2)))
+          (cond ((/= id1 id2)
+                 ;; Different type-classes - it may be worth creating a 2D bit-array
+                 ;; such that if (sbit id1 id2) is 0 then the two instances
+                 ;; can not possibly be TYPE= like the quick-fail-simple-=-mask.
+                 ;; Trying to exploit commutative nature in a naive way fails!
+                 ;; We'd have to be a little trickier by always entering into the cache
+                 ;; in a canonical order, but calling the method with args as given,
+                 ;; but allow lookup with swapped args.
+                 #+nil ; (we care which class's operation is invoked)
+                 (when (< (type-hash-value type2) (type-hash-value type1))
+                   (rotatef type1 type2))
+                 (memoize (invoke-type-method :none :complex-= type1 type2)))
+                ((logbitp id1 (quick-fail-simple-=-mask))
+                 (values nil t))
+                ((= id1 #.(type-class-name->id 'number)) ; do not cache
+                 ;; At most 2 EQL tests, which are as fast as memoization, if not faster.
+                 (number-simple-=-type-method type1 type2))
+                (t ; use the SIMPLE-= method
+                 ;; A cached answer for swapped args is the same, so always put the smaller
+                 ;; hash first, and we might win with a previous answer.
+                 (when (< (type-hash-value type2) (type-hash-value type1))
+                   (rotatef type1 type2))
+                 (%simple-type= type1 type2)))))))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1808,10 +1837,6 @@ expansion happened."
 
 ;;;; built-in types
 
-(define-type-method (named :simple-=) (type1 type2)
-  ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
-  (values (eq type1 type2) t))
-
 (defun cons-type-might-be-empty-type (type)
   (declare (type cons-type type))
   (let ((car-type (cons-type-car-type type))
@@ -2462,17 +2487,21 @@ expansion happened."
 (define-type-class number :enumerable #'numeric-type-enumerable :might-contain-other-types nil)
 
 (define-type-method (number :simple-=) (type1 type2)
-  ;; Note that EQUALP equates signed zeros of the same precision.
+  ;; If NUMERIC-TYPE-CLASS is FLOAT, then we have to compare the bounds using EQUALP
+  ;; which equates signed zeros of the same precision.
   ;; In particular all the following are different, but TYPE= to each other:
   ;;  (specifier-type '(single-float -0s0 -0s0))
   ;;  (specifier-type '(single-float -0s0 +0s0))
   ;;  (specifier-type '(single-float +0s0 -0s0))
   ;;  (specifier-type '(single-float +0s0 +0s0))
-  (values
-   (and (numtype-aspects-eq type1 type2)
-        (equalp (numeric-type-low type1) (numeric-type-low type2))
-        (equalp (numeric-type-high type1) (numeric-type-high type2)))
-   t))
+  ;; If not a FLOAT class, then thanks to hash-consing, two instances can be TYPE=
+  ;; only if EQ. Therefore, since this method was invoked, the arguments are not TYPE=
+  ;; if the class is other than FLOAT.
+  (values (and (eq (numeric-type-class type1) 'float)
+               (numtype-aspects-eq type1 type2)
+               (equalp (numeric-type-low type1) (numeric-type-low type2))
+               (equalp (numeric-type-high type1) (numeric-type-high type2)))
+          t))
 
 (declaim (inline bounds-unbounded-p))
 (defun bounds-unbounded-p (low high)
@@ -3449,6 +3478,7 @@ used for a COMPLEX component.~:@>"
          (type= (array-type-element-type type1)
                 (array-type-element-type type2)))
         (t
+         ;; FIXME: I would think this can be strength-reduced to EQ
          (values (type= (array-type-specialized-element-type type1)
                         (array-type-specialized-element-type type2))
                  t))))
@@ -4038,15 +4068,6 @@ used for a COMPLEX component.~:@>"
                     (union (member-type-fp-zeroes type1)
                            (member-type-fp-zeroes type2))))
 
-(define-type-method (member :simple-=) (type1 type2)
-  (let ((l1 (member-type-fp-zeroes type1))
-        (l2 (member-type-fp-zeroes type2)))
-    (values (and (xset= (member-type-xset type1)
-                        (member-type-xset type2))
-                 (subsetp l1 l2)
-                 (subsetp l2 l1))
-            t)))
-
 (define-type-method (member :complex-=) (type1 type2)
   (if (type-enumerable type1)
       (multiple-value-bind (val win) (csubtypep type2 type1)
@@ -4176,7 +4197,7 @@ used for a COMPLEX component.~:@>"
 ;;;
 ;;; Possibly yes, but then the SUBTYPEP methods would have to be
 ;;; rewritten not to use TYPE= (see the discussion around UNION
-;;; :SIMPLE=)
+;;; :SIMPLE-=)
 (define-type-method (intersection :simple-=) (type1 type2)
   (type=-set (intersection-type-types type1)
              (intersection-type-types type2)))
@@ -4934,14 +4955,6 @@ used for a COMPLEX component.~:@>"
         (values t (code-char (car pair)))
         (values nil nil))))
 
-(define-type-method (character-set :simple-=) (type1 type2)
-  ;; FIXME: Do we actually call the SIMPLE-= method on instances that are EQ?
-  ;; I can't recall if that's done at a higher level. If it is, then this method
-  ;; should return (VALUES NIL T) because two different instances are not TYPE=
-  (let ((pairs1 (character-set-type-pairs type1))
-        (pairs2 (character-set-type-pairs type2)))
-    (values (equal pairs1 pairs2) t)))
-
 (define-type-method (character-set :simple-subtypep) (type1 type2)
   (values
    (dolist (pair (character-set-type-pairs type1) t)
@@ -5111,11 +5124,6 @@ used for a COMPLEX component.~:@>"
   (define-type-method (simd-pack :unparse) (flags type)
     (simd-type-unparser-helper 'simd-pack (simd-pack-type-tag-mask type)))
 
-  (define-type-method (simd-pack :simple-=) (type1 type2)
-    (declare (type simd-pack-type type1 type2))
-    (values (= (simd-pack-type-tag-mask type1) (simd-pack-type-tag-mask type2))
-            t))
-
   (define-type-method (simd-pack :simple-subtypep) (type1 type2)
     (declare (type simd-pack-type type1 type2))
     (values (zerop (logandc2 (simd-pack-type-tag-mask type1)
@@ -5153,11 +5161,6 @@ used for a COMPLEX component.~:@>"
 
   (define-type-method (simd-pack-256 :unparse) (flags type)
     (simd-type-unparser-helper 'simd-pack-256 (simd-pack-256-type-tag-mask type)))
-
-  (define-type-method (simd-pack-256 :simple-=) (type1 type2)
-    (declare (type simd-pack-256-type type1 type2))
-    (values (= (simd-pack-256-type-tag-mask type1) (simd-pack-256-type-tag-mask type2))
-            t))
 
   (define-type-method (simd-pack-256 :simple-subtypep) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
