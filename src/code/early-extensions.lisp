@@ -467,6 +467,8 @@ NOTE: This interface is experimental and subject to change."
   (dolist (name *cache-vector-symbols*)
     (set name nil)))
 
+(defmacro sb-int-package () (find-package "SB-INT"))
+
 ;; Make a new hash-cache and optionally create the statistics vector.
 (defun alloc-hash-cache (size symbol)
   (declare (type index size))
@@ -485,8 +487,7 @@ NOTE: This interface is experimental and subject to change."
                  ;; it is inconsequential to performance.
                  (if *profile-hash-cache*
                      `(let ((statistics
-                             (let ((*package* (sb-xc:symbol-package symbol)))
-                               (symbolicate symbol "STATISTICS"))))
+                             (package-symbolicate (sb-int-package) symbol "-STATS")))
                         (unless (boundp statistics)
                           (set! statistics
                                 (make-array 3 :element-type 'fixnum
@@ -548,7 +549,7 @@ NOTE: This interface is experimental and subject to change."
          (var-name (symbolicate "**" name "-CACHE-VECTOR**"))
          (statistics-name
           (when *profile-hash-cache*
-            (symbolicate var-name "STATISTICS")))
+            (package-symbolicate (sb-int-package) var-name "-STATS")))
          (nargs (length args))
          (size (ash 1 hash-bits))
          (hashval (make-symbol "HASH"))
@@ -1337,8 +1338,7 @@ NOTE: This interface is experimental and subject to change."
 '(defun show-hash-cache-statistics ()
   (flet ((cache-stats (symbol)
            (let* ((name (string symbol))
-                  (statistics (let ((*package* (sb-xc:symbol-package symbol)))
-                                (symbolicate symbol "STATISTICS")))
+                  (statistics (package-symbolicate (sb-int-package) symbol "-STATS"))
                   (prefix
                    (subseq name 0 (- (length name) (length "VECTOR**")))))
              (values (if (boundp statistics)

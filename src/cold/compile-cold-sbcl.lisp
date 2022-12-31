@@ -233,6 +233,11 @@
                     (format t " (~f sec)~%" elapsed)
                     (incf total-time elapsed)))
                 ;(sb-kernel::show-ctype-ctor-cache-metrics)
+                ;; The TYPE= cache starts out doing well, with > 50% hit rate
+                ;; but by the final file is compiled, it is down to 11%. Why?
+                (when nil ; sb-impl::*profile-hash-cache*
+                  ;;  avoid "make-host-2 stopped due to unexpected STYLE-WARNING raised from the host."
+                  (funcall (intern "SHOW-HASH-CACHE-STATISTICS" "SB-IMPL")))
                 ;; The specialized array registry has file-wide scope. Hacking that aspect
                 ;; into the xc build scaffold seemed slightly easier than hacking the
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)

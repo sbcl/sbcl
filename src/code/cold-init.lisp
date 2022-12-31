@@ -47,10 +47,6 @@
 
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
 
-(defun !format-cold-init ()
-  (sb-format::!late-format-init)
-  (sb-format::!format-directives-init))
-
 ;;; Allows the SIGNAL function to be called early.
 (defun !signal-function-cold-init ()
   #+sb-devel

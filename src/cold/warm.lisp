@@ -217,6 +217,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                          ;; rather than asking what to do here?
                          #+(or x86 x86-64) ;; these should complete without warnings
                          (cerror "Ignore warnings" "Compile completed with warnings")))
+                  #+nil (sb-impl::show-hash-cache-statistics)
                   (unless (handler-bind
                               ((sb-kernel:redefinition-with-defgeneric
                                 #'muffle-warning))
