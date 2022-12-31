@@ -103,7 +103,7 @@
                    :load-if (not (and (sc-is symbol constant)
                                       (or (symbol-always-has-tls-value-p (tn-value symbol))
                                           (symbol-always-has-tls-index-p (tn-value symbol)))))))
-    (:args-var symbol-tn-ref)
+    (:arg-refs symbol-tn-ref)
     (:temporary (:sc any-reg) tls-index)
     (:variant-vars check-boundp)
     (:variant t)
@@ -210,7 +210,7 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:args-var args)
+  (:arg-refs args)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2

@@ -238,7 +238,7 @@
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
-  (:args-var args)
+  (:arg-refs args)
   (:policy :fast-safe))
 
 (define-vop (fixnump/unsigned-byte-64 simple-type-predicate)
@@ -296,7 +296,7 @@
 (define-vop (signed-byte-64-p pointerp)
   (:translate signed-byte-64-p)
   (:conditional :z)
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:generator 6
     (when (types-equal-or-intersect (tn-ref-type arg-ref) (specifier-type 'fixnum))
       (inst test :byte value fixnum-tag-mask)
@@ -326,7 +326,7 @@
                   (:translate ,name)
                   (:args (value :scs (any-reg descriptor-reg)))
                   (:conditional :z)
-                  (:args-var arg-ref)
+                  (:arg-refs arg-ref)
                   (:policy :fast-safe)
                   (:temporary (:sc unsigned-reg) temp temp2)
                   (:generator 6
@@ -552,7 +552,7 @@
                   (:translate ,name)
                   (:info) ; nullify the info
                   (:conditional :z)
-                  (:args-var value-tn-ref)
+                  (:arg-refs value-tn-ref)
                   (:generator 4
                     (fail-if-not-otherptr)
                     (inst or :byte temp 8)
@@ -569,7 +569,7 @@
                     (:translate ,name)
                     (:info)
                     (:conditional :c) ; Carry flag = "below" (unsigned)
-                    (:args-var value-tn-ref)
+                    (:arg-refs value-tn-ref)
                     (:generator 4
                       (fail-if-not-otherptr)
                       (inst sub :byte temp ,min)
@@ -645,9 +645,8 @@
 (eval-when (:compile-toplevel) (aver (= sb-impl::package-id-bits 16)))
 (define-vop (keywordp symbolp)
   (:translate keywordp)
-  (:args-var args-ref)
   (:generator 3
-    (cond ((csubtypep (tn-ref-type args-ref) (specifier-type 'symbol))
+    (cond ((csubtypep (tn-ref-type args) (specifier-type 'symbol))
            (inst cmp :word (ea (+ (ash symbol-name-slot word-shift) 6
                                   (- other-pointer-lowtag))
                                value)
@@ -678,7 +677,7 @@
   (:info widetag)
   (:arg-types * (:constant t))
   (:conditional :e)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
    (inst cmp :byte (ea (- other-pointer-lowtag) x) widetag)))
 
@@ -759,7 +758,7 @@
 
 (define-vop (fixnump simple-type-predicate)
   (:translate fixnump)
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:args (value :scs (any-reg descriptor-reg) :load-if (tn-ref-memory-access arg-ref)))
   (:conditional :z)
   ;; the compiler is very sensitive to this cost here as regards boxing. DON'T TOUCH !!!
@@ -829,7 +828,7 @@
   (:temporary (:sc unsigned-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:args-var integer-ref)
+  (:arg-refs integer-ref)
   (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :g)
@@ -881,7 +880,7 @@
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
   (:arg-types tagged-num (:or integer bignum))
-  (:args-var nil integer-ref)
+  (:arg-refs nil integer-ref)
   (:variant :l))
 
 (define-vop (<-fixnum-integer >-fixnum-integer)
@@ -904,7 +903,7 @@
 
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:args-var args)
+  (:arg-refs args)
   (:info not-other-pointer-label null-label)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -1018,7 +1017,7 @@
   (:translate sb-c::structure-typep)
   (:args (object :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:args-var args)
+  (:arg-refs args)
   (:policy :fast-safe)
   (:conditional)
   (:info target not-p test-layout)
@@ -1068,7 +1067,7 @@
 
 (define-vop (load-instance-layout)
   (:args (object :scs (any-reg descriptor-reg)))
-  (:args-var args)
+  (:arg-refs args)
   (:info not-instance)
   (:temporary (:sc unsigned-reg) temp)
   (:results (r :scs (descriptor-reg)))

@@ -826,7 +826,7 @@
   (:translate truncate)
   (:args (x :scs (any-reg) :target eax)
          (y :scs (any-reg control-stack)))
-  (:args-var args)
+  (:arg-refs args)
   (:arg-types tagged-num tagged-num)
   (:temporary (:sc signed-reg :offset rax-offset :target quo
                :from (:argument 0) :to (:result 0)) eax)
@@ -888,7 +888,7 @@
   (:args (x :scs (unsigned-reg) :target eax)
          (y :scs (unsigned-reg signed-stack)))
   (:arg-types unsigned-num unsigned-num)
-  (:args-var args)
+  (:arg-refs args)
   (:temporary (:sc unsigned-reg :offset rax-offset :target quo
                :from (:argument 0) :to (:result 0)) eax)
   (:temporary (:sc unsigned-reg :offset rdx-offset :target rem
@@ -940,7 +940,7 @@
   (:translate truncate)
   (:args (x :scs (signed-reg) :target eax)
          (y :scs (signed-reg signed-stack)))
-  (:args-var args)
+  (:arg-refs args)
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg :offset rax-offset :target quo
                    :from (:argument 0) :to (:result 0)) eax)
@@ -1136,7 +1136,7 @@
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 3
     (with-shift-operands
       (move ecx amount)
@@ -1160,7 +1160,7 @@
 (define-vop (fast-ash-left/unsigned-mod64=>unsigned
              fast-ash-left/unsigned=>unsigned)
   (:translate ash-left-mod64)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 3
     (with-shift-operands
       (move ecx amount)
@@ -1228,7 +1228,7 @@
   (:results (result :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:args-var args)
+  (:arg-refs args)
   (:variant-vars check-amount signed)
   (:note "inline ASH")
   (:generator 5
@@ -1279,7 +1279,7 @@
          (amount :scs (signed-reg) :target ecx))
   (:arg-types (:or signed-num unsigned-num) signed-num)
   (:results (result :scs (any-reg) :from (:argument 0)))
-  (:args-var args)
+  (:arg-refs args)
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:note "inline ASH")
@@ -1778,7 +1778,7 @@
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant integer))
   (:info y)
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:conditional :ne)
   (:generator 1
    (let ((disp (cdr (tn-ref-memory-access arg-ref))))
@@ -1952,7 +1952,7 @@
   (:args (x :scs (descriptor-reg)))
   (:arg-types (:constant (mod 64)) *)
   (:info bit)
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:vop-var vop)
   (:conditional :ne)
   (:ignore temp)
@@ -2065,7 +2065,7 @@
                                    ,(symbolicate "FAST-CONDITIONAL"  suffix))
                         (:translate ,tran)
                         (:conditional ,(if signed cond unsigned))
-                        (:args-var x-tn-ref)
+                        (:arg-refs x-tn-ref)
                         (:generator ,cost
                           (emit-optimized-cmp
                            x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
@@ -2191,7 +2191,7 @@
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eql %eql/integer)
-  (:args-var x-tn-ref)
+  (:arg-refs x-tn-ref)
   (:generator 2 (emit-optimized-cmp x (fixnumize y) temp (tn-ref-type x-tn-ref))))
 
 ;;; FIXME: this seems never to be invoked any more. What did we either break or improve?

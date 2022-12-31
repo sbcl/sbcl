@@ -411,7 +411,7 @@
 ;;; ARG is a fixnum or bignum; figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
-  (:results-var results)
+  (:result-refs results)
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 4

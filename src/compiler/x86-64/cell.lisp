@@ -39,7 +39,7 @@
   (:results)
   (:vop-var vop)
   (:node-var node)
-  (:args-var args)
+  (:arg-refs args)
   (:temporary (:sc unsigned-reg) val-temp)
   (:generator 1
     (cond #+ubsan
@@ -428,7 +428,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     ;; The symbol-hash slot of NIL holds NIL because it is also the

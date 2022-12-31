@@ -212,7 +212,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; car slot, so we have to strip off the two low bits to make sure

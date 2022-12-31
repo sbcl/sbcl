@@ -83,7 +83,7 @@
   (:info labels otherwise key-type keys test-vop-name)
   (:temporary (:sc unsigned-reg) table)
   (:temporary (:sc unsigned-reg) temp)
-  (:args-var x-tn-ref)
+  (:arg-refs x-tn-ref)
   (:generator 10
     (let* ((key-derived-type (tn-ref-type x-tn-ref))
            (ea)
@@ -320,7 +320,7 @@
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
-  (:args-var x-tn-ref)
+  (:arg-refs x-tn-ref)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 6
     (cond

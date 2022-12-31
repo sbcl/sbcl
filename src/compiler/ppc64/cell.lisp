@@ -279,7 +279,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 4
     (when (not-nil-tn-ref-p args)
       (loadw res symbol symbol-hash-slot other-pointer-lowtag)

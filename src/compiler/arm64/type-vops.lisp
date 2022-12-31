@@ -269,7 +269,7 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:args-var integer-ref)
+  (:arg-refs integer-ref)
   (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :gt)
@@ -351,7 +351,7 @@
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
   (:arg-types tagged-num (:or integer bignum))
-  (:args-var nil integer-ref)
+  (:arg-refs nil integer-ref)
   (:variant :lt))
 
 (define-vop (<-fixnum-integer >-fixnum-integer)
@@ -572,7 +572,7 @@
 
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:args-var args)
+  (:arg-refs args)
   (:info not-other-pointer-label null-label)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -597,7 +597,7 @@
 
 (define-vop (load-instance-layout)
   (:args (object :scs (any-reg descriptor-reg)))
-  (:args-var args)
+  (:arg-refs args)
   (:info not-instance)
   (:results (r :scs (descriptor-reg)))
   (:generator 1
@@ -670,7 +670,7 @@
   (:translate sb-c::structure-typep)
   (:args (object :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:args-var args)
+  (:arg-refs args)
   (:policy :fast-safe)
   (:conditional)
   (:info target not-p test-layout)
@@ -733,12 +733,11 @@
 
 (define-vop (keywordp type-predicate)
   (:translate keywordp)
-  (:args-var args-ref)
   (:generator 3
     #.(assert (= sb-impl::package-id-bits 16))
-    (unless (csubtypep (tn-ref-type args-ref) (specifier-type 'symbol))
+    (unless (csubtypep (tn-ref-type args) (specifier-type 'symbol))
       (test-type value temp (if not-p target not-target) t (symbol-widetag)
-                 :value-tn-ref args-ref))
+                 :value-tn-ref args))
     (inst ldrh temp (@ value (+ (ash symbol-name-slot word-shift)
                                (- other-pointer-lowtag)
                                6)))

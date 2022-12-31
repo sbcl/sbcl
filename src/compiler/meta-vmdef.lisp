@@ -343,8 +343,6 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
-  (args-var nil :type list)
-  (results-var '.results. :type symbol)
   (before-load :unspecified :type (or (member :unspecified) list)))
 (declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
@@ -373,9 +371,9 @@
 ;;; The list of slots in the structure, not including the OPERANDS slot.
 ;;; Order here is insignificant; it happens to be alphabetical.
 (defglobal vop-parse-slot-names
-    '(arg-types args args-var before-load body conditional-p cost guard ignores info-args inherits
+    '(arg-types args before-load body conditional-p cost guard ignores info-args inherits
       ltn-policy more-args more-results move-args name node-var note optional-results result-types
-      results results-var save-p source-location temps translate variant variant-vars vop-var))
+      results save-p source-location temps translate variant variant-vars vop-var))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
 ;; get this far in cross-compilaion. So it's probably not worth much.
 (eval-when (#+sb-xc :compile-toplevel)
@@ -727,7 +725,6 @@
 (defun make-generator-function (parse)
   (declare (type vop-parse parse))
   (let ((n-vop (vop-parse-vop-var parse))
-        (n-results (vop-parse-results-var parse))
         (operands (vop-parse-operands parse))
         (n-info (gensym)) (n-variant (gensym))
         (dummy (gensym)))
@@ -753,13 +750,13 @@
           ((:more-argument :more-result))))
 
       `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
-         (let* ((,n-results (vop-results ,n-vop))
-                ,@(access-operands (vop-parse-args parse)
+         (declare (ignorable ,n-vop))
+         (let* (,@(access-operands (vop-parse-args parse)
                                    (vop-parse-more-args parse)
                                    `(vop-args ,n-vop))
                 ,@(access-operands (vop-parse-results parse)
                                    (vop-parse-more-results parse)
-                                   n-results)
+                                   `(vop-results ,n-vop))
                 ,@(access-operands (vop-parse-temps parse) nil
                                    `(vop-temps ,n-vop))
                 ,@(when (vop-parse-info-args parse)
@@ -778,8 +775,7 @@
                 ,@(binds))
            (declare (ignore ,@(vop-parse-ignores parse)
                             ,@(and (neq (vop-parse-before-load parse) :unspecified)
-                                   `(,dummy)))
-                    (ignorable ,n-results))
+                                   `(,dummy))))
            ,@(loads)
            ;; RETURN-FROM can exit the ASSEMBLE while continuing on with saves.
            (block ,(vop-parse-name parse)
@@ -795,17 +791,15 @@
     (when (or unused-temps
               conditional)
       (let* ((n-vop (vop-parse-vop-var parse))
-             (n-results (vop-parse-results-var parse))
              (n-info (gensym))
              (n-variant (gensym))
              (bindings
-               `((,n-results (vop-results ,n-vop))
-                 ,@(access-operands (vop-parse-args parse)
+               `(,@(access-operands (vop-parse-args parse)
                                     (vop-parse-more-args parse)
                                     `(vop-args ,n-vop))
                  ,@(access-operands (vop-parse-results parse)
                                     (vop-parse-more-results parse)
-                                    n-results)
+                                    `(vop-results ,n-vop))
                  ,@(and unused-temps
                         (access-operands (vop-parse-temps parse) nil
                                          `(vop-temps ,n-vop)))
@@ -1022,19 +1016,27 @@
 
 ;;; the top level parse function: clobber PARSE to represent the
 ;;; specified options.
-(defun parse-define-vop (parse specs)
+(defun parse-define-vop (parse specs inherits)
   (declare (type vop-parse parse) (list specs))
-  (let ((*parse-vop-operand-count* (compute-parse-vop-operand-count parse)))
+  (let ((*parse-vop-operand-count* (compute-parse-vop-operand-count parse))
+        args-p
+        results-p
+        arg-refs
+        arg-refs-p
+        result-refs
+        result-refs-p)
     (dolist (spec specs)
       (unless (consp spec)
         (error "malformed option specification: ~S" spec))
       (case (first spec)
         (:args
+         (setf args-p t)
          (multiple-value-bind (fixed more)
              (parse-vop-operands parse (rest spec) :argument)
            (setf (vop-parse-args parse) fixed)
            (setf (vop-parse-more-args parse) more)))
         (:results
+         (setf results-p t)
          (multiple-value-bind (fixed more)
              (parse-vop-operands parse (rest spec) :result)
            (setf (vop-parse-results parse) fixed)
@@ -1048,8 +1050,8 @@
         (:temporary
          (parse-temporary spec parse))
         (:generator
-            (setf (vop-parse-cost parse)
-                  (vop-spec-arg spec 'unsigned-byte 1 nil))
+         (setf (vop-parse-cost parse)
+               (vop-spec-arg spec 'unsigned-byte 1 nil))
          (setf (vop-parse-body parse) (cddr spec)))
         (:before-load
          (setf (vop-parse-before-load parse) (cdr spec)))
@@ -1070,10 +1072,12 @@
          (setf (vop-parse-cost parse) (vop-spec-arg spec 'unsigned-byte)))
         (:vop-var
          (setf (vop-parse-vop-var parse) (vop-spec-arg spec 'symbol)))
-        (:args-var
-         (setf (vop-parse-args-var parse) (cdr spec)))
-        (:results-var
-         (setf (vop-parse-results-var parse) (vop-spec-arg spec 'symbol)))
+        (:arg-refs
+         (setf arg-refs-p t
+               arg-refs (cdr spec)))
+        (:result-refs
+         (setf result-refs-p t
+               result-refs (cdr spec)))
         (:move-args
          (setf (vop-parse-move-args parse)
                (vop-spec-arg spec '(member nil :local-call :full-call
@@ -1098,8 +1102,8 @@
         ;; architecture, since the renaming would be a change to the
         ;; interface between
         (:policy
-         (setf (vop-parse-ltn-policy parse)
-               (vop-spec-arg spec 'ltn-policy)))
+            (setf (vop-parse-ltn-policy parse)
+                  (vop-spec-arg spec 'ltn-policy)))
         (:save-p
          (setf (vop-parse-save-p parse)
                (vop-spec-arg spec
@@ -1110,11 +1114,36 @@
                        (rest spec))))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
-    (loop with refs = (vop-parse-args-var parse)
-          for arg in (vop-parse-args parse)
-          for ref = (pop refs)
-          when ref
-          do (setf (operand-parse-temp arg) ref))
+    (cond (arg-refs-p
+           (loop with refs = arg-refs
+                 for arg in (if args-p
+                                (vop-parse-args parse)
+                                (setf (vop-parse-args parse)
+                                      (mapcar #'copy-structure (vop-parse-args parse))))
+                 for ref = (pop refs)
+                 when ref
+                 do (setf (operand-parse-temp arg) ref)))
+          ((and inherits
+                args-p)
+           (loop for inherited-arg in (vop-parse-args inherits)
+                 for arg in (vop-parse-args parse)
+                 do (setf (operand-parse-temp arg)
+                          (operand-parse-temp inherited-arg)))))
+    (cond (result-refs-p
+           (loop with refs = result-refs
+                 for result in (if results-p
+                                (vop-parse-results parse)
+                                (setf (vop-parse-results parse)
+                                      (mapcar #'copy-structure (vop-parse-results parse))))
+                 for ref = (pop refs)
+                 when ref
+                 do (setf (operand-parse-temp result) ref)))
+          ((and inherits
+                results-p)
+           (loop for inherited-result in (vop-parse-results inherits)
+                 for result in (vop-parse-results parse)
+                 do (setf (operand-parse-temp result)
+                          (operand-parse-temp inherited-result)))))
     (values)))
 
 ;;;; making costs and restrictions
@@ -1672,7 +1701,7 @@
       (setf (vop-parse-name parse) name))
     (setf (vop-parse-inherits parse) inherits)
 
-    (parse-define-vop parse specs)
+    (parse-define-vop parse specs inherited-parse)
     (set-vop-parse-operands parse)
     (check-operand-types parse
                          (vop-parse-args parse)

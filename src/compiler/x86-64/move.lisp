@@ -212,7 +212,7 @@
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target y))
   (:results (y :scs (signed-reg unsigned-reg)))
-  (:results-var results)
+  (:result-refs results)
   (:note "integer to untagged word coercion")
   (:temporary (:sc unsigned-reg) backup)
   (:generator 4
@@ -302,7 +302,7 @@
 (define-vop (move-from-fixnum+1)
   (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:vop-var vop)
   (:generator 4
     (let ((const (case (vop-name vop)
