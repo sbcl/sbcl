@@ -131,45 +131,37 @@
 
 
 (defglobal *backend-type-predicates-grouped*
-    (let (plist)
-      (loop for (type . pred) in *backend-type-predicates*
-            for class = (#-sb-xc-host %instance-wrapper
-                         #+sb-xc-host type-of
-                         type)
-            do (push type (getf plist class))
-               (push pred (getf plist class)))
-      (map 'vector (lambda (x)
-                     (if (listp x)
-                         (concatenate 'vector
-                                      (list
-                                       (every (lambda (x)
-                                                (or (symbolp x)
-                                                    (and (sb-kernel::ctype-eq-comparable x)
-                                                         (sb-kernel::ctype-interned-p x))))
-                                              x))
-                                      (nreverse x))
-                         x))
-           plist)))
+  (let ((classes (make-array (count-if #'identity sb-kernel::*type-classes*)
+                             :initial-element nil)))
+    (dolist (cell *backend-type-predicates*)
+      (let ((index (sb-kernel::type-class-id (car cell))))
+        (push cell (aref classes index))))
+    (dotimes (i (length classes) classes)
+      (let ((elements (nreverse (aref classes i))))
+        (setf (aref classes i)
+              (when elements
+                (let ((types (coerce (mapcar 'car elements) 'vector))
+                      (preds (coerce (mapcar 'cdr elements) 'vector)))
+                  (cons types preds))))))))
 (declaim (simple-vector *backend-type-predicates-grouped*))
 
 (defun backend-type-predicate (type)
   #-sb-xc-host
   (declare (optimize (insert-array-bounds-checks 0)))
-  (flet ((vector-getf (vector key test &optional (start 0))
-           (loop for i from start below (length vector) by 2
-                 when (funcall test (svref vector i) key)
-                 return (svref vector (1+ i)))))
-    (declare (inline vector-getf))
-    (let ((group (truly-the (or simple-vector null)
-                            (vector-getf *backend-type-predicates-grouped*
-                                         (#-sb-xc-host %instance-wrapper
-                                          #+sb-xc-host type-of type)
-                                         #'eq))))
-      (when group
-        (if (and (svref group 0)
-                 (sb-kernel::ctype-eq-comparable type))
-            (vector-getf (truly-the simple-vector group) type #'eq 1)
-            (vector-getf (truly-the simple-vector group) type #'type= 1))))))
+  (let* ((choices (aref *backend-type-predicates-grouped*
+                        (sb-kernel::type-class-id type)))
+         (ctypes (car choices)))
+    ;; Other than array types, there is no way to make a type
+    ;; which is TYPE= to one of the choices but not EQ to it.
+    ;; But often with array types, EQ works, so always try it first.
+    (dotimes (i (length ctypes))
+      (when (eq type (aref ctypes i))
+        (return-from backend-type-predicate (aref (cdr choices) i))))
+    ;; "if at first you don't succeed ..."
+    (when (array-type-p type)
+      (dotimes (i (length ctypes))
+        (when (type= type (aref ctypes i))
+          (return (aref (cdr choices) i)))))))
 
 (defglobal *backend-union-type-predicates*
     (let ((unions (sort

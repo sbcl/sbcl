@@ -254,22 +254,16 @@
                    (:constructor nil)
                    (:copier nil)
                    (:pure t))
-  ;; bits  0..19: 20 bits for opaque hash
-  ;; bit      20: 1 if interned: specifier -> object is guaranteed unique
-  ;; bit      21: 1 if admits type= optimization: NEQ implies (NOT TYPE=)
-  ;; bits 22..26: more bits of hash
+  ;; bits  0..26: pseudorandom hash
   ;; bits 27..31: 5 bits for type-class index
-  ;; We'll never return the upper 5 bits from a hash mixer, so it's fine
-  ;; that this uses all 32 bits for a 32-bit word.
   ;; No more than 32 bits are used, even for 64-bit words.
+  ;; TODO: this should probably be a target positive-fixnum, and there's
+  ;; no reason to chop out the class id bits when mixing hashes.
   (%bits (missing-arg) :type (unsigned-byte 32) :read-only t))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant ctype-hash-nbits 27))
-;;; take 27 low bits but exclude bits 20 and 21
-;;; [Our MASK-FIELD can't be folded, and I didn't feel like fixing that.]
-(defconstant +type-hash-mask+
-  #.(cl:logandc2 (cl:ldb (cl:byte 27 0) -1) (cl:mask-field (cl:byte 2 20) -1)))
+(defconstant +type-hash-mask+ (1- (ash 1 ctype-hash-nbits)))
 
 (defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-hash-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
@@ -278,24 +272,10 @@
 (declaim (inline type-hash-value))
 (defun type-hash-value (ctype) (ldb (byte ctype-hash-nbits 0) (type-%bits ctype)))
 
-;;; TODO: remove the "interned" bit. No two internal representations can exist
-;;; for the same structures that are EQUALP. Except for ALIEN-TYPE-TYPE (FIXME)
-(defmacro type-bits-internedp (bits) `(logbitp 20 ,bits))
-(defmacro type-bits-admit-type=-optimization (bits) `(logbitp 21 ,bits))
-
 (defglobal *ctype-hashsets* nil)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +type-internedp+ (ash 1 20))
-  (defconstant +type-admits-type=-optimization+ (ash 1 21))
   (defun ctype-class-bits (type-class)
-    (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
-            ;; NUMBER, MEMBER, and CLASSOID admit TYPE= optimization.
-            ;; Other type classes might, but this is the conservative assumption.
-            (if (member type-class '(number member classoid))
-                +type-admits-type=-optimization+ 0)
-            ;; The mapping from name to a CLASSOID type is unique,
-            ;; therefore all CLASSOIDs have the "interned" bit on.
-            (if (eq type-class 'classoid) +type-internedp+ 0)))
+    (ash (type-class-name->id type-class) ctype-hash-nbits))
   (defvar *type-class-list*
     ;; type-class and ctype instance types in that class
     ;; The instance types MUST be list in descending order of DEPTHOID.
@@ -333,10 +313,7 @@
 (defun pack-interned-ctype-bits (type-class &optional hash)
   (let ((hash (or hash (ctype-random))))
     (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
-            (logand hash +type-hash-mask+)
-            ;; type= optimization is valid if not an array-type
-            (if (eq type-class 'array) 0 +type-admits-type=-optimization+)
-            +type-internedp+)))
+            (logand hash +type-hash-mask+))))
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)

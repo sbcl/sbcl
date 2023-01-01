@@ -1115,13 +1115,6 @@
       (values t t)
       (csubtypep (specifier-type type1) (specifier-type type2))))
 
-(declaim (inline ctype-eq-comparable))
-(defun ctype-eq-comparable (ctype)
-  (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
-
-(defun ctype-interned-p (ctype)
-  (logtest (type-hash-value ctype) +type-internedp+))
-
 (declaim (start-block))
 
 ;;; Helper for TYPE= so that we can separately cache the :SIMPLE-= function.

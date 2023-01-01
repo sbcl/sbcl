@@ -1670,7 +1670,8 @@
   (lambda (self env)
     (declare (ignore env))
     (aver (acyclic-type-p self))
-    (the (not null) (make-type-load-form self))))
+    (let ((form (make-type-load-form self)))
+      (the (not null) form))))
 
 (defun show-alien-type-caches ()
   (dolist (var *alien-type-hashsets*)
