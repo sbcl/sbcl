@@ -20,7 +20,7 @@
 ;;; And it's possible that we could decide to install a closure as
 ;;; the fin-fun but I don't think that's necessary.
 (sb-kernel:!defstruct-with-alternate-metaclass fmt-control
-  :slot-names (string symbols memo)
+  :slot-names ((string simple-string) symbols memo)
   :constructor %make-fmt-control
   :superclass-name function
   :metaclass-name static-classoid
