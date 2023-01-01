@@ -460,6 +460,7 @@ NOTE: This interface is experimental and subject to change."
 ;;;   a fixnum with at least (* 2 <hash-bits>) of information in it.
 ;;; :VALUES <n>
 ;;;   the number of return values cached for each function call
+(define-load-time-global *!cache-definitions* nil)
 (define-load-time-global *cache-vector-symbols* nil)
 
 (defun drop-all-hash-caches ()
@@ -534,9 +535,9 @@ NOTE: This interface is experimental and subject to change."
   (def 5)
   (def 6))
 
-(defmacro !define-hash-cache (name args aux-vars
+(defmacro !define-hash-cache (name args
                               &key hash-function hash-bits memoizer
-                              flush-function (values 1))
+                              (values 1))
   (declare (ignore memoizer))
   (dolist (arg args)
     ;; Each arg is (VARNAME EQUIVALENCE-TEST &OPTIONAL EXPR-TO-CACHE)
@@ -545,40 +546,60 @@ NOTE: This interface is experimental and subject to change."
     (unless (<= 2 (length arg) 3)
       (error "bad argument spec: ~S" arg)))
   (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
-  (let* ((fun-name (symbolicate "!" name "-MEMO-WRAPPER"))
-         (var-name (symbolicate "**" name "-CACHE-VECTOR**"))
+  (unless (integerp values) ; non-numeric was only for CTYPE-OF-ARRAY
+    (error "Values ~S unsupported" values))
+  (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
+         (statistics-name (package-symbolicate (sb-int-package) var-name "-STATS"))
+         (cache-type `(simple-vector ,(ash 1 hash-bits))))
+    `(progn
+       (eval-when (:compile-toplevel :execute)
+         (setf (get ',var-name '!cache-definition)
+               (list ',hash-bits ',hash-function ',args ',values)))
+       (pushnew ',var-name *cache-vector-symbols*)
+       (define-load-time-global ,var-name nil)
+       ,@(when *profile-hash-cache*
+           `((declaim (type (simple-array fixnum (3)) ,statistics-name))
+             (defvar ,statistics-name)))
+       (declaim (type (or null ,cache-type) ,var-name))
+       (defun ,(symbolicate name "-CACHE-CLEAR") () (setq ,var-name nil))
+       ',var-name)))
+
+(eval-when (:compile-toplevel :execute) ; leave this out of the core image
+(#+sb-xc-host defmacro #-sb-xc-host sb-xc:defmacro
+ with-cache ((fun-name &rest actual-args) &body computation)
+  (let* ((var-name (symbolicate "**" fun-name "-CACHE-VECTOR**"))
+         (cache-params (get var-name '!cache-definition))
          (statistics-name
           (when *profile-hash-cache*
             (package-symbolicate (sb-int-package) var-name "-STATS")))
-         (nargs (length args))
+         (hash-bits (first cache-params))
+         (hashfun (second cache-params))
+         (arg-specs (third cache-params))
+         (nargs (length arg-specs))
+         (values (fourth cache-params))
          (size (ash 1 hash-bits))
          (hashval (make-symbol "HASH"))
          (cache (make-symbol "CACHE"))
          (entry (make-symbol "LINE"))
-         (thunk (make-symbol "THUNK"))
-         (arg-vars (mapcar #'first args))
          (nvalues (if (listp values) (length values) values))
          (result-temps
           (if (listp values)
               values ; use the names provided by the user
               (loop for i from 1 to nvalues ; else invent some names
                     collect (make-symbol (format nil "R~D" i)))))
-         (temps (append (mapcar (lambda (x) (make-symbol (string x)))
-                                arg-vars)
-                        result-temps))
+         (temps (append (mapcar #'copy-symbol actual-args) result-temps))
          ;; Mnemonic: (FIND x SEQ :test #'f) calls f with x as the LHS
-         (tests (mapcar (lambda (spec temp) ; -> (EQx ARG #:ARG)
-                          `(,(cadr spec) ,(car spec) ,temp))
-                        args temps))
+         (tests (mapcar (lambda (spec temp actual) ; -> (EQx #:ARG ARG)
+                          `(,(cadr spec) ,temp ,actual))
+                        arg-specs temps actual-args))
          (cache-type `(simple-vector ,size))
          (line-type (let ((n (+ nargs nvalues)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
-         (bind-hashval
-          `((,hashval (the sb-xc:fixnum
-                           (funcall ,hash-function ,@arg-vars)))
-            (,cache ,var-name)))
+         ;; It's not really necessary to factor out PROBE-IT,
+         ;; but it used to be possible to probe for an entry to forcefully
+         ;; evict (unmemoize) it. That capability is no longer needed.
          (probe-it
-          (lambda (ignore action)
+          (lambda (action)
             `(when ,cache
                (let ((,hashval ,hashval) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
@@ -589,8 +610,8 @@ NOTE: This interface is experimental and subject to change."
                               (svref ,cache
                                      (ldb (byte ,hash-bits 0) ,hashval))))
                          (unless (eql ,entry 0)
-                           (locally (declare (type ,line-type ,entry))
-                             (let* ,(case (length temps)
+                           (let* ((,entry (truly-the ,line-type ,entry))
+                                  ,@(case (length temps)
                                      (2 `((,(first temps) (car ,entry))
                                           (,(second temps) (cdr ,entry))))
                                      (3 (let ((arg-temp (gensym "ARGS")))
@@ -600,63 +621,38 @@ NOTE: This interface is experimental and subject to change."
                                              (car (truly-the cons ,arg-temp)))
                                             (,(third temps) (cdr ,arg-temp)))))
                                      (t (loop for i from 0 for x in temps
-                                              collect `(,x (svref ,entry ,i)))))
-                               ,@ignore
-                               (when (and ,@tests) ,action))))
-                         (setq ,hashval (ash ,hashval ,(- hash-bits)))))))))
-         (fun
-          `(defun ,fun-name (,thunk ,@arg-vars ,@aux-vars)
-             ,@(when *profile-hash-cache* ; count seeks
-                 `((when (boundp ',statistics-name)
-                     (incf (aref ,statistics-name 0)))))
-             (let ,bind-hashval
-               ,(funcall probe-it nil
-                         `(return-from ,fun-name (values ,@result-temps)))
-               (multiple-value-bind ,result-temps (funcall ,thunk)
-                 (let ((,entry
-                        (,(hash-cache-line-allocator (+ nargs nvalues))
-                         ,@(mapcar (lambda (spec) (or (caddr spec) (car spec)))
-                                   args)
-                         ,@result-temps))
-                       (,cache
-                        (truly-the ,cache-type
-                         (or ,cache (alloc-hash-cache ,size ',var-name))))
-                       (idx1 (ldb (byte ,hash-bits 0) ,hashval))
-                       (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
-                   ,@(when *profile-hash-cache*
-                       `((incf (aref ,statistics-name 1)))) ; count misses
+                                              collect `(,x (svref ,entry ,i))))))
+                               (when (and ,@tests) ,action)))
+                         (setq ,hashval (ash ,hashval ,(- hash-bits))))))))))
+    `(let ((,hashval (the sb-xc:fixnum (funcall ,hashfun ,@actual-args)))
+           (,cache ,var-name))
+       ,@(when *profile-hash-cache* ; count seeks
+           `((when (boundp ',statistics-name) (incf (aref ,statistics-name 0)))))
+       (block seek
+         ,(funcall probe-it `(return-from seek (values ,@result-temps)))
+         (multiple-value-bind ,result-temps (progn ,@computation)
+           (let ((,entry (,(hash-cache-line-allocator (+ nargs nvalues))
+                          ,@(mapcar (lambda (spec actual) (or (caddr spec) actual))
+                                    arg-specs actual-args)
+                          ,@result-temps))
+                 (,cache (truly-the ,cache-type
+                                    (or ,cache (alloc-hash-cache ,size ',var-name))))
+                 (idx1 (ldb (byte ,hash-bits 0) ,hashval))
+                 (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
+             ,@(when *profile-hash-cache*
+                 `((incf (aref ,statistics-name 1)))) ; count misses
                    ;; Why a barrier: the pointer to 'entry' (a cons or vector)
                    ;; MUST NOT be observed by another thread before its cells
                    ;; are filled. Equally bad, the 'output' cells in the line
                    ;; could be 0 while the 'input' cells matched something.
-                   (sb-thread:barrier (:write))
-                   (cond ((eql (svref ,cache idx1) 0)
-                          (setf (svref ,cache idx1) ,entry))
-                         ((eql (svref ,cache idx2) 0)
-                          (setf (svref ,cache idx2) ,entry))
-                         (t
-                           ,@(when *profile-hash-cache* ; count evictions
-                               `((incf (aref ,statistics-name 2))))
-                           (setf (svref ,cache idx1) ,entry))))
-                 (values ,@result-temps))))))
-    `(progn
-       (pushnew ',var-name *cache-vector-symbols*)
-       (define-load-time-global ,var-name nil)
-       ,@(when *profile-hash-cache*
-           `((declaim (type (simple-array fixnum (3)) ,statistics-name))
-             (defvar ,statistics-name)))
-       (declaim (type (or null ,cache-type) ,var-name))
-       (defun ,(symbolicate name "-CACHE-CLEAR") () (setq ,var-name nil))
-       ,@(when flush-function
-           `((defun ,flush-function ,arg-vars
-               (let ,bind-hashval
-                 ,(funcall probe-it
-                   `((declare (ignore ,@result-temps)))
-                   `(return (setf (svref ,cache
-                                         (ldb (byte ,hash-bits 0) ,hashval))
-                                  0)))))))
-       (declaim (inline ,fun-name))
-       ,fun)))
+             (sb-thread:barrier (:write))
+             (cond ((eql (svref ,cache idx1) 0) (setf (svref ,cache idx1) ,entry))
+                   ((eql (svref ,cache idx2) 0) (setf (svref ,cache idx2) ,entry))
+                   (t
+                    (setf (svref ,cache idx1) ,entry)
+                    ,@(when *profile-hash-cache* ; count evictions
+                        `((incf (aref ,statistics-name 2)))))))
+           (values ,@result-temps)))))))
 
 ;;; some syntactic sugar for defining a function whose values are
 ;;; cached by !DEFINE-HASH-CACHE
@@ -683,10 +679,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; Since we don't have caches that aren't in direct support of DEFUN-CACHED
 ;;; - did we ever? - this should be possible to change.
 ;;;
-(defmacro defun-cached ((name &rest options &key
-                              (memoizer (make-symbol "MEMOIZE")
-                                        memoizer-supplied-p)
-                              &allow-other-keys)
+(defmacro defun-cached ((name &rest options &key memoizer &allow-other-keys)
                         args &body body-decls-doc)
   (binding* (((forms decls doc) (parse-body body-decls-doc t))
              ((inputs aux-vars)
@@ -695,20 +688,17 @@ NOTE: This interface is experimental and subject to change."
                     (values (ldiff args aux) aux)
                     (values args nil))))
              (arg-names (mapcar #'car inputs)))
+    (assert (not aux-vars)) ; was only for CTYPE-OF-ARRAY
     `(progn
-        (!define-hash-cache ,name ,inputs ,aux-vars ,@options)
+        (!define-hash-cache ,name ,inputs ,@options)
         (defun ,name ,arg-names
           ,@decls
           ,@(if doc (list doc))
-          (macrolet ((,memoizer (&body body)
-                       ;; We don't need (DX-FLET ((,thunk () ,@body)) ...)
-                       ;; This lambda is a single-use local call within
-                       ;; the inline memoizing wrapper.
-                       `(,',(symbolicate "!" name "-MEMO-WRAPPER")
-                         (lambda () ,@body) ,@',arg-names)))
-             ,@(if memoizer-supplied-p
-                   forms
-                   `((,memoizer ,@forms))))))))
+          ,(if memoizer
+               `(macrolet ((,memoizer (&body body)
+                             `(with-cache ,',(list* name arg-names) ,@body)))
+                  ,@forms)
+               `(with-cache (,name ,@arg-names) ,@forms))))))
 
 (defun list-elts-eq (x y)
   (loop (when (eq x y) (return t))

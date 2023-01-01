@@ -341,7 +341,11 @@
               unparsed
               (nconc unparsed '(&optional))))))
 
-#+sb-xc-host ; why only on the host? Shouldn't we always declaim the ftype??
+;;; Hmm, according to the comments at DEFUN-CACHED, it may be inefficient
+;;; to proclaim the type of a cached function, because it forces checks to
+;;; be inserted on every return from the function, even though we would only
+;;; need to check when inserting to the cache.
+#+sb-xc-host
 (declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
 
 ;;; Return true if LIST1 and LIST2 have the same elements in the same
@@ -1117,14 +1121,11 @@
 
 (declaim (start-block))
 
-;;; Helper for TYPE= so that we can separately cache the :SIMPLE-= function.
-(defun-cached (%simple-type= :hash-function #'type-cache-hash
-                             :hash-bits 11
-                             :values 2)
-    ((type1 eq) (type2 eq))
-  (declare (type ctype type1 type2))
-  (funcall (type-class-simple-=  (type-id->type-class (type-class-id type1)))
-           type1 type2))
+;;; Helper for TYPE= so that we can separately cache the :SIMPLE-= method.
+(sb-impl::!define-hash-cache %simple-type=
+                             ((type1 eq) (type2 eq))
+                             :hash-function #'type-cache-hash
+                             :hash-bits 11 :values 2)
 
 ;;; If two types are definitely equivalent, return true. The second
 ;;; value indicates whether the first value is definitely correct.
@@ -1167,7 +1168,10 @@
                  ;; hash first, and we might win with a previous answer.
                  (when (< (type-hash-value type2) (type-hash-value type1))
                    (rotatef type1 type2))
-                 (%simple-type= type1 type2)))))))
+                 (sb-impl::with-cache (%simple-type= type1 type2)
+                   (funcall (type-class-simple-=
+                             (type-id->type-class (type-class-id type1)))
+                            type1 type2))))))))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1376,9 +1380,14 @@
 ;;; This means that we won't match things like (INTEGER (0) 4) to an existing
 ;;; entry unless it is EQ.  This is probably not a disaster.
 #-sb-xc-host
+(progn
 (sb-impl::!define-hash-cache values-specifier-type
-  ((orig list-elements-eql)) ()
+  ((orig list-elements-eql))
    :hash-function #'sxhash :hash-bits 10)
+(declaim (inline !values-specifier-type-memo-wrapper))
+(defun !values-specifier-type-memo-wrapper (thunk specifier)
+  (sb-impl::with-cache (values-specifier-type specifier)
+    (funcall thunk))))
 
 (declaim (inline make-type-context))
 (defstruct (type-context
@@ -5548,40 +5557,28 @@ used for a COMPLEX component.~:@>"
 
 ;; Helper function that implements (CTYPE-OF x) when X is an array.
 #-sb-xc-host
-(defun-cached (ctype-of-array
-               :values (ctype) ; Bind putative output to this when probing.
-               :hash-bits 7
-               :hash-function (lambda (a &aux (hash cookie))
-                                (if header-p
-                                    (dotimes (axis rank hash)
-                                      (mixf hash (%array-dimension a axis)))
-                                    (mixf hash (length a)))))
-    ;; "type-key" is a perfect hash of rank + widetag + simple-p.
-    ;; If it matches, then compare dims, which are read from the output.
-    ;; The hash of the type-key + dims can have collisions.
-    ((array (lambda (array type-key)
-              (and (eq type-key cookie)
-                   (let ((dims (array-type-dimensions ctype)))
-                     (if header-p
-                         (dotimes (axis rank t)
-                           (unless (eq (pop (truly-the list dims))
-                                       (%array-dimension array axis))
-                             (return nil)))
-                         (eq (length array) (car dims))))))
-            cookie) ; Store COOKIE as the single key.
-     &aux (rank (array-rank array))
-          (simple-p (if (simple-array-p array) 1 0))
-          (header-p (array-header-p array)) ; non-simple or rank <> 1 or both
-          (cookie (the fixnum (logior (ash (logior (ash rank 1) simple-p)
-                                           sb-vm:n-widetag-bits)
-                                      (array-underlying-widetag array)))))
-  ;; The value computed on cache miss.
-  ;; FIXME: don't cache if ARRAY is not heap-allocated
-  (let ((etype (sb-vm::array-element-ctype array)))
-    (make-array-type (array-dimensions array)
-                     :complexp (not (simple-array-p array))
-                     :element-type etype
-                     :specialized-element-type etype)))
+(defun ctype-of-array (array)
+  ;; This function relies on the general mechanism for hash-consing of ctypes
+  ;; to act as if it were a memoized function.
+  ;; The main problem is that DIMENSIONS have to be constructed on the stack.
+  (let ((etype (sb-vm::array-element-ctype array))
+        (complexp (not (simple-array-p array)))
+        (rank (array-rank array)))
+    (case rank
+      (0 (%make-array-type '() complexp etype etype))
+      ((1 2 3)
+       (dx-let ((dims (list (array-dimension array 0) nil nil)))
+         (case rank
+           (1 (setf (cdr dims) nil))
+           (2 (setf (cadr dims) (array-dimension array 1)
+                    (cddr dims) nil))
+           (t (setf (cadr dims) (array-dimension array 1)
+                    (caddr dims) (array-dimension array 2))))
+         (%make-array-type dims complexp etype etype)))
+      (t (let ((dims (make-list rank)))
+           (dotimes (i rank)
+             (setf (nth i dims) (array-dimension array i)))
+           (%make-array-type dims complexp etype etype))))))
 
 (!defun-from-collected-cold-init-forms !type-cold-init)
 
