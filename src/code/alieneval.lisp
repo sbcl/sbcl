@@ -1063,22 +1063,34 @@
 
 ;;; TODOs:
 ;;; * named ("tagged") record types that do not involve structural recursion can
-;;;   and should be hash-consed.  As they are currently not, the pristine core
-;;;   has about 6 separate instances of OS-CONTEXT-T-STRUCT and 2 of POLLFD.
-;;;   Real-world applications are even worse about making redundant types.
-(defun hash-alien-record-fields (fields)
-  (declare (notinline sb-xc:sxhash))
-  (let ((h (length fields)))
-    (dolist (field fields h)
-      (setq h (mix (mix (sb-xc:sxhash (alien-record-field-name field))
-                        (sb-xc:sxhash (alien-record-field-offset field)))
-                   (alien-type-hash (alien-record-field-type field)))))))
+;;;   and should be hash-consed.
 (defun hash-alien-record-type (r)
-  (hash-alien-record-fields (alien-record-type-fields r)))
+  (declare (notinline sb-xc:sxhash))
+  (labels ((hash-fields (fields)
+             (let ((h (length fields)))
+               (dolist (field fields h)
+                 (setq h (mix (mix (hash-sym (alien-record-field-name field))
+                                   (sb-xc:sxhash (alien-record-field-offset field)))
+                              (alien-type-hash (alien-record-field-type field)))))))
+           (hash-sym (symbol)
+             ;; This mixes in package names when hashing field names.
+             ;; The reason is that if you have 100 different packages each defining
+             ;; (STRUCT FOO (WORD0 INT) (WORD1 INT)), then without package names,
+             ;; those would cause a massive number of hash collisions.
+             ;; It doesn't matter that SXHASH does not mix a package name's
+             ;; hash into a symbol hash.
+             (mix (sb-xc:sxhash symbol)
+                  (let ((package (cl:symbol-package symbol)))
+                    (if package
+                        (sb-impl::%sxhash-simple-string (cl:package-name package))
+                        #xf00)))))
+    (mix (hash-sym (alien-record-type-name r))
+         (hash-fields (alien-record-type-fields r)))))
 (defun alien-record-type-equiv (a b)
   (let ((fields1 (alien-record-type-fields a))
         (fields2 (alien-record-type-fields b)))
-    (and (= (length fields1) (length fields2))
+    (and (eq (alien-record-type-name a) (alien-record-type-name b))
+         (= (length fields1) (length fields2))
          (every (lambda (f1 f2)
                   (and (eq (alien-record-field-name f1) (alien-record-field-name f2))
                        (eq (alien-record-field-type f1) (alien-record-field-type f2))
@@ -1099,7 +1111,7 @@
                    :name name :kind kind :fields fields)))
          ;; XXX: probably a screwed up hash if there is recursion involved
          (setf (ldb (byte type-hash-nbits 0) (alien-type-hash new))
-               (hash-alien-record-fields fields))
+               (hash-alien-record-type new))
          (if name
              ;; named ("tagged") alien record types hang off a hook in the
              ;; lexenv (or possibly global env)
@@ -1190,7 +1202,7 @@
          (new (!make-alien-record-type :bits bits :alignment alignment
                                        :name name :kind kind :fields fields)))
     (setf (ldb (byte type-hash-nbits 0) (alien-type-hash new))
-          (hash-alien-record-fields fields))
+          (hash-alien-record-type new))
     (hashset-insert-if-absent
      (if (eq kind :union) *union-type-cache* *struct-type-cache*)
      new

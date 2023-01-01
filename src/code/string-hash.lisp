@@ -84,7 +84,7 @@
          (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
         (t
          ;; (STRING X) could be a non-simple string, it's OK.
-         (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
+         (let ((hash (logxor (%sxhash-simple-string (string x))
                              most-positive-fixnum)))
            (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
            hash))))
@@ -214,10 +214,10 @@
     (logior (if (typep name '(and symbol (not null)))
                 (flet ((improve-hash (x) (murmur3-fmix-word x)))
                   (mix (logand
-                        (improve-hash (sb-impl::%sxhash-simple-string (symbol-name name)))
+                        (improve-hash (%sxhash-simple-string (symbol-name name)))
                         most-positive-fixnum)
                        (let ((package (sb-xc:symbol-package name)))
-                         (sb-impl::%sxhash-simple-string
+                         (%sxhash-simple-string
                           ;; Must specifically look for CL package when cross-compiling
                           ;; because we might have remapped a symbol from its "actual"
                           ;; package of the host lisp, to being logically in CL if the
