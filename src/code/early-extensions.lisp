@@ -631,27 +631,37 @@ NOTE: This interface is experimental and subject to change."
        (block seek
          ,(funcall probe-it `(return-from seek (values ,@result-temps)))
          (multiple-value-bind ,result-temps (progn ,@computation)
-           (let ((,entry (,(hash-cache-line-allocator (+ nargs nvalues))
-                          ,@(mapcar (lambda (spec actual) (or (caddr spec) actual))
-                                    arg-specs actual-args)
-                          ,@result-temps))
-                 (,cache (truly-the ,cache-type
-                                    (or ,cache (alloc-hash-cache ,size ',var-name))))
-                 (idx1 (ldb (byte ,hash-bits 0) ,hashval))
-                 (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
-             ,@(when *profile-hash-cache*
-                 `((incf (aref ,statistics-name 1)))) ; count misses
+           ;; Decide if cacheable result. Lambda expressions and strings always are.
+           ;; Parsing a type specifier nonlocally exits from COMPUTATION if it
+           ;; wants not to cache. And of course CTYPE-OF always returns a good type.
+           ;; It's unfortunate that this macro macro bakes in such knowledge.
+           (when ,(if (member fun-name '(sb-format::tokenize-control-string
+                                         sb-alien::coerce-to-interpreted-function
+                                         values-specifier-type
+                                         ctype-of))
+                      t
+                      `(sb-kernel::ok-to-memoize-p ,@actual-args))
+             (let ((,entry (,(hash-cache-line-allocator (+ nargs nvalues))
+                            ,@(mapcar (lambda (spec actual) (or (caddr spec) actual))
+                                      arg-specs actual-args)
+                            ,@result-temps))
+                   (,cache (truly-the ,cache-type
+                                      (or ,cache (alloc-hash-cache ,size ',var-name))))
+                   (idx1 (ldb (byte ,hash-bits 0) ,hashval))
+                   (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
+               ,@(when *profile-hash-cache*
+                   `((incf (aref ,statistics-name 1)))) ; count misses
                    ;; Why a barrier: the pointer to 'entry' (a cons or vector)
                    ;; MUST NOT be observed by another thread before its cells
                    ;; are filled. Equally bad, the 'output' cells in the line
                    ;; could be 0 while the 'input' cells matched something.
-             (sb-thread:barrier (:write))
-             (cond ((eql (svref ,cache idx1) 0) (setf (svref ,cache idx1) ,entry))
-                   ((eql (svref ,cache idx2) 0) (setf (svref ,cache idx2) ,entry))
-                   (t
-                    (setf (svref ,cache idx1) ,entry)
-                    ,@(when *profile-hash-cache* ; count evictions
-                        `((incf (aref ,statistics-name 2)))))))
+               (sb-thread:barrier (:write))
+               (setf (svref ,cache (cond ((eql (svref ,cache idx1) 0) idx1)
+                                         ((eql (svref ,cache idx2) 0) idx2)
+                                         (t ,@(when *profile-hash-cache* ; count evictions
+                                                `((incf (aref ,statistics-name 2))))
+                                            idx1)))
+                     ,entry)))
            (values ,@result-temps)))))))
 
 ;;; some syntactic sugar for defining a function whose values are

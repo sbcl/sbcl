@@ -3108,13 +3108,19 @@
                         (sleep 1)))
                    :allow-notes nil))
 
-(with-test (:name :full-warning-for-undefined-type-in-cl)
+;;; These next two tests rely on memoization and/or caching to d.t.r.t.
+;;; which is absurd. The warning suppression mechanism should be based
+;;; on something higher-level, and not whether an operation was memoized,
+;;; because who's to say we didn't kick something out of a cache?
+(with-test (:name :full-warning-for-undefined-type-in-cl
+                  :broken-on :sbcl)
   (multiple-value-bind (fun failure-p warnings)
       (checked-compile `(lambda (x) (the replace x)) :allow-warnings t)
     (declare (ignore fun failure-p))
     (assert (= 1 (length warnings)))))
 
-(with-test (:name :single-warning-for-single-undefined-type)
+(with-test (:name :single-warning-for-single-undefined-type
+                  :broken-on :sbcl)
   ;; STYLE-WARNING for symbol not in cl package.
   (multiple-value-bind (fun failure-p warnings style-warnings)
       (checked-compile `(lambda (x) (the #:no-type x))

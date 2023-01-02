@@ -151,6 +151,16 @@
               (when (unknown-type-p type)
                 (return-from contains-unknown-type-p t)))
             ctype))
+(defun ok-to-memoize-p (&rest args)
+  (dolist (arg args t)
+    (etypecase arg
+      (ctype
+       (when (contains-unknown-type-p arg)
+         (return-from ok-to-memoize-p nil)))
+      (list
+       (dolist (elt arg)
+         (when (contains-unknown-type-p elt)
+           (return-from ok-to-memoize-p nil)))))))
 
 (defun contains-hairy-type-p (ctype)
   (map-type (lambda (type)
@@ -1166,6 +1176,7 @@
                 (t ; use the SIMPLE-= method
                  ;; A cached answer for swapped args is the same, so always put the smaller
                  ;; hash first, and we might win with a previous answer.
+                 #+nil ; not 100% sure this is legal even with SIMPLE-=
                  (when (< (type-hash-value type2) (type-hash-value type1))
                    (rotatef type1 type2))
                  (sb-impl::with-cache (%simple-type= type1 type2)
@@ -1366,10 +1377,11 @@
 #+sb-xc-host
 (let ((table (make-hash-table :test 'equal)))
   (defun !values-specifier-type-memo-wrapper (thunk specifier)
-    (multiple-value-bind (type yesp) (gethash specifier table)
-      (if yesp
-          type
-          (setf (gethash specifier table) (funcall thunk)))))
+    (or (gethash specifier table)
+        (let ((parse (funcall thunk)))
+          ;; THUNK must nonlocally exit to avoid caching
+          (aver (not (contains-unknown-type-p parse)))
+          (setf (gethash specifier table) parse))))
   (defun values-specifier-type-cache-clear ()
     (clrhash table)))
 ;;; This cache is sized extremely generously, which has payoff
