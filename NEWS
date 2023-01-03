@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.0:
+  * optimization: load-time only code is no longer retained at runtime when
+    functions close over top level bindings.
   * optimization: GO and RETURN-FROM now elide out-of-extent tag checks when
     the compiler can prove it's safe even on high safety.
   * sb-graph has been removed. To visualize IR1 in sbcl, it is recommended to

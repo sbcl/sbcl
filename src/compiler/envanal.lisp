@@ -32,6 +32,8 @@
                  (eq (functional-kind x) :deleted))
                (component-new-functionals component)))
   (setf (component-new-functionals component) ())
+  (dolist (fun (component-lambdas component))
+    (reinit-lambda-environment fun))
   (mapc #'add-lambda-vars-and-let-vars-to-closures
         (component-lambdas component))
 
@@ -52,6 +54,21 @@
 
   (values))
 
+;;; This is to be called on a COMPONENT with top level LAMBDAs before
+;;; the compilation of the associated non-top-level code to detect
+;;; closed over top level variables. We just do COMPUTE-CLOSURE on all
+;;; the lambdas. This will pre-allocate environments for all the
+;;; functions with closed-over top level variables. The post-pass will
+;;; use the existing structure, rather than allocating a new one. We
+;;; return true if we discover any possible closure vars.
+(defun pre-environment-analyze-top-level (component)
+  (declare (type component component))
+  (let ((found-it nil))
+    (dolist (lambda (component-lambdas component))
+      (when (add-lambda-vars-and-let-vars-to-closures lambda)
+        (setq found-it t)))
+    found-it))
+
 ;;; If FUN has an environment, return it, otherwise assign an empty
 ;;; one and return that.
 (defun get-lambda-environment (fun)
@@ -63,6 +80,30 @@
           (dolist (lambda (lambda-lets fun))
             (setf (lambda-environment lambda) res))
           res))))
+
+;;; If FUN has no environment, assign one, otherwise clean up
+;;; variables that have no sets or refs. If a var has no references,
+;;; we remove it from the closure. If it has no sets, we clear the
+;;; INDIRECT flag. This is necessary because pre-analysis is done
+;;; before optimization.
+(defun reinit-lambda-environment (fun)
+  (let ((old (lambda-environment (lambda-home fun))))
+    (cond (old
+           (setf (environment-closure old)
+                 (delete-if (lambda (x)
+                              (and (lambda-var-p x))
+                              (null (leaf-refs x)))
+                            (environment-closure old)))
+           (flet ((clear (fun)
+                    (dolist (var (lambda-vars fun))
+                      (unless (lambda-var-sets var)
+                        (setf (lambda-var-indirect var) nil)))))
+             (clear fun)
+             (dolist (let (lambda-lets fun))
+               (clear let))))
+          (t
+           (get-lambda-environment fun))))
+  (values))
 
 ;;; Get NODE's environment, assigning one if necessary.
 (defun get-node-environment (node)
@@ -348,7 +389,7 @@
         (let ((xep (functional-entry-fun fun)))
           ;; We need to have a closure environment to dynamic-extent
           ;; allocate.
-          (when (and xep (environment-closure (get-lambda-environment xep)))
+          (when (and xep (environment-closure (lambda-environment xep)))
             (let ((enclose (functional-enclose fun)))
               (when (and enclose (not (node-lvar enclose)))
                 (let ((lvar (make-lvar)))

@@ -1354,7 +1354,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "LVAR-VALUE"
            "MACRO-POLICY-DECLS"
            "MAKE-ALIAS-TN" "MAKE-CATCH-BLOCK"
-           "MAKE-CLOSURE" "MAKE-CONSTANT-TN"
+           "MAKE-CLOSURE" #+(or x86-64 arm64) "MAKE-CLOSURE-FROM-LABEL" "MAKE-CONSTANT-TN"
            "MAKE-FIXUP-NOTE"
            "MAKE-LOAD-TIME-CONSTANT-TN" "MAKE-N-TNS" "MAKE-NORMAL-TN"
            "MAKE-RANDOM-TN"

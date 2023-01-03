@@ -97,10 +97,10 @@
   (values))
 
 ;;; This function is called on each block by FIND-INITIAL-DFO-AUX
-;;; before it walks the successors. It looks at the home CLAMBDA's
-;;; BIND block to see whether that block is in some other component:
+;;; before it walks the successors. It looks at the home lambda's
+;;; bind block to see whether that block is in some other component:
 ;;; -- If the block is in the initial component, then do
-;;;    DFO-SCAVENGE-DEPENDENCY-GRAPH on the home function to move it
+;;;    DFO-WALK-CALL-GRAPH on the home function to move it
 ;;;    into COMPONENT.
 ;;; -- If the block is in some other component, join COMPONENT into
 ;;;    it and return that component.
@@ -113,14 +113,14 @@
 ;;; the same component, even when they might not seem reachable from
 ;;; the environment entry. Consider the case of code that is only
 ;;; reachable from a non-local exit.
-(defun scavenge-home-dependency-graph (block component)
+(defun walk-home-call-graph (block component)
   (declare (type cblock block) (type component component))
   (let ((home-lambda (block-home-lambda block)))
     (if (eq (functional-kind home-lambda) :deleted)
         component
         (let ((home-component (lambda-component home-lambda)))
           (cond ((eq (component-kind home-component) :initial)
-                 (dfo-scavenge-dependency-graph home-lambda component))
+                 (dfo-walk-call-graph home-lambda component))
                 ((eq home-component component)
                  component)
                 (t
@@ -151,7 +151,7 @@
      ((block-flag block) component)
      (t
       (setf (block-flag block) t)
-      (let ((current (scavenge-home-dependency-graph block component)))
+      (let ((current (walk-home-call-graph block component)))
         (dolist (succ (block-succ block))
           (setq current (find-initial-dfo-aux succ current)))
         (remove-from-dfo block)
@@ -186,17 +186,9 @@
           (res home))))
     (res)))
 
-;;; If CLAMBDA is already in COMPONENT, just return that
-;;; component. Otherwise, move the code for CLAMBDA and all lambdas it
-;;; depends on (either because of calls or because of closure
-;;; relationships) into COMPONENT, or possibly into another COMPONENT
-;;; that we find to be related. Return whatever COMPONENT we actually
-;;; merged into.
-;;;
-;;; (Note: The analogous CMU CL code only scavenged call-based
-;;; dependencies, not closure dependencies. That seems to've been by
-;;; oversight, not by design, as per the bug reported by WHN on
-;;; cmucl-imp ca. 2001-11-29 and explained by DTC shortly after.)
+;;; Move the code for FUN and all functions called by it into
+;;; COMPONENT. If FUN is already in COMPONENT, just return that
+;;; component.
 ;;;
 ;;; If the function is in an initial component, then we move its head
 ;;; and tail to COMPONENT and add it to COMPONENT's lambdas. It is
@@ -204,16 +196,16 @@
 ;;; unreachable) because if the return is unreachable it (and its
 ;;; successor link) will be deleted in the post-deletion pass.
 ;;;
-;;; We then do a FIND-DFO-AUX starting at the head of CLAMBDA. If this
+;;; We then do a FIND-DFO-AUX starting at the head of FUN. If this
 ;;; flow-graph walk encounters another component (which can only
 ;;; happen due to a non-local exit), then we move code into that
 ;;; component instead. We then recurse on all functions called from
-;;; CLAMBDA, moving code into whichever component the preceding call
+;;; FUN, moving code into whichever component the preceding call
 ;;; returned.
 ;;;
-;;; If CLAMBDA is in the initial component, but the BLOCK-FLAG is set
-;;; in the bind block, then we just return COMPONENT, since we must
-;;; have already reached this function in the current walk (or the
+;;; If FUN is in the initial component, but the BLOCK-FLAG is set in
+;;; the bind block, then we just return COMPONENT, since we must have
+;;; already reached this function in the current walk (or the
 ;;; component would have been changed).
 ;;;
 ;;; If the function is an XEP, then we also walk all functions that
@@ -222,80 +214,48 @@
 ;;; ensures that conversion of a full call to a local call won't
 ;;; result in a need to join components, since the components will
 ;;; already be one.
-(defun dfo-scavenge-dependency-graph (clambda component)
-  (declare (type clambda clambda) (type component component))
-  (aver (not (eql (lambda-kind clambda) :deleted)))
-  (let* ((bind-block (node-block (lambda-bind clambda)))
-         (old-lambda-component (block-component bind-block))
-         (return (lambda-return clambda)))
+(defun dfo-walk-call-graph (fun component)
+  (declare (type clambda fun) (type component component))
+  (aver (not (eql (lambda-kind fun) :deleted)))
+  (let* ((bind-block (node-block (lambda-bind fun)))
+         (this (block-component bind-block))
+         (return (lambda-return fun)))
     (cond
-     ((eq old-lambda-component component)
+     ((eq this component)
       component)
-     ((not (eq (component-kind old-lambda-component) :initial))
-      (join-components old-lambda-component component)
-      old-lambda-component)
+     ((not (eq (component-kind this) :initial))
+      (join-components this component)
+      this)
      ((block-flag bind-block)
       component)
      (t
-      (push clambda (component-lambdas component))
-      (setf (component-lambdas old-lambda-component)
-            (delete clambda (component-lambdas old-lambda-component)))
+      (push fun (component-lambdas component))
+      (setf (component-lambdas this)
+            (delete fun (component-lambdas this)))
       (link-blocks (component-head component) bind-block)
-      (unlink-blocks (component-head old-lambda-component) bind-block)
+      (unlink-blocks (component-head this) bind-block)
       (when return
         (let ((return-block (node-block return)))
           (link-blocks return-block (component-tail component))
-          (unlink-blocks return-block (component-tail old-lambda-component))))
+          (unlink-blocks return-block (component-tail this))))
       (let ((res (find-initial-dfo-aux bind-block component)))
         (declare (type component res))
-        ;; Scavenge related lambdas.
-        (labels ((scavenge-lambda (clambda)
-                   (setf res
-                         (dfo-scavenge-dependency-graph (lambda-home clambda)
-                                                        res)))
-                 (scavenge-possibly-deleted-lambda (clambda)
-                   (unless (or (eql (lambda-kind clambda) :deleted)
-                               (eql (lambda-kind (lambda-home clambda)) :deleted))
-                     (scavenge-lambda clambda)))
-                 ;; Scavenge call relationship.
-                 (scavenge-call (called-lambda)
-                   (scavenge-lambda called-lambda))
-                 ;; Scavenge closure over a variable: if CLAMBDA
-                 ;; refers to a variable whose home lambda is not
-                 ;; CLAMBDA, then the home lambda should be in the
-                 ;; same component as CLAMBDA. (sbcl-0.6.13, and CMU
-                 ;; CL, didn't do this, leading to the occasional
-                 ;; failure when environment analysis, which is local
-                 ;; to each component, would bogusly conclude that a
-                 ;; closed-over variable was unused and thus delete
-                 ;; it. See e.g. cmucl-imp 2001-11-29.)
-                 (scavenge-closure-var (var)
-                   (when (lambda-var-refs var) ; unless var deleted
-                     (let ((var-home-home (lambda-home (lambda-var-home var))))
-                       (scavenge-possibly-deleted-lambda var-home-home))))
-                 ;; Scavenge closure over an entry for nonlocal exit.
-                 ;; This is basically parallel to closure over a
-                 ;; variable above.
-                 (scavenge-entry (entry)
-                   (declare (type entry entry))
-                   (let ((entry-home (node-home-lambda entry)))
-                     (scavenge-possibly-deleted-lambda entry-home))))
-          (do-sset-elements (cc (lambda-calls-or-closes clambda))
-            (etypecase cc
-              (clambda (scavenge-call cc))
-              (lambda-var (scavenge-closure-var cc))
-              (entry (scavenge-entry cc))))
-          (when (eq (lambda-kind clambda) :external)
-            (mapc #'scavenge-call (find-reference-funs clambda))))
-        ;; Voila.
-        res)))))
+        (flet ((walk (fun)
+                 (unless (eq (lambda-kind fun) :deleted)
+                   (setq res (dfo-walk-call-graph fun res)))))
+          (do-sset-elements (fun (lambda-calls fun))
+            (walk fun))
+          (when (eq (lambda-kind fun) :external)
+            (dolist (fun (find-reference-funs fun))
+              (walk fun)))
+          res))))))
 
-;;; Return true if CLAMBDA either is an XEP or has EXITS to some of
-;;; its ENTRIES.
-(defun has-xep-or-nlx (clambda)
-  (declare (type clambda clambda))
-  (or (eq (functional-kind clambda) :external)
-      (let ((entries (lambda-entries clambda)))
+;;; Return true if FUN either is an XEP or has EXITS to some of its
+;;; ENTRIES.
+(defun has-xep-or-nlx (fun)
+  (declare (type clambda fun))
+  (or (eq (functional-kind fun) :external)
+      (let ((entries (lambda-entries fun)))
         (and entries
              (find-if #'entry-exits entries)))))
 
@@ -307,8 +267,9 @@
 ;;; sort are deleted.
 (defun separate-toplevelish-components (components)
   (declare (list components))
-  (collect ((non-top)
-            (top))
+  (collect ((real)
+            (top)
+            (real-top))
     (dolist (component components)
       (unless (eq (block-next (component-head component))
                   (component-tail component))
@@ -326,26 +287,30 @@
                  ;; references from pure :TOPLEVEL components. -- WHN
                  has-external-references
                  (setf (component-kind component) :complex-toplevel)
-                 (non-top component))
+                 (real component)
+                 (real-top component))
                 ((or (some #'has-xep-or-nlx funs)
                      (and has-top (rest funs)))
                  (setf (component-name component)
                        (possibly-base-stringize
                         (find-component-name component)))
-                 (non-top component)
+                 (real component)
                  (when has-top
-                   (setf (component-kind component) :complex-toplevel)))
+                   (setf (component-kind component) :complex-toplevel)
+                   (real-top component)))
                 (has-top
                  (setf (component-kind component) :toplevel)
                  (setf (component-name component) "top level form")
                  (top component))
                 (t
                  (delete-component component))))))
-    (values (non-top) (top))))
+    (values (real) (top) (real-top))))
 
-;;; Given a list of top level lambdas, return two lists of components
-;;; representing the actual component division. The first value is the
-;;; non-top-level components, and the second is the top-level ones.
+;;; Given a list of top-level lambdas, return three lists of components
+;;; representing the actual component division:
+;;;  1] the non-top-level components,
+;;;  2] and the second is the top-level components, and
+;;;  3] Components in [1] that also have a top-level lambda.
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
 ;;; blocks. We assume that the FLAGS have already been cleared.
@@ -367,8 +332,7 @@
             (aver (member (functional-kind component-lambda)
                           '(:optional :external :toplevel nil :escape
                             :cleanup)))
-            (let ((res (dfo-scavenge-dependency-graph component-lambda
-                                                      new)))
+            (let ((res (dfo-walk-call-graph component-lambda new)))
               (when (eq res new)
                 (aver (not (member new (components))))
                 (components new)
@@ -389,6 +353,9 @@
         (declare (fixnum num))
         (do-blocks-backwards (block component :both)
           (setf (block-number block) (incf num)))))
+
+    (dolist (component (components))
+      (delete-if-no-entries component))
 
     ;; Pull out top-level-ish code.
     (separate-toplevelish-components (components))))
