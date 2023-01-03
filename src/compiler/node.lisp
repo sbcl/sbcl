@@ -1184,7 +1184,6 @@
 (defstruct (clambda (:include functional)
                     (:conc-name lambda-)
                     (:predicate lambda-p)
-                    (:constructor make-lambda)
                     (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list)

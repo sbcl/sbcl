@@ -80,7 +80,7 @@
 
     (dolist (name function)
       (clambdas
-       (sb-c::make-lambda
+       (sb-c::make-clambda
         :lexenv *null-lexenv*
         :%source-name name
         :allow-instrumenting nil)))

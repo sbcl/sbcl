@@ -897,7 +897,7 @@
                                               :succ (list next-block)))
                    (bind (make-bind))
                    (vars (butlast all-vars))
-                   (lambda (make-lambda :vars vars
+                   (lambda (make-clambda :vars vars
                                         :kind :let
                                         :bind bind
                                         :home (lambda-home original-lambda)

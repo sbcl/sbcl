@@ -212,7 +212,7 @@
   (aver-live-component *current-component*)
 
   (let* ((bind (make-bind))
-         (lambda (make-lambda :vars vars
+         (lambda (make-clambda :vars vars
                               :bind bind
                               :%source-name source-name
                               :%debug-name debug-name
