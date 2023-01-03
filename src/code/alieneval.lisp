@@ -1061,29 +1061,30 @@
   (name nil :type (or symbol null) :read-only t)
   (fields nil :type list)) ; mutable because of structural recursion and parser
 
-;;; TODOs:
-;;; * named ("tagged") record types that do not involve structural recursion can
-;;;   and should be hash-consed.
 (defun hash-alien-record-type (r)
   (declare (notinline sb-xc:sxhash))
   (labels ((hash-fields (fields)
              (let ((h (length fields)))
                (dolist (field fields h)
-                 (setq h (mix (mix (hash-sym (alien-record-field-name field))
-                                   (sb-xc:sxhash (alien-record-field-offset field)))
-                              (alien-type-hash (alien-record-field-type field)))))))
+                 (setq h (mix h (hash-field field))))))
+           (hash-field (field)
+             (mix (mix (hash-sym (alien-record-field-name field))
+                       (sb-xc:sxhash (alien-record-field-offset field)))
+                  (alien-type-hash (alien-record-field-type field))))
            (hash-sym (symbol)
-             ;; This mixes in package names when hashing field names.
+             ;; Since ALIEN-TYPE literals are reconstructed via load-forms that involve
+             ;; the constructor, host object hashes don't have to be target-compatible.
+             #+sb-xc-host (sb-xc:sxhash symbol)
+             ;; This mixes in package-id when hashing field names.
              ;; The reason is that if you have 100 different packages each defining
-             ;; (STRUCT FOO (WORD0 INT) (WORD1 INT)), then without package names,
-             ;; those would cause a massive number of hash collisions.
-             ;; It doesn't matter that SXHASH does not mix a package name's
-             ;; hash into a symbol hash.
-             (mix (sb-xc:sxhash symbol)
-                  (let ((package (cl:symbol-package symbol)))
-                    (if package
-                        (sb-impl::%sxhash-simple-string (cl:package-name package))
-                        #xf00)))))
+             ;; (STRUCT FOO (WORD0 INT) (WORD1 INT)), then without a better hash
+             ;; than symbol-name, those would cause a massive number of hash collisions.
+             ;; This hash is resilient against RENAME-PACKAGE, but not against re-homing
+             ;; a symbol. It's not important because at worst, you miss in the hashset.
+             ;; We can't perfectly hash-cons record types anyway.
+             ;; (Detecting isomorphism between possibly cyclic objects is hard)
+             #-sb-xc-host (mix (sb-kernel:symbol-package-id symbol)
+                               (sb-xc:sxhash symbol))))
     (mix (hash-sym (alien-record-type-name r))
          (hash-fields (alien-record-type-fields r)))))
 (defun alien-record-type-equiv (a b)
