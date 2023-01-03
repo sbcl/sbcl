@@ -326,8 +326,7 @@ guaranteed to be collected."
          ;; but there is no automatic cache rehashing after GC.
          (sb-format::tokenize-control-string-cache-clear))
         ((eql 1 gen)
-         (sb-format::tokenize-control-string-cache-clear)
-         (ctype-of-cache-clear))
+         (sb-format::tokenize-control-string-cache-clear))
         (t
          (drop-all-hash-caches)))
   #-gencgc

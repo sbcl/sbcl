@@ -314,6 +314,7 @@
         #-sb-devel
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
+;; TODO: would it be feasible to unify this definition with that in src/code/typep ?
 (defun ctype-of (x)
   (typecase x
     (function

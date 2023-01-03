@@ -405,3 +405,71 @@ Experimental."
   ;; just deem it invalid.
   (not (null (ignore-errors
                (type-or-nil-if-unknown type-specifier t)))))
+
+;;; This is like TYPE-OF, only we return a CTYPE structure instead of
+;;; a type specifier, and we try to return the type most useful for
+;;; type checking, rather than trying to come up with the one that the
+;;; user might find most informative.
+;;;
+;;; The result is always hash-consed, and in most cases there is only a very tiny amount
+;;; of work to decide what to return. Also, constants get their type stored in their LEAF,
+;;; so there is little to no advantage to using DEFUN-CACHED for this.
+(defun ctype-of (x)
+  (macrolet ((simd-subtype (tag base-type &aux (n-ets (length +simd-pack-element-types+)))
+               `(let ((tag ,tag))
+                  (svref ,(map-into (make-array (1+ n-ets)
+                                                :initial-element (specifier-type base-type))
+                                    (lambda (x) (specifier-type `(,base-type ,x)))
+                                    +simd-pack-element-types+)
+                         (if (<= 0 tag ,(1- n-ets)) tag ,n-ets)))))
+    (typecase x
+      (function
+       (if (funcallable-instance-p x)
+           (classoid-of x)
+           ;; This is the only case that conses now. Apparently %FUN-FTYPE has to TYPEXPAND
+           ;; the type as stored, which generally uses SFUNCTION so that we can represent
+           ;; the strict number of return values. TYPEXPAND of course conses.
+           ;; But I seriously doubt that this function is often called on functions.
+           (let ((type (sb-impl::%fun-ftype x)))
+             (if (typep type '(cons (eql function))) ; sanity test
+                 (specifier-type type) ; cached
+                 (classoid-of x)))))
+      (symbol (make-eql-type x)) ; hash-consed
+      (number (ctype-of-number x)) ; hash-consed
+      (array
+       ;; The main difficulty here is that DIMENSIONS have to be constructed
+       ;; to pass to %MAKE-ARRAY-TYPE but with care we can usually avoid consing.
+       (let ((etype (sb-vm::array-element-ctype x))
+             (rank (array-rank x))
+             (complexp (not (simple-array-p x))))
+         (case rank
+           (0 (%make-array-type '() complexp etype etype))
+           ((1 2 3)
+            (dx-let ((dims (list (array-dimension x 0) nil nil)))
+              (case rank
+                (1 (setf (cdr dims) nil))
+                (2 (setf (cadr dims) (array-dimension x 1)
+                         (cddr dims) nil))
+                (t (setf (cadr dims) (array-dimension x 1)
+                         (caddr dims) (array-dimension x 2))))
+              (%make-array-type dims complexp etype etype)))
+           (t
+            (let ((dims (make-list rank)))
+              ;; Need ALLOCATE-LIST-ON-STACK for this decl. Can't use vop-exists-p
+              ;; because can't macroexpand into DECLARE. Maybe sharp-dot it ?
+              #+x86-64 (declare (truly-dynamic-extent dims))
+              (dotimes (i rank)
+                (setf (nth i dims) (array-dimension x i)))
+           (%make-array-type dims complexp etype etype))))))
+      (cons (specifier-type 'cons))
+      (character ; Why not return an EQL type?
+       (typecase x
+         (standard-char (specifier-type 'standard-char))
+         (base-char (specifier-type 'base-char))
+         (t (specifier-type 'extended-char))))
+      #+sb-simd-pack
+      (simd-pack (simd-subtype (%simd-pack-tag x) simd-pack))
+      #+sb-simd-pack-256
+      (simd-pack-256 (simd-subtype (%simd-pack-256-tag x) simd-pack-256))
+      (t
+       (classoid-of x)))))

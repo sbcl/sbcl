@@ -358,9 +358,6 @@ Please check that all strings which were not recognizable to the compiler
 
 ;;; The system is complete now, all standard functions are
 ;;; defined.
-;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
-;;; SAVE-LISP-AND-DIE calls DEINIT which calls DROP-ALL-HASH-CACHES.
-(sb-kernel::ctype-of-cache-clear)
 
 ;;; In case there is xref data for internals, repack it here to
 ;;; achieve a more compact encoding.
