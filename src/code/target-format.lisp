@@ -102,7 +102,8 @@
        (%format stream control-string format-arguments)))
     (string
      (with-output-to-string (stream destination)
-       (%format stream control-string format-arguments)))
+       (%format stream control-string format-arguments))
+     nil)
     ((member t)
      (%format *standard-output* control-string format-arguments)
      nil)
