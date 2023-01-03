@@ -333,23 +333,23 @@
    `(;; test forward reference
      (let ((y 0))
        (defun foo3 (x)
-         (+ (bar2 x) (incf y)))
+         (+ (bar3 x) (incf y)))
 
        (defun bar3 (x)
-         (+ (incf y) (baz2 (+ 3 x))))
+         (+ (incf y) (baz3 (+ 3 x))))
 
        ;; test backward reference
        (defun baz3 (x)
          (if (zerop x)
-             (foo2 x)
+             (foo3 x)
              x))))
    :block-compile t
    :load t)
   ;; Test that calls in the same environment work.
-  (assert (= (baz3 0) 21))
-  (assert (= (baz3 0) 23))
-  (assert (= (baz3 0) 25))
-  (assert (= (baz3 0) 27)))
+  (assert (= (baz3 0) 6))
+  (assert (= (baz3 0) 10))
+  (assert (= (baz3 0) 14))
+  (assert (= (baz3 0) 18)))
 
 (with-test (:name :block-compile-top-level-closures.same-environment.local-calls
                   :fails-on :sbcl)
