@@ -415,7 +415,8 @@ Experimental."
 ;;; of work to decide what to return. Also, constants get their type stored in their LEAF,
 ;;; so there is little to no advantage to using DEFUN-CACHED for this.
 (defun ctype-of (x)
-  (macrolet ((simd-subtype (tag base-type &aux (n-ets (length +simd-pack-element-types+)))
+  (macrolet (#+sb-simd-pack
+             (simd-subtype (tag base-type &aux (n-ets (length +simd-pack-element-types+)))
                `(let ((tag ,tag))
                   (svref ,(map-into (make-array (1+ n-ets)
                                                 :initial-element (specifier-type base-type))
