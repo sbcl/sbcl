@@ -117,6 +117,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:vop-var vop)
+  (:node-var node)
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
@@ -131,8 +132,11 @@
     (loadw list list cons-cdr-slot list-pointer-lowtag)
     (inst add csp-tn csp-tn n-word-bytes)
     (storew temp csp-tn -1)
-    (test-type list ndescr LOOP nil (list-pointer-lowtag))
-    (cerror-call vop 'bogus-arg-to-values-list-error list)
+    (cond ((policy node (> safety 0))
+           (test-type list ndescr LOOP nil (list-pointer-lowtag))
+           (cerror-call vop 'bogus-arg-to-values-list-error list))
+          (t
+           (inst b LOOP)))
 
     DONE
     (unless (eq (tn-kind count) :unused)
