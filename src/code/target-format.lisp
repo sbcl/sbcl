@@ -113,27 +113,30 @@
 (defun %format (stream string-or-fun orig-args &optional (args orig-args))
   (if (and (functionp string-or-fun) (not (typep string-or-fun 'fmt-control)))
       (apply string-or-fun stream args)
-      (catch 'up-and-out
-        (let* ((string (etypecase string-or-fun
-                         (simple-string
-                          string-or-fun)
-                         (string
-                          (coerce string-or-fun 'simple-string))
-                         (fmt-control
-                          (fmt-control-string string-or-fun))))
-               (*default-format-error-control-string* string)
-               (*logical-block-popper* nil)
-               (tokens
-                (if (functionp string-or-fun)
-                    (or (fmt-control-memo string-or-fun)
-                        ;; Memoize the parse back into the object
-                        (setf (fmt-control-memo string-or-fun)
-                              (%tokenize-control-string
-                               string 0 (length string)
-                               (fmt-control-symbols string-or-fun))))
-                    (tokenize-control-string string))))
-          (interpret-directive-list stream tokens orig-args args)))))
-
+      (truly-the
+       (values t &optional)
+       (catch 'up-and-out
+         (let* ((string (etypecase string-or-fun
+                          (simple-string
+                           string-or-fun)
+                          (string
+                           (coerce string-or-fun 'simple-string))
+                          ;; Not just more compact than testing for fmt-control
+                          ;; but also produces a better error message.
+                          (function
+                           (fmt-control-string string-or-fun))))
+                (*default-format-error-control-string* string)
+                (*logical-block-popper* nil)
+                (tokens
+                  (if (functionp string-or-fun)
+                      (or (fmt-control-memo string-or-fun)
+                          ;; Memoize the parse back into the object
+                          (setf (fmt-control-memo string-or-fun)
+                                (%tokenize-control-string
+                                 string 0 (length string)
+                                 (fmt-control-symbols string-or-fun))))
+                      (tokenize-control-string string))))
+           (interpret-directive-list stream tokens orig-args args))))))
 
 (!begin-collecting-cold-init-forms)
 (define-load-time-global *format-directive-interpreters* nil)
