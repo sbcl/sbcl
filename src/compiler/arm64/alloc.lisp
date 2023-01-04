@@ -116,7 +116,7 @@
                            (storew-pair temp 0 lr closure-fun-slot tmp-tn)))
                        (t
                         `(progn
-                           (inst sub lr function fun-pointer-lowtag)
+                           (inst add lr function (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
                            (storew-pair temp 0 lr closure-fun-slot tmp-tn))))))))))
   (frob make-closure nil)
   (frob make-closure-from-label t))
