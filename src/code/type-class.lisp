@@ -283,15 +283,11 @@
 (defun contains-hairy-type-p (ctype)
   (logbitp 1 (type-%bits ctype)))
 
-(defun ok-to-memoize-p (&rest args)
-  (declare (dynamic-extent args))
-  (dolist (arg args t)
-    (etypecase arg
-      (ctype (when (oddp (type-%bits arg))
-               (return-from ok-to-memoize-p nil)))
-      (list  (dolist (elt arg)
-               (when (oddp (type-%bits elt))
-                 (return-from ok-to-memoize-p nil)))))))
+(defun ok-to-memoize-p (arg)
+  (etypecase arg
+    (ctype (evenp (type-%bits arg))) ; i.e. not CTYPE-CONTAINS-UNKNOWN
+    (list  (dolist (elt arg t)
+             (when (oddp (type-%bits elt)) (return nil))))))
 
 (defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-PRNG-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
@@ -588,7 +584,7 @@
 ;;; Various hash mixing functions.
 (declaim (inline hash-ctype-pair))
 (declaim (ftype (function (ctype ctype) (signed-byte #.ctype-hash-size)) hash-ctype-pair))
-(defun type-cache-hash (type1 type2)
+(defun hash-ctype-pair (type1 type2)
   (logxor (ash (type-%bits type1) -3) (type-%bits type2)))
 
 (declaim (inline hash-ctype-list))

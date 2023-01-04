@@ -648,7 +648,8 @@ NOTE: This interface is experimental and subject to change."
                                          values-specifier-type
                                          ctype-of))
                       t
-                      `(sb-kernel::ok-to-memoize-p ,@actual-args))
+                      `(and ,@(mapcar (lambda (x) `(sb-kernel::ok-to-memoize-p ,x))
+                                      actual-args)))
              (let ((,entry (,(hash-cache-line-allocator (+ nargs nvalues))
                             ,@(mapcar (lambda (spec actual) (or (caddr spec) actual))
                                       arg-specs actual-args)

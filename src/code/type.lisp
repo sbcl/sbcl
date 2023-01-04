@@ -993,7 +993,7 @@
 ;;;
 ;;; The return convention seems to be analogous to
 ;;; TYPES-EQUAL-OR-INTERSECT. -- WHN 19990910.
-(defun-cached (values-type-union :hash-function #'type-cache-hash
+(defun-cached (values-type-union :hash-function #'hash-ctype-pair
                                  :hash-bits 8)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
@@ -1003,7 +1003,7 @@
         (t
          (values (values-type-op type1 type2 #'type-union #'min)))))
 
-(defun-cached (values-type-intersection :hash-function #'type-cache-hash
+(defun-cached (values-type-intersection :hash-function #'hash-ctype-pair
                                         :hash-bits 8)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
@@ -1040,7 +1040,7 @@
 
 ;;; a SUBTYPEP-like operation that can be used on any types, including
 ;;; VALUES types
-(defun-cached (values-subtypep :hash-function #'type-cache-hash
+(defun-cached (values-subtypep :hash-function #'hash-ctype-pair
                                :hash-bits 8
                                :values 2)
     ((type1 eq) (type2 eq))
@@ -1088,7 +1088,7 @@
 ;;;; type method interfaces
 
 ;;; like SUBTYPEP, only works on CTYPE structures
-(defun-cached (csubtypep :hash-function #'type-cache-hash
+(defun-cached (csubtypep :hash-function #'hash-ctype-pair
                          :hash-bits 10
                          :memoizer memoize
                          :values 2)
@@ -1140,13 +1140,13 @@
 ;;; Helper for TYPE= so that we can separately cache the :SIMPLE-= method.
 (sb-impl::!define-hash-cache %simple-type=
                              ((type1 eq) (type2 eq))
-                             :hash-function #'type-cache-hash
+                             :hash-function #'hash-ctype-pair
                              :hash-bits 11 :values 2)
 
 ;;; If two types are definitely equivalent, return true. The second
 ;;; value indicates whether the first value is definitely correct.
 ;;; This should only fail in the presence of HAIRY types.
-(defun-cached (type= :hash-function #'type-cache-hash
+(defun-cached (type= :hash-function #'hash-ctype-pair
                      :hash-bits 12
                      :memoizer memoize
                      :values 2)
@@ -1223,7 +1223,7 @@
 ;;; that is precise to the best of our knowledge. This result is
 ;;; simplified into the canonical form, thus is not a UNION-TYPE
 ;;; unless we find no other way to represent the result.
-(defun-cached (type-union2 :hash-function #'type-cache-hash
+(defun-cached (type-union2 :hash-function #'hash-ctype-pair
                            :hash-bits 11
                            :memoizer memoize)
               ((type1 eq) (type2 eq))
@@ -1287,7 +1287,7 @@
                       (t
                        nil))))))))
 
-(defun-cached (type-intersection2 :hash-function #'type-cache-hash
+(defun-cached (type-intersection2 :hash-function #'hash-ctype-pair
                                   :hash-bits 11
                                   :memoizer memoize
                                   :values 1)
