@@ -273,8 +273,10 @@
 
 (defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
 (defconstant +ctype-flag-mask+      #b11)
-(defconstant ctype-contains-unknown #b01)
-(defconstant ctype-contains-hairy   #b10) ; any hairy type, including UNKNOWN
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant ctype-contains-unknown #b01)
+  (defconstant ctype-contains-hairy   #b10)) ; any hairy type, including UNKNOWN
 ;;; Apparently the old CONTAINS-UNKNOWN-TYPE-P function could accept NIL
 ;;; and return NIL. This seems kinda sloppy. Can we get rid of that "feature"?
 #+nil
