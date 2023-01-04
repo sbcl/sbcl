@@ -218,7 +218,7 @@
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux
-               :hash-function #'type-hash-value
+               :hash-function #'sb-kernel::type-%bits
                :hash-bits 9
                :values 2)
               ((type eq))

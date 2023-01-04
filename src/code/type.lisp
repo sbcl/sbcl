@@ -547,11 +547,13 @@
   (let ((rest (if (eq rest *empty-type*) nil rest))
         (required (intern-ctype-list required))
         (optional (intern-ctype-list optional)))
-    (if designator
-        (new-ctype fun-designator-type required optional rest keyp keywords
-                   allowp wild-args returns)
-        (new-ctype fun-type required optional rest keyp keywords
-                   allowp wild-args returns))))
+    (macrolet ((new (metatype)
+                 `(new-ctype ,metatype
+                             required optional rest keyp keywords
+                             allowp wild-args returns)))
+      (if designator
+          (new fun-designator-type)
+          (new fun-type)))))
 
 ;; This seems to be used only by cltl2, and within 'cross-type',
 ;; where it is never used, which makes sense, since pretty much we
@@ -573,7 +575,8 @@
   (type= (constant-type-type type1) (constant-type-type type2)))
 
 (def-type-translator constant-arg ((:context context) type)
-  (new-ctype constant-type (single-value-specifier-type type context)))
+  (let ((parse (single-value-specifier-type type context)))
+    (new-ctype constant-type parse)))
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -861,7 +864,7 @@
             exact)))
 
 ;;; If TYPE isn't a values type, then make it into one.
-(defun-cached (%coerce-to-values :hash-bits 8 :hash-function #'type-hash-value)
+(defun-cached (%coerce-to-values :hash-bits 8 :hash-function #'type-%bits)
     ((type eq))
   (cond ((multiple-value-bind (res sure)
              (csubtypep (specifier-type 'null) type)
@@ -1742,14 +1745,14 @@ expansion happened."
           nil
           result))))
 
-(defun-cached (type-negation :hash-function #'type-hash-value
+(defun-cached (type-negation :hash-function #'type-%bits
                              :hash-bits 8
                              :values 1)
               ((type eq))
   (declare (type ctype type))
   (funcall (type-class-negate (type-class type)) type))
 
-(defun-cached (type-singleton-p :hash-function #'type-hash-value
+(defun-cached (type-singleton-p :hash-function #'type-%bits
                              :hash-bits 8
                              :values 2)
               ((type eq))

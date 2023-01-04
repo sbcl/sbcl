@@ -127,7 +127,7 @@
     (weaken-integer-type-part type 'integer)))
 
 (defun-cached
-    (weaken-type :hash-bits 7 :hash-function #'type-hash-value)
+    (weaken-type :hash-bits 7 :hash-function #'sb-kernel::type-%bits)
     ((type eq))
   (declare (type ctype type))
   (cond ((named-type-p type)

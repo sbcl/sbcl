@@ -545,7 +545,11 @@ NOTE: This interface is experimental and subject to change."
     ;; (the default is to store each argument as-is)
     (unless (<= 2 (length arg) 3)
       (error "bad argument spec: ~S" arg)))
-  (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
+  ;; Disallow >12 hash bits. Supposing a 32-bit machine, a ctype hash uses 5
+  ;; reserved bits for the type-class index, and then we need 2 independent
+  ;; choices of hash, so supposing that's 12 bits each, we're at 29 bits.
+  ;; But I want to take 2 bits for flags, so that's 31 bits.
+  (assert (typep hash-bits '(integer 5 12))) ; reasonable bounds
   (unless (integerp values) ; non-numeric was only for CTYPE-OF-ARRAY
     (error "Values ~S unsupported" values))
   (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
@@ -601,7 +605,10 @@ NOTE: This interface is experimental and subject to change."
          (probe-it
           (lambda (action)
             `(when ,cache
-               (let ((,hashval ,hashval) ; gets clobbered in probe loop
+               ;; Shift out 2 low bits because they won't be as random as other bits,
+               ;; at least not for single-argument cached functions. They might be OK
+               ;; for functions that involve mixing.
+               (let ((,hashval (ash ,hashval -2)) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
                  ;; FIXME: redundant?
                  (declare (type sb-xc:fixnum ,hashval))
@@ -626,6 +633,7 @@ NOTE: This interface is experimental and subject to change."
                          (setq ,hashval (ash ,hashval ,(- hash-bits))))))))))
     `(let ((,hashval (the sb-xc:fixnum (funcall ,hashfun ,@actual-args)))
            (,cache ,var-name))
+       #-sb-xc-host (declare (optimize (sb-c::insert-array-bounds-checks 0)))
        ,@(when *profile-hash-cache* ; count seeks
            `((when (boundp ',statistics-name) (incf (aref ,statistics-name 0)))))
        (block seek
@@ -647,8 +655,8 @@ NOTE: This interface is experimental and subject to change."
                             ,@result-temps))
                    (,cache (truly-the ,cache-type
                                       (or ,cache (alloc-hash-cache ,size ',var-name))))
-                   (idx1 (ldb (byte ,hash-bits 0) ,hashval))
-                   (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
+                   (idx1 (ldb (byte ,hash-bits 2) ,hashval))
+                   (idx2 (ldb (byte ,hash-bits ,(+ 2 hash-bits)) ,hashval)))
                ,@(when *profile-hash-cache*
                    `((incf (aref ,statistics-name 1)))) ; count misses
                    ;; Why a barrier: the pointer to 'entry' (a cons or vector)

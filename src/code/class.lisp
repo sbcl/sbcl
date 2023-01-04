@@ -799,8 +799,8 @@ between the ~A definition and the ~A definition"
 (defmacro classoid-bits (x)
   ;; CLASSOIDs have a deterministic hash based on the symbol naming the classoid,
   ;; but HASH-LAYOUT-NAME will pick a pseudo-random hash if NAME is NIL.
-  `(logior (logand (hash-layout-name ,x) +type-hash-mask+)
-           ,(ctype-class-bits 'classoid)))
+  `(logior ,(ctype-class-bits 'classoid)
+           (logand (hash-layout-name ,x) +ctype-hash-mask+)))
 ;;; Now that the type-class has an ID, the various constructors can be defined.
 (macrolet ((def-make (name args &aux (allocator (symbolicate "!ALLOC-" name)))
              `(defun ,(symbolicate "MAKE-" name) ,args

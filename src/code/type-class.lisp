@@ -247,35 +247,67 @@
 
 ;;; the base class for the internal representation of types
 
-;; Each CTYPE instance (incl. subtypes thereof) has a random opaque hash value.
-;; Hashes are mixed together to form a lookup key in the memoization wrappers
-;; for most operations in CTYPES. This works because CTYPEs are immutable.
+;;; Each CTYPE instance (all subtypes thereof) has a random opaque hash value.
+;;; Hashes are mixed together to form a lookup key in the memoization wrappers
+;;; for most operations on CTYPES. This works because CTYPEs are immutable.
+;;; No more than N-FIXNUM-BITS for 32-bit machines are used, even for 64-bit words.
+;;; It's easiest this way. It could be host-fixnum-sized for the host, and then
+;;; target-fixnum-sized for the target, but that's not easy to do with DEF!STRUCT.
+;;; (In fact I think it's probably infeasible but I'm not certain of it)
+;;; You could always make it SB-XC:FIXNUM at the risk of forcing the host to
+;;; deal in bignums. Why cause it undue slowness when we don't need so many bits?
+;;; NOTE: we _do_ use the sign bit, leaving us 25 pseudorandom bits, but
+;;; the 2 bits of least significance are NOT pseudorandom, so it's best
+;;; not to use them directly in the hash index.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant ctype-hash-size  30)  ; all significant bits, for the slot type specifier
+  (defconstant ctype-PRNG-nbits 25)) ; from pseudorandom number generator
+
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:copier nil)
                    (:pure t))
-  ;; bits  0..26: pseudorandom hash
-  ;; bits 27..31: 5 bits for type-class index
-  ;; No more than 32 bits are used, even for 64-bit words.
-  ;; TODO: this should probably be a target positive-fixnum, and there's
-  ;; no reason to chop out the class id bits when mixing hashes.
-  (%bits (missing-arg) :type (unsigned-byte 32) :read-only t))
+  ;; bits  0..24: pseudorandom hash
+  ;; bits 25..29: 5 bits for type-class index
+  (%bits (missing-arg) :type (signed-byte #.ctype-hash-size) :read-only t))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant ctype-hash-nbits 27))
-(defconstant +type-hash-mask+ (1- (ash 1 ctype-hash-nbits)))
+(defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
+(defconstant +ctype-flag-mask+      #b11)
+(defconstant ctype-contains-unknown #b01)
+(defconstant ctype-contains-hairy   #b10) ; any hairy type, including UNKNOWN
+;; work-in-progress:
+;;(defmacro contains-unknown-type-p (ctype) `(oddp (type-%bits ,ctype)))
+;;(defmacro contains-hairy-type-p (ctype) `(logbitp 1 (type-%bits ,ctype)))
 
-(defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-hash-nbits) (type-%bits ,ctype)))
+(defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-PRNG-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
 (defmacro type-class (ctype) `(type-id->type-class (type-class-id ,ctype)))
 
 (declaim (inline type-hash-value))
-(defun type-hash-value (ctype) (ldb (byte ctype-hash-nbits 0) (type-%bits ctype)))
+(defun type-hash-value (ctype) (logand (type-%bits ctype) sb-xc:most-positive-fixnum))
+
+(defmacro type-flags (ctype) `(logand (type-%bits ,ctype) +ctype-flag-mask+))
+;;; Hash caches can in general accept any signed fixnum as the hash.
+;;; Hashsets probably can as well, but if the mixing function entails MIX,
+;;; the inputs have to be positive fixnums.
+;;; I can't remember if our hash-tables that use arbitrary user-supplied
+;;; hash functions can accept negative fixnums.
+(defun type-list-flags (list)
+  (let ((bits 0)) ; LOGIOR together and then mask once when done
+    (dolist (ctype list (logand bits +ctype-flag-mask+))
+      (setq bits (logior bits (type-%bits ctype))))))
 
 (defglobal *ctype-hashsets* nil)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun ctype-class-bits (type-class)
-    (ash (type-class-name->id type-class) ctype-hash-nbits))
+    (let* ((index (type-class-name->id type-class))
+           (shifted
+            (dpb index
+                 (byte 5 ctype-PRNG-nbits)
+                 ;; ensure that the result is a (SIGNED-BYTE 30) by depositing
+                 ;; into a -1 if the high bit of the class ID is on.
+                 (if (logbitp 4 index) (ash -1 ctype-PRNG-nbits) 0))))
+      (the (signed-byte #.ctype-hash-size) shifted)))
   (defvar *type-class-list*
     ;; type-class and ctype instance types in that class
     ;; The instance types MUST be list in descending order of DEPTHOID.
@@ -312,8 +344,8 @@
 ;;; For system build-time only
 (defun pack-interned-ctype-bits (type-class &optional hash)
   (let ((hash (or hash (ctype-random))))
-    (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
-            (logand hash +type-hash-mask+))))
+    (logior (ash (type-class-name->id type-class) ctype-PRNG-nbits)
+            (logand hash +ctype-hash-mask+))))
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)
@@ -541,43 +573,30 @@
 
 ;;;; miscellany
 
-;;; Hash two things (types) down to a target fixnum. In CMU CL this was an EQ
-;;; hash, but since it now needs to run in vanilla ANSI Common Lisp at
-;;; cross-compile time, it's now based on the CTYPE-HASH-VALUE field
-;;; instead.
-;;;
-;;; FIXME: This was a macro in CMU CL, and is now an INLINE function. Is
-;;; it important for it to be INLINE, or could be become an ordinary
-;;; function without significant loss? -- WHN 19990413
-(declaim (inline type-cache-hash))
-(declaim (ftype (function (ctype ctype) (signed-byte #.sb-vm:n-fixnum-bits))
-                type-cache-hash))
+;;; Various hash mixing functions.
+(declaim (inline hash-ctype-pair))
+(declaim (ftype (function (ctype ctype) (signed-byte #.ctype-hash-size)) hash-ctype-pair))
 (defun type-cache-hash (type1 type2)
-  (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
+  (logxor (ash (type-%bits type1) -3) (type-%bits type2)))
 
 (declaim (inline hash-ctype-list))
-(declaim (ftype (function (list) (signed-byte #.sb-vm:n-fixnum-bits))
-                hash-ctype-list))
+(declaim (ftype (function (list) (signed-byte #.ctype-hash-size)) hash-ctype-list))
 (defun hash-ctype-list (types)
-  (loop with res of-type (signed-byte #.sb-vm:n-fixnum-bits) = 0
+  (loop with res of-type (signed-byte #.ctype-hash-size) = 0
         for type in types
-        do (setq res (logxor (ash res -1) (type-hash-value type)))
-        finally (return res)))
-
-;;;; representations of types
+        do (setq res (logxor (ash res -1) (type-%bits type)))
+        ;; This returns a positive number so that it can be passed to MIX
+        finally (return (ldb (byte (1- ctype-hash-size) 0) res))))
 
 (defun hash-ctype-set (types) ; ctype list hashed order-insensitively
-  (let ((hash (type-hash-value (car types)))
+  (let ((hash (type-%bits (car types)))
         (n 1))
-    (dolist (type (cdr types) (mix (the (integer 2) n) hash))
+    (dolist (type (cdr types) (mix (logand hash sb-xc:most-positive-fixnum)
+                                   (the (integer 2) n)))
       (incf n)
-      (setq hash (logxor (type-hash-value type) hash)))))
+      (setq hash (logxor (type-%bits type) hash)))))
 (defun ctype-set= (a b)
-  ;; We could order ctype sets deterministically by the TYPE-HASH-VALUE of
-  ;; the items, but there would also have to be a provision made for hash
-  ;; collisions, which entails the comparator doing one thing or another
-  ;; depending on whether the set had collisions.
-  ;; However, it might also be nice to canonicalize putting any type containing
+  ;; However, it might also be nice to canonicalize sets by putting any type containing
   ;; SATISFIES to the right of any type that does not. This order would tend to have
   ;; a beneficial effect of making TYPEP tests pass or fail "sooner" without calling
   ;; a random predicate. It's just as well to compare sets elementwise for now
@@ -708,10 +727,10 @@
 
 (defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
 ;;; The final mix ensures that all bits affect the masked hash.
-;;; Since it takes non-zero time, only do it for NUMERIC where it seems to make
-;;; a large difference in the maximum probe sequence
+;;; Since it takes non-zero time, only do it for NUMERIC and ARRAY, where it seems
+;;; to make a large difference in the maximum probe sequence length.
 (defmacro type-hash-final-mix (val)
-  `(ldb (byte ctype-hash-nbits 0) (sb-impl::murmur3-fmix-word ,val)))
+  `(logand (sb-impl::murmur3-fmix-word ,val) ,sb-xc:most-positive-fixnum))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
@@ -742,15 +761,14 @@
          (hashset (package-symbolicate "SB-KERNEL" "*" name "-HASHSET*"))
          (bits (ctype-class-bits (ctype-instance->type-class name))))
     #+sb-xc-host ; allocate permanent data, and insert into cache if not found
-    `(let ((temp (,allocator (logior (logand (ctype-random) +type-hash-mask+) ,bits)
+    `(let ((temp (,allocator (logior (logand (ctype-random) +ctype-hash-mask+) ,bits)
                              ,@initargs)))
        (hashset-insert-if-absent ,hashset temp #'identity))
     ;; allocate temporary key, copy it if and only if not found.
     ;; COPY-CTYPE can copy subparts like the numeric bound if arena-allocated
     #-sb-xc-host
     `(let ((temp (,allocator ,bits ,@initargs)))
-       ;; Too many "can't stack-allocate" warnings for most
-       #+(or 64-bit c-stack-is-control-stack) (declare (truly-dynamic-extent temp))
+       (declare (truly-dynamic-extent temp))
        #+nil ; or #+sb-devel as you see fit
        (unless *hashsets-preloaded*
          (write-string "CTYPE hashset preload failure")
@@ -889,16 +907,6 @@
 ;;;      than one MEMBER-TYPE component. FIXME: As of sbcl-0.6.11.13,
 ;;;      this hadn't been fully implemented yet.
 ;;;   2. There are never any UNION-TYPE components.
-;;;
-;;; TODO: As STRING is an especially important union type,
-;;; it could be interned by canonicalizing its subparts into
-;;; ARRAY of {CHARACTER,BASE-CHAR} in that exact order always.
-;;; It will therefore admit quick TYPE=, but not quick failure, since
-;;;   (type= (specifier-type '(or (simple-array (member #\a) (*))
-;;;                               (simple-array character (*))))
-;;;          (specifier-type 'simple-string)) => T and T
-;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
-;;;
 (def-type-model (union-type
                  (:constructor* nil (enumerable types))
                  (:include compound-type)))
@@ -1078,12 +1086,18 @@
 (defun key-info-hash (x)
   (declare (optimize (safety 0)))
   (mix (#+sb-xc-host sb-impl::symbol-name-hash #-sb-xc-host sxhash (key-info-name x))
-       (type-hash-value (key-info-type x))))
+       ;; MIX requires positive fixnums
+       (logand (type-hash-value (key-info-type x)) sb-xc:most-positive-fixnum)))
 
 (defun key-info-list-hash (list)
   (declare (optimize (safety 0)))
   (let ((h 0))
-  (dolist (elt list h) (setf h (mix (key-info-hash elt) h)))))
+    (dolist (elt list h) (setf h (mix (key-info-hash elt) h)))))
+
+(defun key-info-list-flags (list)
+  (let ((bits 0))
+    (dolist (elt list (logand bits +ctype-flag-mask+))
+      (setq bits (logior bits (type-%bits (key-info-type elt)))))))
 
 (define-load-time-global *key-info-hashset*
     (make-hashset 32 #'key-info= #'key-info-hash :weakness t :synchronized t))
@@ -1464,12 +1478,12 @@
 ;;; then assert that all members are cacheable.
 #+sb-xc-host
 (defun copy-ctype (x)
-  (let ((bits (logior (logand (ctype-random) +type-hash-mask+) (type-%bits x))))
+  (let ((bits (logior (type-%bits x) (logand (ctype-random) +ctype-hash-mask+))))
     (etypecase x
       (member-type
        (!alloc-member-type bits (member-type-xset x) (member-type-fp-zeroes x))))))
 #-sb-xc-host
-(defun copy-ctype (x)
+(defun copy-ctype (x &optional (flags 0))
   (declare (type ctype x))
   (declare (sb-c::tlab :system) (inline !new-xset))
   #+c-stack-is-control-stack (aver (stack-allocated-p x))
@@ -1511,8 +1525,7 @@
                     xset)
                    (t ; This could certainly be improved
                     (error "Off-heap MEMBER type members")))))
-    (let ((bits (logior (logand (ctype-random) +type-hash-mask+)
-                        (type-%bits x))))
+    (let ((bits (logior (type-%bits x) (logand (ctype-random) +ctype-hash-mask+) flags)))
       ;; These cases are in descending order of frequency of seek in the hashsets.
       ;; It matters only for backends that don't convert TYPECASE to a jump table.
       (etypecase x
