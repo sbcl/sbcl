@@ -275,9 +275,23 @@
 (defconstant +ctype-flag-mask+      #b11)
 (defconstant ctype-contains-unknown #b01)
 (defconstant ctype-contains-hairy   #b10) ; any hairy type, including UNKNOWN
-;; work-in-progress:
-;;(defmacro contains-unknown-type-p (ctype) `(oddp (type-%bits ,ctype)))
-;;(defmacro contains-hairy-type-p (ctype) `(logbitp 1 (type-%bits ,ctype)))
+;;; Apparently the old CONTAINS-UNKNOWN-TYPE-P function could accept NIL
+;;; and return NIL. This seems kinda sloppy. Can we get rid of that "feature"?
+#+nil
+(defun contains-unknown-type-p (ctype)
+  (or (null ctype) (oddp (type-%bits ctype))))
+(defun contains-hairy-type-p (ctype)
+  (logbitp 1 (type-%bits ctype)))
+
+(defun ok-to-memoize-p (&rest args)
+  (declare (dynamic-extent args))
+  (dolist (arg args t)
+    (etypecase arg
+      (ctype (when (oddp (type-%bits arg))
+               (return-from ok-to-memoize-p nil)))
+      (list  (dolist (elt arg)
+               (when (oddp (type-%bits elt))
+                 (return-from ok-to-memoize-p nil)))))))
 
 (defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-PRNG-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
@@ -342,10 +356,8 @@
         (error "~S is not a defined type class." name))))
 
 ;;; For system build-time only
-(defun pack-interned-ctype-bits (type-class &optional hash)
-  (let ((hash (or hash (ctype-random))))
-    (logior (ash (type-class-name->id type-class) ctype-PRNG-nbits)
-            (logand hash +ctype-hash-mask+))))
+(defun make-ctype-bits (type-class &optional (hash (ctype-random)))
+  (logior (ctype-class-bits type-class) (logand hash +ctype-hash-mask+)))
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)
@@ -704,7 +716,14 @@
        ,@(when (second public-ctor)
            `((declaim (ftype (sfunction * ,name) ,(second public-ctor)))
              (defun ,(second public-ctor) ,public-ctor-args
-               (new-ctype ,name ,@(cdr private-ctor-args))))))))
+               (new-ctype ,name
+                          ,(ecase name ; Compute or propagate the flag bits
+                             (hairy-type ctype-contains-hairy)
+                             (unknown-type (logior ctype-contains-unknown ctype-contains-hairy))
+                             ((simd-pack-type simd-pack-256-type alien-type-type) 0)
+                             (negation-type '(type-flags type))
+                             (array-type '(type-flags element-type)))
+                          ,@(cdr private-ctor-args))))))))
 
 ;;; The "clipped hash" is just some stable hash that may rely on the host's SXHASH
 ;;; but always ensuring that the result is an unsigned fixnum for the target,
@@ -755,25 +774,55 @@
   `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
        (heap-allocated-p ,obj)))
 
+#-sb-xc-host
+(defun ctype-hashset-insert-if-absent (hashset key function)
+  (or (hashset-find hashset key)
+      (let ((flags (funcall function key)))
+        (with-system-mutex ((sb-impl::hashset-mutex hashset))
+          (or (hashset-find hashset key)
+              (hashset-insert hashset (copy-ctype key flags)))))))
+
 (defvar *hashsets-preloaded* nil)
-(defmacro new-ctype (name &rest initargs)
-  (let* ((allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name))
-         (hashset (package-symbolicate "SB-KERNEL" "*" name "-HASHSET*"))
-         (bits (ctype-class-bits (ctype-instance->type-class name))))
-    #+sb-xc-host ; allocate permanent data, and insert into cache if not found
-    `(let ((temp (,allocator (logior (logand (ctype-random) +ctype-hash-mask+) ,bits)
-                             ,@initargs)))
-       (hashset-insert-if-absent ,hashset temp #'identity))
+(defmacro new-ctype (metatype flags-expr &rest initargs)
+  (let* ((hashset (package-symbolicate "SB-KERNEL" "*" metatype "-HASHSET*"))
+         (allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" metatype))
+         (defer-flags (typep flags-expr '(cons (member lambda function))))
+         (flag-bits (if defer-flags 0 flags-expr))
+         (class-bits (ctype-class-bits (ctype-instance->type-class metatype))))
+
+    #+sb-xc-host
+    (let ((gensyms (make-gensym-list (length initargs))))
+      `(multiple-value-bind ,gensyms (values ,@initargs)
+         (let ((temp (,allocator
+                      (logior ,@(unless defer-flags
+                                  '((logand (ctype-random) +ctype-hash-mask+)))
+                              ,flag-bits ,class-bits)
+                      ,@gensyms)))
+           ;; If lazily computing flags, might have to make a second instance
+           ;; since the %BITS slot is immutable, so try to stack-allocate this.
+           ,@(if defer-flags
+                 `((declare (dynamic-extent temp))
+                   (or (hashset-find ,hashset temp)
+                       (hashset-insert
+                        ,hashset
+                        (,allocator (logior (logand (ctype-random) +ctype-hash-mask+)
+                                            (funcall ,flags-expr temp) ,class-bits)
+                                    ,@gensyms))))
+                 `((hashset-insert-if-absent ,hashset temp #'identity))))))
+
     ;; allocate temporary key, copy it if and only if not found.
     ;; COPY-CTYPE can copy subparts like the numeric bound if arena-allocated
     #-sb-xc-host
-    `(let ((temp (,allocator ,bits ,@initargs)))
+    `(let ((temp (,allocator (logior ,flag-bits ,class-bits) ,@initargs)))
        (declare (truly-dynamic-extent temp))
        #+nil ; or #+sb-devel as you see fit
        (unless *hashsets-preloaded*
          (write-string "CTYPE hashset preload failure")
          (sb-vm:ldb-monitor))
-       (hashset-insert-if-absent ,hashset temp #'copy-ctype))))
+       (truly-the (values ,metatype &optional)
+                  ,(if defer-flags
+                       `(ctype-hashset-insert-if-absent ,hashset temp ,flags-expr)
+                       `(hashset-insert-if-absent ,hashset temp #'copy-ctype))))))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -899,6 +948,7 @@
   ;; A singleton would not be a compound type.
   ;; An empty OR is the type NIL, and an empty AND is type T.
   (types nil :type (cons t cons) :hasher hash-ctype-set :test eq)) ; list is hash-consed
+(defun compound-type-flags (type) (type-list-flags (compound-type-types type)))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
 ;;; couldn't canonicalize to something simpler. Canonical form:

@@ -135,6 +135,9 @@
        (%map (cons-type-cdr-type type)))
       (array-type
        (%map (array-type-element-type type)))
+      ;; FIXME:  how does adding in CONSTANT-TYPE cause test failures ?
+      ;; (constant-type
+      ;;  (%map (constant-type-type type)))
       (args-type
        (mapc #'%map (args-type-required type))
        (mapc #'%map (args-type-optional type))
@@ -146,26 +149,11 @@
          (%map (fun-type-returns type))))))
   nil)
 
+;;; new and old way do NOT agree on this predicate. Wtf?
 (defun contains-unknown-type-p (ctype)
   (map-type (lambda (type)
               (when (unknown-type-p type)
                 (return-from contains-unknown-type-p t)))
-            ctype))
-(defun ok-to-memoize-p (&rest args)
-  (dolist (arg args t)
-    (etypecase arg
-      (ctype
-       (when (contains-unknown-type-p arg)
-         (return-from ok-to-memoize-p nil)))
-      (list
-       (dolist (elt arg)
-         (when (contains-unknown-type-p elt)
-           (return-from ok-to-memoize-p nil)))))))
-
-(defun contains-hairy-type-p (ctype)
-  (map-type (lambda (type)
-              (when (hairy-type-p type)
-                (return-from contains-hairy-type-p t)))
             ctype))
 
 (defun replace-hairy-type (type)
@@ -188,6 +176,8 @@
 ;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
 ;; is not a testable type unless F is currently bound.
 (defun testable-type-p (ctype)
+  (unless (contains-hairy-type-p ctype)
+    (return-from testable-type-p t))
   (map-type
    (lambda (ctype)
      (typecase ctype
@@ -296,7 +286,13 @@
           (t
            (let ((required (intern-ctype-list required))
                  (optional (intern-ctype-list optional)))
-             (new-ctype values-type required optional rest))))))
+             (new-ctype values-type
+                        (lambda (x)
+                          (logior (type-list-flags (args-type-required x))
+                                  (type-list-flags (args-type-optional x))
+                                  (acond ((args-type-rest x) (type-flags it))
+                                         (t 0))))
+                        required optional rest))))))
 
 (define-type-method (values :simple-subtypep :complex-subtypep-arg1)
                      (type1 type2)
@@ -547,13 +543,20 @@
   (let ((rest (if (eq rest *empty-type*) nil rest))
         (required (intern-ctype-list required))
         (optional (intern-ctype-list optional)))
-    (macrolet ((new (metatype)
-                 `(new-ctype ,metatype
-                             required optional rest keyp keywords
-                             allowp wild-args returns)))
-      (if designator
-          (new fun-designator-type)
-          (new fun-type)))))
+    (flet ((fun-type-flags (x)
+             (logior (type-list-flags (fun-type-required x))
+                     (type-list-flags (fun-type-optional x))
+                     (acond ((fun-type-rest x) (type-flags it))
+                            (t 0))
+                     (key-info-list-flags (fun-type-keywords x))
+                     (type-flags (fun-type-returns x)))))
+      (macrolet ((new (metatype)
+                   `(new-ctype ,metatype #'fun-type-flags
+                               required optional rest keyp keywords
+                               allowp wild-args returns)))
+        (if designator
+            (new fun-designator-type)
+            (new fun-type))))))
 
 ;; This seems to be used only by cltl2, and within 'cross-type',
 ;; where it is never used, which makes sense, since pretty much we
@@ -576,7 +579,7 @@
 
 (def-type-translator constant-arg ((:context context) type)
   (let ((parse (single-value-specifier-type type context)))
-    (new-ctype constant-type parse)))
+    (new-ctype constant-type (type-flags parse) parse)))
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -1834,11 +1837,12 @@ expansion happened."
           ((null simplified-types) *universal-type*)
           ((null (cdr simplified-types)) (car simplified-types))
           (t (new-ctype intersection-type
+              #'compound-type-flags
               (some #'type-enumerable simplified-types)
               (intern-ctype-set simplified-types)))))))
 
 (defun make-union-type (enumerable types)
-  (new-ctype union-type enumerable (intern-ctype-set types)))
+  (new-ctype union-type #'compound-type-flags enumerable (intern-ctype-set types)))
 (defun type-union (&rest input-types)
   (declare (dynamic-extent input-types))
   (%type-union input-types))
@@ -2723,7 +2727,7 @@ expansion happened."
       (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
-    (new-ctype numeric-type (get-numtype-aspects complexp class format) low high)))
+    (new-ctype numeric-type 0 (get-numtype-aspects complexp class format) low high)))
 
 (defun modified-numeric-type (base
                               &key
@@ -3002,7 +3006,7 @@ expansion happened."
   (setf (info :type :builtin 'number)
         #+sb-xc-host
         (hashset-insert *numeric-type-hashset*
-                        (!alloc-numeric-type #.(pack-interned-ctype-bits 'number)
+                        (!alloc-numeric-type #.(make-ctype-bits 'number)
                                              (get-numtype-aspects nil nil nil)
                                              nil nil))
         #-sb-xc-host (specifier-type 'number)))
@@ -3458,7 +3462,7 @@ used for a COMPLEX component.~:@>"
       (macrolet ((range (low high)
                    `(return-from make-character-set-type
                       (inline-cache-ctype
-                       (!alloc-character-set-type (pack-interned-ctype-bits 'character-set)
+                       (!alloc-character-set-type (make-ctype-bits 'character-set)
                                                   '((,low . ,high)))
                        (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
@@ -3474,7 +3478,7 @@ used for a COMPLEX component.~:@>"
                 #+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)))))))
-    (new-ctype character-set-type pairs)))
+    (new-ctype character-set-type 0 pairs)))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -3907,7 +3911,7 @@ used for a COMPLEX component.~:@>"
            (eq (car (xset-members xset)) nil))
       ;; Bypass the hashset for type NULL because it's so important
       (return-from make-member-type
-        (inline-cache-ctype (!alloc-member-type (pack-interned-ctype-bits 'member)
+        (inline-cache-ctype (!alloc-member-type (make-ctype-bits 'member)
                                                 (!new-xset '(nil) 1)
                                                 '())
                             null))))
@@ -4717,11 +4721,14 @@ used for a COMPLEX component.~:@>"
          *empty-type*)
         ;; Bypass the hashset for plain CONS
         ((and (eq car-type *universal-type*) (eq cdr-type *universal-type*))
-         (inline-cache-ctype (!alloc-cons-type (pack-interned-ctype-bits 'cons)
+         (inline-cache-ctype (!alloc-cons-type (make-ctype-bits 'cons)
                                                *universal-type* *universal-type*)
                              cons))
         (t
-         (new-ctype cons-type car-type cdr-type))))
+         (new-ctype cons-type
+                    (logand (logior (type-%bits car-type) (type-%bits cdr-type))
+                            +ctype-flag-mask+)
+                    car-type cdr-type))))
 
 ;;; Return TYPE converted to canonical form for a situation where the
 ;;; "type" '* (which SBCL still represents as a type even though ANSI
