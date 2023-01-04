@@ -135,9 +135,8 @@
        (%map (cons-type-cdr-type type)))
       (array-type
        (%map (array-type-element-type type)))
-      ;; FIXME:  how does adding in CONSTANT-TYPE cause test failures ?
-      ;; (constant-type
-      ;;  (%map (constant-type-type type)))
+      (constant-type
+       (%map (constant-type-type type)))
       (args-type
        (mapc #'%map (args-type-required type))
        (mapc #'%map (args-type-optional type))
@@ -148,13 +147,6 @@
        (when (fun-type-p type)
          (%map (fun-type-returns type))))))
   nil)
-
-;;; new and old way do NOT agree on this predicate. Wtf?
-(defun contains-unknown-type-p (ctype)
-  (map-type (lambda (type)
-              (when (unknown-type-p type)
-                (return-from contains-unknown-type-p t)))
-            ctype))
 
 (defun replace-hairy-type (type)
   (if (contains-hairy-type-p type)

@@ -261,7 +261,11 @@
 ;;; not to use them directly in the hash index.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant ctype-hash-size  30)  ; all significant bits, for the slot type specifier
-  (defconstant ctype-PRNG-nbits 25)) ; from pseudorandom number generator
+  (defconstant ctype-PRNG-nbits 25)  ; from pseudorandom number generator
+  (defconstant ctype-contains-unknown #b01)
+  (defconstant ctype-contains-hairy   #b10)) ; any hairy type, including UNKNOWN
+(defconstant +ctype-flag-mask+ #b11)
+(defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
 
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
@@ -271,17 +275,11 @@
   ;; bits 25..29: 5 bits for type-class index
   (%bits (missing-arg) :type (signed-byte #.ctype-hash-size) :read-only t))
 
-(defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
-(defconstant +ctype-flag-mask+      #b11)
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant ctype-contains-unknown #b01)
-  (defconstant ctype-contains-hairy   #b10)) ; any hairy type, including UNKNOWN
 ;;; Apparently the old CONTAINS-UNKNOWN-TYPE-P function could accept NIL
 ;;; and return NIL. This seems kinda sloppy. Can we get rid of that "feature"?
-#+nil
+(declaim (inline contains-unknown-type-p contains-hairy-type-p))
 (defun contains-unknown-type-p (ctype)
-  (or (null ctype) (oddp (type-%bits ctype))))
+  (if ctype (oddp (type-%bits ctype)) nil))
 (defun contains-hairy-type-p (ctype)
   (logbitp 1 (type-%bits ctype)))
 
