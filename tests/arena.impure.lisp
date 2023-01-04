@@ -354,6 +354,8 @@
 ;;; except that the memory is still there so we can figure out what went wrong
 ;;; with user code. This might pass on #+-linux but has not been tested.
 (test-util:with-test (:name :arena-use-after-free :skipped-on (:not :linux))
+  ;; scary messages scare me
+  (format t "::: NOTE: Expect a \"CORRUPTION WARNING\" from this test~%")
   (hide-arena *another-arena*)
   (let (caught)
     (block foo
@@ -370,6 +372,61 @@
   (unhide-arena *another-arena*)
   (rewind-arena *another-arena*)
   (dotimes (i 10) (f *another-arena* 1000)))
+
+;;;; Type specifier parsing and operations
+
+(defparameter *bunch-of-objects*
+  `((foo)
+    "astring"
+    #*1010
+    ,(find-package "CL")
+    ,(pathname "/tmp/blub")
+    ,#'open
+    #2a((1 2) (3 4))
+    ,(ash 1 64)
+    ))
+
+;; These type-specs are themselves consed so that we can
+;; ascertain whether there are arena pointers in internalized types.
+(defun get-bunch-of-type-specs ()
+  `((integer ,(random 47) *)
+    (and bignum (not (eql ,(random 1000))))
+    (and bignum (not (eql ,(logior #x8000000000000001
+                                   (ash (1+ (random #xF00)) 10)))))
+    (member ,(complex (coerce (random 10) 'single-float)
+                      (coerce (- (random 10)) 'single-float))
+            (goo)
+            #\thumbs_up_sign)
+    (or stream (member #\thumbs_down_sign :hello))
+    (array t (,(+ 10 (random 10))))))
+
+(defun show-cache-counts ()
+  (dolist (s sb-impl::*cache-vector-symbols*)
+    (let ((v (symbol-value s)))
+      (when (vectorp v)
+        (format t "~5d  ~a~%"
+                (count-if (lambda (x) (not (eql x 0))) v)
+                s)))))
+
+(defun ctype-operator-tests (arena &aux (result 0))
+  (sb-int:drop-all-hash-caches)
+  (flet ((try (spec)
+           (dolist (x *bunch-of-objects*)
+             (when (typep x spec)
+               (incf result)))))
+    (sb-vm:with-arena (arena)
+      (let ((specs (get-bunch-of-type-specs)))
+        (dolist (spec1 specs)
+          (dolist (spec2 specs)
+            (try `(and ,spec1 ,spec2))
+            (try `(or ,spec1 ,spec2))
+            (try `(and ,spec1 (not ,spec2)))
+            (try `(or ,spec1 (not ,spec2))))))))
+  (assert (null (sb-vm:c-find-heap->arena arena)))
+  result)
+(test-util:with-test (:name :ctype-cache)
+  (let ((arena (sb-vm:new-arena 1048576)))
+    (ctype-operator-tests arena)))
 
 ;; #+sb-devel preserves some symbols that the test doesn't care about
 ;; as the associated function will never be called.

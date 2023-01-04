@@ -81,16 +81,6 @@
                       (xset-data xset) table))))
         (setf (gethash elt data) t))))
 
-(defun xset-union (a b)
-  (let ((xset (alloc-xset)))
-    (map-xset (lambda (x)
-                (add-to-xset x xset))
-              a)
-    (map-xset (lambda (y)
-                (add-to-xset y xset))
-              b)
-    xset))
-
 (defun xset-member-p (elt xset)
   (let ((data (xset-data xset)))
     (if (if (listp data)
@@ -110,7 +100,14 @@
                    data)
           members))))
 
+;;; Possible TODO:
+;;; INTERSECTION and UNION could allocate the new xset where the input(s)
+;;; were, to avoid an extra copy operation.
+;;; The reason for not always forcing to dynamic space is that I'd like
+;;; (eventually) the compiler to able to run in an arena, with only its
+;;; output forced to the dynamic or immmobile space.
 (defun xset-intersection (a b)
+  (declare (inline alloc-xset))
   (let ((intersection (alloc-xset)))
     ;; Under the assumption that lookup time is constant in either set,
     ;; you should scan the * smaller * set to see if each item
@@ -130,6 +127,33 @@
                           (add-to-xset elt intersection))))
                  source)))
     intersection))
+
+;;; This attempts to return A or B if one is a subset of the other.
+(defun xset-union (a b)
+  (declare (inline !new-xset))
+  (binding* (((small large)
+              (if (< (xset-count a) (xset-count b)) (values a b) (values b a)))
+             (data (xset-data large)))
+  ;; If one of A or B is a hash-table, then surely it's the larger. The other might be too.
+  ;; For each key in the smaller, count the elements missing from the larger.
+  (if (hash-table-p data)
+      (let ((missing 0))
+        (declare (index missing))
+        (map-xset (lambda (x) (unless (gethash x data) (incf missing))) small)
+        (cond ((= missing 0) large)
+              (t
+               ;; We have an exact count for the resulting hash-table.
+               (let ((new (make-hash-table :size (+ (hash-table-count data) missing))))
+                 ;; Ideally we would have a valueless hash-table so we don't store all the Ts
+                 (map-xset (lambda (k) (setf (gethash k new) t)) small)
+                 (maphash (lambda (k v) (setf (gethash k new) v)) data)
+                 (!new-xset new 0)))))
+      ;; Both A and B are lists. Share list tails since the lists are immutable.
+      ;; Let the resulting XSET dynamically become a hash-table if it wants to.
+      (let ((xset (!new-xset data (xset-count large))))
+        (dolist (elt (xset-data small)) (add-to-xset elt xset))
+        ;; if nothing was actually added, then NEW can be GCed
+        (if (eq (xset-data xset) data) large xset)))))
 
 (defun xset-subset-p (xset1 xset2)
   (when (<= (xset-count xset1) (xset-count xset2))
@@ -214,7 +238,8 @@
 (define-load-time-global *xset-stable-hashes* (make-hash-table :test 'eq))
 
 (defun xset-generate-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
-  #-sb-xc-host (declare (notinline sb-impl::eql-hash)) ; forward ref
+  #-sb-xc-host (declare (notinline sb-impl::eql-hash) ; forward ref
+                        (sb-c::tlab :system))
   (flet ((get-stable-hash-cell (obj)
            (let ((cell (gethash obj hashmap)))
              (cond (cell
