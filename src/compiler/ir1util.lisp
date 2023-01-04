@@ -985,31 +985,6 @@
                                       (node-source-path use)))))
         (list (node-source-form use)))))
 
-;;; Return the LAMBDA that is CTRAN's home, or NIL if there is none.
-(declaim (ftype (sfunction (ctran) (or clambda null))
-                ctran-home-lambda-or-null))
-(defun ctran-home-lambda-or-null (ctran)
-  ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
-  ;; implementation might not be quite right, or might be uglier than
-  ;; necessary. It appears that the original Python never found a need
-  ;; to do this operation. The obvious things based on
-  ;; NODE-HOME-LAMBDA of CTRAN-USE usually work; then if that fails,
-  ;; BLOCK-HOME-LAMBDA of CTRAN-BLOCK works, given that we
-  ;; generalize it enough to grovel harder when the simple CMU CL
-  ;; approach fails, and furthermore realize that in some exceptional
-  ;; cases it might return NIL. -- WHN 2001-12-04
-  (cond ((ctran-use ctran)
-         (node-home-lambda (ctran-use ctran)))
-        ((ctran-block ctran)
-         (block-home-lambda-or-null (ctran-block ctran)))
-        (t
-         (bug "confused about home lambda for ~S" ctran))))
-
-;;; Return the LAMBDA that is CTRAN's home.
-(declaim (ftype (sfunction (ctran) clambda) ctran-home-lambda))
-(defun ctran-home-lambda (ctran)
-  (ctran-home-lambda-or-null ctran))
-
 (declaim (inline cast-single-value-p))
 (defun cast-single-value-p (cast)
   (not (values-type-p (cast-asserted-type cast))))
