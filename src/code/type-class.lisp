@@ -270,7 +270,7 @@
 (defstruct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:copier nil)
-                   (:pure t))
+                   #-sb-xc-host (:pure t))
   ;; bits  0..24: pseudorandom hash
   ;; bits 25..29: 5 bits for type-class index
   (%bits (missing-arg) :type (signed-byte #.ctype-hash-size) :read-only t))
