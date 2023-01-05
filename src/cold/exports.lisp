@@ -249,7 +249,6 @@ SBCL itself")
         "SB-FASL" "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
 
 (defpackage* "SB-SEQUENCE"
-  (:nicknames "SEQUENCE")
   (:documentation "semi-public: implements something which might eventually
 be submitted as a CDR")
   (:export "PROTOCOL-UNIMPLEMENTED"

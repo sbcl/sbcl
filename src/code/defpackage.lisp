@@ -787,3 +787,6 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                     (list int-max int-psl int-lf))
               (package-name pkg))))
   (format t "~8d~%" tot-ncells)))
+
+(let ((package (find-package "SB-SEQUENCE")))
+  (rename-package package package (list "SEQUENCE")))
