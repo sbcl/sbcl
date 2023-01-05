@@ -2289,11 +2289,9 @@
                        (let ((use-component (node-component use)))
                          (substitute-leaf-if
                           (lambda (ref)
-                            (cond ((eq (node-component ref) use-component)
-                                   t)
-                                  (t
-                                   (aver (lambda-toplevelish-p (lambda-home fun)))
-                                   nil)))
+                            ;; Some unreachable function may be in a different component,
+                            ;; don't worry about it
+                            (eq (node-component ref) use-component))
                           leaf var)))
                      t))))))
        ((and arg

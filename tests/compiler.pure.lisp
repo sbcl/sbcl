@@ -6334,3 +6334,17 @@
       (handler-bind ((error (constantly nil)))
         (pathname-type x)))
    :allow-notes nil))
+
+(with-test (:name (propagate-let-args :cross-component-constant-substition))
+  (checked-compile
+   `(lambda (a)
+      (labels ((%f2 (x)
+                 (flet ((%f6 (y)
+                          (prog1 y
+                            (catch 'tag y)
+                            (return-from %f2
+                              (unwind-protect (reduce #'(lambda (b c) x)
+                                                      (list))
+                                a))))))))
+        (%f2 (loop for i below 1 sum (%f2 1)))))
+   :allow-warnings t))
