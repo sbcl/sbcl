@@ -507,17 +507,17 @@
             fp-complex-double-zero-sc-number
             fp-complex-double-immediate-sc-number))
     #+(and sb-simd-pack (not sb-xc-host))
-    ((simd-pack double-float) double-sse-immediate-sc-number)
-    #+(and sb-simd-pack (not sb-xc-host))
-    ((simd-pack single-float) single-sse-immediate-sc-number)
-    #+(and sb-simd-pack (not sb-xc-host))
-    (simd-pack int-sse-immediate-sc-number)
+    (simd-pack
+     (typecase value
+       ((simd-pack double-float) double-sse-immediate-sc-number)
+       ((simd-pack single-float) single-sse-immediate-sc-number)
+       (t int-sse-immediate-sc-number)))
     #+(and sb-simd-pack-256 (not sb-xc-host))
-    ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
-    #+(and sb-simd-pack-256 (not sb-xc-host))
-    ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
-    #+(and sb-simd-pack-256 (not sb-xc-host))
-    (simd-pack-256 int-avx2-immediate-sc-number)))
+    (simd-pack-256
+     (typecase value
+       ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
+       ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
+       (t int-avx2-immediate-sc-number)))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
