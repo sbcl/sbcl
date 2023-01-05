@@ -396,8 +396,13 @@
     (member ,(complex (coerce (random 10) 'single-float)
                       (coerce (- (random 10)) 'single-float))
             (goo)
-            #\thumbs_up_sign)
-    (or stream (member #\thumbs_down_sign :hello))
+            #+sb-unicode
+            #\thumbs_up_sign
+            #-sb-unicode
+            #\a)
+    (or stream (member :hello
+                       #+sb-unicode #\thumbs_down_sign
+                       #-sb-unicode #\B))
     (array t (,(+ 10 (random 10))))))
 
 (defun show-cache-counts ()
