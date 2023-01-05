@@ -460,7 +460,6 @@ NOTE: This interface is experimental and subject to change."
 ;;;   a fixnum with at least (* 2 <hash-bits>) of information in it.
 ;;; :VALUES <n>
 ;;;   the number of return values cached for each function call
-(define-load-time-global *!cache-definitions* nil)
 (define-load-time-global *cache-vector-symbols* nil)
 
 (defun drop-all-hash-caches ()
@@ -557,7 +556,7 @@ NOTE: This interface is experimental and subject to change."
          (cache-type `(simple-vector ,(ash 1 hash-bits))))
     `(progn
        (eval-when (:compile-toplevel :execute)
-         (setf (get ',var-name '!cache-definition)
+         (setf (get ',name '!cache-definition)
                (list ',hash-bits ',hash-function ',args ',values)))
        (pushnew ',var-name *cache-vector-symbols*)
        (define-load-time-global ,var-name nil)
@@ -571,8 +570,9 @@ NOTE: This interface is experimental and subject to change."
 (eval-when (:compile-toplevel :execute) ; leave this out of the core image
 (#+sb-xc-host defmacro #-sb-xc-host sb-xc:defmacro
  with-cache ((fun-name &rest actual-args) &body computation)
-  (let* ((var-name (symbolicate "**" fun-name "-CACHE-VECTOR**"))
-         (cache-params (get var-name '!cache-definition))
+  (let* ((var-name (package-symbolicate (cl:symbol-package fun-name)
+                                        "**" fun-name "-CACHE-VECTOR**"))
+         (cache-params (get fun-name '!cache-definition))
          (statistics-name
           (when *profile-hash-cache*
             (package-symbolicate (sb-int-package) var-name "-STATS")))
