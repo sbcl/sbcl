@@ -3188,6 +3188,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (format t "#define ~A ~A~A /* 0x~X */~%" name value suffix value))))
     (terpri))
 
+  (format t "#define CLASSOID_NAME_WORDINDEX ~d~%" sb-kernel::classoid-name-wordindex)
   ;; backend-page-bytes doesn't really mean much any more.
   ;; It's the granularity at which we can map the core file pages.
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)

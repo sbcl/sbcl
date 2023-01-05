@@ -162,6 +162,13 @@
   ;; we don't just call it the CLASS slot) object for this class, or
   ;; NIL if none assigned yet
   (pcl-class nil))
+;;; For low-level C code if it wants to display a classoid
+(defconstant classoid-name-wordindex
+  (+ 2 #-compact-instance-header 1))  ; <Header, Layout (if needed), %BITS, NAME>
+#-sb-xc-host
+(eval-when (:compile-toplevel)
+  (assert (= (+ sb-vm:instance-slots-offset (get-dsd-index classoid name))
+             classoid-name-wordindex)))
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for

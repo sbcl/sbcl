@@ -859,11 +859,7 @@ struct vector * classoid_name(lispobj * classoid)
   if (forwarding_pointer_p(classoid))
       classoid = native_pointer(forwarding_pointer_value(classoid));
   // Classoids are named by symbols even though a CLASS name is arbitrary (theoretically)
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-  lispobj sym = classoid[2]; // Header, %BITS, NAME
-#else
-  lispobj sym = classoid[3]; // Header, Layout, %BITS, NAME
-#endif
+  lispobj sym = classoid[CLASSOID_NAME_WORDINDEX];
   return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL : symbol_name(SYMBOL(sym));
 }
 struct vector * layout_classoid_name(lispobj * layout)
