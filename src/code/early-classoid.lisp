@@ -111,6 +111,58 @@
 ;;; ID must be an fixnum for either value of n-word-bits.
 (def!type layout-id () '(signed-byte 30))
 
+(declaim (start-block))
+
+;;; The CLASSOID structure is a supertype of all classoid types.  A
+;;; CLASSOID is also a CTYPE structure as recognized by the type
+;;; system.  (FIXME: It's also a type specifier, though this might go
+;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
+;;; longer necessary)
+(defstruct (classoid
+             (:include ctype)
+             (:constructor nil)
+             (:copier nil)
+             (:print-object
+              (lambda (class stream)
+                (let ((name (classoid-name class)))
+                  (print-unreadable-object (class stream
+                                                  :type t
+                                                  :identity (not name))
+                    (format stream
+                            ;; FIXME: Make sure that this prints
+                            ;; reasonably for anonymous classes.
+                            "~:[anonymous~;~:*~S~]~@[ (~(~A~))~]"
+                            name
+                            (classoid-state class))))))
+             #-sb-xc-host (:pure nil))
+  ;; the value to be returned by CLASSOID-NAME.
+  (name nil :type symbol)
+  ;; the current WRAPPER for this class, or NIL if none assigned yet
+  (wrapper nil :type (or null wrapper))
+  ;; How sure are we that this class won't be redefined?
+  ;;   :READ-ONLY = We are committed to not changing the effective
+  ;;                slots or superclasses.
+  ;;   :SEALED    = We can't even add subclasses.
+  ;;   NIL        = Anything could happen.
+  (state nil :type (member nil :read-only :sealed))
+  ;; direct superclasses of this class. Always NIL for CLOS classes.
+  (direct-superclasses () :type list)
+  ;; Definition location
+  ;; Not used for standard-classoid, because pcl has its own mechanism.
+  (source-location nil)
+  ;; representation of all of the subclasses (direct or indirect) of
+  ;; this class. This is NIL if no subclasses or not initalized yet;
+  ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
+  ;; subclass layout that was in effect at the time the subclass was
+  ;; created.
+  ;; Initially an alist, and changed to a hash-table at some threshold.
+  (subclasses nil :type (or list hash-table))
+  (%lock nil) ; install it just-in-time, similar to hash-table-lock
+  ;; the PCL class (= CL:CLASS, but with a view to future flexibility
+  ;; we don't just call it the CLASS slot) object for this class, or
+  ;; NIL if none assigned yet
+  (pcl-class nil))
+
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
 ;;; type checking and garbage collection. Whenever a class is
@@ -257,6 +309,8 @@
   ;; and there are one or more raw words for the GC bitmap.
   )
 (declaim (freeze-type wrapper sb-vm:layout)))
+
+(declaim (end-block))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
@@ -460,56 +514,6 @@
   (declare (type wrapper wrapper))
   (logtest (wrapper-flags wrapper) +pcl-object-layout-flag+))
 
-;;; The CLASSOID structure is a supertype of all classoid types.  A
-;;; CLASSOID is also a CTYPE structure as recognized by the type
-;;; system.  (FIXME: It's also a type specifier, though this might go
-;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
-;;; longer necessary)
-(def!struct (classoid
-             (:include ctype)
-             (:constructor nil)
-             (:copier nil)
-             (:print-object
-              (lambda (class stream)
-                (let ((name (classoid-name class)))
-                  (print-unreadable-object (class stream
-                                                  :type t
-                                                  :identity (not name))
-                    (format stream
-                            ;; FIXME: Make sure that this prints
-                            ;; reasonably for anonymous classes.
-                            "~:[anonymous~;~:*~S~]~@[ (~(~A~))~]"
-                            name
-                            (classoid-state class))))))
-             #-sb-xc-host (:pure nil))
-  ;; the value to be returned by CLASSOID-NAME.
-  (name nil :type symbol)
-  ;; the current WRAPPER for this class, or NIL if none assigned yet
-  (wrapper nil :type (or null wrapper))
-  ;; How sure are we that this class won't be redefined?
-  ;;   :READ-ONLY = We are committed to not changing the effective
-  ;;                slots or superclasses.
-  ;;   :SEALED    = We can't even add subclasses.
-  ;;   NIL        = Anything could happen.
-  (state nil :type (member nil :read-only :sealed))
-  ;; direct superclasses of this class. Always NIL for CLOS classes.
-  (direct-superclasses () :type list)
-  ;; Definition location
-  ;; Not used for standard-classoid, because pcl has its own mechanism.
-  (source-location nil)
-  ;; representation of all of the subclasses (direct or indirect) of
-  ;; this class. This is NIL if no subclasses or not initalized yet;
-  ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
-  ;; subclass layout that was in effect at the time the subclass was
-  ;; created.
-  ;; Initially an alist, and changed to a hash-table at some threshold.
-  (subclasses nil :type (or list hash-table))
-  (%lock nil) ; install it just-in-time, similar to hash-table-lock
-  ;; the PCL class (= CL:CLASS, but with a view to future flexibility
-  ;; we don't just call it the CLASS slot) object for this class, or
-  ;; NIL if none assigned yet
-  (pcl-class nil))
-
 (defun wrapper-classoid-name (x)
   (classoid-name (wrapper-classoid x)))
 
@@ -517,7 +521,7 @@
 
 ;;; An UNDEFINED-CLASSOID is a cookie we make up to stick in forward
 ;;; referenced layouts. Users should never see them.
-(def!struct (undefined-classoid
+(defstruct (undefined-classoid
              (:include classoid)
              (:constructor !alloc-undefined-classoid (%bits name))
              (:copier nil)))
@@ -532,7 +536,7 @@
 ;;; This translation is done when type specifiers are parsed. Type
 ;;; system operations (union, subtypep, etc.) should never encounter
 ;;; translated classes, only their translation.
-(def!struct (built-in-classoid (:include classoid) (:copier nil)
+(defstruct (built-in-classoid (:include classoid) (:copier nil)
                                     (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
   ;; stands on its own. Only :INITIALIZING for a period during cold
@@ -540,7 +544,7 @@
   (translation nil :type (or null ctype (member :initializing)))
   (predicate (missing-arg) :type (sfunction (t) boolean) :read-only t))
 
-(def!struct (condition-classoid (:include classoid)
+(defstruct (condition-classoid (:include classoid)
                                 (:constructor !alloc-condition-classoid (%bits name))
                                 (:copier nil))
   ;; list of CONDITION-SLOT structures for the direct slots of this
@@ -570,7 +574,7 @@
 ;;; STRUCTURE-CLASSOID represents what we need to know about structure
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
-(def!struct (structure-classoid
+(defstruct (structure-classoid
              (:include classoid)
              (:constructor !alloc-structure-classoid (%bits name))
              (:copier nil)))
@@ -579,7 +583,7 @@
 
 ;;; We use an indirection to allow forward referencing of class
 ;;; definitions with load-time resolution.
-(def!struct (classoid-cell
+(defstruct (classoid-cell
              (:copier nil)
              (:constructor make-classoid-cell (name &optional classoid))
              (:print-object (lambda (s stream)
@@ -603,16 +607,32 @@
 ;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
 ;;; side does not need to distinguish between STANDARD-CLASS and
 ;;; FUNCALLABLE-STANDARD-CLASS.
-(def!struct (standard-classoid
+(defstruct (standard-classoid
              (:include classoid)
              (:constructor !alloc-standard-classoid (%bits name pcl-class))
              (:copier nil))
   old-layouts)
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
-(def!struct (static-classoid (:include classoid)
+(defstruct (static-classoid (:include classoid)
                              (:constructor !alloc-static-classoid (%bits name))
                              (:copier nil)))
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
+
+;;; Return the name of the global hashset that OBJ (a CTYPE instance)
+;;; would be stored in, if it were stored in one.
+;;; This is only for bootstrap, and not 100% precise as it does not know
+;;; about the other MEMBER type containers.
+(defun ctype->hashset-sym (obj)
+  (macrolet ((generate  ()
+               (collect ((clauses))
+                 (dolist (type-class *type-class-list*
+                                     `(etypecase obj ,@(clauses)))
+                   (dolist (instance-type (cdr type-class))
+                     (clauses
+                      (list instance-type
+                            (unless (member instance-type '(classoid named-type))
+                              `',(symbolicate "*" instance-type "-HASHSET*")))))))))
+    (generate)))

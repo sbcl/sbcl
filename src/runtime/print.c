@@ -845,7 +845,6 @@ void brief_print(lispobj obj)
 // hence all the forwarding checks.
 
 #include "forwarding-ptr.h"
-#include "genesis/classoid.h"
 struct vector * symbol_name(struct symbol* sym)
 {
   if (forwarding_pointer_p((lispobj*)sym))
@@ -860,7 +859,11 @@ struct vector * classoid_name(lispobj * classoid)
   if (forwarding_pointer_p(classoid))
       classoid = native_pointer(forwarding_pointer_value(classoid));
   // Classoids are named by symbols even though a CLASS name is arbitrary (theoretically)
-  lispobj sym = ((struct classoid*)classoid)->name;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+  lispobj sym = classoid[2]; // Header, %BITS, NAME
+#else
+  lispobj sym = classoid[3]; // Header, Layout, %BITS, NAME
+#endif
   return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL : symbol_name(SYMBOL(sym));
 }
 struct vector * layout_classoid_name(lispobj * layout)

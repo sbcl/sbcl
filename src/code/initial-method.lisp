@@ -17,11 +17,6 @@
 ;;; precedence order on method invocation.
 (defvar *!initial-methods* '())
 
-;;; Deferred methods (which include initial methods) are installed
-;;; later by the full CLOS implementation. These can have any number
-;;; of specialized arguments or qualifiers.
-(defvar *!deferred-methods* '())
-
 (defun !early-load-method (class name quals specls ll lambda source-loc)
   (declare (ignore class))
   (push (list quals specls lambda ll source-loc)

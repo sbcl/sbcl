@@ -84,3 +84,9 @@
            `((defmethod make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr))))))
+
+;;; Deferred methods (which include initial methods) are installed
+;;; later by the full CLOS implementation. These can have any number
+;;; of specialized arguments or qualifiers.
+(defvar sb-pcl::*!deferred-methods* '())
+

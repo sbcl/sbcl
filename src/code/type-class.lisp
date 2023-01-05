@@ -267,7 +267,7 @@
 (defconstant +ctype-flag-mask+ #b11)
 (defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
 
-(def!struct (ctype (:conc-name type-)
+(defstruct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:copier nil)
                    (:pure t))
@@ -1240,22 +1240,6 @@
         (t nil)))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
-
-;;; Return the name of the global hashset that OBJ (a CTYPE instance)
-;;; would be stored in, if it were stored in one.
-;;; This is only for bootstrap, and not 100% precise as it does not know
-;;; about the other MEMBER type containers.
-(defun ctype->hashset-sym (obj)
-  (macrolet ((generate  ()
-               (collect ((clauses))
-                 (dolist (type-class *type-class-list*
-                                     `(etypecase obj ,@(clauses)))
-                   (dolist (instance-type (cdr type-class))
-                     (clauses
-                      (list instance-type
-                            (unless (member instance-type '(classoid named-type))
-                              `',(symbolicate "*" instance-type "-HASHSET*")))))))))
-    (generate)))
 
 (defglobal *alien-type-hashsets* nil)
 (export 'show-ctype-ctor-cache-metrics)

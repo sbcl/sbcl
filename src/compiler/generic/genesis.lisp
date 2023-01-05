@@ -1426,6 +1426,19 @@ core and return a descriptor to it."
                      :precision (sb-kernel::numtype-aspects-precision val))
         cold-obj)))
 
+(defvar *dsd-index-cache* nil)
+(defun dsd-index-cached (type-name slot-name)
+  (let ((cell (find-if (lambda (x)
+                         (and (eq (caar x) type-name) (eq (cdar x) slot-name)))
+                       *dsd-index-cache*)))
+    (if cell
+        (cdr cell)
+        (let* ((dd-slots (car (get type-name 'dd-proxy)))
+               (dsd (find slot-name dd-slots :key #'dsd-name))
+               (index (dsd-index dsd)))
+          (push (cons (cons type-name slot-name) index) *dsd-index-cache*)
+          index))))
+
 (defun ctype-to-core (obj)
   (declare (type (or ctype xset list) obj))
   (cond
@@ -1448,13 +1461,13 @@ core and return a descriptor to it."
                (classoid
                 (let ((slots-to-omit
                        `(;; :predicate will be patched in during cold init.
-                         (,(get-dsd-index built-in-classoid sb-kernel::predicate) .
+                         (,(dsd-index-cached 'built-in-classoid 'sb-kernel::predicate) .
                           ,(make-random-descriptor sb-vm:unbound-marker-widetag))
-                         (,(get-dsd-index classoid sb-kernel::subclasses) . nil)
+                         (,(dsd-index-cached 'classoid 'sb-kernel::subclasses) . nil)
                          ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
                          ;; we nonetheless must set LAYOUT to NIL or else warm build fails
                          ;; in the twisty maze of class initializations.
-                         (,(get-dsd-index classoid wrapper) . nil))))
+                         (,(dsd-index-cached 'classoid 'wrapper) . nil))))
                   (if (typep obj 'built-in-classoid)
                       slots-to-omit
                       ;; :predicate is not a slot. Don't mess up the object
@@ -1537,7 +1550,6 @@ core and return a descriptor to it."
                  (set-instance-layout instance (->layout wrapper-layout))
                  (set-instance-layout (->layout instance) (->layout layout-layout)))))
       (chill-layout 'function t-layout)
-      (chill-layout 'sb-kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
@@ -4174,7 +4186,7 @@ III. initially undefined function references (alphabetically):
           (write-structure-object (wrapper-info (find-layout 'sb-impl::general-hash-table))
                                   stream "hash_table"))
         (dolist (class '(defstruct-description defstruct-slot-description
-                         classoid package
+                         package
                          sb-vm::arena sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
