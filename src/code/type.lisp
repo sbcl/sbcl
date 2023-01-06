@@ -1149,23 +1149,20 @@
                (loop for class in '(character-set classoid member named
                                     #+sb-simd-pack simd-pack
                                     #+sb-simd-pack-256 simd-pack-256)
-                     sum (ash 1 (type-class-name->id class)))))
+                     sum (ash 1 (type-class-name->id class))))
+             (quick-fail-complex-= ()
+               ;; Fail if neither arg is in a class that defines a COMPLEX-= method
+               (let ((mask (loop for class in classes-having-complex-=-method
+                                 sum (ash 1 (type-class-name->id class)))))
+                 `(not (logtest (logior (ash 1 id1) (ash 1 id2)) ,mask)))))
     (if (eq type1 type2)
         (values t t)
         (let ((id1 (type-class-id type1))
               (id2 (type-class-id type2)))
           (cond ((/= id1 id2)
-                 ;; Different type-classes - it may be worth creating a 2D bit-array
-                 ;; such that if (sbit id1 id2) is 0 then the two instances
-                 ;; can not possibly be TYPE= like the quick-fail-simple-=-mask.
-                 ;; Trying to exploit commutative nature in a naive way fails!
-                 ;; We'd have to be a little trickier by always entering into the cache
-                 ;; in a canonical order, but calling the method with args as given,
-                 ;; but allow lookup with swapped args.
-                 #+nil ; (we care which class's operation is invoked)
-                 (when (< (type-hash-value type2) (type-hash-value type1))
-                   (rotatef type1 type2))
-                 (memoize (invoke-type-method :none :complex-= type1 type2)))
+                 (if (quick-fail-complex-=)
+                     (values nil t)
+                     (memoize (invoke-type-method :none :complex-= type1 type2))))
                 ((logbitp id1 (quick-fail-simple-=-mask))
                  (values nil t))
                 ((= id1 #.(type-class-name->id 'number)) ; do not cache

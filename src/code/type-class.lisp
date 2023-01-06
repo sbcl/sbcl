@@ -397,8 +397,23 @@
       (warn "Undefined type-class method ~S" name))
     (package-symbolicate "SB-KERNEL" "TYPE-CLASS-" name)))
 
+;;; Sure we could infer this list by seeing what gets defined,
+;;; but doing that would introduce a requirement that TYPE= be defined
+;;; only after all the methods are.
+;;; No need to make this more complicated.
+(defglobal classes-having-complex-=-method
+  '(named intersection union negation member hairy))
+(eval-when (#-sb-xc-host :compile-toplevel)
+  (dolist (name classes-having-complex-=-method)
+    ;; Assert that NAME is valid and defines a COMPLEX-= method
+    (assert (functionp (type-class-complex-= (!type-class-or-lose name))))))
+
 (defmacro define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
+  (when (and (eq method :complex-=)
+             (not (member class classes-having-complex-=-method)))
+    (error "Didn't expect to see a ~S method for type-class ~S"
+           method class))
   (let* ((name (symbolicate class "-" method "-TYPE-METHOD"))
          (arg-type
           (case class
@@ -523,6 +538,10 @@
 ;;; then swap the arguments when calling TYPE1's method. If no
 ;;; applicable method, return DEFAULT.
 (defmacro invoke-type-method (simple complex-arg2 type1 type2 &key
+                                      ;; This default is counterintuitive.
+                                      ;; You'd think the most general default
+                                      ;; would be "don't know" (i.e. NIL NIL)
+                                      ;; instead of "Certainly no"
                                       (default '(values nil t))
                                         ; assume complex fn is symmetric
                                         ; unless told otherwise.
