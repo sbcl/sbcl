@@ -16,14 +16,14 @@
 ;;; to CALL-WITH-FOO less ugly.
 (defmacro dx-flet (functions &body forms)
   `(flet ,functions
-     (declare (truly-dynamic-extent ,@(mapcar (lambda (func) `#',(car func))
-                                              functions)))
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
+               ,@(mapcar (lambda (func) `#',(car func)) functions)))
      ,@forms))
 
 ;;; Another similar one.
 (defmacro dx-let (bindings &body forms)
   `(let ,bindings
-     (declare (truly-dynamic-extent
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
                ,@(mapcar (lambda (bind) (if (listp bind) (car bind) bind))
                          bindings)))
      ,@forms))
