@@ -677,7 +677,9 @@
   (:translate floating-point-modes)
   (:policy :fast-safe)
   (:generator 3
-    (inst mrs res :fpsr)))
+    (inst mrs res :fpsr)
+    (inst mrs tmp-tn :fpcr)
+    (inst orr res res tmp-tn)))
 
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :target res))
@@ -688,6 +690,7 @@
   (:policy :fast-safe)
   (:generator 3
     (inst msr :fpsr new)
+    (inst msr :fpcr new)
     (move res new)))
 
 ;;;; Complex float VOPs

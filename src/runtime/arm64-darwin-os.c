@@ -98,3 +98,34 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
         = (os_vm_address_t)(((uintptr_t) address) + length);
     __clear_cache(address, end_address);
 }
+
+void
+sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
+    int esr;
+    if (siginfo->si_code == ILL_ILLTRP &&
+        ((esr = context->uc_mcontext->__es.__esr)>>26 & 0x3f) == 0x2C) {
+        int code = 0;
+        if (esr & 1 << 4) {
+            code = FPE_FLTRES;
+        }
+        else if (esr & 1 << 3) {
+            code = FPE_FLTUND;
+        } else if (esr & 1 << 2) {
+            code = FPE_FLTOVF;
+        } else if (esr & 1 << 1) {
+            code = FPE_FLTDIV;
+        } else if (esr & 1) {
+            code = FPE_FLTINV;
+        }
+/*        if (esr & 1 << 7) {
+          Input Denormal Floating-point exception trapped bit.
+          No FPE_ constant for it.
+        }
+*/
+        siginfo->si_code = code;
+        return interrupt_handle_now(SIGFPE, siginfo, context);
+    }
+
+    fake_foreign_function_call(context);
+    lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
+}

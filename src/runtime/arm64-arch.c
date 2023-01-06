@@ -128,11 +128,16 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
     handle_trap(context, code);
 }
+
+void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
+
+#ifndef LISP_FEATURE_DARWIN
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
     lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
 }
+#endif
 
 void arch_install_interrupt_handlers()
 {
