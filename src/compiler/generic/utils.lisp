@@ -308,8 +308,9 @@
         (return-from stack-consed-p nil))
       (when (eq (vop-name vop) 'allocate-vector-on-stack)
         (return-from stack-consed-p t))
-      (when (and (eq (vop-name vop) 'fixed-alloc)
-                 (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+      (when (or (and (eq (vop-name vop) 'fixed-alloc) ; do we still need this case?
+                     (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+                (eq (vop-name vop) 'sb-c::fixed-alloc-to-stack))
         (return-from stack-consed-p t))
       ;; Should we try to detect a stack-consed LIST also?
       ;; I don't think that will work.

@@ -1193,9 +1193,8 @@
     (split-string (get-output-stream-string string-stream)
                   #\newline)))
 
-(defun assert-has-gc-barrier (match-string lines &optional (skip 0))
-
-  (let (found)
+(defun has-gc-barrier (match-string lines &optional (skip 0))
+  (let (found-sentinel found-barrier-fixup)
 ;; Look for something like this in the trace output:
 ;; "VOP CLOSURE-INIT t9[RBX(d)] :NORMAL t13[RSI(d)] :NORMAL {0} "
 ;; "        MOV     0, #<TN t14[RAX(u)] :NORMAL>, #<TN t9[RBX(d)] :NORMAL>"
@@ -1207,13 +1206,14 @@
           do
           (when (and (search match-string (car lines))
                      (minusp (decf skip)))
-            (setq found t)
+            (setq found-sentinel t)
             (let ((barrier-fixup-line (nth 3 lines)))
-              (assert (search ":FLAVOR GC-BARRIER" barrier-fixup-line))
+              (setq found-barrier-fixup (search ":FLAVOR GC-BARRIER" barrier-fixup-line))
               (return)))
           (pop lines))
-    ;; Fail if we didn't find the sentinel CLOSURE-INIT
-    (assert found)))
+    (and found-sentinel found-barrier-fixup)))
+(defun assert-has-gc-barrier (&rest args)
+  (assert (apply #'has-gc-barrier args)))
 
 (with-test (:name :closure-init-gc-barrier)
   (let ((lines
@@ -1302,3 +1302,36 @@
                (lambda (x)
                  (setf (car c) x)))))))
     (assert-has-gc-barrier "SET-SLOT" lines)))
+
+(defstruct (wordpair (:predicate nil) (:copier nil)) a b)
+(defun func (x) (wordpair-b x))
+(with-test (:name :non-stack-instance-set)
+  (let ((lines
+         (compiler-trace-output-lines
+          '(lambda ()
+            (declare (inline make-wordpair))
+            (let ((pair (make-wordpair :a 'foo)))
+              (setf (wordpair-b pair) "hi")
+              (values (func pair)))))))
+    (assert-has-gc-barrier "INSTANCE-INDEX-SET" lines)))
+
+(with-test (:name :stack-instance-set)
+  (let ((lines
+         (compiler-trace-output-lines
+          '(lambda ()
+            (declare (inline make-wordpair))
+            (let ((pair (make-wordpair :a 'foo)))
+              (declare (dynamic-extent pair))
+              (setf (wordpair-b pair) "hi")
+              (values (func pair)))))))
+    (assert (not (has-gc-barrier "INSTANCE-INDEX-SET" lines)))))
+
+(declaim (freeze-type wordpair))
+(with-test (:name :stack-instance-copy)
+  (let ((lines
+         (compiler-trace-output-lines
+          '(lambda (x)
+            (let ((copy (copy-structure (truly-the wordpair x))))
+              (declare (dynamic-extent copy))
+              (values (func copy)))))))
+    (assert (not (has-gc-barrier "INSTANCE-INDEX-SET" lines)))))
