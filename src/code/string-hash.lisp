@@ -175,14 +175,21 @@
   (logxor k (ash k -33)))
 (defmacro murmur3-fmix-word (x) `(murmur3-fmix64 ,x)))
 
-(defun murmur-fmix-word (x) ; FIXME: this is not a very distinctive name
-  (murmur3-fmix-word (truly-the sb-vm:word x)))
-(export 'murmur-fmix-word) ; for unit testing vs C code
+;;; You probably don't want to use this function because it (almost surely)
+;;; has to cons the result. Better to use the /FIXNUM functions below. 
+(defun murmur-fmix-word-for-unit-test (x)
+  (murmur3-fmix-word (the sb-vm:word x)))
+(export 'murmur-fmix-word-for-unit-test) ; protect from tree-shaker
 
-;;; The "good" hash function on sb-vm:word returns a fixnum, does not cons,
+;;; This hash function on sb-vm:word returns a fixnum, does not cons,
 ;;; and has better avalanche behavior then SXHASH - changing any one input bit
 ;;; should affect each bit of output with equal chance.
-(defun good-hash-word->fixnum (x)
+#-sb-xc-host
+(defun murmur-hash-word/fixnum (x) ; result may be positive or negative
+  (%make-lisp-obj (logandc2 (murmur3-fmix-word (truly-the sb-vm:word x))
+                            sb-vm:fixnum-tag-mask)))
+;;; Similar, but the sign bit is always 0
+(defun murmur-hash-word/+fixnum (x)
   (logand (murmur3-fmix-word (truly-the sb-vm:word x)) most-positive-fixnum))
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs

@@ -467,7 +467,7 @@
                  (when #-64-bit t #+64-bit (not (eq hasher 'sxhash))
                    (assert (>= (length (remove-duplicates field)) 8))))))))
     (try 'sxhash)
-    (try 'sb-int:good-hash-word->fixnum)))
+    (try 'sb-int:murmur-hash-word/fixnum)))
 
 ;;; Ensure that all layout-clos-hash values have a 1 somewhere
 ;;; such that LOGANDing any number of nonzero hashes is nonzero.
@@ -497,7 +497,7 @@
     (loop repeat (the fixnum n-iter)
           do
        (let* ((n (random limit random-state))
-              (lisp-hash (sb-impl::murmur-fmix-word n))
+              (lisp-hash (sb-impl:murmur-fmix-word-for-unit-test n))
               (c-hash (c-murmur-fmix n)))
          (assert (= lisp-hash c-hash))))))
 (compile 'murmur-compare)

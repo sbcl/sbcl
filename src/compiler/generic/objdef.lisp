@@ -595,7 +595,7 @@ during backtrace.
   (et-find-freeish-page)
   (et-bzeroing)
   (obj-size-histo :c-type "size_histogram"
-                  :length #.(+ histogram-small-bins sb-vm:n-word-bits))
+                  :length #.(+ histogram-small-bins n-word-bits))
 
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
@@ -668,7 +668,7 @@ during backtrace.
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
-#+sb-xc-host (defun get-nil-taggedptr () sb-vm:nil-value)
+#+sb-xc-host (defun get-nil-taggedptr () nil-value)
 
 ;;; Start of static objects:
 ;;;
@@ -713,7 +713,7 @@ during backtrace.
 ;;; This constant is the number of words to report that NIL consumes
 ;;; when Lisp asks for its primitive-object-size. So we say that it consumes
 ;;; all words from the start of static-space objects up to the next object.
-(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
+(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- symbol-size) 2)))
 
 ;;; Address at which to start scanning static symbols when heap-walking.
 ;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.

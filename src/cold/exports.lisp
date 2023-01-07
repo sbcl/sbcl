@@ -3037,7 +3037,8 @@ possibly temporarily, because it might be used internally.")
             ;; hash mixing operations
 
            "MIX" "MIXF" "WORD-MIX"
-           "GOOD-HASH-WORD->FIXNUM"
+           "MURMUR-HASH-WORD/FIXNUM"
+           "MURMUR-HASH-WORD/+FIXNUM"
 
             ;; Macroexpansion that doesn't touch special forms
 

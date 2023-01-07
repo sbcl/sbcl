@@ -338,12 +338,12 @@
   (defun so-find/fixnum (table key)
     (declare (split-ordered-list table))
     (declare (fixnum key))
-    (guts (good-hash-word->fixnum key) %so-search/fixnum =))
+    (guts (murmur-hash-word/fixnum key) %so-search/fixnum =))
 #+nil
   (defun so-find/addr (table key)
     (declare (split-ordered-list table))
     (declare (fixnum key))
-    (guts (good-hash-word->fixnum (get-lisp-obj-address key)) %so-search/addr eq))
+    (guts (murmur-hash-word/fixnum (get-lisp-obj-address key)) %so-search/addr eq))
   (defun so-find/string (table key)
     (declare (split-ordered-list table))
     (declare (string key))
@@ -370,7 +370,7 @@
       so-list)))
 
 (flet ((make (valuesp)
-         (%make-so-list #'good-hash-word->fixnum
+         (%make-so-list #'murmur-hash-word/fixnum
                         #'%so-insert/fixnum
                         #'%so-delete/fixnum
                         #'so-find/fixnum

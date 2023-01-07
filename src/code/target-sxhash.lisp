@@ -107,7 +107,8 @@
        ;; There is not more entropy imparted by doing a mix step on a value that had
        ;; at most 32 bits of randomness, but this makes more of the bits vary.
        ;; Some uses of the hash might expect the high bits to have randomness in them.
-       (logand (murmur-fmix-word hash) most-positive-fixnum)))
+       ;; This returns a positive fixnum to conform with the requirement on SXHASH.
+       (murmur-hash-word/+fixnum hash)))
    #-compact-instance-header
    (sb-pcl::standard-funcallable-instance-hash-code
     (truly-the sb-pcl::standard-funcallable-instance fin))))

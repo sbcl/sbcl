@@ -81,7 +81,7 @@
            ;; don't know how good our hash is, so use all N-FIXNUM-BITS of it
            ;; as input to murmur-hash, which should definitely affect all bits,
            ;; and then take 32 bits of that result.
-           (ldb (byte 32 0) (sb-impl:murmur-fmix-word hash))))
+           (ldb (byte 32 0) (sb-impl::murmur3-fmix-word hash))))
       (sb-sys:with-pinned-objects (fin)
         (setf (sb-vm::compact-fsc-instance-hash fin) 32-bit-hash)))
     (setf (%funcallable-instance-fun fin)
