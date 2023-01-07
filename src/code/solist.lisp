@@ -39,7 +39,7 @@
           make-so-map/string
           so-insert
           so-delete
-          so-find/string))
+          so-find))
 
 ;; For testing, uses 8 bit from the key's hash plus the wired bit,
 ;; because 8 is easy to understand.
@@ -51,6 +51,7 @@
 (defstruct (split-ordered-list
             (:include linked-list)
             (:conc-name so-)
+            (:copier nil)
             (:constructor %%make-split-ordered-list
              (head hashfun inserter deleter finder
               inequality equality valuesp)))
@@ -71,6 +72,7 @@
 ;;; than that of an ordinary node.
 (defstruct (so-node (:conc-name nil)
                     (:include list-node)
+                    (:copier nil)
                     (:constructor %make-so-dummy-node (node-hash)))
   (node-hash 0 :type fixnum :read-only t))
 ;;; An ordinary node has a key and hash. Keys are unique but hashes can be nonunique,
@@ -80,11 +82,13 @@
 (defstruct (so-key-node
             (:conc-name nil)
             (:include so-node)
+            (:copier nil)
             (:constructor %make-so-set-node (node-hash so-key)))
   (so-key (missing-arg) :read-only t))
 (defstruct (so-data-node
             (:conc-name nil)
             (:include so-key-node)
+            (:copier nil)
             (:constructor %make-so-map-node (node-hash so-key so-data)))
   (so-data nil))
 (defmethod print-object ((self so-key-node) stream)
@@ -121,11 +125,11 @@
                   (cond ((< x hash) t)
                         ((= x hash)
                          (< (|the| fixnum (so-key (|the| so-key-node this))) key))))))
-    (lfl-search-macro compare t)))
+    (lfl-search-macro compare fixnum)))
 
 (defun %so-search/addr (head hash key)
-  ;; KEY is a fixnum representing an aligned machine address in the usual way
-  (declare (list-node head) (fixnum hash) (string key))
+  ;; KEY is any object, which either has to be immobile, or else GC has to repair the table.
+  (declare (list-node head) (fixnum hash))
   (macrolet ((cast-to-word (x) `(get-lisp-obj-address ,x))
              (compare (x y)
                (declare (ignore x y))
@@ -144,7 +148,7 @@
                   (cond ((< x hash) t)
                         ((= x hash)
                          (string< (so-key (|the| so-key-node this)) key))))))
-    (lfl-search-macro compare t)))
+    (lfl-search-macro compare string)))
 
 ;;; Ensure existence of dummy node having HASH.
 (defun %so-insert/dummy (start hash &aux (new 0))
@@ -209,9 +213,7 @@
  (defun %so-insert/fixnum (start hash key &optional (data nil datap))
    (declare (fixnum key))
    (guts fixnum %so-search/fixnum =))
- #+nil
  (defun %so-insert/addr (start hash key &optional (data nil datap))
-   (declare (fixnum key))
    (guts t %so-search/addr eq))
  (defun %so-insert/string (start hash key &optional (data nil datap))
    (declare (string key))
@@ -239,9 +241,12 @@
         (if (so-valuesp table)
             (funcall (so-inserter table) start-node (logior hash 1) key value)
             (funcall (so-inserter table) start-node (logior hash 1) key))
-      (when foundp ; must not find a dummy node
-        (aver (typep node 'so-key-node)))
-      (cond ((not foundp)
+      (cond (foundp ; must not find a dummy node
+             ;; Note that in this case we do not update SO-DATA. The client of the table
+             ;; should use the secondary value to notice that the node existed,
+             ;; and pick an appropriate way to atomically update the node.
+             (aver (typep node 'so-key-node)))
+            (t
              (let* ((n-bins (length bins))
                     ;; The more bins there are, the more dummy nodes.
                     ;; Dummy nodes constitute extra space overhead.
@@ -255,26 +260,24 @@
                    (dotimes (i n-bins)
                      (setf (aref new-bins (* i 2)) (aref bins i)))
                    ;; It makes no difference whether this CAS succeeds or fails!
-                   (cas (so-bins table) bins+shift (cons new-bins (1- shift)))))))
-            ((so-valuesp table)
-             (setf (so-data node) value)))
-      node)))
+                   (cas (so-bins table) bins+shift (cons new-bins (1- shift))))))))
+      (values node foundp))))
 
 ;; This is like LFL-DELETE-MACRO but passes both a hash and a key
-;; to the search function. The hash is the primary key the usual LFL search,
+;; to the search function. The hash is the primary key of the usual LFL search,
 ;; but the user's "actual" key breaks ties when hashes collide.
 (defmacro so-delete-macro (search compare= type)
   `(loop
     ;; Step 1: find
     (multiple-value-bind (this predecessor)
-        (,search ,@(if (eq type 't) '(list)) head hash key)
+        (,search ,@(if (eq type '*) '(list)) head hash key)
       ;(format t "~&Deletion point: ~S and ~S (~D)~%" predecessor this (dummy-node-p this))
       (when (or (endp this)
                 (dummy-node-p this)
                 (not (,compare= key (|the| ,type (so-key this)))))
         (return nil))
       (let ((succ (%node-next this)))
-        ;; If THIS is already marked for deletion (it successor pointer is a fixnum),
+        ;; If THIS is already marked for deletion (its successor pointer is a fixnum),
         ;; then we have to search again, which should finish the physical delete
         ;; using the correct object pinning strategy. i.e. we can't just OR in
         ;; some tag bits now and assume that the resulting bit pattern is
@@ -293,13 +296,13 @@
               ;; Step 3: physically delete by swinging the predecessor's successor
               (unless (eq succ (cas (%node-next predecessor) this succ))
                 ;; Call SEARCH again which will perform physical deletion.
-                (,search ,@(if (eq type 't) '(list)) head hash key))
+                (,search ,@(if (eq type '*) '(list)) head hash key))
               (return t)))))))) ; T = successful removal of KEY
 
 (defun %so-delete/fixnum (head hash key)
   (so-delete-macro %so-search/fixnum = fixnum))
 (defun %so-delete/addr (head hash key)
-  (so-delete-macro %so-search/addr eq fixnum))
+  (so-delete-macro %so-search/addr eq t))
 (defun %so-delete/string (head hash key)
   (so-delete-macro %so-search/string string= string))
 
@@ -339,35 +342,41 @@
     (declare (split-ordered-list table))
     (declare (fixnum key))
     (guts (murmur-hash-word/fixnum key) %so-search/fixnum =))
-#+nil
   (defun so-find/addr (table key)
     (declare (split-ordered-list table))
-    (declare (fixnum key))
-    (guts (murmur-hash-word/fixnum (get-lisp-obj-address key)) %so-search/addr eq))
+    (guts (funcall (so-hashfun table) key) %so-search/addr eq))
   (defun so-find/string (table key)
     (declare (split-ordered-list table))
     (declare (string key))
     (guts (sxhash key) %so-search/string string=)))
 
-(defun unimplemented (&rest args)
-  (declare (ignore args))
-  (bug "unimplemented"))
+(defun so-find (table key)
+  (funcall (so-finder table) table key)) ; returns a NODE or NIL
 
 (defun nofun (&rest args)
   (declare (ignore args))
   (bug "don't call me"))
 
 (defun %make-so-list (&rest args)
-  (let ((head (%make-sentinel-node))
-        (initial-bin (make-so-dummy-node 0)))
-    (setf (%node-next head) initial-bin
-          (%node-next initial-bin) *tail-atom*)
-    (let ((so-list (apply #'%%make-split-ordered-list head args)))
+  (let ((initial-bin (make-so-dummy-node 0)))
+    (setf (%node-next initial-bin) *tail-atom*)
+    (let ((so-list (apply #'%%make-split-ordered-list initial-bin args)))
       ;; Start with 2 bins, only the first being initialized.
       ;; Shift out all bits except 1 for the bin number.
       (setf (so-bins so-list) (cons (vector initial-bin (make-unbound-marker))
                                     (- +hash-nbits+ 1)))
       so-list)))
+
+(defun map-solist (function solist)
+  (let ((node (%node-next (so-head solist))))
+    (loop
+     (when (endp node) (return))
+     (if (evenp (node-hash node)) ; dummy node, no KEY, and can't be deleted
+         (setq node (%node-next node))
+         (multiple-value-bind (next bits) (get-next node)
+           (unless (ptr-markedp bits)
+             (funcall function node))
+           (setq node next))))))
 
 (flet ((make (valuesp)
          (%make-so-list #'murmur-hash-word/fixnum
@@ -386,3 +395,12 @@
                         #'nofun #'nofun valuesp)))
   (defun make-so-set/string () (make nil))
   (defun make-so-map/string () (make t)))
+
+(flet ((make (valuesp)
+         (%make-so-list (lambda (x)
+                          (logand (sb-impl::murmur3-fmix-word (get-lisp-obj-address x))
+                                  most-positive-fixnum))
+                        #'%so-insert/addr #'%so-delete/addr #'so-find/addr
+                        #'nofun #'nofun valuesp)))
+  (defun make-so-set/addr () (make nil))
+  (defun make-so-map/addr () (make t)))

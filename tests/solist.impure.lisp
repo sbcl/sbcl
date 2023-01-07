@@ -2,54 +2,69 @@
 (in-package sb-lockless)
 
 ;;; Show all nodes including dummies.
-;;; There are actually two dummy head nodes: the LFL itself has a dummy node,
-;;; and every bin including the 0th has a dummy node with a hash.
 (defun show-list (solist)
   (let ((node (so-head solist)))
     (loop (format t "~s~%" node)
           (when (endp node) (return))
           (setq node (%node-next node)))))
 
+(defun show-bin (solist i)
+  (let ((node (aref (car (so-bins solist)) i))
+        (bin-nbits (- +hash-nbits+ (cdr (so-bins solist))))
+        (count 0))
+    (flet ((bit-string (hash)
+             (let ((s (format nil " ~v,'0b" +hash-nbits+ hash)))
+               (replace s s :end1 bin-nbits :start2 1)
+               (setf (char s bin-nbits) #\.)
+               s)))
+      (cond
+        ((unbound-marker-p node)
+         (values 0 0))
+        (t
+         (let ((node node))
+           (loop (let ((next (get-next node)))
+                   (when (or (endp next) (evenp (node-hash next)))
+                     (return))
+                   (incf count)
+                   (setq node next))))
+         (format t " ~5d [~2d] = ~a" i count (bit-string (node-hash node)))
+         (loop (let ((next (get-next node)))
+                 (when (or (endp next) (evenp (node-hash next)))
+                   (return))
+                 (setq node next)
+                 (if (= count 1)
+                     (format t " ~a=~s"
+                             (bit-string (node-hash node)) (so-key node))
+                     (format t "~%              ~a=~s"
+                             (bit-string (node-hash node)) (so-key node)))))
+         (terpri)
+         (values 1 count))))))
+
 (defun show-bins (solist)
   (let ((bins (car (so-bins solist)))
         (bin-nbits (- +hash-nbits+ (cdr (so-bins solist))))
         (n-occupied-bins 0)
-        (sum-chainlengths 0))
+        (sum-chainlengths 0)
+        (max-chainlength 0))
     (aver (= (length bins) (ash 1 bin-nbits)))
     (format t "Bins (~d total, ~d leading bits):~%"
             (length bins) bin-nbits)
     (dotimes (i (length bins))
-      (let ((node (aref bins i))
-            (count 0))
-        (unless (unbound-marker-p node)
-          (let ((node node))
-            (loop (let ((next (get-next node)))
-                    (when (or (endp next) (evenp (node-hash next)))
-                      (return))
-                    (incf count)
-                    (setq node next))))
-          (flet ((bit-string (hash)
-                   (let ((s (format nil " ~v,'0b" +hash-nbits+ hash)))
-                     (replace s s :end1 bin-nbits :start2 1)
-                     (setf (char s bin-nbits) #\.)
-                     s)))
-            (when (plusp count)
-              (incf n-occupied-bins)
-              (incf sum-chainlengths count))
-            (format t " ~5d [~2d] = ~a" i count (bit-string (node-hash node)))
-            (loop (let ((next (get-next node)))
-                    (when (or (endp next) (evenp (node-hash next)))
-                      (return))
-                    (setq node next)
-                    (if (= count 1)
-                        (format t " ~a=~s"
-                                (bit-string (node-hash node)) (so-key node))
-                        (format t "~%              ~a=~s"
-                                (bit-string (node-hash node)) (so-key node)))))
-            (terpri)))))
-    (format t "~&Total ~D items, avg ~F items/bin~%"
-            (so-count solist)
-            (/ sum-chainlengths n-occupied-bins))))
+      (multiple-value-bind (occupied count) (show-bin solist i)
+        (incf n-occupied-bins occupied)
+        (incf sum-chainlengths count)
+        (setq max-chainlength (max count max-chainlength))))
+    (let ((avg-chainlength (/ sum-chainlengths n-occupied-bins)))
+      (format t "~&Total ~D items, avg ~F items/bin~%"
+              (so-count solist) avg-chainlength)
+      (values max-chainlength (float avg-chainlength)))))
+
+(defun print-hashes (solist)
+  (do ((node (%node-next (so-head solist)) (%node-next node)))
+      ((endp node))
+    (format t "~16x~@[ ~s~]~%"
+            (node-hash node)
+            (if (so-key-node-p node) (type-of (so-key node))))))
 
 #|
 ;;; Our SXHASH has _extremely_ bad behavior for the split-order algorithm,
@@ -274,6 +289,78 @@
 
 (test-util:with-test (:name :basic-functionality)
   (smoke-test))
+
+;;; All threads try to insert each key. At most one thread wins,
+;;; and the others increment a count associated with the key.
+;;; The final count per key should be the number of threads,
+;;; and total number of actual insertions performed across threads
+;;; should equal the total number of keys.
+(defun test-insert-same-keys-concurrently (tbl keys
+                                           &key (nthreads (floor test-util:*n-cpus* 2))
+                                                ((:delete keys-to-delete)))
+  (flet ((worker (sem &aux inserted)
+           (sb-thread:wait-on-semaphore sem)
+           (dolist (key keys)
+             (when keys-to-delete
+               (let ((delete (atomic-pop (cdr keys-to-delete))))
+                 (when delete
+                   (so-delete tbl delete))))
+             (multiple-value-bind (node foundp) (so-insert tbl key (list 1))
+               (if foundp
+                   (atomic-incf (car (so-data node)))
+                   (push key inserted))))
+           ;; Return the list of keys that this worker inserted
+           inserted))
+    (let* ((start-sem (sb-thread:make-semaphore))
+           (args (list start-sem))
+           (threads
+            (loop repeat nthreads
+                  collect (sb-thread:make-thread #'worker :arguments args))))
+      (sb-thread:signal-semaphore start-sem nthreads)
+      (let* ((results (mapcar 'sb-thread:join-thread threads))
+             (counts (mapcar 'length results)))
+        (format t "~&Insertion counts: ~S~%" counts)
+        (assert (= (reduce #'+ counts) (length keys)))
+        (dolist (key keys)
+          (let ((node (so-find tbl key)))
+            (assert (= (car (so-data node)) nthreads))))))))
+
+(defun assert-not-found (tbl keys)
+  ;; no key in keys-to-delete should be in the table
+  (dolist (k keys)
+    (assert (not (so-find tbl k)))))
+
+(test-util:with-test (:name :concurrently-insert-same-keys/string)
+  (let* ((objects *strings*)
+         (tbl (make-so-map/string))
+         (keys-to-delete
+          (loop for i from 1 to (length objects)
+                collect (let ((key (concatenate 'string
+                                               ;; avoid colliding with anything
+                                               ;; in *STRINGS*
+                                                (string #+sb-unicode #\blue_heart
+                                                        #-sb-unicode (code-char 255))
+                                                (write-to-string i))))
+                          (so-insert tbl key i)
+                          key))))
+    (test-insert-same-keys-concurrently tbl objects :delete (cons nil keys-to-delete))
+    (assert-not-found tbl keys-to-delete)
+    tbl))
+
+(test-util:with-test (:name :concurrently-insert-same-keys/object)
+  (let* ((objects
+          (remove-if (lambda (x)
+                       (not (eql (generation-of x) sb-vm:+pseudo-static-generation+)))
+                     (sb-vm:list-allocated-objects :all :type sb-vm:symbol-widetag)))
+         (tbl (make-so-map/addr))
+         (keys-to-delete
+          ;; preload the hashset with some keys that will be deleted
+          ;; concurrently with all the insertions
+          (loop for i from 1 to (length objects)
+                do (so-insert tbl i i)
+                   collect i)))
+    (test-insert-same-keys-concurrently tbl objects :delete (cons nil keys-to-delete))
+    (assert-not-found tbl keys-to-delete)))
 
 #|
 ;; Speedup: 4x
