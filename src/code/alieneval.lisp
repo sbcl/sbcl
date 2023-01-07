@@ -185,6 +185,7 @@
   (let ((defun-name (symbolicate class "-" method "-METHOD")))
     `(progn
        (defun ,defun-name ,lambda-list
+         ,@(when (eq method :unparse) `((declare (ignorable ,(second lambda-list)))))
          ,@body)
        (setf (,(method-slot method) (alien-type-class-or-lose ',class))
              #',defun-name))))
@@ -207,10 +208,6 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (create-alien-type-class-if-necessary 'root 'alien-type nil))
-
-(defmethod print-object ((type alien-type) stream)
-  (print-unreadable-object (type stream :type t)
-    (sb-impl:print-type-specifier stream (unparse-alien-type type))))
 
 
 ;;;; type parsing and unparsing
@@ -295,24 +292,18 @@
       (when (info :alien-type kind name)
         (error "attempt to shadow definition of ~A ~S" kind name)))))
 
-;;; the list of record types that have already been unparsed. This is
-;;; used to keep from outputting the slots again if the same structure
-;;; shows up twice.
-(defvar *record-types-already-unparsed*)
-
-(defun unparse-alien-type (type)
+(defun unparse-alien-type (type &optional abbreviate)
   "Convert the alien-type structure TYPE back into a list specification of
    the type."
   (declare (type alien-type type))
-  (let ((*record-types-already-unparsed* nil))
-    (%unparse-alien-type type)))
+  (dx-let ((state (cons abbreviate nil)))
+    (%unparse-alien-type state type)))
 
-;;; Does all the work of UNPARSE-ALIEN-TYPE. It's separate because we
-;;; need to recurse inside the binding of
-;;; *RECORD-TYPES-ALREADY-UNPARSED*.
-(defun %unparse-alien-type (type)
-  (invoke-alien-type-method :unparse type))
-
+;;; Does all the work of UNPARSE-ALIEN-TYPE without rebinding the STATE.
+(defun %unparse-alien-type (state type)
+  (invoke-alien-type-method :unparse type state))
+(defun %unparse-alien-types (state list)
+  (mapcar (lambda (x) (%unparse-alien-type state x)) list))
 
 ;;;; alien type defining stuff
 
@@ -506,7 +497,7 @@
 (define-alien-type-translator unsigned (&optional (bits sb-vm:n-word-bits))
   (make-alien-integer-type :bits bits :signed nil))
 
-(define-alien-type-method (integer :unparse) (type)
+(define-alien-type-method (integer :unparse) (type state)
   (list (if (alien-integer-type-signed type) 'signed 'unsigned)
         (alien-integer-type-bits type)))
 
@@ -579,7 +570,7 @@
 (define-alien-type-translator boolean (&optional (bits sb-vm:n-word-bits))
   (make-alien-boolean-type :bits bits :signed nil))
 
-(define-alien-type-method (boolean :unparse) (type)
+(define-alien-type-method (boolean :unparse) (type state)
   `(boolean ,(alien-boolean-type-bits type)))
 
 (define-alien-type-method (boolean :lisp-rep) (type)
@@ -739,7 +730,7 @@
               (alien-enum-type-kind result) :alist)))
       (setf (alien-enum-type-from result) from-alist))))
 
-(define-alien-type-method (enum :unparse) (type)
+(define-alien-type-method (enum :unparse) (type state)
   `(enum ,(alien-enum-type-name type)
          ,@(let ((prev -1))
              (mapcar (lambda (mapping)
@@ -779,7 +770,7 @@
   ;; but we also keep the Lisp type in a slot. Why do that?
   (type (missing-arg) :type symbol :read-only t))
 
-(define-alien-type-method (float :unparse) (type)
+(define-alien-type-method (float :unparse) (type state)
   (alien-float-type-type type))
 
 (define-alien-type-method (float :lisp-rep) (type)
@@ -816,7 +807,7 @@
 
 (define-alien-type-class (system-area-pointer))
 
-(define-alien-type-method (system-area-pointer :unparse) (type)
+(define-alien-type-method (system-area-pointer :unparse) (type state)
   (declare (ignore type))
   'system-area-pointer)
 
@@ -895,11 +886,9 @@
 (define-alien-type-translator * (to &environment env)
   (make-alien-pointer-type :to (if (eq to t) nil (parse-alien-type to env))))
 
-(define-alien-type-method (pointer :unparse) (type)
+(define-alien-type-method (pointer :unparse) (type state)
   (let ((to (alien-pointer-type-to type)))
-    `(* ,(if to
-             (%unparse-alien-type to)
-             t))))
+    `(* ,(if to (%unparse-alien-type state to) t))))
 
 (define-alien-type-method (pointer :type=) (type1 type2)
   (let ((to1 (alien-pointer-type-to type1))
@@ -986,8 +975,8 @@
                                 (alien-type-alignment parsed-ele-type))
                   (reduce #'* dims))))))
 
-(define-alien-type-method (array :unparse) (type)
-  `(array ,(%unparse-alien-type (alien-array-type-element-type type))
+(define-alien-type-method (array :unparse) (type state)
+  `(array ,(%unparse-alien-type state (alien-array-type-element-type type))
           ,@(alien-array-type-dimensions type)))
 
 (define-alien-type-method (array :type=) (type1 type2)
@@ -1137,8 +1126,9 @@
                       "Incompatible alien record type definition~%Old: ~S~%New: ~S"
                       (unparse-alien-type old)
                       `(,(unparse-alien-record-kind kind) ,name
-                        ,@(let ((*record-types-already-unparsed* '()))
-                            (mapcar #'unparse-alien-record-field new-fields))))
+                        ,@(let ((state (cons nil nil)))
+                            (mapcar (lambda (x) (unparse-alien-record-field state x))
+                                    new-fields))))
               (setq redefined t))
             (when redefined
               ;; Assert that we're not mutating a cache entry - unnamed types
@@ -1176,13 +1166,15 @@
      new
      #'identity)))
 
-(define-alien-type-method (record :unparse) (type)
-  `(,(unparse-alien-record-kind (alien-record-type-kind type))
-    ,(alien-record-type-name type)
-    ,@(unless (member type *record-types-already-unparsed* :test #'eq)
-        (push type *record-types-already-unparsed*)
-        (mapcar #'unparse-alien-record-field
-                (alien-record-type-fields type)))))
+(define-alien-type-method (record :unparse) (type state)
+  (if (car state) ; abbreviated
+      `(,(alien-record-type-kind type) ,(alien-record-type-name type))
+      `(,(unparse-alien-record-kind (alien-record-type-kind type))
+        ,(alien-record-type-name type)
+        ,@(unless (memq type (cdr state))
+            (push type (cdr state))
+            (mapcar (lambda (x) (unparse-alien-record-field state x))
+                    (alien-record-type-fields type))))))
 
 (defun unparse-alien-record-kind (kind)
   (case kind
@@ -1190,9 +1182,9 @@
     (:union 'union)
     (t '???)))
 
-(defun unparse-alien-record-field (field)
+(defun unparse-alien-record-field (state field)
   `(,(alien-record-field-name field)
-     ,(%unparse-alien-type (alien-record-field-type field))
+     ,(%unparse-alien-type state (alien-record-field-type field))
      ,@(when (alien-record-field-offset field)
              (list :offset (alien-record-field-offset field)))))
 
@@ -1318,14 +1310,13 @@
                        :varargs varargs
                        :arg-types args))
 
-(define-alien-type-method (fun :unparse) (type)
+(define-alien-type-method (fun :unparse) (type state)
   `(function ,(let ((result-type
-                     (%unparse-alien-type (alien-fun-type-result-type type)))
+                     (%unparse-alien-type state (alien-fun-type-result-type type)))
                     (convention (alien-fun-type-convention type)))
                 (if convention (list convention result-type)
                     result-type))
-             ,@(mapcar #'%unparse-alien-type
-                       (alien-fun-type-arg-types type))
+             ,@(%unparse-alien-types state (alien-fun-type-arg-types type))
              ,@(when (alien-fun-type-varargs type)
                  '(&rest))))
 
@@ -1351,9 +1342,8 @@
      :values (mapcar (lambda (alien-type) (parse-alien-type alien-type env))
                      values))))
 
-(define-alien-type-method (values :unparse) (type)
-  `(values ,@(mapcar #'%unparse-alien-type
-                     (alien-values-type-values type))))
+(define-alien-type-method (values :unparse) (type state)
+  `(values ,@(%unparse-alien-types state (alien-values-type-values type))))
 
 (define-alien-type-method (values :type=) (type1 type2)
   (and (= (length (alien-values-type-values type1))
@@ -1664,4 +1654,17 @@
             (let ((entry (aref v i)))
               (when (and entry (not (eql entry 0)))
                 (format t " ~A~%" entry)))))))))
-(export '(*alien-type-hashsets* show-alien-type-caches))
+
+;;; Directly printing an alien-record-type will include its field names,
+;;; otherwise just the name.
+(defmethod print-object ((type alien-type) stream)
+  (if (alien-record-type-p type)
+      (print-unreadable-object (type stream :type nil :identity t)
+        (format stream "~S ~S ~@S" 'alien-type
+                (list (alien-record-type-kind type) (alien-record-type-name type))
+                (mapcar #'alien-record-field-name (alien-record-type-fields type))))
+      (let ((expr (unparse-alien-type type t)))
+        ;; Unparsed expression conveys its type. There's no need to print e.g.
+        ;; #<alien-single-float-type single-float>
+        (print-unreadable-object (type stream :type nil)
+          (format stream "~A ~S" 'alien-type expr)))))

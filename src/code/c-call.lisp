@@ -31,7 +31,7 @@
         #-sb-xc-host (default-c-string-external-format)
         external-format)))
 
-(define-alien-type-method (c-string :unparse) (type)
+(define-alien-type-method (c-string :unparse) (type state)
   (let* ((external-format (alien-c-string-type-external-format type))
          (element-type (alien-c-string-type-element-type type))
          (not-null (alien-c-string-type-not-null type))
