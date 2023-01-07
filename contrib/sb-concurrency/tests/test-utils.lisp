@@ -15,13 +15,7 @@
 #+sb-thread
 (progn
 
-(defvar *cpus*
-  (max 1
-       #-win32 (sb-alien:alien-funcall
-                (sb-alien:extern-alien "sysconf"
-                                       (function sb-alien:long sb-alien:int))
-                sb-unix::sc-nprocessors-onln)
-       #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int)))
+(defvar *cpus* test-util:*n-cpus*)
 
 (defparameter +timeout+ 30.0)
 

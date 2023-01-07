@@ -14,6 +14,7 @@
            #:random-type
 
            ;; thread tools
+           #:*n-cpus*
            #:make-kill-thread #:make-join-thread
            #:wait-for-threads
            #:process-all-interrupts
@@ -51,6 +52,14 @@
 
 (defvar *threads-to-kill*)
 (defvar *threads-to-join*)
+
+(defvar *n-cpus*
+  (max 1
+       #-win32 (sb-alien:alien-funcall
+                (sb-alien:extern-alien "sysconf"
+                                       (function sb-alien:long sb-alien:int))
+                sb-unix::sc-nprocessors-onln)
+       #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int)))
 
 (defun setenv (name value)
   #-win32
