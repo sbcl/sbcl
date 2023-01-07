@@ -464,17 +464,6 @@
 
 ;;;; default methods
 
-(defun missing-alien-operation-error (type operation)
-  (error "Cannot ~A aliens of type ~/sb-impl:print-type-specifier/."
-         operation type))
-
-(define-alien-type-method (root :unparse) (type) ; why does ROOT have any methods at all?
-  `(<unknown-alien-type> ,(type-of type)))
-
-(define-alien-type-method (root :type=) (type1 type2)
-  (declare (ignore type1 type2))
-  (bug "unreachable"))
-
 (define-alien-type-method (root :subtypep) (type1 type2)
   (alien-type-= type1 type2))
 
@@ -486,14 +475,6 @@
   (declare (ignore type context))
   '*)
 
-(define-alien-type-method (root :naturalize-gen) (type alien)
-  (declare (ignore alien))
-  (missing-alien-operation-error "represent" type))
-
-(define-alien-type-method (root :deport-gen) (type object)
-  (declare (ignore object))
-  (missing-alien-operation-error "represent" type))
-
 (define-alien-type-method (root :deport-alloc-gen) (type object)
   (declare (ignore type))
   object)
@@ -504,22 +485,8 @@
   ;; GCable lisp object when deporting.
   nil)
 
-(define-alien-type-method (root :extract-gen) (type sap offset)
-  (declare (ignore sap offset))
-  (missing-alien-operation-error "represent" type))
-
 (define-alien-type-method (root :deposit-gen) (type sap offset value)
   `(setf ,(invoke-alien-type-method :extract-gen type sap offset) ,value))
-
-(define-alien-type-method (root :arg-tn) (type state)
-  (declare (ignore state))
-  (missing-alien-operation-error "pass as argument to CALL-OUT"
-                                 (unparse-alien-type type)))
-
-(define-alien-type-method (root :result-tn) (type state)
-  (declare (ignore state))
-  (missing-alien-operation-error "return from CALL-OUT"
-                                 (unparse-alien-type type)))
 
 ;;;; the INTEGER type
 
