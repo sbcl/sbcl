@@ -1193,46 +1193,43 @@
     (split-string (get-output-stream-string string-stream)
                   #\newline)))
 
-(defun has-gc-barrier (match-string lines &optional (skip 0))
-  (let (found-sentinel found-barrier-fixup)
-;; Look for something like this in the trace output:
-;; "VOP CLOSURE-INIT t9[RBX(d)] :NORMAL t13[RSI(d)] :NORMAL {0} "
-;; "        MOV     0, #<TN t14[RAX(u)] :NORMAL>, #<TN t9[RBX(d)] :NORMAL>"
-;; "        SHR     0, #<TN t14[RAX(u)] :NORMAL>, 10"
-;; "        AND     6, #<TN t14[RAX(u)] :NORMAL>, #S(FIXUP :NAME NIL :FLAVOR GC-BARRIER :OFFSET 0)"
-;; "        MOV     4, PTR [R12+RAX+0], 0"
-;; "        MOV     7, PTR [RBX+5], #<TN t13[RSI(d)] :NORMAL>"
-    (loop while lines
-          do
-          (when (and (search match-string (car lines))
-                     (minusp (decf skip)))
-            (setq found-sentinel t)
-            (let ((barrier-fixup-line (nth 3 lines)))
-              (setq found-barrier-fixup (search ":FLAVOR GC-BARRIER" barrier-fixup-line))
-              (return)))
-          (pop lines))
-    (and found-sentinel found-barrier-fixup)))
-(defun assert-has-gc-barrier (&rest args)
-  (assert (apply #'has-gc-barrier args)))
+;;; Return the list of vops (as strings) that emitted a GC barrier.
+(defun find-gc-barriers (lambda-expression)
+  (let ((lines
+         (compiler-trace-output-lines lambda-expression))
+        (current-vop)
+        (result))
+    ;; FIXME: can this miss vops on a label line, or do we always print labels
+    ;; on their own line?
+    (dolist (line lines (nreverse result))
+     (let ((line (pop lines)))
+       (cond ((and (>= (length line) 4) (string= line "VOP " :end1 4))
+              (let ((string (subseq line 4 (position #\space line :start 5))))
+                (setq current-vop string)))
+             ((search ":FLAVOR GC-BARRIER" line)
+              (push current-vop result)))))))
 
 (with-test (:name :closure-init-gc-barrier)
-  (let ((lines
-         (compiler-trace-output-lines
+  (let ((vops-with-barrier
+         (find-gc-barriers
            '(lambda (address)
-             (declare (sb-vm:word address))
-             (let ((sap (sb-sys:int-sap address)))
-               (lambda () sap))))))
-    (assert-has-gc-barrier "CLOSURE-INIT" lines)))
+              (let ((sap (sb-sys:int-sap (truly-the sb-vm:word address))))
+                ;; The compiler conses the SAP *after* making the closure, so the store
+                ;; of the sap into the closure needs a barrier, as it's an old->young store.
+                (lambda () sap))))))
+    (assert (equal vops-with-barrier '("CLOSURE-INIT")))))
 
 (defstruct (point (:constructor make-point (x))) x (y 0) (z 0))
 (with-test (:name :structure-init-gc-barrier)
-  (let ((lines
-          (compiler-trace-output-lines
+  (let ((vops-with-barrier
+          (find-gc-barriers
            '(lambda (val)
              (declare (double-float val) (inline make-point))
+             ;; Similarly to the closure-init test, DOUBLE-FLOAT reg is cast to
+             ;; DESCRIPTOR-REG only after making the object. This seems like a
+             ;; low-hanging-fruit optimization to flip the order.
              (let ((neg (- val))) (make-point neg))))))
-    (assert-has-gc-barrier "SET-SLOT" lines
-                           #-compact-instance-header 1)))
+    (assert (equal vops-with-barrier '("SET-SLOT")))))
 
 (with-test (:name :system-tlabs)
   (when (find-symbol "SYS-ALLOC-TRAMP" "SB-VM")
@@ -1295,43 +1292,44 @@
                     thereis (search (princ-to-string sym) line))))))
 
 (with-test (:name :closure-gc-barrier)
-  (let ((lines
-          (compiler-trace-output-lines
+  (let ((vops-with-barrier
+         (find-gc-barriers
            '(lambda ()
              (let ((c (cons 1 2)))
                (lambda (x)
                  (setf (car c) x)))))))
-    (assert-has-gc-barrier "SET-SLOT" lines)))
+    (assert (equal vops-with-barrier '("SET-SLOT")))))
 
 (defstruct (wordpair (:predicate nil) (:copier nil)) a b)
 (defun func (x) (wordpair-b x))
 (with-test (:name :non-stack-instance-set)
-  (let ((lines
-         (compiler-trace-output-lines
+  ;; This is a trivial test of the control case for :stack-instance-set
+  (let ((vops-with-barrier
+         (find-gc-barriers
           '(lambda ()
             (declare (inline make-wordpair))
             (let ((pair (make-wordpair :a 'foo)))
               (setf (wordpair-b pair) "hi")
               (values (func pair)))))))
-    (assert-has-gc-barrier "INSTANCE-INDEX-SET" lines)))
+    (assert (equal vops-with-barrier '("INSTANCE-INDEX-SET")))))
 
 (with-test (:name :stack-instance-set)
-  (let ((lines
-         (compiler-trace-output-lines
+  (let ((vops-with-barrier
+         (find-gc-barriers
           '(lambda ()
             (declare (inline make-wordpair))
             (let ((pair (make-wordpair :a 'foo)))
               (declare (dynamic-extent pair))
               (setf (wordpair-b pair) "hi")
               (values (func pair)))))))
-    (assert (not (has-gc-barrier "INSTANCE-INDEX-SET" lines)))))
+    (assert (not vops-with-barrier))))
 
 (declaim (freeze-type wordpair))
 (with-test (:name :stack-instance-copy)
-  (let ((lines
-         (compiler-trace-output-lines
+  (let ((vops-with-barrier
+         (find-gc-barriers
           '(lambda (x)
             (let ((copy (copy-structure (truly-the wordpair x))))
               (declare (dynamic-extent copy))
               (values (func copy)))))))
-    (assert (not (has-gc-barrier "INSTANCE-INDEX-SET" lines)))))
+    (assert (not vops-with-barrier))))
