@@ -80,7 +80,7 @@
                    #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
                  (get-lisp-obj-address instance))))
     ;; perturb the address
-    (logand (murmur3-fmix-word addr) most-positive-fixnum)))
+    (murmur-hash-word/+fixnum addr)))
 
 (declaim (inline instance-sxhash))
 (defun instance-sxhash (instance)
@@ -250,8 +250,7 @@
 
 (defun sap-hash (x)
   ;; toss in a LOGNOT so that (the word a) and (int-sap a) hash differently
-  (let ((w (logand (lognot (sap-int x)) most-positive-word)))
-    (logand (murmur3-fmix-word w) most-positive-fixnum)))
+  (murmur-hash-word/+fixnum (logand (lognot (sap-int x)) most-positive-word)))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go

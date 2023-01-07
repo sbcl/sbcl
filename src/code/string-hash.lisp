@@ -221,11 +221,9 @@
   (let ((limit (1+ (ash most-positive-fixnum -1))))
     (declare (notinline random))
     (logior (if (typep name '(and symbol (not null)))
-                (flet ((improve-hash (x) (murmur3-fmix-word x)))
-                  (mix (logand
-                        (improve-hash (%sxhash-simple-string (symbol-name name)))
-                        most-positive-fixnum)
-                       (let ((package (sb-xc:symbol-package name)))
+                (mix (murmur-hash-word/+fixnum
+                         (%sxhash-simple-string (symbol-name name)))
+                     (let ((package (sb-xc:symbol-package name)))
                          (%sxhash-simple-string
                           ;; Must specifically look for CL package when cross-compiling
                           ;; because we might have remapped a symbol from its "actual"
@@ -233,7 +231,7 @@
                           ;; host happens to have standard symbols homed elsewhere.
                           (cond #+sb-xc ((eq package *cl-package*) "COMMON-LISP")
                                 ((not package) "uninterned")
-                                (t (sb-xc:package-name package)))))))
+                                (t (sb-xc:package-name package))))))
                 ;; This L-T-V form has to remain out of the common path,
                 ;; or else cheneygc will crash in cold-init.
                 ;; Cold-init calls HASH-LAYOUT-NAME many times *before* the L-T-V

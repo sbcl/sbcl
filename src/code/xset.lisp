@@ -229,7 +229,7 @@
     (let ((word-bits
            #+sb-xc-host (ldb (byte sb-vm:n-word-bits 0) (ash h sb-vm:n-fixnum-tag-bits))
            #-sb-xc-host (get-lisp-obj-address h)))
-      (logand (sb-impl::murmur3-fmix-word word-bits) most-positive-fixnum))))
+      (murmur-hash-word/+fixnum word-bits))))
 
 ;;; Stably-hashed XSETs that have elements which are not nicely EQL-hashable
 ;;; rely on a global table that maps any object to a pseudorandom hash.

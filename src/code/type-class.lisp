@@ -763,8 +763,7 @@
 ;;; The final mix ensures that all bits affect the masked hash.
 ;;; Since it takes non-zero time, only do it for NUMERIC and ARRAY, where it seems
 ;;; to make a large difference in the maximum probe sequence length.
-(defmacro type-hash-final-mix (val)
-  `(logand (sb-impl::murmur3-fmix-word ,val) ,sb-xc:most-positive-fixnum))
+(defmacro type-hash-final-mix (val) `(murmur-hash-word/+fixnum ,val))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
