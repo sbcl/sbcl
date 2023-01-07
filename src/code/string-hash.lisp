@@ -191,6 +191,7 @@
   (%make-lisp-obj (logandc2 (murmur3-fmix-word (truly-the sb-vm:word x))
                             sb-vm:fixnum-tag-mask))))
 ;;; Similar, but the sign bit is always 0
+(declaim (inline murmur-hash-word/+fixnum))
 (defun murmur-hash-word/+fixnum (x)
   (logand (murmur3-fmix-word (truly-the sb-vm:word x)) sb-xc:most-positive-fixnum))
 
