@@ -35,11 +35,10 @@
 ;;;
 
 (in-package "SB-LOCKLESS")
-(export '(make-so-set/string
-          make-so-map/string
-          so-insert
-          so-delete
-          so-find))
+(export '(make-so-set/string make-so-set/fixnum make-so-set/addr
+          make-so-map/string make-so-map/fixnum make-so-map/addr
+          so-insert so-delete so-find
+          so-maplist))
 
 ;; For testing, uses 8 bit from the key's hash plus the wired bit,
 ;; because 8 is easy to understand.
@@ -54,7 +53,7 @@
             (:constructor %%make-split-ordered-list
              (head hashfun inserter deleter finder
               inequality equality valuesp)))
-  (hashfun #'error :type function)
+  (hashfun #'error :type (sfunction (t) (and fixnum unsigned-byte)))
   (bins '(#() . 1) :type (cons simple-vector (integer 1 (#.+hash-nbits+))))
   (count 0 :type sb-ext:word)
   ;; If VALUESP is NIL, then this is a set, otherwise it is a map.
@@ -222,20 +221,29 @@
 (declaim (inline masked-hash))
 (defun masked-hash (hash) (mask-field (byte (1- +hash-nbits+) 1) hash))
 
+(defmacro with-bin ((table-var ; input
+                     hash-var node-var &rest rest) ; output
+                    hash-expr &body body)
+  `(multiple-value-bind (,hash-var ,node-var ,@rest)
+       (let* ((hash (masked-hash ,hash-expr))
+              (bins+shift (so-bins ,table-var)))
+         (declare (optimize (safety 0))) ; won't pertain to the body, just these bindings
+         (let* ((bins (car bins+shift))
+                ;; We don't use the declared type- I guess because it's a CONS ?
+                (shift (the (integer 1 (,+hash-nbits+)) (cdr bins+shift)))
+                (bin-number (ash hash (- shift)))
+                (start-node (svref bins bin-number)))
+           (values hash (if (unbound-marker-p start-node)
+                            (initialize-bin bins bin-number shift)
+                            start-node)
+                   ;; INSERT needs these but FIND and DELETE don't
+                   ,@(if rest '(bins+shift bins shift)))))
+     ,@body))
+
 (defun so-insert (table key &optional (value nil valuep))
   (when (and valuep (not (so-valuesp table)))
     (error "~S is a set, not a map" table))
-  (let* ((hash (masked-hash (funcall (so-hashfun table) key)))
-         (bins+shift (so-bins table))
-         (bins (car bins+shift))
-         (shift (cdr bins+shift))
-         (bin-number (ash hash (- shift)))
-         (start-node (aref bins bin-number)))
-    #+so-debug (format t "inserting ~S hash=[~v,'0b] bin=~d~%" key +hash-nbits+ hash bin-number)
-    (when (unbound-marker-p start-node)
-      #+so-debug (format t "initializing bin~%")
-      (setq start-node (initialize-bin bins bin-number shift))
-      )
+  (with-bin (table hash start-node bins+shift bins shift) (funcall (so-hashfun table) key)
     (multiple-value-bind (node foundp)
         (if (so-valuesp table)
             (funcall (so-inserter table) start-node (logior hash 1) key value)
@@ -306,37 +314,19 @@
   (so-delete-macro %so-search/string string= string))
 
 (defun so-delete (table key)
-  (let* ((hash (masked-hash (funcall (so-hashfun table) key)))
-         (bins+shift (so-bins table))
-         (bins (car bins+shift))
-         (shift (cdr bins+shift))
-         (bin-number (ash hash (- shift)))
-         (start-node (aref bins bin-number)))
-    #+so-debug (format t "inserting ~S hash=[~v,'0b] bin=~d~%" key +hash-nbits+ hash bin-number)
-    (when (unbound-marker-p start-node)
-      #+so-debug (format t "initializing bin~%")
-      (setq start-node (initialize-bin bins bin-number shift)))
+  (with-bin (table hash start-node) (funcall (so-hashfun table) key)
     (let ((deleted (funcall (so-deleter table) start-node (logior hash 1) key)))
       (when deleted
         (atomic-decf (so-count table)))
       deleted)))
 
 (macrolet ((guts (key-hash searcher equality-fn)
-             `(let* ((hash (masked-hash ,key-hash))
-                     (bins+shift (so-bins table))
-                     (bins (truly-the simple-vector (car bins+shift)))
-                     (shift (truly-the (integer 1 28) (cdr bins+shift)))
-                     (bin-number (ash hash (- shift)))
-                     (start-node (aref bins bin-number)))
-                (when (unbound-marker-p start-node)
-                  (setq start-node (initialize-bin bins bin-number shift)))
-                (locally
-                    (declare (optimize (safety 0)))
-                  (let ((node (,searcher start-node (logior hash 1) key)))
-                    (when (and (not (endp node))
-                               (not (dummy-node-p node))
-                               (,equality-fn (so-key node) key))
-                      node))))))
+             `(with-bin (table hash start-node) ,key-hash
+                (let ((node (,searcher start-node (logior hash 1) key)))
+                  (when (and (not (endp node))
+                             (not (dummy-node-p node))
+                             (,equality-fn (so-key node) key))
+                    node)))))
   (defun so-find/fixnum (table key)
     (declare (split-ordered-list table))
     (declare (fixnum key))
@@ -396,9 +386,7 @@
   (defun make-so-map/string () (make t)))
 
 (flet ((make (valuesp)
-         (%make-so-list (lambda (x)
-                          (logand (sb-impl::murmur3-fmix-word (get-lisp-obj-address x))
-                                  most-positive-fixnum))
+         (%make-so-list (lambda (x) (murmur-hash-word/+fixnum (get-lisp-obj-address x)))
                         #'%so-insert/addr #'%so-delete/addr #'so-find/addr
                         #'nofun #'nofun valuesp)))
   (defun make-so-set/addr () (make nil))
