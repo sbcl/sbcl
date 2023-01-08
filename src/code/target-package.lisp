@@ -432,7 +432,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
       (setf (symtbl-%cells table)
             (load-time-value (cons (make-symtbl-magic 0 0 0 0) #(0 0 0)) t)
             (symtbl-free table) 0
-            (symtbl-size table) 2
+            (symtbl-size table) 0
             (symtbl-deleted table) 0)))
   (let* ((temp-table (make-symbol-hashset size load-factor))
          (cells (symtbl-%cells temp-table))

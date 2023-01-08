@@ -481,6 +481,8 @@ Please check that all strings which were not recognizable to the compiler
              (delta-int (- int (caddr entry))))
         (incf sum-delta-ext delta-ext)
         (incf sum-delta-int delta-int)
+        (assert (<= delta-ext 0))
+        (assert (<= delta-int 0))
         (format t "~20a | ~5d (~5@d) | ~5d (~5@d)~%"
                 (package-name (car entry))
                 ext delta-ext int delta-int)))
