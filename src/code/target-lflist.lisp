@@ -17,7 +17,9 @@
 
 (in-package "SB-LOCKLESS")
 
-(export '(make-ordered-list lfl-insert lfl-delete lfl-find make-marked-ref))
+(export '(make-ordered-list lfl-insert lfl-delete lfl-find
+          lfl-insert*/t lfl-delete*/t lfl-find*/t
+          do-lockfree-list lfl-keys make-marked-ref))
 
 ;;; The changes to GC to support this code were as follows:
 ;;;
@@ -28,6 +30,10 @@
 ;;;   to, pinning a lockfree list node may implicitly pin not only that node but
 ;;;   also the successor node, since there would otherwise be no way to reconstruct
 ;;;   (in Lisp) a tagged pointer to the successor of a node pending deletion.
+;;;   Pinning a node always binds *PINNED-OBJECTS* and never relies on conservative
+;;;   stack scan even for the architectures that have conservative stack.
+;;;   arm64 and x86-64 uses PSEUDO-ATOMIC, which produces shorter code than
+;;;   WITH-PINNED-OBJECTS.
 ;;;
 ;;; * Copying a lockfree list node tries to copy the successor nodes into adjacent
 ;;;   memory just like copying a chain of cons cells. This is inessential but nice.
@@ -117,6 +123,13 @@
 (progn
 (declaim (inline get-next))
 (defun get-next (node)
+  ;; You must not call GET-NEXT on +TAIL+ because the 'next' of +TAIL+ is NIL,
+  ;; and (LOGIOR NIL-VALUE INSTANCE-POINTER-LOWTAG) isn't necessarily NIL.
+  ;; It would be a bogus pointer on ppc64 because of rearranged lowtags.
+  ;; arm64 and x86-64 are missing this AVER (because the vop doesn't do it),
+  ;; but as long as some of the platforms test this it, we should be reasonably ok.
+  ;; (I could assign 'next' of +TAIL+ as +TAIL+ like it used to be, and remove this.)
+  (aver (neq node +tail+))
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
   (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
          (%next (%node-next node)))
