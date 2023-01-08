@@ -139,3 +139,48 @@
   ;; EMPLACE will have been LET-converted. VISIT and VISIT-CODE should
   ;; have been separated out or simply deleted.
   (assert (= 1 (sb-kernel::code-n-entries (sb-kernel::fun-code-header #'dead-code-puke-1)))))
+
+(with-test (:name :top-level-closure-is-dx)
+  (ctu:file-compile
+   `((eval-when (:compile-toplevel :load-toplevel :execute)
+       (defstruct (precondition-tag (:constructor nil))
+         (%bits0 0)
+         (%bits1 0)))
+
+     (defvar *pt-hash-set* 0)
+
+     (defmacro bit-op (operation destination source)
+       `(setf (precondition-tag-%bits0 ,destination)
+              (,operation (precondition-tag-%bits0 ,destination) (precondition-tag-%bits0 ,source))
+              (precondition-tag-%bits1 ,destination)
+              (,operation (precondition-tag-%bits1 ,destination) (precondition-tag-%bits1 ,source))))
+
+     (declaim (inline tags-logandc2))
+     (defun tags-logandc2 (a b)
+       (let ((result (copy-precondition-tag a)))
+         (bit-op logandc2 result b)
+         result))
+
+     (declaim (ftype (function)))
+     (declaim (inline mock-get-canonical-obj))
+     (defun mock-get-canonical-obj (pt)
+       (flet ((compute-it () (copy-precondition-tag pt)))
+         (declare (dynamic-extent #'compute-it))
+         (our-hash-table-lookup *pt-hash-set* pt #'compute-it)))
+
+     (declaim (sb-ext:freeze-type precondition-tag))
+     (declaim (inline tags-logior))
+     (defun tags-logior (a b)
+       (if (read)
+           (let ((result (copy-structure a)))
+             (bit-op logior result b)
+             (mock-get-canonical-obj result))
+           (let ((result (copy-precondition-tag a)))
+             (bit-op logior result b)
+             result)))
+
+     (defvar +z+
+       (tags-logandc2 (read)
+                      (tags-logior (tags-logior (read)
+                                                (read))
+                                   (read)))))))

@@ -398,7 +398,12 @@
                     (aver (eq (cleanup-mess-up cleanup) enclose))
                     (setf (lvar-dynamic-extent lvar) cleanup)
                     (setf (cleanup-nlx-info cleanup) (list lvar)))
-                  (push lvar (component-dx-lvars component)))))))))
+                  ;; THe node component of ENCLOSE may be a different
+                  ;; component for top level closure references. We
+                  ;; always compile non-top-level components before
+                  ;; top-level components, so this takes effect at the
+                  ;; right time.
+                  (push lvar (component-dx-lvars (node-component enclose))))))))))
     (dolist (entry (lambda-entries lambda))
       (let* ((cleanup (entry-cleanup entry))
              (lvar+extents (cleanup-nlx-info cleanup))
