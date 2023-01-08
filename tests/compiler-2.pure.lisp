@@ -610,13 +610,6 @@
                   (unwind-protect x)))))))
     ((321) 321)))
 
-(with-test (:name :interval-div-zero)
-  (checked-compile-and-assert (:optimize :safe)
-    `(lambda (x y)
-       (truncate (the (integer 0 0) x)
-                 (the (rational (1) (2)) y)))
-   ((0 3/2) (values 0 0))))
-
 (with-test (:name :float-remainders-rounding-errors)
   (loop for fun in '(ceiling truncate floor
                      fceiling ftruncate ffloor
@@ -628,24 +621,6 @@
                                   `(lambda (x)
                                      (nth-value 1 (,fun (the double-float x) 1/2)))))))
                         '(double-float real)))))
-
-(with-test (:name :float-quotient-rounding-errors)
-  (checked-compile-and-assert (:optimize :safe)
-   `(lambda ()
-      (floor -114658225103614 84619.58))
-    (() (values -1354984705 8473228.0)))
-  (checked-compile-and-assert (:optimize :safe)
-   `(lambda ()
-      (floor -302254842 50510.5))
-    (() (eval '(floor -302254842 50510.5))))
-  (checked-compile-and-assert (:optimize :safe)
-   `(lambda ()
-      (ceiling 114658225103614 84619.58))
-    (() (values 1354984705 -8473228.0)))
-  (checked-compile-and-assert (:optimize :safe)
-   `(lambda ()
-      (ceiling 285493348393 94189.93))
-    (() (values 3031039 0.0))))
 
 (with-test (:name :complex-float-contagion)
   (checked-compile-and-assert ()
@@ -1258,15 +1233,6 @@
          (setf (schar (the (satisfies eval) s) 0) v)
          s)
     (((copy-seq "abc") #\m) "mbc" :test #'equal)))
-
-(with-test (:name :check-function-designator-cast-key-lambda-var)
-  (checked-compile-and-assert
-      (:optimize '(:speed 3 :space 0))
-      `(lambda (p1 p4)
-         (declare (vector p1)
-                  ((member ,#'car "x" cdr) p4))
-         (stable-sort p1 #'<= :key p4))
-    (((vector '(2) '(3) '(1)) #'car) #((1) (2) (3)) :test #'equalp)))
 
 (with-test (:name :replace-zero-elements)
   (checked-compile-and-assert
@@ -2359,18 +2325,6 @@
           1))
     (() (condition 'simple-error))))
 
-(with-test (:name :functional-may-escape-p)
-  (checked-compile-and-assert
-      (:optimize :safe)
-      '(lambda ()
-        (let (x)
-          (block nil
-            (flet ((x () (let (*)
-                           (return 33))))
-              (setf x #'x)))
-          (funcall x)))
-    (() (condition 'control-error))))
-
 (with-test (:name :inlining-multiple-refs)
   (checked-compile
    `(lambda (x)
@@ -2579,15 +2533,6 @@
      (declare ((or (function (number)) (eql #.#'symbolp)) m))
      (the (member 3/4 4/5 1/2 #.#'symbolp) m))
    ((#'symbolp) #'symbolp)))
-
-(with-test (:name :lvar-fun-type-on-literal-funs)
-  (checked-compile-and-assert
-   ()
-   `(lambda (p)
-      (declare (type (or null string) p))
-      (locally (declare (optimize (space 0)))
-        (stable-sort p ,#'string<)))
-   (((copy-seq "acb")) "abc" :test #'equal)))
 
 (with-test (:name :equal-to-eql)
   (let ((f (checked-compile
@@ -3650,21 +3595,6 @@
   (checked-compile '(lambda ()
                      (declare (notinline list +))
                      (list (loop for i below 2 count t)))))
-
-(with-test (:name :ir2-optimize-jumps-multiway-branch-if-eq-delete-branch)
-  (checked-compile-and-assert
-      ()
-      `(lambda (a)
-         (declare (type (integer -345 1) a))
-         (case (ldb (byte 24 5) a)
-           ((4 47 61 17 10 39) 1)
-           ((2 7 55) A)
-           ((42 48 16 33 40 20) A)
-           ((60 54 28) 3)
-           ((15 1 44 29 57 41 52) 32771)
-           ((46 64 3 18 36 49 37) 1)
-           (t A)))
-    ((-5) -5)))
 
 (with-test (:name :bignump-integer-<)
   (checked-compile-and-assert

@@ -17,8 +17,8 @@
       (format t "~2&Tests ordered by descending elapsed time:~%")
       (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
         (let ((*print-pretty* nil))
-          (format t "~6d ~a~%" (car x) (cdr x))))
-      (format t "~6d TOTAL TIME (~a)~%" actual-total file))))
+          (format t "~8d ~a~%" (car x) (cdr x))))
+      (format t "~8d TOTAL TIME (~a)~%" actual-total file))))
 
 (defun clear-test-status ()
   (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
