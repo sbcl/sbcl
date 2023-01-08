@@ -1668,3 +1668,8 @@
         ;; #<alien-single-float-type single-float>
         (print-unreadable-object (type stream :type nil)
           (format stream "~A ~S" 'alien-type expr)))))
+
+(push '("SB-ALIEN-INTERNALS"
+        define-alien-type-translator ; not sure why this doesn't get dropped automatically
+        define-alien-type-method) ; this is external, needed by compiler/*/c-call
+      *!removable-symbols*)

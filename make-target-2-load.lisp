@@ -423,20 +423,10 @@ Please check that all strings which were not recognizable to the compiler
            (search "-TN" (string symbol))))
       (#.(find-package "SB-ALIEN")
        (or (eq accessibility :external) (eq symbol 'sb-alien::alien-callback-p)))
-      ((#.(find-package "SB-C")
-        #.(find-package "SB-ASSEM")
-        #.(find-package "SB-DISASSEM")
-        #.(find-package "SB-IMPL")
-        #.(find-package "SB-FORMAT")
-        #.(find-package "SB-UNIX")
-        #.(find-package "SB-PCL")
-        #.(find-package "SB-MOP")
-        #.(find-package "SB-PRETTY")
-        #.(find-package "SB-REGALLOC")
-        #.(find-package "SB-SYS")
-        #.(find-package "SB-UNICODE")
-        #.(find-package "SB-BROTHERTREE")
-        #.(find-package "SB-KERNEL"))
+      (#.(mapcar 'find-package
+                 '("SB-ASSEM" "SB-BROTHERTREE" "SB-C" "SB-DISASSEM" "SB-FORMAT"
+                   "SB-IMPL" "SB-KERNEL" "SB-MOP" "SB-PCL" "SB-PRETTY" "SB-PROFILE"
+                   "SB-REGALLOC" "SB-SYS" "SB-UNICODE" "SB-UNIX" "SB-WALKER"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))
       (#.(find-package "SB-LOOP")
@@ -444,6 +434,9 @@ Please check that all strings which were not recognizable to the compiler
            ;; Retain some internals to keep CLSQL working.
            (member symbol '(sb-loop::*loop-epilogue*
                             sb-loop::add-loop-path))))
+      (#.(find-package "SB-LOCKLESS")
+       (or (eq accessibility :external)
+           (member symbol '(sb-lockless::+hash-nbits+)))) ; for a test
       (#.(find-package "SB-THREAD")
        (or (eq accessibility :external)
            ;; for some reason a recent change caused the tree-shaker to drop MAKE-SPINLOCK
