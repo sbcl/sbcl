@@ -76,6 +76,7 @@
     (and static-fun-index
          (+ (* (length +static-symbols+) (pad-data-block symbol-size))
             (pad-data-block (1- symbol-size))
+            (* 4 n-word-bytes) ; sizeof SB-LOCKLESS:+TAIL+
             (- list-pointer-lowtag)
             (* static-fun-index (pad-data-block fdefn-size))
             other-pointer-lowtag))))

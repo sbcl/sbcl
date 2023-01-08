@@ -44,9 +44,8 @@
 ;; For testing, uses 8 bit from the key's hash plus the wired bit,
 ;; because 8 is easy to understand.
 ;(defconstant +hash-nbits+ 9) ; for testing
-
-;; Realistically, allow 25 bits of hash including the wired bit
-(defconstant +hash-nbits+ 25)
+;; NODE-HASH is a fixnum. Not sure whether negatives d.t.r.t
+(defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits)
 
 (defstruct (split-ordered-list
             (:include linked-list)
@@ -359,7 +358,7 @@
 
 (defun %make-so-list (&rest args)
   (let ((initial-bin (make-so-dummy-node 0)))
-    (setf (%node-next initial-bin) *tail-atom*)
+    (setf (%node-next initial-bin) +tail+)
     (let ((so-list (apply #'%%make-split-ordered-list initial-bin args)))
       ;; Start with 2 bins, only the first being initialized.
       ;; Shift out all bits except 1 for the bin number.

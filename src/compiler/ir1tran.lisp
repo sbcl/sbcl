@@ -347,7 +347,8 @@
       (cl:typep obj 'package)
       ;; The cross-compiler wants to dump CTYPE instances as leaves,
       ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
-      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))))
+      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
+      (eq obj sb-lockless:+tail+)))
 
 ;;; Grovel over CONSTANT checking for any sub-parts that need to be
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because

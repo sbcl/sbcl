@@ -135,7 +135,11 @@
               (tagged (dpb bits (byte 32 32) single-float-widetag)))
          (load-immediate-word y tagged)))
       (symbol
-       (load-symbol y val)))))
+       (load-symbol y val))
+      (structure-object
+       (if (eq val sb-lockless:+tail+)
+           (inst add y null-tn (- sb-vm::lockfree-list-tail-value sb-vm:nil-value))
+           (bug "immediate structure-object ~S" val))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate)

@@ -259,7 +259,10 @@
     (double-float
      double-immediate-sc-number)
     (single-float
-     single-immediate-sc-number)))
+     single-immediate-sc-number)
+    (structure-object
+     (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))

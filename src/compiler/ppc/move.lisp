@@ -24,7 +24,11 @@
        (load-symbol y val))
       (character
        (inst lr y (logior (ash (char-code val) n-widetag-bits)
-                          character-widetag))))))
+                          character-widetag)))
+      (structure-object
+       (if (eq val sb-lockless:+tail+)
+           (inst addi y null-tn (- sb-vm::lockfree-list-tail-value sb-vm:nil-value))
+           (bug "immediate structure-object ~S" val))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate zero)

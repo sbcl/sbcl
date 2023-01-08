@@ -252,7 +252,7 @@
 (defun scan-lfl-gens (deletep &aux page-indices)
   (do ((node (get-next (list-head *l*)) ; can't delete the dummy node (list head)
              (get-next node)))
-      ((eq node *tail-atom*))
+      ((eq node +tail+))
     (when (eql (generation-of node) 1)
       (let ((page (sb-vm:find-page-index
                    (sb-kernel:get-lisp-obj-address node))))

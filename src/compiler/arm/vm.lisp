@@ -236,7 +236,10 @@
     (symbol
      (if (static-symbol-p value)
          immediate-sc-number
-         nil))))
+         nil))
+    (structure-object
+     (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc null-sc-number)

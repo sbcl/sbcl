@@ -50,18 +50,12 @@
 (defun ptr-markedp (bits) (fixnump bits))
 (defun node-markedp (node) (fixnump (%node-next node)))
 
-;;; Lockless lists should be terminated by *tail-atom*.
-;;; The value of %NODE-NEXT of the tail atom is chosen such that we will never
-;;; violate the type assertion in GET-NEXT if pointer is inadvertently
-;;; followed out of the tail atom. It would mostly work to use NIL as the %NEXT,
-;;; but just in terms of whether the %MAKE-LISP-OBJ expression is correct.
-;;; (ORing in instance-pointer-lowtag does not change NIL's representation.)
-;;; However, using NIL would violates the type assertion.
-(define-load-time-global *tail-atom*
-  (let ((node (%make-sentinel-node)))
-    (setf (%node-next node) node)))
+;;; Lockfree lists are terminated by +TAIL+. The %NEXT bits in +TAIL+
+;;; must not imply that the node is marked for deletion.
+(setf (%node-next +tail+) nil)
+(assert (not (node-markedp +tail+)))
 
-(defmacro endp (node) `(eq ,node (load-time-value *tail-atom*)))
+(defmacro endp (node) `(eq ,node ,+tail+))
 
 ;;; WORD< uses fixnum-valued keys to represent aligned addresses
 ;;; a la DESCRIPTOR-SAP.
@@ -98,7 +92,7 @@
                          (coerce test 'function))
                  (error "Must specify both :SORT and :TEST"))))
     (let ((head (%make-sentinel-node)))
-      (setf (%node-next head) *tail-atom*)
+      (setf (%node-next head) +tail+)
       (funcall constructor
                head insert delete find inequality equality))))
 
@@ -151,9 +145,11 @@
          (print-unreadable-object (node stream :type t)
            (format stream "(~:[~;*~]~S ~S)"
                    (node-markedp node) (node-key node) (node-data node))))
-        ((eq node *tail-atom*)
-         (print-unreadable-object (node stream :type t)
-           (write '*tail-atom* :stream stream)))
+        ((eq node +tail+)
+         (if *read-eval*
+             (format stream "#.~S" '+tail+)
+             (print-unreadable-object (node stream :type t)
+               (write '+tail+ :stream stream))))
         (t
          (print-unreadable-object (node stream :type t :identity t)))))
 
@@ -369,7 +365,7 @@
 ;;; a complete snapshot of the list.
 (defun copy-lfl (lfl)
   (labels ((copy-chain (node)
-             (if (eq node *tail-atom*)
+             (if (eq node +tail+)
                  node
                  (let ((copy (copy-structure node))
                        (copy-of-next (copy-chain (get-next node))))

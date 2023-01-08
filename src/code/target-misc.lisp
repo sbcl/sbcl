@@ -252,12 +252,6 @@ version 1[.0.0...] or greater."
   string)
 
 (in-package "SB-LOCKLESS")
-(defstruct (list-node
-            (:conc-name nil)
-            (:constructor %make-sentinel-node ())
-            (:copier nil))
-  (%node-next nil))
-
 ;;; Specialized list variants will be created for
 ;;;  fixnum, integer, real, string, generic "comparable"
 ;;; but the node type and list type is the same regardless of key type.

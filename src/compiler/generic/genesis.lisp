@@ -695,6 +695,7 @@
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
 (defvar *c-callable-fdefn-vector*)
+(defvar *lflist-tail-atom*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
 ;;; when the target Lisp starts up
@@ -812,6 +813,7 @@
   ;; Store WIDETAG in the header and LENGTH in the length slot.
   (when (and (= widetag sb-vm:simple-vector-widetag)
              (= length 0)
+             (eq gspace *dynamic*)
              *simple-vector-0-descriptor*)
     (return-from allocate-vector *simple-vector-0-descriptor*))
   (emplace-vector (allocate-cold-descriptor
@@ -873,9 +875,10 @@
 (defun struct-size (thing)
   ;; ASSUMPTION: all slots consume 1 storage word
   (+ sb-vm:instance-data-start (length (type-dd-slots-or-lose thing))))
-(defun allocate-struct-of-type (type)
+(defun allocate-struct-of-type (type &optional (gspace *dynamic*))
   (allocate-struct (struct-size type)
-                   (cold-layout-descriptor (gethash type *cold-layouts*))))
+                   (cold-layout-descriptor (gethash type *cold-layouts*))
+                   gspace))
 
 ;;;; copying simple objects into the cold core
 
@@ -1555,6 +1558,7 @@ core and return a descriptor to it."
              (list     (chill-layout 'list t-layout sequence))
              (symbol   (chill-layout 'symbol t-layout)))
         (chill-layout 'null t-layout sequence list symbol))
+      (chill-layout 'sb-lockless::list-node t-layout s-o-layout)
       (chill-layout 'stream t-layout))))
 
 ;;;; interning symbols in the cold image
@@ -1878,6 +1882,13 @@ core and return a descriptor to it."
               nil
               offset-found
               offset-wanted))))
+  ;; Reserve space for SB-LOCKLESS:+TAIL+ which is conceptually like NIL
+  ;; but tagged with INSTANCE-POINTER-LOWTAG.
+  (setq *lflist-tail-atom*
+        (if core-file-name
+            (allocate-struct-of-type 'sb-lockless::list-node *static*)
+            (let ((words (+ 1 #-compact-instance-header 1)))
+              (allocate-struct words (make-fixnum-descriptor 0) *static*))))
 
   ;; Assign TLS indices of C interface symbols
   #+sb-thread
@@ -1996,6 +2007,7 @@ core and return a descriptor to it."
 
   (cold-set 'sb-impl::*setf-fdefinition-hook* *nil-descriptor*)
   (cold-set 'sb-impl::*user-hash-table-tests* *nil-descriptor*)
+  (cold-set 'sb-lockless:+tail+ *lflist-tail-atom*)
 
   #+immobile-code
   (let* ((space *immobile-text*)
@@ -3508,6 +3520,8 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
               (descriptor-bits (cold-intern symbol))
               (+ sb-vm:nil-value
                  (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
+  (format stream "#define LFLIST_TAIL_ATOM LISPBOJ(0x~X)~%"
+          (descriptor-bits *lflist-tail-atom*))
   #+sb-thread
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))

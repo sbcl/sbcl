@@ -369,7 +369,10 @@
                  (eql value (log 2.718281828459045235360287471352662L0 2l0))
                  (eql value (log 2l0 10l0))
                  (eql value (log 2l0 2.718281828459045235360287471352662L0)))
-         fp-constant-sc-number))))
+         fp-constant-sc-number))
+    (structure-object
+     (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
@@ -385,7 +388,11 @@
           (integer (fixnumize val))
           (symbol (+ nil-value (static-symbol-offset val)))
           (character (logior (ash (char-code val) n-widetag-bits)
-                             character-widetag))))
+                             character-widetag))
+          (structure-object
+           (if (eq val sb-lockless:+tail+)
+               sb-vm::lockfree-list-tail-value
+               (bug "immediate structure-object ~S" val)))))
       tn))
 
 ;;;; miscellaneous function call parameters
