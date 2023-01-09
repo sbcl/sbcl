@@ -1426,7 +1426,8 @@
 (defun check-concatenate (type sequences node &optional (description "concatenate"))
   (let ((result-element-type (if (ctype-p type)
                                  type
-                                 (type-array-element-type (specifier-type type)))))
+                                 (type-array-element-type (or (careful-specifier-type type)
+                                                              (return-from check-concatenate))))))
     (unless (or (eq result-element-type *wild-type*)
                 (eq result-element-type *universal-type*))
       (loop for i from 0
