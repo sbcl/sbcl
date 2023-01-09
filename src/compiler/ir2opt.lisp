@@ -978,7 +978,8 @@
              (value (if plusp
                         1
                         (car (vop-codegen-info next)))))
-        (when (and (not (tn-ref-next (tn-reads result)))
+        (when (and (tn-reads result)
+                   (not (tn-ref-next (tn-reads result)))
                    (eq result (tn-ref-tn (vop-args next))))
           (check-type value bit)
           (let ((template (template-or-lose #+arm64

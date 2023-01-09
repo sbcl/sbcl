@@ -3803,3 +3803,14 @@
                          42))))
            42)))))
     '(values (integer -99734 -99734) (integer 19 19) &optional))))
+
+(with-test (:name :bit-ir2opt)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a c)
+      (declare (fixnum c))
+      (setf a -14)
+      (logior
+       (shiftf a (bit #*01 (max 0 c)))
+       (max 0 c)))
+   ((1 1) -13)))
