@@ -251,24 +251,9 @@ Examples:
 (defvar *in-a-finalizer* nil)
 #+sb-thread (define-alien-variable finalizer-thread-runflag int)
 
-(define-load-time-global *bg-compiler-function* nil)
-
-(defun run-pending-finalizers (&aux (hashtable (finalizer-id-map **finalizer-store**))
-                                    (ran-bg-compile)
-                                    (ran-a-system-finalizer)
-                                    (system-finalizer-scratchpad (list 0))
-                                    (ran-a-user-finalizer))
-  (declare (truly-dynamic-extent system-finalizer-scratchpad))
+(defun run-user-finalizer (&aux (hashtable (finalizer-id-map **finalizer-store**)))
   ;; This never acquires the finalizer store lock. Code accordingly.
-  (loop
-   ;; Perform no further work if trying to stop the thread, even if there is work.
-   #+sb-thread (when (zerop finalizer-thread-runflag) (return))
-   ;; Try to run a background compilation task
-   (when *bg-compiler-function* (setq ran-bg-compile (funcall *bg-compiler-function*)))
-   ;; Try to run 1 system finalizer
-   (setq ran-a-system-finalizer (sb-vm::immobile-code-dealloc-1 system-finalizer-scratchpad))
-   ;; Try to run 1 user finalizer
-   (let ((cell (hash-table-culled-values hashtable)))
+  (let ((cell (hash-table-culled-values hashtable)))
      ;; This is like atomic-pop, but its obtains the first cons cell
      ;; in the list, not the car of the first cons.
      ;; Possible TODO: when no other work remains, free the *JOINABLE-THREADS*,
@@ -304,7 +289,6 @@ Examples:
            (if (simple-vector-p finalizers)
                (map nil #'call finalizers)
                (call finalizers)))
-         (setq ran-a-user-finalizer t)
          ;; While the assignment to (SVREF STORE ID) should have been adequate,
          ;; we don't know that the vector is current - a new vector could have
          ;; gotten assigned into **FINALIZER-STORE** in between [1] and [2],
@@ -322,13 +306,24 @@ Examples:
          ;; removing dangling references, but if it's just a function,
          ;; there's nothing to smash.
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
-               ((consp finalizers) (rplaca finalizers 0))))))
-   ;; Did this iteration do anything at all?
-   (unless (or ran-bg-compile ran-a-system-finalizer ran-a-user-finalizer)
-     (return))
-   (setq ran-bg-compile nil
-         ran-a-system-finalizer nil
-         ran-a-user-finalizer nil)))
+               ((consp finalizers) (rplaca finalizers 0))))
+       t)))
+
+(define-load-time-global *bg-compiler-function* nil)
+(defun run-pending-finalizers (&aux (system-finalizer-scratchpad (list 0)))
+  (declare (truly-dynamic-extent system-finalizer-scratchpad))
+  (loop
+   ;; Perform no further work if trying to stop the thread, even if there is work.
+   #+sb-thread (when (zerop finalizer-thread-runflag) (return))
+   (let ((ran-bg-compile ; Try to run a background compilation task
+          (when *bg-compiler-function* (funcall *bg-compiler-function*)))
+         (ran-a-system-finalizer ; Try to run 1 system finalizer
+          (sb-vm::immobile-code-dealloc-1 system-finalizer-scratchpad))
+         (ran-a-user-finalizer ; Try to run 1 user finalizer
+          (run-user-finalizer)))
+     ;; Did this iteration do anything at all?
+     (unless (or ran-bg-compile ran-a-system-finalizer ran-a-user-finalizer)
+       (return)))))
 
 (define-load-time-global *finalizer-thread* nil)
 (declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
