@@ -1251,6 +1251,45 @@
                     (delete-vop vop)))))))
     nil))
 
+(defmacro vop-bind (args results vop &body body)
+  (flet ((gen (accessor operands)
+           (loop for op in operands
+                 for name = (gensym "TN-REF")
+                 and tn-ref = `(,accessor ,vop) then `(tn-ref-across ,name)
+                 collect `(,name ,tn-ref)
+                 collect `(,op (tn-ref-tn ,name)))))
+   `(let* (,@(gen 'vop-args args)
+           ,@(gen 'vop-results results))
+      ,@body)))
+
+(defun tn-reader (tn &key single-writer
+                          single-reader)
+  (let ((reads (tn-reads tn))
+        (writes (tn-writes tn)))
+   (and reads writes
+        (not (and single-reader
+                  (tn-ref-next reads)))
+        (not (and single-writer
+                  (tn-ref-next writes)))
+        (tn-ref-vop reads))))
+
+(defoptimizer (vop-optimize sb-vm::move-from-word/fixnum)
+    (vop)
+  (vop-bind (in) (out) vop
+    (let ((to (tn-reader out :single-writer t)))
+      (when (and to
+                 (eq (vop-name to) 'sb-vm::move-to-word/fixnum))
+        (vop-bind (in2) (out2) to
+          (when (eq out in2)
+            (emit-and-insert-vop
+             (vop-node to) (vop-block to)
+             (template-or-lose 'sb-vm::word-move)
+             (reference-tn in nil)
+             (reference-tn out2 t)
+             to)
+            (delete-vop to)
+            nil))))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))
