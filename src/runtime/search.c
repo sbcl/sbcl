@@ -176,7 +176,7 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
         struct instance* table = (struct instance*)
           native_pointer(table_selector ? pkg->external_symbols : pkg->internal_symbols);
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
-        gc_assert(listp(table->slots[INSTANCE_DATA_START]));
+        gc_assert(listp(table->slots[INSTANCE_DATA_START])); // KLUDGE
         struct cons* cells = (void*)native_pointer(table->slots[INSTANCE_DATA_START]);
         gc_assert(simple_vector_p(cells->cdr));
         struct vector* v = VECTOR(cells->cdr);

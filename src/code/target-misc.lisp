@@ -250,18 +250,3 @@ version 1[.0.0...] or greater."
   (declare (type (or null string) string))
   (push (list string name doc-type) sb-pcl::*!docstrings*)
   string)
-
-(in-package "SB-LOCKLESS")
-;;; Specialized list variants will be created for
-;;;  fixnum, integer, real, string, generic "comparable"
-;;; but the node type and list type is the same regardless of key type.
-(defstruct (linked-list
-            (:constructor %make-lfl
-                          (head inserter deleter finder inequality equality))
-            (:conc-name list-))
-  (head       nil :type list-node :read-only t)
-  (inserter   nil :type function :read-only t)
-  (deleter    nil :type function :read-only t)
-  (finder     nil :type function :read-only t)
-  (inequality nil :type function :read-only t)
-  (equality   nil :type function :read-only t))

@@ -19,6 +19,7 @@
 #include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "genesis/list-node.h"
 #include "code.h"
 #include "immobile-space.h"
 #include "queue.h"
@@ -247,8 +248,8 @@ static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
     gc_mark_obj(layout);
 #endif
     if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
-        struct instance* node = (struct instance*)where;
-        lispobj next = node->slots[INSTANCE_DATA_START];
+        struct list_node* node = (void*)where;
+        lispobj next = node->_node_next;
         // ignore if 0
         if (fixnump(next) && next) __mark_obj(next|INSTANCE_POINTER_LOWTAG);
     }

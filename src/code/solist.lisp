@@ -40,25 +40,6 @@
           so-insert so-delete so-find
           so-maplist))
 
-;; For testing, uses 8 bit from the key's hash plus the wired bit,
-;; because 8 is easy to understand.
-;(defconstant +hash-nbits+ 9) ; for testing
-;; NODE-HASH is a fixnum. Not sure whether negatives d.t.r.t
-(defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits)
-
-(defstruct (split-ordered-list
-            (:include linked-list)
-            (:conc-name so-)
-            (:copier nil)
-            (:constructor %%make-split-ordered-list
-             (head hashfun inserter deleter finder
-              inequality equality valuesp)))
-  (hashfun #'error :type (sfunction (t) (and fixnum unsigned-byte)))
-  (bins '(#() . 1) :type (cons simple-vector (integer 1 (#.+hash-nbits+))))
-  (count 0 :type sb-ext:word)
-  ;; If VALUESP is NIL, then this is a set, otherwise it is a map.
-  (valuesp nil))
-
 (defmethod print-object ((self split-ordered-list) stream)
   (print-unreadable-object (self stream :type t :identity t)
     (format stream "~d keys, ~d bins" (so-count self)
@@ -101,7 +82,9 @@
 (declaim (ftype (sfunction (fixnum) so-node) make-so-dummy-node))
 (defun make-so-dummy-node (hash)
   (declare (inline %make-so-dummy-node))
-  (%make-so-dummy-node (the (satisfies evenp) hash)))
+  ;; CROSS-TYPEP croaks on (THE (SATISFIES EVENP) HASH)
+  ;; I think we're OK leaving out the assertion.
+  (%make-so-dummy-node hash))
 
 (declaim (ftype (sfunction (fixnum t t t) so-key-node) make-so-node))
 (defun make-so-node (hash key datap data)

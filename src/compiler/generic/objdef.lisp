@@ -731,12 +731,46 @@ during backtrace.
 ;;; and the end-of-list node to be static so IMMEDIATE-CONSTANT-SC is true of it.
 ;;; Thereby the C implementation is easier as well.
 (in-package "SB-LOCKLESS")
-(def!struct (list-node
+(sb-xc:defstruct (list-node
              (:conc-name nil)
              (:constructor %make-sentinel-node ())
              (:copier nil))
     (%node-next nil))
-#+sb-xc-host (defvar +tail+ (%make-sentinel-node))
+;;; We look for +TAIL+ in IMMEDIATE-CONSTANT-SC.
+#+sb-xc-host
+(progn (defstruct list-node)
+       (defvar +tail+ (make-list-node)))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; This constant is magic and is assigned by genesis
   (setf (info :variable :kind '+tail+) :constant))
+
+;;; Specialized list variants will be created for
+;;;  fixnum, integer, real, string, generic "comparable"
+;;; but the node type and list type is the same regardless of key type.
+(sb-xc:defstruct (linked-list
+                   (:constructor %make-lfl
+                                 (head inserter deleter finder inequality equality))
+                   (:conc-name list-))
+  (head       nil :type list-node :read-only t)
+  (inserter   nil :type function :read-only t)
+  (deleter    nil :type function :read-only t)
+  (finder     nil :type function :read-only t)
+  (inequality nil :type function :read-only t)
+  (equality   nil :type function :read-only t))
+
+;; NODE-HASH is a fixnum. Negatives probably don't do the right thing
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits))
+(sb-xc:defstruct (split-ordered-list
+                   (:include linked-list)
+                   (:conc-name so-)
+                   (:copier nil)
+                   (:constructor %%make-split-ordered-list
+                    (head hashfun inserter deleter finder
+                     inequality equality valuesp)))
+  (hashfun #'error :type (sfunction (t) (and fixnum unsigned-byte)))
+  (bins '(#() . 1) :type (cons simple-vector (integer 1 (#.+hash-nbits+))))
+  (count 0 :type sb-ext:word)
+  ;; If VALUESP is NIL, then this is a set, otherwise it is a map.
+  (valuesp nil))

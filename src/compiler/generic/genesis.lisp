@@ -3520,7 +3520,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
               (descriptor-bits (cold-intern symbol))
               (+ sb-vm:nil-value
                  (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
-  (format stream "#define LFLIST_TAIL_ATOM LISPBOJ(0x~X)~%"
+  (format stream "#define LFLIST_TAIL_ATOM LISPOBJ(0x~X)~%"
           (descriptor-bits *lflist-tail-atom*))
   #+sb-thread
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
@@ -4202,6 +4202,8 @@ III. initially undefined function references (alphabetically):
                                   stream "hash_table"))
         (dolist (class '(defstruct-description defstruct-slot-description
                          package
+                         ;; FIXME: probably these should be external?
+                         sb-lockless::list-node sb-lockless::split-ordered-list
                          sb-vm::arena sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)

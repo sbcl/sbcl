@@ -203,10 +203,10 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
             }
             if (lockfree_list_node_layout_p(LAYOUT(layout))) {
-                struct instance* node = (struct instance*)object;
-                lispobj next = node->slots[INSTANCE_DATA_START];
+                struct list_node* node = (void*)object;
+                lispobj next = node->_node_next;
                 if (fixnump(next) && next)
-                  CHECK(next | INSTANCE_POINTER_LOWTAG, node->slots+INSTANCE_DATA_START);
+                  CHECK(next | INSTANCE_POINTER_LOWTAG, &node->_node_next);
             }
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) CHECK(object[1+i], object+1+i);

@@ -540,6 +540,8 @@
  ("src/code/fdefinition"       :not-host)
  ("src/code/query"  :not-host)
  ("src/code/sort"  :not-host)
+ ("src/code/target-lflist" :not-host)
+ ("src/code/solist" :not-host)
  ("src/code/final" :not-host)
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)
@@ -626,9 +628,7 @@
   ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
   "src/code/icf"
-  "src/code/defpackage"
-  "src/code/target-lflist"
-  "src/code/solist")
+  "src/code/defpackage")
 
  #+sb-fasteval
  ("src/interpreter/macros"

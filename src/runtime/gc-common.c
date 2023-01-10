@@ -44,6 +44,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "genesis/list-node.h"
 #define WANT_SCAV_TRANS_SIZE_TABLES
 #include "gc-internal.h"
 #include "gc-private.h"
@@ -632,11 +633,11 @@ scav_instance_pointer(lispobj *where, lispobj object)
             // Copy chain of lockfree list nodes to consecutive memory addresses,
             // just like trans_list does.  A logically deleted node will break the chain,
             // as its 'next' will not satisfy instancep(), but that's ok.
-            while (instancep(object = node->slots[INSTANCE_DATA_START]) // node.next
+            while (instancep(object = ((struct list_node*)node)->_node_next)
                    && from_space_p(object)
                    && !forwarding_pointer_p(native_pointer(object))) {
                 copy = copy_instance(object);
-                node->slots[INSTANCE_DATA_START] = copy;
+                ((struct list_node*)node)->_node_next = copy;
                 node = INSTANCE(copy);
                 // We don't have to stop upon seeing an instance with a different layout.
                 // The only other object in the 'next' chain could be *TAIL-ATOM* if we reach
@@ -892,14 +893,14 @@ scav_instance(lispobj *where, lispobj header)
     // GC doesn't care too much about the deletion algorithm, but does have to
     // ensure liveness of the pointee, which may move unless pinned.
     if (lockfree_list_node_layout_p(layout)) {
-        struct instance* node = (struct instance*)where;
-        lispobj next = node->slots[INSTANCE_DATA_START];
+        struct list_node* node = (struct list_node*)where;
+        lispobj next = node->_node_next;
         if (fixnump(next) && next) { // ignore initially 0 heap words
             lispobj descriptor = next | INSTANCE_POINTER_LOWTAG;
             scav1(&descriptor, descriptor);
             // Fix the pointer but of course leave it in mid-deletion (untagged) state.
             if (descriptor != (next | INSTANCE_POINTER_LOWTAG))
-                node->slots[INSTANCE_DATA_START] = descriptor & ~LOWTAG_MASK;
+                node->_node_next = descriptor & ~LOWTAG_MASK;
         }
     }
 

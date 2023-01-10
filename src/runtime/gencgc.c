@@ -51,6 +51,7 @@
 #include "genesis/simple-fun.h"
 #include "save.h"
 #include "genesis/hash-table.h"
+#include "genesis/list-node.h"
 #include "genesis/instance.h"
 #include "genesis/layout.h"
 #include "hopscotch.h"
@@ -2795,7 +2796,7 @@ static inline void protect_page(void* page_addr)
 }
 #endif
 
-#define LOCKFREE_LIST_NEXT(x) ((struct instance*)x)->slots[INSTANCE_DATA_START]
+#define LOCKFREE_LIST_NEXT(x) ((struct list_node*)x)->_node_next
 
 /* Helper function for update_writeprotection.
  * If the [where,limit) contain an old->young pointer, then return
@@ -3895,7 +3896,7 @@ static void scan_explicit_pins(__attribute__((unused)) struct thread* th)
                 /* A logically-deleted explicitly-pinned lockfree list node pins its
                  * successor too, since Lisp reconstructs the next node's tagged pointer
                  * from an untagged pointer currently stored in %NEXT of this node. */
-                lispobj successor = instance->slots[INSTANCE_DATA_START];
+                lispobj successor = ((struct list_node*)instance)->_node_next;
                 // Be sure to ignore an uninitialized word containing 0.
                 if (successor && fixnump(successor))
                     pin_exact_root(successor | INSTANCE_POINTER_LOWTAG);
