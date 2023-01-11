@@ -373,6 +373,19 @@
   (setf (documentation 'bug-643958-test 'function) "bar")
   (assert (equal "bar" (documentation 'bug-643958-test 'function))))
 
+(defmacro test-macro-function ()
+  "foo"
+  :dong!)
+
+(with-test (:name (documentation :macro-function))
+  (assert (equal
+           "foo"
+           (documentation (macro-function 'test-macro-function) 'function)))
+  (setf (documentation (macro-function 'test-macro-function) 'function) "bar")
+  (assert (equal
+           "bar"
+           (documentation (macro-function 'test-macro-function) 'function))))
+
 (with-test (:name (:endianness :in *features*))
   (assert
    (or (member :big-endian *features*)

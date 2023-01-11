@@ -240,7 +240,9 @@
       (documentation it t)))
 
   (defmethod documentation ((x list) (doc-type (eql 'function)))
-    (maybe-function-documentation x))
+    (if (eql (car x) 'macro-function)
+        (maybe-function-documentation (cadr x))
+        (maybe-function-documentation x)))
 
   (defmethod documentation ((x symbol) (doc-type (eql 'function)))
     (maybe-function-documentation x))
@@ -256,7 +258,9 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (set-function-name-documentation x new-value))
+  (if (eql (car x) 'macro-function)
+      (set-function-name-documentation (cadr x) new-value)
+      (set-function-name-documentation x new-value)))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
