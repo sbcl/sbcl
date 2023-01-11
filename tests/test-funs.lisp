@@ -37,7 +37,10 @@
         (start-time (get-internal-real-time)))
     (declare (special test-util::*deferred-test-forms*))
     (makunbound 'test-util::*deferred-test-forms*)
-    (let ((*features* (append *features* sb-impl:+internal-features+)))
+    (let ((*features* (append *features* #+(and (or arm arm64) (not darwin))
+                                         (unless (getf (sb-int:get-floating-point-modes) :traps)
+                                           '(:no-float-traps))
+                                         sb-impl:+internal-features+)))
       (load file :external-format :utf-8))
     (when (boundp 'test-util::*deferred-test-forms*)
       ;; Execute all tests that were wrapped in WITH-TEST

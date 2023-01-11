@@ -6126,8 +6126,8 @@
 (with-test (:name :reducing-constants.2)
   (checked-compile-and-assert (:allow-style-warnings t)
       `(lambda () (*  1.0 2 (expt 2 127)))
-    (() #-(or (and arm64 (not darwin)) arm) (condition 'floating-point-overflow)
-        #+(or (and arm64 (not darwin)) arm) sb-ext:single-float-positive-infinity)))
+    (() #-no-float-traps (condition 'floating-point-overflow)
+        #+no-float-traps sb-ext:single-float-positive-infinity)))
 
 (with-test (:name (logbitp :past fixnum))
   (checked-compile-and-assert ()
