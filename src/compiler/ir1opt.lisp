@@ -123,8 +123,8 @@
 
 ;;; Return the derived type for LVAR's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
-(declaim (ftype (sfunction (lvar) ctype) lvar-type))
 (defun lvar-type (lvar)
+  (declare (type lvar lvar) #-sb-xc-host (values ctype))
   (single-value-type (lvar-derived-type lvar)))
 
 ;;; LVAR-CONSERVATIVE-TYPE

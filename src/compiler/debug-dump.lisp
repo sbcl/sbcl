@@ -142,10 +142,11 @@
 ;;; variables dumped, compute a bit-vector representing the set of
 ;;; live variables. If the TN is environment-live, we only mark it as
 ;;; live when it is in scope at NODE.
-(declaim (ftype (sfunction (local-tn-bit-vector node ir2-block hash-table (or null vop))
-                           simple-bit-vector)
-                compute-live-vars))
 (defun compute-live-vars (live node block var-locs vop)
+  (declare (type ir2-block block) (type local-tn-bit-vector live)
+           (type hash-table var-locs) (type node node)
+           (type (or vop null) vop)
+           #-sb-xc-host (values simple-bit-vector))
   (let ((res (make-array (logandc2 (+ (hash-table-count var-locs) 7) 7)
                          :element-type 'bit
                          :initial-element 0))

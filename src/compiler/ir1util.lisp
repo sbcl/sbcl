@@ -71,12 +71,12 @@
 ;;;; lvar use hacking
 
 ;;; Return a list of all the nodes which use LVAR.
-(declaim (ftype (sfunction (lvar) list) find-uses))
 (defun find-uses (lvar)
+  (declare (type lvar lvar) #-sb-xc-host (values list))
   (ensure-list (lvar-uses lvar)))
 
-(declaim (ftype (sfunction (lvar) lvar) principal-lvar))
 (defun principal-lvar (lvar)
+  (declare (type lvar lvar))
   (labels ((pl (lvar)
              (let ((use (lvar-uses lvar)))
                (if (cast-p use)
@@ -151,12 +151,11 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
 ;;; changed.
-(declaim (ftype (sfunction (node) (values))
-                delete-lvar-use
-                %delete-lvar-use))
+
 ;;; Just delete NODE from its LVAR uses; LVAR is preserved so it may
 ;;; be given a new use.
 (defun %delete-lvar-use (node)
+  (declare (type node node))
   (let ((lvar (node-lvar node)))
     (when lvar
       (if (listp (lvar-uses lvar))
@@ -171,6 +170,7 @@
 ;;; Delete NODE from its LVAR uses; if LVAR has no other uses, delete
 ;;; its DEST's block, which must be unreachable.
 (defun delete-lvar-use (node)
+  (declare (type node node))
   (let ((lvar (node-lvar node)))
     (when lvar
       (%delete-lvar-use node)
@@ -187,8 +187,8 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
 ;;; changed.
-(declaim (ftype (sfunction (node (or lvar null)) (values)) add-lvar-use))
 (defun add-lvar-use (node lvar)
+  (declare (type node node) (type (or lvar null) lvar))
   (aver (not (node-lvar node)))
   (when lvar
     (let ((uses (lvar-uses lvar)))
@@ -293,15 +293,16 @@
 (defun node-to-be-deleted-p (node)
   (block-to-be-deleted-p (node-block node)))
 
-(declaim (ftype (sfunction (clambda) cblock) lambda-block))
-(defun lambda-block (clambda)
-  (node-block (lambda-bind clambda)))
-(declaim (ftype (sfunction (clambda) component) lambda-component))
-(defun lambda-component (clambda)
-  (block-component (lambda-block clambda)))
+(defun lambda-block (lambda)
+  (declare (type clambda lambda))
+  (node-block (lambda-bind lambda)))
 
-(declaim (ftype (sfunction (cblock) node) block-start-node))
+(defun lambda-component (lambda)
+  (declare (type clambda lambda))
+  (block-component (lambda-block lambda)))
+
 (defun block-start-node (block)
+  (declare (type cblock block))
   (ctran-next (block-start block)))
 
 
@@ -887,17 +888,17 @@
 
 ;;; Return the (reversed) list for the PATH in the original source
 ;;; (with the Top Level Form number last).
-(declaim (ftype (sfunction (list) list) source-path-original-source))
 (defun source-path-original-source (path)
-  (declare (list path) (inline member))
+  (declare (list path) (inline member)
+           #-sb-xc-host (values list))
   (cddr (member 'original-source-start path :test #'eq)))
 
 ;;; Return the Form Number of PATH's original source inside the Top
 ;;; Level Form that contains it. This is determined by the order that
 ;;; we walk the subforms of the top level source form.
-(declaim (ftype (sfunction (list) (or null index)) source-path-form-number))
 (defun source-path-form-number (path)
-  (declare (inline member))
+  (declare (type list path) (inline member)
+           #-sb-xc-host (values (or null index)))
   (cadr (member 'original-source-start path :test #'eq)))
 
 ;;; Return a list of all the enclosing forms not in the original
@@ -1266,8 +1267,9 @@
 
 ;;; Unlink a block from the next/prev chain. We also null out the
 ;;; COMPONENT.
-(declaim (ftype (sfunction (cblock) (values)) remove-from-dfo))
+(declaim (inline remove-from-dfo))
 (defun remove-from-dfo (block)
+  (declare (type cblock block))
   (let ((next (block-next block))
         (prev (block-prev block)))
     (setf (block-component block) nil)
@@ -1277,6 +1279,7 @@
 
 ;;; Add BLOCK to the next/prev chain following AFTER. We also set the
 ;;; COMPONENT to be the same as for AFTER.
+(declaim (inline add-to-dfo))
 (defun add-to-dfo (block after)
   (declare (type cblock block after))
   (let ((next (block-next after))
@@ -1291,8 +1294,8 @@
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
-(declaim (ftype (sfunction (component) (values)) clear-flags))
 (defun clear-flags (component)
+  (declare (type component component))
   (let ((head (component-head component))
         (tail (component-tail component)))
     (setf (block-flag head) t)
@@ -1303,8 +1306,8 @@
 
 ;;; Make a component with no blocks in it. The BLOCK-FLAG is initially
 ;;; true in the head and tail blocks.
-(declaim (ftype (sfunction () component) make-empty-component))
 (defun make-empty-component ()
+  #-sb-xc-host (declare (values component))
   (let* ((head (make-block-key :start nil :component nil))
          (tail (make-block-key :start nil :component nil))
          (res (make-component head tail)))
@@ -2313,8 +2316,8 @@ is :ANY, the function name is not checked."
 
 ;;;; functional hackery
 
-(declaim (ftype (sfunction (functional) clambda) main-entry))
 (defun main-entry (functional)
+  (declare (type functional functional) #-sb-xc-host (values clambda))
   (etypecase functional
     (clambda functional)
     (optional-dispatch
@@ -2324,8 +2327,9 @@ is :ANY, the function name is not checked."
 ;;; MV-BIND when it appears in an MV-CALL. All fixed arguments must be
 ;;; optional with null default and no SUPPLIED-P. There must be a
 ;;; &REST arg with no references.
-(declaim (ftype (sfunction (functional) boolean) looks-like-an-mv-bind))
 (defun looks-like-an-mv-bind (functional)
+  (declare (type functional functional)
+           #-sb-xc-host (values boolean))
   (and (optional-dispatch-p functional)
        (do ((arg (optional-dispatch-arglist functional) (cdr arg)))
            ((null arg) nil)
@@ -2356,6 +2360,7 @@ is :ANY, the function name is not checked."
 ;;; Return true if function is an external entry point. This is true
 ;;; of normal XEPs (:EXTERNAL kind) and also of top level lambdas
 ;;; (:TOPLEVEL kind.)
+(declaim (inline xep-p))
 (defun xep-p (fun)
   (declare (type functional fun))
   (not (null (member (functional-kind fun) '(:external :toplevel)))))
@@ -2514,10 +2519,9 @@ is :ANY, the function name is not checked."
 ;;; resulting of the evaluation. If an error is signalled during the
 ;;; application, then return the condition and NIL as the
 ;;; second value.
-(declaim (ftype (sfunction ((or symbol function) list)
-                          (values t boolean))
-                careful-call))
 (defun careful-call (function args)
+  (declare (type (or symbol function) function)
+           (type list args))
   (handler-case (values (multiple-value-list (apply function args)) t)
     ;; When cross-compiling, being "careful" is the wrong thing - our code should
     ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
@@ -2558,9 +2562,8 @@ is :ANY, the function name is not checked."
 ;;; lvars ARGS. It returns the lvar if the keyword is present, or NIL
 ;;; otherwise. The legality and constantness of the keywords should
 ;;; already have been checked.
-(declaim (ftype (sfunction (list keyword) (or lvar null))
-                find-keyword-lvar))
 (defun find-keyword-lvar (args key)
+  (declare (type list args) (type keyword key))
   (do ((arg args (cddr arg)))
       ((null arg) nil)
     (when (eq (lvar-value (first arg)) key)
@@ -2569,8 +2572,8 @@ is :ANY, the function name is not checked."
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that alternating lvars in ARGS are constant and that there
 ;;; is an even number of args.
-(declaim (ftype (sfunction (list) boolean) check-key-args-constant))
 (defun check-key-args-constant (args)
+  (declare (type list args) #-sb-xc-host (values boolean))
   (do ((arg args (cddr arg)))
       ((null arg) t)
     (unless (and (rest arg)
@@ -2580,8 +2583,8 @@ is :ANY, the function name is not checked."
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that the list of lvars ARGS is a well-formed &KEY arglist
 ;;; and that only keywords present in the list KEYS are supplied.
-(declaim (ftype (sfunction (list list) boolean) check-transform-keys))
 (defun check-transform-keys (args keys)
+  (declare (list args keys) #-sb-xc-host (values boolean))
   (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
            ((null arg) t)
@@ -2591,8 +2594,8 @@ is :ANY, the function name is not checked."
 ;;;; miscellaneous
 
 ;;; Called by the expansion of the EVENT macro.
-(declaim (ftype (sfunction (event-info (or node null)) *) %event))
 (defun %event (info node)
+  (declare (type event-info info) (type (or node null) node))
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)
              (policy (or node *lexenv*)

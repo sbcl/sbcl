@@ -1650,18 +1650,10 @@
     (trace-inst s :align bits)
     (emit s `(.align ,bits ,pattern))))
 
-;; ECL bug workaround: it miscompiles LABEL-POSITION with this decl
-;; This might be unnecessary now that I'm proclaiming an OPTIMIZE policy
-;; that seems to fix everything. It certainly was needed without that.
-;; At least by keeping this we might be able to report some specific bugs
-;; against ECL in the hope it gets fixed. Of course we can't actually ever
-;; remove workarounds.
-#-host-quirks-ecl
-(declaim (ftype (sfunction (label &optional t index) (or null index))
-                label-position))
 (defun label-position (label &optional if-after delta)
   "Return the current position for LABEL. Chooser maybe-shrink functions
    should supply IF-AFTER and DELTA in order to ensure correct results."
+  (declare #-sb-xc-host (values (or null index)))
   (let ((posn (label-posn label)))
     (if (and if-after (> posn if-after))
         (- posn delta)
