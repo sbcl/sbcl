@@ -468,6 +468,14 @@ triggers."
                    (push timer timers)))
         (run-timers)))))
 
+#+unix
+(defun sb-unix::sigalrm-handler (signal info context)
+  (declare (ignore signal info context))
+  ;; Safepoint invokes the "signal handler" without a signal context,
+  ;; since it's not a signal handler.
+  #-sb-safepoint (declare (type system-area-pointer context))
+  (run-expired-timers))
+
 (defun timeout-cerror (&optional seconds)
   (cerror "Continue" 'timeout :seconds seconds))
 

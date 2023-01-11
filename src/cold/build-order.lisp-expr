@@ -538,7 +538,6 @@
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
  ("src/code/fdefinition"       :not-host)
- ("src/code/query"  :not-host)
  ("src/code/sort"  :not-host)
  ("src/code/target-lflist" :not-host)
  ("src/code/solist" :not-host)
@@ -546,7 +545,6 @@
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)
  ("src/code/pprint" :not-host)
-
 
  ("src/code/target-defstruct"  :not-host)
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
@@ -563,7 +561,6 @@
  ("src/code/gc"                :not-host)
  ("src/code/avltree"           :not-host)
  ("src/code/target-thread"     :not-host)
- ("src/code/timer" :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
@@ -724,6 +721,8 @@
   #+win32 "src/code/warm-mswin"
   #+gencgc "src/code/traceroot"
 
+  "src/code/query"
+  "src/code/timer"
   "src/code/repack-xref"
   #+cheneygc "src/code/purify"
   "src/code/module"

@@ -165,13 +165,6 @@
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
-(defun sigalrm-handler (signal info context)
-  (declare (ignore signal info context))
-  ;; Safepoint invokes the "signal handler" without a signal context,
-  ;; since it's not a signal handler.
-  #-sb-safepoint (declare (type system-area-pointer context))
-  (sb-impl::run-expired-timers))
-
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
   (exit))
@@ -203,7 +196,8 @@
       (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
   #-(or linux android) (%install-handler sigsys #'sigsys-handler)
-  (%install-handler sigalrm #'sigalrm-handler)
+  (when (fboundp 'sigalrm-handler) ; defined in warm build
+    (%install-handler sigalrm (symbol-function 'sigalrm-handler)))
   #-sb-safepoint (%install-handler sigurg #'sigurg-handler)
   (%install-handler sigchld #'sigchld-handler)
   ;; Don't want to silently quit on broken pipes.
