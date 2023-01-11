@@ -634,9 +634,6 @@ SBCL has deleted or deprecated some nonstandard features and code
 complexity which helped efficiency at the price of
 maintainability. For example, the SBCL compiler no longer implements
 memory pooling internally (and so is simpler and more maintainable,
-but generates more garbage and runs more slowly), and various
-block-compilation efficiency-increasing extensions to the language
-have been deleted or are no longer used in the implementation of SBCL
-itself.
+but generates more garbage and runs more slowly).
 
 @end itemize
