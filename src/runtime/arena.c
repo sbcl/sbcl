@@ -494,7 +494,8 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
 void arena_mprotect(lispobj arena, int option)
 {
 #ifndef LISP_FEATURE_WIN32
-    int prot = option ? PROT_NONE : (PROT_READ|PROT_WRITE|PROT_EXEC);
+    // PROT_EXEC is not needed. Code blobs always go to dynamic or immobile space
+    int prot = option ? PROT_NONE : (PROT_READ|PROT_WRITE /*|PROT_EXEC*/);
     struct arena* a = (void*)native_pointer(arena);
     struct arena_memblk* blk = (void*)a->uw_first_block;
     do {
