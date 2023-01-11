@@ -61,6 +61,10 @@
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
     `(progn
+       ;; TBH this looks suspicious to me - when we emit more than one ADD, the intermediate
+       ;; value is a random pointer. How do we know it won't harm GC?
+       ;; We could at least try to compute ADD operands that leave the register
+       ;; always pointing to the base of _something_ _valid_ in static space.
        (composite-immediate-instruction add ,reg null-tn (static-symbol-offset ,symbol)))))
 
 (defmacro load-symbol-value (reg symbol &optional (predicate :al))

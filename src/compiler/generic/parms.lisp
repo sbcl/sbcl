@@ -222,6 +222,12 @@
     *immobile-codeblob-tree* ; for generations 0 through 5 inclusive
     *immobile-codeblob-vector* ; for pseudo-static-generation
     *dynspace-codeblob-tree*
+    ;; these are here because I encountered "cannot encode immediate operand"
+    ;; on 32-bit arm when adding 3 static symbols in a large change.
+    ;; I want to disentangle that problem from the actual change.
+    *ss-pad1*
+    *ss-pad2*
+    *ss-pad3*
 
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread

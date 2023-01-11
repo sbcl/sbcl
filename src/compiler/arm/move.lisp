@@ -60,16 +60,10 @@
        (load-symbol y val))
       (structure-object
        (if (eq val sb-lockless:+tail+)
-           ;; The ADD operand can't be encoded into one instruction.
-           ;; I don't see how COMPOSITE-IMMEDIATE-INSTRUCTION is necessarily safe to use,
-           ;; as it produces a wild pointer for its intermediate result.
-           ;; Static symbols can be reached using a single ADD because the low 2 bits
-           ;; of the offset are 0. So compute the last static symbol and then add some more.
-           (let ((symbol '#.(elt +static-symbols+ (1- (length +static-symbols+)))))
-             (inst add y null-tn (static-symbol-offset symbol))
-             (inst add y y (+ (- other-pointer-lowtag)
-                              (ash (align-up symbol-size 2) word-shift)
-                              instance-pointer-lowtag)))
+           ;; same comment as for LOAD-SYMBOL - how is this guaranteed
+           ;; to be GC-safe ? Because we always ignore static-space pointers ?
+           (composite-immediate-instruction add y null-tn
+             (- sb-vm::lockfree-list-tail-value sb-vm:nil-value))
            (bug "immediate structure-object ~S" val))))))
 
 (define-move-fun (load-number 1) (vop x y)
