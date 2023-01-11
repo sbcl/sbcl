@@ -281,10 +281,10 @@
              (lvar-almost-immediately-used-p lvar))))))
 
 
-;;;; BLOCK UTILS
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)
+  (declare (type cblock block))
   (or (block-delete-p block)
       (eq (functional-kind (block-home-lambda block)) :deleted)))
 
@@ -303,13 +303,6 @@
 (declaim (ftype (sfunction (cblock) node) block-start-node))
 (defun block-start-node (block)
   (ctran-next (block-start block)))
-
-;;; Return the enclosing cleanup for environment of the first or last
-;;; node in BLOCK.
-(defun block-start-cleanup (block)
-  (node-enclosing-cleanup (block-start-node block)))
-(defun block-end-cleanup (block)
-  (node-enclosing-cleanup (block-last block)))
 
 
 ;;;; lvar substitution
@@ -617,6 +610,24 @@
   (declare (type node node) #-sb-xc-host (inline node-home-lambda))
   (the environment (lambda-environment (node-home-lambda node))))
 
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
+(defun block-start-cleanup (block)
+  (node-enclosing-cleanup (block-start-node block)))
+(defun block-end-cleanup (block)
+  (node-enclosing-cleanup (block-last block)))
+
+;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(defun block-home-lambda (block)
+  (declare (type cblock block)
+           #-sb-xc-host (inline node-home-lambda))
+  (node-home-lambda (block-last block)))
+
+;;; Return the IR1 environment for BLOCK.
+(defun block-environment (block)
+  (declare (type cblock block))
+  (lambda-environment (block-home-lambda block)))
+
 (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
   (awhen (node-lvar node)
@@ -696,55 +707,6 @@
         ;; Is it declared flushable locally?
         (let ((name (lvar-fun-name (combination-fun call) t)))
           (memq name (lexenv-flushable (node-lexenv call)))))))
-
-;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
-;;; if there is none.
-;;;
-;;; There can legitimately be no home lambda in dead code early in the
-;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
-;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
-;;; where the block is just a placeholder during parsing and doesn't
-;;; actually correspond to code which will be written anywhere.
-(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
-(defun block-home-lambda-or-null (block)
-  #-sb-xc-host (declare (inline node-home-lambda))
-  (if (node-p (block-last block))
-      ;; This is the old CMU CL way of doing it.
-      (node-home-lambda (block-last block))
-      ;; Now that SBCL uses this operation more aggressively than CMU
-      ;; CL did, the old CMU CL way of doing it can fail in two ways.
-      ;;   1. It can fail in a few cases even when a meaningful home
-      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
-      ;;      an IF.
-      ;;   2. It can fail when converting a form which is born orphaned
-      ;;      so that it never had a meaningful home lambda, e.g. a form
-      ;;      which follows a RETURN-FROM or GO form.
-      (let ((pred-list (block-pred block)))
-        ;; To deal with case 1, we reason that
-        ;; previous-in-target-execution-order blocks should be in the
-        ;; same lambda, and that they seem in practice to be
-        ;; previous-in-compilation-order blocks too, so we look back
-        ;; to find one which is sufficiently initialized to tell us
-        ;; what the home lambda is.
-        (if pred-list
-            ;; We could get fancy about this, flooding through the
-            ;; graph of all the previous blocks, but in practice it
-            ;; seems to work just to grab the first previous block and
-            ;; use it.
-            (node-home-lambda (block-last (first pred-list)))
-            ;; In case 2, we end up with an empty PRED-LIST and
-            ;; have to punt: There's no home lambda.
-            nil))))
-
-;;; Return the non-LET LAMBDA that holds BLOCK's code.
-(defun block-home-lambda (block)
-  (declare (type cblock block))
-  (the clambda (block-home-lambda-or-null block)))
-
-;;; Return the IR1 environment for BLOCK.
-(defun block-environment (block)
-  (declare (type cblock block))
-  (lambda-environment (block-home-lambda block)))
 
 ;;;; DYNAMIC-EXTENT related
 
@@ -915,7 +877,7 @@
           (loop for v in vars
                 for arg in (combination-args combination)
                 when (eq v var)
-                return arg))))))
+                  return arg))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
