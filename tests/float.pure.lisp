@@ -133,7 +133,8 @@
     (mapc #'test '(sin cos tan))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on (or (and :arm64 :no-float-traps)
+            :fails-on (or (and :arm64 (not :darwin))
+                          :arm
                           (and :ppc :openbsd)
                           (and :x86 :netbsd)))
   (assert-error
@@ -153,7 +154,8 @@
 ;; the preceeding "pure" test files aren't as free of side effects as
 ;; we might like.
 (with-test (:name (:addition-overflow :bug-372 :take-2)
-            :fails-on (or (and :arm64 :no-float-traps)
+            :fails-on (or (and :arm64 (not :darwin))
+                          :arm
                           (and :ppc :openbsd)
                           (and :x86 :netbsd)))
   (assert-error

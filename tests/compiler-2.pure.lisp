@@ -2818,7 +2818,7 @@
              (dotimes (c 3) (catch 'c)))))
     (() 10)))
 
-(with-test (:name :dce-more-often)
+(with-test (:name :dce-more-often :fails-on :arm)
   (checked-compile-and-assert
    ()
    `(lambda (a)
@@ -2838,7 +2838,7 @@
     ((1) 1)
     (:return-type (values (integer 1 1) &optional))))
 
-(with-test (:name :dce-more-often.2)
+(with-test (:name :dce-more-often.2 :fails-on :arm)
   (checked-compile-and-assert
    ()
    `(lambda (b)

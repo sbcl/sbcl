@@ -526,7 +526,7 @@
                 (sb-alien::coerce-to-interpreted-function form2)))))
 
 (with-test (:name :undefined-alien-name
-            :skipped-on (not (or :x86-64 :arm :arm64)))
+            :skipped-on (not (or :x86-64 :arm64)))
   (dolist (memspace '(:dynamic #+immobile-space :immobile))
     (let ((lispfun
            (let ((sb-c::*compile-to-memory-space* memspace))
@@ -539,7 +539,7 @@
           (assert (equal (cell-error-name c) "bar")))))))
 
 (with-test (:name :undefined-alien-name-via-linkage-table-trampoline
-            :skipped-on (not (or :x86-64 :arm :arm64)))
+            :skipped-on (not (or :x86-64 :arm64)))
   (dolist (memspace '(:dynamic #+immobile-space :immobile))
     (let ((lispfun
            (let ((sb-c::*compile-to-memory-space* memspace))

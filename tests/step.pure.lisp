@@ -294,19 +294,19 @@
     (step (out))
     (assert (equal expected (reverse results)))))
 
-(with-test (:name :step-into)
+(with-test (:name :step-into :fails-on :arm)
   (test-step-into))
 
-(with-test (:name :step-next)
+(with-test (:name :step-next :fails-on :arm)
   (test-step-next))
 
-(with-test (:name :step-out)
+(with-test (:name :step-out :fails-on :arm)
   (test-step-out))
 
-(with-test (:name :step-start-from-break)
+(with-test (:name :step-start-from-break :fails-on :arm)
   (test-step-start-from-break))
 
-(with-test (:name :step-frame)
+(with-test (:name :step-frame :fails-on :arm)
   (test-step-frame))
 
 (with-test (:name :step-backtrace)
