@@ -140,6 +140,19 @@
 (declaim (inline descriptor-sap))
 (defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))
 
+(defmacro widetag@baseptr (sap)
+  `(sap-ref-8 ,sap #+big-endian ,(1- n-word-bytes) #+little-endian 0))
+
+(defmacro lispobj@baseptr (sap widetag)
+  `(%make-lisp-obj
+    (logior (sap-int ,sap)
+            (logand (deref (extern-alien "widetag_lowtag" (array char 256)) ,widetag)
+                    lowtag-mask))))
+
+;;; Return an object given its base ADDRESS in the manner that DESCRIPTOR-SAP accepts.
+(defun reconstitute-object (address)
+  (let ((sap (descriptor-sap address)))
+    (lispobj@baseptr sap (widetag@baseptr sap))))
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

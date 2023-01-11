@@ -155,25 +155,6 @@
                (ash header-word (- hash-slot-present-flag))
                1))))
 
-;;; Macros not needed after this file (and avoids a redefinition warning this way)
-(eval-when (:compile-toplevel)
-(defmacro widetag@baseptr (sap)
-  #+big-endian `(sap-ref-8 ,sap ,(1- n-word-bytes))
-  #+little-endian `(sap-ref-8 ,sap 0))
-
-(defmacro lispobj@baseptr (sap widetag)
-  `(%make-lisp-obj
-    (logior (sap-int ,sap)
-            (logand (deref (extern-alien "widetag_lowtag" (array char 256)) ,widetag)
-                    lowtag-mask)))))
-
-;;; This uses the funny fixnum representation of ADDRESS. I'd like to change this
-;;; to take a SAP but god forbid people are using it?
-;;; DO NOT USE THIS! It is soon to be removed
-(defun reconstitute-object (address)
-  (let ((sap (descriptor-sap address)))
-    (lispobj@baseptr sap (widetag@baseptr sap))))
-
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
 ;;; END, calling FUN with the object, the object's type code, and the
