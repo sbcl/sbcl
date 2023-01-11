@@ -1882,7 +1882,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     ;; Emit either BIND or DYNBIND, preferring BIND if both exist.
     ;; If only one exists, it's DYNBIND.
     ;; Even if the backend supports load-time TLS index assignment,
-    ;; there might be only one vop (as with arm64).
+    ;; there might be only one vop.
     (macrolet ((doit (bind dynbind)
                  (if (gethash 'bind *backend-parsed-vops*) bind dynbind)))
       (doit

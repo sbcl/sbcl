@@ -101,8 +101,9 @@
     (:translate symbol-value)
     (:args (symbol :scs (descriptor-reg) :to :save
                    :load-if (not (and (sc-is symbol constant)
-                                      (or (symbol-always-has-tls-value-p (tn-value symbol))
-                                          (symbol-always-has-tls-index-p (tn-value symbol)))))))
+                                      (let ((pkg (sb-xc:symbol-package (tn-value symbol))))
+                                        (or (and pkg (system-package-p pkg))
+                                            (eq pkg *cl-package*)))))))
     (:arg-refs symbol-tn-ref)
     (:temporary (:sc any-reg) tls-index)
     (:variant-vars check-boundp)
@@ -380,9 +381,6 @@
   (define-vop (dynbind)
     (:args (value :scs (any-reg descriptor-reg zero) :to :save)
            (symbol :scs (descriptor-reg)
-                   :load-if (not (and (sc-is symbol constant)
-                                      (or (symbol-always-has-tls-value-p (tn-value symbol))
-                                          (symbol-always-has-tls-index-p (tn-value symbol)))))
                    :target alloc-tls-symbol))
     (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
@@ -390,28 +388,52 @@
     (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
     (:ignore free-tls-index)
     (:temporary (:scs (any-reg)) bsp)
-     (:generator 5
+    (:generator 5
       (load-binding-stack-pointer bsp)
       (inst add bsp bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp)
-      (let* ((known-symbol-p (sc-is symbol constant))
-             (known-symbol (and known-symbol-p (tn-value symbol)))
+      (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
+      (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
+      (move alloc-tls-symbol symbol)
+      (load-inline-constant lr '(:fixup alloc-tls-index :assembly-routine))
+      (inst blr lr)
+      TLS-INDEX-VALID
+      (inst ldr alloc-tls-symbol (@ thread-tn tls-index))
+      (inst stp alloc-tls-symbol tls-index
+        (@ bsp (* (- binding-value-slot binding-size)
+                 n-word-bytes)))
+      (inst str value (@ thread-tn tls-index))))
+
+  (define-vop (bind)
+    (:args (value :scs (any-reg descriptor-reg zero) :to :save))
+    (:temporary (:sc non-descriptor-reg) tls-index)
+    (:temporary (:sc descriptor-reg) temp)
+    (:info symbol)
+    (:temporary (:scs (any-reg)) bsp)
+    (:generator 5
+      (load-binding-stack-pointer bsp)
+      (inst add bsp bsp (* binding-size n-word-bytes))
+      (store-binding-stack-pointer bsp)
+      (let* ((pkg (sb-xc:symbol-package symbol))
+             ;; These symbols should have a small enough index to be
+             ;; immediately encoded.
+             (known-symbol-p (or (and pkg (system-package-p pkg))
+                                 (eq pkg *cl-package*)))
              (tls-index-reg tls-index)
-             (tls-index (if known-symbol
-                            (make-fixup known-symbol :symbol-tls-index)
+             (tls-index (if known-symbol-p
+                            (make-fixup symbol :symbol-tls-index)
                             tls-index)))
         (assemble ()
-          (cond (known-symbol
+          (cond (known-symbol-p
                  (inst movz tls-index-reg tls-index))
                 (t
-                 (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
-                 (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
-                 (move alloc-tls-symbol symbol)
-                 (load-inline-constant lr '(:fixup alloc-tls-index :assembly-routine))
-                 (inst blr lr)))
-          TLS-INDEX-VALID
-          (inst ldr alloc-tls-symbol (@ thread-tn tls-index))
-          (inst stp alloc-tls-symbol tls-index-reg
+                 (inst fixup :symbol-tls (make-fixup symbol :symbol-tls-index))
+                 ;; TODO: a fixup could replace this with a NOP and use an immediate
+                 ;; offset.
+                 (inst load-constant temp (tn-byte-offset (emit-constant symbol)))
+                 (inst ldr (32-bit-reg tls-index) (tls-index-of temp))))
+          (inst ldr temp (@ thread-tn tls-index))
+          (inst stp temp tls-index-reg
                 (@ bsp (* (- binding-value-slot binding-size)
                           n-word-bytes)))
           (inst str value (@ thread-tn tls-index))))))
