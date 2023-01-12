@@ -858,3 +858,13 @@
     (assert-tri-eq t t (subtypep t2 t1))
     (assert-tri-eq t t (subtypep `(not ,t1) `(not ,t2)))
     (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1)))))
+
+(with-test (:name (:cons-union :lp1999352))
+  (let* ((v (list :a))
+         (type1 `(cons (or atom (eql ,v))))
+         (type2 `(cons (or (member :a 2) cons) list)))
+    (let ((bug103 (compile nil
+                           `(lambda (val)
+                              (declare (type ,type1 val))
+                              (the ,type2 val)))))
+      (assert (equal (funcall bug103 (list v)) '((:a)))))))

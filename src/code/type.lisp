@@ -4799,8 +4799,7 @@ used for a COMPLEX component.~:@>"
         (car-type2 (cons-type-car-type type2))
         (cdr-type1 (cons-type-cdr-type type1))
         (cdr-type2 (cons-type-cdr-type type2))
-        car-not1
-        car-not2)
+        car-intersection)
     ;; UGH.  -- CSR, 2003-02-24
     (macrolet ((frob-car (car1 car2 cdr1 cdr2 &optional not1)
                  `(let ((intersection (type-intersection ,car2
@@ -4847,21 +4846,13 @@ used for a COMPLEX component.~:@>"
             ;; possible.  However, if they are not disjoint, and we
             ;; can tell that they are not disjoint, we should be able
             ;; to break the type up into smaller pieces.
-            ((multiple-value-bind (yes win)
-                 (csubtypep car-type2 (setf car-not1 (type-negation car-type1)))
-               (and (not yes) win))
-             (let ((cdr-union (type-union cdr-type1 cdr-type2)))
-               (setf car-not2 (type-negation car-type2))
+            ((not (eql (setf car-intersection (type-intersection car-type1 car-type2))
+                       *empty-type*))
+             (let ((cdr-union (type-union cdr-type1 cdr-type2))
+                   (car-not1 (type-negation car-type1))
+                   (car-not2 (type-negation car-type2)))
                (type-union
-                (make-cons-type (type-intersection car-type1 car-type2) cdr-union)
-                (make-cons-type (type-intersection car-type1 car-not2) cdr-type1)
-                (make-cons-type (type-intersection car-not1 car-type2) cdr-type2))))
-            ((multiple-value-bind (yes win)
-                 (csubtypep car-type1 (setf car-not2 (type-negation car-type2)))
-               (and (not yes) win))
-             (let ((cdr-union (type-union cdr-type1 cdr-type2)))
-               (type-union
-                (make-cons-type (type-intersection car-type1 car-type2) cdr-union)
+                (make-cons-type car-intersection cdr-union)
                 (make-cons-type (type-intersection car-type1 car-not2) cdr-type1)
                 (make-cons-type (type-intersection car-not1 car-type2) cdr-type2))))
             ;; Don't put these in -- consider the effect of taking the
