@@ -305,8 +305,6 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 #define hashtable_weakp(ht) (ht->flags & (8<<N_FIXNUM_TAG_BITS))
 #define hashtable_weakness(ht) (ht->flags >> (6+N_FIXNUM_TAG_BITS))
 
-#if defined(LISP_FEATURE_GENCGC)
-
 extern unsigned char* gc_card_mark;
 
 #ifdef LISP_FEATURE_DARWIN_JIT
@@ -381,43 +379,39 @@ static inline void unprotect_page(void* addr, unsigned char mark)
 }
 #endif
 
-// Two helpers to avoid invoking the memory fault signal handler.
+// Helpers to avoid invoking the memory fault signal handler.
 // For clarity, distinguish between words which *actually* need to frob
 // physical (MMU-based) protection versus those which don't,
 // but are forced to call mprotect() because it's the only choice.
 // Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
 // the ensuing store toggles the WP bit without invoking the fault handler.
-static inline void notice_pointer_store(void* addr) {
+static inline void notice_pointer_store(__attribute__((unused)) void* base_addr,
+                                        __attribute__((unused)) void* slot_addr) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    int card = addr_to_card_index(addr);
+    int card = addr_to_card_index(base_addr);
     // STICKY is stronger than MARKED. Only change if UNMARKED.
     if (gc_card_mark[card] == CARD_UNMARKED) gc_card_mark[card] = CARD_MARKED;
 #else
-    page_index_t index = find_page_index(addr);
+    page_index_t index = find_page_index(slot_addr);
     gc_assert(index >= 0);
-    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page(addr, CARD_MARKED);
+    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page(slot_addr, CARD_MARKED);
 #endif
+}
+static inline void vector_notice_pointer_store(void* addr) {
+    notice_pointer_store(addr, addr);
 }
 static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
 {
-  // there's nothing to "ensure" if using software card marks
+    // there's nothing to "ensure" if using software card marks
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    notice_pointer_store(addr);
+    // #-soft-card-marks ignores the first argument of notice_pointer_store()
+    notice_pointer_store(0, addr);
 #endif
 }
 
 // #+soft-card-mark: this expresion is true of both CARD_MARKED and STICKY_MARK
 // #-soft-card-mark: this expresion is true of both CARD_MARKED and WP_CLEARED_AND_MARKED
 #define card_dirtyp(index) (gc_card_mark[index] & MARK_BYTE_MASK) != CARD_UNMARKED
-
-#else
-
-/* cheneygc */
-#define notice_pointer_store(dummy)
-#define ensure_non_ptr_word_writable(dummy)
-#define NON_FAULTING_STORE(operation, addr) operation
-
-#endif
 
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]

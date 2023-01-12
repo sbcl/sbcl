@@ -1021,7 +1021,7 @@ static int trace_paths(void (*context_scanner)(),
                                   (struct vector*)native_pointer(ignored_objects),
                                   n_pins, pins, context_scanner, criterion);
             lispobj* elt = VECTOR(paths)->data + i;
-            notice_pointer_store(elt);
+            vector_notice_pointer_store(elt);
             if ((*elt = path) != 0) ++n_found;
         }
         ++i;

@@ -736,12 +736,9 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
     // Wasn't the point of code serial# that you don't store
     // code blob pointers into the various profiling buffers? (FIXME?)
     if (code) {
-        /* If the first of the two stores is at an even index, then the second
-         * "notice" call is redundant because it will certainly be on the same card.
-         * Doing both calls is future-proof though. */
-        notice_pointer_store(&v->data[index]);
-        notice_pointer_store(&v->data[index+1]);
+        vector_notice_pointer_store(&v->data[index]);
         v->data[index] = make_lispobj(code, OTHER_POINTER_LOWTAG);
+        // do not need to take notice of a fixnum store
         v->data[index+1] = make_fixnum((lispobj)pc - (lispobj)code);
     } else {
         gc_assert(!((uword_t)pc & LOWTAG_MASK));
