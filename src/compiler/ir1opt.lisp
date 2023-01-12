@@ -124,7 +124,7 @@
 ;;; Return the derived type for LVAR's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
 (defun lvar-type (lvar)
-  (declare (type lvar lvar) #-sb-xc-host (values ctype))
+  (declare (type lvar lvar) #-sb-xc-host (values ctype &optional))
   (single-value-type (lvar-derived-type lvar)))
 
 ;;; LVAR-CONSERVATIVE-TYPE
