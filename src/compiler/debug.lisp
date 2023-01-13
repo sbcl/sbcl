@@ -1069,6 +1069,14 @@
            (write-string "enclose ")
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
+             (write-char #\space)
+             (let ((entry-fun (functional-entry-fun leaf)))
+               (when entry-fun
+                 (write-string "{env:")
+                 (dolist (leaf (environment-closure (lambda-environment entry-fun)))
+                   (write-char #\space)
+                   (print-leaf leaf))
+                 (write-string "}")))
              (write-char #\space))))
         (when (and *debug-print-types*
                    (valued-node-p node))

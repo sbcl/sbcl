@@ -184,3 +184,25 @@
                       (tags-logior (tags-logior (read)
                                                 (read))
                                    (read)))))))
+
+(with-test (:name :top-level-closure-fun-arg-substitution)
+  (ctu:file-compile
+   `((let ((x (let ((y (random 8)))
+                 (lambda ()
+                   y))))
+        (defun top-level-closure-fun-arg-substitution ()
+          (funcall x))))
+   :load t)
+  (assert (<= 0 (top-level-closure-fun-arg-substitution) 8)))
+
+(with-test (:name :top-level-closure-fun-arg-substitution.2)
+  (ctu:file-compile
+   `((let ((x (let ((y (random 8)))
+                 (lambda ()
+                   y))))
+       (print x)
+       (defun top-level-closure-fun-arg-substitution ()
+         (funcall x)
+         (funcall x))))
+   :load t)
+  (assert (<= 0 (top-level-closure-fun-arg-substitution) 8)))

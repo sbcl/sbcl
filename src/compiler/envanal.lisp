@@ -91,8 +91,8 @@
     (cond (old
            (setf (environment-closure old)
                  (delete-if (lambda (x)
-                              (and (lambda-var-p x))
-                              (null (leaf-refs x)))
+                              (and (lambda-var-p x)
+                                   (null (leaf-refs x))))
                             (environment-closure old)))
            (flet ((clear (fun)
                     (dolist (var (lambda-vars fun))

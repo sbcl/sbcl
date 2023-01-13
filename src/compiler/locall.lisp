@@ -154,7 +154,22 @@
   (declare (type ref ref) (type combination call) (type clambda fun))
   (propagate-to-args call fun)
   (setf (basic-combination-kind call) :local)
-  (sset-adjoin fun (lambda-calls (node-home-lambda call)))
+  (let ((fun-environment (lambda-environment fun))
+        (call-home (node-home-lambda call)))
+    ;; FUN might close over top-level variables. Make sure we
+    ;; propagate those in the local call environment.
+    (when fun-environment
+      (dolist (thing (environment-closure fun-environment))
+        (let ((thing-env
+                (lambda-environment
+                 (etypecase thing
+                   (lambda-var (lambda-var-home thing))
+                   (nlx-info (node-home-lambda (exit-entry (nlx-info-exit thing))))
+                   (clambda
+                    (aver (xep-p thing))
+                    (node-home-lambda (xep-enclose thing)))))))
+          (close-over thing (lambda-environment call-home) thing-env))))
+    (sset-adjoin fun (lambda-calls call-home)))
   (recognize-potentially-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
