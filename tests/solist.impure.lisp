@@ -362,6 +362,76 @@
     (test-insert-same-keys-concurrently tbl objects :delete (cons nil keys-to-delete))
     (assert-not-found tbl keys-to-delete)))
 
+(defun logical-delete (node &aux (succ (%node-next node)))
+  (unless (fixnump succ)
+    (with-pinned-objects (succ)
+      (cas (%node-next node) succ (make-marked-ref succ))))
+  node)
+
+(defparameter *so-map*
+  (let ((tbl (make-so-map/string)))
+    (loop for i from (char-code #\a) to (char-code #\z)
+          do (so-insert tbl (string (code-char i)) (char-upcase (code-char i))))
+    tbl))
+(defparameter *keys-in-table-order* nil)
+(defparameter *deleted-nodes* nil)
+(defparameter *node-addresses* nil)
+
+(let ((x 0))
+  (sb-int:collect ((allkeys) (addresses) (deleted))
+    (so-maplist
+     (lambda (node)
+       (let ((key (so-key node)))
+         (allkeys key)
+         (when (evenp (incf x))
+           (deleted node)
+           (logical-delete node))
+         (addresses (get-lisp-obj-address node))))
+     *so-map*)
+    (setf *keys-in-table-order* (allkeys)
+          *deleted-nodes* (deleted)
+          *node-addresses* (addresses))))
+
+(gc)
+;;; Most of the node addresses should have changed,
+;;; but the list should still be fully intact.
+(test-util:with-test (:name :solist-integrity)
+  (let ((node (so-head *so-map*))
+        (addr-change 0)
+        (addresses *node-addresses*)
+        (keys *keys-in-table-order*))
+    (loop
+      (cond ((endp node) (return))
+            ((dummy-node-p node) ; skip
+             (setq node (get-next node)))
+            (t
+             (assert (eq (so-key node) (pop keys)))
+             (unless (= (get-lisp-obj-address node) (pop addresses))
+               (incf addr-change))
+             (multiple-value-bind (next next-bits) (get-next node)
+               (let ((node-deletedp (fixnump next-bits))
+                     (found (so-find *so-map* (so-key node))))
+                 (assert (eq (not (null (find node *deleted-nodes*)))
+                             node-deletedp))
+                 (if node-deletedp
+                     (assert (not found))
+                     (assert (eq found node))))
+               (setq node next)))))
+    (assert (>= addr-change 24)))) ; seems about right
+
+;;; SO-MAPLIST does not include deleted nodes.
+;;; Nodes marked for deletion should still be marked after GC
+;;; (though it should be possible to modify GC to finish deletion)
+(test-util:with-test (:name :solist-mid-deletion)
+  (let ((present-keys
+         (remove-if
+          (lambda (string)
+            (member string *deleted-nodes* :key #'so-key :test #'string=))
+          *keys-in-table-order*)))
+    (so-maplist (lambda (node)
+                  (assert (string= (so-key node) (pop present-keys))))
+                *so-map*)))
+
 #|
 ;; Speedup: 4x
 Small test: 20k keys, 8 writers, 2 readers

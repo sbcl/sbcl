@@ -3594,5 +3594,9 @@ package is deprecated in favour of SB-MOP.")
 (defpackage* "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")
   (:use "CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")
-  (:export "+TAIL+")
+  (:export "+TAIL+" "%NODE-NEXT"
+           "MAKE-SO-SET/STRING" "MAKE-SO-SET/FIXNUM" "MAKE-SO-SET/ADDR"
+           "MAKE-SO-MAP/STRING" "MAKE-SO-MAP/FIXNUM" "MAKE-SO-MAP/ADDR"
+           "SO-INSERT" "SO-DELETE" "SO-FIND"
+           "SO-KEY" "SO-DATA" "SO-MAPLIST")
   (:shadow "ENDP"))

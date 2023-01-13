@@ -35,10 +35,6 @@
 ;;;
 
 (in-package "SB-LOCKLESS")
-(export '(make-so-set/string make-so-set/fixnum make-so-set/addr
-          make-so-map/string make-so-map/fixnum make-so-map/addr
-          so-insert so-delete so-find
-          so-maplist))
 
 (defmethod print-object ((self split-ordered-list) stream)
   (print-unreadable-object (self stream :type t :identity t)
@@ -63,7 +59,7 @@
             (:include so-node)
             (:copier nil)
             (:constructor %make-so-set-node (node-hash so-key)))
-  (so-key (missing-arg) :read-only t))
+  (so-key (missing-arg))) ; should be readonly. DO NOT MUTATE without extreme care
 (defstruct (so-data-node
             (:conc-name nil)
             (:include so-key-node)
@@ -223,6 +219,10 @@
                    ,@(if rest '(bins+shift bins shift)))))
      ,@body))
 
+;;; The more bins there are, the more dummy nodes.
+;;; Dummy nodes constitute extra space overhead.
+(defconstant +desired-elts-per-bin+ 3)
+
 (defun so-insert (table key &optional (value nil valuep))
   (when (and valuep (not (so-valuesp table)))
     (error "~S is a set, not a map" table))
@@ -238,11 +238,7 @@
              (aver (typep node 'so-key-node)))
             (t
              (let* ((n-bins (length bins))
-                    ;; The more bins there are, the more dummy nodes.
-                    ;; Dummy nodes constitute extra space overhead.
-                    ;; It seems to be quicker to strive for 2 or 3 items per
-                    ;; bin on average, rather than 1 per bin.
-                    (threshold (* n-bins 3)))
+                    (threshold (* n-bins +desired-elts-per-bin+)))
                (when (and (> (atomic-incf (so-count table)) threshold)
                           (> shift 1)) ; can't reduce the shift below 1
                  #+so-debug (format t "count = ~d thresh = ~d~%" new-count threshold)
@@ -339,7 +335,7 @@
                                     (- +hash-nbits+ 1)))
       so-list)))
 
-(defun map-solist (function solist)
+(defun so-maplist (function solist)
   (let ((node (%node-next (so-head solist))))
     (loop
      (when (endp node) (return))
