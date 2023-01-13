@@ -127,7 +127,7 @@
   ;; and (LOGIOR NIL-VALUE INSTANCE-POINTER-LOWTAG) isn't necessarily NIL.
   ;; It would be a bogus pointer on ppc64 because of rearranged lowtags.
   ;; arm64 and x86-64 are missing this AVER (because the vop doesn't do it),
-  ;; but as long as some of the platforms test this it, we should be reasonably ok.
+  ;; but as long as some of the platforms test this, we should be reasonably ok.
   ;; (I could assign 'next' of +TAIL+ as +TAIL+ like it used to be, and remove this.)
   (aver (neq node +tail+))
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
