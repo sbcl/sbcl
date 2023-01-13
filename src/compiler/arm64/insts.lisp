@@ -3320,8 +3320,7 @@
                   (- word-shift))))
       (:move-wide
        (setf (ldb (byte 16 5) (sap-ref-32 sap offset))
-             (the (unsigned-byte 16) value)))
-      (:symbol-tls)))
+             (the (unsigned-byte 16) value)))))
   nil)
 
 ;;; Even though non darwin-jit arm64 targets can store directly in the
@@ -3711,7 +3710,3 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
-
-(define-instruction fixup (segment kind fixup)
-  (:emitter
-   (note-fixup segment kind fixup)))

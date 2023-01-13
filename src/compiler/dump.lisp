@@ -1192,7 +1192,11 @@
                 (dump-specialized-vector (make-array (cdr entry)
                                                      :element-type '(unsigned-byte 8)
                                                      :initial-element #xFF)
-                                         fasl-output))))
+                                         fasl-output))
+               #+arm64
+               (:tls-index
+                (dump-object (cdr entry) fasl-output)
+                (dump-fop 'fop-tls-index fasl-output))))
             (null
              (dump-fop 'fop-misc-trap fasl-output)))))
 

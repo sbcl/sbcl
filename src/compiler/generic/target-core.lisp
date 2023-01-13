@@ -348,6 +348,9 @@
                                      (core-object-entry-table object))))
              ((eql :fdefinition) (cadr const))
              ((eql :known-fun) (%coerce-name-to-fun (cadr const)))
+             #+arm64
+             ((eql :tls-index)
+              (ash (ensure-symbol-tls-index (cdr const)) (- sb-vm:n-fixnum-tag-bits)))
              (constant (constant-value const)))
            (eq kind :fdefinition))))
 

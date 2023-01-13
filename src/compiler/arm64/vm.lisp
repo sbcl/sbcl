@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch :layout-id
-                                 :ldr-str :move-wide :symbol-tls)
+                                 :ldr-str :move-wide)
   #'equalp)
 
 

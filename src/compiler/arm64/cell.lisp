@@ -404,6 +404,16 @@
                  n-word-bytes)))
       (inst str value (@ thread-tn tls-index))))
 
+  (defun load-time-tls-index (symbol)
+    (let ((component (component-info *component-being-compiled*)))
+      (ash (or (position-if (lambda (x)
+                              (and (typep x '(cons (eql :tls-index)))
+                                   (eq (cdr x) symbol)))
+                            (ir2-component-constants component))
+               (vector-push-extend (cons :tls-index symbol)
+                                   (ir2-component-constants component)))
+           word-shift)))
+
   (define-vop (bind)
     (:args (value :scs (any-reg descriptor-reg zero) :to :save))
     (:temporary (:sc non-descriptor-reg) tls-index)
@@ -427,11 +437,8 @@
           (cond (known-symbol-p
                  (inst movz tls-index-reg tls-index))
                 (t
-                 (inst fixup :symbol-tls (make-fixup symbol :symbol-tls-index))
-                 ;; TODO: a fixup could replace this with a NOP and use an immediate
-                 ;; offset.
-                 (inst load-constant temp (tn-byte-offset (emit-constant symbol)))
-                 (inst ldr (32-bit-reg tls-index) (tls-index-of temp))))
+                 ;; TODO: a fixup could replace this with an immediate
+                 (inst load-constant tls-index (load-time-tls-index symbol))))
           (inst ldr temp (@ thread-tn tls-index))
           (inst stp temp tls-index-reg
                 (@ bsp (* (- binding-value-slot binding-size)
