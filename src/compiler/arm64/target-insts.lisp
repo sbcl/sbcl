@@ -457,21 +457,33 @@
                  (note (lambda (stream) (format stream "tls: ~S" symbol))
                        dstate)))))))))
 
-(defun find-value-from-previos-inst (register dstate)
+(defun find-value-from-previous-inst (register dstate)
   ;; Needs to be MOVZ REGISTER, imm, LSL #0
   ;; Should cover most offsets in sane code
   (let ((inst (current-instruction dstate -4)))
-    (when (and (= (ldb (byte 9 23) inst) #b110100101) ;; MOVZ
-               (= (ldb (byte 5 0) inst) register)
-               (= (ldb (byte 2 21) inst) 0)) ;; LSL #0
-      (ldb (byte 16 5) inst))))
+    (cond ((and (= (ldb (byte 9 23) inst) #b110100101) ;; MOVZ
+                (= (ldb (byte 5 0) inst) register)
+                (= (ldb (byte 2 21) inst) 0)) ;; LSL #0
+           (ldb (byte 16 5) inst))
+          ((and (= (ldb (byte 6 26) inst) #b010110) ;; LDR literal
+                (= (ldb (byte 5 0) inst) register))
+           (let ((value (sb-disassem::code-constant-value
+                         (sb-disassem::segment-offs-to-code-offs
+                          (+ (dstate-cur-offs dstate)
+                             -4
+                             (* (sb-c::mask-signed-field 19 (ldb (byte 19 5) inst))
+                                4))
+                          (dstate-segment dstate))
+                         dstate)))
+             (when (fixnump value)
+               (fixnumize value)))))))
 
 (defun annotate-ldr-str-reg (value stream dstate)
   (declare (ignore stream))
   (let* ((inst (current-instruction dstate))
          (float (ldb-test (byte 1 26) inst)))
     (unless float
-      (let ((value (find-value-from-previos-inst value dstate)))
+      (let ((value (find-value-from-previous-inst value dstate)))
         (when value
           (annotate-ldr-str (ldb (byte 5 5) inst) value dstate))))))
 

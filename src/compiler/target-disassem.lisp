@@ -2344,6 +2344,14 @@
 
 (defun note-code-constant (location dstate &optional (how :relative))
   (declare (type disassem-state dstate))
+  (multiple-value-bind (const valid)
+      (code-constant-value location dstate how)
+    (when valid
+      (note (lambda (stream) (prin1-quoted-short const stream)) dstate)
+      (values const t))))
+
+(defun code-constant-value (location dstate &optional (how :relative))
+  (declare (type disassem-state dstate))
   (binding* ((code (seg-code (dstate-segment dstate)))
              ((addr index)
               (ecase how
@@ -2373,9 +2381,7 @@
     (cond ((and code (< 1 index (code-header-words code)))
            (when addr ; ADDR must be word-aligned to be sensible
              (aver (not (logtest addr (ash sb-vm:lowtag-mask -1)))))
-           (let ((const (code-header-ref code index)))
-             (note (lambda (stream) (prin1-quoted-short const stream)) dstate)
-             (values const t)))
+           (values (code-header-ref code index) t))
           (t
            (values nil nil)))))
 
