@@ -16,6 +16,7 @@
            (sb-kernel:type-specifier (sb-kernel:specifier-type type))))
     (let ((types (mapcar #'normalize-type types))
           (result-types (mapcar #'normalize-type result-types))
+          (progress 0)
           (cache (make-hash-table :test #'equal)))
       (loop for op in ops
             do
@@ -49,6 +50,13 @@
                                                               (setf (gethash lambda cache)
                                                                     (checked-compile lambda :allow-warnings t)))
                                                 do
+                                                (when (and (zerop (mod (incf progress) (or #+(or arm x86) 100 10000)))
+                                                           (interactive-stream-p *standard-output*))
+                                                  (write-char #\Return)
+                                                  (write progress)
+                                                  (write-char #\Space)
+                                                  (write (hash-table-count cache))
+                                                  (force-output))
                                                 (handler-case
                                                     (apply fun args)
                                                   (error (c)
@@ -70,8 +78,7 @@
                                                           (error "~a = ~a /= ~a" (list* lambda args) x result))
                                                         (error "~a => ~a /= type error" (list* lambda args) x))))))))))))))
 
-(with-test (:name :overflow-arith
-            :skipped-on :arm) ; hangs for me
+(with-test (:name :overflow-arith)
   (test-ops '(+ - *)
             `(t fixnum (integer ,(- (expt 2 sb-vm:n-word-bits) 10)
                                 ,(- (expt 2 sb-vm:n-word-bits) 1))
