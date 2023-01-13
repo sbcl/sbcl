@@ -119,8 +119,9 @@
 (defun make-marked-ref (x)
   (%make-lisp-obj (logandc2 (get-lisp-obj-address x) sb-vm:lowtag-mask)))
 
-#-(or arm64 x86-64) ; why in hell doesn't vop-exists-p working here? wtf?
-(progn
+(sb-c::when-vop-existsp (:translate get-next)
+  (defun get-next (node) (get-next node)))
+(sb-c::unless-vop-existsp (:translate get-next)
 (declaim (inline get-next))
 (defun get-next (node)
   ;; You must not call GET-NEXT on +TAIL+ because the 'next' of +TAIL+ is NIL,

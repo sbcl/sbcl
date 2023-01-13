@@ -123,7 +123,6 @@
   (def %set-instance-layout (instance new-value))
   ; (def %instance-ref (instance index)) ; defined in 'target-defstruct'
   (def %instance-set (instance index new-value))
-  (def sb-lockless:get-next)
   ;; funcallable instances
   (def %make-funcallable-instance)
   (def %fun-layout)
