@@ -1,4 +1,3 @@
-#-sb-thread (invoke-restart 'run-tests::skip-file)
 (in-package sb-lockless)
 
 ;;; Show all nodes including dummies.
@@ -287,7 +286,7 @@
       (assert (= (so-count tbl) initial-count)))
     tbl))
 
-(test-util:with-test (:name :basic-functionality)
+(test-util:with-test (:name :basic-functionality :skipped-on (not :sb-thread))
   (smoke-test))
 
 ;;; All threads try to insert each key. At most one thread wins,
@@ -330,7 +329,8 @@
   (dolist (k keys)
     (assert (not (so-find tbl k)))))
 
-(test-util:with-test (:name :concurrently-insert-same-keys/string)
+(test-util:with-test (:name :concurrently-insert-same-keys/string
+                      :skipped-on (not :sb-thread))
   (let* ((objects *strings*)
          (tbl (make-so-map/string))
          (keys-to-delete
@@ -347,7 +347,8 @@
     (assert-not-found tbl keys-to-delete)
     tbl))
 
-(test-util:with-test (:name :concurrently-insert-same-keys/object)
+(test-util:with-test (:name :concurrently-insert-same-keys/object
+                      :skipped-on (not :sb-thread))
   (let* ((objects
           (remove-if (lambda (x)
                        (not (eql (generation-of x) sb-vm:+pseudo-static-generation+)))

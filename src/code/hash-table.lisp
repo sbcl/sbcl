@@ -108,14 +108,14 @@
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents address-based hashing on the
   ;; respective key.
   (hash-vector nil :type (or null (simple-array hash-table-index (*))))
-  ;; flags: WEAKNESS | KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZEDP
+  ;; flags: WEAKNESS | KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZED
   ;; WEAKNESS is 2 bits, KIND is 2 bits, the rest are 1 bit each
   ;;   - WEAKNESS     : {K-and-V, K, V, K-or-V}, irrelevant unless WEAKP
   ;;   - KIND         : {EQ, EQL, EQUAL, EQUALP}, irrelevant if USERFUNP
   ;;   - WEAKP        : table is weak
   ;;   - FINALIZERSP  : table is the global finalizer store
   ;;   - USERFUNP     : table has a nonstandard hash function
-  ;;   - SYCHRONIZEDP : all operations are automatically guarded by a mutex
+  ;;   - SYNCHRONIZED : all operations are automatically guarded by a mutex
   ;; If you change these, be sure to check the definition of hash_table_weakp()
   ;; in 'gc-private.h'
   (flags 0 :type (unsigned-byte 8) :read-only t)
