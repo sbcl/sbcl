@@ -15,7 +15,9 @@ CFLAGS:=-I../src/runtime $(CFLAGS)
 LDFLAGS:=$(LDFLAGS)
 LDLIBS:=$(OS_LIBS)
 
-all: grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2
+all: grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2 testftz
+
+testftz: testftz.o testftz-main.o
 
 clean:
 	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2

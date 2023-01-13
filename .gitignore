@@ -45,6 +45,8 @@ tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/mmap-rwx
+tools-for-build/testftz
+tools-for-build/testftz.exe
 tools-for-build/where-is-mcontext
 contrib/asdf/asdf-upstream
 doc/manual/*.html

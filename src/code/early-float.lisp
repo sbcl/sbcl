@@ -59,21 +59,6 @@
 (defconstant most-negative-double-float #.most-negative-double-float)
 (defconstant pi #.pi)
 
-(defconstant least-positive-single-float (single-from-bits 0 0 1))
-(defconstant least-positive-short-float (single-from-bits 0 0 1))
-(defconstant least-negative-single-float (single-from-bits 1 0 1))
-(defconstant least-negative-short-float (single-from-bits 1 0 1))
-(defconstant least-positive-double-float (double-from-bits 0 0 1))
-#-long-float
-(defconstant least-positive-long-float (double-from-bits 0 0 1))
-#+(and long-float x86)
-(defconstant least-positive-long-float (long-from-bits 0 0 1))
-(defconstant least-negative-double-float (double-from-bits 1 0 1))
-#-long-float
-(defconstant least-negative-long-float (double-from-bits 1 0 1))
-#+(and long-float x86)
-(defconstant least-negative-long-float (long-from-bits 1 0 1))
-
 (defconstant least-positive-normalized-single-float
   (single-from-bits 0 sb-vm:single-float-normal-exponent-min 0))
 (defconstant least-positive-normalized-short-float
@@ -100,6 +85,41 @@
 (defconstant least-negative-normalized-long-float
   (long-from-bits 1 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
+
+#-normalize-float
+(progn
+  (defconstant least-positive-single-float (single-from-bits 0 0 1))
+  (defconstant least-positive-short-float (single-from-bits 0 0 1))
+  (defconstant least-negative-single-float (single-from-bits 1 0 1))
+  (defconstant least-negative-short-float (single-from-bits 1 0 1))
+  (defconstant least-positive-double-float (double-from-bits 0 0 1))
+  #-long-float
+  (defconstant least-positive-long-float (double-from-bits 0 0 1))
+  #+(and long-float x86)
+  (defconstant least-positive-long-float (long-from-bits 0 0 1))
+  (defconstant least-negative-double-float (double-from-bits 1 0 1))
+  #-long-float
+  (defconstant least-negative-long-float (double-from-bits 1 0 1))
+  #+(and long-float x86)
+  (defconstant least-negative-long-float (long-from-bits 1 0 1)))
+#+normalize-float
+(progn
+  (defconstant least-positive-single-float
+    least-positive-normalized-single-float)
+  (defconstant least-positive-short-float
+    least-positive-normalized-short-float)
+  (defconstant least-negative-single-float
+    least-negative-normalized-single-float)
+  (defconstant least-negative-short-float
+    least-negative-normalized-short-float)
+  (defconstant least-positive-double-float
+    least-positive-normalized-double-float)
+  (defconstant least-positive-long-float
+    least-positive-normalized-long-float)
+  (defconstant least-negative-double-float
+    least-negative-normalized-double-float)
+  (defconstant least-negative-long-float
+    least-negative-normalized-long-float))
 
 (defconstant most-positive-short-float most-positive-single-float)
 (defconstant most-negative-short-float most-negative-single-float)
