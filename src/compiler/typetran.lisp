@@ -514,6 +514,7 @@
         ((and (= (length types) 2)
               ;; (and subtype-of-integer (not (eql x)))
               ;; don't test a range.
+              ;; (and subtype-of-integer (not (integer x y)))
               (destructuring-bind (b a) types
                 (and (eq (numeric-type-class a) 'integer)
                      (eq (numeric-type-class b) 'integer)
@@ -522,13 +523,25 @@
                                      (a-lo (numeric-type-low a))
                                      (b-hi (numeric-type-high b))
                                      (b-lo (numeric-type-low b)))
-                                (when (and a-hi b-lo)
-                                  (let ((lo (1- b-lo))
-                                        (hi (1+ a-hi)))
-                                    (and (= lo hi)
-                                         `(and (not (eql ,object ,lo))
-                                               ,(%source-transform-typep object
-                                                                         `(integer ,(or a-lo '*) ,(or b-hi '*))))))))))
+                                (when (and a-hi b-lo
+                                           (not (eql a-lo a-hi))
+                                           (not (eql b-lo b-hi))
+                                           (> b-lo a-hi))
+                                  (let* (typecheck
+                                         (a
+                                           (%source-transform-typep object
+                                                                    `(integer ,(or a-lo '*) ,(or b-hi '*))))
+                                         (b `(not
+                                              ,(cond ((= (1+ a-hi)
+                                                         (1- b-lo))
+                                                      `(eql ,object ,(1+ a-hi)))
+                                                     (t
+                                                      (setf typecheck t)
+                                                      (%source-transform-typep object
+                                                                               `(integer ,a-hi ,b-lo)))))))
+                                    (if typecheck
+                                        `(and ,a ,b)
+                                        `(and ,b ,a)))))))
                        (or (check a b)
                            (check b a)))))))
         ((and (= (length types) 2)
