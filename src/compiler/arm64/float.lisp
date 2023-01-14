@@ -354,22 +354,16 @@
 
 (define-vop (float-compare)
   (:args (x) (y))
-  (:variant-vars format is-=)
+  (:variant-vars is-=)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (note-this-location vop :internal-error)
-    (ecase format
-      (:single
-       (if is-=
-           (inst fcmp x y)
-           (inst fcmpe x y)))
-      (:double
-       (if is-=
-           (inst fcmp x y)
-           (inst fcmpe x y))))))
+    (if is-=
+        (inst fcmp x y)
+        (inst fcmpe x y))))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
@@ -384,11 +378,11 @@
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :single ,is-=))
+                  (:variant ,is-=))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :double  ,is-=)))))
+                  (:variant ,is-=)))))
   (frob < :mi </single-float </double-float nil)
   (frob > :gt >/single-float >/double-float nil)
   (frob <= :ls <=/single-float <=/double-float nil)
