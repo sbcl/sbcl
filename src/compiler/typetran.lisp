@@ -538,7 +538,7 @@
                                                      (t
                                                       (setf typecheck t)
                                                       (%source-transform-typep object
-                                                                               `(integer ,a-hi ,b-lo)))))))
+                                                                               `(integer (,a-hi) (,b-lo))))))))
                                     (if typecheck
                                         `(and ,a ,b)
                                         `(and ,b ,a)))))))
