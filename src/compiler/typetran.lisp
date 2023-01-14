@@ -326,10 +326,11 @@
               `(or (eq ,object ,low) (eq ,object ,high)))
              #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
              ((and (eql (numeric-type-class type) 'integer)
-                   (or (eql low 0) (eql low 1))
-                   (fixnump (numeric-type-high type)))
-              (let ((mod-p
-                      `(fixnum-mod-p ,object ,(numeric-type-high type))))
+                   (or (eql low 0)
+                       (and (eql low 1)
+                            (not (eql high most-positive-fixnum))))
+                   (fixnump high))
+              (let ((mod-p `(fixnum-mod-p ,object ,high)))
                 (if (eql low 1)
                     `(and (not (eq ,object 0))
                           ,mod-p)
