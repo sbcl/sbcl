@@ -391,7 +391,7 @@
                   (:variant :double  ,is-=)))))
   (frob < :mi </single-float </double-float nil)
   (frob > :gt >/single-float >/double-float nil)
-  (frob <= :le <=/single-float <=/double-float nil)
+  (frob <= :ls <=/single-float <=/double-float nil)
   (frob >= :ge >=/single-float >=/double-float nil)
   (frob = :eq =/single-float =/double-float t))
 
@@ -431,7 +431,7 @@
                   (:variant ,is-=)))))
   (frob < :mi </single-float-zero </double-float-zero nil)
   (frob > :gt >/single-float-zero >/double-float-zero nil)
-  (frob <= :le <=/single-float-zero <=/double-float-zero nil)
+  (frob <= :ls <=/single-float-zero <=/double-float-zero nil)
   (frob >= :ge >=/single-float-zero >=/double-float-zero nil)
   (frob = :eq eql/single-float-zero eql/double-float-zero t))
 
