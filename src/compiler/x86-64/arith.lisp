@@ -2056,26 +2056,40 @@
         (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
                (inst cmp operand-size x y)))))
 
-(macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
-             (declare (ignore not-cond not-unsigned))
-             `(progn
-                ,@(mapcar
-                   (lambda (suffix cost signed)
-                     `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
-                                   ,(symbolicate "FAST-CONDITIONAL"  suffix))
-                        (:translate ,tran)
-                        (:conditional ,(if signed cond unsigned))
-                        (:arg-refs x-tn-ref)
-                        (:generator ,cost
-                          (emit-optimized-cmp
-                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                           temp (tn-ref-type x-tn-ref)))))
-                   '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
-                   '(4 3 6 5 6 5)
-                   '(t t t t nil nil)))))
 
-  (define-conditional-vop < :l :b :ge :ae)
-  (define-conditional-vop > :g :a :le :be))
+(macrolet ((define-conditional-vop (tran cond unsigned
+                                    addend addend-signed addend-unsigned)
+             `(progn
+                ,@(loop for (suffix cost signed constant)
+                        in '((/fixnum 4 t)
+                             (-c/fixnum 3 t t)
+                             (/signed 6 t)
+                             (-c/signed 5 t t)
+                             (/unsigned 6)
+                             (-c/unsigned 5 nil t))
+                        collect
+                        `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
+                                      ,(symbolicate "FAST-CONDITIONAL"  suffix))
+                           (:translate ,tran)
+                           (:vop-var vop)
+                           ,(if constant
+                                `(:conditional
+                                  :after-sc-selection
+                                  (cond ((zerop (+ y ,addend))
+                                         (setf (car (vop-codegen-info vop)) 0)
+                                         ,(if signed
+                                              addend-signed
+                                              addend-unsigned))
+                                        (t
+                                         ,(if signed cond unsigned))))
+                                `(:conditional ,(if signed cond unsigned)))
+                           (:arg-refs x-tn-ref)
+                           (:generator ,cost
+                             (emit-optimized-cmp
+                               x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
+                               temp (tn-ref-type x-tn-ref))))))))
+  (define-conditional-vop < :l :b -1 :le :be)
+  (define-conditional-vop > :g :a 1 :ge :ae))
 
 (define-vop (<-unsigned-signed)
   (:translate <)
