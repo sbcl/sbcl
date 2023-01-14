@@ -507,6 +507,36 @@
              other
              `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
 
+(defun source-transform-union-numeric-typep (object types)
+  (cond ((not (every #'numeric-type-p types))
+         nil)
+        ((and (= (length types) 2)
+              ;; (or (integer * fixnum-x) (integer fixnum-y))
+              ;; only check for bignump and not its value.
+              (destructuring-bind (b a) types
+                (and (eq (numeric-type-class a) 'integer)
+                     (eq (numeric-type-class b) 'integer)
+                     (flet ((check (a b)
+                              (let* ((a-hi (numeric-type-high a))
+                                     (a-lo (numeric-type-low a))
+                                     (b-hi (numeric-type-high b))
+                                     (b-lo (numeric-type-low b)))
+                                (when (and (fixnump a-hi)
+                                           (fixnump b-lo)
+                                           (not a-lo)
+                                           (not b-hi))
+                                  (let ((lo (1- b-lo))
+                                        (hi (1+ a-hi)))
+                                    `(or (and (fixnump ,object)
+                                              ,(if (and (fixnump lo)
+                                                        (= lo hi))
+                                                   `(not (= ,object ,lo))
+                                                   `(or (>= ,object ,b-lo)
+                                                        (<= ,object ,a-hi))))
+                                         (bignump ,object)))))))
+                       (or (check a b)
+                           (check b a)))))))))
+
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
@@ -535,6 +565,7 @@
                                 (remove type-symbol types)))))))
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
+          ((source-transform-union-numeric-typep object types))
           (t
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
