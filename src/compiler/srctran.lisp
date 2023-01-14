@@ -2913,6 +2913,15 @@
                         `(ash x ,shift))
                    (logand x ,mask))))))
 
+;;; Floats could be transformed if we had some declaration to ignore NaNs
+(deftransform truncate ((x y) (rational (or (rational (0) *)
+                                            (rational * (0))))
+                        *
+                        :important nil)
+  (if (same-leaf-ref-p x y)
+      `(values 1 0)
+      (give-up-ir1-transform)))
+
 ;;; And the same for REM.
 (deftransform rem ((x y) (integer (constant-arg integer)) *)
   "convert remainder mod 2^k to LOGAND"
