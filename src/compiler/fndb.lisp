@@ -274,7 +274,7 @@
   (integer integer) rational
   (no-verify-arg-count unsafely-flushable))
 
-(defknown (two-arg-< two-arg-= two-arg->)
+(defknown (two-arg-< two-arg-= two-arg-> two-arg-<= two-arg->=)
     (number number) boolean
     (no-verify-arg-count))
 

@@ -153,6 +153,8 @@
       (< two-arg-<)
       (= two-arg-=)
       (> two-arg->)
+      (<= two-arg-<=)
+      (>= two-arg->=)
       (char-equal two-arg-char-equal)
       (char-greaterp two-arg-char-greaterp)
       (char-lessp two-arg-char-lessp)
@@ -194,7 +196,7 @@
 (def-two-arg-funs (character character)
   char= char/= char< char> char<= char>=)
 (def-two-arg-funs (number number)
-  >= <= /=)
+  /=)
 
 ;;; A list of function which always call their functional argument correctly,
 ;;; meaning that no arg-count-error can occur in the callee

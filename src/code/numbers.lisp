@@ -638,12 +638,12 @@ the first."
          (values most-negative-fixnum-double-float most-positive-fixnum-double-float)))
     ` (cond ((> ,float ,max)
              ,(ecase operation
-                ((= >) nil)
-                (< t)))
+                ((= > >=) nil)
+                ((< <=) t)))
             ((< ,float ,min)
              ,(ecase operation
-                ((= <) nil)
-                (> t)))
+                ((= < <=) nil)
+                ((> >=) t)))
             (t
              (let ((quot (%unary-truncate ,float)))
                ,(ecase operation
@@ -661,7 +661,21 @@ the first."
                           ((> ,integer quot)
                            nil)
                           ((>= ,integer 0)
-                           (< (float quot ,float) ,float))))))))))
+                           (< (float quot ,float) ,float))))
+                  (>=
+                   `(cond ((> ,integer quot))
+                          ((< ,integer quot)
+                           nil)
+                          (t
+                           (or (< ,float 0)
+                               (= (float quot ,float) ,float)))))
+                  (<=
+                   `(cond ((< ,integer quot))
+                          ((> ,integer quot)
+                           nil)
+                          (t
+                           (or (>= ,float 0)
+                               (= (float quot ,float) ,float)))))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
@@ -692,6 +706,8 @@ the first."
                (make-fixnum-float-comparer ,(case op
                                               (> '<)
                                               (< '>)
+                                              (>= '<=)
+                                              (<= '>=)
                                               (= '=))
                                            y x (dispatch-type x)))))
       (((foreach single-float double-float) double-float)
@@ -726,22 +742,24 @@ the first."
        (if (float-infinity-p x)
            ,infinite-x-finite-y
            #+64-bit
-           (,(case op
-               (> 'float-bignum->)
-               (< 'float-bignum-<)
-               (= 'float-bignum-=))
-            x y)
+           ,(case op
+              (> '(float-bignum-> x y))
+              (< '(float-bignum-< x y))
+              (>= '(not (float-bignum-< x y)))
+              (<= '(not (float-bignum-> x y)))
+              (= '(float-bignum-= x y)))
            #-64-bit
            (,op (rational x) y)))
       ((bignum float)
        (if (float-infinity-p y)
            ,infinite-y-finite-x
            #+64-bit
-           (,(case op
-               (> 'float-bignum-<)
-               (< 'float-bignum->)
-               (= 'float-bignum-=))
-            y x)
+           ,(case op
+              (> '(float-bignum-< y x))
+              (< '(float-bignum-> y x))
+              (>= '(not (float-bignum-> y x)))
+              (<= '(not (float-bignum-< y x)))
+              (= '(float-bignum-= y x)))
            #-64-bit
            (,op x (rational y))))))
   )                                     ; EVAL-WHEN
@@ -759,17 +777,34 @@ the first."
                    :infinite-y-finite-x
                    (,op (coerce 0 '(dispatch-type y)) y))
                   (((foreach fixnum bignum) ratio)
-                   (,op x (,ratio-arg2 (numerator y)
-                                       (denominator y))))
+                   (,(case op
+                       (<= '<)
+                       (>= '>)
+                       (t op))
+                    x (,ratio-arg2 (numerator y)
+                                   (denominator y))))
                   ((ratio integer)
-                   (,op (,ratio-arg1 (numerator x)
-                                     (denominator x))
-                        y))
+                   (,(case op
+                       (<= '<)
+                       (>= '>)
+                       (t op))
+                    (,ratio-arg1 (numerator x)
+                                 (denominator x))
+                    y))
                   ((ratio ratio)
-                   (,op (* (numerator   (truly-the ratio x))
-                           (denominator (truly-the ratio y)))
-                        (* (numerator   (truly-the ratio y))
-                           (denominator (truly-the ratio x)))))
+                   (or
+                    ,@(case op
+                        ((<= >=)
+                         `((and (eql (numerator x) (numerator y))
+                                (eql (denominator x) (denominator y))))))
+                    (,(case op
+                        (<= '<)
+                        (>= '>)
+                        (t op))
+                     (* (numerator   (truly-the ratio x))
+                        (denominator (truly-the ratio y)))
+                     (* (numerator   (truly-the ratio y))
+                        (denominator (truly-the ratio x))))))
                   ,@cases))))
   (def-two-arg-</> two-arg-< < floor ceiling
     ((fixnum bignum)
@@ -784,7 +819,21 @@ the first."
     ((bignum fixnum)
      (bignum-plus-p x))
     ((bignum bignum)
-     (plusp (bignum-compare x y)))))
+     (plusp (bignum-compare x y))))
+  (def-two-arg-</> two-arg-<= <= floor ceiling
+    ((fixnum bignum)
+     (bignum-plus-p y))
+    ((bignum fixnum)
+     (not (bignum-plus-p x)))
+    ((bignum bignum)
+     (<= (bignum-compare x y) 0)))
+  (def-two-arg-</> two-arg->= >= ceiling floor
+    ((fixnum bignum)
+     (not (bignum-plus-p y)))
+    ((bignum fixnum)
+     (bignum-plus-p x))
+    ((bignum bignum)
+     (>= (bignum-compare x y) 0))))
 
 (defun two-arg-= (x y)
   (declare (inline float-infinity-p)
