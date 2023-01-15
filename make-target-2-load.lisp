@@ -6,6 +6,13 @@
 (defvar *compile-files-p* nil)
 (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
 
+;; sb-xref-for-internals is actively harmful to tree-shaking.
+;; Remove some symbols to make the hide-packages test pass.
+#+sb-xref-for-internals
+(progn
+  (fmakunbound 'sb-kernel::type-class-fun-slot)
+  (fmakunbound 'sb-kernel::new-ctype))
+
 (sb-impl::!recompile-globaldb-checkfuns)
 
 ;;; Users don't want to know if there are multiple TLABs per se, but they do want
