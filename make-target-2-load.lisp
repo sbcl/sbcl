@@ -343,7 +343,7 @@ Please check that all strings which were not recognizable to the compiler
                ;; but both "cooked" values are empty
                (null (sb-kernel:symbol-dbinfo symbol))
                (null (symbol-plist symbol)))
-      (sb-sys:%primitive sb-vm::set-slot symbol nil
+      (sb-sys:%primitive sb-c:set-slot symbol nil
                          'make-symbol sb-vm:symbol-info-slot sb-vm:other-pointer-lowtag)))
 )
 
