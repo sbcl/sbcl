@@ -241,7 +241,7 @@
       (let ((res (find-initial-dfo-aux bind-block component)))
         (declare (type component res))
         (flet ((walk (fun)
-                 (unless (eq (lambda-kind fun) :deleted)
+                 (unless (member (lambda-kind fun) '(:deleted :let :assignment))
                    (setq res (dfo-walk-call-graph fun res)))))
           (do-sset-elements (fun (lambda-calls fun))
             (walk fun))

@@ -3815,7 +3815,7 @@
        (max 0 c)))
    ((1 1) -13)))
 
-(with-test (:name :find-initial-dfo-iugnore-let-converted-funs)
+(with-test (:name :find-initial-dfo-ignore-let-converted-funs)
   (checked-compile-and-assert
    ()
    `(lambda (c)
@@ -3828,3 +3828,24 @@
            ((lambda (v10) (%f7 (go tag5) -63522127 v10)) c))
        tag5))
    ((9) nil)))
+
+(with-test (:name :find-initial-dfo-ignore-assignment-converted-funs)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (values
+       (catch 'c 0)
+       (labels ((%f (&optional (x 0) (y 0)) y))
+         (case 0
+           ((1) (%f 0))
+           ((2) (%f))))))
+   (() (values 0 nil))))
+
+(with-test (:name :find-initial-dfo-ignore-assignment-converted-funs.2)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda  (a)
+    (let ((v (make-array 1 :initial-element (catch 'ct 42))))
+      (labels ((f (&optional (x 4) &key (k a)) x))
+        (if nil (f) (f a)))))
+   ((9) 9)))

@@ -1571,18 +1571,6 @@
   (let* ((leaf (ref-leaf ref))
          (refs (delq1 ref (leaf-refs leaf))))
     (setf (leaf-refs leaf) refs)
-    (when (lambda-p leaf)
-      (let ((home (node-home-lambda ref)))
-        ;; If it was the last local call from this lambda, remove it.
-        ;; KLUDGE: This is probably slower than it needs to be. See if
-        ;; we can do some additional bookkeeping or simply ignore more
-        ;; types of lambdas when scanning lambda-calls.
-        (dolist (ref refs (sset-delete leaf (lambda-calls home)))
-          (let ((dest (node-dest ref)))
-            (when (and (basic-combination-p dest)
-                       (eq (basic-combination-kind dest) :local)
-                       (eq home (node-home-lambda ref)))
-              (return))))))
     (cond ((null refs)
            (typecase leaf
              (lambda-var
