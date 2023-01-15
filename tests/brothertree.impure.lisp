@@ -253,7 +253,10 @@
                                         key
                                         (sb-kernel:get-lisp-obj-address tree))))
                     (unless (eql result sb-vm:nil-value)
-                      (sb-kernel:make-lisp-obj result)))))))
+                      ;; have to use *UNSAFE* make-lisp-obj here because "safe" make-lisp-obj
+                      ;; will not allow you to see an object in an open allocation region.
+                      ;; (could we close the region flushing the trees nodes to the page table?)
+                      (sb-kernel:%make-lisp-obj result)))))))
   (define-c-wrapper c-find<= "brothertree_find_lesseql")
   (define-c-wrapper c-find>= "brothertree_find_greatereql"))
 
