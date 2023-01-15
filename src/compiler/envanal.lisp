@@ -90,10 +90,19 @@
   (let ((old (lambda-environment (lambda-home fun))))
     (cond (old
            (setf (environment-closure old)
-                 (delete-if (lambda (x)
-                              (and (lambda-var-p x)
-                                   (null (leaf-refs x))))
-                            (environment-closure old)))
+                 (delete-if
+                  (lambda (x)
+                    (and (lambda-var-p x)
+                         ;; If the home component of the variable has
+                         ;; been compiled already, don't clean it out,
+                         ;; since we already committed to the closure
+                         ;; format.
+                         (let ((home (lambda-var-home x)))
+                           (not (or (member (functional-kind home) '(:deleted :zombie))
+                                    (eq (component-info (lambda-component home))
+                                        :dead))))
+                         (null (leaf-refs x))))
+                  (environment-closure old)))
            (flet ((clear (fun)
                     (dolist (var (lambda-vars fun))
                       (unless (lambda-var-sets var)

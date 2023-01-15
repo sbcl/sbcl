@@ -206,3 +206,14 @@
          (funcall x))))
    :load t)
   (assert (<= 0 (top-level-closure-fun-arg-substitution) 8)))
+
+(with-test (:name :top-level-closure-dead-component-reference)
+  (ctu:file-compile
+   `((declaim (inline top-level-closure-dead-component-reference))
+     (defun top-level-closure-dead-component-reference (control &rest arguments)
+       (with-standard-io-syntax
+         (apply #'format nil (string control) arguments)))
+     ((lambda ()
+        (top-level-closure-dead-component-reference :keyword "~a" 2)
+        (top-level-closure-dead-component-reference :keyword "~a" 2))))
+   :load t))

@@ -1070,10 +1070,11 @@
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
              (write-char #\space)
-             (let ((entry-fun (functional-entry-fun leaf)))
-               (when entry-fun
+             (let* ((entry-fun (functional-entry-fun leaf))
+                    (env (and entry-fun (lambda-environment entry-fun))))
+               (when env
                  (write-string "{env:")
-                 (dolist (leaf (environment-closure (lambda-environment entry-fun)))
+                 (dolist (leaf (environment-closure env))
                    (write-char #\space)
                    (print-leaf leaf))
                  (write-string "}")))
