@@ -688,6 +688,8 @@ the first."
   (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
     `(((fixnum fixnum) (,op x y))
       ((single-float single-float) (,op x y))
+      (((foreach single-float double-float) double-float)
+       (,op (coerce x 'double-float) y))
       #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
@@ -695,80 +697,83 @@ the first."
       ((long-float (foreach single-float double-float))
        (,op x (coerce y 'long-float)))
       ((fixnum (foreach single-float double-float))
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           (make-fixnum-float-comparer ,op x y (dispatch-type y))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         (make-fixnum-float-comparer ,op x y (dispatch-type y))))
       (((foreach single-float double-float) fixnum)
        (if (eql y 0)
            (,op x (coerce 0 '(dispatch-type x)))
-           (if (float-infinity-p x)
-               ,infinite-x-finite-y
-               (make-fixnum-float-comparer ,(case op
-                                              (> '<)
-                                              (< '>)
-                                              (>= '<=)
-                                              (<= '>=)
-                                              (= '=))
-                                           y x (dispatch-type x)))))
-      (((foreach single-float double-float) double-float)
-       (,op (coerce x 'double-float) y))
+           (with-float-inf-or-nan-test x
+             ,infinite-x-finite-y
+             nil
+             (make-fixnum-float-comparer ,(case op
+                                            (> '<)
+                                            (< '>)
+                                            (>= '<=)
+                                            (<= '>=)
+                                            (= '=))
+                                         y x (dispatch-type x)))))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
       (((foreach single-float double-float #+long-float long-float) ratio)
-       (if (float-infinity-p x)
-           ,infinite-x-finite-y
-           ;; Avoid converting the float into a rational, since it
-           ;; will be taken apart later anyway.
-           (multiple-value-bind (bits exp) (integer-decode-float x)
-             (if (eql bits 0)
-                 (,op 0 y)
-                 (let ((int (if (minusp x) (- bits) bits)))
-                   (if (minusp exp)
-                       (,op (* int (denominator y))
-                            (ash (numerator y) (- exp)))
-                       (,op (ash int exp) y)))))))
+       (with-float-inf-or-nan-test x
+         ,infinite-x-finite-y
+         nil
+         ;; Avoid converting the float into a rational, since it
+         ;; will be taken apart later anyway.
+         (multiple-value-bind (bits exp) (integer-decode-float x)
+           (if (eql bits 0)
+               (,op 0 y)
+               (let ((int (if (minusp x) (- bits) bits)))
+                 (if (minusp exp)
+                     (,op (* int (denominator y))
+                          (ash (numerator y) (- exp)))
+                     (,op (ash int exp) y)))))))
       ((ratio (foreach single-float double-float))
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           (multiple-value-bind (bits exp) (integer-decode-float y)
-             (if (eql bits 0)
-                 (,op x 0)
-                 (let ((int (if (minusp y) (- bits) bits)))
-                   (if (minusp exp)
-                       (,op (ash (numerator x) (- exp))
-                            (* int (denominator x)))
-                       (,op x (ash int exp))))))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         (multiple-value-bind (bits exp) (integer-decode-float y)
+           (if (eql bits 0)
+               (,op x 0)
+               (let ((int (if (minusp y) (- bits) bits)))
+                 (if (minusp exp)
+                     (,op (ash (numerator x) (- exp))
+                          (* int (denominator x)))
+                     (,op x (ash int exp))))))))
       (((foreach single-float double-float) bignum)
-       (if (float-infinity-p x)
-           ,infinite-x-finite-y
-           #+64-bit
-           ,(case op
-              (> '(float-bignum-> x y))
-              (< '(float-bignum-< x y))
-              (>= '(not (float-bignum-< x y)))
-              (<= '(not (float-bignum-> x y)))
-              (= '(float-bignum-= x y)))
-           #-64-bit
-           (,op (rational x) y)))
+       (with-float-inf-or-nan-test x
+         ,infinite-x-finite-y
+         nil
+         #+64-bit
+         ,(case op
+            (> '(float-bignum-> x y))
+            (< '(float-bignum-< x y))
+            (>= '(not (float-bignum-< x y)))
+            (<= '(not (float-bignum-> x y)))
+            (= '(float-bignum-= x y)))
+         #-64-bit
+         (,op (rational x) y)))
       ((bignum float)
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           #+64-bit
-           ,(case op
-              (> '(float-bignum-< y x))
-              (< '(float-bignum-> y x))
-              (>= '(not (float-bignum-> y x)))
-              (<= '(not (float-bignum-< y x)))
-              (= '(float-bignum-= y x)))
-           #-64-bit
-           (,op x (rational y))))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         #+64-bit
+         ,(case op
+            (> '(float-bignum-< y x))
+            (< '(float-bignum-> y x))
+            (>= '(not (float-bignum-> y x)))
+            (<= '(not (float-bignum-< y x)))
+            (= '(float-bignum-= y x)))
+         #-64-bit
+         (,op x (rational y))))))
   )                                     ; EVAL-WHEN
 
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
-                (declare (inline float-infinity-p)
-                         (explicit-check))
+                (declare (explicit-check))
                 (number-dispatch ((x real) (y real))
                   (basic-compare
                    ,op
