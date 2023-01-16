@@ -45,6 +45,7 @@
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"
+#include "genesis/split-ordered-list.h"
 #define WANT_SCAV_TRANS_SIZE_TABLES
 #include "gc-internal.h"
 #include "gc-private.h"
@@ -1718,7 +1719,6 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             uint32_t *next_vector, uint32_t *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
-                            boolean save_culled_values,
                             boolean rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
@@ -1737,22 +1737,6 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
         gc_assert(value != empty_symbol);
         if (!alivep_test(key, value)) {
             gc_assert(hash_table->_count > 0);
-            if (save_culled_values) {
-                lispobj val = kv_vector[2 * index + 1];
-                gc_assert(!is_lisp_pointer(val));
-                struct cons *cons = (struct cons*)
-                  gc_general_alloc(cons_region, sizeof(struct cons), PAGE_TYPE_CONS);
-                // Lisp code which manipulates the culled_values slot must use
-                // compare-and-swap, but C code need not, because GC runs in one
-                // thread and has stopped the Lisp world.
-                cons->cdr = hash_table->culled_values;
-                cons->car = val;
-                lispobj list = make_lispobj(cons, LIST_POINTER_LOWTAG);
-                notice_pointer_store(hash_table, &hash_table->culled_values);
-                hash_table->culled_values = list;
-                // ensure this cons doesn't get smashed into (0 . 0) by full gc
-                if (!compacting_p()) gc_mark_obj(list);
-            }
             kv_vector[2 * index] = empty_symbol;
             kv_vector[2 * index + 1] = empty_symbol;
             ensure_non_ptr_word_writable(&hash_table->_count);
@@ -1815,7 +1799,6 @@ cull_weak_hash_table (struct hash_table *hash_table,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
 
     boolean rehash = 0;
-    boolean save_culled_values = (hash_table->flags & make_fixnum(4)) != 0;
     // I'm slightly confused as to why we can't (or don't) compute the
     // 'should rehash' flag while scavenging the weak k/v vector.
     // I believe the explanation is this: for weak-key-AND-value tables, the vector
@@ -1827,7 +1810,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
         if (cull_weak_hash_table_bucket(hash_table, i, index_vector[i],
                                         kv_vector, next_vector, hash_vector,
                                         alivep_test, fix_pointers,
-                                        save_culled_values, rehash))
+                                        rehash))
             rehash = 1;
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
@@ -1881,7 +1864,7 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
      * which is what an extra reset would do if it saw no inserts. */
     if (weak_objects.count)
         hopscotch_reset(&weak_objects);
-    // Close the region used when pushing items to the finalizer queue
+    // Close the region used when pushing into hash_table->smashed_cells
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
 }
 
@@ -2636,6 +2619,145 @@ scavenge_interrupt_contexts(struct thread *th)
 }
 #endif /* !REG_CODE */
 #endif /* x86oid targets */
+
+/* Finalizer table based on Split-Ordered Lists */
+typedef struct {
+    struct list_node lfnode;
+    lispobj hash;
+    lispobj key;
+    lispobj data;
+    // padding word, only if #+compact-instance-header
+} so_node;
+
+static inline int dummy_node_p(so_node* node) {
+    return (node->hash & make_fixnum(1)) == 0;
+}
+
+static inline int lispobj_livep(lispobj obj_base) {
+    extern int fullcgc_lispobj_livep(lispobj);
+    lispobj obj = compute_lispobj((lispobj*)obj_base);
+    return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
+}
+
+static void push_in_lockfree_list(struct symbol* list_holder,
+                                  so_node* this, lispobj key, lispobj data)
+{
+    // Using the so_node type for the rehash list is slightly wasteful of space
+    // but I don't feel like inventing another type just to eliminate the 'hash' slot.
+    // It is, however, imperative that we create new objects, because
+    // the lockfree algorithm crashes if nodes are mutated.
+    so_node* node =
+      gc_general_alloc(mixed_region, ALIGN_UP(sizeof (so_node), 2*N_WORD_BYTES),
+                       PAGE_TYPE_MIXED);
+    const unsigned int header_low =
+        (((sizeof (so_node) / N_WORD_BYTES) - 1) << INSTANCE_LENGTH_SHIFT)
+        | INSTANCE_WIDETAG;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    node->lfnode.header = ((this->lfnode.header >> 32) << 32) | header_low;
+    *(&node->data + 1) = 0; // padding words
+#else
+    node->lfnode.header = header_low;
+    node->lfnode._layout = this->lfnode._layout;
+#endif
+    node->hash = 0;
+    node->key = key;
+    node->data = data;
+    lispobj old = list_holder->value;
+    node->lfnode._node_next = old != NIL ? old : LFLIST_TAIL_ATOM;
+    // This __sync_val_compare_and_swap can not fail.
+    // On the machines that have spurious failure, it is not exposed,
+    // unlike in C++ where you can choose compare_exchange_{weak|strong}
+    lispobj new = make_lispobj(node, INSTANCE_POINTER_LOWTAG);
+    lispobj actual = __sync_val_compare_and_swap(&list_holder->value, old, new);
+    gc_assert(actual == old);
+    if (!compacting_p()) gc_mark_obj(new);
+}
+static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
+{
+    struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
+    cons->car = element;
+    lispobj old = list_holder->value;
+    cons->cdr = old;
+    lispobj new = make_lispobj(cons, LIST_POINTER_LOWTAG);
+    lispobj actual = __sync_val_compare_and_swap(&list_holder->value, old, new);
+    gc_assert(actual == old);
+    if (!compacting_p()) gc_mark_obj(new);
+}
+
+/* Scan the finalizer table and take action on each node as follows:
+ * - dummy nodes are ignored
+ * - nodes marked for deletion (by CANCEL-FINALIZATION) are culled
+ * - transported keys are moved to the "rehash" list
+ * - dead keys are moved to the "triggered" list
+ * - all other live keys are left alone
+ */
+void scan_finalizers()
+{
+    // NOTE: we do NOT need to invoke notice_pointer_store() on the global values
+    // of REHASHLIST or TRIGGERED because those are static symbols.
+    lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
+    gc_assert(lowtag_of(finalizer_store) == INSTANCE_POINTER_LOWTAG);
+    struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
+    so_node* prev = (void*)native_pointer(solist->head);
+    // SO-HEAD can not possibly be marked for deletion, therefore %NODE-NEXT
+    // returns a valid node.
+    lispobj node = prev->lfnode._node_next;
+    while (node != LFLIST_TAIL_ATOM) {
+        // At each iteration, 'this' is the node whose disposition we're pondering,
+        // and 'prev' is its immediate predecessor, always a valid non-deleted node.
+        so_node* this = (so_node*)(node-INSTANCE_POINTER_LOWTAG);
+        // To determine if 'this' is pending deletion, read the bits of its 'next'
+        lispobj next = this->lfnode._node_next;
+        if (dummy_node_p(this)) {
+            // Case 1: split-order dummy node
+            gc_assert(!fixnump(next)); // 'this' can not be marked for impending deletion
+            prev = this, node = next;
+            continue;
+        } else if (fixnump(next)) {
+            // Case 2: logically deleted regular node- "help" the lisp code along
+            // by completing this deletion. Lisp will decrement SO-COUNT (I hope!)
+        } else if (forwarding_pointer_p((lispobj*)this->key)) {
+            // Case 3: live object moved
+            // Get the moved object and construct a weak pointer to it.
+            // If the new object were directly stored in node->key, that would create
+            // a strong reference which not delays finalization, but also transitively
+            // enlivens anything it reaches.
+            struct weak_pointer* weakptr =
+              gc_general_alloc(mixed_region,
+                               ALIGN_UP(sizeof (struct weak_pointer), 2*N_WORD_BYTES),
+                               PAGE_TYPE_MIXED);
+            weakptr->header = ((WEAK_POINTER_SIZE-1) << N_WIDETAG_BITS) | WEAK_POINTER_WIDETAG;
+            weakptr->value = forwarding_pointer_value((lispobj*)this->key);
+#ifndef LISP_FEATURE_64_BIT
+            // 64-bit weak-pointers are 2 words, but 32-bit are 4 words because there
+            // is a GC-use field. In 64-bit, that field fits in the header.
+            memset(&weakptr->next, 0, 2*N_WORD_BYTES); // Will crash without this
+#endif
+            if (!compacting_p()) gc_mark_obj(make_lispobj(weakptr, OTHER_POINTER_LOWTAG));
+            push_in_lockfree_list(SYMBOL(FINALIZER_REHASHLIST),
+                                  this, make_lispobj(weakptr, OTHER_POINTER_LOWTAG),
+                                  this->data);
+            this->key = 0; // clobber dangling reference
+            --solist->uw_count;
+        } else if (!lispobj_livep(this->key)) {
+            // Case 4: dead object
+            push_in_ordinary_list(SYMBOL(FINALIZERS_TRIGGERED), this->data);
+            this->key = 0; // clobber dangling reference
+            --solist->uw_count;
+        } else {
+            // Case 5: ordinary node, live unmoved object
+            prev = this, node = next;
+            continue;
+        }
+        // Cases 2 through 4 all delete 'this' from the list
+        node = next | INSTANCE_POINTER_LOWTAG; // restore lowtag on 'next' for case 2
+        notice_pointer_store(prev, &prev->lfnode._node_next);
+        prev->lfnode._node_next = node;
+    }
+    // Close the region
+    ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
+    ensure_region_closed(cons_region, PAGE_TYPE_CONS);
+}
 
 /* Our own implementation of heapsort, because some C libraries have a qsort()
  * that calls malloc() apparently, which we MUST NOT do. */

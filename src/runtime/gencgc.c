@@ -4304,6 +4304,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     /* Return private-use pages to the general pool so that Lisp can have them */
     gc_dispose_private_pages();
     cull_weak_hash_tables(weak_ht_alivep_funs);
+    scan_finalizers();
 
     obliterate_nonpinned_words();
     // Do this last, because until obliterate_nonpinned_words() happens,

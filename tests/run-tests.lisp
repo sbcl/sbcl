@@ -198,11 +198,12 @@
     `(sb-c::*code-serialno*
       sb-c::*compile-elapsed-time*
       sb-c::*compile-file-elapsed-time*
+      sb-impl::*finalizer-rehashlist*
+      sb-impl::*finalizers-triggered*
       sb-impl::*package-names-cookie*
       sb-impl::*available-buffers*
       sb-impl::*token-buf-pool*
       sb-impl::*user-hash-table-tests*
-      sb-impl::**finalizer-store**
       sb-impl::*pn-dir-table*
       sb-impl::*pn-table*
       sb-vm::*immobile-codeblob-tree*

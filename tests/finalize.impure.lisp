@@ -71,17 +71,13 @@
 (with-test (:name :finalizers-dont-nest-garbage-collections)
   (assert (<= *maxdepth* 1)))
 
-;;; Regardless of anything else, check representational invariants.
-;;; - each ID in the id-recycle-list is not a value in the hash-table
-;;; - each value in the hash-table is not in the id-recycle-list
-(with-test (:name :finalizer-id-uniqueness)
-  (let* ((hash-table (elt sb-impl::**finalizer-store** 1))
-         (used-ids (loop for v being each hash-value of hash-table
-                         collect v))
-         (available-ids (cdr (elt sb-impl::**finalizer-store** 0))))
-    (assert (null (intersection used-ids available-ids)))))
-
 (with-test (:name :finalizers-ran)
+  ;; Finalizers won't have run for keys needing to be rehashed.
+  (unless (null sb-impl::*finalizer-rehashlist*)
+    (format t "~&::: INFO: rehashing finalizer store~%")
+    (sb-impl::finalizers-rehash)
+    (gc)
+    (sb-impl::run-pending-finalizers))
   ;; expect that 97% of the finalizers ran
   (assert (>= *count* (* *n-finalized-things* 97/100)))
   #+gencgc
@@ -97,12 +93,20 @@
   (setq *weak-pointers*
         (delete-if (lambda (x) (null (weak-pointer-value x)))
                    *weak-pointers*))
-  (let ((hash-table (elt sb-impl::**finalizer-store** 1)))
-    (loop for k being each hash-key of hash-table
-          when (and (symbolp k) (not (symbol-package k)))
-            do (assert (find k *weak-pointers* :key #'weak-pointer-value)))
-    (dolist (wp *weak-pointers*)
-      (assert (gethash (weak-pointer-value wp) hash-table)))))
+  (let ((solist sb-impl::**finalizer-store**))
+    (sb-lockless:so-maplist
+     (lambda (node)
+       (let ((k (sb-sys:without-gcing (sb-impl::finalizer-object node))))
+         (when (and (symbolp k) (not (symbol-package k)))
+           (assert (find k *weak-pointers* :key #'weak-pointer-value)))))
+     solist)
+    (sb-sys:without-gcing
+        (dolist (wp *weak-pointers*)
+          (let ((addr (sb-kernel:%make-lisp-obj
+                       (logandc2 (sb-kernel:get-lisp-obj-address
+                                  (weak-pointer-value wp))
+                                 sb-vm:lowtag-mask))))
+            (assert (sb-lockless:so-find solist addr)))))))
 
 ;;; A super-smart GC and/or compiler might prove that the object passed to
 ;;; FINALIZE is instantly garbage. Like maybe (FINALIZE (CONS 1 2) 'somefun)

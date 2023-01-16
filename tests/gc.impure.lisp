@@ -105,7 +105,7 @@
     ;; but seems like it'll be OK for a while.
     ;; I see only 4 weak pointers in the baseline image.
     ;; Really we could just assert /= 1000.
-    (assert (< (length l) 15))))
+    (assert (< (length l) 60))))
 
 ;; check that WITHOUT-INTERRUPTS doesn't block SIG_STOP_FOR_GC
 (with-test (:name :gc-without-interrupts

@@ -6,11 +6,10 @@
 #-unix (invoke-restart 'run-tests::skip-file)
 
 (defun fd-has-finalizer-p (fd)
-  ;; Finalizer function can be:
-  ;; 1. a function - finalizer that was not created with :DONT-SAVE.
-  ;; 2. a single list of a function - a finalizer that was created with :DONT-SAVE
-  ;; 3. a vector - more than one finalizer, each being form 1 or form 2.
   (flet ((checkit (thing)
+           ;; Return T if THING is a closure created in MAKE-FD-STREAM
+           ;; (which is assumed to be a stream finalizer) whose payload
+           ;; contains the integer FD.
            (when (and (sb-kernel:closurep thing)
                       (eql (sb-kernel:%closure-index-ref thing 0) fd))
              (let ((underlying (sb-kernel:%closure-fun thing)))
@@ -18,16 +17,11 @@
                           (equal (sb-kernel:%simple-fun-name underlying)
                                  '(lambda () :in sb-sys:make-fd-stream)))
                  (return-from fd-has-finalizer-p t))))))
-    (let ((v sb-impl::**finalizer-store**))
-      (loop for i from 3 below (length v)
-            do
-         (let ((entry (aref v i)))
-           (typecase entry
-             (list (checkit (car entry)))
-             (function (checkit entry))
-             (vector
-              (sb-int:dovector (entry entry)
-                (checkit (if (listp entry) (car entry) entry))))))))))
+    (sb-lockless:so-maplist
+     (lambda (node)
+       (dolist (f (sb-int:ensure-list (sb-lockless:so-data node)))
+         (checkit (if (functionp f) f (sb-kernel:value-cell-ref f)))))
+     sb-impl::**finalizer-store**)))
 
 (defvar *fds*)
 (defun make-streams ()

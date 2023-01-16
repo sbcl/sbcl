@@ -269,8 +269,7 @@ run in any thread.")
     ;; interrupts, which is precisely the thing we need to NOT do if already
     ;; in post-GC code of any kind (be it finalizer or other).
   (when (and *allow-with-interrupts*
-               (or (and (sb-impl::hash-table-culled-values
-                         (sb-impl::finalizer-id-map sb-impl::**finalizer-store**))
+               (or (and sb-impl::*finalizers-triggered*
                         (not sb-impl::*in-a-finalizer*))
                    *after-gc-hooks*))
       (sb-thread::without-thread-waiting-for ()

@@ -18,7 +18,6 @@
   (let ((args (copy-list args)))
     (remf args :weakness)
     (remf args :synchronized)
-    (remf args :finalizer)
     (let ((hash-fun (getf args :hash-function)))
       (when hash-fun
         (assert (eq (getf args :test) 'eq))

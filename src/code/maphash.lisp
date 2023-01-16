@@ -137,7 +137,6 @@ for."
         form)))
 
 (defconstant hash-table-weak-flag         8)
-(defconstant hash-table-finalizer-flag    4)
 ;;; USERFUN-FLAG implies a nonstandard hash function. Such tables may also have
 ;;; a custom comparator. But you can't have a custom comparator without a custom
 ;;; hash, because there's no way in general to produce a compatible hash.
@@ -157,7 +156,7 @@ for."
   (defconstant +min-hash-table-size+ 7)
   (defconstant default-rehash-size $1.5))
 
-(defmacro make-system-hash-table (&key test synchronized weakness finalizer)
+(defmacro make-system-hash-table (&key test synchronized weakness)
   (multiple-value-bind (kind args)
       (cond ((equal test '(quote eq))  (values 0 '('eq  #'eq  #'eq-hash)))
             ((equal test '(quote eql)) (values 1 '('eql #'eql #'eql-hash)))
@@ -169,8 +168,7 @@ for."
                 (:key   '(pack-ht-flags-weakness +ht-weak-key+))
                 (:value '(pack-ht-flags-weakness +ht-weak-value+)))
                (pack-ht-flags-kind ,kind)
-               ,(if synchronized 'hash-table-synchronized-flag 0)
-               ,(if finalizer 'hash-table-finalizer-flag 0))
+               ,(if synchronized 'hash-table-synchronized-flag 0))
       ,@args
       ,+min-hash-table-size+
       ,default-rehash-size

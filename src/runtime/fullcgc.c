@@ -152,6 +152,10 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     return (fullcgcmarks[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
 }
 
+int fullcgc_lispobj_livep(lispobj pointer) {
+    return pointer_survived_gc_yet(pointer);
+}
+
 void dump_marked_objects() {
     fprintf(stderr, "Marked objects:\n");
     page_index_t first = 0;
@@ -590,6 +594,7 @@ void execute_full_sweep_phase()
     local_smash_weak_pointers();
     gc_dispose_private_pages();
     cull_weak_hash_tables(alivep_funs);
+    scan_finalizers();
 
     memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

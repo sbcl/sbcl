@@ -178,6 +178,7 @@
   sb-impl::bytes-per-utf8-character-aref
   sb-impl::bytes-per-utf8-character-sap-ref-8
   sb-impl::user-homedir-namestring
+  sb-lockless:make-so-map/addr
   sb-c::apply-core-fixups
   sb-c::compiled-debug-info-char-offset
   sb-c::compiled-debug-info-tlf-number

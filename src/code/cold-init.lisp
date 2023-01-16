@@ -404,8 +404,6 @@ process to continue normally."
       (sb-thread::init-main-thread)
       #+x86-64 (sb-vm::validate-asm-routine-vector)
       (rebuild-package-vector))
-    ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
-    (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
     (rebuild-pathname-cache)
