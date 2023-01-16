@@ -682,7 +682,6 @@
   "src/pcl/fixup"
   "src/pcl/call-next-method"
   "src/pcl/defcombin"
-  "src/pcl/ctypes"
   "src/pcl/env"
   "src/pcl/documentation"
   "src/pcl/print-object"

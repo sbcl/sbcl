@@ -36,7 +36,16 @@
      ,(if (and (cddr form)
                (listp (caddr form)))
           (expand-long-defcombin form)
-          (expand-short-defcombin form))))
+          (let* ((type-name (cadr form))
+                 (doc (getf (cddr form) :documentation (make-unbound-marker)))
+                 (ioa (getf (cddr form) :identity-with-one-argument nil))
+                 (operator (getf (cddr form) :operator type-name)))
+            (unless (or (unbound-marker-p doc) (stringp doc))
+              (%program-error "~@<~S argument to the short form of ~S must be a string.~:@>"
+                              :documentation 'define-method-combination))
+            `(load-short-defcombin ',type-name ',operator ',ioa
+                                   ,(unless (unbound-marker-p doc) doc)
+                                   (sb-c:source-location))))))
 
 (defstruct method-combination-info
   (lambda-list nil :type list)
@@ -56,7 +65,10 @@
 ;;;; standard method combination
 (setf (gethash 'standard **method-combinations**)
       (make-method-combination-info
-       :constructor (lambda (options) (when options (method-combination-error "STANDARD method combination accepts no options.")) *standard-method-combination*)
+       :constructor (lambda (options)
+                      (when options
+                        (method-combination-error "STANDARD method combination accepts no options."))
+                      *standard-method-combination*)
        :cache (list (cons nil *standard-method-combination*))))
 
 (defun update-mcs (name new old frobmc)
@@ -84,23 +96,6 @@
 ;;;; effective method. So, we just implement that rule once. Each short
 ;;;; method combination object just reads the parameters out of the object
 ;;;; and runs the same rule.
-
-(defun expand-short-defcombin (whole)
-  (let* ((canary (cons nil nil))
-         (type-name (cadr whole))
-         (documentation (getf (cddr whole) :documentation canary))
-         (ioa (getf (cddr whole) :identity-with-one-argument nil))
-         (operator
-           (getf (cddr whole) :operator type-name)))
-    (unless (or (eq documentation canary)
-                (stringp documentation))
-      (%program-error "~@<~S argument to the short form of ~S must be a string.~:@>"
-                      :documentation 'define-method-combination))
-    `(load-short-defcombin
-      ',type-name ',operator ',ioa
-      ',(and (neq documentation canary)
-             documentation)
-      (sb-c:source-location))))
 
 (defun random-documentation (name type)
   (cdr (assoc type (info :random-documentation :stuff name))))
@@ -519,3 +514,25 @@
             (return (nconc (frob required nr nreq t)
                            (frob optional no nopt values)
                            values)))))
+
+;;; The built-in method combination types as taken from page 1-31 of
+;;; 88-002R. Note that the STANDARD method combination type is defined
+;;; by hand in the file combin.lisp.
+(define-method-combination +      :identity-with-one-argument t)
+(define-method-combination and    :identity-with-one-argument t)
+(define-method-combination append :identity-with-one-argument nil)
+(define-method-combination list   :identity-with-one-argument nil)
+(define-method-combination max    :identity-with-one-argument t)
+(define-method-combination min    :identity-with-one-argument t)
+(define-method-combination nconc  :identity-with-one-argument t)
+(define-method-combination progn  :identity-with-one-argument t)
+
+;;; we made OR (:MOST-SPECIFIC-FIRST) earlier in the build; hook it in
+(define-method-combination or     :identity-with-one-argument t)
+(let ((info (gethash 'or **method-combinations**)))
+  (aver info)
+  (aver (null (method-combination-info-cache info)))
+  (setf (method-combination-info-cache info)
+        (list (cons '(:most-specific-first) *or-method-combination*))))
+(add-to-weak-hashset #'make-specializer-form-using-class
+                     (method-combination-%generic-functions *or-method-combination*))
