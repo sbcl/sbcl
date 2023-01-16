@@ -440,4 +440,14 @@
                  (if (= a b)
                      a
                      (error ""))))))
-            `(values (integer 10 20) &optional))))
+           `(values (integer 10 20) &optional)))
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a b)
+                 (declare ((real 10 20) b))
+                 (if (> a b)
+                     a
+                     (error ""))))))
+           `(values (real (10)) &optional))))

@@ -875,6 +875,24 @@
             (make-numeric-type :low bound)
             (make-numeric-type :high bound))))))
 
+(defun constrain-real (y greater or-equal)
+  (let ((int (type-approximate-interval y)))
+    (when int
+      (flet ((exclude (x)
+               (cond ((not x) nil)
+                     (or-equal x)
+                     ((consp x) x)
+                     (t (list x))))
+             (bound (x)
+               (if greater
+                   (interval-low x)
+                   (interval-high x))))
+        (let ((bound (exclude (bound int))))
+          (when bound
+            (if greater
+                (make-numeric-type :low bound)
+                (make-numeric-type :high bound))))))))
+
 ;;; Return true if LEAF is "visible" from NODE.
 (defun leaf-visible-from-node-p (leaf node)
   (cond
@@ -1024,6 +1042,10 @@
           (constrain-float-type current-type type greater not-p))
          ((integer-type-p type)
           (let ((type (constrain-real-to-integer type greater not-p)))
+            (when type
+              (type-intersection current-type type))))
+         (t
+          (let ((type (constrain-real type greater not-p)))
             (when type
               (type-intersection current-type type)))))))))
 
