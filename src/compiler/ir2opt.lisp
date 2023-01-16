@@ -660,8 +660,10 @@
                                  (tn-leaf from))
                              ;; It might not make sense if there are NULL-TN or ZERO-TN.
                              #-(or x86 x86-64)
-                             (or (not (memq (constant-value (tn-leaf from))
-                                            '(nil #+arm64 0)))
+                             (or (not (or (type= (tn-type from)
+                                                 (specifier-type 'null))
+                                          #+arm64
+                                          (eql (constant-value (tn-leaf from)) 0)))
                                  (location= x y)))
                     (change-tn-ref-tn args x)
                     (setf (tn-ref-load-tn args) nil)))))))

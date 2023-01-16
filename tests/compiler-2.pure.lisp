@@ -3844,8 +3844,18 @@
 (with-test (:name :find-initial-dfo-ignore-assignment-converted-funs.2)
   (checked-compile-and-assert
    (:allow-style-warnings t)
-   `(lambda  (a)
-    (let ((v (make-array 1 :initial-element (catch 'ct 42))))
-      (labels ((f (&optional (x 4) &key (k a)) x))
-        (if nil (f) (f a)))))
+   `(lambda (a)
+      (let ((v (make-array 1 :initial-element (catch 'ct 42))))
+        (labels ((f (&optional (x 4) &key (k a)) x))
+          (if nil (f) (f a)))))
    ((9) 9)))
+
+(with-test (:name :if-eq-optimizer-nil)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (let (b)
+           (unless (eq x b)
+             (error ""))
+           x))
+    ((nil) nil)))
