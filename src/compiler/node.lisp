@@ -831,7 +831,7 @@
                 :type (or symbol (and cons (satisfies legal-fun-name-p)))
                 :read-only t)
   ;; the type which values of this leaf must have
-  (%type *universal-type* :type ctype)
+  (type *universal-type* :type ctype)
   ;; the type which values of this leaf have last been defined to have
   ;; (but maybe won't have in future, in case of redefinition)
   (defined-type *universal-type* :type ctype)
@@ -857,15 +857,6 @@
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)
 
-(declaim (inline leaf-type))
-(defun leaf-type (leaf)
-  ;; (when (leaf-debug-me leaf) ...)
-  (leaf-%type leaf))
-(declaim (inline (setf leaf-type)))
-(defun (setf leaf-type) (newval leaf)
-  ;; (when (leaf-debug-me leaf) ...)
-  (setf (leaf-%type leaf) newval))
-
 (defun leaf-dynamic-extent (leaf)
   (let ((extent (leaf-extent leaf)))
     (unless (member extent '(nil indefinite-extent))
@@ -885,7 +876,7 @@
 ;;; constant.
 (defstruct (constant (:constructor make-constant (value
                                                   &optional
-                                                  (%type (ctype-of value))
+                                                  (type (ctype-of value))
                                                   (%source-name '.anonymous.)
                                                   &aux
                                                   (where-from :defined)))
@@ -903,20 +894,13 @@
                       (:constructor nil))
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
-(declaim (inline basic-var-type))
-(defun basic-var-type (var) (basic-var-%type var))
 
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
 ;;; NAME.
-(defstruct (global-var (:constructor %make-global-var)
-                       (:include basic-var) (:copier nil))
+(defstruct (global-var (:include basic-var) (:copier nil))
   ;; kind of variable described
   (kind (missing-arg)
         :type (member :special :global-function :global :unknown)))
-(defmacro make-global-var (&rest args &aux (copy (copy-list args)))
-  (awhen (member :type copy) (setf (car it) :%type))
-  `(%make-global-var ,@copy))
-(defmacro global-var-type (var) `(global-var-%type ,var))
 
 (defun pretty-print-global-var (var stream)
   (let ((name (leaf-source-name var)))
@@ -952,7 +936,6 @@
 (defstruct (defined-fun (:include global-var
                                   (where-from :defined)
                                   (kind :global-function))
-                        (:constructor %make-defined-fun)
                         (:copier nil))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
@@ -965,9 +948,6 @@
   ;; this function is not an entry point, then this may be deleted or
   ;; LET-converted. NULL if we haven't converted the expansion yet.
   (functional nil :type (or functional null)))
-(defmacro make-defined-fun (&rest args &aux (copy (copy-list args)))
-  (awhen (member :type copy) (setf (car it) :%type))
-  `(%make-defined-fun ,@copy))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
@@ -983,7 +963,7 @@
 (defstruct (functional (:include leaf
                                  (%source-name '.anonymous.)
                                  (where-from :defined)
-                                 (%type (specifier-type 'function)))
+                                 (type (specifier-type 'function)))
                        (:copier nil))
   ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
   ;;
@@ -1133,7 +1113,6 @@
   ;; Is it coming from a top-level NAMED-LAMBDA?
   (top-level-defun-p nil)
   (ignore nil))
-(defmacro functional-type (var) `(functional-%type ,var))
 
 (defun pretty-print-functional (functional stream)
   (let ((name (functional-debug-name functional)))
@@ -1259,7 +1238,7 @@
   %source-name
   %debug-name
   kind
-  (%type :test (not (eq %type *universal-type*)))
+  (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))
 
@@ -1340,8 +1319,8 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  (%type :test (neq %type *universal-type*))
-  (where-from :test (neq where-from :assumed))
+  (type :test (not (eq type *universal-type*)))
+  (where-from :test (not (eq where-from :assumed)))
   arglist
   allowp
   keyp
@@ -1418,8 +1397,7 @@
   ;; Does it hold a constant that should't be destructively modified
   constant)
 
-(defstruct (lambda-var (:constructor %make-lambda-var)
-                       (:include basic-var) (:copier nil))
+(defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
          :type attributes)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
@@ -1449,7 +1427,6 @@
   (equality-constraints    nil :type (or null (array t 1)))
 
   source-form)
-(defmacro lambda-var-type (var) `(lambda-var-%type ,var))
 (defprinter (lambda-var :identity t)
   %source-name
   (type :test (not (eq type *universal-type*)))
@@ -1458,9 +1435,6 @@
          :prin1 (decode-lambda-var-attributes flags))
   (arg-info :test arg-info)
   (specvar :test specvar))
-(defmacro make-lambda-var (&rest args &aux (copy (copy-list args)))
-  (awhen (member :type copy) (setf (car it) :%type))
-  `(%make-lambda-var ,@copy))
 
 (defmacro lambda-var-ignorep (var)
   `(lambda-var-attributep (lambda-var-flags ,var) ignore))
