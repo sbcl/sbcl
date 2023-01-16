@@ -378,3 +378,10 @@
                       `(lambda (x)
                          (aref x 0)))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :call-full-like-p-constants)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (a b)
+                         (< (truly-the double-float a) b)))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))

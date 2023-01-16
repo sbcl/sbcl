@@ -2493,7 +2493,6 @@ is :ANY, the function name is not checked."
     (functional
      (assure-functional-live-p leaf))))
 
-
 (defun call-full-like-p (call)
   (declare (type basic-combination call))
   (let ((kind (basic-combination-kind call)))
@@ -2509,9 +2508,8 @@ is :ANY, the function name is not checked."
                 (not (fun-info-ltn-annotate info))
                 (dolist (template (fun-info-templates info) t)
                   (when (eq (template-ltn-policy template) :fast-safe)
-                    (multiple-value-bind (val win)
-                        (valid-fun-use call (template-type template))
-                      (when (or val (not win)) (return nil)))))))))))
+                    (when (valid-fun-use call (template-type template))
+                      (return))))))))))
 
 ;;;; careful call
 
