@@ -67,7 +67,7 @@
                                  alternative-constraints)
   (case operator
     ((eq eql char= two-arg-char-equal
-      > < =)
+      > < = <= >=)
      (when (= (length args) 2)
        (flet ((ok-lvar-p (lvar)
                 (or (ok-lvar-lambda-var lvar constraints)
@@ -97,6 +97,8 @@
                     (case operator
                       (< '>)
                       (> '<)
+                      (<= '>=)
+                      (>= '<=)
                       (t operator))))
             (when constant-x
               (when constant-y
@@ -320,6 +322,24 @@
      (equality-constraint eq inverse)
      (equality-constraint eql inverse)
      (equality-constraint = inverse))
+    result))
+
+(defoptimizer (>= equality-constraint) ((x y))
+  (let ((result :give-up))
+    (or
+     (equality-constraint >= nil nil)
+     (equality-constraint > nil nil)
+     (equality-constraint =)
+     (equality-constraint < inverse nil))
+    result))
+
+(defoptimizer (<= equality-constraint) ((x y))
+  (let ((result :give-up))
+    (or
+     (equality-constraint < nil nil)
+     (equality-constraint <= nil nil)
+     (equality-constraint =)
+     (equality-constraint > inverse nil))
     result))
 
 (defoptimizer (- equality-constraint) ((x y) node)
