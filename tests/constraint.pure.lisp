@@ -417,3 +417,27 @@
                      (< y x)
                      (error ""))))))
             `(values null &optional))))
+
+(with-test (:name :=-real)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a b)
+                 (declare ((real 10 20) b))
+                 (if (= a b)
+                     a
+                     (error ""))))))
+           `(values (or (real 10 20) (complex (rational 10 20)) (complex (single-float 10.0 20.0))
+                        (complex (double-float 10.0d0 20.0d0))) &optional)))
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a b)
+                 (declare (integer a)
+                          ((real 10 20) b))
+                 (if (= a b)
+                     a
+                     (error ""))))))
+            `(values (integer 10 20) &optional))))

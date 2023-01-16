@@ -1003,14 +1003,17 @@
 (defun type-after-comparison (operator not-p current-type type)
   (case operator
     ((= eq)
-     (when (and (numeric-type-p type)
-                (not not-p))
-       (type-intersection current-type
-                          (type-union (make-numeric-type :low (numeric-type-low type)
-                                                         :high (numeric-type-high type))
-                                      (make-numeric-type :complexp :complex
-                                                         :low (numeric-type-low type)
-                                                         :high (numeric-type-high type))))))
+     (unless not-p
+       (let ((int (type-approximate-interval type)))
+         (when (and int
+                    (or (interval-low int)
+                        (interval-high int)))
+           (type-intersection current-type
+                              (type-union (make-numeric-type :low (interval-low int)
+                                                             :high (interval-high int))
+                                          (make-numeric-type :complexp :complex
+                                                             :low (interval-low int)
+                                                             :high (interval-high int))))))))
     (t
      (let* ((greater (eq operator '>))
             (greater (if not-p (not greater) greater)))

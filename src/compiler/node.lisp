@@ -1774,8 +1774,16 @@
                         (lexenv thing)
                         (node (node-lexenv thing))
                         (functional (functional-lexenv thing)))))))
+
+;;; The basic interval type. It can handle open and closed intervals.
+;;; A bound is open if it is a list containing a number, just like
+;;; Lisp says. NIL means unbounded.
+(defstruct (interval (:constructor %make-interval (low high))
+                     (:copier nil))
+  low high)
+
 
 ;;;; Freeze some structure types to speed type testing.
 
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      environment tail-set nlx-info leaf))
+                      environment tail-set nlx-info leaf interval))

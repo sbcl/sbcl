@@ -717,14 +717,6 @@
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'cl:single-float))
 
-;;; The basic interval type. It can handle open and closed intervals.
-;;; A bound is open if it is a list containing a number, just like
-;;; Lisp says. NIL means unbounded.
-(defstruct (interval (:constructor %make-interval (low high))
-                     (:copier nil))
-  low high)
-(declaim (freeze-type interval))
-
 ;;; Handle monotonic functions of a single variable whose domain is
 ;;; possibly part of the real line. ARG is the variable, FUN is the
 ;;; function, and DOMAIN is a specifier that gives the (real) domain
