@@ -1123,6 +1123,7 @@
 
 (defun pass-nargs-p (combination)
   (let ((fun-info (combination-fun-info combination)))
+    (declare (ignorable fun-info))
     (and #+(or arm64 x86-64)
          (or (policy combination (> insert-step-conditions 1))
              (and
