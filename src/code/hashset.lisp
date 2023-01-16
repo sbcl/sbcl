@@ -415,6 +415,16 @@
             (or (hashset-find hashset key)
                 (hashset-insert hashset (funcall copier key)))))))
 
+(defun map-hashset (function hashset)
+  (declare (dynamic-extent function))
+  (macrolet ((dovect ()
+               `(dovector (elt (hss-cells (hashset-storage hashset)))
+                  (unless (or (null elt) (eql elt 0))
+                    (funcall function elt)))))
+    (if (hashset-mutex hashset)
+        (with-system-mutex ((hashset-mutex hashset)) (dovect))
+        (dovect))))
+
 (defun hashset-count (hashset &aux (cells (hss-cells (hashset-storage hashset))))
   (count-if (lambda (x) (and x (not (hs-chain-terminator-p x))))
             cells :end (hs-cells-capacity cells)))

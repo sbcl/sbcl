@@ -368,35 +368,3 @@
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
   (declare (ignore x))
   nil)
-
-;;; Every architecture needs this portable replacement for +-modfx.
-;;; Some, but not all, define +-modfx in cross-modular.
-;;; We need this available sooner than that because:
-;;;  - src/code/alien-type uses sb-xc:defstruct
-;;;  - sb-xc:defstruct needs to parse a MEMBER type because PARSE-1-DSD asks
-;;;    if (CSUBTYPEP CTYPE (SPECIFIER-type '(or fixnum boolean ...))).
-;;;  - BOOLEAN is defined as a MEMBER type.
-;;;  - MEMBER types go in a hashset.
-;;;  - The hashset's hash function by way of XSETs involves +-modfx.
-;;; And so there you go. I tried moving cross-modular earlier in the build; it failed.
-(defun plus-mod-fixnum (a b)
-  (declare (type sb-xc:fixnum a b))
-  (let* ((mask (ldb (byte sb-vm:n-fixnum-bits 0) -1))
-         (result (logand (+ (logand a mask) (logand b mask)) mask)))
-    (if (logbitp sb-vm:n-positive-fixnum-bits result) ; then it's negative
-        (dpb result (byte sb-vm:n-fixnum-bits 0) -1)
-        result)))
-
-;; Assume 2 fixnum tag bits:
-;;      significant bits      tag
-;;   #b01111...11111111111111  00
-;; + #b0                    1  00
-;;   ------------------------
-;; = #b10000...00000000000000  00
-(assert (= (plus-mod-fixnum sb-xc:most-positive-fixnum 1)
-           sb-xc:most-negative-fixnum))
-;; etc
-(assert (= (plus-mod-fixnum sb-xc:most-negative-fixnum sb-xc:most-negative-fixnum)
-           0))
-(assert (= (plus-mod-fixnum -1 most-negative-fixnum)
-           sb-xc:most-positive-fixnum))

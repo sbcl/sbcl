@@ -2973,6 +2973,7 @@ possibly temporarily, because it might be used internally.")
            ;; key-only hash lookup which saves space over a hash-table
            "MAKE-HASHSET" "HASHSET-INSERT" "HASHSET-REMOVE" "HASHSET-FIND"
            "HASHSET-INSERT-IF-ABSENT" "HASHSET-COUNT"
+           "HASHSET-MUTEX" "MAP-HASHSET"
            ;; useful for DX keys that should persist to the heap
            "SYS-COPY-STRUCT"
            "ENSURE-HEAP-LIST"

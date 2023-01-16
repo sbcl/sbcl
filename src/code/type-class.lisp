@@ -618,10 +618,13 @@
 (defun hash-ctype-set (types) ; ctype list hashed order-insensitively
   (let ((hash (type-%bits (car types)))
         (n 1))
+    (declare (type sb-xc:fixnum hash))
     (dolist (type (cdr types) (mix (logand hash sb-xc:most-positive-fixnum)
                                    (the (integer 2) n)))
       (incf n)
-      (setq hash (logxor (type-%bits type) hash)))))
+      (setq hash (plus-mod-fixnum (type-%bits type) hash)))))
+;;; NOTE: despite the name, this does not operate only on lists of CTYPE.
+;;; Maybe pick a better name.
 (defun ctype-set= (a b)
   ;; However, it might also be nice to canonicalize sets by putting any type containing
   ;; SATISFIES to the right of any type that does not. This order would tend to have
@@ -792,7 +795,7 @@
 (defun ctype-hashset-insert-if-absent (hashset key function)
   (or (hashset-find hashset key)
       (let ((flags (funcall function key)))
-        (with-system-mutex ((sb-impl::hashset-mutex hashset))
+        (with-system-mutex ((hashset-mutex hashset))
           (or (hashset-find hashset key)
               (hashset-insert hashset (copy-ctype key flags)))))))
 
@@ -1142,21 +1145,31 @@
   (type (missing-arg) :type ctype :read-only t))
 (declaim (freeze-type key-info))
 
+(defmethod print-object ((self key-info) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "(~S ~S)"
+            (key-info-name self)
+            (type-specifier (key-info-type self)))))
 (defun key-info= (a b)
   (declare (optimize (safety 0)))
   (and (eq (key-info-name a) (key-info-name b))
-       ;; This will work better once I hash-cons all ctypes
        (eq (key-info-type a) (key-info-type b))))
 (defun key-info-hash (x)
   (declare (optimize (safety 0)))
-  (mix (#+sb-xc-host sb-impl::symbol-name-hash #-sb-xc-host sxhash (key-info-name x))
-       ;; MIX requires positive fixnums
-       (logand (type-hash-value (key-info-type x)) sb-xc:most-positive-fixnum)))
+  (#+sb-xc-host progn
+   #-sb-xc-host murmur-hash-word/fixnum ; scramble some more
+   (mix (#+sb-xc-host sb-impl::symbol-name-hash #-sb-xc-host sxhash (key-info-name x))
+        ;; MIX requires positive fixnums
+        (logand (type-hash-value (key-info-type x)) sb-xc:most-positive-fixnum))))
 
-(defun key-info-list-hash (list)
+(defun hash-key-info-set (set) ; order-insensitive
   (declare (optimize (safety 0)))
   (let ((h 0))
-    (dolist (elt list h) (setf h (mix (key-info-hash elt) h)))))
+    (declare (type sb-xc:fixnum h))
+    ;; Don't need the answer to be positive for key-info-set-hashset,
+    ;; but do need it to be positive when hashing ARGS-TYPE which uses MIX.
+    (dolist (elt set (logand h sb-xc:most-positive-fixnum))
+      (setf h (plus-mod-fixnum (truly-the fixnum (key-info-hash elt)) h)))))
 
 (defun key-info-list-flags (list)
   (let ((bits 0))
@@ -1165,8 +1178,8 @@
 
 (define-load-time-global *key-info-hashset*
     (make-hashset 32 #'key-info= #'key-info-hash :weakness t :synchronized t))
-(define-load-time-global *key-info-list-hashset*
-    (make-hashset 32 #'list-elts-eq #'key-info-list-hash :weakness t :synchronized t))
+(define-load-time-global *key-info-set-hashset*
+    (make-hashset 32 #'ctype-set= #'hash-key-info-set :weakness t :synchronized t))
 
 (defun make-key-info (key type)
   (dx-let ((x (!make-key-info key type)))
@@ -1175,7 +1188,8 @@
         (!make-key-info (key-info-name x) (key-info-type x))))))
 (defun intern-key-infos (list)
   (when list
-    (hashset-insert-if-absent *key-info-list-hashset* list #'identity)))
+    ;; I suppose we don't have to COPY-LIST to insert.
+    (hashset-insert-if-absent *key-info-set-hashset* list #'identity)))
 
 (def-type-model (values-type (:constructor* nil (required optional rest))
                              (:include args-type)))
@@ -1189,7 +1203,7 @@
   ;; true if &KEY arguments are specified
   (keyp nil :type boolean)
   ;; list of KEY-INFO structures describing the &KEY arguments
-  (keywords nil :type list :hasher key-info-list-hash :test eq) ; hash-consed already
+  (keywords nil :type list :hasher hash-key-info-set :test eq) ; hash-consed already
   ;; true if other &KEY arguments are allowed
   (allowp nil :type boolean)
   ;; true if the arguments are unrestrictive, i.e. *
@@ -1308,7 +1322,7 @@
       (push (list "List" *ctype-list-hashset*) caches)
       (push (list "Set" *ctype-set-hashset*) caches)
       (push (list "Key-Info" *key-info-hashset*) caches)
-      (push (list "Key-Info-List" *key-info-list-hashset*) caches)
+      (push (list "Key-Info-Set" *key-info-set-hashset*) caches)
       (push (list "EQL" *eql-type-cache*) caches)
       (dolist (symbol *ctype-hashsets*)
         (push (list (subseq (string symbol) 1
@@ -1619,7 +1633,7 @@
 
 ;;; Drop NILs, possibly reducing the storage vector length
 (defun rebuild-ctype-hashsets ()
-  (dolist (sym (list* '*key-info-hashset* '*key-info-list-hashset*
+  (dolist (sym (list* '*key-info-hashset* '*key-info-set-hashset*
                       *ctype-hashsets*))
     (sb-impl::hashset-rehash (symbol-value sym) nil)))
 
