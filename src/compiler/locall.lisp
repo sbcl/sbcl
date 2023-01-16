@@ -1459,6 +1459,7 @@
              (not (block-delete-p (lambda-block fun))))
     (let ((outside-calls nil)
           (outside-calls-ctran nil)
+          (outside-calls-lvar nil)
           (outside-calls-env nil)
           (outside-calls-cleanup nil))
       (when (and (dolist (ref (leaf-refs fun) t)
@@ -1474,6 +1475,9 @@
                            (let ((dest-ctran
                                    (or (node-next dest)
                                        (block-start (first (block-succ (node-block dest))))))
+                                 (dest-lvar
+                                   (and (valued-node-p dest)
+                                        (node-lvar dest)))
                                  (dest-env
                                    (node-home-lambda dest))
                                  (dest-cleanup
@@ -1494,13 +1498,15 @@
                                     ;; cleanups with respect to the
                                     ;; messiest common ancestor.
                                     (unless (and (or (eq (node-derived-type dest) *empty-type*)
-                                                     (and (eq outside-calls-ctran dest-ctran)))
+                                                     (and (eq outside-calls-ctran dest-ctran)
+                                                          (eq outside-calls-lvar dest-lvar)))
                                                  (eq outside-calls-env dest-env)
                                                  (eq outside-calls-cleanup dest-cleanup))
                                       (return nil)))
                                    (t
                                     (setq outside-calls-env dest-env)
                                     (setq outside-calls-ctran dest-ctran)
+                                    (setq outside-calls-lvar dest-lvar)
                                     (setq outside-calls-cleanup dest-cleanup)))
                              (push dest outside-calls))))))
                  (ok-initial-convert-p fun))

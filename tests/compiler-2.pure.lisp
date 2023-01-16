@@ -3859,3 +3859,19 @@
              (error ""))
            x))
     ((nil) nil)))
+
+(with-test (:name :assignment-convert-check-same-lvar)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda (c)
+      (flet ((%f9 (f9-1 f9-2 &optional (key1 0))
+               f9-2))
+        (multiple-value-prog1 (%f9 701021570480035 c)
+          (if t
+              0
+              (progn
+                (%f9 1048572 2385880201)
+                (if t
+                    (%f9 777238289903386671 -15131644893)
+                    0))))))
+   ((10) 10)))
