@@ -72,6 +72,7 @@
        :cache (list (cons nil *standard-method-combination*))))
 
 (defun update-mcs (name new old frobmc)
+  (declare (function frobmc))
   (setf (gethash name **method-combinations**) new)
   ;; for correctness' sake we should probably lock
   ;; **METHOD-COMBINATIONS** while we're updating things, to defend
@@ -84,11 +85,10 @@
       (let* ((mc (cdr entry))
              (gfs (method-combination-%generic-functions mc)))
         (funcall frobmc mc)
-        (flet ((flush (gf ignore)
-                 (declare (ignore ignore))
+        (flet ((flush (gf)
                  (flush-effective-method-cache gf)
                  (reinitialize-instance gf)))
-          (maphash #'flush gfs))))))
+          (map-hashset #'flush gfs))))))
 
 ;;;; short method combinations
 ;;;;

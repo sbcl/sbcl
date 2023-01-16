@@ -365,18 +365,10 @@
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
 
-;;; TODO: we can express MAKE-GF-HASHSET in terms of the robinhood hashset
-;;; using the same stable FSC-INSTANCE-HASH as this.
 (defun make-gf-hashset ()
-  ;; Return what is logically a weak hashset, but physically a weak hash-table
-  ;; because we don't implement hashsets.
-  (make-hash-table :test 'eq
-                   :hash-function #'fsc-instance-hash ; stable hash
-                   :weakness :key
+  (make-hashset 64 #'eq #'fsc-instance-hash
+                   :weakness t
                    :synchronized t))
-(defun add-to-weak-hashset (key set) (setf (gethash key set) t))
-(defun remove-from-weak-hashset (key set) (remhash key set))
-(defun weak-hashset-memberp (key set) (gethash key set))
 
 (defclass standard-method-combination (definition-source-mixin
                                        method-combination)

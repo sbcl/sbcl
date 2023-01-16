@@ -386,6 +386,16 @@
 (defmethod gf-fast-method-function-p ((gf standard-generic-function))
   (gf-info-fast-mf-p (slot-value gf 'arg-info)))
 
+(defun add-to-weak-hashset (key set)
+  (with-system-mutex ((hashset-mutex set))
+    (hashset-insert set key)))
+(defun remove-from-weak-hashset (key set)
+  (with-system-mutex ((hashset-mutex set))
+    (hashset-remove set key)))
+(defun weak-hashset-memberp (key set)
+  (with-system-mutex ((hashset-mutex set))
+    (hashset-find set key)))
+
 (defmethod initialize-instance :after ((gf standard-generic-function)
                                        &key (lambda-list nil lambda-list-p)
                                        argument-precedence-order)
