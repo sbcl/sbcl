@@ -3944,9 +3944,12 @@
                                     nil ,result)
                                `(if (,predicate ,current ,last)
                                     ,result nil))))
-               ((zerop i)
-                `((lambda ,vars (declare (type ,type ,@vars)) ,result)
-                  ,@args)))))))
+                ((zerop i)
+                 `((lambda ,vars
+                     ;; the first two arguments will be checked by the comparison function.
+                     (declare (type ,type ,@(subseq vars 2)))
+                     ,result)
+                   ,@args)))))))
 
 (define-source-transform = (&rest args) (multi-compare '= args nil 'number))
 (define-source-transform < (&rest args) (multi-compare '< args nil 'real))
