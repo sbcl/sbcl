@@ -349,6 +349,61 @@
      (t
       `("~2D: not referenced?" ,loc)))))
 
+(eval-when (:compile-toplevel)
+  (assert (zerop (rem sb-vm:finite-sc-offset-limit 8)))) ; multiple of 8
+
+(defmacro do-sc-locations ((location locations &optional result (increment 1))
+                           &body body)
+  (let ((inc '#:increment)
+        (bitmap '#:bits)
+        (bias '#:bias))
+    (declare (ignorable inc))
+    `(let ((,bitmap ,locations)
+           (,inc (truly-the (member 1 2 4) ,increment))
+           (,bias 0))
+       ;; This bitmap won't be a machine word if #+sparc but who cares?
+       (declare (type sb-vm:finite-sc-offset-map ,bitmap))
+       ;; BIAS can take on the limiting value at its final iteration
+       (declare (type (integer 0 ,sb-vm:finite-sc-offset-limit) ,bias))
+       (block nil
+         #|
+         ;; This should be faster since there is no loop nesting
+         ;; and only the 1 bits are visited. But it didn't benchmark better.
+         ;; Must dig deeper.
+         #+(and (or x86 x86-64) (not sb-xc-host))
+         (unless (zerop ,bitmap)
+           (loop named #:noname
+                 do
+             (let ((.index. (truly-the
+                             (integer 0 (,sb-vm:n-word-bits))
+                             (%primitive sb-vm::unsigned-word-find-first-bit ,bitmap))))
+               ;; BIAS is the bit index in the original LOCATIONS map
+               ;; which is at index 0 in BITMAP
+               (let ((,location (truly-the sb-vm:finite-sc-offset (+ .index. ,bias))))
+                 ,@body
+                 ;; Shift using 2 steps due to the type constraint on digit-logical-shift-right
+                 ;; and/or CPU behavior of oversized shift.
+                 ;; Consider: 32 bit word and bit 31 (and only that) is on. After processing it,
+                 ;; we need to shift out 32 bits to get to the "next" bit. There is no next bit,
+                 ;; so the word should become 0. But shifting by 32 = shifting by 0 which won't do
+                 ;; the right thing.
+                 (setq ,bitmap (sb-bignum:%digit-logical-shift-right
+                                 (sb-bignum:%digit-logical-shift-right ,bitmap .index.)
+                                 ,inc))
+                 (when (zerop ,bitmap) (loop-finish))
+                 (incf ,bias (truly-the (integer 0 ,sb-vm:n-word-bits)
+                                        (+ .index. ,inc)))))))
+         #-(and (or x86 x86-64) (not sb-xc-host))
+         |#
+         (loop named #:outer repeat (/ sb-vm:finite-sc-offset-limit 8)
+               do (when (ldb-test (byte 8 ,bias) ,bitmap)
+                    ;; scan 8 bits starting at BIAS
+                    (loop named #:inner
+                          for ,location from ,bias to (+ ,bias 7) by ,inc
+                          when (logbitp ,location ,bitmap) do (progn ,@body)))
+                  (incf ,bias 8))
+         ,result))))
+
 ;;; If load TN packing fails, try to give a helpful error message. We
 ;;; find a TN in each location that conflicts, and print it.
 (defun failed-to-pack-load-tn-error (scs op)
