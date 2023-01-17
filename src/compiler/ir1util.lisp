@@ -205,14 +205,18 @@
 
 ;;; Return true if LVAR destination is executed immediately after
 ;;; NODE. Cleanups are ignored.
-(defun immediately-used-p (lvar node)
+(defun immediately-used-p (lvar node &optional single-predecessor)
   (declare (type lvar lvar) (type node node))
   (aver (eq (node-lvar node) lvar))
   (let ((dest (lvar-dest lvar)))
     (acond ((node-next node)
             (eq (ctran-next it) dest))
-           (t (eq (block-start (first (block-succ (node-block node))))
-                  (node-prev dest))))))
+           (t
+            (let ((succ (first (block-succ (node-block node)))))
+              (and (not (and single-predecessor
+                             (cdr (block-pred succ))))
+                   (eq (block-start succ)
+                       (node-prev dest))))))))
 
 ;;; Returns the defined (usually untrusted) type of the combination,
 ;;; or NIL if we couldn't figure it out.

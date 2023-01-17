@@ -278,6 +278,10 @@
     (number number) boolean
     (no-verify-arg-count))
 
+(defknown (range< range<= range<<= range<=<)
+    (fixnum real fixnum) boolean
+    (foldable flushable movable no-verify-arg-count))
+
 (defknown (two-arg-gcd two-arg-lcm two-arg-and two-arg-ior two-arg-xor two-arg-eqv)
   (integer integer) integer
   (no-verify-arg-count))

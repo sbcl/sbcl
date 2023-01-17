@@ -5234,3 +5234,147 @@
            nil)
           (t
            (give-up-ir1-transform)))))
+
+(macrolet
+    ((def (name low high)
+       `(progn
+          (deftransform ,name ((low x high) (t double-float t))
+            `(and (,',low low x)
+                  (,',high x high)))
+          (deftransform ,name ((low x high) (t single-float t))
+            `(and (,',low low x)
+                  (,',high x high)))
+          (deftransform ,name ((low x high) (t integer t))
+            `(and (fixnump x)
+                  (,',low low x)
+                  (,',high x high))))))
+  (def range< < <)
+  (def range<= <= <=)
+  (def range<<= < <=)
+  (def range<=< <= <))
+
+(defun next-non-ref-node (node-or-block &optional (cast t))
+  (let ((node node-or-block)
+        ctran)
+    (tagbody
+       (when (block-p node)
+         (setf ctran (block-start node))
+         (go :next-ctran))
+     :next
+       (setf ctran (node-next node))
+     :next-ctran
+       (cond (ctran
+              (setf node (ctran-next ctran))
+              (typecase node
+                (ref)
+                (cast
+                 (unless cast
+                   (return-from next-non-ref-node node)))
+                (enclose)
+                (t (return-from next-non-ref-node node)))
+              (go :next))
+             (t
+              (let ((start (block-start (first (block-succ (node-block node))))))
+                (when start
+                  (setf ctran start)
+                  (go :next-ctran))))))))
+
+(defun range-transform (op a b node)
+  (let ((if (node-dest node)))
+    (flet ((types (x y)
+             (and (not (or (csubtypep (lvar-type x) (specifier-type 'integer))
+                           (csubtypep (lvar-type x) (specifier-type 'single-float))
+                           (csubtypep (lvar-type x) (specifier-type 'double-float))))
+                  (csubtypep (lvar-type y) (specifier-type 'fixnum))))
+           (flip (op)
+             (case op
+               (< '>)
+               (> '<)
+               (<= '>=)
+               (>= '<=))))
+      (when (and (if-p if)
+                 (immediately-used-p (node-lvar node) node t)
+                 (or (types a b)
+                     (and (types b a)
+                          (progn
+                            (rotatef a b)
+                            (setf op (flip op))))))
+        (let ((then (next-non-ref-node (if-consequent if)))
+              (else (next-non-ref-node (if-alternative if) nil)))
+          (when (combination-p then)
+            (let ((op2 (combination-fun-debug-name then)))
+              (when (memq op2 '(< <= > >=))
+                (destructuring-bind (a2 b2) (combination-args then)
+                  (when (and (or (types a2 b2)
+                                 (and (types b2 a2)
+                                      (progn
+                                        (rotatef a2 b2)
+                                        (setf op2 (flip op2)))))
+                             (memq op2
+                                   (case op
+                                     ((< <=) '(> >=))
+                                     ((> >=) '(< <=))))
+                             (let ((after-then (next-non-ref-node then)))
+                               (or (eq else after-then)
+                                   (and (if-p after-then)
+                                        (eq else
+                                            (next-non-ref-node (if-alternative after-then) nil))))))
+                    (when (csubtypep (lvar-type b2) (specifier-type 'fixnum))
+                      (let ((ref (principal-lvar-use a))
+                            (ref2 (lvar-uses a2)))
+                        (when (and (cast-p ref2)
+                                   (type= (cast-type-to-check ref2)
+                                          (specifier-type 'real)))
+                          (setf ref2 (lvar-uses (cast-value ref2))))
+                        (when (and (ref-p ref)
+                                   (ref-p ref2)
+                                   (eq (ref-leaf ref)
+                                       (ref-leaf ref2)))
+
+                          (when (cast-p (lvar-use a))
+                            (delete-cast (lvar-use a)))
+                          (kill-if-branch-1 if (if-test if)
+                                            (node-block if)
+                                            (if-alternative if))
+                          (setf (lvar-dest b) then)
+                          (setf (combination-args then)
+                                (case op
+                                  ((>= >)
+                                   (list b a2 b2))
+                                  (t
+                                   (list b2 a2 b))))
+
+
+                          (transform-call then
+                                          `(lambda (l x h)
+                                             (,(case op
+                                                 (>=
+                                                  (case op2
+                                                    (<= 'range<=)
+                                                    (< 'range<=<)))
+                                                 (>
+                                                  (case op2
+                                                    (<= 'range<<=)
+                                                    (< 'range<)))
+                                                 (<=
+                                                  (case op2
+                                                    (>= 'range<=)
+                                                    (> 'range<<=)))
+                                                 (<
+                                                  (case op2
+                                                    (>= 'range<=<)
+                                                    (> 'range<))))
+                                              l x h))
+                                          'range<))))))))))))))
+
+(defoptimizer (> optimizer) ((a b) node)
+  (range-transform '> a b node))
+
+(defoptimizer (< optimizer) ((a b) node)
+  (range-transform '< a b node))
+
+(defoptimizer (>= optimizer) ((a b) node)
+  (range-transform '>= a b node))
+
+(defoptimizer (<= optimizer) ((a b) node)
+  (range-transform '<= a b node))
