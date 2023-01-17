@@ -2668,7 +2668,8 @@ static void push_in_lockfree_list(struct symbol* list_holder,
     // On the machines that have spurious failure, it is not exposed,
     // unlike in C++ where you can choose compare_exchange_{weak|strong}
     lispobj new = make_lispobj(node, INSTANCE_POINTER_LOWTAG);
-    lispobj actual = __sync_val_compare_and_swap(&list_holder->value, old, new);
+    lispobj __attribute__((unused)) actual =
+        __sync_val_compare_and_swap(&list_holder->value, old, new);
     gc_assert(actual == old);
     if (!compacting_p()) gc_mark_obj(new);
 }
@@ -2679,7 +2680,8 @@ static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
     lispobj old = list_holder->value;
     cons->cdr = old;
     lispobj new = make_lispobj(cons, LIST_POINTER_LOWTAG);
-    lispobj actual = __sync_val_compare_and_swap(&list_holder->value, old, new);
+    lispobj __attribute__((unused)) actual =
+        __sync_val_compare_and_swap(&list_holder->value, old, new);
     gc_assert(actual == old);
     if (!compacting_p()) gc_mark_obj(new);
 }
