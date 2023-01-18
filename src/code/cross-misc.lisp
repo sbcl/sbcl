@@ -398,3 +398,8 @@
 
 (defun sys-copy-struct (x) (copy-structure x))
 (defun ensure-heap-list (x) (copy-list x))
+
+(defun range< (l x h) (< l x h))
+(defun range<= (l x h) (<= l x h))
+(defun range<<= (l x h) (and (< l x) (<= x h)))
+(defun range<=< (l x h) (and (<= l x) (< x h)))
