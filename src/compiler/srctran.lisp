@@ -5268,10 +5268,9 @@
   (unless (delay-ir1-optimizer node :ir1-phases)
     (let ((if (node-dest node)))
       (labels ((types (x y)
-                 (and (not (or (unless-vop-existsp (:translate range<)
-                                 (csubtypep (lvar-type x) (specifier-type 'integer)))
-                               (csubtypep (lvar-type x) (specifier-type 'single-float))
-                               (csubtypep (lvar-type x) (specifier-type 'double-float))))
+                 (declare (ignorable x))
+                 (and (not (unless-vop-existsp (:translate range<)
+                             (csubtypep (lvar-type x) (specifier-type 'integer))))
                       (csubtypep (lvar-type y) (specifier-type 'fixnum))))
                (flip (op)
                  (case op
