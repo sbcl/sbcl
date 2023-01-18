@@ -5,6 +5,7 @@ changes relative to sbcl-2.3.0:
     functions close over top level bindings.
   * optimization: GO and RETURN-FROM now elide out-of-extent tag checks when
     the compiler can prove it's safe even on high safety.
+  * optimization: better numerical comparison functions.
   * sb-graph has been removed. To visualize IR1 in sbcl, it is recommended to
     use the function IR1-TO-DOT (which only survives the final tree shake if
     the feature :sb-devel is enabled at build time).

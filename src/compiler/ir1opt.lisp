@@ -1930,8 +1930,8 @@
               (setf this-low (car this-low)))
             (when (consp this-high)
               (setf this-high (car this-high)))
-            (setf low  (min this-low  (or low  this-low))
-                  high (max this-high (or high this-high))))))
+            (setf low  (sb-xc:min this-low  (or low  this-low))
+                  high (sb-xc:max this-high (or high this-high))))))
       type))
 
 ;;; Iteration variable: only SETQs of the form:

@@ -5378,3 +5378,23 @@
 
 (defoptimizer (<= optimizer) ((a b) node)
   (range-transform '<= a b node))
+
+(macrolet
+    ((def (name excl-low excl-high)
+       `(defoptimizer (,name constraint-propagate-if) ((low x high) node gen)
+          (let ((x-var (ok-lvar-lambda-var x gen)))
+            (when x-var
+              (let ((low (interval-low (type-approximate-interval (lvar-type low))))
+                    (high (interval-high (type-approximate-interval (lvar-type high)))))
+                (values nil nil (list
+                                 (list 'typep x-var
+                                       (specifier-type `(real ,(if ,excl-low
+                                                                   `(,low)
+                                                                   low)
+                                                              ,(if ,excl-high
+                                                                   `(,high)
+                                                                   high))))))))))))
+  (def range< t t)
+  (def range<= nil nil)
+  (def range<<= t nil)
+  (def range<=< nil t))
