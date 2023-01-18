@@ -5416,7 +5416,7 @@
                          `(,(if excl-high
                                 '<
                                 '<=)
-                           x low)))
+                           x high)))
                   ((let ((outer (outer low high)))
                      (or (eq outer *empty-type*)
                          (not (types-equal-or-intersect (lvar-type x) outer))))
