@@ -731,7 +731,7 @@
 
 ;;;; IF optimization
 
-(declaim (start-block ir1-optimize-if))
+(declaim (start-block ir1-optimize-if kill-if-branch-1))
 
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
