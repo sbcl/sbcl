@@ -1973,31 +1973,41 @@
                               (:constant t))
                   (:info lo hi)
                   (:temporary (:sc signed-reg) temp)
-                  (:conditional :ls)
+                  (:conditional :after-sc-selection
+                                (if (and (sc-is x any-reg signed-reg)
+                                         (eql hi
+                                              ,(if excl-high
+                                                   0
+                                                   -1)))
+                                    :hs
+                                    :ls))
                   (:policy :fast-safe)
                   (:generator 2
-                    (let ((lo (+ (if (sc-is x any-reg)
-                                     (fixnumize lo)
-                                     lo)
-                                 ,@(and excl-low
-                                        '(1))))
-                          (hi (+ (if (sc-is x any-reg)
-                                     (fixnumize hi)
-                                     hi)
-                                 ,@(and excl-low
-                                        '(-1)))))
-                      (cond
-                        ((and (sc-is x unsigned-reg)
-                              (< hi 0))
-                         (inst cmp null-tn 0))
-                        ((and (sc-is x unsigned-reg)
-                              (<= lo 0))
-                         (inst cmp x (add-sub-immediate hi)))
-                        (t
-                         (if (plusp lo)
-                             (inst sub temp x (add-sub-immediate lo))
-                             (inst add temp x (add-sub-immediate (abs lo))))
-                         (inst cmp temp (add-sub-immediate (- hi lo))))))))
+                    (aver (>= hi lo))
+                    (let ((lo (+ lo ,@(and excl-low
+                                           '(1))))
+                          (hi (+ hi ,@(and excl-low
+                                           '(-1)))))
+                      (multiple-value-bind (flo fhi)
+                          (if (sc-is x any-reg)
+                              (values (fixnumize lo) (fixnumize hi))
+                              (values lo hi))
+                        (cond
+                          ((and (sc-is x unsigned-reg)
+                                (< fhi 0))
+                           (inst cmp null-tn 0))
+                          ((and (sc-is x unsigned-reg)
+                                (<= flo 0))
+                           (inst cmp x (add-sub-immediate fhi)))
+                          ((= lo 0)
+                           (inst cmp x (add-sub-immediate fhi)))
+                          ((= hi -1)
+                           (inst cmn x (add-sub-immediate (- flo))))
+                          (t
+                           (if (plusp flo)
+                               (inst sub temp x (add-sub-immediate flo))
+                               (inst add temp x (add-sub-immediate (abs flo))))
+                           (inst cmp temp (add-sub-immediate (- fhi flo)))))))))
 
                 (define-vop (,(symbolicate name '-integer/c))
                   (:translate ,name)
@@ -2005,18 +2015,32 @@
                   (:arg-types (:constant t) (:or integer bignum) (:constant t))
                   (:info lo hi)
                   (:temporary (:sc signed-reg) temp)
-                  (:conditional :ls)
+                  (:conditional :after-sc-selection
+                                (if (eql hi
+                                         ,(if excl-high
+                                              0
+                                              -1))
+                                    :hs
+                                    :ls))
                   (:policy :fast-safe)
                   (:generator 5
-                    (let ((lo (+ (fixnumize lo) ,@(and excl-low
-                                                       '(1))))
-                          (hi (+ (fixnumize hi) ,@(and excl-low
-                                                       '(-1)))))
-                      (if (plusp lo)
-                          (inst sub temp x (add-sub-immediate lo))
-                          (inst add temp x (add-sub-immediate (abs lo))))
-                      (inst tst x fixnum-tag-mask)
-                      (inst ccmp temp (ccmp-immediate (- hi lo)) :eq #b10))))
+                    (aver (>= hi lo))
+                    (let ((lo (fixnumize (+ lo ,@(and excl-low
+                                                      `(1)))))
+                          (hi (fixnumize (+ hi ,@(and excl-low
+                                                      `(-1))))))
+                      (cond ((= lo 0)
+                             (inst tst x fixnum-tag-mask)
+                             (inst ccmp x (ccmp-immediate hi) :eq #b10))
+                            ((= hi ,(fixnumize -1))
+                             (inst tst x fixnum-tag-mask)
+                             (inst ccmn x (ccmp-immediate (- lo)) :eq))
+                            (t
+                             (if (plusp lo)
+                                 (inst sub temp x (add-sub-immediate lo))
+                                 (inst add temp x (add-sub-immediate (abs lo))))
+                             (inst tst x fixnum-tag-mask)
+                             (inst ccmp temp (ccmp-immediate (- hi lo)) :eq #b10))))))
 
                 (define-vop ()
                   (:translate ,name)
@@ -2060,7 +2084,7 @@
                                      :lt
                                      :le))
                   (:policy :fast-safe)
-                  (:generator 4
+                  (:generator 6
                     (flet ((imm (x)
                              (if (sc-is x immediate)
                                  (ccmp-immediate (fixnumize (tn-value x)))
