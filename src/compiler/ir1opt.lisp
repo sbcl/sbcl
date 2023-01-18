@@ -1672,6 +1672,17 @@
               (pushnew reason (cdr assoc)))
             (throw 'give-up-ir1-transform :delayed)))))
 
+(defun delay-ir1-optimizer (node &rest reasons)
+  (let ((assoc (assoc node *delayed-ir1-transforms*)))
+    (cond ((not assoc)
+           (setf *delayed-ir1-transforms*
+                 (acons node reasons *delayed-ir1-transforms*))
+           t)
+          ((cdr assoc)
+           (dolist (reason reasons)
+             (pushnew reason (cdr assoc)))
+           t))))
+
 ;;; Poor man's catching and resignalling
 ;;; Implicit %GIVE-UP macrolet will resignal the give-up "condition"
 (defmacro catch-give-up-ir1-transform ((form &optional args) &body gave-up-body)
