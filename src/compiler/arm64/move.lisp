@@ -117,6 +117,14 @@
         (t
          (load-immediate-word temp x))))
 
+(defun ccmp-immediate (x &optional (temp tmp-tn))
+  (cond ((not (integerp x))
+         x)
+        ((typep x '(unsigned-byte 5))
+         x)
+        (t
+         (load-immediate-word temp x))))
+
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))

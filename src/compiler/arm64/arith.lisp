@@ -1962,3 +1962,116 @@
   (:generator 10
     (inst mul temp dividend c) ; want only the low 64 bits
     (inst umulh remainder temp divisor))) ; want only the high 64 bits
+
+(macrolet ((def (name excl-low excl-high)
+             `(progn
+                (define-vop (,(symbolicate name '/c))
+                  (:translate ,name)
+                  (:args (x :scs (any-reg signed-reg unsigned-reg)))
+                  (:arg-types (:constant t)
+                              (:or tagged-num signed-num unsigned-num)
+                              (:constant t))
+                  (:info lo hi)
+                  (:temporary (:sc signed-reg) temp)
+                  (:conditional :ls)
+                  (:policy :fast-safe)
+                  (:generator 2
+                    (let ((lo (+ (if (sc-is x any-reg)
+                                     (fixnumize lo)
+                                     lo)
+                                 ,@(and excl-low
+                                        '(1))))
+                          (hi (+ (if (sc-is x any-reg)
+                                     (fixnumize hi)
+                                     hi)
+                                 ,@(and excl-low
+                                        '(-1)))))
+                      (cond
+                        ((and (sc-is x unsigned-reg)
+                              (< hi 0))
+                         (inst cmp null-tn 0))
+                        ((and (sc-is x unsigned-reg)
+                              (<= lo 0))
+                         (inst cmp x (add-sub-immediate hi)))
+                        (t
+                         (if (plusp lo)
+                             (inst sub temp x (add-sub-immediate lo))
+                             (inst add temp x (add-sub-immediate (abs lo))))
+                         (inst cmp temp (add-sub-immediate (- hi lo))))))))
+
+                (define-vop (,(symbolicate name '-integer/c))
+                  (:translate ,name)
+                  (:args (x :scs (descriptor-reg)))
+                  (:arg-types (:constant t) (:or integer bignum) (:constant t))
+                  (:info lo hi)
+                  (:temporary (:sc signed-reg) temp)
+                  (:conditional :ls)
+                  (:policy :fast-safe)
+                  (:generator 5
+                    (let ((lo (+ (fixnumize lo) ,@(and excl-low
+                                                       '(1))))
+                          (hi (+ (fixnumize hi) ,@(and excl-low
+                                                       '(-1)))))
+                      (if (plusp lo)
+                          (inst sub temp x (add-sub-immediate lo))
+                          (inst add temp x (add-sub-immediate (abs lo))))
+                      (inst tst x fixnum-tag-mask)
+                      (inst ccmp temp (ccmp-immediate (- hi lo)) :eq #b10))))
+
+                (define-vop ()
+                  (:translate ,name)
+                  (:args (lo :scs (any-reg immediate))
+                         (x :scs (any-reg signed-reg unsigned-reg))
+                         (hi :scs (any-reg immediate)))
+                  (:arg-types tagged-num
+                              (:or tagged-num signed-num unsigned-num)
+                              tagged-num)
+                  (:conditional ,(if excl-high
+                                     :lt
+                                     :le))
+                  (:policy :fast-safe)
+                  (:generator 4
+                    (flet ((imm (i)
+                             (if (sc-is i immediate)
+                                 (ccmp-immediate (if (sc-is x any-reg)
+                                                     (fixnumize (tn-value i))
+                                                     (tn-value i)))
+                                 (sc-case x
+                                   (any-reg i)
+                                   (t
+                                    (inst asr tmp-tn i n-fixnum-tag-bits)
+                                    tmp-tn)))))
+                      (sc-case x
+                        (unsigned-reg
+                         (inst tst x (ash 1 (- n-word-bits 1)))
+                         (inst ccmp x (imm lo) :eq 1))
+                        (t
+                         (inst cmp x (imm lo))))
+                      (inst ccmp x (imm hi) ,(if excl-low
+                                                 :gt
+                                                 :ge)))))
+                (define-vop (,(symbolicate name '-integer))
+                  (:translate ,name)
+                  (:args (lo :scs (any-reg immediate))
+                         (x :scs (descriptor-reg))
+                         (hi :scs (any-reg immediate)))
+                  (:arg-types tagged-num (:or integer bignum) tagged-num)
+                  (:conditional ,(if excl-high
+                                     :lt
+                                     :le))
+                  (:policy :fast-safe)
+                  (:generator 4
+                    (flet ((imm (x)
+                             (if (sc-is x immediate)
+                                 (ccmp-immediate (fixnumize (tn-value x)))
+                                 x)))
+                      (inst tst x fixnum-tag-mask)
+                      (inst ccmp x (imm lo) :eq 1)
+                      (inst ccmp x (imm hi) ,(if excl-low
+                                                 :gt
+                                                 :ge))))))))
+
+  (def range< t t)
+  (def range<= nil nil)
+  (def range<<= t nil)
+  (def range<=< nil t))
