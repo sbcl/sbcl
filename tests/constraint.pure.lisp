@@ -451,3 +451,13 @@
                      a
                      (error ""))))))
            `(values (real (10)) &optional))))
+
+(with-test (:name :<=-constraints)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (if (/= a 0)
+             (if (>= a 0)
+                 t)))
+    ((1) t)
+    ((0) nil)))

@@ -202,7 +202,9 @@
                                       (and (eq (equality-constraint-operator con)
                                                (case operator
                                                  (< '>)
-                                                 (> '<)))
+                                                 (> '<)
+                                                 (<= '>=)
+                                                 (>= '<=)))
                                            (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
                                            (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
                            return con))
@@ -250,6 +252,16 @@
          `(when (and constraint
                      (not (constraint-not-p constraint)))
             (setf result nil)
+            t))
+        (inverse-true
+         `(when (and constraint
+                     (constraint-not-p constraint))
+            (setf result t)
+            t))
+        (inverse-false
+         `(when (and constraint
+                     (constraint-not-p constraint))
+            (setf result nil)
             t)))))
 
 (defoptimizer (eql equality-constraint) ((x y))
@@ -261,7 +273,9 @@
      (equality-constraint two-arg-char-equal false)
      (equality-constraint > inverse)
      (equality-constraint < inverse)
-     (equality-constraint = false))
+     (equality-constraint = false)
+     (equality-constraint <= inverse-false)
+     (equality-constraint >= inverse-false))
     result))
 
 (defoptimizer (eq equality-constraint) ((x y))
@@ -273,7 +287,9 @@
      (equality-constraint two-arg-char-equal false)
      (equality-constraint > inverse)
      (equality-constraint < inverse)
-     (equality-constraint = false))
+     (equality-constraint = false)
+     (equality-constraint <= inverse-false)
+     (equality-constraint >= inverse-false))
     result))
 
 (defoptimizer (= equality-constraint) ((x y))
@@ -283,7 +299,9 @@
      (equality-constraint eq true)
      (equality-constraint eql true)
      (equality-constraint > inverse)
-     (equality-constraint < inverse))
+     (equality-constraint < inverse)
+     (equality-constraint <= inverse-false)
+     (equality-constraint >= inverse-false))
     result))
 
 (defoptimizer (char= equality-constraint) ((x y))
@@ -311,7 +329,8 @@
      (equality-constraint < inverse nil)
      (equality-constraint eq inverse)
      (equality-constraint eql inverse)
-     (equality-constraint = inverse))
+     (equality-constraint = inverse)
+     (equality-constraint <= inverse-true nil))
     result))
 
 (defoptimizer (< equality-constraint) ((x y))
@@ -321,25 +340,26 @@
      (equality-constraint > inverse nil)
      (equality-constraint eq inverse)
      (equality-constraint eql inverse)
-     (equality-constraint = inverse))
+     (equality-constraint = inverse)
+     (equality-constraint >= inverse-true nil))
     result))
 
 (defoptimizer (>= equality-constraint) ((x y))
   (let ((result :give-up))
     (or
      (equality-constraint >= nil nil)
-     (equality-constraint > nil nil)
-     (equality-constraint =)
-     (equality-constraint < inverse nil))
+     (equality-constraint > true nil)
+     (equality-constraint = true)
+     (equality-constraint < inverse-true nil))
     result))
 
 (defoptimizer (<= equality-constraint) ((x y))
   (let ((result :give-up))
     (or
-     (equality-constraint < nil nil)
+     (equality-constraint < true nil)
      (equality-constraint <= nil nil)
-     (equality-constraint =)
-     (equality-constraint > inverse nil))
+     (equality-constraint = true)
+     (equality-constraint > inverse-true nil))
     result))
 
 (defoptimizer (- equality-constraint) ((x y) node)
