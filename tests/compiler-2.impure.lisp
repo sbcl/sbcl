@@ -217,3 +217,14 @@
         (top-level-closure-dead-component-reference :keyword "~a" 2)
         (top-level-closure-dead-component-reference :keyword "~a" 2))))
    :load t))
+
+(with-test (:name :top-level-closure-zombie-reference)
+  `((declaim (inline top-level-closure-zombie-reference))
+
+    (defun top-level-closure-zombie-reference ()
+      (multiple-value-bind (g190 param) (#.(gensym))
+        (unwind-protect (#.(gensym) g190)
+          (#.(gensym) g190 param))))
+
+    (print (top-level-closure-zombie-reference)))
+  :load t)

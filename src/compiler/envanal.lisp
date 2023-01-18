@@ -98,9 +98,9 @@
                          ;; since we already committed to the closure
                          ;; format.
                          (let ((home (lambda-var-home x)))
-                           (not (or (member (functional-kind home) '(:deleted :zombie))
-                                    (eq (component-info (lambda-component home))
-                                        :dead))))
+                           (or (member (functional-kind home) '(:deleted :zombie))
+                               (not (eq (component-info (lambda-component home))
+                                    :dead))))
                          (null (leaf-refs x))))
                   (environment-closure old)))
            (flet ((clear (fun)
