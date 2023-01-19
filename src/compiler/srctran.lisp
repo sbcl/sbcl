@@ -5281,7 +5281,8 @@
                    (>= '<)))
                (try (consequent alternative)
                  (let ((then (next-node consequent :non-ref)))
-                   (when (combination-p then)
+                   (when (and (combination-p then)
+                              (eq (combination-kind then) :known)) ;; no notinline
                      (let ((op2 (combination-fun-debug-name then)))
                        (when (memq op2 '(< <= > >=))
                          (flet ((try (&optional reverse-if)
