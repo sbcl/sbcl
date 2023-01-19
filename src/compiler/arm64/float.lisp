@@ -493,7 +493,11 @@
   (frob %unary-truncate/single-float single-reg single-float fcvtzs)
   (frob %unary-truncate/double-float double-reg double-float fcvtzs)
   (frob %unary-round single-reg single-float fcvtns)
-  (frob %unary-round double-reg double-float fcvtns))
+  (frob %unary-round double-reg double-float fcvtns)
+  (frob %unary-ceiling single-reg single-float fcvtps)
+  (frob %unary-ceiling double-reg double-float fcvtps)
+  (frob %unary-floor single-reg single-float fcvtms)
+  (frob %unary-floor double-reg double-float fcvtms))
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res

@@ -1958,7 +1958,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%SXHASH-STRING" "%SXHASH-SIMPLE-STRING"
            "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK" "%TANH"
            "THE*"
-           "%UNARY-ROUND"
+           "%UNARY-ROUND" "%UNARY-CEILING" "%UNARY-FLOOR"
            "%UNARY-TRUNCATE" "UNARY-TRUNCATE"
            "%UNARY-TRUNCATE/SINGLE-FLOAT"
            "%UNARY-TRUNCATE/DOUBLE-FLOAT"
