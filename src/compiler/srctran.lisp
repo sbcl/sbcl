@@ -3831,6 +3831,7 @@
   (neq *empty-type* (type-intersection (specifier-type 'float)
                                        (lvar-type lvar))))
 
+#+(or arm arm64 x86-64 x86)
 (flet ((maybe-invert (op inverted x y)
          (cond
            ((and (not (vop-existsp :translate >=))
@@ -3848,6 +3849,23 @@
   (deftransform <= ((x y) (number number) * :node node)
     "invert or open code"
     (maybe-invert '< '> x y)))
+
+;;; FIXME: for some reason these do not survive cold-init with <=
+#-(or arm arm64 x86-64 x86)
+(flet ((maybe-invert (node op inverted x y)
+         (cond
+           ;; Don't invert if either argument can be a float (NaNs)
+           ((or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
+            (delay-ir1-transform node :constraint)
+            `(or (,op x y) (= x y)))
+           (t
+            `(if (,inverted x y) nil t)))))
+  (deftransform >= ((x y) (number number) * :node node)
+    "invert or open code"
+    (maybe-invert node '> '< x y))
+  (deftransform <= ((x y) (number number) * :node node)
+    "invert or open code"
+    (maybe-invert node '< '> x y)))
 
 ;;; See whether we can statically determine (< X Y) using type
 ;;; information. If X's high bound is < Y's low, then X < Y.
