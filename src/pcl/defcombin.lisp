@@ -485,7 +485,7 @@
             ;; it result in the actual arguments of the generic-function
             ;; not the frobbed list.
             ,,(when whole
-                ``(setq ,',whole .gf-args.))
+                ``(setq ,',(car whole) .gf-args.))
             ,inner-result.)))))
 
 ;;; Partition VALUES into three sections: required, optional, and the
