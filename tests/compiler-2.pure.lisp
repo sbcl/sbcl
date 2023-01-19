@@ -3900,3 +3900,12 @@
               (not (> h a))))
     ((1 0) t)
     ((-1 0) nil)))
+
+(with-test (:name :range<.3)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b c)
+         (and (or (not b) (< 0 c)) (<= c 0)))
+    ((nil -1) t)
+    ((t -1) nil)
+    ((nil 1) nil)))

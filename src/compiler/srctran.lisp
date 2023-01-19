@@ -5239,8 +5239,10 @@
   (let ((node node-or-block)
         ctran)
     (tagbody
-       (when (block-p node)
-         (setf ctran (block-start node))
+       (when (block-p node-or-block)
+         (when (cdr (block-pred node-or-block))
+           (return-from next-node))
+         (setf ctran (block-start node-or-block))
          (go :next-ctran))
      :next
        (setf ctran (node-next node))
@@ -5259,8 +5261,10 @@
                        node))))
               (go :next))
              (t
-              (let ((start (block-start (first (block-succ (node-block node))))))
-                (when start
+              (let* ((succ (first (block-succ (node-block node))))
+                     (start (block-start succ)))
+                (when (and start
+                           (null (cdr (block-pred succ))))
                   (setf ctran start)
                   (go :next-ctran))))))))
 
