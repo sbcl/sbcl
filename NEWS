@@ -11,7 +11,7 @@ changes relative to sbcl-2.3.0:
     the feature :sb-devel is enabled at build time).
   * bug fix: method combination group selection interprets the symbol * as
     a wildcard element within proper qualifier-pattern lists.  (reported by
-    Daniel Kochmański)
+    Maciej Katafiasz and by Daniel Kochmański)
 
 changes in sbcl-2.3.0 relative to sbcl-2.2.11:
   * enhancement: support for SLOT-VALUE and friends has been extended to
