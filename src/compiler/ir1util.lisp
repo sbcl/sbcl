@@ -2417,7 +2417,7 @@ is :ANY, the function name is not checked."
            (values nil nil)))))
 
 (defun combination-fun-debug-name (combination)
-  (let ((uses (principal-lvar-use (combination-fun combination))))
+  (let ((uses (principal-lvar-use (basic-combination-fun combination))))
     (when (ref-p uses)
       (let ((leaf (ref-leaf uses)))
         (typecase leaf

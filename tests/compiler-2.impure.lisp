@@ -16,13 +16,11 @@
   (compiles-with-warning '(lambda () (make-a-foo-2 3))))
 
 (with-test (:name (inline structure :ctor :no declaim))
-  (let ((f (checked-compile '(lambda ()
-                               (make-a-foo-1 :a 'wat :b 3)))))
-    (assert (ctu:find-named-callees f)))
-  (let ((f (checked-compile '(lambda ()
+  (assert (ctu:ir1-named-calls '(lambda () (make-a-foo-1 :a 'wat :b 3))))
+  (assert (not (ctu:ir1-named-calls
+                            '(lambda ()
                                (declare (inline make-a-foo-1))
-                               (make-a-foo-1 :a 'wat :b 3)))))
-    (assert (not (ctu:find-named-callees f)))))
+                               (make-a-foo-1 :a 'wat :b 3))))))
 
 (defstruct %instance-ref-eq (n 0))
 

@@ -14,14 +14,18 @@
 (defpackage :compiler-test-util
   (:nicknames :ctu)
   (:use :cl :sb-c :sb-kernel)
-  (:export #:assert-consing
+  (:import-from #:sb-c #:*compile-component-hook*)
+  (:export #:asm-search
+           #:assert-consing
            #:assert-no-consing
            #:compiler-derived-type
            #:count-full-calls
            #:find-code-constants
            #:find-named-callees
            #:find-anonymous-callees
-           #:file-compile))
+           #:file-compile
+           #:inspect-ir
+           #:ir1-named-calls))
 
 (cl:in-package :ctu)
 
@@ -33,6 +37,39 @@
   (defun compiler-derived-type (x)
     (declare (ignore x))
     (values t nil)))
+
+;;; New tests should use INSPECT-IR or ASM-SEARCH rather than FIND-NAMED-CALLEES
+;;; unless you are 100% certain that there will be an fdefn of the given name.
+;;; (negative assertions may yield falsely passing tests)
+(defun asm-search (expect lambda)
+  (let* ((code (etypecase lambda
+                 (cons (test-util:checked-compile lambda))
+                 (function lambda)))
+         (disassembly
+          (with-output-to-string (s)
+            (let ((sb-disassem:*disassem-location-column-width* 0)
+                  (*print-pretty* nil))
+              (sb-c:dis code s)))))
+    (loop for line in (test-util:split-string disassembly #\newline)
+          thereis (search expect line))))
+
+(defun inspect-ir (form fun &rest checked-compile-args)
+  (let ((*compile-component-hook* fun))
+    (apply #'test-util:checked-compile form checked-compile-args)))
+
+(defun ir1-named-calls (lambda-expression)
+  (let* ((calls)
+         (compiled-fun
+          (inspect-ir
+           lambda-expression
+           (lambda (component)
+             (do-blocks (block component)
+               (do-nodes (node nil block)
+                 (when (and (sb-c::basic-combination-p node)
+                            (eq (sb-c::basic-combination-info node) :full))
+                   (pushnew (sb-c::combination-fun-debug-name node)
+                            calls :test 'equal))))))))
+    (values calls compiled-fun)))
 
 (defun find-named-callees (fun &key (name nil namep))
   (sb-int:binding* ((code (fun-code-header (%fun-fun fun)))

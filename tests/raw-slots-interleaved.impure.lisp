@@ -172,7 +172,3 @@
 (with-test (:name :copy-structure-bignum-bitmap)
   (assert (zerop (foo-lotsaslots-s0
                   (copy-structure (make-foo-lotsaslots))))))
-
-(load "compiler-test-util.lisp")
-(with-test (:name :copy-structure-efficient-case)
-  (assert (not (ctu:find-named-callees #'copy-structure :name 'ash))))

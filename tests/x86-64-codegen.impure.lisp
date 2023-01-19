@@ -535,16 +535,20 @@
     ;; Aside from ECASE failure, there are no other JMPs
     (assert (= (count-assembly-labels lines) 1))))
 
+;;; Assert that the ECASE-FAILURE vop emits a trap and that we don't call ERROR
+;;; (cutting down on the code size for each ECASE)
 (with-test (:name :ecase-failure-trap)
-  (assert (null (ctu:find-named-callees
-                 (checked-compile `(lambda (x)
-                                     (ecase x (:a 1) (:b 2) (:c 3)))))))
-  (assert (null (ctu:find-named-callees
-                 (checked-compile `(lambda (x)
+  ;; test ECASE
+  (assert (ctu:asm-search "ECASE-FAILURE-ERROR"
+                                  `(lambda (x)
+                                     (ecase x (:a 1) (:b 2) (:c 3)))))
+  ;; test ETYPECASE
+  (assert (ctu:asm-search "ETYPECASE-FAILURE-ERROR"
+                                  `(lambda (x)
                                      (etypecase x
                                        ((integer 1 20) 'hi)
                                        ((cons (eql :thing)) 'wat)
-                                       (bit-vector 'hi-again))))))))
+                                       (bit-vector 'hi-again))))))
 
 (with-test (:name :symbol-case-optimization-levels)
   (let ((cases

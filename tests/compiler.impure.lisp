@@ -1181,17 +1181,18 @@
   (assert (= (atanh #C(-0.7d0 1.1d0)) #C(-0.28715567731069275d0 0.9394245539093365d0))))
 
 (with-test (:name :slot-value-on-structure)
-  (let ((f (checked-compile `(lambda (x a b)
+  (multiple-value-bind (callees f)
+      (ctu:ir1-named-calls  `(lambda (x a b)
                                (declare (something-known-to-be-a-struct x))
                                (setf (slot-value x 'x) a
                                      (slot-value x 'y) b)
                                (list (slot-value x 'x)
-                                     (slot-value x 'y))))))
+                                     (slot-value x 'y))))
     (assert (equal '(#\x #\y)
                    (funcall f
                             (make-something-known-to-be-a-struct :x "X" :y "Y")
                             #\x #\y)))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not callees))))
 
 (defclass some-slot-thing ()
   ((slot :initarg :slot)))
@@ -2507,7 +2508,9 @@
     (assert (and warn fail))))
 
 (test-util:with-test (:name :bug-903821)
-  (let* ((fun (test-util:checked-compile
+  (sb-int:binding*
+       (((calls fun)
+          (ctu:ir1-named-calls
                '(lambda (x n)
                  (declare (sb-ext:word x)
                   (type (integer 0 #.(1- sb-vm:n-machine-word-bits)) n)
@@ -2515,8 +2518,7 @@
                  (logandc2 x (ash -1 n)))))
          (thing-not-to-call
           (intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")))
-    (assert (not (member (symbol-function thing-not-to-call)
-                         (ctu:find-named-callees fun))))
+    (assert (not (member thing-not-to-call calls)))
     (assert (= 7 (funcall fun 15 3)))))
 
 (test-util:with-test (:name :bug-997528)
@@ -2657,11 +2659,11 @@
      (lambda (arg) (funcall f (funcall g arg)))))
 
 (with-test (:name :coerce-to-function-smarter)
-  (let ((f (checked-compile
+  (let ((calls (ctu:ir1-named-calls
             '(lambda (x)
               (funcall (compose2 #'integerp #'car) x)))))
     ;; should be completely inlined
-    (assert (null (ctu:find-named-callees f)))))
+    (assert (null calls))))
 
 (with-test (:name :derived-function-type-casts)
   (let ((fasl (compile-file "derived-function-type-casts.lisp"

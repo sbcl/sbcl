@@ -546,10 +546,13 @@
    ((-96088.234) -1.0)))
 
 (with-test (:name :inline-signum)
-  (assert (ctu:find-named-callees ; should be a full call
-           (compile nil '(lambda (x)
+  (assert (equal '(signum)
+                 (ctu:ir1-named-calls ; should be a full call
+                        '(lambda (x)
                            (signum (truly-the number x))))))
-  ;; should not be a full call
+  ;; FIXME: This test passed by accident on backends that didn't fully inline
+  ;; the call, because PLUSP (from the IR transform) is an asm routine.
+  #+x86-64
   (dolist (type '(integer
                   (or (integer 1 10) (integer 50 90))
                   rational
@@ -557,9 +560,9 @@
                   (or (single-float -10f0 0f0) (single-float 1f0 20f0))
                   double-float
                   (or (double-float -10d0 0d0) (double-float 1d0 20d0))))
-    (assert (null (ctu:find-named-callees
-                   (compile nil `(lambda (x)
-                                   (signum (truly-the ,type x))))))))
+    (assert (null (ctu:ir1-named-calls
+                                `(lambda (x)
+                                   (signum (truly-the ,type x)))))))
   ;; check signed zero
   (let ((f (compile nil '(lambda (x) (signum (the single-float x))))))
     (assert (eql (funcall f -0f0) -0f0))

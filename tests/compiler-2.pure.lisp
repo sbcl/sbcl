@@ -62,12 +62,13 @@
 
 (with-test (:name (ldb :recognize-local-macros))
   ;; Should not call %LDB
-  (assert (not (ctu:find-named-callees
-                (checked-compile
-                 '(lambda (x)
+  (assert (equal
+           (ctu:ir1-named-calls
+                '(lambda (x)
                    (declare (optimize speed))
                    (macrolet ((b () '(byte 2 2)))
-                     (ldb (b) (the fixnum x)))))))))
+                     (ldb (b) (the fixnum x)))))
+           '(sb-c::check-ds-list)))) ; why does this remain in the IR?
 
 (with-test (:name (dpb :eval-order :lp-1458190))
   (sb-int:collect ((calls))
@@ -103,14 +104,12 @@
   ;; that asserts that inlining F works in (THE (SATISFIES F) obj).
   (assert (equal (sb-ext:typexpand 'sb-impl::function-name)
                  '(satisfies sb-int:legal-fun-name-p)))
-  (let ((f (checked-compile '(lambda (x) (the sb-impl::function-name x)))))
-    (assert (equal (list (symbol-function 'sb-int:valid-function-name-p))
-                   (ctu:find-named-callees f))))
-  (let ((f (checked-compile '(lambda (x)
-                               (declare (notinline sb-int:legal-fun-name-p))
-                               (the sb-impl::function-name x)))))
-    (assert (equal (list (symbol-function 'sb-int:legal-fun-name-p))
-                   (ctu:find-named-callees f)))))
+  (let ((f `(lambda (x) (the sb-impl::function-name x))))
+    (assert (equal (ctu:ir1-named-calls f) '(sb-int:valid-function-name-p))))
+  (let ((f `(lambda (x)
+              (declare (notinline sb-int:legal-fun-name-p))
+              (the sb-impl::function-name x))))
+    (assert (equal (ctu:ir1-named-calls f) '(sb-int:legal-fun-name-p)))))
 
 (with-test (:name (make-array :untestable-type :no-warning))
   (checked-compile `(lambda () (make-array '(2 2)
@@ -145,12 +144,11 @@
 
 (with-test (:name (princ-to-string :unflushable))
   ;; Ordinary we'll flush it
-  (let ((f (checked-compile '(lambda (x) (princ-to-string x) x))))
-    (assert (not (ctu:find-named-callees f :name 'princ-to-string))))
+  (assert (not (ctu:ir1-named-calls '(lambda (x) (princ-to-string x) x))))
   ;; But in high safety it should be called for effect
-  (let ((f (checked-compile '(lambda (x)
-                               (declare (optimize safety)) (princ-to-string x) x))))
-    (assert (ctu:find-named-callees f :name 'princ-to-string))))
+  (let ((f `(lambda (x)
+              (declare (optimize safety)) (princ-to-string x) x)))
+    (assert (equal (ctu:ir1-named-calls f) '(princ-to-string)))))
 
 (with-test (:name :space-bounds-no-consing
             :serial t
@@ -545,7 +543,7 @@
                      (declare (dynamic-extent #'h0))
                      (return-from block608
                        (progn
-                         (print #'h0)
+                         (print #'h0 (make-broadcast-stream))
                          nil)))))))
         (when nil (%f17))
         (if t
@@ -910,9 +908,9 @@
                    :allow-style-warnings t))
 
 (with-test (:name :flushable-with-callable-args)
-  (let ((fun (checked-compile '(lambda (y) (let ((x (count y '(1 2 3))))
-                                             (declare (ignore x)))))))
-    (assert (not (ctu:find-named-callees fun)))))
+  (assert (not (ctu:ir1-named-calls
+                '(lambda (y) (let ((x (count y '(1 2 3))))
+                            (declare (ignore x))))))))
 
 (with-test (:name (remove :count))
   (checked-compile-and-assert
@@ -2128,67 +2126,72 @@
    ((nil 1 2) 2)))
 
 (with-test (:name :m-v-bind-multi-use-unused-values.1)
-  (let ((f (checked-compile
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
             '(lambda (z m)
               (multiple-value-bind (a b)
                   (if z
                       10
                       (values (sxhash m) m))
                 (declare (ignore a))
-                b)))))
+                b)))
     (assert (eql (funcall f t 33) nil))
     (assert (eql (funcall f nil 33) 33))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not calls))))
 
 (with-test (:name :m-v-bind-multi-use-unused-values.2)
-  (let ((f (checked-compile
-            '(lambda (z m)
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
+           '(lambda (z m)
               (multiple-value-bind (a b c)
                   (if z
                       (values 10)
                       (values (sxhash m) m))
                 (declare (ignore a))
-                (list b c))))))
+                (list b c))))
     (assert (equal (funcall f t 33) '(nil nil)))
     (assert (equal (funcall f nil 33) '(33 nil)))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not calls))))
 
 (with-test (:name :m-v-bind-multi-use-unused-values.3)
-  (let ((f (checked-compile
-            '(lambda (z m)
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
+           '(lambda (z m)
               (multiple-value-bind (a b)
                   (if z
                       10
                       (values m (sxhash m)))
                 (declare (ignore b))
-                a)))))
+                a)))
     (assert (eql (funcall f t 33) 10))
     (assert (eql (funcall f nil 33) 33))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not calls))))
 
 (with-test (:name :m-v-bind-multi-use-unused-values.4
             :skipped-on :sbcl)
-  (let ((f (checked-compile
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
             '(lambda (z m)
               (nth-value 1
                (if z
                    (funcall (the function z))
-                   (values (sxhash m) m)))))))
+                   (values (sxhash m) m)))))
     (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
     (assert (eql (funcall f nil 34) 34))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not calls))))
 
 (with-test (:name :m-v-bind-multi-use-unused-values.5
             :skipped-on :sbcl)
-  (let ((f (checked-compile
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
             '(lambda (z m)
               (nth-value 1
                (if z
                    (funcall (the function z))
-                   (sxhash m)))))))
+                   (sxhash m)))))
     (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
     (assert (eql (funcall f nil 34) nil))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not calls))))
 
 (with-test (:name :m-v-bind-multi-use-variable-type-change)
   (checked-compile-and-assert
@@ -2432,9 +2435,9 @@
             (values null &optional)))))
 
 (with-test (:name :known-fun-no-fdefn)
-  (assert (not (ctu:find-named-callees
-                (checked-compile
-                 '(lambda () #'+))))))
+  (assert (equal (ctu:find-code-constants (checked-compile '(lambda () #'+))
+                                          :type 'function)
+                 (list #'+))))
 
 (with-test (:name :double-float-p-weakening)
   (checked-compile-and-assert
@@ -3502,11 +3505,12 @@
 
 (with-test (:name :%coerce-callable-for-call-with-casts
             :skipped-on (not :call-symbol))
-  (let ((f (checked-compile
+  (multiple-value-bind (calls f)
+      (ctu:ir1-named-calls
             `(lambda (x y)
-              (apply x 1 2 y)))))
+              (apply x 1 2 y)))
     (assert (equal (funcall f #'list '(3)) '(1 2 3)))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (equal calls '(x)))))
 
 (with-test (:name :local-fun-type-check-eliminatetion)
   (let ((fun (checked-compile '(lambda ()
@@ -3741,14 +3745,13 @@
     ((3) 204)))
 
 (with-test (:name :unused-local-fun-results)
-  (let ((f (checked-compile
-            `(lambda (x)
+  (let ((f  `(lambda (x)
                (flet ((x ()
                         (expt x x)))
                  (x)
                  (x)
-                 10)))))
-    (assert (not (ctu:find-named-callees f)))))
+                 10))))
+    (assert (not (ctu:ir1-named-calls f)))))
 
 (with-test (:name :ir2opt-tns-without-sc)
   (checked-compile-and-assert

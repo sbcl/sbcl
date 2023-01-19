@@ -23,9 +23,7 @@
           sb-c::%check-bound
           sb-kernel:%bit-pos-fwd/1))
 
-(defun inspect-ir (form fun &rest checked-compile-args)
-  (let ((*compile-component-hook* fun))
-    (apply #'checked-compile form checked-compile-args)))
+(import 'ctu:inspect-ir)
 
 (defun ir-full-calls (form)
   (let (calls)

@@ -177,7 +177,7 @@
     (let ((ctors (find-anonymous-callees fun :type 'sb-pcl::ctor)))
       (assert ctors)
       (assert (not (cdr ctors)))
-      (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))
+      (assert (asm-search "FAST-MAKE-INSTANCE" (car ctors))))))
 
 ;;; Make sure we get default initargs right with on the FAST-MAKE-INSTANCE path CTORs
 ;;; in more interesting cases as well...
@@ -206,7 +206,7 @@
     (let ((ctors (find-anonymous-callees fun :type 'sb-pcl::ctor)))
       (assert ctors)
       (assert (not (cdr ctors)))
-      (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))
+      (assert (asm-search "FAST-MAKE-INSTANCE" (car ctors))))))
 
 ;;; No compiler notes, please
 (locally (declare (optimize safety))

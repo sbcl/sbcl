@@ -3180,9 +3180,7 @@
 
 ;;; optimizing make-array
 (with-test (:name (make-array :open-code-initial-contents))
-  (flet ((test (form)
-           (assert (not (ctu:find-named-callees
-                         (checked-compile form))))))
+  (flet ((test (form) (assert (not (ctu:ir1-named-calls form)))))
     (test `(lambda (x y z)
              (make-array '(3) :initial-contents (list x y z))))
     (test `(lambda (x y z)
@@ -3199,22 +3197,18 @@
                (make-array (size) :initial-contents `(,x ,y ,z)))))))
 
 ;;; optimizing array-in-bounds-p
+(defun contains-array-in-bounds-p (form)
+  (member 'array-in-bounds-p (ctu:ir1-named-calls `(lambda () ,form))))
 (with-test (:name :optimize-array-in-bounds-p)
   (locally
-    (macrolet ((find-callees (&body body)
-                 `(ctu:find-named-callees
-                    (checked-compile '(lambda () ,@body))
-                    :name 'array-in-bounds-p))
-               (must-optimize (&body exprs)
+    (macrolet ((must-optimize (&body exprs)
                  `(progn
                     ,@(loop for expr in exprs
-                            collect `(assert (not (find-callees
-                                                   ,expr))))))
+                            collect `(assert (not (contains-array-in-bounds-p ',expr))))))
                (must-not-optimize (&body exprs)
                  `(progn
                     ,@(loop for expr in exprs
-                            collect `(assert (find-callees
-                                              ,expr))))))
+                            collect `(assert (contains-array-in-bounds-p ',expr))))))
       (must-optimize
         ;; in bounds
         (let ((a (make-array '(1))))
@@ -3271,8 +3265,9 @@
 ;;; optimizing (EXPT -1 INTEGER)
 (with-test (:name (expt -1 integer))
   (dolist (x '(-1 -1.0 -1.0d0))
-    (let ((fun (checked-compile `(lambda (x) (expt ,x (the fixnum x))))))
-      (assert (not (ctu:find-named-callees fun)))
+    (multiple-value-bind (callees fun)
+        (ctu:ir1-named-calls `(lambda (x) (expt ,x (the fixnum x))))
+      (assert (not callees))
       (dotimes (i 12)
         (if (oddp i)
             (assert (eql x (funcall fun i)))
@@ -3281,18 +3276,16 @@
 (with-test (:name :float-division-using-exact-reciprocal)
   (flet ((test (lambda-form arg res &key (check-insts t))
            (declare (ignorable check-insts))
-           (let* ((fun (checked-compile lambda-form))
-                  (disassembly (with-output-to-string (s)
-                                  (disassemble fun :stream s))))
+           (let ((fun (checked-compile lambda-form)))
              ;; Let's make sure there is no division at runtime: for x86 and
              ;; x86-64 that implies an FDIV, DIVSS, or DIVSD instruction, so
              ;; look for DIV in the disassembly. It's a terrible KLUDGE, but
              ;; it works.
              #+(or x86 x86-64)
              (when check-insts
-               (assert (not (search "DIV" disassembly))))
+               (assert (not (ctu:asm-search "DIV" fun))))
              ;; No generic arithmetic!
-             (assert (not (search "GENERIC" disassembly)))
+             (assert (not (ctu:asm-search "GENERIC" fun)))
              (assert (eql res (funcall fun arg))))))
     (dolist (c '(128 64 32 16 8 4 2 1 1/2 1/4 1/8 1/16 1/32 1/64))
       (dolist (type '(single-float double-float))
@@ -3324,20 +3317,15 @@
                   (fun2 (funcall (checked-compile
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
-                                     ,lambda-form))))
-                  (disassembly1 (with-output-to-string (s)
-                                  (disassemble fun1 :stream s)))
-                  (disassembly2 (with-output-to-string (s)
-                                  (disassemble fun2 :stream s))))
-             (declare (ignorable disassembly1 disassembly2))
+                                     ,lambda-form)))))
              ;; Multiplication at runtime should be eliminated only with
              ;; FLOAT-ACCURACY=0. (To catch SNaNs.)
              #+(or x86 x86-64)
-             (assert (and (search "MUL" disassembly1)
-                          (not (search "MUL" disassembly2))))
+             (assert (and (ctu:asm-search "MUL" fun1)
+                          (not (ctu:asm-search "MUL" fun2))))
              ;; Not generic arithmetic, please!
-             (assert (and (not (search "GENERIC" disassembly1))
-                          (not (search "GENERIC" disassembly2))))
+             (assert (and (not (ctu:asm-search "GENERIC" fun1))
+                          (not (ctu:asm-search "GENERIC" fun2))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (dolist (type '(single-float double-float))
@@ -3355,12 +3343,7 @@
                   (fun2 (funcall (checked-compile
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
-                                     ,lambda-form))))
-                  (disassembly1 (with-output-to-string (s)
-                                  (disassemble fun1 :stream s)))
-                  (disassembly2 (with-output-to-string (s)
-                                  (disassemble fun2 :stream s))))
-             (declare (ignorable disassembly1 disassembly2))
+                                     ,lambda-form)))))
              ;; Let's make sure there is no addition at runtime: for x86 and
              ;; x86-64 that implies an FADD, ADDSS, or ADDSD instruction, so
              ;; look for the ADDs in the disassembly. It's a terrible KLUDGE,
@@ -3368,13 +3351,13 @@
              ;; addition in to catch SNaNs.
              #+x86
              (progn
-               (assert (search "FADD" disassembly1))
-               (assert (not (search "FADD" disassembly2))))
+               (assert (ctu:asm-search "FADD" fun1))
+               (assert (not (ctu:asm-search "FADD" fun2))))
              #+x86-64
              (let ((inst (if (typep result 'double-float)
                              "ADDSD" "ADDSS")))
-               (assert (search inst disassembly1))
-               (assert (not (search inst disassembly2))))
+               (assert (ctu:asm-search inst fun1))
+               (assert (not (ctu:asm-search inst fun2))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (test `(lambda (x) (declare (single-float x)) (+ x 0)) 123.45)
@@ -3390,25 +3373,20 @@
                   (fun2 (funcall (checked-compile
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
-                                     ,lambda-form))))
-                  (disassembly1 (with-output-to-string (s)
-                                  (disassemble fun1 :stream s)))
-                  (disassembly2 (with-output-to-string (s)
-                                  (disassemble fun2 :stream s))))
-             (declare (ignorable disassembly1 disassembly2))
+                                     ,lambda-form)))))
              ;; Let's make sure there is no substraction at runtime: for x86
              ;; and x86-64 that implies an FSUB, SUBSS, or SUBSD instruction,
              ;; so look for SUB in the disassembly. It's a terrible KLUDGE,
              ;; but it works. Unless FLOAT-ACCURACY is zero, we leave the
              ;; substraction in in to catch SNaNs.
              #+x86
-             (assert (and (search "FSUB" disassembly1)
-                          (not (search "FSUB" disassembly2))))
+             (assert (and (ctu:asm-search "FSUB" fun1)
+                          (not (ctu:asm-search "FSUB" fun2))))
              #+x86-64
              (let ((inst (if (typep result 'double-float)
                              "SUBSD" "SUBSS")))
-               (assert (and (search inst disassembly1)
-                            (not (search inst disassembly2)))))
+               (assert (and (ctu:asm-search inst fun1)
+                            (not (ctu:asm-search inst fun2)))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (test `(lambda (x) (declare (single-float x)) (- x 0)) 123.45)
@@ -3424,19 +3402,14 @@
                   (fun2 (funcall (checked-compile
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
-                                     ,lambda-form))))
-                  (disassembly1 (with-output-to-string (s)
-                                  (disassemble fun1 :stream s)))
-                  (disassembly2 (with-output-to-string (s)
-                                  (disassemble fun2 :stream s))))
-             (declare (ignorable disassembly1 disassembly2))
+                                     ,lambda-form)))))
              ;; Let's make sure there is no multiplication at runtime: for x86
              ;; and x86-64 that implies an FMUL, MULSS, or MULSD instruction,
              ;; so look for MUL in the disassembly. It's a terrible KLUDGE,
              ;; but it works.
              #+(or x86 x86-64)
-             (assert (and (not (search "MUL" disassembly1))
-                          (not (search "MUL" disassembly2))))
+             (assert (and (not (ctu:asm-search "MUL" fun1))
+                          (not (ctu:asm-search "MUL" fun2))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (test `(lambda (x) (declare (single-float x)) (* x 2)) 123.45 246.9)
@@ -3484,19 +3457,11 @@
                        (declare (type (double-float 0.0d0 1.0d0) x))
                        (truncate x)))))
     ;; Check that there is no generic arithmetic
-    (assert (not (search "GENERIC"
-                         (with-output-to-string (out)
-                           (disassemble s :stream out)))))
-    (assert (not (search "GENERIC"
-                         (with-output-to-string (out)
-                           (disassemble d :stream out)))))
+    (assert (not (ctu:asm-search "GENERIC" s)))
+    (assert (not (ctu:asm-search "GENERIC" d)))
     ;; Check that we actually inlined the call when we were supposed to.
-    (assert (not (search "UNARY-TRUNCATE"
-                         (with-output-to-string (out)
-                           (disassemble s-inlined :stream out)))))
-    (assert (not (search "UNARY-TRUNCATE"
-                         (with-output-to-string (out)
-                           (disassemble d-inlined :stream out)))))))
+    (assert (not (ctu:asm-search "UNARY-TRUNCATE" s-inlined)))
+    (assert (not (ctu:asm-search "UNARY-TRUNCATE" d-inlined)))))
 
 (with-test (:name (make-array :unnamed-dimension-leaf))
   (checked-compile-and-assert ()
@@ -3564,22 +3529,23 @@
     (assert (= 1 (length notes)))))
 
 (with-test (:name (concatenate :string-opt))
-  (flet ((test (type grep)
-           (let* ((fun (checked-compile `(lambda (a b c d e)
+  (flet ((test (type expect)
+           (sb-int:binding*
+                 (((calls fun)
+                   (ctu:ir1-named-calls `(lambda (a b c d e)
                                            (concatenate ',type a b c d e))))
                   (args '("foo" #(#\.) "bar" (#\-) "quux"))
                   (res (apply fun args)))
-             (assert (search grep (with-output-to-string (out)
-                                    (disassemble fun :stream out))))
+             (assert (equal calls (list expect)))
              (assert (equal (apply #'concatenate type args)
                             res))
              (assert (typep res type)))))
     #+sb-unicode
-    (test 'string "%CONCATENATE-TO-STRING")
+    (test 'string 'sb-kernel:%concatenate-to-string)
     #+sb-unicode
-    (test 'simple-string "%CONCATENATE-TO-STRING")
-    (test 'base-string "%CONCATENATE-TO-BASE-STRING")
-    (test 'simple-base-string "%CONCATENATE-TO-BASE-STRING")))
+    (test 'simple-string 'sb-kernel:%concatenate-to-string)
+    (test 'base-string 'sb-kernel:%concatenate-to-base-string)
+    (test 'simple-base-string 'sb-kernel:%concatenate-to-base-string)))
 
 (with-test (:name (satisfies :no-local-fun))
   (let ((fun (checked-compile
@@ -3638,13 +3604,11 @@
     (() 1.0d0)))
 
 (with-test (:name :%array-data-type-derivation)
-  (let* ((f (checked-compile
+  (assert (not
+           (ctu:asm-search "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR"
              `(lambda (ary)
                 (declare (type (simple-array (unsigned-byte 32) (3 3)) ary))
-                (setf (aref ary 0 0) 0))))
-         (text (with-output-to-string (s)
-                 (disassemble f :stream s))))
-    (assert (not (search "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR" text)))))
+                (setf (aref ary 0 0) 0))))))
 
 (with-test (:name :array-storage-vector-type-derivation)
   (checked-compile-and-assert ()
@@ -3664,11 +3628,12 @@
     ((:toff 2.3d0) (vector 2.3d0 0.0d0 0.0d0) :test #'equalp)))
 
 (with-test (:name :bug-309788)
-  (let ((fun (checked-compile `(lambda (x)
+  (let ((calls (ctu:ir1-named-calls
+                              `(lambda (x)
                                  (declare (optimize speed))
                                  (let ((env nil))
                                    (typep x 'fixnum env))))))
-    (assert (not (ctu:find-named-callees fun)))))
+    (assert (not calls))))
 
 (with-test (:name :bug-309124)
   (let ((fun (checked-compile `(lambda (x)
@@ -3687,12 +3652,13 @@
                          #'string<)))))
 
 (with-test (:name :bug-316078)
-  (let ((fun (checked-compile
+  (multiple-value-bind (calls fun)
+      (ctu:ir1-named-calls
               `(lambda (x)
                  (declare (type (and simple-bit-vector (satisfies eval)) x)
                           (optimize speed))
-                 (elt x 5)))))
-    (assert (equal (ctu:find-named-callees fun) (list #'eval)))
+                 (elt x 5)))
+    (assert (equal calls '(eval)))
     (assert (= 1 (funcall fun #*000001)))
     (assert (= 0 (funcall fun #*000010)))))
 
@@ -4011,13 +3977,12 @@
 
 ;;; This doesn't test LVAR-FUN-IS directly, but captures it
 ;;; pretty accurately anyways.
-(with-test (:name :lvar-fun-is :skipped-on :interpreter)
+(with-test (:name :lvar-fun-is)
   (dolist (fun (list
                 `(lambda (x) (member x x :test #'eq))
                 `(lambda (x) (member x x :test 'eq))
                 `(lambda (x) (member x x :test #.#'eq))))
-    (assert (equal (list #'sb-kernel:%member-eq)
-                   (ctu:find-named-callees (checked-compile fun)))))
+    (assert (equal '(sb-kernel:%member-eq) (ctu:ir1-named-calls fun))))
   (dolist (fun (list
                 `(lambda (x)
                    (declare (notinline eq))
@@ -4028,8 +3993,7 @@
                 `(lambda (x)
                    (declare (notinline eq))
                    (member x x :test #.#'eq))))
-    (assert (member #'sb-kernel:%member-test
-                    (ctu:find-named-callees (checked-compile fun))))))
+    (assert (equal '(sb-kernel:%member-test) (ctu:ir1-named-calls fun)))))
 
 (with-test (:name :delete-to-delq-opt :skipped-on :interpreter)
   (dolist (fun (list `(lambda (x y)
@@ -4041,8 +4005,8 @@
                      `(lambda (x y)
                         (declare (symbol x) (list y))
                         (delete x y :test #'eql))))
-    (assert (equal (list #'sb-int:delq)
-                   (ctu:find-named-callees (checked-compile fun))))))
+    (assert (equal '(sb-int:delq)
+                   (ctu:ir1-named-calls fun)))))
 
 (with-test (:name (compile :bug-767959))
   ;; This used to signal an error.
@@ -4315,15 +4279,14 @@
 
 (with-test (:name (compile fixnum + float :coerces fixnum)
             :skipped-on :x86)
-  (let ((fun (checked-compile
+  (multiple-value-bind (calls fun)
+      (ctu:ir1-named-calls
               `(lambda (x y)
                  (declare (fixnum x)
                           (single-float y))
-                 (+ x y)))))
-    (assert (not (ctu:find-named-callees fun)))
-    (assert (not (search "GENERIC"
-                         (with-output-to-string (s)
-                           (disassemble fun :stream s)))))))
+                 (+ x y)))
+    (assert (not calls))
+    (assert (not (ctu:asm-search "GENERIC" fun)))))
 
 (with-test (:name (compile :bug-803508))
   (checked-compile `(lambda ()
@@ -4575,12 +4538,10 @@
     ((10038) -1055121909)))
 
 (with-test (:name (compile :first-open-coded))
-  (let ((fun (checked-compile `(lambda (x) (first x)))))
-    (assert (not (ctu:find-named-callees fun)))))
+  (assert (not (ctu:ir1-named-calls `(lambda (x) (first x))))))
 
 (with-test (:name (compile :second-open-coded))
-  (let ((fun (checked-compile `(lambda (x) (second x)))))
-    (assert (not (ctu:find-named-callees fun)))))
+  (assert (not (ctu:ir1-named-calls `(lambda (x) (second x))))))
 
 (with-test (:name (compile svref :symbol-macro))
   (checked-compile `(lambda (x)
@@ -5427,10 +5388,9 @@
                *)))
 
 (with-test (:name (typep :quasiquoted-constant))
-  (assert (null (ctu:find-named-callees
-                 (checked-compile
+  (assert (not (ctu:ir1-named-calls
                   `(lambda (x)
-                     (typep x `(signed-byte ,sb-vm:n-word-bits))))))))
+                     (typep x `(signed-byte ,sb-vm:n-word-bits)))))))
 
 (with-test (:name (logior :transform))
   (multiple-value-bind (fun failurep warnings)
