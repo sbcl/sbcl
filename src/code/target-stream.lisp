@@ -26,7 +26,7 @@
 ;;; SKIPPED-CHAR-FORM - the form to execute when skipping a character
 ;;; EOF-DETECTED-FORM - the form to execute when EOF has been detected
 ;;;                     (this will default to EOF-RESULT)
-(sb-xc:defmacro generalized-peeking-mechanism
+(defmacro generalized-peeking-mechanism
     (peek-type eof-value char-var read-form read-eof unread-form
      &optional (skipped-char-form nil) (eof-detected-form nil))
   `(let ((,char-var ,read-form))
@@ -47,10 +47,11 @@
                          ,char-var)))
              ,skipped-char-form))
           ((eql ,peek-type t)
-           (do ((,char-var ,char-var ,read-form))
+           (do ((.readtable. *readtable*)
+                (,char-var ,char-var ,read-form))
                ((or (eql ,char-var ,read-eof)
                     ;; whitespace[2]p will type-check for us
-                    (not (whitespace[2]p ,char-var)))
+                    (not (whitespace[2]p ,char-var .readtable.)))
                 (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
                             eof-detected-form

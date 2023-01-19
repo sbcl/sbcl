@@ -349,7 +349,7 @@
     (assert (char= (peek-char t (make-string-input-stream " a")) #\Space))))
 
 (with-test (:name :whitespace[2]p-is-type-safe)
-  (let ((fun (checked-compile `(lambda () (sb-impl::whitespace[2]p :potato))
+  (let ((fun (checked-compile `(lambda () (sb-impl::whitespace[2]p :potato *readtable*))
                               :allow-warnings t)))
     (assert-error (funcall fun) type-error)))
 

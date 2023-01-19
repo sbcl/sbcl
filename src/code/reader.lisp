@@ -58,23 +58,26 @@
 ;;;; macros and functions for character tables
 
 ;;; As efficiently as possible look up the character attributes of CHAR.
-;;; If CAST is true then insert an assertion that CHARACTER is actually
-;;; a character. This seems to be necessary to ensure that gray stream
-;;; methods that should return characters don't return random objects.
-(defmacro char-syntax (char syntax-array extension-table &optional cast)
-  #-sb-unicode (declare (ignore cast))
-  `(progn
-     #-sb-unicode ,extension-table
-     (truly-the (unsigned-byte 8)
-                #-sb-unicode
-                (elt ,syntax-array (char-code ,char))
-                #+sb-unicode
-                (if (typep ,char 'base-char)
-                    (elt ,syntax-array (char-code ,char))
-                    (car (truly-the list
-                                    (gethash ,(if cast `(the character ,char) char)
-                                             ,extension-table
-                                             ',`(,+char-attr-constituent+))))))))
+;;; If TYPECHECK then insert an assertion that CHAR is actually a character,
+;;; which is needed sometimes when calling Gray stream methods that could return
+;;; random objects which must be of type CHARACTER.
+;;; (Naturally GETHASH doesn't care what its argument is.)
+(defmacro char-syntax (char syntax-array extension-table &optional typecheck)
+  (declare (ignorable extension-table typecheck))
+  `(truly-the (unsigned-byte 8)
+      ;; Unfortunately we require divergent code here for unicode/non-unicode builds.
+      ;; Non-unicode will deduce that the 'else' branch of the IF can't possibly satisfy
+      ;; the typecheck in `(THE CHARACTER) because CHARACTER = BASE-CHAR, and complains.
+      #+sb-unicode
+      (if (typep ,char 'base-char)
+          (elt ,syntax-array (char-code ,char))
+          (let ((found (gethash ,char ,extension-table +char-attr-constituent+)))
+            (cond ((fixnump found)
+                   ,@(if typecheck `((the character ,char))) ; a "drive-by" typecheck
+                   found)
+                  (t
+                   (car (truly-the cons found))))))
+      #-sb-unicode (elt ,syntax-array (char-code ,char))))
 
 ;;; Formerly known as SET-CAT-ENTRY and SET-CMT-ENTRY
 (defun assign-char-syntax (readtable char attributes function)
@@ -145,15 +148,10 @@
 (declaim (inline single-escape-p multiple-escape-p))
 (declaim (inline token-delimiterp))
 
-;;; the [1] and [2] here refer to ANSI glossary entries for
-;;; "whitespace".
-;; whitespace[2]p is the only predicate whose readtable is optional
-;; - other than whitespace[1]p which has a fixed readtable - due to
-;; callers not otherwise needing a readtable at all, and so not binding
-;; *READTABLE* into a local variable throughout their lifetime.
+;;; the [1] and [2] here refer to ANSI glossary entries for "whitespace".
 (defun whitespace[1]p (char)
   (test-attribute char +char-attr-whitespace+ *standard-readtable*))
-(defun whitespace[2]p (char &optional (rt *readtable*))
+(defun whitespace[2]p (char rt)
   (test-attribute char +char-attr-whitespace+ rt t))
 
 (defun constituentp (char rt)
@@ -450,12 +448,11 @@ standard Lisp readtable when NIL."
 
 (defconstant +EOF+ 0)
 
-(defun flush-whitespace (stream)
+(defun flush-whitespace (stream readtable)
   ;; This flushes whitespace chars, returning the last char it read (a
   ;; non-white one). It always gets an error on end-of-file.
-  (let* ((rt *readtable*)
-         (base (base-char-syntax-array rt))
-         (extended (extended-char-table rt)))
+  (let* ((base (base-char-syntax-array readtable))
+         #+sb-unicode (extended (extended-char-table readtable)))
     (macrolet ((done-p ()
                 '(neq (char-syntax char base extended) +char-attr-whitespace+)))
       (if (ansi-stream-p stream)
@@ -696,13 +693,14 @@ standard Lisp readtable when NIL."
   (if recursive-p
       ;; a loop for repeating when a macro returns nothing
       (let* ((tracking-p (form-tracking-stream-p stream))
+             (rt *readtable*)
              (outermost-p
               (and tracking-p
                    (null (form-tracking-stream-form-start-char-pos stream)))))
         (loop
          (let ((char (read-char stream eof-error-p +EOF+)))
            (cond ((eq char +EOF+) (return eof-value))
-                 ((whitespace[2]p char))
+                 ((whitespace[2]p char rt))
                  (t
                   (when outermost-p
                     ;; Calling FILE-POSITION at each token seems to slow down
@@ -779,7 +777,7 @@ standard Lisp readtable when NIL."
     (unless (or (eql result local-eof-val) recursive-p)
       (let ((next-char (read-char stream nil +EOF+)))
         (unless (or (eq next-char +EOF+)
-                    (whitespace[2]p next-char))
+                    (whitespace[2]p next-char *readtable*))
           (unread-char next-char stream))))
     (if (eq result local-eof-val) eof-value result)))
 
@@ -824,9 +822,10 @@ standard Lisp readtable when NIL."
     ((with-list-reader ((streamvar delimiter) &body body)
        `(let* ((thelist (list nil))
                (listtail thelist)
+               (rt *readtable*)
                (collectp (if *read-suppress* 0 -1)))
           (declare (dynamic-extent thelist))
-          (loop (let ((firstchar (flush-whitespace ,streamvar)))
+          (loop (let ((firstchar (flush-whitespace ,streamvar rt)))
                   (when (eq firstchar ,delimiter)
                     (return (cdr thelist)))
                   ,@body))))
@@ -849,8 +848,8 @@ standard Lisp readtable when NIL."
                         (unless (zerop collectp)
                           (simple-reader-error
                            stream "Nothing appears before . in list.")))
-                       ((whitespace[2]p nextchar)
-                        (setq nextchar (flush-whitespace stream))))
+                       ((whitespace[2]p nextchar rt)
+                        (setq nextchar (flush-whitespace stream rt))))
                  (rplacd (truly-the cons listtail)
                          (read-after-dot stream nextchar collectp))
                  ;; Check for improper ". ,@" or ". ,." now rather than
@@ -888,8 +887,9 @@ standard Lisp readtable when NIL."
 
 (defun read-after-dot (stream firstchar collectp)
   ;; FIRSTCHAR is non-whitespace!
-  (let ((lastobj ()))
-    (do ((char firstchar (flush-whitespace stream)))
+  (let ((lastobj ())
+        (rt *readtable*))
+    (do ((char firstchar (flush-whitespace stream rt)))
         ((eq char #\))
          (if (zerop collectp)
              (return-from read-after-dot nil)
@@ -900,7 +900,7 @@ standard Lisp readtable when NIL."
     ;; At least one thing appears after the dot.
     ;; Check for more than one thing following dot.
     (loop
-     (let ((char (flush-whitespace stream)))
+     (let ((char (flush-whitespace stream rt)))
        (cond ((eq char #\)) (return lastobj)) ;success!
              ;; Try reading virtual whitespace.
              ((not (zerop (logand (read-maybe-nothing stream char)
@@ -1224,7 +1224,7 @@ extended <package-name>::<form-in-package> syntax."
   (let* ((rt *readtable*)
          (base *read-base*)
          (attribute-array (base-char-syntax-array rt))
-         (attribute-hash-table (extended-char-table rt))
+         #+sb-unicode (attribute-hash-table (extended-char-table rt))
          (buf *read-buffer*)
          (package-designator nil)
          (colons 0)

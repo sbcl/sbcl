@@ -274,11 +274,12 @@
                     (funcall-stm-handler j-unread-char encap t))
                   (if (eq char stream) eof-value char))))
             ((eq peek-type t)
-             (do ((char char (funcall-stm-handler j-read-char encap
+             (do ((readtable *readtable*)
+                  (char char (funcall-stm-handler j-read-char encap
                                                   eof-error-p
                                                   stream t)))
                  ((or (eq char stream)
-                      (not (sb-impl::whitespace[2]p char)))
+                      (not (sb-impl::whitespace[2]p char readtable)))
                   (unless (eq char stream)
                     (funcall-stm-handler j-unread-char encap t))
                   (if (eq char stream) eof-value char))))
