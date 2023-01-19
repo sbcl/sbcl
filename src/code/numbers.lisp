@@ -645,37 +645,57 @@ the first."
                 ((= < <=) nil)
                 ((> >=) t)))
             (t
-             (let ((quot (%unary-truncate ,float)))
+             (sb-c::if-vop-existsp (:translate %unary-floor)
                ,(ecase operation
                   (=
-                   `(and (= quot ,integer)
-                         (= (float quot ,float) ,float)))
+                   `(let ((quot (%unary-truncate ,float)))
+                      (and (= quot ,integer)
+                           (= (float quot ,float) ,float))))
                   (>
-                   `(cond ((> ,integer quot))
-                          ((< ,integer quot)
-                           nil)
-                          ((<= ,integer 0)
-                           (> (float quot ,float) ,float))))
+                   `(,operation ,integer (truly-the fixnum (%unary-floor ,float))))
                   (<
-                   `(cond ((< ,integer quot))
-                          ((> ,integer quot)
-                           nil)
-                          ((>= ,integer 0)
-                           (< (float quot ,float) ,float))))
+                   `(,operation ,integer (truly-the fixnum (%unary-ceiling ,float))))
                   (>=
-                   `(cond ((> ,integer quot))
-                          ((< ,integer quot)
-                           nil)
-                          (t
-                           (or (< ,float 0)
+                   `(let ((quot (truly-the fixnum (%unary-floor ,float))))
+                      (or (> ,integer quot)
+                          (and (= ,integer quot)
                                (= (float quot ,float) ,float)))))
                   (<=
-                   `(cond ((< ,integer quot))
-                          ((> ,integer quot)
-                           nil)
-                          (t
-                           (or (>= ,float 0)
-                               (= (float quot ,float) ,float)))))))))))
+                   `(let ((quot (truly-the fixnum (%unary-ceiling ,float))))
+                      (or (< ,integer quot)
+                          (and (= ,integer quot)
+                               (= (float quot ,float) ,float))))))
+               (let ((quot (%unary-truncate ,float)))
+                 ,(ecase operation
+                    (=
+                     `(and (= quot ,integer)
+                           (= (float quot ,float) ,float)))
+                    (>
+                     `(cond ((> ,integer quot))
+                            ((< ,integer quot)
+                             nil)
+                            ((<= ,integer 0)
+                             (> (float quot ,float) ,float))))
+                    (<
+                     `(cond ((< ,integer quot))
+                            ((> ,integer quot)
+                             nil)
+                            ((>= ,integer 0)
+                             (< (float quot ,float) ,float))))
+                    (>=
+                     `(cond ((> ,integer quot))
+                            ((< ,integer quot)
+                             nil)
+                            (t
+                             (or (< ,float 0)
+                                 (= (float quot ,float) ,float)))))
+                    (<=
+                     `(cond ((< ,integer quot))
+                            ((> ,integer quot)
+                             nil)
+                            (t
+                             (or (>= ,float 0)
+                                 (= (float quot ,float) ,float))))))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
