@@ -5299,7 +5299,7 @@
                                                        ((< <=) '(> >=))
                                                        ((> >=) '(< <=))))
                                                (not (unless-vop-existsp (:translate range<)
-                                                      (csubtypep (lvar-type x) (specifier-type 'integer))))
+                                                      (csubtypep (lvar-type a) (specifier-type 'integer))))
                                                (csubtypep (lvar-type b) (specifier-type 'fixnum))
                                                (csubtypep (lvar-type b2) (specifier-type 'fixnum))
                                                (let ((after-then (next-node then)))
