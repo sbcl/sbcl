@@ -3890,3 +3890,13 @@
                  :good)
              :bad))
     ((-1 -1 0) :good)))
+
+(with-test (:name :range<.2)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a h)
+         (declare (fixnum h))
+         (and (>= a 0)
+              (not (> h a))))
+    ((1 0) t)
+    ((-1 0) nil)))
