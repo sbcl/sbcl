@@ -378,7 +378,9 @@
   (loop (cond ((and (null pattern) (null qualifiers))
                (return t))
               ((eq pattern '*) (return t))
-              ((and pattern qualifiers (eq (car pattern) (car qualifiers)))
+              ((and pattern qualifiers
+                    (or (eq (car pattern) '*)
+                        (eq (car pattern) (car qualifiers))))
                (pop pattern)
                (pop qualifiers))
               (t (return nil)))))

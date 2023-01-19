@@ -316,3 +316,18 @@
                             (method-self-call a b :z j :j 10)))
       (and warning
            (not sb-kernel:redefinition-warning))))
+
+(define-method-combination qualifier-pattern-element-wild ()
+  ((qpew (:qpew *)))
+  `(1+ (call-method ,(first qpew))))
+
+(defgeneric qualifier-pattern-element-wild-fun (x)
+  (:method-combination qualifier-pattern-element-wild)
+  (:method :qpew * ((x integer)) x)
+  (:method :qpew t ((x ratio)) x)
+  (:method :qpew 1 2 ((x symbol)) 3))
+
+(with-test (:name :method-combination-qualfier-pattern-element-wild)
+  (assert (= (qualifier-pattern-element-wild-fun 1) 2))
+  (assert (= (qualifier-pattern-element-wild-fun 1/2) 3/2))
+  (assert-error (qualifier-pattern-element-wild-fun t)))
