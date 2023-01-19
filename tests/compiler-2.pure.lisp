@@ -3875,3 +3875,15 @@
                     (%f9 777238289903386671 -15131644893)
                     0))))))
    ((10) 10)))
+
+(with-test (:name :range<)
+  (checked-compile-and-assert
+      ()
+      `(lambda (l h v)
+         (declare (fixnum l h))
+         (if (< l v)
+             (if (> h v)
+                 :bad
+                 :good)
+             :bad))
+    ((-1 -1 0) :good)))
