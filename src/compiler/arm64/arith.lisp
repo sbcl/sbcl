@@ -1988,7 +1988,7 @@
                     (aver (>= hi lo))
                     (let ((lo (+ lo ,@(and excl-low
                                            '(1))))
-                          (hi (+ hi ,@(and excl-low
+                          (hi (+ hi ,@(and excl-high
                                            '(-1)))))
                       (multiple-value-bind (flo fhi)
                           (if (sc-is x any-reg)
@@ -2034,7 +2034,7 @@
                     (aver (>= hi lo))
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
                                                       `(1)))))
-                          (hi (fixnumize (+ hi ,@(and excl-low
+                          (hi (fixnumize (+ hi ,@(and excl-high
                                                       `(-1))))))
                       (cond ((= lo 0)
                              (inst tst x fixnum-tag-mask)

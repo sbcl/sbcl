@@ -5324,8 +5324,12 @@
                                                        (case op
                                                          ((< <=) '(> >=))
                                                          ((> >=) '(< <=))))
-                                                 (not (unless-vop-existsp (:translate range<)
-                                                        (csubtypep (lvar-type a) (specifier-type 'integer))))
+                                                 (not (if-vop-existsp (:translate range<)
+                                                                      (if-vop-existsp (:named range<)
+                                                                                      t
+                                                                                      (not (and (constant-lvar-p b)
+                                                                                                (constant-lvar-p b2))))
+                                                                      (csubtypep (lvar-type a) (specifier-type 'integer))))
                                                  (csubtypep (lvar-type b) (specifier-type 'fixnum))
                                                  (csubtypep (lvar-type b2) (specifier-type 'fixnum))
                                                  (let ((after-then (next-node then)))
