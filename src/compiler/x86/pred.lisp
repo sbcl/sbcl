@@ -114,6 +114,8 @@
         (setf not-p (not not-p)))
       (flet ((load-immediate (dst constant-tn &optional (sc-reg dst))
                (let ((val (tn-value constant-tn)))
+                 ;; Shouldn't this just be ENCODE-VALUE-IF-IMMEDIATE ?
+                 ;; (at least for a boxed SC ?)
                  (etypecase val
                    (integer
                     (if (sc-is sc-reg any-reg descriptor-reg)
@@ -128,7 +130,10 @@
                              (logior (ash (char-code val) n-widetag-bits)
                                      character-widetag)))
                       (character-reg
-                       (inst mov sc-reg (char-code val)))))))))
+                       (inst mov sc-reg (char-code val)))))
+                   (structure-object
+                    (aver (eq val sb-lockless:+tail+))
+                    sb-vm::lockfree-list-tail-value)))))
         (aver (null (rest flags)))
         (if (sc-is else immediate)
             (load-immediate res else)
