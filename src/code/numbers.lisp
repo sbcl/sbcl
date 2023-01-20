@@ -790,6 +790,14 @@ the first."
          (,op x (rational y))))))
   )                                     ; EVAL-WHEN
 
+(defmacro dispatch-ratio ((ratio numerator denominator) &body body)
+  `(let ((,numerator (numerator ,ratio))
+         (,denominator (denominator ,ratio)))
+     (if (and (fixnump ,numerator)
+              (fixnump ,denominator))
+         (progn ,@body)
+         (progn ,@body))))
+
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
@@ -802,34 +810,36 @@ the first."
                    :infinite-y-finite-x
                    (,op (coerce 0 '(dispatch-type y)) y))
                   (((foreach fixnum bignum) ratio)
-                   (,(case op
-                       (<= '<)
-                       (>= '>)
-                       (t op))
-                    x (,ratio-arg2 (numerator y)
-                                   (denominator y))))
-                  ((ratio integer)
-                   (,(case op
-                       (<= '<)
-                       (>= '>)
-                       (t op))
-                    (,ratio-arg1 (numerator x)
-                                 (denominator x))
-                    y))
+                   (dispatch-ratio (y numerator denominator)
+                       (,(case op
+                           (<= '<)
+                           (>= '>)
+                           (t op))
+                        x (,ratio-arg2 numerator
+                                       denominator))))
+                  ((ratio (foreach fixnum bignum))
+                   (dispatch-ratio (x numerator denominator)
+                     (,(case op
+                         (<= '<)
+                         (>= '>)
+                         (t op))
+                      (,ratio-arg1 numerator
+                                   denominator)
+                      y)))
                   ((ratio ratio)
-                   (or
-                    ,@(case op
-                        ((<= >=)
-                         `((and (eql (numerator x) (numerator y))
-                                (eql (denominator x) (denominator y))))))
-                    (,(case op
-                        (<= '<)
-                        (>= '>)
-                        (t op))
-                     (* (numerator   (truly-the ratio x))
-                        (denominator (truly-the ratio y)))
-                     (* (numerator   (truly-the ratio y))
-                        (denominator (truly-the ratio x))))))
+                   (dispatch-ratio (x numerator-x denominator-x)
+                     (dispatch-ratio (y numerator-y denominator-y)
+                       (or
+                        ,@(case op
+                            ((<= >=)
+                             `((and (eql numerator-x numerator-y)
+                                    (eql denominator-x denominator-y)))))
+                        (,(case op
+                            (<= '<)
+                            (>= '>)
+                            (t op))
+                         (* numerator-x denominator-y)
+                         (* numerator-y denominator-x))))))
                   ,@cases))))
   (def-two-arg-</> two-arg-< < floor ceiling
     ((fixnum bignum)
