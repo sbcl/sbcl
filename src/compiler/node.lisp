@@ -1782,8 +1782,13 @@
                      (:copier nil))
   low high)
 
+(defstruct (conditional-flags
+            (:constructor make-conditional-flags (flags))
+            (:copier nil))
+  flags)
 
 ;;;; Freeze some structure types to speed type testing.
 
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      environment tail-set nlx-info leaf interval))
+                      environment tail-set nlx-info leaf interval
+                      conditional-flags))

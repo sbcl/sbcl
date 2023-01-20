@@ -632,6 +632,10 @@
 
       (values (the (or tn-ref null) first) (info-args)))))
 
+(defun change-vop-flags (vop flags)
+  (setf (conditional-flags-flags (car (last (vop-codegen-info vop))))
+        flags))
+
 ;;; Convert a conditional template. We try to exploit any
 ;;; drop-through, but emit an unconditional branch afterward if we
 ;;; fail. NOT-P is true if the sense of the TEMPLATE's test should be
@@ -661,15 +665,12 @@
                (register-drop-thru alternative)
                (vop branch node block (block-label alternative))))
           (t
-           (when (equal flags '(:after-sc-selection))
-             ;; To be fixed up by VOP-INFO-AFTER-SC-SELECTION
-             (setf flags (list :after-sc-selection))
-             (setf info-args (append info-args flags)))
-           (emit-template node block template args nil info-args)
-           (vop branch-if if block (block-label consequent) not-p flags)
-           (if (drop-thru-p if alternative)
-               (register-drop-thru alternative)
-               (vop branch if block (block-label alternative)))))))
+           (let ((flags (make-conditional-flags flags)))
+             (emit-template node block template args nil (append info-args (list flags)))
+             (vop branch-if if block (block-label consequent) not-p flags)
+             (if (drop-thru-p if alternative)
+                 (register-drop-thru alternative)
+                 (vop branch if block (block-label alternative))))))))
 
 (when-vop-existsp (:named sb-vm::move-conditional-result)
   ;; Use a dedicated VOP instead of wrapping a conditional that needs
@@ -695,17 +696,14 @@
                (emit-template node block (template-or-lose 'sb-vm::move-conditional-result) nil res-refs
                               (list true))))
             (t
-             (when (equal flags '(:after-sc-selection))
-               ;; To be fixed up by VOP-INFO-AFTER-SC-SELECTION
-               (setf flags (list :after-sc-selection))
-               (setf info-args (append info-args flags)))
-             (emit-template node block template args nil info-args)
-             (emit-template node block (template-or-lose 'sb-vm::move-if/descriptor)
-                            (reference-tn-list
-                             (list (emit-constant t)
-                                   (emit-constant nil))
-                             nil)
-                            res-refs (list flags))))
+             (let ((flags (make-conditional-flags flags)))
+              (emit-template node block template args nil (append info-args (list flags)))
+              (emit-template node block (template-or-lose 'sb-vm::move-if/descriptor)
+                             (reference-tn-list
+                              (list (emit-constant t)
+                                    (emit-constant nil))
+                              nil)
+                             res-refs (list flags)))))
       (move-lvar-result node block res lvar))))
 
 ;;; Convert an IF that isn't the DEST of a conditional template.

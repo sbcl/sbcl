@@ -37,12 +37,13 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
-       (aver (null (rest flags)))
-       (inst jmp
-             (if not-p
-                 (negate-condition (first flags))
-                 (first flags))
-             dest)))
+    (let ((flags (conditional-flags-flags flags)))
+      (aver (null (rest flags)))
+      (inst jmp
+            (if not-p
+                (negate-condition (first flags))
+                (first flags))
+            dest))))
 
 (define-vop (multiway-branch-if-eq)
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
@@ -107,7 +108,8 @@
   (:info flags)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 0
-    (let ((not-p (eq (first flags) 'not)))
+    (let* ((flags (conditional-flags-flags flags))
+           (not-p (eq (first flags) 'not)))
       (when not-p (pop flags))
       (when (location= res then)
         (rotatef then else)

@@ -514,12 +514,12 @@
 (defoptimizer (vop-optimize branch-if select-representations) (branch-if)
   (cond ((maybe-convert-one-cmov branch-if)
          nil)
-        #+(or arm arm64 x86 x86-64)
+        #+(and (or) (or arm arm64 x86 x86-64)) ;; check for flag modification in the VOPs
         (t
          ;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
          ;; into CMP X,Y BRANCH-IF M BRANCH-IF N
          ;; Run it after SELECT-REPRESENTATIONS, after CMOVs are
-         ;; converted and :after-sc-selection flags are resolved.
+         ;; converted.
          ;; While it's portable the VOPs are not validated for
          ;; compatibility on other backends yet.
          (let ((prev (vop-prev branch-if)))
@@ -549,7 +549,7 @@
                    (setf block (ir2-block-next block)))))
 
 (defun branch-destination (branch &optional (true t))
-  (unless (vop-codegen-info branch)
+  (unless (typep (vop-codegen-info branch) '(cons t (cons t)))
     (let ((next (vop-next branch)))
       (if (and next
                (eq (vop-name next) 'branch-if))
@@ -984,14 +984,15 @@
                    (not (tn-ref-next (tn-reads result)))
                    (eq result (tn-ref-tn (vop-args next))))
           (check-type value bit)
-          (let ((template (template-or-lose #+arm64
-                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
-                                                'sb-vm::data-vector-ref/simple-bit-vector-eq
-                                                'sb-vm::data-vector-ref/simple-bit-vector-c-eq)
-                                            #+x86-64
-                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref-with-offset/simple-bit-vector)
-                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-eq
-                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-c-eq))))
+          (let* ((template (template-or-lose #+arm64
+                                             (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
+                                                 'sb-vm::data-vector-ref/simple-bit-vector-eq
+                                                 'sb-vm::data-vector-ref/simple-bit-vector-c-eq)
+                                             #+x86-64
+                                             (if (eq (vop-name vop) 'sb-vm::data-vector-ref-with-offset/simple-bit-vector)
+                                                 'sb-vm::data-vector-ref-with-offset/simple-bit-vector-eq
+                                                 'sb-vm::data-vector-ref-with-offset/simple-bit-vector-c-eq)))
+                 (flags (make-conditional-flags (cdr (template-result-types template)))))
             (prog1
                 (emit-and-insert-vop (vop-node vop)
                                      (vop-block vop)
@@ -999,10 +1000,9 @@
                                      (reference-tn-refs (vop-args vop) nil)
                                      nil
                                      vop
-                                     (vop-codegen-info vop))
-              ;; copy the condition flag
+                                     (append (vop-codegen-info vop) (list flags)))
               (setf (third (vop-codegen-info branch))
-                    (cdr (template-result-types template)))
+                    flags)
               (when (eq value 1)
                 (setf (second (vop-codegen-info branch))
                       (not (second (vop-codegen-info branch)))))

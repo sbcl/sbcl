@@ -618,7 +618,10 @@
                      (if (template-conditional-p info) 0 (length rtypes))
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
-      (unless (= (length (vop-codegen-info vop))
+      (unless (= (+ (length (vop-codegen-info vop))
+                    (if (typep (template-result-types info) '(cons (eql :conditional)))
+                        -1
+                        0))
                  (template-info-arg-count info))
         (barf "wrong number of codegen info args in ~S" vop))))
   (values))

@@ -410,7 +410,8 @@
                  (new (sb-c::emit-and-insert-vop
                        (sb-c::vop-node vop) (vop-block vop)
                        (template-or-lose 'svref-with-addend+if-eq)
-                       new-args nil vop (vop-codegen-info vop))))
+                       new-args nil vop (append (vop-codegen-info vop)
+                                                (vop-codegen-info next)))))
             (sb-c::delete-vop vop)
             (sb-c::delete-vop next)
             new))))))

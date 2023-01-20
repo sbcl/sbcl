@@ -30,12 +30,13 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
+    (let ((flags (conditional-flags-flags flags)))
       (aver (null (rest flags)))
       (inst b
             (if not-p
                 (negate-condition (first flags))
                 (first flags))
-            dest)))
+            dest))))
 
 (defun convert-conditional-move-p (dst-tn)
   (sc-case dst-tn
@@ -58,7 +59,8 @@
   (:results (res))
   (:info flags)
   (:generator 0
-    (let ((not-p (eq (first flags) 'not)))
+    (let* ((flags (conditional-flags-flags flags))
+           (not-p (eq (first flags) 'not)))
       (when not-p (pop flags))
       (cond ((null (rest flags))
              (inst csel res then else (if not-p
@@ -89,7 +91,8 @@
   (:results (res :scs (double-reg)))
   (:result-types double-float)
   (:generator 1
-    (let ((not-p (eq (first flags) 'not)))
+    (let* ((flags (conditional-flags-flags flags))
+           (not-p (eq (first flags) 'not)))
       (when not-p (pop flags))
       (cond ((null (rest flags))
              (inst fcsel res then else (if not-p

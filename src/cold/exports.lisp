@@ -1258,7 +1258,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "*BACKEND-BYTE-ORDER*"
            "+BACKEND-INTERNAL-ERRORS+" "+BACKEND-PAGE-BYTES+"
            "*BACKEND-REGISTER-SAVE-PENALTY*"
-           "*BACKEND-SBS*"          ; storage bases
+           "*BACKEND-SBS*"              ; storage bases
 
            "*BACKEND-SC-NAMES*" "*BACKEND-SC-NUMBERS*"
            "*BACKEND-SUBFEATURES*"
@@ -1437,7 +1437,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "VOP-BLOCK"
            "VOP-NEXT" "NEXT-VOP-IS" "REPLACE-VOPS"
            "VOP-NAME" "VOP-CODEGEN-INFO"
-
+           "CHANGE-VOP-FLAGS" "CONDITIONAL-FLAGS-FLAGS"
            "IMMEDIATE-CONSTANT-SC"
            "BOXED-IMMEDIATE-SC-P"
            "COMBINATION-IMPLEMENTATION-STYLE"
@@ -1464,7 +1464,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "GENERATE-CALL-SEQUENCE"
            "GENERATE-RETURN-SEQUENCE"
            "WITH-COMPILER-ERROR-RESIGNALLING"
-           "XDEFUN"                 ; extended defun for defstruct
+           "XDEFUN"                     ; extended defun for defstruct
 
 
            "BRANCH-IF" "MULTIWAY-BRANCH-IF-EQ"

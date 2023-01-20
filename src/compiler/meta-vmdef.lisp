@@ -786,10 +786,8 @@
 (defun make-after-sc-function (parse)
   (let ((unused-temps
           (remove-if-not #'operand-parse-unused-if
-                         (vop-parse-temps parse)))
-        (conditional (typep (vop-parse-conditional-p parse) '(cons (eql :after-sc-selection)))))
-    (when (or unused-temps
-              conditional)
+                         (vop-parse-temps parse))))
+    (when unused-temps
       (let* ((n-vop (vop-parse-vop-var parse))
              (n-info (gensym))
              (n-variant (gensym))
@@ -826,11 +824,6 @@
         `(lambda (,n-vop)
            (let* ,bindings
              (declare (ignorable ,@(mapcar #'car bindings)))
-             ,@(when conditional
-                 `((setf (car (last (vop-codegen-info ,n-vop)))
-                         (progn ,@(cdr (vop-parse-conditional-p parse))))
-                   (setf (vop-codegen-info ,n-vop)
-                         (butlast (vop-codegen-info ,n-vop)))))
              ,@(loop for op in unused-temps
                      collect `(when ,(operand-parse-unused-if op)
                                 (setf (tn-kind ,(operand-parse-name op)) :unused)))))))))
@@ -1449,8 +1442,6 @@
       :more-args-type ,(when more-args (make-operand-type more-arg))
       :result-types ,(cond ((eq conditional t)
                             :conditional)
-                           ((eql (car conditional) :after-sc-selection)
-                            ''(:conditional :after-sc-selection))
                            (conditional
                             `'(:conditional . ,conditional))
                            (t
