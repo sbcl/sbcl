@@ -339,7 +339,10 @@
 (defknown (rationalize) (real) rational
   (movable foldable flushable recursive))
 
-(defknown (numerator denominator) (rational) integer
+(defknown numerator (rational) integer
+  (movable foldable flushable))
+
+(defknown denominator (rational) (integer 1)
   (movable foldable flushable))
 
 (defknown (floor ceiling round)
