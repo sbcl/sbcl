@@ -3909,3 +3909,13 @@
     ((nil -1) t)
     ((t -1) nil)
     ((nil 1) nil)))
+
+(with-test (:name :move-from-word/fixnum-ir2opt)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (declare (type (integer -10 10) c))
+      (let ((v5 (logior 2305843195621877482 c)))
+        (values v5
+                (abs (shiftf v5 (+ v5 1))))))
+   ((-10) (values -2 2))))
