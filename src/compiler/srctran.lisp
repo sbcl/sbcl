@@ -5347,7 +5347,9 @@
                                         (kill-if-branch-1 if (if-test if)
                                                           (node-block if)
                                                           alternative)
+                                        (nsubst nil b (combination-args node))
                                         (setf (lvar-dest b) then)
+                                        (flush-combination node)
                                         (setf (combination-args then)
                                               (case op
                                                 ((>= >)
@@ -5372,23 +5374,24 @@
                                                             (>= 'range<=<)
                                                             (> 'range<))))
                                                       l x h)))
-
                                           (transform-call then
                                                           `(lambda (l x h)
                                                              ,(if reverse-if
                                                                   `(not ,form)
                                                                   form))
-                                                          'range<))
-                                        t)))))
-                           (unless (try)
-                             (setf op2 (invert op2))
-                             (try t)))))))))
+                                                          'range<)
+                                          t))))))
+                           (cond ((try))
+                                 (t
+                                  (setf op2 (invert op2))
+                                  (try t))))))))))
         (when (and (if-p if)
                    (immediately-used-p (node-lvar node) node t))
-          (unless (try (if-consequent if) (if-alternative if))
-            ;; Deal with (not (< .. ...)) which is transformed from >=.
-            (setf op (invert op))
-            (try (if-alternative if) (if-consequent if))))))))
+          (cond ((try (if-consequent if) (if-alternative if)))
+                (t
+                 ;; Deal with (not (< .. ...)) which is transformed from >=.
+                 (setf op (invert op))
+                 (try (if-alternative if) (if-consequent if)))))))))
 
 (defoptimizer (> optimizer) ((a b) node)
   (range-transform '> a b node))

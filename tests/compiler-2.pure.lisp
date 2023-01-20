@@ -3910,6 +3910,16 @@
     ((t -1) nil)
     ((nil 1) nil)))
 
+(with-test (:name :range<.4)
+  (checked-compile-and-assert
+      ()
+      `(lambda (f m)
+         (declare (fixnum f))
+         (<= (truncate 10 f) m 0))
+    ((-1 0) t)
+    ((1 0) nil)
+    ((-1 10) nil)))
+
 (with-test (:name :move-from-word/fixnum-ir2opt)
   (checked-compile-and-assert
    ()
