@@ -1972,7 +1972,16 @@
                               (:or tagged-num signed-num unsigned-num)
                               (:constant t))
                   (:info lo hi)
-                  (:temporary (:sc signed-reg) temp)
+                  (:temporary (:sc signed-reg
+                               :unused-if
+                               (cond ((or (= lo ,(if excl-low
+                                                     -1
+                                                     0))
+                                          (= hi
+                                             ,(if excl-high
+                                                  0
+                                                  -1))))))
+                              temp)
                   (:conditional :after-sc-selection
                                 (if (and (sc-is x any-reg signed-reg)
                                          (eql hi
@@ -2014,7 +2023,16 @@
                   (:args (x :scs (descriptor-reg)))
                   (:arg-types (:constant t) (:or integer bignum) (:constant t))
                   (:info lo hi)
-                  (:temporary (:sc signed-reg) temp)
+                  (:temporary (:sc signed-reg
+                               :unused-if
+                               (cond ((or (= lo ,(if excl-low
+                                                     -1
+                                                     0))
+                                          (= hi
+                                             ,(if excl-high
+                                                  0
+                                                  -1))))))
+                              temp)
                   (:conditional :after-sc-selection
                                 (if (eql hi
                                          ,(if excl-high
@@ -2050,30 +2068,78 @@
                   (:arg-types tagged-num
                               (:or tagged-num signed-num unsigned-num)
                               tagged-num)
-                  (:conditional ,(if excl-high
-                                     :lt
-                                     :le))
+                  (:arg-refs lo-ref nil hi-ref)
+                  (:conditional :after-sc-selection
+                                (if (and (not (sc-is x unsigned-reg))
+                                         (sc-is hi immediate))
+                                    ,(if excl-low
+                                         :gt
+                                         :ge)
+                                    ,(if excl-high
+                                         :lt
+                                         :le)))
                   (:policy :fast-safe)
                   (:generator 4
-                    (flet ((imm (i)
-                             (if (sc-is i immediate)
-                                 (ccmp-immediate (if (sc-is x any-reg)
-                                                     (fixnumize (tn-value i))
-                                                     (tn-value i)))
-                                 (sc-case x
-                                   (any-reg i)
-                                   (t
-                                    (inst asr tmp-tn i n-fixnum-tag-bits)
-                                    tmp-tn)))))
-                      (sc-case x
-                        (unsigned-reg
+                    (flet ((imm (i &optional (ccmp t))
+                             (let ((i (if (and (tn-p i)
+                                               (sc-is i immediate))
+                                          (tn-value i)
+                                          i)))
+                              (cond ((integerp i)
+                                     (funcall (if ccmp
+                                                  'ccmp-immediate
+                                                  'add-sub-immediate)
+                                              (if (sc-is x any-reg)
+                                                  (fixnumize i)
+                                                  i)))
+                                    ((sc-is x any-reg)
+                                     i)
+                                    (ccmp
+                                     (inst asr tmp-tn i n-fixnum-tag-bits)
+                                     tmp-tn)
+                                    (t
+                                     (asr i n-fixnum-tag-bits))))))
+                      (cond
+                        ((sc-is x unsigned-reg)
                          (inst tst x (ash 1 (- n-word-bits 1)))
-                         (inst ccmp x (imm lo) :eq 1))
+                         (inst ccmp x (imm lo) :eq 1)
+                         (inst ccmp x (imm hi) ,(if excl-low
+                                                    :gt
+                                                    :ge)))
+                        ((sc-is hi immediate)
+                         (let ((hi (tn-value hi)))
+                           (cond
+                             ;; Need to change the :condition
+                             ;; ((and (= hi ,(if excl-high
+                             ;;                  0
+                             ;;                  -1))
+                             ;;       (csubtypep (tn-ref-type lo-ref)
+                             ;;                  (specifier-type '(integer * -1))))
+                             ;;  (inst cmn x lo))
+                             (t
+                              (if (minusp hi)
+                                  (inst cmn x (imm (- hi) nil))
+                                  (inst cmp x (imm hi nil)))
+                              (inst ccmp x (imm lo) ,(if excl-high :lt :le) 1)))))
+                        ((sc-is lo immediate)
+                         (let ((lo (tn-value lo)))
+                           (cond
+                             ;; Need to change the condition
+                             ;; ((and (= lo ,(if excl-low
+                             ;;                  -1
+                             ;;                  0))
+                             ;;       (csubtypep (tn-ref-type hi-ref)
+                             ;;                  (specifier-type 'unsigned-byte)))
+                             ;;  (inst cmp x hi))
+
+                             (t
+                              (if (minusp lo)
+                                  (inst cmn x (imm (- lo) nil))
+                                  (inst cmp x (imm lo nil)))
+                              (inst ccmp x (imm hi) ,(if excl-low :gt :ge))))))
                         (t
-                         (inst cmp x (imm lo))))
-                      (inst ccmp x (imm hi) ,(if excl-low
-                                                 :gt
-                                                 :ge)))))
+                         (inst cmp x (imm lo nil))
+                         (inst ccmp x (imm hi) ,(if excl-low :gt :ge)))))))
                 (define-vop (,(symbolicate name '-integer))
                   (:translate ,name)
                   (:args (lo :scs (any-reg immediate))
@@ -2085,15 +2151,20 @@
                                      :le))
                   (:policy :fast-safe)
                   (:generator 6
-                    (flet ((imm (x)
-                             (if (sc-is x immediate)
-                                 (ccmp-immediate (fixnumize (tn-value x)))
-                                 x)))
+                    (labels ((imm (x)
+                               (if (sc-is x immediate)
+                                   (fixnumize (tn-value x))
+                                   x))
+                             (ccmp (c cond &optional (flags 0))
+                               (let ((c (imm c)))
+                                 (if (typep c '(integer * -1))
+                                     (inst ccmn x (ccmp-immediate (- c)) cond flags)
+                                     (inst ccmp x (ccmp-immediate c) cond flags)))))
                       (inst tst x fixnum-tag-mask)
-                      (inst ccmp x (imm lo) :eq 1)
-                      (inst ccmp x (imm hi) ,(if excl-low
-                                                 :gt
-                                                 :ge))))))))
+                      (ccmp lo :eq 1)
+                      (ccmp hi ,(if excl-low
+                                    :gt
+                                    :ge))))))))
 
   (def range< t t)
   (def range<= nil nil)
