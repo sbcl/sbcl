@@ -41,6 +41,7 @@ ENV=$3  # if you need to set SBCL_ARCH,CFLAGS,etc remotely
 
 set -ex
 
+./generate-version.sh
 ssh $ssh_port_opt $host cd $root \; $checkout '&&' \
   $ENV sh make-config.sh $config_options '&&' \
   mv version.lisp-expr remote-version.lisp-expr
