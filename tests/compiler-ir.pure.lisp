@@ -391,7 +391,7 @@
                        (eq b 10))))))
     (assert (not (find-if
                   (lambda (call)
-                    (let ((fun (sb-c::ref-leaf (sb-c::lvar-use (sb-c::combination-fun call)))))
+                    (let ((fun (sb-c::ref-leaf (sb-c::lvar-uses (sb-c::combination-fun call)))))
                       (and (sb-c::functional-p fun)
                            (eq (sb-c::functional-kind fun) :let))))
                   calls)))))
