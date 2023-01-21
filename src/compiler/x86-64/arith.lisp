@@ -2926,7 +2926,6 @@
                   (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 2
-                    (aver (>= hi lo))
                     (let ((lo (+ lo ,@(and excl-low
                                            '(1))))
                           (hi (+ hi ,@(and excl-high
@@ -2941,9 +2940,12 @@
                             (if (sc-is x any-reg)
                                 (values (fixnumize lo) (fixnumize hi))
                                 (values lo hi))
-                          (when (sc-is x unsigned-reg)
-                            (aver (>= fhi 0)))
+
                           (cond
+                            ((or (< hi lo)
+                                 (and (sc-is x unsigned-reg)
+                                      (< hi 0)))
+                             (inst cmp rsp-tn 0))
                             ((or (= lo 0)
                                  (and (sc-is x unsigned-reg)
                                       (<= flo 0)))
@@ -2970,34 +2972,36 @@
                   (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 5
-                    (aver (>= hi lo))
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
                                             '(1)))))
                           (hi (fixnumize (+ hi ,@(and excl-high
                                             '(-1))))))
-                      (flet ((imm (x)
-                               (cond ((plausible-signed-imm32-operand-p x)
-                                      x)
-                                     (t
-                                      (inst mov temp2 x)
-                                      temp2))))
-                        (generate-fixnum-test x)
-                        (inst jmp :ne (if not-p target skip))
-                        (cond
-                          ((= lo 0)
-                           (inst cmp x (imm hi))
-                           (inst jmp (if not-p :a :be) target))
-                          ((= hi ,(fixnumize -1))
-                           (inst cmp x (imm lo))
-                           (inst jmp (if not-p :b :ae) target))
-                          (t
-                           (if (location= temp x)
-                               (if (plusp lo)
-                                   (inst sub temp (imm lo))
-                                   (inst add temp (imm (- lo))))
-                               (inst lea temp (ea (imm (- lo)) x)))
-                           (inst cmp temp (imm (- hi lo)))
-                           (inst jmp (if not-p :a :be) target)))))
+                      (cond ((< hi lo)
+                             (inst jmp (if not-p target skip)))
+                            (t
+                             (flet ((imm (x)
+                                      (cond ((plausible-signed-imm32-operand-p x)
+                                             x)
+                                            (t
+                                             (inst mov temp2 x)
+                                             temp2))))
+                               (generate-fixnum-test x)
+                               (inst jmp :ne (if not-p target skip))
+                               (cond
+                                 ((= lo 0)
+                                  (inst cmp x (imm hi))
+                                  (inst jmp (if not-p :a :be) target))
+                                 ((= hi ,(fixnumize -1))
+                                  (inst cmp x (imm lo))
+                                  (inst jmp (if not-p :b :ae) target))
+                                 (t
+                                  (if (location= temp x)
+                                      (if (plusp lo)
+                                          (inst sub temp (imm lo))
+                                          (inst add temp (imm (- lo))))
+                                      (inst lea temp (ea (imm (- lo)) x)))
+                                  (inst cmp temp (imm (- hi lo)))
+                                  (inst jmp (if not-p :a :be) target)))))))
                     skip)))))
 
   (def range< t t)
