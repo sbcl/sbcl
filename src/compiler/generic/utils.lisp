@@ -394,9 +394,7 @@
   (logand (1- rank) array-rank-mask))
 
 (defun compute-object-header (nwords widetag-or-metadata)
-  (let* ((widetag (if (typep widetag-or-metadata '(or wrapper defstruct-description))
-                      instance-widetag
-                      widetag-or-metadata))
+  (let* ((widetag (if (fixnump widetag-or-metadata) widetag-or-metadata instance-widetag))
          (array-header-p
           (or (= widetag simple-array-widetag)
               (>= widetag complex-base-string-widetag))))
