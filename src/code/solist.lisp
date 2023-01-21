@@ -219,10 +219,6 @@
                    ,@(if rest '(bins+shift bins shift)))))
      ,@body))
 
-;;; The more bins there are, the more dummy nodes.
-;;; Dummy nodes constitute extra space overhead.
-(defconstant +desired-elts-per-bin+ 3)
-
 (defun so-insert (table key &optional (value nil valuep))
   (when (and valuep (not (so-valuesp table)))
     (error "~S is a set, not a map" table))
@@ -233,20 +229,28 @@
             (funcall (so-inserter table) start-node (logior hash 1) key))
       (cond (foundp ; must not find a dummy node
              ;; Note that in this case we do not update SO-DATA. The client of the table
-             ;; should use the secondary value to notice that the node existed,
+             ;; can use the secondary value to notice that the node existed,
              ;; and pick an appropriate way to atomically update the node.
              (aver (typep node 'so-key-node)))
-            (t
-             (let* ((n-bins (length bins))
-                    (threshold (* n-bins +desired-elts-per-bin+)))
-               (when (and (> (atomic-incf (so-count table)) threshold)
-                          (> shift 1)) ; can't reduce the shift below 1
-                 #+so-debug (format t "count = ~d thresh = ~d~%" new-count threshold)
-                 (let ((new-bins (make-array (* 2 n-bins) :initial-element (make-unbound-marker))))
-                   (dotimes (i n-bins)
-                     (setf (aref new-bins (* i 2)) (aref bins i)))
-                   ;; It makes no difference whether this CAS succeeds or fails!
-                   (cas (so-bins table) bins+shift (cons new-bins (1- shift))))))))
+            ((and (> (atomic-incf (so-count table)) (so-threshold table))
+                  (> shift 1)) ; can't reduce the shift below 1
+             ;; Try to compare-and-swap the threshold first before changing the bins.
+             ;; This way, at most one thread should win, and rellocate bins.
+             (let* ((cur-n-bins (length bins))
+                    (new-n-bins (the index (* 2 cur-n-bins)))
+                    (cur-threshold (so-threshold table))
+                    (new-threshold (the index (* new-n-bins (so-elts-per-bin table)))))
+               ;; These tables don't downsize ever (same as our HASH-TABLE), so just make sure
+               ;; we're increasing the threshold.  Due to unusual scheduling of threads, it could
+               ;; be that CUR-THRESHOLD is already larger than NEW-THRESHOLD.
+               (when (and (> new-threshold cur-threshold)
+                          (eql (cas (so-threshold table) cur-threshold new-threshold)
+                               cur-threshold))
+                 (let ((new-bins (make-array new-n-bins :initial-element (make-unbound-marker))))
+                   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                   (dotimes (i cur-n-bins) (setf (aref new-bins (* i 2)) (aref bins i)))
+                   ;; If the CAS fails, there was already at least another doubling in another thread.
+                   (cas (so-bins table) bins+shift (cons new-bins (1- shift))) bins+shift)))))
       (values node foundp))))
 
 ;; This is like LFL-DELETE-MACRO but passes both a hash and a key
@@ -331,7 +335,8 @@
     (let ((so-list (apply #'%%make-split-ordered-list initial-bin args)))
       ;; Start with 2 bins, only the first being initialized.
       ;; Shift out all bits except 1 for the bin number.
-      (setf (so-bins so-list) (cons (vector initial-bin (make-unbound-marker))
+      (setf (so-threshold so-list) (* 2 (so-elts-per-bin so-list)) ; 2 bins
+            (so-bins so-list) (cons (vector initial-bin (make-unbound-marker))
                                     (- +hash-nbits+ 1)))
       so-list)))
 

@@ -762,6 +762,9 @@ during backtrace.
 ;; NODE-HASH is a fixnum. Negatives probably don't do the right thing
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits))
+;;; The more bins there are, the more dummy nodes.
+;;; Dummy nodes constitute extra space overhead.
+(defparameter *desired-elts-per-bin* 4)
 (sb-xc:defstruct (split-ordered-list
                    (:include linked-list)
                    (:conc-name so-)
@@ -769,8 +772,10 @@ during backtrace.
                    (:constructor %%make-split-ordered-list
                     (head hashfun inserter deleter finder
                      inequality equality valuesp)))
+  (count 0 :type sb-ext:word)
+  (threshold 0 :type sb-ext:word)
   (hashfun #'error :type (sfunction (t) (and fixnum unsigned-byte)))
   (bins '(#() . 1) :type (cons simple-vector (integer 1 (#.+hash-nbits+))))
-  (count 0 :type sb-ext:word)
+  (elts-per-bin *desired-elts-per-bin* :type (integer 1 20))
   ;; If VALUESP is NIL, then this is a set, otherwise it is a map.
   (valuesp nil))
