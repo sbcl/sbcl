@@ -343,6 +343,19 @@
                 ~%  ~S~%*** possible internal error? Please report this."
                (type-specifier rtype) (type-specifier node-type))))
           (setf (node-derived-type node) int)
+          ;; If the new type consists of only one object, replace the
+          ;; node with a constant reference.
+          (when (and (ref-p node)
+                     (lambda-var-p (ref-leaf node)))
+            (let ((type (single-value-type int)))
+              (when (and (and (boundp '*component-being-compiled*)
+                              (eq (node-component node) *component-being-compiled*))
+                         (member-type-p type)
+                         (eql (member-type-size type) 1)
+                         (not (preserve-single-use-debug-var-p node (ref-leaf node))))
+
+                (change-ref-leaf node (find-constant
+                                       (first (member-type-members type)))))))
           (reoptimize-lvar lvar)))))
   (values))
 
