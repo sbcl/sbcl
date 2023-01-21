@@ -226,3 +226,13 @@
 
     (print (top-level-closure-zombie-reference)))
   :load t)
+
+(with-test (:name :top-level-closure-type-errors
+            :fails-on :sbcl)
+  (let (warnings)
+    (handler-bind ((warning (lambda (c) (push c warnings))))
+      (ctu:file-compile
+       `((let ((x (random 1d0)))
+           (defun test ()
+             (car x))))))
+    (assert (typep (car warnings) 'sb-int:type-warning))))
