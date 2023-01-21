@@ -1051,6 +1051,30 @@
                          (f2))))))))
     (assert (= count 3))))
 
+(with-test (:name :indirect-closure-values.crash)
+  (block nil
+    (handler-bind ((error (lambda (c)
+                            (declare (ignore c))
+                            (sb-debug:map-backtrace
+                             (lambda (frame)
+                               (let ((name (sb-debug::frame-call frame))
+                                     (location (sb-debug::frame-code-location frame))
+                                     (d-fun (sb-debug::frame-debug-fun frame)))
+                                 (when (eq name 'test)
+                                   (assert (sb-debug::debug-var-info-available d-fun))
+                                   (dolist (v (sb-debug::ambiguous-debug-vars d-fun ""))
+                                     (assert (not (sb-debug::var-valid-in-frame-p v location frame))))
+                                   (return))))))))
+      (funcall
+       (compile nil
+                `(sb-int:named-lambda test ()
+                   (declare (optimize debug safety))
+                   (signal 'error)
+                   (let ((protos '()))
+                     (mapcar (lambda (x)
+                               (print x))
+                             protos))))))))
+
 (with-test (:name :non-tail-self-call-bad-variables)
   (let ((count 0))
     (block nil

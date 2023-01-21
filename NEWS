@@ -14,6 +14,9 @@ changes relative to sbcl-2.3.0:
     Maciej Katafiasz and by Daniel Kochmański)
   * bug fix: &WHOLE can be used without error in method combination lambda
     lists.  (reported by Daniel Kochmański)
+  * bug fix: bogus debug variables generated for closure variables whose value
+    cell had not yet been allocated could cause segfaults and gc crashes
+    (reported by _death on #sbcl)
 
 changes in sbcl-2.3.0 relative to sbcl-2.2.11:
   * enhancement: support for SLOT-VALUE and friends has been extended to
