@@ -244,6 +244,9 @@
                ;; we're increasing the threshold.  Due to unusual scheduling of threads, it could
                ;; be that CUR-THRESHOLD is already larger than NEW-THRESHOLD.
                (when (and (> new-threshold cur-threshold)
+                          #+(or arm mips sparc) ; no support for raw slot atomic ops, really?
+                          (setf (so-threshold table) new-threshold)
+                          #-(or arm mips sparc)
                           (eql (cas (so-threshold table) cur-threshold new-threshold)
                                cur-threshold))
                  (let ((new-bins (make-array new-n-bins :initial-element (make-unbound-marker))))
