@@ -10,6 +10,10 @@
                        make-so-map/string make-so-set/string make-so-map/addr
                        make-marked-ref))
 
+;;; Make sure no promotions occur so that objects will be movable
+;;; throughout these tests.
+(setf (generation-number-of-gcs-before-promotion 0) 1000000)
+
 ;;; Show all nodes including dummies.
 (defun show-list (solist)
   (let ((node (so-head solist)))
