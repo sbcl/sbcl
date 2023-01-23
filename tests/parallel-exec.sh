@@ -44,7 +44,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        "compiler.pure"
                        "timer.impure"
                        "bug-1180102.impure"
-                       "gethash-concurrency.impure"
+                       "gethash-concurrency.pure"
                        "arith-slow.pure"))
 (defvar *filter* nil)
 (defglobal *delete-logs* nil)

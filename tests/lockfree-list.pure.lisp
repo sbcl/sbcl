@@ -1,4 +1,12 @@
-(in-package "SB-LOCKLESS")
+(shadowing-import 'sb-lockless::endp)
+(import 'sb-kernel::(find-layout generation-of get-lisp-obj-address))
+(import 'sb-int::(fixnump))
+(import 'sb-sys::(sap>= with-pinned-objects))
+(import 'sb-lockless::(list-node keyed-node +tail+
+                       %node-next get-next
+                       list-head lfl-insert lfl-delete make-ordered-list
+                       make-marked-ref
+                       finish-incomplete-deletions))
 
 ;; Missing runtime functions
 #+interpreter (invoke-restart 'run-tests::skip-file)

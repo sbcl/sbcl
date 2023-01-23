@@ -387,6 +387,9 @@
                        (search ".impure-cload" (namestring file)))))
              (packages-to-use '("ASSERTOID" "TEST-UTIL"))
              (initial-packages (list-all-packages))
+             ;; It is not only permitted to change this GC parameter in tests, it is
+             ;; _encouraged_ as a way to show insensitivity to object address stability.
+             (gen0-gcs-before-promo (generation-number-of-gcs-before-promotion 0))
              (global-symbol-values (when actually-pure
                                      (collect-symbol-values)))
              (gf-summary (summarize-generic-functions))
@@ -470,6 +473,9 @@
             (skip-file ())))
         (sb-impl::disable-stepping)
         (sb-int:unencapsulate 'open 'open-guard)
+        (unless (eql (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo)
+          (format t "~&::: NOTE: nursery space promotion rate restored to nominal~%")
+          (setf (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo))
         (when actually-pure
           (setq sb-disassem::*disassem-inst-space* nil
                 sb-disassem::*assembler-routines-by-addr* nil)

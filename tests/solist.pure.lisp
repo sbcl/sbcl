@@ -1,4 +1,14 @@
-(in-package sb-lockless)
+(shadowing-import 'sb-lockless::endp)
+(import 'sb-int::(aver fixnump unbound-marker-p))
+(import 'sb-sys:with-pinned-objects)
+(import 'sb-kernel::(generation-of get-lisp-obj-address))
+(import 'sb-lockless::(+hash-nbits+ %node-next
+                       get-next node-hash
+                       so-head so-bins so-key so-data so-count
+                       so-key-node-p dummy-node-p
+                       so-insert so-delete so-find so-find/string so-maplist
+                       make-so-map/string make-so-set/string make-so-map/addr
+                       make-marked-ref))
 
 ;;; Show all nodes including dummies.
 (defun show-list (solist)
@@ -366,7 +376,8 @@
 ;;; sb-fasteval does not use that same technique to represent special bindings,
 ;;; and has no problem iterating over all symbols.
 (test-util:with-test (:name :concurrently-insert-same-keys/object
-                      :skipped-on (or (not :sb-thread) (not :sb-fasteval)))
+                      :skipped-on (or (not :sb-thread)
+                                      (and :interpreter (not :sb-fasteval))))
   (let* ((objects
           (remove-if (lambda (x)
                        (not (eql (generation-of x) sb-vm:+pseudo-static-generation+)))
