@@ -1080,5 +1080,26 @@
                                     :external-format :euc-jp)
                    (read-line f))))
   (delete-file *test-path*))
-
-;;;; success
+
+;; test for lp#659107
+(with-test (:name :cmdline-setq-external-format
+                  :skipped-on (not :sb-unicode))
+  (with-scratch-file (script "lisp")
+    (with-open-file (stream script :direction :output
+                                   :if-exists :supersede
+                                   :if-does-not-exist :create
+                                   :external-format :utf16le)
+      (format stream "(defvar s \"what? ~A\"~%)" (name-char "GRINNING_FACE"))
+      (format stream "(sb-ext:exit :code
+ (if (and (string= (subseq s 0 6) \"what? \") (char= (char s 6) #\\grinning_face)) 0 1))~%"))
+    (let ((code
+            (process-exit-code
+             (run-program
+              sb-ext:*runtime-pathname*
+              (list "--core" sb-int:*core-string*
+                    "--noinform" "--no-sysinit" "--no-userinit" "--noprint"
+                    "--disable-debugger"
+                    "--eval" "(setq *default-external-format* :utf16le)"
+                    "--load" script)
+              :error t))))
+      (assert (zerop code)))))
