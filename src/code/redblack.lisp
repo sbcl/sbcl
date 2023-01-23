@@ -32,7 +32,7 @@
   (:shadow "DELETE")
   (:export "INSERT" "DELETE"))
 
-(in-package "SB-RBTREE")
+(cl:in-package "SB-RBTREE")
 
 (defmacro define-tree-class (&key key-type value-type (lessp '<)
                              &aux (data-type (if value-type 'cons key-type))

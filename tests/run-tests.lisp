@@ -271,7 +271,8 @@
            (n-new (when (and (slot-exists-p gf 'sb-pcl::methods)
                              (slot-boundp gf 'sb-pcl::methods))
                     (length (sb-mop:generic-function-methods gf)))))
-      (assert (eql n-old n-new)))))
+      (unless (eql n-old n-new)
+        (error "Generic-Function change: ~S (had ~D methods)" gf n-old)))))
 
 (defun tersely-summarize-globaldb ()
   (let* ((symbols-with-properties)
@@ -352,7 +353,16 @@
     (dolist (package delete)
       (unuse-package (package-use-list package) package))
     ;; Then all deletions
-    (mapc 'delete-package delete))
+    (mapc 'delete-package delete)
+    (when delete
+      (format t "::: NOTE: Deleted ~D package~:P~%" (length delete))))
+  ;; Remove PRINT-OBJECT methods specialized on uninterned symbols
+  (let ((gf #'print-object))
+    (dolist (method (sb-mop:generic-function-methods gf))
+      (let ((first-specializer
+             (class-name (car (sb-mop:method-specializers method)))))
+        (unless (symbol-package first-specializer)
+          (remove-method gf method)))))
   (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
         for index from 0
         unless (equal x y)
@@ -482,8 +492,8 @@
           (setq sb-disassem::*disassem-inst-space* nil
                 sb-disassem::*assembler-routines-by-addr* nil)
           (compare-symbol-values global-symbol-values)
-          (compare-gf-summary gf-summary)
           (globaldb-cleanup initial-packages globaldb-summary)
+          (compare-gf-summary gf-summary)
           (dolist (symbol '(sb-pcl::compile-or-load-defgeneric
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
