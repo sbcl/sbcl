@@ -1,6 +1,7 @@
 (with-compilation-unit ()
-  (load "test-util")
-  (load "assertoid"))
+  (let ((*evaluator-mode* :compile))
+    (load "test-util")
+    (load "assertoid")))
 
 (defpackage :run-tests
   (:use :cl :test-util :sb-ext))
@@ -13,7 +14,7 @@
 
 (defvar *break-on-error*)
 
-(load "test-funs")
+(let ((*evaluator-mode* :compile)) (load "test-funs"))
 
 (defun run (file test-fun
             break-on-failure break-on-expected-failure break-on-error
@@ -40,6 +41,7 @@
                            (sb-debug:print-backtrace)))
                     (invoke-restart 'skip-file))))
         (let ((*package* (find-package :cl-user)))
+          #+nil (sb-aprof:aprof-run test-fun :arguments (list file))
           (funcall test-fun file)))
     (skip-file ()
       (format t ">>>~a<<<~%"*failures*)))
