@@ -18,6 +18,23 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(import 'sb-impl::(*info-types*
+                   meta-info-category meta-info-kind meta-info-number meta-info-type-spec
+                   get-info-value
+                   make-info-hashtable info-env-count info-maphash info-puthash
+                   packed-info-value-index
+                   package-internal-symbols symtbl-cells))
+(import 'sb-int::(sb-int:*recognized-declarations*
+                  awhen it
+                  find-fdefn
+                  globaldb-sxhashoid meta-info info set-info-value clear-info
+                  get-info-value-initializing
+                  show-info))
+(import 'sb-kernel::(declaration-type-conflict-error
+                     find-classoid find-classoid-cell
+                     make-fdefn
+                     symbol-dbinfo))
+
 (defun foo (a) (list a))
 (let ((x 1)) (foo x))
 
@@ -47,8 +64,6 @@
                  type-error)
   (assert-error (funcall (compile nil `(lambda (x) (fdefinition x))) 0)
                  type-error))
-
-(in-package "SB-IMPL")
 
 (test-util:with-test (:name :globaldb-sxhashoid-discrimination)
   (assert (not (eql (globaldb-sxhashoid '(a b c d e))
@@ -114,7 +129,8 @@
                  'declaration-type-conflict-error))
   (proclaim '(declaration nthing))
   (assert (typep (nth-value 1 (ignore-errors (deftype nthing (x) `(not ,x))))
-                 'declaration-type-conflict-error)))
+                 'declaration-type-conflict-error))
+  (setq *recognized-declarations* (delete 'nthing *recognized-declarations*)))
 
 (test-util:with-test (:name :info-env-clear)
   (setf (info :variable :kind 'fruitbaskets) :macro
@@ -337,19 +353,19 @@
 
 ;; classoid cells
 
-(in-package "SB-IMPL")
-
 (defglobal *make-classoid-cell-callcount* (make-array 1 :element-type 'sb-ext:word))
 (sb-int:encapsulate 'sb-kernel::make-classoid-cell 'count
   (compile nil '(lambda (f name &optional classoid)
                  (sb-ext:atomic-incf (aref *make-classoid-cell-callcount* 0))
                  (funcall f name classoid))))
 
+(defvar *lotsa-symbols*
+  (map 'vector 'copy-symbol
+       (remove-if-not
+        #'symbolp
+        (symtbl-cells (package-internal-symbols (find-package "SB-C"))))))
 ;; Return a set of symbols to play around with
-(defun classoid-cell-test-get-lotsa-symbols ()
-  (remove-if-not
-   #'symbolp
-   (symtbl-cells (package-internal-symbols (find-package "SB-C")))))
+(defun classoid-cell-test-get-lotsa-symbols () *lotsa-symbols*)
 
 ;; Make every symbol in the test set have a classoid-cell
 (defun be-a-classoid-cell-writer ()
@@ -580,5 +596,8 @@
     ;; The :lockfree-hash-concurrent-twiddling test should give high confidence
     ;; that it works, by creating and testing a standalone hash-table.
     (run (coerce (loop repeat 50 collect `(foo ,(gensym) hair)) 'vector))))
+
+(setf (sb-impl::info-env-storage sb-int:*info-environment*) (sb-impl::make-info-storage 30)
+      (sb-impl::info-env-count sb-int:*info-environment*) 0)
 
 ;;; success
