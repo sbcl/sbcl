@@ -26,14 +26,14 @@
       (((make-synonym-stream '*stream*)) (condition 'type-error)))))
 
 (with-test (:name (pathname :accessors file-stream))
-  (let* ((name "pathnames.impure")
+  (let* ((name "pathnames.pure")
          (type "lisp"))
     (with-open-file (stream (make-pathname :name name :type type))
       (assert (equal (pathname-name stream) name))
       (assert (equal (pathname-type stream) type)))))
 
 (with-test (:name (pathname :accessors synonym-stream))
-  (let* ((name "pathnames.impure")
+  (let* ((name "pathnames.pure")
          (type "lisp"))
     (with-open-file (stream (make-pathname :name name :type type))
       (let* ((*stream1* stream)

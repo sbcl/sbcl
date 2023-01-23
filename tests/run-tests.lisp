@@ -395,6 +395,7 @@
              (gf-summary (summarize-generic-functions))
              (globaldb-summary (when actually-pure
                                  (tersely-summarize-globaldb)))
+             (logical-hosts sb-impl::*logical-hosts*)
              (test-package
               (if actually-pure
                   (make-package
@@ -476,6 +477,7 @@
         (unless (eql (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo)
           (format t "~&::: NOTE: nursery space promotion rate restored to nominal~%")
           (setf (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo))
+        (setq sb-impl::*logical-hosts* logical-hosts)
         (when actually-pure
           (setq sb-disassem::*disassem-inst-space* nil
                 sb-disassem::*assembler-routines-by-addr* nil)
