@@ -84,9 +84,9 @@ EOF
 
 run_sbcl <<\EOF
 
-;;; This failed on mips when I tried it
-#-(or arm arm64 ppc ppc64 x86 x86-64) (exit)
-#+sb-devel (exit)
+;; This test passes almost everywhere now
+#+(or mips riscv sb-devel) (exit)
+(when (find-package "SB-INTERPRETER") (exit)) ; but not for this. Why?
 
 ;;; Does not pass with interpreter
 (setq sb-ext:*evaluator-mode* :compile)
