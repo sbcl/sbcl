@@ -235,6 +235,18 @@
       (test (not (> -1.0 nan)))
       (test (not (> nan 1.0))))))
 
+(with-test (:name (:nan :comparison :non-float)
+            :fails-on (or :sparc))
+  (sb-int:with-float-traps-masked (:invalid)
+    (let ((nan (/ 0.0 0.0))
+          (reals (list 0 1 -1 1/2 -1/2 (expt 2 300) (- (expt 2 300))))
+          (funs '(> < <= >= =)))
+      (loop for fun in funs
+            do
+            (loop for real in reals
+                  do (assert (not (funcall fun nan real)))
+                     (assert (not (funcall fun real nan))))))))
+
 (with-test (:name :log-int/double-accuracy)
   ;; we used to use single precision for intermediate results
   (assert (eql 2567.6046442221327d0
