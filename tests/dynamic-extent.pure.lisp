@@ -328,10 +328,12 @@
 (defstruct list-container listy-slot)
 (defun make-var-length-dx-list (n thunk)
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
-    (funcall thunk s)))
+    (values (funcall (the function thunk) s))))
 ;; stack-allocatable lists are necessary but not sufficient
 (with-test (:name (:dx-list :make-list) :skipped-on (not :x86-64))
-  (assert (null (ctu:find-named-callees #'make-var-length-dx-list)))
+  (let ((calls (ctu:asm-search "CALL" #'make-var-length-dx-list)))
+    ;; Call nothing but the funarg
+    (assert (eql (length calls) 1)))
   (assert-no-consing (make-var-length-dx-list
                       50 (lambda (x) (declare (ignore x))))))
 

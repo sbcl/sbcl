@@ -51,7 +51,7 @@
                   (*print-pretty* nil))
               (sb-c:dis code s)))))
     (loop for line in (test-util:split-string disassembly #\newline)
-          thereis (search expect line))))
+          when (search expect line) collect line)))
 
 (defun inspect-ir (form fun &rest checked-compile-args)
   (let ((*compile-component-hook* fun))
