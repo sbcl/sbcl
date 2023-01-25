@@ -48,12 +48,9 @@
                    :allow-style-warnings t)
   ;; The sequence must contain a mixture of symbols and non-symbols
   ;; to call %FIND-POSITION. If only symbols, it makes no calls.
-  (let ((f (checked-compile '(lambda (x)
-                              (position x '(1 2 3 a b c 4 5 6 d e f g))))))
-    ;; test should be EQ, not EQL
-    (assert (or (find (symbol-function 'eq)
-                      (ctu:find-code-constants f :type 'sb-kernel:simple-fun))
-                (ctu:find-named-callees f :name 'eq))))
+  (let ((calls (ctu:ir1-funargs '(lambda (x) (position x '(1 2 3 a b c 4 5 6 d e f g))))))
+    ;; Assert that the default :TEST of #'EQL was strength-reduced to #'EQ
+    (assert (equal calls '((sb-kernel:%find-position identity eq)))))
   (checked-compile-and-assert ()
       '(lambda (x)
         (position x '(a b c d e d c b a) :from-end t))

@@ -26,6 +26,7 @@
            #:file-compile
            #:inspect-ir
            #:ir1-named-calls
+           #:ir1-funargs
            #:disassembly-lines))
 
 (cl:in-package :ctu)
@@ -70,6 +71,32 @@
                             (eq (sb-c::basic-combination-info node) :full))
                    (pushnew (sb-c::combination-fun-debug-name node)
                             calls :test 'equal))))))))
+    (values calls compiled-fun)))
+
+;;; For any call that passes a global constant funarg - as in (FOO #'EQ) -
+;;; return the name of the caller and the names of all such funargs.
+(defun ir1-funargs (lambda-expression)
+  (let* ((calls)
+         (compiled-fun
+          (inspect-ir
+           lambda-expression
+           (lambda (component)
+             (do-blocks (block component)
+               (do-nodes (node nil block)
+                 (when (and (sb-c::basic-combination-p node)
+                            (eq (sb-c::basic-combination-info node) :full))
+                   (let ((filtered
+                          (mapcan
+                           (lambda (arg &aux (uses (sb-c::lvar-uses arg)))
+                             (when (sb-c::ref-p uses)
+                               (let ((leaf (sb-c::ref-leaf uses)))
+                                 (when (and (sb-c::global-var-p leaf)
+                                            (eq (sb-c::global-var-kind leaf) :global-function))
+                                   (list (sb-c::leaf-source-name leaf))))))
+                           (sb-c::combination-args node))))
+                     (when filtered
+                       (push (cons (sb-c::combination-fun-debug-name node) filtered)
+                             calls))))))))))
     (values calls compiled-fun)))
 
 (defun find-named-callees (fun &key (name nil namep))
@@ -168,6 +195,7 @@
       (ignore-errors (delete-file fasl)))))
 
 ;; Pretty horrible, but does the job
+;; FIXME: could be implemented in terms of INSPECT-IR
 (defun count-full-calls (name function)
   (let ((code (with-output-to-string (s)
                 (let ((*print-right-margin* 120))
