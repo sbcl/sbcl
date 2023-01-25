@@ -3929,3 +3929,19 @@
         (values v5
                 (abs (shiftf v5 (+ v5 1))))))
    ((-10) (values -2 2))))
+
+(with-test (:name :values-list-type-check
+            :skipped-on (not (or :x86-64 :arm64)))
+  (assert (find-if (lambda (line)
+                     (search "BOGUS-ARG-TO-VALUES-LIST-ERROR" line :test #'equal))
+                   (ctu:disassembly-lines
+                    (checked-compile
+                     `(lambda (l)
+                        (values-list l))))))
+  (assert (not (find-if (lambda (line)
+                          (search "BOGUS-ARG-TO-VALUES-LIST-ERROR" line :test #'equal))
+                        (ctu:disassembly-lines
+                         (checked-compile
+                          `(lambda (l)
+                             (declare (optimize (safety 0)))
+                             (values-list l))))))))

@@ -25,7 +25,8 @@
            #:find-anonymous-callees
            #:file-compile
            #:inspect-ir
-           #:ir1-named-calls))
+           #:ir1-named-calls
+           #:disassembly-lines))
 
 (cl:in-package :ctu)
 
@@ -185,3 +186,18 @@
               while line
               when (asm-line-calls-name-p line name) do (incf n)))
       n)))
+
+(defun disassembly-lines (fun)
+  ;; FIXME: I don't remember what this override of the hook is for.
+  (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
+                      (lambda (f &rest args) (declare (ignore f args))))
+  (prog1
+      (mapcar (lambda (x) (string-left-trim " ;" x))
+              (cddr
+               (test-util:split-string
+                (with-output-to-string (s)
+                  (let ((sb-disassem:*disassem-location-column-width* 0)
+                        (*print-pretty* nil))
+                    (disassemble fun :stream s)))
+                #\newline)))
+    (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)))
