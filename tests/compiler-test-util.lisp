@@ -194,26 +194,23 @@
       (ignore-errors (delete-file lisp))
       (ignore-errors (delete-file fasl)))))
 
-;; Pretty horrible, but does the job
-;; FIXME: could be implemented in terms of INSPECT-IR
-(defun count-full-calls (name function)
-  (let ((code (with-output-to-string (s)
-                (let ((*print-right-margin* 120))
-                  (sb-disassem:disassemble-code-component function :stream s))))
-        (n 0))
-    (flet ((asm-line-calls-name-p (line name)
-             (dolist (herald '("#<FDEFN" "#<SB-KERNEL:FDEFN" "#<FUNCTION"))
-               (let ((pos (search herald line)))
-                 (when pos
-                   (return (string= (subseq line
-                                            (+ pos (length herald) 1)
-                                            (1- (length line)))
-                                    name)))))))
-      (with-input-from-string (s code)
-        (loop for line = (read-line s nil nil)
-              while line
-              when (asm-line-calls-name-p line name) do (incf n)))
-      n)))
+;;; TODO: this would be better done as LIST-FULL-CALLS so that you could
+;;; make an assertion that the list EQUALs something in particular.
+;;; Negative assertions (essentially "count = 0") are silently succeptible
+;;; to spelling mistakes or a change in how we name nodes.
+(defun count-full-calls (function-name lambda-expression)
+  (let ((n 0))
+    (inspect-ir
+     lambda-expression
+     (lambda (component)
+       (do-blocks (block component)
+         (do-nodes (node nil block)
+           (when (and (sb-c::basic-combination-p node)
+                      (eq (sb-c::basic-combination-info node) :full)
+                      (equal (sb-c::combination-fun-debug-name node)
+                             function-name))
+             (incf n))))))
+    n))
 
 (defun disassembly-lines (fun)
   ;; FIXME: I don't remember what this override of the hook is for.
