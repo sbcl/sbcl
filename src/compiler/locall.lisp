@@ -379,8 +379,7 @@
 ;;; do LET conversion here.
 (defun locall-analyze-fun-1 (fun)
   (declare (type functional fun))
-  (let ((refs (leaf-refs fun))
-        (local-p t))
+  (let ((refs (leaf-refs fun)))
     (dolist (ref refs)
       (let* ((lvar (node-lvar ref))
              (dest (when lvar (lvar-dest lvar))))
@@ -394,12 +393,9 @@
                  (when (eq (functional-kind fun) :deleted)
                    (return-from locall-analyze-fun-1))
                  (unless (eq (basic-combination-kind dest) :local)
-                   (reference-entry-point ref)
-                   (setq local-p nil)))
+                   (reference-entry-point ref)))
                 (t
-                 (reference-entry-point ref)
-                 (setq local-p nil))))))
-    (when local-p (note-local-functional fun)))
+                 (reference-entry-point ref)))))))
 
   (values))
 

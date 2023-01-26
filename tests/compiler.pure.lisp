@@ -5935,15 +5935,6 @@
                    s)))
     (('(1 2) 3) 6)))
 
-(with-test (:name :delete-optional-dispatch-xep)
-  (let ((name (gensym)))
-    (checked-compile-and-assert ()
-        `(sb-int:named-lambda ,name (&optional x)
-           (if (= x 0)
-               10
-               (multiple-value-call #',name (1- x))))
-      ((3) 10))))
-
 (with-test (:name :bug-1951889)
   (checked-compile-and-assert
    (:optimize '(:debug 2))

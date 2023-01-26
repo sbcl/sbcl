@@ -3137,3 +3137,13 @@
                   (sb-int:info :function :type 'non-top-level-type-derive))
                  '(function () (values (integer 1 1) &optional))))
   (assert (eql (funcall 'non-top-level-type-derive) 1)))
+
+(with-test (:name :delete-optional-dispatch-xep)
+  (ctu:file-compile
+   "(defun delete-optional-dispatch-xep (&optional x)
+      (if (= x 0)
+          10
+          (multiple-value-call #'delete-optional-dispatch-xep (1- x))))"
+   :block-compile t ; so the self call is recognized
+   :load t)
+  (assert (= (funcall 'delete-optional-dispatch-xep 3) 10)))

@@ -1360,24 +1360,6 @@
           (setf (ctran-block ctran) new-block))
         new-block))))
 
-;;; This is called by locall-analyze-fun-1 after it convers a call to
-;;; FUN into a local call.
-;;; Presumably, the function can be no longer reused by new calls to
-;;; FUN, so the whole thing has to be removed from (FREE-FUN *IR1-NAMESPACE*).
-(defun note-local-functional (fun &aux (free-funs (free-funs *ir1-namespace*)))
-  (declare (type functional fun))
-  (when (and (leaf-has-source-name-p fun)
-             (eq (leaf-source-name fun) (functional-debug-name fun)))
-    (let* ((name (leaf-source-name fun))
-           (defined-fun (gethash name free-funs)))
-      (when (and (defined-fun-p defined-fun)
-                 ;; KLUDGE: We must not blow away the free-fun entry
-                 ;; while block compiling. It would be better to get
-                 ;; rid of this function entirely and untangle this
-                 ;; mess, since this is really a workaround.
-                 (not (eq (block-compile *compilation*) t)))
-        (remhash name free-funs)))))
-
 
 ;;;; deleting stuff
 

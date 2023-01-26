@@ -1007,56 +1007,68 @@
     ((named-lambda)
      (let* ((name (cadr thing))
             (lambda-expression `(lambda ,@(cddr thing)))
-            (*inline-expansions* (list name 1 *inline-expansions*))
-            (simple-lexenv-p (simple-lexical-environment-p *lexenv*)))
-       ;; Discard any forward references to this function unless we
-       ;; are block compiling and the lexical environment doesn't
-       ;; contain any hair. If the lexical environment is too hairy, then we only
-       ;; install the definition during the processing of this NAMED-LAMBDA,
-       ;; ensuring that the function cannot be called outside of the correct
-       ;; environment.
-       (unless (and (block-compile *compilation*) simple-lexenv-p)
-         (remhash name (free-funs *ir1-namespace*)))
+            (*inline-expansions* (list name 1 *inline-expansions*)))
        (if (and name (legal-fun-name-p name))
-           (let ((defined-fun-res (get-defined-fun name (second lambda-expression)))
-                 (res (ir1-convert-lambda lambda-expression
-                                          :maybe-add-debug-catch t
-                                          :source-name name))
-                 (info (info :function :info name)))
-             (setf (functional-inlinep res) (info :function :inlinep name)
-                   (defined-fun-same-block-p defined-fun-res) t)
-             (when (has-toplevelness-decl lambda-expression)
-               (setf (functional-top-level-defun-p res) t))
-             ;; FIXME: Should non-entry block compiled defuns have
-             ;; this propagate?
-             (unless (and info
-                          (ir1-attributep (fun-info-attributes info) fixed-args))
-               (assert-global-function-definition-type name res))
-             ;; If in a simple environment, then we can allow
-             ;; backward references to this function from following
-             ;; top-level forms.
-             (when simple-lexenv-p
-               (setf (defined-fun-functional defined-fun-res) res))
-             (unless (or
-                      (eq (defined-fun-inlinep defined-fun-res) 'notinline)
-                      ;; Don't treat recursive stubs like CAR as self-calls
-                      ;; Maybe just use the fact that it is a known function?
-                      ;; Though a known function may be used
-                      ;; because of some other attributues but
-                      ;; still wants to get optimized self calls
-                      (and info
-                           (or (fun-info-templates info)
-                               (fun-info-transforms info)
-                               (fun-info-ltn-annotate info)
-                               (fun-info-ir2-convert info)
-                               (fun-info-optimizer info))))
-               (if (block-compile *compilation*)
-                   (substitute-leaf res defined-fun-res)
-                   (substitute-leaf-if
-                    (lambda (ref)
-                      (policy ref (> recognize-self-calls 0)))
-                    res defined-fun-res)))
-             res)
+           (let ((simple-lexenv-p (simple-lexical-environment-p *lexenv*)))
+             ;; If not in a simple environment, then discard any
+             ;; forward references to this function. If the lexical
+             ;; environment is too hairy, then we only install the
+             ;; definition during the processing of this NAMED-LAMBDA,
+             ;; ensuring that the function cannot be called outside of
+             ;; the correct environment. If the function is globally
+             ;; NOTINLINE, then that inhibits even local substitution.
+             (unless simple-lexenv-p
+               (remhash name (free-funs *ir1-namespace*)))
+             (let ((defined-fun-res (get-defined-fun name)))
+               ;;
+               ;; If there is a type from a previous definition, blast it, since it is
+               ;; obsolete.
+               (when (neq :declared (leaf-where-from defined-fun-res))
+                 (setf (leaf-type defined-fun-res)
+                       ;; Use the type from the lambda list so that self
+                       ;; calls warn about mismatched args.
+                       (let ((lambda-list (second lambda-expression)))
+                         (or (and lambda-list
+                                  (ignore-errors
+                                   (ftype-from-lambda-list lambda-list)))
+                             (specifier-type 'function)))))
+               (let ((res (ir1-convert-lambda lambda-expression
+                                              :maybe-add-debug-catch t
+                                              :source-name name))
+                     (info (info :function :info name)))
+                 (setf (functional-inlinep res) (info :function :inlinep name)
+                       (defined-fun-same-block-p defined-fun-res) t)
+                 (when (has-toplevelness-decl lambda-expression)
+                   (setf (functional-top-level-defun-p res) t))
+                 (unless (and info
+                              (ir1-attributep (fun-info-attributes info) fixed-args))
+                   (assert-global-function-definition-type name res))
+                 (unless (or
+                          (eq (defined-fun-inlinep defined-fun-res) 'notinline)
+                          ;; Don't treat recursive stubs like CAR as self-calls
+                          ;; Maybe just use the fact that it is a known function?
+                          ;; Though a known function may be used
+                          ;; because of some other attributues but
+                          ;; still wants to get optimized self calls
+                          (and info
+                               (or (fun-info-templates info)
+                                   (fun-info-transforms info)
+                                   (fun-info-ltn-annotate info)
+                                   (fun-info-ir2-convert info)
+                                   (fun-info-optimizer info))))
+                   (if (block-compile *compilation*)
+                       (progn
+                         (substitute-leaf res defined-fun-res)
+                         ;; If in a simple environment, then we can allow
+                         ;; backward references to this function from
+                         ;; following top-level forms.
+                         (when simple-lexenv-p
+                           (setf (defined-fun-functional defined-fun-res) res)))
+                       (substitute-leaf-if
+                        (lambda (ref)
+                          (policy ref (> recognize-self-calls 0)))
+                        res defined-fun-res)))
+                 res)))
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
                                :debug-name
@@ -1193,7 +1205,7 @@
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the
 ;;; previous references.
-(defun get-defined-fun (name &optional (lambda-list nil lp))
+(defun get-defined-fun (name)
   (proclaim-as-fun-name name)
   (let ((found (find-free-fun name "shouldn't happen! (defined-fun)"))
         (free-funs (free-funs *ir1-namespace*)))
@@ -1213,19 +1225,14 @@
                         :where-from (if (eq where-from :declared)
                                         :declared
                                         :defined-here)
-                        :type (if (eq :declared where-from)
-                                  (leaf-type found)
-                                  (or (and lp
-                                           (ignore-errors
-                                            (ftype-from-lambda-list lambda-list)))
-                                      (specifier-type 'function))))))
+                        :type (leaf-type found))))
              (substitute-leaf res found)
              (setf (gethash name free-funs) res)))
           ;; If FREE-FUNS has a previously converted definition
           ;; for this name, then blow it away and try again.
           ((defined-fun-functional found)
            (remhash name free-funs)
-           (get-defined-fun name lambda-list))
+           (get-defined-fun name))
           (t found))))
 
 ;;; Check a new global function definition for consistency with
@@ -1406,18 +1413,11 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 ;;; The inline lambda will be NIL for a structure accessor, predicate, or copier
 ;;; since those can always be reconstructed from a defstruct description.
 (defun %compiler-defun (name compile-toplevel inline-lambda extra-info)
-  (let ((defined-fun nil)) ; will be set below if we're in the compiler
-    (cond (compile-toplevel
+  (cond (compile-toplevel
+         (let ((defined-fun nil))
            (with-single-package-locked-error
                (:symbol name "defining ~S as a function")
-             (setf defined-fun
-                   ;; Try to pass the lambda-list to GET-DEFINED-FUN if we can.
-                   (if (atom inline-lambda)
-                       (get-defined-fun name)
-                       (get-defined-fun
-                        name (ecase (car inline-lambda)
-                               (lambda-with-lexenv (third inline-lambda))
-                               (lambda (second inline-lambda)))))))
+             (setf defined-fun (get-defined-fun name)))
            (when (boundp '*lexenv*)
              (aver (producing-fasl-file))
              (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
@@ -1425,22 +1425,12 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
                  (push name (fun-names-in-this-file *compilation*))))
            ;; I don't know why this is guarded by (WHEN compile-toplevel),
            ;; because regular old %DEFUN is going to call this anyway.
-           (%set-inline-expansion name defined-fun inline-lambda extra-info))
-          ((boundp 'sb-fasl::*current-fasl-group*)
-           (if (member name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*) :test #'equal)
-               (warn 'duplicate-definition :name name)
-               (push name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*)))))
+           (%set-inline-expansion name defined-fun inline-lambda extra-info)))
+        ((boundp 'sb-fasl::*current-fasl-group*)
+         (if (member name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*) :test #'equal)
+             (warn 'duplicate-definition :name name)
+             (push name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*)))))
 
-    (become-defined-fun-name name)
-
-    ;;
-    ;; If there is a type from a previous definition, blast it, since it is
-    ;; obsolete.
-    (when (and defined-fun (neq :declared (leaf-where-from defined-fun)))
-      (setf (leaf-type defined-fun)
-            ;; FIXME: If this is a block compilation thing, shouldn't
-            ;; we be setting the type to the full derived type for the
-            ;; definition, instead of this most general function type?
-            (specifier-type 'function))))
+  (become-defined-fun-name name)
 
   (values))
