@@ -917,7 +917,8 @@ the first."
                      ,(ecase operation
                         (<
                          `(cond ((or (> quot ,high)
-                                     (< quot ,low))
+                                     (< quot ,low)
+                                     (= low high))
                                  nil)
                                 ((= quot high)
                                  (and (minusp ,float)
@@ -931,7 +932,8 @@ the first."
                                      (< quot ,low))
                                  nil)
                                 ((= quot high)
-                                 (or (minusp ,float)
+                                 (or (and (minusp ,float)
+                                          (/= low high))
                                      (= ,float (float quot))))
                                 ((= quot low)
                                  (or (plusp ,float)
@@ -939,7 +941,8 @@ the first."
                                 (t)))
                         (<<=
                          `(cond ((or (> quot ,high)
-                                     (< quot ,low))
+                                     (< quot ,low)
+                                     (= low high))
                                  nil)
                                 ((= quot high)
                                  (or (minusp ,float)
@@ -950,7 +953,8 @@ the first."
                                 (t)))
                         (<=<
                          `(cond ((or (> quot ,high)
-                                     (< quot ,low))
+                                     (< quot ,low)
+                                     (= low high))
                                  nil)
                                 ((= quot high)
                                  (and (minusp ,float)
@@ -976,6 +980,8 @@ the first."
                        (cond ((or (not (fixnump x))
                                   (< x low)
                                   (> x high))
+                              nil)
+                             ((= low high)
                               nil)
                              ((= x high)
                               minusp)
