@@ -35,7 +35,7 @@
                                     :source-name source-name
                                     :debug-name (debug-name 'tl-xep debug-name-tail))))
       (when name
-        (assert-global-function-definition-type name fun))
+        (assert-new-definition xep fun))
       (setf (functional-kind xep) :external
             (functional-entry-fun xep) fun
             (functional-entry-fun fun) xep

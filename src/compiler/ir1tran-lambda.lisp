@@ -1042,7 +1042,7 @@
                    (setf (functional-top-level-defun-p res) t))
                  (unless (and info
                               (ir1-attributep (fun-info-attributes info) fixed-args))
-                   (assert-global-function-definition-type name res))
+                   (assert-new-definition defined-fun-res res))
                  (unless (or
                           (eq (defined-fun-inlinep defined-fun-res) 'notinline)
                           ;; Don't treat recursive stubs like CAR as self-calls
@@ -1241,10 +1241,8 @@
 ;;; EXPLICIT-CHECK attribute, which is specified on functions that
 ;;; check their argument types as a consequence of type dispatching.
 ;;; This avoids redundant checks such as NUMBERP on the args to +, etc.
-;;; FIXME: this seems to have nothing at all to do with adding "new"
-;;; definitions, as it is only called from IR1-CONVERT-INLINE-EXPANSION.
 (defun assert-new-definition (var fun)
-  (let* ((type (leaf-type var))
+  (let* ((type (massage-global-definition-type (leaf-type var) fun))
          (for-real (eq (leaf-where-from var) :declared))
          (name (leaf-source-name var))
          (info (info :function :info name))

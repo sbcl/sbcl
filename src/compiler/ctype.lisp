@@ -879,26 +879,6 @@ and no value was provided for it." name))))))))))
     ((t) nil)
     (t `(:not . ,explicit-check))))
 
-;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
-(defun assert-global-function-definition-type (name fun)
-  (declare (type functional fun))
-  (let ((where (info :function :where-from name))
-        (explicit-check (getf (functional-plist fun) 'explicit-check)))
-    (if (eq where :declared)
-        (let ((type
-               (massage-global-definition-type (global-ftype name) fun)))
-          (setf (leaf-type fun) type)
-          (assert-definition-type
-           fun type
-           :unwinnage-fun #'compiler-notify
-           :where "proclamation"
-           :really-assert (explicit-check->really-assert explicit-check)))
-        ;; Can't actually test this. DEFSTRUCTs declare this, but non-toplevel
-        ;; ones won't have an FTYPE at compile-time.
-        #+nil
-        (when explicit-check
-          (warn "Explicit-check without known FTYPE is meaningless")))))
-
 ;;; If the function has both &REST and &KEY, FIND-OPTIONAL-DISPATCH-TYPES
 ;;; doesn't complain about the type missing &REST -- which is good, because in
 ;;; that case &REST is really an implementation detail and not part of the
