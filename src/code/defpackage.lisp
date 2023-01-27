@@ -34,11 +34,24 @@ implementation it is ~S." *!default-package-use-list*)
   (prog ((name (stringify-string-designator name))
          (nicks (stringify-string-designators nicknames))
          (package
+          ;; a "resolved" package is not in the global name->package mapping yet,
+          ;; which is why the FIND-PACKAGE / CERROR below does not signal.
           (or (resolve-deferred-package name)
               (%make-package (make-symbol-hashset internal-symbols)
                              (make-symbol-hashset external-symbols))))
          clobber)
    :restart
+      ;; FIXME:
+      ;; Of the possible ways to continue from the "package already exists" error,
+      ;; I've seen implementations offer these:
+      ;;  - pick a different name for the new package
+      ;;  - return the existing package as-is
+      ;; Other ways to proceed might be:
+      ;;  - rename the existing package to something different (mostly harmless)
+      ;;  - first delete the existing package (potentially nontrivial)
+      ;; SBCL does the absolute worst possible thing: the name->package mapping gets
+      ;; the new package, and the old package keeps its name under which it is not findable,
+      ;; thereby causing an extreme amount of print/read inconsistency.
      (when (find-package name)
        ;; ANSI specifies that this error is correctable.
        (signal-package-cerror
@@ -232,6 +245,25 @@ implementation it is ~S." *!default-package-use-list*)
                         (make-symbol-hashset 0)))
                 (return-from delete-package t)))))))
 ) ; end FLET
+
+;;; Possible FIXME:
+;;;   After doing these 2 things:
+;;;    (defpackage "P" (:nicknames "PNICK" "PNICK2"))
+;;;    (defpackage "P" (:nicknames "NN"))
+;;;   how many nicknames has "P" - 1, 2, 3?
+;;;   The case for 1 is that DEFPACKAGE says:
+;;;      "The arguments to :nicknames set the package's nicknames to the supplied names."
+;;       [ECL interprets the redefinition thusly]
+;;;   The case for 2 is that it says:
+;;;      "If defined-package-name already refers to an existing package,
+;;;       the name-to-package mapping for that name is not changed."
+;;;      [ABCL interprets the redefinition thusly]
+;;;   The case for 3 is that nicknames are cumulative.
+;;;      [SBCL interprets the redefinition thusly]
+;;; I suspect that any treatment is fine as long as its documented.
+;;; Relatedly, ECL and ABCL take a redefinition with 0 nicknames as follows:
+;;;  (defpackage "P" (:nicknames))
+;;; to imply _no_ _change_ to existing nicknames, while CLISP removes any nicknames.
 
 (defmacro defpackage (package &rest options)
   #.(format nil
