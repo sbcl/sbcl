@@ -29,7 +29,10 @@
                            (/ (expt 2 300))
                            (/ (- (expt 2 300)))
                            (/ 3 (expt 2 300))
-                           (/ 3 (- (expt 2 300)))))))
+                           (/ 3 (- (expt 2 300)))
+                           (1- (expt 2 sb-vm:n-word-bits))
+                           (1- (expt 2 (1- sb-vm:n-word-bits)))
+                           (- (expt 2 (1- sb-vm:n-word-bits)))))))
     (loop
       for logical in '(and #+slow or)
       do
