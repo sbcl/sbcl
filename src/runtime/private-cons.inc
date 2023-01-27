@@ -9,7 +9,7 @@
  * With gencgc we steal a GC card having generation = 0 so that it
  * won't look like a root page. Optionally, malloc / free can be used
  * for testing a fallback algorithm that works with cheneygc.
- * The fallback is succeptible to deadlock with multiple threads
+ * The fallback is susceptible to deadlock with multiple threads
  * and therefore not suitable for production use.
  * (if a foreign call entails malloc, and malloc potentially acquires a
  * mutex, and the Lisp thread making the foreign call is stopped for GC,

@@ -167,7 +167,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 ;;; backward-compatibility assuming no extension blocks. DON'T USE THIS!
 (defun arena-base-address (arena) (arena-first-block arena))
 
-;;; Possible TOOD: if this needs to be efficient, then we would need
+;;; Possible TODO: if this needs to be efficient, then we would need
 ;;; a balanced tree which maps each 'struct memblk' to an arena.
 ;;; This would be complicated by the fact that extension occurs in C code,
 ;;; so C would have to maintain the balanced tree structure.

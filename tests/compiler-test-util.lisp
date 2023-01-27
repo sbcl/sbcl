@@ -196,7 +196,7 @@
 
 ;;; TODO: this would be better done as LIST-FULL-CALLS so that you could
 ;;; make an assertion that the list EQUALs something in particular.
-;;; Negative assertions (essentially "count = 0") are silently succeptible
+;;; Negative assertions (essentially "count = 0") are silently susceptible
 ;;; to spelling mistakes or a change in how we name nodes.
 (defun count-full-calls (function-name lambda-expression)
   (let ((n 0))
