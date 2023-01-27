@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+slow(push :slow *features*) ;; takes more than 5 minutes
+#+slow(push :slow *features*) ;; takes more than 30 minutes
 
 (with-test (:name :ranges)
   (let* ((ops '(< > <= >=))
@@ -67,32 +67,54 @@
                           for args2 in (list (list h 'n)
                                              #+slow (list 'n h))
                           do
-                          (let* ((form `(lambda (l n h)
-                                          (declare (fixnum l h)
-                                                   (ignorable l h))
-                                          (,not
-                                           (,logical
-                                            (,op1-not (,op1 ,@args1))
-                                            (,op1-not (,op2 ,@args2))))))
-                                 (fun1 (cached-compile form))
-                                 (fun2 (cached-compile
-                                        `(lambda (l n h)
-                                           (declare (fixnum l h)
-                                                    (ignorable l h)
-                                                    (notinline ,@ops))
-                                           (,not
-                                            (,logical
-                                             (,op1-not (,op1 ,@args1))
-                                             (,op1-not (,op2 ,@args2))))))))
+                          (loop
+                            for type in `(t #+slow ,@'(integer fixnum unsigned-byte (and fixnum unsigned-byte)
+                                                       sb-vm:signed-word
+                                                       sb-vm:word))
+                            do
                             (loop
-                              for l in ranges
+                              for l-type in `(fixnum #+slow ,@'((and unsigned-byte fixnum)
+                                                                (and (integer * -1) fixnum)
+                                                                sb-vm:signed-word
+                                                                sb-vm:word))
                               do
                               (loop
-                                for h in ranges
+                                for h-type in `(fixnum #+slow ,@'((and unsigned-byte fixnum)
+                                                                  (and (integer * -1) fixnum)
+                                                                  sb-vm:signed-word
+                                                                  sb-vm:word))
                                 do
-                                (loop
-                                  for n in ns
-                                  do (unless (eql (funcall fun1 l n h)
-                                                  (funcall fun2 l n h))
-                                       (error "~a" (list form
-                                                         l n h))))))))))))))))))))
+                                (let* ((form `(lambda (l n h)
+                                                (declare (,l-type l)
+                                                         (,h-type h)
+                                                         (,type n)
+                                                         (ignorable l h))
+                                                (,not
+                                                 (,logical
+                                                  (,op1-not (,op1 ,@args1))
+                                                  (,op1-not (,op2 ,@args2))))))
+                                       (fun1 (cached-compile form))
+                                       (fun2 (cached-compile
+                                              `(lambda (l n h)
+                                                 (declare (ignorable l h)
+                                                          (notinline ,@ops))
+                                                 (,not
+                                                  (,logical
+                                                   (,op1-not (,op1 ,@args1))
+                                                   (,op1-not (,op2 ,@args2))))))))
+                                  (loop
+                                    for l in ranges
+                                    when (typep l l-type)
+                                    do
+                                    (loop
+                                      for h in ranges
+                                      when (typep h h-type)
+                                      do
+                                      (loop
+                                        for n in ns
+                                        when (typep n type)
+                                        do
+                                        (unless (eql (funcall fun1 l n h)
+                                                     (funcall fun2 l n h))
+                                          (error "~a" (list form
+                                                            l n h)))))))))))))))))))))))

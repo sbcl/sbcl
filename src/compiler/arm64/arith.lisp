@@ -2094,7 +2094,7 @@
                            (change-vop-flags vop '(,(if excl-low
                                                         :gt
                                                         :ge)))
-                           (if (minusp hi)
+                           (if (typep hi `(integer (,most-negative-fixnum) -1))
                                (inst cmn x (imm (- hi) nil))
                                (inst cmp x (imm hi nil)))
                            (inst ccmp x (imm lo) ,(if excl-high :lt :le) 1)))
@@ -2107,9 +2107,9 @@
                                    (csubtypep (tn-ref-type hi-ref)
                                               (specifier-type 'unsigned-byte)))
                               (change-vop-flags vop '(,(if excl-high :lo :ls)))
-                              (inst cmp x hi))
+                              (inst cmp x (imm hi nil)))
                              (t
-                              (if (minusp lo)
+                              (if (typep lo `(integer (,most-negative-fixnum) -1))
                                   (inst cmn x (imm (- lo) nil))
                                   (inst cmp x (imm lo nil)))
                               (inst ccmp x (imm hi) ,(if excl-low :gt :ge))))))
@@ -2122,6 +2122,7 @@
                          (x :scs (descriptor-reg))
                          (hi :scs (any-reg immediate)))
                   (:arg-types tagged-num (:or integer bignum) tagged-num)
+                  (:arg-refs lo-ref nil hi-ref)
                   (:conditional ,(if excl-high
                                      :lt
                                      :le))
@@ -2133,17 +2134,19 @@
                                    (fixnumize (tn-value x))
                                    x))
                              (ccmp (c cond &optional (flags 0))
-                               (if (typep c '(integer * -1))
+                               (if (typep c `(integer (,most-negative-fixnum) -1))
                                    (inst ccmn x (ccmp-immediate (- c)) cond flags)
                                    (inst ccmp x (ccmp-immediate c) cond flags))))
                       (inst tst x fixnum-tag-mask)
                       (cond ((and (sc-is lo immediate)
+                                  (csubtypep (tn-ref-type hi-ref)
+                                             (specifier-type 'unsigned-byte))
                                   (eql (tn-value lo)
                                        ,(if excl-low
                                             -1
                                             0)))
                              (change-vop-flags vop '(,(if excl-high :lo :ls)))
-                             (ccmp (imm hi) :eq 1))
+                             (ccmp (imm hi) :eq #b10))
                             (t
                              (ccmp (imm lo) :eq 1)
                              (ccmp (imm hi) ,(if excl-low
