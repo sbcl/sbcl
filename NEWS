@@ -6,9 +6,7 @@ changes relative to sbcl-2.3.0:
     the feature :sb-devel is enabled at build time).
   * platform support:
     ** implement some peephole optimizations on arm64;
-    ** support float traps on arm64/Darwin;
-  * bug fix: compilation crash in forms invoking top-level lambdas.
-    (lp#2002895, reported by 3b)
+    ** support float traps on arm64;
   * bug fix: package-manipulation operations within fasls work as expected in
     the absence of explicit block compilation requests.  (lp#2000004, reported
     by Shubhamkar Ayare)
@@ -23,7 +21,8 @@ changes relative to sbcl-2.3.0:
     cell had not yet been allocated could cause segfaults and gc crashes
     (reported by _death on #sbcl)
   * bug fix: handling of float NaNs in two-arg numeric comparison functions is
-    more consistent with the required semantics in IEEE 754.
+    more consistent with the required semantics in IEEE 754 when comparing
+    with rationals.
   * bug fix: ensure that the hide-packages test passes even when the system
     retains internal cross-reference metadata.  (lp#2002896, reported by 3b)
   * bug fix: don't trip an internal assertion in weak hash tables with
