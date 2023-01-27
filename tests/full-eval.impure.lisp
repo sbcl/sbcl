@@ -111,7 +111,7 @@
 (with-test (:name :inline-fun-captures-decl :fails-on (not :sb-fasteval))
   (assert (equal (sb-int:fun-name-inline-expansion 'some-inline-fun)
                  '(sb-c:lambda-with-lexenv
-                   (:declare ((muffle-conditions compiler-note))) (x)
+                   ((declare (muffle-conditions compiler-note))) (x)
                    (block some-inline-fun (- x))))))
 
 (defun typecase-test (node)

@@ -1142,47 +1142,13 @@
             (t
              (let ((expansion (sb-walker:macroexpand-all lambda lexenv)))
                (if decls
-                   `(lambda-with-lexenv (:declare ,decls) ,@(cdr expansion))
+                   `(lambda-with-lexenv ((declare ,@decls)) ,@(cdr expansion))
                    expansion))))))
    #+(and sb-fasteval (not sb-xc-host))
    (sb-interpreter:basic-env
-    (awhen (sb-interpreter::reconstruct-syntactic-closure-env lexenv)
-      `(lambda-with-lexenv ,it ,@(cdr lambda))))
+    (sb-interpreter::inline-syntactic-closure-lambda lambda lexenv))
    #+sb-fasteval
    (null lambda))) ; trivial case. Never occurs in the compiler.
-
-(declaim (start-block ir1-convert-inline-lambda))
-
-;;; Convert the forms produced by RECONSTRUCT-LEXENV to LEXENV
-(defun process-inline-lexenv (inline-lexenv)
-  (labels ((recurse (inline-lexenv lexenv)
-             (let ((*lexenv* lexenv))
-               (if (null inline-lexenv)
-                   lexenv
-                   (destructuring-bind (type bindings &optional body) inline-lexenv
-                     (case type
-                       (:declare
-                        (recurse body
-                                 (process-decls `((declare ,@bindings)) nil nil)))
-                       (:macro
-                        (let ((macros
-                               (mapcar (lambda (binding)
-                                         ;; XC compile-in-lexenv ignores its second arg
-                                         #+sb-xc-host (aver (null-lexenv-p lexenv))
-                                         (list* (car binding) 'macro
-                                                (compile-in-lexenv (cdr binding) lexenv
-                                                                   nil nil nil t nil)))
-                                       bindings)))
-                          (recurse body
-                                   (make-lexenv :default lexenv
-                                                :funs macros))))
-                       (:symbol-macro
-                        (funcall-in-symbol-macrolet-lexenv bindings
-                                                           (lambda (&optional vars)
-                                                             (declare (ignore vars))
-                                                             (recurse body *lexenv*))
-                                                           :compile))))))))
-    (recurse inline-lexenv (make-null-lexenv))))
 
 ;;; Convert FUN as a lambda in the null environment, but use the
 ;;; current compilation policy. Note that FUN may be a
@@ -1191,41 +1157,38 @@
 (defun ir1-convert-inline-lambda (fun
                                   &key
                                   (source-name '.anonymous.)
-                                  debug-name
-                                  (policy (lexenv-policy *lexenv*)))
+                                  debug-name)
   (when (and (not debug-name) (eq '.anonymous. source-name))
     (setf debug-name (name-lambdalike fun)))
-  (let* ((lambda-with-lexenv-p (eq (car fun) 'lambda-with-lexenv))
-         (body (if lambda-with-lexenv-p
-                   `(lambda ,@(cddr fun))
-                   fun))
-         (lexenv-lambda (lexenv-lambda *lexenv*))
-         (*lexenv*
-           (if lambda-with-lexenv-p
-               (make-lexenv
-                :default (process-inline-lexenv (second fun))
-                :handled-conditions (lexenv-handled-conditions *lexenv*)
-                :policy policy
-                :flushable (lexenv-flushable *lexenv*)
-                :lambda lexenv-lambda
-                :parent *lexenv*)
-               (make-almost-null-lexenv
-                policy
-                ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
-                ;; rather than the definition-site lexenv, since it seems
-                ;; like a much more common case.
-                (lexenv-handled-conditions *lexenv*)
-                (lexenv-flushable *lexenv*)
-                lexenv-lambda
-                *lexenv*)))
-         (*inlining* (1+ *inlining*))
-         (clambda (ir1-convert-lambda body
-                                      :source-name source-name
-                                      :debug-name debug-name)))
-    (setf (functional-inline-expanded clambda) t)
-    clambda))
-
-(declaim (end-block))
+  (destructuring-bind (decls &rest body)
+      (if (eq (car fun) 'lambda-with-lexenv)
+          (cdr fun)
+          `(() . ,(cdr fun)))
+    (let* ((*lexenv*
+             (if decls
+                 (make-lexenv
+                  :default (process-decls decls nil nil
+                                          :lexenv (make-null-lexenv))
+                  ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
+                  ;; rather than the definition-site lexenv, since it seems
+                  ;; like a much more common case.
+                  :handled-conditions (lexenv-handled-conditions *lexenv*)
+                  :policy (lexenv-policy *lexenv*)
+                  :flushable (lexenv-flushable *lexenv*)
+                  :lambda (lexenv-lambda *lexenv*)
+                  :parent *lexenv*)
+                 (make-almost-null-lexenv
+                  (lexenv-policy *lexenv*)
+                  (lexenv-handled-conditions *lexenv*)
+                  (lexenv-flushable *lexenv*)
+                  (lexenv-lambda *lexenv*)
+                  *lexenv*)))
+           (*inlining* (1+ *inlining*))
+           (clambda (ir1-convert-lambda `(lambda ,@body)
+                                        :source-name source-name
+                                        :debug-name debug-name)))
+      (setf (functional-inline-expanded clambda) t)
+      clambda)))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the

@@ -275,13 +275,7 @@
   (sb-alien:define-alien-routine bug-316075 void (result char :out)))
 (with-test (:name :bug-316075 :fails-on :win32)
   #+win32 (error "fail")
-  ;; The interpreter gives you a style-warning because the "undefined alien"
-  ;; first occurs here during compilation of the test case. But if compiling
-  ;; by default, then the warning already happened above at DEFINE-ALIEN-ROUTINE
-  ;; because when that got compiled, it warned, which inhibited further
-  ;; warnings for the same foreign symbol.
-  (checked-compile '(lambda () (multiple-value-list (bug-316075)))
-                   :allow-style-warnings t))
+  (checked-compile '(lambda () (multiple-value-list (bug-316075)))))
 
 ;;; Bug #316325: "return values of alien calls assumed truncated to
 ;;; correct width on x86"

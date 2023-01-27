@@ -1196,29 +1196,24 @@
               )))
     lexenv))
 
-;;; Produce the source representation expected by :INLINE-EXPANSION-DESIGNATOR.
-(defun reconstruct-syntactic-closure-env (env &aux guts)
-  (loop
-    (awhen (env-declarations env)
-      (setq guts `((:declare ,(apply 'append (mapcar 'cdr it)) ,@guts))))
-    (multiple-value-bind (kind data)
-        (typecase env
-          (macro-env
-           (values :macro
-                   (map 'list
-                        (lambda (f)
-                          ;; The name of each macro is (MACROLET symbol).
-                          (cons (second (fun-name f))
-                                (fun-lambda-expression f)))
-                        (env-payload env))))
-          (symbol-macro-env
-           (values :symbol-macro
-                   (map 'list (lambda (x y) (list (car x) y))
-                        (env-symbols env) (env-payload env)))))
-      (when kind
-        (setq guts `((,kind ,data ,@guts)))))
-    (unless (setq env (env-parent env))
-      (return (car guts)))))
+(defun inline-syntactic-closure-lambda (lambda env)
+  (labels ((frob (env decls)
+             (unless (or (basic-env-p env)
+                         (macro-env-p env)
+                         (symbol-macro-env-p env))
+               (return-from inline-syntactic-closure-lambda nil))
+             (let ((parent (env-parent env)))
+               (dolist (decl-spec (env-declarations env))
+                 (dolist (decl (cdr decl-spec))
+                   (push decl decls)))
+               (if parent
+                   (frob parent decls)
+                   decls))))
+    (let ((decls (frob env '()))
+          (expansion (sb-walker:macroexpand-all lambda env)))
+      (if decls
+          `(sb-c::lambda-with-lexenv ((declare ,@decls)) ,@(cdr expansion))
+          expansion))))
 
 ;;; Return INLINE or NOTINLINE if FNAME has a lexical declaration,
 ;;; otherwise NIL for no information.

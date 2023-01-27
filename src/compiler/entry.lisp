@@ -26,26 +26,6 @@
           (push info (ir2-component-entries 2comp))))))
   (values))
 
-;;; An "effectively" null environment captures at most
-;;; a compilation policy, nothing more.
-;;; This is to make the 2nd value of FUNCTION-LAMBDA-EXPRESSION
-;;; accurate; but is it really important to do that? Nah.
-#+nil
-(defun effectively-null-lexenv-p (lexenv)
-  (or (null-lexenv-p lexenv)
-      (and (not (or (lexenv-funs lexenv)
-                    (lexenv-vars lexenv)
-                    (lexenv-blocks lexenv)
-                    (lexenv-tags lexenv)
-                    (lexenv-type-restrictions lexenv)
-                    (lexenv-lambda lexenv)
-                    (lexenv-cleanup lexenv)
-                    (lexenv-handled-conditions lexenv)
-                    (lexenv-disabled-package-locks lexenv)
-                    (lexenv-user-data lexenv)))
-           (or (not (lexenv-parent lexenv))
-               (null-lexenv-p (lexenv-parent lexenv))))))
-
 ;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))

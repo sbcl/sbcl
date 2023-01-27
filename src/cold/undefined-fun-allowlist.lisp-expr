@@ -134,7 +134,7 @@
   sb-interpreter:lexenv-from-env
   sb-interpreter::lexically-unlocked-symbol-p
   sb-interpreter:list-locals
-  sb-interpreter::reconstruct-syntactic-closure-env)
+  sb-interpreter::inline-syntactic-closure-lambda)
  ;; Simple-streams symbols in SB-IMPL
  (sb-impl::s-%charpos
   sb-impl::s-%clear-output
