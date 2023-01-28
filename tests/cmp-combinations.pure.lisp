@@ -138,7 +138,7 @@
     (loop for op in ops
           do
           (loop for constant in constants
-                do 
+                do
                 (loop for type in '(integer rational)
                       do
                       (let* ((form `(lambda (x)
