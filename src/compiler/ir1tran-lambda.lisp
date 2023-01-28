@@ -982,14 +982,6 @@
              (progn
                ,@forms))))))))
 
-;; FIXME: really should be an aspect of the lexical environment,
-;; but LEXENVs don't know whether they are toplevel or not.
-(defun has-toplevelness-decl (lambda-expr)
-  (dolist (expr (cddr lambda-expr)) ; Skip over (LAMBDA (ARGS))
-    (cond ((equal expr '(declare (top-level-form))) (return t))
-          ((typep expr '(or (cons (eql declare)) string))) ; DECL | DOCSTRING
-          (t (return nil)))))
-
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
 (defun ir1-convert-lambdalike (thing
@@ -1019,12 +1011,13 @@
              ;; NOTINLINE, then that inhibits even local substitution.
              (unless simple-lexenv-p
                (remhash name (free-funs *ir1-namespace*)))
-             (let ((defined-fun-res (get-defined-fun name)))
+             (let ((var (get-defined-fun name)))
+               (setf (defined-fun-same-block-p var) t)
                ;;
                ;; If there is a type from a previous definition, blast it, since it is
                ;; obsolete.
-               (when (neq :declared (leaf-where-from defined-fun-res))
-                 (setf (leaf-type defined-fun-res)
+               (when (neq :declared (leaf-where-from var))
+                 (setf (leaf-type var)
                        ;; Use the type from the lambda list so that self
                        ;; calls warn about mismatched args.
                        (let ((lambda-list (second lambda-expression)))
@@ -1032,43 +1025,7 @@
                                   (ignore-errors
                                    (ftype-from-lambda-list lambda-list)))
                              (specifier-type 'function)))))
-               (let ((res (ir1-convert-lambda lambda-expression
-                                              :maybe-add-debug-catch t
-                                              :source-name name))
-                     (info (info :function :info name)))
-                 (setf (functional-inlinep res) (info :function :inlinep name)
-                       (defined-fun-same-block-p defined-fun-res) t)
-                 (when (has-toplevelness-decl lambda-expression)
-                   (setf (functional-top-level-defun-p res) t))
-                 (unless (and info
-                              (ir1-attributep (fun-info-attributes info) fixed-args))
-                   (assert-new-definition defined-fun-res res))
-                 (unless (or
-                          (eq (defined-fun-inlinep defined-fun-res) 'notinline)
-                          ;; Don't treat recursive stubs like CAR as self-calls
-                          ;; Maybe just use the fact that it is a known function?
-                          ;; Though a known function may be used
-                          ;; because of some other attributues but
-                          ;; still wants to get optimized self calls
-                          (and info
-                               (or (fun-info-templates info)
-                                   (fun-info-transforms info)
-                                   (fun-info-ltn-annotate info)
-                                   (fun-info-ir2-convert info)
-                                   (fun-info-optimizer info))))
-                   (if (block-compile *compilation*)
-                       (progn
-                         (substitute-leaf res defined-fun-res)
-                         ;; If in a simple environment, then we can allow
-                         ;; backward references to this function from
-                         ;; following top-level forms.
-                         (when simple-lexenv-p
-                           (setf (defined-fun-functional defined-fun-res) res)))
-                       (substitute-leaf-if
-                        (lambda (ref)
-                          (policy ref (> recognize-self-calls 0)))
-                        res defined-fun-res)))
-                 res)))
+               (ir1-convert-lambda-for-defun lambda-expression var simple-lexenv-p)))
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
                                :debug-name
@@ -1277,6 +1234,49 @@
        (every (lambda (entry)
                 (consp (cdr entry)))
               (lexenv-vars lexenv))))
+
+;; FIXME: really should be an aspect of the lexical environment,
+;; but LEXENVs don't know whether they are toplevel or not.
+(defun has-toplevelness-decl (lambda-expr)
+  (dolist (expr (cddr lambda-expr)) ; Skip over (LAMBDA (ARGS))
+    (cond ((equal expr '(declare (top-level-form))) (return t))
+          ((typep expr '(or (cons (eql declare)) string))) ; DECL | DOCSTRING
+          (t (return nil)))))
+
+;;; Convert a lambda doing all the basic stuff we would do if we were
+;;; converting a DEFUN.
+(defun ir1-convert-lambda-for-defun (lambda var simple-lexenv-p)
+  (let* ((name (leaf-source-name var))
+         (fun (ir1-convert-lambda lambda
+                                  :maybe-add-debug-catch t
+                                  :source-name name))
+         (info (info :function :info name)))
+    (setf (functional-inlinep fun) (info :function :inlinep name))
+    (unless (and info
+                 (ir1-attributep (fun-info-attributes info) fixed-args))
+      (assert-new-definition var fun))
+    (when (has-toplevelness-decl lambda)
+      (setf (functional-top-level-defun-p fun) t))
+    ;; If definitely not an interpreter stub, then substitute for any
+    ;; old references.
+    (unless (or (eq (defined-fun-inlinep var) 'notinline)
+                (and info
+                     (or (fun-info-transforms info)
+                         (fun-info-templates info)
+                         (fun-info-ir2-convert info))))
+      (if (block-compile *compilation*)
+          (progn
+            (substitute-leaf fun var)
+            ;; If in a simple environment, then we can allow backward
+            ;; references to this function from following top-level
+            ;; forms.
+            (when simple-lexenv-p
+              (setf (defined-fun-functional var) fun)))
+          (substitute-leaf-if
+           (lambda (ref)
+             (policy ref (> recognize-self-calls 0)))
+           fun var)))
+    fun))
 
 ;;; Convert a lambda for global inline expansion.
 ;;;
