@@ -114,6 +114,63 @@
                                       (error "~a" (list form
                                                         l n h)))))))))))))))))))))
 
+(with-test (:name :ranges-to-fixnump)
+  (let* ((ops '(< > <= >=))
+         (ranges (list 0 1 -1 -2 2 most-positive-fixnum most-negative-fixnum
+                       (1- (expt 2 sb-vm:n-word-bits))
+                       (1- (expt 2 (1- sb-vm:n-word-bits)))
+                       (- (expt 2 (1- sb-vm:n-word-bits)))))
+         (ranges (or (append ranges
+                             (loop for i in '(1 -1 -2 2)
+                                   collect (+ most-positive-fixnum i)
+                                   collect (+ most-negative-fixnum i)))
+                     ranges))
+         (ns (append ranges
+                     (list 20 -20
+                           (expt 2 300)
+                           (- (expt 2 300))
+                           (1- (expt 2 sb-vm:n-word-bits))
+                           (1- (expt 2 (1- sb-vm:n-word-bits)))
+                           (- (expt 2 (1- sb-vm:n-word-bits)))))))
+    (loop
+      for op1 in ops
+      do
+      (loop
+        for op2 in ops
+        do
+        (loop
+          for l in ranges
+          do
+          (loop
+            for h in ranges
+            do
+            (loop
+              for args1 in (list (list l 'n)
+                                 #+slow (list 'n l))
+              do
+              (loop
+                for args2 in (list (list h 'n)
+                                   #+slow (list 'n h))
+                do
+                (let* ((form `(lambda (n)
+                                (declare (integer n))
+                                (and
+                                 (,op1 ,@args1)
+                                 (,op2 ,@args2))))
+                       (fun1 (checked-compile form))
+                       (fun2 (checked-compile
+                              `(lambda (n)
+                                 (declare (notinline ,@ops))
+                                 (and
+                                  (,op1 ,@args1)
+                                  (,op2 ,@args2))))))
+                  (loop
+                    for n in ns
+                    do
+                    (unless (eql (funcall fun1 n)
+                                 (funcall fun2 n))
+                      (error "~a" (list form n)))))))))))))
+
 (with-test (:name :cmp-constant-fraction)
   (let* ((ops '(< > <= >=))
          (rational (list 0 1 -1 -2 2 most-positive-fixnum most-negative-fixnum
