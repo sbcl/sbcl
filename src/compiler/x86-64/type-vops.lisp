@@ -430,16 +430,22 @@
   (:conditional :e)
   (:info hi)
   (:policy :fast-safe)
+  (:arg-refs value-ref)
+  (:vop-var vop)
   (:generator 4
-     (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                           hi
-                           (fixnumize hi)))
-            (mask (lognot fixnum-hi))
-            (constant
-             (if (= (ldb (byte 64 0) mask) non-negative-fixnum-mask-constant)
-                 (ea non-negative-fixnum-mask-constant-wired-address)
-                 (constantize mask))))
-       (inst test value constant))))
+    (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
+                         hi
+                         (fixnumize hi))))
+      (cond ((sc-is value descriptor-reg)
+             (let* ((mask (lognot fixnum-hi))
+                    (constant
+                      (if (= (ldb (byte 64 0) mask) non-negative-fixnum-mask-constant)
+                          (ea non-negative-fixnum-mask-constant-wired-address)
+                          (constantize mask))))
+               (inst test value constant)))
+            (t
+             (change-vop-flags vop '(:be))
+             (inst cmp value (constantize fixnum-hi)))))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
   (:args (value :scs (any-reg unsigned-reg signed-reg)))
