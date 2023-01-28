@@ -4076,6 +4076,31 @@
   (def < ceiling)
   (def > floor))
 
+(macrolet ((def (comparator not-equal round)
+             `(progn
+                (deftransform ,comparator
+                    ((x y) (rational (constant-arg float)))
+                  "open-code RATIONAL to FLOAT comparison"
+                  (let ((y (lvar-value y)))
+                    (when (float-infinity-or-nan-p y)
+                      (give-up-ir1-transform))
+                    (setf y (rational y))
+                    (multiple-value-bind (qout rem)
+                        (if (csubtypep (lvar-type x)
+                                       (specifier-type 'integer))
+                            (,round y)
+                            (values y 0))
+                      `(,(if (zerop rem)
+                             ',comparator
+                             ',not-equal)
+                        x ,qout))))
+                (deftransform ,comparator
+                    ((x y) (integer (constant-arg ratio)))
+                  "open-code INTEGER to RATIO comparison"
+                  `(,',not-equal x ,(,round (lvar-value y)))))))
+  (def <= < ceiling)
+  (def >= > floor))
+
 (deftransform = ((x y) (rational (constant-arg float)))
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))

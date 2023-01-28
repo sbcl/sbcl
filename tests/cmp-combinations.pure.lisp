@@ -115,3 +115,41 @@
                                                  (funcall fun2 l n h))
                                       (error "~a" (list form
                                                         l n h)))))))))))))))))))))
+
+(with-test (:name :cmp-constant-fraction)
+  (let* ((ops '(< > <= >=))
+         (rational (list 0 1 -1 -2 2 most-positive-fixnum most-negative-fixnum
+                         1/2 -1/2
+                         4/3 -4/3
+                         (expt 2 300)
+                         (- (expt 2 300))
+                         (/ (expt 2 300))
+                         (/ (- (expt 2 300)))
+                         (/ 3 (expt 2 300))
+                         (/ 3 (- (expt 2 300)))
+                         (1- (expt 2 sb-vm:n-word-bits))
+                         (1- (expt 2 (1- sb-vm:n-word-bits)))
+                         (- (expt 2 (1- sb-vm:n-word-bits)))))
+         (constants (list* most-positive-double-float most-negative-double-float
+                           least-positive-double-float least-negative-double-float
+                           most-positive-single-float most-negative-single-float
+                           least-positive-single-float least-negative-single-float
+                           0.0 -0.0 0d0 -0.0
+                           1.0 -1.0 0.5 -0.5 1.2 -1.2
+                           1.0d0 -1.0d0 0.5d0 -0.5d0 1.2d0 -1.2d0 rational)))
+    (loop for op in ops
+          do
+          (loop for constant in constants
+                do 
+                (loop for type in '(integer rational)
+                      do
+                      (let* ((form `(lambda (x)
+                                      (declare (,type x))
+                                      (,op x ,constant)))
+                             (fun (checked-compile form)))
+                        (loop for arg in rational
+                              when (typep arg type)
+                              do
+                              (unless (eq (funcall fun arg)
+                                          (funcall op arg constant))
+                                (error "~a" (list form arg))))))))))
