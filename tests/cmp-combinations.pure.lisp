@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+slow(push :slow *features*) ;; takes around 5 minutes
-
 (with-test (:name :ranges)
   (let* ((ops '(< > <= >=))
          (ranges (list 0 1 -1 -2 2 most-positive-fixnum most-negative-fixnum))

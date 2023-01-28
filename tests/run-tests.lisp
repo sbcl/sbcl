@@ -49,6 +49,8 @@
              ((string= arg "--report-skipped-tests")
               (setf *report-skipped-tests* t))
              ((string= arg "--no-color"))
+             ((string= arg "--slow")
+              (push :slow *features*))
              (t
               (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
@@ -528,7 +530,9 @@
      ,*break-on-failure*
      ,*break-on-expected-failure*
      ,*break-on-error*
-     ,(eq *test-evaluator-mode* :interpret))))
+     ,(eq *test-evaluator-mode* :interpret)
+     ,(and (member :slow *features*)
+           t))))
 
 (defun impure-runner (files test-fun log)
   (when files
