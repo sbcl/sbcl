@@ -130,12 +130,12 @@ void save_gc_crashdump(char *pathname,
     preamble.pin_dynspace_code = pin_all_dynamic_space_code;
     preamble.sizeof_context = sizeof (os_context_t);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    char *tlsf_memory_end = (char*)TEXT_SPACE_START + TEXT_SPACE_SIZE;
+    char *tlsf_memory_end = (char*)TEXT_SPACE_START + text_space_size;
     preamble.fixedobj_start = FIXEDOBJ_SPACE_START;
     preamble.fixedobj_size = FIXEDOBJ_SPACE_SIZE;
     preamble.fixedobj_free_pointer = (uword_t)fixedobj_free_pointer;
     preamble.text_start = TEXT_SPACE_START;
-    preamble.text_size = TEXT_SPACE_SIZE;
+    preamble.text_size = text_space_size;
     preamble.text_space_highwatermark = text_space_highwatermark;
     preamble.tlsf_mem_start = tlsf_mem_start;
     preamble.tlsf_control_address = tlsf_control;
@@ -159,7 +159,7 @@ void save_gc_crashdump(char *pathname,
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
     // write the block_header_t that is just beyond the high water mark
     checked_write("text", fd, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
-    total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    total_npages = text_space_size / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
     checked_write("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
     checked_write("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
@@ -916,7 +916,7 @@ int load_gc_crashdump(char* pathname)
                 calc_immobile_space_bounds(),
                 write_protect_immobile_space();
     gc_assert(preamble.fixedobj_size == FIXEDOBJ_SPACE_SIZE);
-    gc_assert(preamble.text_size == TEXT_SPACE_SIZE);
+    gc_assert(preamble.text_size == text_space_size);
     FIXEDOBJ_SPACE_START = preamble.fixedobj_start;
     TEXT_SPACE_START = preamble.text_start;
     fixedobj_free_pointer = (lispobj*)preamble.fixedobj_free_pointer;
@@ -924,7 +924,7 @@ int load_gc_crashdump(char* pathname)
     os_alloc_gc_space(IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, 0, (char*)FIXEDOBJ_SPACE_START,
                       FIXEDOBJ_SPACE_SIZE);
     os_alloc_gc_space(IMMOBILE_TEXT_CORE_SPACE_ID, 0, (char*)TEXT_SPACE_START,
-                      TEXT_SPACE_SIZE);
+                      text_space_size);
     gc_init_immobile(); // allocate the page tables
     calc_immobile_space_bounds();
     // Read fixedobj space
@@ -935,13 +935,13 @@ int load_gc_crashdump(char* pathname)
     checked_read("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
     // Read text space
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
-    char *tlsf_memory_end = (char*)TEXT_SPACE_START + TEXT_SPACE_SIZE;
+    char *tlsf_memory_end = (char*)TEXT_SPACE_START + text_space_size;
     tlsf_mem_start = preamble.tlsf_mem_start;
     fprintf(stderr, "tlsf_mem_start=%p\n", tlsf_mem_start);
     int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
     checked_read("text", fd, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
     memcpy(tlsf_memory_end-3*N_WORD_BYTES, preamble.sentinel_block, 3*N_WORD_BYTES);
-    total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    total_npages = text_space_size / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
     checked_read("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
     checked_read("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));

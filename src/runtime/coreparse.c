@@ -768,7 +768,7 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     {
         spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size +=
-            TEXT_SPACE_SIZE + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
+            text_space_size + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
     }
 #endif
 

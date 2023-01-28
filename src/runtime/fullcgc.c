@@ -385,7 +385,7 @@ void prepare_for_full_mark_phase()
     sword_t nbits_dynamic = dynamic_space_size / (2*N_WORD_BYTES);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     sword_t nbits_fixedobj = FIXEDOBJ_SPACE_SIZE / (2*N_WORD_BYTES);
-    sword_t nbits_text = TEXT_SPACE_SIZE / (2*N_WORD_BYTES);
+    sword_t nbits_text = text_space_size / (2*N_WORD_BYTES);
     fixedobj_index_bit_bias = nbits_dynamic;
     text_index_bit_bias = fixedobj_index_bit_bias + nbits_fixedobj;
     sword_t nbytes = (nbits_dynamic + nbits_fixedobj + nbits_text) / 8;

@@ -302,7 +302,7 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
 void test_dirty_all_gc_cards()
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    int n_text_pages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    int n_text_pages = text_space_size / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(n_text_pages, 32) / 32;
     memset(text_page_touched_bits, 0xFF, sizeof (int)*n_bitmap_elts);
     lispobj* where = (lispobj*)TEXT_SPACE_START;
