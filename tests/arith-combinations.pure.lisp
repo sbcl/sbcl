@@ -127,3 +127,30 @@
                   (floor most-positive-fixnum 2)
                   (floor most-negative-fixnum 2))
             '(t)))
+
+(with-test (:name :integer-ratio-float-compare)
+  (test-ops '(> <)
+            `(t fixnum
+                integer
+                bignum
+                (integer ,(- (expt 2 sb-vm:n-word-bits) 10)
+                         ,(- (expt 2 sb-vm:n-word-bits) 1))
+                (signed-byte ,sb-vm:n-word-bits)
+                (unsigned-byte ,sb-vm:n-word-bits)
+                (signed-byte 8)
+                (unsigned-byte 8))
+            (list 0 1 2 3 4 -1 -2 -3 -4
+                  (- (expt 2 sb-vm:n-word-bits) 1)
+                  (- (expt 2 sb-vm:n-word-bits) 5)
+                  (- (expt 2 (1- sb-vm:n-word-bits)) 1)
+                  (- (expt 2 (1- sb-vm:n-word-bits)) 5)
+                  (- (expt 2 (1- sb-vm:n-word-bits)))
+                  (- 10 (expt 2 (1- sb-vm:n-word-bits)))
+                  (expt 2 (1- sb-vm:n-word-bits))
+                  most-positive-fixnum
+                  most-negative-fixnum
+                  (1- most-positive-fixnum)
+                  (1+ most-negative-fixnum)
+                  (floor most-positive-fixnum 2)
+                  (floor most-negative-fixnum 2))
+            '(t)))

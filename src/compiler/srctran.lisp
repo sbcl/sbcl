@@ -4101,6 +4101,23 @@
   (def <= < ceiling)
   (def >= > floor))
 
+(macrolet ((def (name x y type-x type-y)
+             `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node)
+                (cond ((csubtypep (lvar-type i) (specifier-type 'fixnum))
+                       (give-up-ir1-transform))
+                      (t
+                       ;; Give the range-transform optimizers a chance to trigger. 
+                       (delay-ir1-transform node :ir1-phases)
+                       `(and (fixnump i)
+                             (let ((i (truly-the fixnum i)))
+                               (,',name ,',x ,',y))))))))
+
+  (def < i f (integer #.most-negative-fixnum) fixnum)
+  (def > f i fixnum (integer #.most-negative-fixnum))
+
+  (def > i f (integer * #.most-positive-fixnum) fixnum)
+  (def < f i fixnum (integer * #.most-positive-fixnum)))
+
 (deftransform = ((x y) (rational (constant-arg float)))
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))
