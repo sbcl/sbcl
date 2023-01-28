@@ -1627,8 +1627,7 @@
                           (remove transform (gethash node table) :key #'car)))
                 t)
                (:delayed
-                (remhash node table)
-                nil))))
+                t))))
           ((and flame
                 (valid-fun-use node
                                type
