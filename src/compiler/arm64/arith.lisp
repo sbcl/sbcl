@@ -2031,14 +2031,16 @@
                   (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 5
-                    (aver (>= hi lo))
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
                                                       `(1)))))
                           (hi (fixnumize (+ hi ,@(and excl-high
                                                       `(-1))))))
-                      (cond ((= lo 0)
-                             (inst tst x fixnum-tag-mask)
-                             (inst ccmp x (ccmp-immediate hi) :eq #b10))
+
+                      (cond ((> lo hi)
+                             (inst cmp null-tn 0))
+                            ((= lo 0)
+                                (inst tst x fixnum-tag-mask)
+                                (inst ccmp x (ccmp-immediate hi) :eq #b10))
                             ((= hi ,(fixnumize -1))
                              (change-vop-flags vop '(:hs))
                              (inst tst x fixnum-tag-mask)
