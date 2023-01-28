@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.0:
+changes in sbcl-2.3.1 relative to sbcl-2.3.0:
   * sb-graph has been removed. To visualize IR1 in sbcl, it is recommended to
     use the function IR1-TO-DOT (which only survives the final tree shake if
     the feature :sb-devel is enabled at build time).
