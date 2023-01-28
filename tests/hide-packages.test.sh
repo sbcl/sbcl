@@ -84,11 +84,8 @@ EOF
 
 run_sbcl <<\EOF
 
-;; This test is too brittle now. It requires the patch to zeroize symbol-cells
-;; when growing a package hashtable. The KEYWORD package can grow just enough
-;; from reading the test file to cause its old vector to become static garbage
-;; holding unkillable references to keywords {:SB-THREAD :SB-EVAL :SB-UNICODE}
-(exit)
+;; This test should pass everywhere now
+#+sb-devel (exit)
 
 ;;; Does not pass with interpreter
 (setq sb-ext:*evaluator-mode* :compile)
@@ -101,22 +98,31 @@ run_sbcl <<\EOF
 ;;; became tenured garbage. Fullcgc can remove it
 (gc :gen 7)
 
+(defmacro explain (form)
+  `(let ((ok ,form))
+     ;; Easily see which heap objects were accepted by uncommenting
+     #+nil
+     (when ok (format t "~&Allowed ~S -> ~S~%" (type-of this) that))
+     ok))
+
 (defun points-to-symbol-ok (this that)
+  (explain
   (or (eq this that) ; symbol-value
       ;; :SB-THREAD, :SB-UNICODE, :SB-EVAL are pointed to by the
       ;; keyword package
       (and (eq this (sb-impl::symtbl-cells
                      (sb-impl::package-external-symbols
                       (find-package "KEYWORD"))))
-           (keywordp that))))
+           (keywordp that)))))
 
 (defun points-to-string-ok (this that)
+  (explain
   (or ;; package can point to its own name
       (and (packagep this) (eq (package-name this) that))
       ;; name table can point to strings
       (eq this (sb-impl::info-env-storage sb-kernel::*package-names*))
       ;; keyword points to its name
-      (and (keywordp this) (eq (symbol-name this) that))))
+      (and (keywordp this) (eq (symbol-name this) that)))))
 
 (defvar *wps* nil)
 (defun check-undesired (object pointee undesired-symbols undesired-strings hashes)

@@ -16,7 +16,7 @@
                        (push x result) ; keep a strong reference to this symbol
                        (push (cons (string x) (make-weak-pointer x)) result))))
                (fill cells 0)
-               (resize-symbol-hashset table 0)
+               (resize-symbol-hashset table 0 t)
                result)))
       (dolist (package (list-all-packages))
         ;; Never discard standard symbols

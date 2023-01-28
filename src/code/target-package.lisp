@@ -426,9 +426,11 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; calls to ADD-SYMBOL make no attempt to preserve Robinhood's minimization
 ;;; of the maximum probe sequence length. We can do it now because the
 ;;; entire vector will be swapped, which is concurrent reader safe.
-(defun resize-symbol-hashset (table size &optional (load-factor 3/4))
+(defun resize-symbol-hashset (table size splat &optional (load-factor 3/4))
   (when (zerop size)
     (return-from resize-symbol-hashset
+      ;; Don't need a barrier here. Suppose a reader finished probing with a miss.
+      ;; Whether it re-probes again or not, it will surely result in a miss.
       (setf (symtbl-%cells table)
             (load-time-value (cons (make-symtbl-magic 0 0 0 0) #(0 0 0)) t)
             (symtbl-free table) 0
@@ -475,14 +477,29 @@ of :INHERITED :EXTERNAL :INTERNAL."
                      (setq max (max stored max))
                      (unless (= stored actual-psp)
                        (error "Messup @ ~A: ~D ~D~%" symbol actual-psp stored)))))))
-      (dovector (sym (symtbl-cells table))
-        (when (pkg-symbol-valid-p sym)
-          (ins 0 sym)
-          (decf (symtbl-free temp-table)))))
-    (setf (symtbl-%cells table) (symtbl-%cells temp-table)
-          (symtbl-size table) (symtbl-size temp-table)
-          (symtbl-free table) (symtbl-free temp-table)
-          (symtbl-deleted table) 0)))
+      (let ((old (symtbl-cells table)))
+        (dovector (sym old)
+          (when (pkg-symbol-valid-p sym)
+            (ins 0 sym)
+            (decf (symtbl-free temp-table))))
+        (let ((new (symtbl-%cells temp-table)))
+          (setf (symtbl-%cells table) new)
+          ;; Unlike above, we _do_ need this barrier. Readers must observe that the
+          ;; change of %cells happens before the old contents are clobbered.
+          (sb-thread:barrier (:write))
+          (setf (symtbl-size table) (symtbl-size temp-table)
+                (symtbl-free table) (symtbl-free temp-table)
+                (symtbl-deleted table) 0)
+          ;; Splat with 0 to reduce garbage tenuring. Readers who searched the old VEC
+          ;; may miss spuriously, but will retry because they can detect that %CELLS changed.
+          ;; Exception: UNINTERN must not splat the vector because it is permitted to
+          ;; UNINTERN while iterating over symbols. We never re-fetch the vector, as doing
+          ;; that would cause extreme complications in deciding what symbols to produce.
+          ;; As such, we simply avoid splatting if called by UNINTERN.
+          ;; (Also, the constant vector of an empty package hashtable.)
+          (when (and splat (not (read-only-space-obj-p old)))
+            (fill old 0))
+          new)))))
 
 ;;;; package locking operations, built unconditionally now
 
@@ -942,13 +959,10 @@ Experimental: interface subject to change."
     ;; amount of symbols than it currently contains. The actual new size
     ;; can be smaller than twice the current size if the table contained
     ;; deleted entries.
-    ;; We'd like to nuke the old vector, but that can't be done threadsafely
-    ;; for readers. We need something like an frlock which forces readers to
-    ;; retry if a concurrent ADD-SYMBOL caused the old vector to get wiped.
     ;; N.B.: Never pass 0 for the new size, as that will assign the
     ;; constant read-only vector #(0 0 0) into the cells.
     (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
-      (resize-symbol-hashset table new-size)))
+      (resize-symbol-hashset table new-size t)))
   (let* ((cells (symtbl-%cells table))
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
@@ -1034,7 +1048,7 @@ Experimental: interface subject to change."
     (when (plusp (info-env-tombstones table))
       (%rebuild-package-names table)))
   (flet ((tune-table-size (desired-lf table)
-           (resize-symbol-hashset table (%symtbl-count table) desired-lf)
+           (resize-symbol-hashset table (%symtbl-count table) t desired-lf)
            ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
            #-darwin-jit (setf (symtbl-modified table) nil)))
     (dolist (package (list-all-packages))
@@ -1088,49 +1102,63 @@ Experimental: interface subject to change."
                            (return-from %lookup-symbol (values symbol index)))))))
                   ;; either a never used cell or a tombstone left by UNINTERN
                   ((eql item 0) ; never used
-                   (return-from %lookup-symbol (values 0 -1)))))))
-    (let* ((cells (symtbl-%cells table))
-           (reciprocals (car cells))
-           (vec (truly-the simple-vector (cdr cells)))
-           (len (length vec))
-           (index (symbol-table-hash 1 name-hash len)))
-      (declare (index index))
-      (probe (atomic-incf *sym-hit-1st-try*))
-      ;; Compute a secondary hash H2, and add it successively to INDEX,
-      ;; treating the vector as a ring. This loop is guaranteed to terminate
-      ;; because there has to be at least one cell with a 0 in it.
-      ;; Whenever we change a cell containing 0 to a symbol, the FREE count
-      ;; is decremented. And FREE starts as a smaller number than the vector length.
-      (let ((h2 (symbol-table-hash 2 name-hash len)))
-        (declare (index h2))
-        (loop (when (>= (incf (truly-the index index) h2) len)
-                (decf (truly-the index index) len))
-              (probe nil))))))
+                   ;; Prevent CPU from speculating the re-load of %CELLS
+                   (sb-thread:barrier (:read))
+                   (return-from try
+                     (let ((new (symtbl-%cells table)))
+                       (if (eq new cells) ; had a consistent view of CELLS
+                           (values 0 -1)
+                           (try new)))))))))
+      (named-let try ((cells (symtbl-%cells table)))
+        (let* ((reciprocals (car cells))
+               (vec (truly-the simple-vector (cdr cells)))
+               (len (length vec))
+               (index (symbol-table-hash 1 name-hash len)))
+          (declare (index index))
+          (probe (atomic-incf *sym-hit-1st-try*))
+          ;; Compute a secondary hash H2, and add it successively to INDEX,
+          ;; treating the vector as a ring. This loop is guaranteed to terminate
+          ;; because there has to be at least one cell with a 0 in it.
+          ;; Whenever we change a cell containing 0 to a symbol, the FREE count
+          ;; is decremented. And FREE starts as a smaller number than the vector length.
+          (let ((h2 (symbol-table-hash 2 name-hash len)))
+            (declare (index h2))
+            (loop (when (>= (incf (truly-the index index) h2) len)
+                    (decf (truly-the index index) len))
+                  (probe nil)))))))
 
 ;;; Almost like %lookup-symbol but compare by EQ, not by name.
 (defun symbol-externalp (symbol package)
-  (declare (symbol symbol))
+  (declare (symbol symbol) (package package))
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (macrolet ((probe ()
                `(let ((item (svref vec index)))
                   (when (eq item symbol) (return-from symbol-externalp t))
-                  (when (eql item 0) (return-from symbol-externalp nil)))))
-    (let* ((table (package-external-symbols package))
-           (cells (symtbl-%cells table))
-           (reciprocals (car cells))
-           (vec (truly-the simple-vector (cdr cells)))
-           (name-hash (sxhash symbol))
-           (len (length vec))
-           (index (symbol-table-hash 1 name-hash len)))
-      (declare (index index))
-      (probe)
-      (let ((h2 (symbol-table-hash 2 name-hash len)))
-        (loop (when (>= (incf index h2) len) (decf index len))
-              (probe))))))
+                  (when (eql item 0)
+                    ;; Prevent CPU from speculating the re-load of %CELLS
+                    (sb-thread:barrier (:read))
+                    (return-from try
+                      (let ((new (symtbl-%cells table)))
+                        (if (eq new cells) nil (try new))))))))
+    (let ((table (package-external-symbols package))
+          ;; Every symbol that was ever interned has a precomputed hash.
+          ;; SXHASH would transform to ENSURE-SYMBOL-HASH which is costlier
+          ;; by a smidgen.
+          (name-hash (symbol-hash symbol)))
+      (named-let try ((cells (symtbl-%cells table)))
+        (let* ((reciprocals (car cells))
+               (vec (truly-the simple-vector (cdr cells)))
+               (len (length vec))
+               (index (symbol-table-hash 1 name-hash len)))
+          (declare (index index))
+          (probe)
+          (let ((h2 (symbol-table-hash 2 name-hash len)))
+            (loop (when (>= (incf index h2) len) (decf index len))
+                  (probe))))))))
 
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
-(defun nuke-symbol (table symbol)
+(defun nuke-symbol (table symbol splat)
   (let* ((string (symbol-name symbol))
          (length (length string))
          (hash (symbol-hash symbol)))
@@ -1147,7 +1175,7 @@ Experimental: interface subject to change."
   (let ((size (symtbl-size table))
         (used (%symtbl-count table)))
     (when (< used (truncate size 4))
-      (resize-symbol-hashset table (* used 2)))))
+      (resize-symbol-hashset table (* used 2) splat))))
 
 ;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
 ;;; conflict then give the user a chance to do something about it.
@@ -1488,7 +1516,8 @@ uninterned."
                  (nuke-symbol (if (eq w :internal)
                                   (package-internal-symbols package)
                                   (package-external-symbols package))
-                              symbol)
+                              symbol
+                              nil)
                  (if (eq (sb-xc:symbol-package symbol) package)
                      (%set-symbol-package symbol nil))
                  t)
@@ -1562,7 +1591,7 @@ uninterned."
               (external (package-external-symbols package)))
           (dolist (sym syms)
             (add-symbol external sym)
-            (nuke-symbol internal sym))))
+            (nuke-symbol internal sym t))))
       t)))
 
 ;;; Check that all symbols are accessible, then move from external to internal.
@@ -1588,7 +1617,7 @@ uninterned."
               (external (package-external-symbols package)))
           (dolist (sym syms)
             (add-symbol internal sym)
-            (nuke-symbol external sym))))
+            (nuke-symbol external sym t))))
       t)))
 
 ;;; Check for name conflict caused by the import and let the user
