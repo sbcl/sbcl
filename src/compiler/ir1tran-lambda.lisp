@@ -1278,55 +1278,60 @@
                 (consp (cdr entry)))
               (lexenv-vars lexenv))))
 
-;;; Used for global inline expansion. Earlier something like this was
-;;; used by %DEFUN too. FIXME: And now it's probably worth rethinking
-;;; whether this function is a good idea at all.
-(defun ir1-convert-inline-expansion (name expansion var inlinep info)
-  ;; Unless a INLINE function, we temporarily clobber the inline
-  ;; expansion. This prevents recursive inline expansion of
-  ;; opportunistic pseudo-inlines.
-  (unless (eq inlinep 'inline)
-    (setf (defined-fun-inline-expansion var) nil))
-  (let ((fun (ir1-convert-inline-lambda expansion
-                                        :source-name name)))
-    (setf (functional-inlinep fun) inlinep)
-    (assert-new-definition var fun)
-    (setf (defined-fun-inline-expansion var) expansion)
-    ;; Associate VAR with the FUN -- and in case of an optional dispatch
-    ;; with the various entry-points. This allows XREF to know where the
-    ;; inline CLAMBDA comes from.
-    (flet ((note-inlining (f)
-             (typecase f
-               (functional
-                (setf (functional-inline-expanded f) var))
-               (cons
-                ;; Delayed entry-point.
-                (if (car f)
-                    (setf (functional-inline-expanded (cdr f)) var)
-                    (let ((old-thunk (cdr f)))
-                      (setf (cdr f) (lambda ()
-                                      (let ((g (funcall old-thunk)))
-                                        (setf (functional-inline-expanded g) var)
-                                        g)))))))))
-      (note-inlining fun)
-      (when (optional-dispatch-p fun)
-        (note-inlining (optional-dispatch-main-entry fun))
-        (note-inlining (optional-dispatch-more-entry fun))
-        (mapc #'note-inlining (optional-dispatch-entry-points fun))))
-    ;; substitute for any old references
-    (unless (or (eq (defined-fun-inlinep var) 'notinline)
-                (not (block-compile *compilation*))
-                (and info
-                     (or (fun-info-transforms info)
-                         (fun-info-templates info)
-                         (fun-info-ir2-convert info))))
-      (substitute-leaf fun var)
-      ;; If in a simple environment, then we can allow backward
-      ;; references to this function from following top-level
-      ;; forms.
-      (when (simple-lexical-environment-p *lexenv*)
-        (setf (defined-fun-functional var) fun)))
-    fun))
+;;; Convert a lambda for global inline expansion.
+;;;
+;;; Unless a INLINE function, we temporarily clobber the inline
+;;; expansion. This prevents recursive inline expansion of
+;;; opportunistic pseudo-inlines.
+(defun ir1-convert-inline-expansion (var inlinep)
+  (declare (type defined-fun var))
+  (let ((var-expansion (defined-fun-inline-expansion var)))
+    (unless (eq inlinep 'inline)
+      (setf (defined-fun-inline-expansion var) nil))
+    (let* ((name (leaf-source-name var))
+           (fun (ir1-convert-inline-lambda var-expansion
+                                           :source-name name))
+           (info (info :function :info name)))
+      (setf (functional-inlinep fun) inlinep)
+      (assert-new-definition var fun)
+      (setf (defined-fun-inline-expansion var) var-expansion)
+      ;; Associate VAR with the FUN -- and in case of an optional dispatch
+      ;; with the various entry-points. This allows XREF to know where the
+      ;; inline CLAMBDA comes from.
+      (flet ((note-inlining (f)
+               (typecase f
+                 (functional
+                  (setf (functional-inline-expanded f) var))
+                 (cons
+                  ;; Delayed entry-point.
+                  (if (car f)
+                      (setf (functional-inline-expanded (cdr f)) var)
+                      (let ((old-thunk (cdr f)))
+                        (setf (cdr f) (lambda ()
+                                        (let ((g (funcall old-thunk)))
+                                          (setf (functional-inline-expanded g) var)
+                                          g)))))))))
+        (note-inlining fun)
+        (when (optional-dispatch-p fun)
+          (note-inlining (optional-dispatch-main-entry fun))
+          (note-inlining (optional-dispatch-more-entry fun))
+          (mapc #'note-inlining (optional-dispatch-entry-points fun))))
+      ;;
+      ;; If definitely not an interpreter stub, then substitute for any
+      ;; old references.
+      (unless (or (eq (defined-fun-inlinep var) 'notinline)
+                  (not (block-compile *compilation*))
+                  (and info
+                       (or (fun-info-transforms info)
+                           (fun-info-templates info)
+                           (fun-info-ir2-convert info))))
+        (substitute-leaf fun var)
+        ;; If in a simple environment, then we can allow backward
+        ;; references to this function from following top-level
+        ;; forms.
+        (when (simple-lexical-environment-p *lexenv*)
+          (setf (defined-fun-functional var) fun)))
+      fun)))
 
 
 ;;; Entry point utilities

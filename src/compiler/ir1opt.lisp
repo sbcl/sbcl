@@ -1427,18 +1427,9 @@
                   (when (eq (car *current-path*) 'original-source-start)
                     (setf (ctran-source-path (node-prev call)) *current-path*))
                   ;; Convert.
-                  (let* ((name (leaf-source-name leaf))
-                         (*inline-expansions*
+                  (let* ((*inline-expansions*
                            (register-inline-expansion leaf call))
-                         (res (ir1-convert-inline-expansion
-                               name
-                               (defined-fun-inline-expansion leaf)
-                               leaf
-                               inlinep
-                               (info :function :info name))))
-
-                    ;; Allow backward references to this function from following
-                    ;; forms.
+                         (res (ir1-convert-inline-expansion leaf inlinep)))
                     (setf (defined-fun-functional leaf) res)
                     (change-ref-leaf ref res)
                     (unless ir1-converting-not-optimizing-p
