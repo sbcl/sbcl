@@ -492,6 +492,9 @@ Please check that all strings which were not recognizable to the compiler
 
 (scan-format-control-strings)
 
+#+sb-devel
+(rename-package "COMMON-LISP" "COMMON-LISP" '("SB-XC" "CL"))
+
 ;;; Lock internal packages
 #-(and sb-devel
        (not sb-devel-lock-packages))
@@ -511,8 +514,7 @@ Please check that all strings which were not recognizable to the compiler
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
 
-#+sb-devel
-(sb-impl::%enter-new-nicknames (find-package :cl) '("SB-XC" "CL"))
+
 "done with warm.lisp, about to SAVE-LISP-AND-DIE"
 
 #|
