@@ -9,8 +9,6 @@
 ;;;;   than one candidate symbol. Any time a name conflict is about to
 ;;;;   occur, a correctable error is signaled.
 ;;;;
-;;;; FIXME: The code contains a lot of type declarations. Are they
-;;;; all really necessary?
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -214,9 +212,11 @@
 (define-load-time-global *package-names-cookie* most-negative-fixnum)
 (declaim (fixnum *package-names-cookie*))
 
+;;; Use this only if you need to acquire the mutex. Otherwise just accessing
+;;; the var is fine.  This no longer allows re-entrance. Let's keep it that way.
 (defmacro with-package-names ((table-var &key) &body body)
   `(let ((,table-var *package-names*))
-     (sb-thread::with-recursive-system-lock ((info-env-mutex ,table-var))
+     (sb-thread::with-system-mutex ((info-env-mutex ,table-var))
        ,@body)))
 
 ;;;; iteration macros
@@ -782,8 +782,38 @@ Experimental: interface subject to change."
           :format-arguments format-args))
 
 (defmacro do-packages ((package) &body body)
-  ;; INFO-MAPHASH is not intrinsically threadsafe - but actually
-  ;; quite easy to fix - so meanwhile until it's fixed, grab the lock.
+  ;; Even if iterating over the name -> package mapping were threadsafe
+  ;; (which is isn't), there could nonetheless exist a race between iterators
+  ;; and RENAME-PACKAGE. This is true whether first deleting the old name
+  ;; and then inserting the new, or the other way around.
+  ;; The examples below (only 2 out of many schedulings and choices of insert/delete
+  ;; ordering) show that iteration can produce a package twice, or skip it entirely.
+  ;;
+  ;; Consider the table bins could have oldname in an earlier bin:
+  ;;   bin 1 -> oldname, bin 2 -> newname
+  ;; and suppose we first delete old, the insert new.
+  ;;
+  ;;  Thread1                Thread2
+  ;;  ------------           -------------
+  ;;  read bin 1 = oldname
+  ;;                         delete oldname
+  ;;                         insert newname
+  ;;  read bin 2 = newname
+  ;;
+  ;; So it is produced twice even though it was not really in the table twice.
+  ;; Or we can see it not at all. Suppose bin1 -> newname, bin 2 -> oldname
+  ;;
+  ;;  Thread1                Thread2
+  ;;  ------------           -------------
+  ;;  read bin 1 (initially empty)
+  ;;                         delete oldname
+  ;;                         insert newname
+  ;;  read bin 2 (empty)
+  ;;
+  ;; The situation is further confounded by the fact that the primary name could
+  ;; become a nickname or vice-versa (among all the myriad other things that
+  ;; renaming can do) in which case there is ambiguity about the table cell
+  ;; that is considered the representative one for the package.
   `(with-package-names (.table.)
       (info-maphash
        (lambda (.name. ,package)
@@ -982,16 +1012,19 @@ Experimental: interface subject to change."
                (decf (symtbl-deleted table))))) ; tombstone
       (declare (fixnum i)))))
 
-;;; Insert a mapping from NAME (a string) to OBJECT (a package or singleton
-;;; list of a package) into TABLE (the hashtable in *PACKAGE-NAMES*),
-;;; taking care to adjust the count of phantom entries.
-(defun %register-package (table name object)
-  ;; Registration ensures a non-null id if it can (even for a "deferred" package)
-  (let ((package (if (listp object) (car object) object)))
-    (unless (package-id package)
-      ;; manipulation of the id->package vector is hard to do lock-freeely
-      ;; and it's not really a bottleneck, so just grab a lock.
-      (with-package-names (dummy)
+;;; For each name (a string) in NAMELIST, insert a mapping to PACKAGE.
+;;; The first element is the primary name and the rest are nicknames.
+(defun alter-package-registry (table package namelist)
+  (aver (sb-thread:holding-mutex-p (info-env-mutex *package-names*)))
+  (let ((delta 0) ; how many tombstones were added or removed
+        (former-names
+         ;; a package being created has no names yet
+         (if (package-%name package)
+             (cons (package-%name package)
+                   (package-%nicknames package)))))
+    (when namelist
+      ;; Registration ensures a non-null id if it can (even for a "deferred" package)
+      (unless (package-id package)
         (let* ((vector *id->package*)
                ;; 30 is an arbitrary constant exceeding the number of builtin packages
                (new-id (position nil vector :start 30)))
@@ -1005,17 +1038,32 @@ Experimental: interface subject to change."
                     vector new-vector)))
           (when new-id
             (setf (package-id package) new-id
-                  (aref vector new-id) package))))))
-  (let ((oldval (info-gethash name table)))
-    (unless oldval ; if any value existed, no new physical cell is claimed
-      (when (> (info-env-tombstones table)
-               (floor (info-storage-capacity (info-env-storage table)) 4))
-        ;; Otherwise, when >1/4th of the table consists of tombstones,
-        ;; then rebuild the table.
-        (%rebuild-package-names table)))
-    (setf (info-gethash name table) object)
-    (when (eq oldval :deleted)
-      (decf (info-env-tombstones table)))))
+                  (aref vector new-id) package))))
+      (let ((primary (car namelist)))
+        (when (eq (info-gethash primary table) :deleted) (decf delta))
+        (setf (package-%name package) primary)
+        (setf (info-gethash primary table) package))
+      (let ((list-of-package (list package)))
+        (dolist (name (cdr namelist))
+          (when (eq (info-gethash name table) :deleted) (decf delta))
+          (setf (info-gethash name table) list-of-package)))
+      (setf (package-%nicknames package) (cdr namelist)))
+    ;; Remove names that this package no longer has.
+    ;; An INFO-HASHTABLE does not support REMHASH. We can simulate it
+    ;; by changing the value to :DELETED.
+    ;; (NIL would be preferable, but INFO-GETHASH does not return
+    ;; a secondary value indicating whether the NIL was by default
+    ;; or found, not does it take a different default to return).
+    (let ((remove (set-difference former-names namelist :test 'string=)))
+      (when remove
+        (dolist (name remove)
+          (aver (%get-package name table)) ; Assert not inserting a new <k,v> pair
+          (setf (info-gethash name table) :deleted)
+          (incf delta))
+        (incf (info-env-tombstones table) delta)
+        ;; If half full of :DELETED markers, rehash
+        (when (>= (info-env-tombstones table) (ash (info-env-count table) -1))
+          (%rebuild-package-names table))))))
 
 ;;; Rebuild the *PACKAGE-NAMES* table.
 ;;; The calling thread must own the mutex on *PACKAGE-NAMES* so that
@@ -1044,7 +1092,7 @@ Experimental: interface subject to change."
 ;;; actually clobber old cells while minimizing the number of pseudostatic vectors
 ;;; that can't ever be freed.
 (defun tune-hashset-sizes-of-all-packages ()
-  (with-package-names (table)
+  (let ((table *package-names*))
     (when (plusp (info-env-tombstones table))
       (%rebuild-package-names table)))
   (flet ((tune-table-size (desired-lf table)
@@ -1177,32 +1225,6 @@ Experimental: interface subject to change."
     (when (< used (truncate size 4))
       (resize-symbol-hashset table (* used 2) splat))))
 
-;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
-;;; conflict then give the user a chance to do something about it.
-;;; Package names do not affect the uses/used-by relation,
-;;; so this can be done without the package graph lock held.
-(defun %enter-new-nicknames (package nicknames &aux (val (list package)))
-  (declare (type list nicknames))
-  (dolist (nickname nicknames)
-    (let ((found (or (%get-package (the simple-string nickname) *package-names*)
-                     (with-package-names (table)
-                       (%register-package table nickname val)
-                       (push nickname (package-%nicknames package))
-                       package))))
-      (cond ((eq found package))
-            ((string= (the string (package-%name found)) nickname)
-             (signal-package-cerror
-              package
-              "Ignore this nickname."
-              "~S is a package name, so it cannot be a nickname for ~S."
-              nickname (package-%name package)))
-            (t
-             (signal-package-cerror
-              package
-              "Leave this nickname alone."
-              "~S is already a nickname for ~S."
-              nickname (package-%name found)))))))
-
 (defun list-all-packages ()
   "Return a list of all existing packages."
   (let ((result ()))
@@ -1847,7 +1869,7 @@ PACKAGE."
   (setf (sb-thread:mutex-name (info-env-mutex *package-names*)) "package names"
         (sb-thread:mutex-name (info-env-mutex (car *package-nickname-ids*)))
         "package nicknames")
-  (with-package-names (names)
+  (let ((names *package-names*))
     (dolist (spec specs)
       (let ((pkg (car spec)) (symbols (cdr spec)))
         ;; the symbol MAKE-TABLE wouldn't magically disappear,
@@ -2092,8 +2114,11 @@ PACKAGE."
         (or (%get-package name *deferred-package-names*)
             (let ((package (%make-package (make-symbol-hashset 0)
                                           (make-symbol-hashset 0))))
-              (%register-package *deferred-package-names* name package)
-              (setf (package-%name package) name)
+              ;; Creation of a package ID is synchronized by the regular package table lock
+              ;; (though we're operating on the loader package table)
+              (sb-thread::with-system-mutex ((info-env-mutex *package-names*))
+                ;; this also assigns the %NAME slot
+                (alter-package-registry *deferred-package-names* package (list name)))
               package)))))
 
 ;;; Return the deferred package object for NAME if it exists, otherwise
