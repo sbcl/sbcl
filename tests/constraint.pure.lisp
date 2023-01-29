@@ -461,3 +461,12 @@
                  t)))
     ((1) t)
     ((0) nil)))
+
+(with-test (:name :vector-length-derive-type)
+  (let ((s "X"))
+    (checked-compile-and-assert
+        ()
+        `(lambda (x)
+           (declare ((or (vector t 2) (member #\@ ,s)) x))
+           (typep x '(string 1)))
+      ((s) t))))

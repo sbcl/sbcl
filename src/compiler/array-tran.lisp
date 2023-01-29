@@ -1532,36 +1532,38 @@
                            (not-p (constraint-not-p con))
                            (operator (equality-constraint-operator con)))
                        (cond (constant
-                              (case operator
-                                (eq
-                                 (unless not-p
-                                   (return-from vector-length-derive-type-optimizer
-                                     (specifier-type `(eql ,constant)))))
-                                (>
-                                 (let ((p (specifier-type (if not-p
-                                                              `(integer 0 ,constant)
-                                                              `(integer (,constant))))))
-                                   (setf type
-                                         (if type
-                                             (type-intersection type p)
-                                             p))))
-                                (<
-                                 (let ((p (specifier-type (if not-p
-                                                              `(integer ,constant)
-                                                              `(integer 0 (,constant))))))
-                                   (setf type
-                                         (if type
-                                             (type-intersection type p)
-                                             p))))))
+                              (when (vector-length-constraint-p x)
+                                (case operator
+                                  (eq
+                                   (unless not-p
+                                     (return-from vector-length-derive-type-optimizer
+                                       (specifier-type `(eql ,constant)))))
+                                  (>
+                                   (let ((p (specifier-type (if not-p
+                                                                `(integer 0 ,constant)
+                                                                `(integer (,constant))))))
+                                     (setf type
+                                           (if type
+                                               (type-intersection type p)
+                                               p))))
+                                  (<
+                                   (let ((p (specifier-type (if not-p
+                                                                `(integer ,constant)
+                                                                `(integer 0 (,constant))))))
+                                     (setf type
+                                           (if type
+                                               (type-intersection type p)
+                                               p)))))))
                              (t
                               (multiple-value-bind (operator y-type)
-                                  (if (vector-length-constraint-p x)
-                                      (values operator y)
-                                      (values (case operator
-                                                (< '>)
-                                                (> '<)
-                                                (t operator))
-                                              x))
+                                  (cond ((vector-length-constraint-p x)
+                                         (values operator y))
+                                        ((vector-length-constraint-p y)
+                                         (values (case operator
+                                                   (< '>)
+                                                   (> '<)
+                                                   (t operator))
+                                                 x)))
                                 (when (ctype-p y-type)
                                   (setf type
                                         (type-after-comparison operator not-p (or type
