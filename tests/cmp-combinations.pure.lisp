@@ -30,89 +30,101 @@
                            (/ 3 (- (expt 2 300)))
                            (1- (expt 2 sb-vm:n-word-bits))
                            (1- (expt 2 (1- sb-vm:n-word-bits)))
-                           (- (expt 2 (1- sb-vm:n-word-bits)))))))
-    (loop
-      for logical in '(and #+slow or)
-      do
+                           (- (expt 2 (1- sb-vm:n-word-bits))))))
+         #+(and slow sb-thread)
+         threads)
+    (macrolet ((thread (&body body)
+                 (or #+(and slow sb-thread)
+                     `(push (sb-thread:make-thread (lambda () ,@body))
+                            threads)
+                     `(progn ,@body))))
       (loop
-        for op1 in ops
+        for logical in '(and #+slow or)
         do
         (loop
-          for op1-not in '(progn #+slow not)
+          for op1 in ops
           do
-          (loop
-            for op2 in ops
-            do
-            (loop
-              for op2-not in '(progn #+slow not)
-              do
-              (loop
-                for l in (list* 'l ranges)
-                do
-                (loop
-                  for h in (list* 'h ranges)
-                  do
-                  (loop
-                    for args1 in (list (list l 'n)
-                                       #+slow (list 'n l))
-                    do
-                    (loop
-                      for args2 in (list (list h 'n)
-                                         #+slow (list 'n h))
-                      do
-                      (loop
-                        for type in `(t #+slow ,@'(integer fixnum unsigned-byte (and fixnum unsigned-byte)
-                                                   sb-vm:signed-word
-                                                   sb-vm:word))
-                        do
-                        (loop
-                          for l-type in (if (integerp l)
-                                            '(t)
-                                            `(fixnum #+slow ,@'((and unsigned-byte fixnum)
-                                                                (and (integer * -1) fixnum)
-                                                                sb-vm:signed-word
-                                                                sb-vm:word)))
-                          do
-                          (loop
-                            for h-type in (if (integerp h)
-                                              '(t)
-                                              `(fixnum #+slow ,@'((and unsigned-byte fixnum)
-                                                                  (and (integer * -1) fixnum)
-                                                                  sb-vm:signed-word
-                                                                  sb-vm:word)))
-                            do
-                            (let* ((form `(lambda (l n h)
-                                            (declare (,l-type l)
-                                                     (,h-type h)
-                                                     (,type n)
-                                                     (ignorable l h))
-                                            (,logical
-                                             (,op1-not (,op1 ,@args1))
-                                             (,op2-not (,op2 ,@args2)))))
-                                   (fun1 (checked-compile form))
-                                   (fun2 (checked-compile
-                                          `(lambda (l n h)
-                                             (declare (ignorable l h)
-                                                      (notinline ,@ops))
-                                             (,logical
-                                              (,op1-not (,op1 ,@args1))
-                                              (,op2-not (,op2 ,@args2)))))))
-                              (loop
-                                for l in ranges
-                                when (typep l l-type)
-                                do
-                                (loop
-                                  for h in ranges
-                                  when (typep h h-type)
-                                  do
-                                  (loop
-                                    for n in ns
-                                    when (typep n type)
-                                    do
-                                    (unless (eql (funcall fun1 l n h)
-                                                 (funcall fun2 l n h))
-                                      (error "~a" (list form
-                                                        l n h)))))))))))))))))))))
+          (let ((op1 op1)
+                (logical logical))
+            (thread
+             (loop
+               for op1-not in '(progn #+slow not)
+               do
+               (loop
+                 for op2 in ops
+                 do
+                 (loop
+                   for op2-not in '(progn #+slow not)
+                   do
+                   (loop
+                     for l in (list* 'l ranges)
+                     do
+                     (loop
+                       for h in (list* 'h ranges)
+                       do
+                       (loop
+                         for args1 in (list (list l 'n)
+                                            #+slow (list 'n l))
+                         do
+                         (loop
+                           for args2 in (list (list h 'n)
+                                              #+slow (list 'n h))
+                           do
+                           (loop
+                             for type in `(t #+slow ,@'(integer fixnum unsigned-byte (and fixnum unsigned-byte)
+                                                        sb-vm:signed-word
+                                                        sb-vm:word))
+                             do
+                             (loop
+                               for l-type in (if (integerp l)
+                                                 '(t)
+                                                 `(fixnum #+slow ,@'((and unsigned-byte fixnum)
+                                                                     (and (integer * -1) fixnum)
+                                                                     sb-vm:signed-word
+                                                                     sb-vm:word)))
+                               do
+                               (loop
+                                 for h-type in (if (integerp h)
+                                                   '(t)
+                                                   `(fixnum #+slow ,@'((and unsigned-byte fixnum)
+                                                                       (and (integer * -1) fixnum)
+                                                                       sb-vm:signed-word
+                                                                       sb-vm:word)))
+                                 do
+                                 (let* ((form `(lambda (l n h)
+                                                 (declare (,l-type l)
+                                                          (,h-type h)
+                                                          (,type n)
+                                                          (ignorable l h))
+                                                 (,logical
+                                                  (,op1-not (,op1 ,@args1))
+                                                  (,op2-not (,op2 ,@args2)))))
+                                        (fun1 (checked-compile form))
+                                        (fun2 (checked-compile
+                                               `(lambda (l n h)
+                                                  (declare (ignorable l h)
+                                                           (notinline ,@ops))
+                                                  (,logical
+                                                   (,op1-not (,op1 ,@args1))
+                                                   (,op2-not (,op2 ,@args2)))))))
+                                   (loop
+                                     for l in ranges
+                                     when (typep l l-type)
+                                     do
+                                     (loop
+                                       for h in ranges
+                                       when (typep h h-type)
+                                       do
+                                       (loop
+                                         for n in ns
+                                         when (typep n type)
+                                         do
+                                         (unless (eql (funcall fun1 l n h)
+                                                      (funcall fun2 l n h))
+                                           (error "~a" (list form
+                                                             l n h))))))))))))))))))))))
+    #+(and slow sb-thread)
+    (mapc #'sb-thread:join-thread threads)))
 
 (with-test (:name :ranges-to-fixnump)
   (let* ((ops '(< > <= >=))
