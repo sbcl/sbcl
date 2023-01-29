@@ -735,6 +735,9 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   ;; always-bound proclamation.
   (find-package-using-package package-designator *package*))
 
+(defun package-%use-list (package)
+  (map 'list #'symtbl-package (package-tables package)))
+
 ;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
 ;;; most other operations, are unspecified for deleted packages. We
 ;;; just do the easy thing and signal errors in that case.
@@ -1516,21 +1519,24 @@ uninterned."
            (name (symbol-name symbol))
            (shadowing-symbols (package-%shadowing-symbols package)))
       (with-single-package-locked-error ()
+        ;; this seems a little wrong - if NAME is inherited and not _present_
+        ;; you're not actually doing anything to the package.
+        ;; So why is that potentially a violation of a package lock?
         (when (nth-value 1 (find-symbol name package))
           (assert-package-unlocked package "uninterning ~A" name))
 
         ;; If a name conflict is revealed, give us a chance to
         ;; shadowing-import one of the accessible symbols.
         (when (member symbol shadowing-symbols)
-          (let ((cset ()))
-            (dolist (p (package-%use-list package))
-              (let ((s (find-external-symbol name p)))
+          (let ((cset ())) ; conflict set
+            (dovector (tbl (package-tables package))
+              (let ((s (find-external-symbol name (symtbl-package tbl))))
                 (unless (eql s 0) (pushnew s cset :test #'eq))))
             (when (cdr cset)
               (apply #'name-conflict package 'unintern symbol cset)
               (return-from unintern t)))
           (setf (package-%shadowing-symbols package)
-                (remove symbol shadowing-symbols)))
+                (remove symbol shadowing-symbols))) ; would not DELETE be ok?
 
         (multiple-value-bind (s w) (find-symbol name package)
           (cond ((not (eq symbol s)) nil)
@@ -1764,7 +1770,7 @@ PACKAGE."
       ;; Loop over each package, USE'ing one at a time...
       (with-single-package-locked-error ()
         (dolist (pkg packages)
-          (unless (member pkg (package-%use-list package))
+          (unless (find (package-external-symbols pkg) (package-tables package))
             (assert-package-unlocked package "using package~P ~{~A~^, ~}"
                                      (length packages) packages)
             (let ((shadowing-symbols (package-%shadowing-symbols package))
@@ -1806,7 +1812,6 @@ PACKAGE."
                                 (not (member s shadowing-symbols)))
                        (name-conflict package 'use-package pkg sym s)))))))
 
-            (push pkg (package-%use-list package))
             (setf (package-tables package)
                   (let ((tbls (package-tables package)))
                     (replace (make-array (1+ (length tbls))
@@ -1825,11 +1830,8 @@ PACKAGE."
           (when (member p (package-use-list package))
             (assert-package-unlocked package "unusing package~P ~{~A~^, ~}"
                                      (length packages) packages))
-          (setf (package-%use-list package)
-                (remove p (the list (package-%use-list package))))
           (setf (package-tables package)
-                (delete (package-external-symbols p)
-                        (package-tables package)))
+                (delete (package-external-symbols p) (package-tables package)))
           (setf (package-%used-by-list p)
                 (remove package (the list (package-%used-by-list p))))))
       t)))
@@ -1844,6 +1846,8 @@ PACKAGE."
 ;;;; The shape of this list is
 ;;;;    (uninterned-symbols . ((package . (externals . internals)) ...)
 (defvar *!initial-symbols*)
+;;; list of (string . list-of-string) to initialize the USE/USED-BY lists
+(defvar *!initial-package-graph*)
 
 (defun rebuild-package-vector ()
   (let ((max-id 0))
@@ -1871,7 +1875,7 @@ PACKAGE."
         "package nicknames")
   (let ((names *package-names*))
     (dolist (spec specs)
-      (let ((pkg (car spec)) (symbols (cdr spec)))
+      (destructuring-bind (pkg external-v internal-v) spec
         ;; the symbol MAKE-TABLE wouldn't magically disappear,
         ;; though its only use be to name an FLET in a function
         ;; hanging on an otherwise uninternable symbol. strange but true :-(
@@ -1880,8 +1884,10 @@ PACKAGE."
                                (length (the simple-vector input)))))
                    (dovector (symbol input table)
                      (add-symbol table symbol)))))
-          (setf (package-external-symbols pkg) (!make-table (first symbols))
-                (package-internal-symbols pkg) (!make-table (second symbols))))
+          (let ((externals (!make-table external-v)))
+            (setf (package-external-symbols pkg) externals
+                  (package-internal-symbols pkg) (!make-table internal-v)
+                  (symtbl-package externals) pkg)))
         (setf (package-%local-nicknames pkg) nil
               (package-source-location pkg) nil
               (info-gethash (package-%name pkg) names) pkg)
@@ -1890,10 +1896,13 @@ PACKAGE."
         (setf (package-%implementation-packages pkg) nil))))
 
   ;; pass 2 - set the 'tables' slots only after all tables have been made
-  (dolist (spec specs)
-    (let ((pkg (car spec)))
-      (setf (package-tables pkg)
-            (map 'vector #'package-external-symbols (package-%use-list pkg)))))
+  (dolist (item *!initial-package-graph*)
+    (let ((this (find-package (car item)))
+          (use-list (mapcar #'find-package (cdr item))))
+      (dolist (other use-list)
+        (push this (package-%used-by-list other)))
+      (setf (package-tables this)
+            (map 'vector #'package-external-symbols use-list))))
 
   (rebuild-package-vector)
   ;; Having made all packages, verify that symbol hashes are good.
@@ -1905,7 +1914,7 @@ PACKAGE."
                       (name (symbol-name symbol))
                       (computed-hash (compute-symbol-hash name (length name))))
                  (aver (= stored-hash computed-hash)))))))
-    (check-hash-slot (car *!initial-symbols*))
+    (check-hash-slot (car *!initial-symbols*)) ; uninterned symbols
     (dolist (spec specs)
       (check-hash-slot (second spec))
       (check-hash-slot (third spec))))
@@ -2114,6 +2123,7 @@ PACKAGE."
         (or (%get-package name *deferred-package-names*)
             (let ((package (%make-package (make-symbol-hashset 0)
                                           (make-symbol-hashset 0))))
+              (setf (symtbl-package (package-external-symbols package)) package)
               ;; Creation of a package ID is synchronized by the regular package table lock
               ;; (though we're operating on the loader package table)
               (sb-thread::with-system-mutex ((info-env-mutex *package-names*))

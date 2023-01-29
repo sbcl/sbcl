@@ -62,6 +62,7 @@
   ;; and the division magic parameters.
   (%cells (missing-arg) :type (cons t simple-vector))
   (modified nil :type boolean)
+  (package nil :type (or null package)) ; backpointer, only if externals
   ;; SIZE is roughly related to the number of symbols the client code asked to be
   ;; able to store. We increase that to a prime number, then scale it down to compute
   ;; a rehash trigger level. The only reason we need to remember this number is that
@@ -87,10 +88,9 @@
   (id nil :type (or (unsigned-byte #.package-id-bits) null))
   ;; nickname strings
   (%nicknames () :type list)
-  ;; packages used by this package
-  (%use-list () :type list)
-  ;; a simple-vector of the external symbol hashtables for used packages.
-  ;; Derived from %USE-LIST, but maintained separately.
+  ;; This is essentially the same as the USE-LIST, but it points
+  ;; to the external symbol hashtables directly.
+  ;; From it we can obtain PACKAGE-USE-LIST on demand.
   (tables #() :type simple-vector)
   ;; index into TABLES of the table in which an inherited symbol was most
   ;; recently found. On the next %FIND-SYMBOL operation, the indexed table

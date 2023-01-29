@@ -48,6 +48,7 @@ implementation it is ~S." *!default-package-use-list*)
          (existing-pkg)
          (namelist (cons name nicks))
          (conflict))
+    (setf (symtbl-package (package-external-symbols package)) package)
     (with-package-names (table) ; get exclusive use of name -> package mapping
       ;; If the loop runs to completion, then insert all names,
       ;; which also assigns %NAME and %NICKNAMES into the package.
@@ -207,8 +208,7 @@ implementation it is ~S." *!default-package-use-list*)
                   (atomic-incf *package-names-cookie*)
                   (when (boundp 'sb-c::*compilation*)
                     (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
-                  (setf (package-%use-list package) nil
-                        (package-tables package) #()
+                  (setf (package-tables package) #()
                         (package-%shadowing-symbols package) nil
                         (package-internal-symbols package)
                         (make-symbol-hashset 0)

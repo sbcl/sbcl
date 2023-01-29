@@ -1567,6 +1567,7 @@ core and return a descriptor to it."
 ;;; ((external-symbols . internal-symbols) . cold-package-descriptor)
 (defvar *cold-package-symbols*)
 (declaim (type hash-table *cold-package-symbols*))
+(defvar *package-graph*)
 
 ;;; preincrement on use. the first non-preassigned ID is 5
 (defvar *package-id-count* 4)
@@ -1624,18 +1625,8 @@ core and return a descriptor to it."
                              0))
                  :doc-string (if (and docstring #-sb-doc nil)
                                  (string-literal-to-core docstring)
-                                 *nil-descriptor*)
-                 :%use-list (list-to-core
-                             (mapcar (lambda (use)
-                                       (cdr (cold-find-package-info
-                                             (sb-xc:package-name use))))
-                                     use-list)))
-    (dolist (use use-list)
-      ;; Push onto the "used-by" list.
-      (let ((cold (cdr (cold-find-package-info (sb-xc:package-name use)))))
-        (write-slots cold
-                     :%used-by-list (cold-cons cold-package
-                                               (read-slot cold :%used-by-list)))))
+                                 *nil-descriptor*))
+    (push (cons name (mapcar 'sb-xc:package-name use-list)) *package-graph*)
     ;; COLD-INTERN AVERs that the package has an ID, so delay writing
     ;; the shadowing-symbols until the package is ready.
     (write-slots cold-package
@@ -2059,6 +2050,11 @@ core and return a descriptor to it."
     (setf syms (stable-sort syms #'string<))
     (dolist (sym syms)
       (cold-intern sym)))
+
+  (cold-set 'sb-impl::*!initial-package-graph*
+            (list-to-core
+             (mapcar (lambda (x) (list-to-core (mapcar #'string-literal-to-core x)))
+                     *package-graph*)))
 
   (cold-set
    'sb-impl::*!initial-symbols*
@@ -3955,6 +3951,7 @@ III. initially undefined function references (alphabetically):
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
            (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
            (*cold-package-symbols* (make-hash-table :test 'equal)) ; string keys
+           (*package-graph* nil) ; list of (string . list-of-string)
            (*read-only* (make-gspace :read-only
                                      read-only-core-space-id
                                      sb-vm:read-only-space-start))
