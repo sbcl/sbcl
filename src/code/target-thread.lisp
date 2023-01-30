@@ -198,6 +198,8 @@ a simple-string (not necessarily unique) or NIL.")
                         ((eq values :aborted) '(:aborted))
                         (t :finished)))
            (*print-array* nil)
+           ;; Don't want to see 10,000 strings or something
+           (*print-length* 2)
            (*print-level* 4))
       (format stream
               ;; if not finished, show the STATE as a list.
