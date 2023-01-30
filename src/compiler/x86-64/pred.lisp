@@ -167,27 +167,36 @@
   (:temporary (:sc unsigned-reg) temp)
   (:generator 0
     (let* ((flags (conditional-flags-flags flags))
-           (not-p (eq (first flags) 'not)))
+           (not-p (eq (first flags) 'not))
+           (size))
       (when not-p (pop flags))
       (when (location= res then)
         (rotatef then else)
         (setf not-p (not not-p)))
       (flet ((load-immediate (dst constant-tn
                               &optional (sc-reg dst))
-               ;; Can't use ZEROIZE, since XOR will affect the flags.
-               (inst mov dst
-                     (encode-value-if-immediate constant-tn
-                                                (sc-is sc-reg any-reg descriptor-reg)))))
+               (let ((encode (encode-value-if-immediate constant-tn
+                                                        (sc-is sc-reg any-reg descriptor-reg))))
+                 (if (typep encode '(unsigned-byte 31))
+                     (unless size
+                       (setf size :dword))
+                     (setf size :qword))
+                 ;; Can't use ZEROIZE, since XOR will affect the flags.
+                 (inst mov dst encode))))
         (cond ((null (rest flags))
-               (if (sc-is else immediate)
-                   (load-immediate res else)
-                   (move res else))
-               (when (sc-is then immediate)
-                 (load-immediate temp then res)
-                 (setf then temp))
-               (inst cmov (if not-p
-                              (negate-condition (first flags))
-                              (first flags))
+               (cond ((sc-is else immediate)
+                      (load-immediate res else))
+                     (t
+                      (setf size :qword)
+                      (move res else)))
+               (cond ((sc-is then immediate)
+                      (load-immediate temp then res)
+                      (setf then temp))
+                     (t
+                      (setf size :qword)))
+               (inst cmov size (if not-p
+                                   (negate-condition (first flags))
+                                   (first flags))
                      res
                      then))
               (not-p
