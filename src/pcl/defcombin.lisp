@@ -310,19 +310,16 @@
                           :format-control "No ~S methods."
                           :format-arguments (list ',name))))
                     required-checks))
-            (loop (unless (and (constantp order)
-                               (neq order (setq order
-                                                (constant-form-value order))))
-                    (return t)))
-            (push (cond ((eq order :most-specific-first)
-                         `(setq ,name (nreverse ,name)))
-                        ((eq order :most-specific-last) ())
-                        (t
-                         `(ecase ,order
-                           (:most-specific-first
-                            (setq ,name (nreverse ,name)))
-                           (:most-specific-last))))
-                  order-cleanups))))
+            (let* ((order-constantp (and (constantp order)))
+                   (order-value (and order-constantp (constant-form-value order))))
+              (cond
+                ((and order-constantp (eq order-value :most-specific-first))
+                 (push `(setq ,name (nreverse ,name)) order-cleanups))
+                ((and order-constantp (eq order-value :most-specific-last)))
+                (t (push `(ecase ,order
+                            (:most-specific-first (setq ,name (nreverse ,name)))
+                            (:most-specific-last))
+                         order-cleanups)))))))
       `(let (,@(nreverse names) ,@specializer-caches)
         (declare (ignorable ,@specializer-caches))
         ,@declarations

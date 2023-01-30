@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.3.1:
+  * bug fix: evaluate the :ORDER long-form-option in DEFINE-METHOD-COMBINATION
+    properly, avoiding an infinite loop in DEFINE-METHOD-COMBINATION if the
+    :ORDER argument leads to a cycle of compile-time constants.
+
 changes in sbcl-2.3.1 relative to sbcl-2.3.0:
   * sb-graph has been removed. To visualize IR1 in sbcl, it is recommended to
     use the function IR1-TO-DOT (which only survives the final tree shake if

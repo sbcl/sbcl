@@ -348,3 +348,16 @@
                  (list #'method-combination-arguments-whole-fun 1 :key-1 2)))
   (assert (equal (method-combination-arguments-whole-fun 1)
                  (list #'method-combination-arguments-whole-fun 1))))
+
+(defconstant order-one 'order-two)
+(defconstant order-two :most-specific-last)
+
+(define-method-combination dont-overevaluate ()
+  ((group * :order order-one))
+  `(call-method ,(first group)))
+
+(with-test (:name :method-combination-dont-overevaluate)
+  (defgeneric dont-overevaluate-gf (x)
+    (:method-combination dont-overevaluate)
+    (:method ((x t)) x))
+  (assert-error (dont-overevaluate-gf 1)))
