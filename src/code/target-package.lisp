@@ -1017,9 +1017,10 @@ Experimental: interface subject to change."
 
 ;;; For each name (a string) in NAMELIST, insert a mapping to PACKAGE.
 ;;; The first element is the primary name and the rest are nicknames.
-(defun alter-package-registry (table package namelist)
+(defun package-registry-update (package namelist)
   (aver (sb-thread:holding-mutex-p (info-env-mutex *package-names*)))
   (let ((delta 0) ; how many tombstones were added or removed
+        (table *package-names*)
         (former-names
          ;; a package being created has no names yet
          (if (package-%name package)
@@ -1042,6 +1043,8 @@ Experimental: interface subject to change."
           (when new-id
             (setf (package-id package) new-id
                   (aref vector new-id) package))))
+      (when (eq namelist 't)
+        (return-from package-registry-update))
       (let ((primary (car namelist)))
         (when (eq (info-gethash primary table) :deleted) (decf delta))
         (setf (package-%name package) primary)
@@ -2115,31 +2118,26 @@ PACKAGE."
 ;;; has not been created by the end of the load.
 (defun find-or-maybe-make-deferred-package (name)
   (or (find-package name)
-      (progn
-        (unless *deferred-package-names* ; bind on demand
-          (setq *deferred-package-names*
-                (make-info-hashtable :comparator #'pkg-name=
-                                     :hash-function #'sxhash)))
-        (or (%get-package name *deferred-package-names*)
+      (let ((table *deferred-package-names*)) ; bind on demand
+        (unless table
+          (setq table (make-hash-table :test 'equal)
+                *deferred-package-names* table))
+        (or (gethash name table)
             (let ((package (%make-package (make-symbol-hashset 0)
                                           (make-symbol-hashset 0))))
               (setf (symtbl-package (package-external-symbols package)) package)
-              ;; Creation of a package ID is synchronized by the regular package table lock
-              ;; (though we're operating on the loader package table)
               (sb-thread::with-system-mutex ((info-env-mutex *package-names*))
-                ;; this also assigns the %NAME slot
-                (alter-package-registry *deferred-package-names* package (list name)))
-              package)))))
+                ;; T is an indicator for doing nothing except assigning an ID
+                (package-registry-update package t))
+              (setf (gethash name table) package))))))
 
 ;;; Return the deferred package object for NAME if it exists, otherwise
 ;;; return NIL.
 (defun resolve-deferred-package (name)
   (and (boundp '*deferred-package-names*)
        *deferred-package-names*
-       (let ((package (%get-package name *deferred-package-names*)))
-         (when package
-           ;; To simulate remhash.
-           (setf (info-gethash name *deferred-package-names*) :deleted))
+       (let ((package (gethash name *deferred-package-names*)))
+         (when package (remhash name *deferred-package-names*))
          package)))
 
 ;;; Bind the deferred package name table and test to see
@@ -2151,17 +2149,16 @@ PACKAGE."
          (*deferred-package-names* (if boundp *deferred-package-names* nil)))
     (funcall function)
     (when (and (not boundp) *deferred-package-names*)
-      (info-maphash
+      (maphash
        (lambda (name package)
-         (unless (eq package :deleted)
-           (dovector (sym (symtbl-cells (package-internal-symbols package)))
-             (when (symbolp sym)
+         (dovector (sym (symtbl-cells (package-internal-symbols package)))
+           (when (symbolp sym)
                (error 'simple-package-error
                       :format-control
                       "The loader tried loading the symbol named ~a ~
                        into the package named ~a, but the package did ~
                        not get defined, and does not exist."
-                      :format-arguments (list (symbol-name sym) name))))))
+                      :format-arguments (list (symbol-name sym) name)))))
        *deferred-package-names*))))
 
 ;;; We don't benefit from these transforms because any time we have a constant

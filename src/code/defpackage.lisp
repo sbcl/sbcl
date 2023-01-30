@@ -52,7 +52,7 @@ implementation it is ~S." *!default-package-use-list*)
     (with-package-names (table) ; get exclusive use of name -> package mapping
       ;; If the loop runs to completion, then insert all names,
       ;; which also assigns %NAME and %NICKNAMES into the package.
-      (dolist (string namelist (alter-package-registry table package namelist))
+      (dolist (string namelist (package-registry-update package namelist))
         (when (setq existing-pkg (%get-package string table))
           (return (setq conflict string)))))
     (when existing-pkg
@@ -132,7 +132,7 @@ implementation it is ~S." *!default-package-use-list*)
     (with-package-names (table)
       ;; get exclusive use of name -> package mapping
       ;; and also prevent concurrent modification to this package's names.
-      (dolist (string namelist (alter-package-registry table package namelist))
+      (dolist (string namelist (package-registry-update package namelist))
         (let ((found (%get-package string table)))
           (cond ((eq found package))
                 (found (return (setq conflict string)))))))
@@ -195,7 +195,7 @@ implementation it is ~S." *!default-package-use-list*)
                     (nullify-home (package-internal-symbols package))
                     (nullify-home (package-external-symbols package)))
                   (with-package-names (table)
-                    (alter-package-registry table package nil)
+                    (package-registry-update package nil)
                     (awhen (package-id package)
                       (setf (aref *id->package* it) nil (package-id package) nil))
                     (setf (package-%name package) nil
