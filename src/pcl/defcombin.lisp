@@ -285,7 +285,7 @@
 
 (defun wrap-method-group-specifier-bindings
     (method-group-specifiers declarations real-body)
-  (let (names specializer-caches cond-clauses required-checks order-cleanups)
+  (let (names specializer-caches cond-clauses required-checks order-vars order-cleanups)
     (let ((nspecifiers (length method-group-specifiers)))
       (dolist (method-group-specifier method-group-specifiers
                (push `(t (return-from .long-method-combination-function.
@@ -316,11 +316,13 @@
                 ((and order-constantp (eq order-value :most-specific-first))
                  (push `(setq ,name (nreverse ,name)) order-cleanups))
                 ((and order-constantp (eq order-value :most-specific-last)))
-                (t (push `(ecase ,order
-                            (:most-specific-first (setq ,name (nreverse ,name)))
-                            (:most-specific-last))
-                         order-cleanups)))))))
-      `(let (,@(nreverse names) ,@specializer-caches)
+                (t (let ((order-var (gensym "O")))
+                     (push `(ecase ,order-var
+                              (:most-specific-first (setq ,name (nreverse ,name)))
+                              (:most-specific-last))
+                           order-cleanups)
+                     (push `(,order-var ,order) order-vars))))))))
+      `(let (,@(nreverse names) ,@specializer-caches ,@order-vars)
         (declare (ignorable ,@specializer-caches))
         ,@declarations
         (dolist (.method. .applicable-methods.)
