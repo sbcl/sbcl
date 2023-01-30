@@ -2055,25 +2055,38 @@
                              (/unsigned 6)
                               (-c/unsigned 5 nil t))
                         collect
-                        `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
-                                      ,(symbolicate "FAST-CONDITIONAL"  suffix))
-                           (:translate ,tran)
-                           (:vop-var vop)
-                           (:conditional)
-                           (:conditional ,(if signed cond unsigned))
-                           (:arg-refs x-tn-ref)
-                           (:generator ,cost
-                             ,(when constant
-                                `(when (zerop (+ y ,addend))
-                                   (setf y 0)
-                                   (change-vop-flags
-                                    vop
-                                    ',(if signed
-                                          (list addend-signed)
-                                          (list addend-unsigned)))))
-                             (emit-optimized-cmp
-                               x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                               temp (tn-ref-type x-tn-ref))))))))
+                        (flet ((fix (n)
+                                 (if (eq suffix '-c/fixnum)
+                                     `(fixnumize ,n)
+                                     n)))
+                          `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
+                                        ,(symbolicate "FAST-CONDITIONAL"  suffix))
+                             (:translate ,tran)
+                             (:vop-var vop)
+                             (:conditional)
+                             (:conditional ,(if signed cond unsigned))
+                             (:arg-refs x-tn-ref)
+                             (:generator ,cost
+                               ,(when constant
+                                  `(cond ((zerop (+ y ,addend))
+                                          (setf y 0)
+                                          (change-vop-flags
+                                           vop
+                                           ',(if signed
+                                                 (list addend-signed)
+                                                 (list addend-unsigned))))
+                                         ((and
+                                           (not (plausible-signed-imm32-operand-p ,(fix 'y)))
+                                           (plausible-signed-imm32-operand-p ,(fix `(+ y ,addend))))
+                                          (incf y ,addend)
+                                          (change-vop-flags
+                                           vop
+                                           ',(if signed
+                                                 (list addend-signed)
+                                                 (list addend-unsigned))))))
+                               (emit-optimized-cmp
+                                 x ,(fix 'y)
+                                 temp (tn-ref-type x-tn-ref)))))))))
   (define-conditional-vop < :l :b -1 :le :be)
   (define-conditional-vop > :g :a 1 :ge :ae))
 
