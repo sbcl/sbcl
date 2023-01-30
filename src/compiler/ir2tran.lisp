@@ -232,19 +232,12 @@
                       (environment-closure (get-lambda-environment functional)))
                      (functional
                       (aver (eq (functional-kind functional) :toplevel-xep))
-                      nil)))
-          global-var)
+                      nil))))
       (cond (closure
              (prepare)
              (let* ((this-env (node-environment ref))
                     (tn (find-in-environment functional this-env)))
                (emit-move ref ir2-block tn res)))
-            ;; we're about to emit a reference to a "closure" that's actually
-            ;; an inlinable global function.
-            ((and (global-var-p (setf global-var
-                                      (functional-inline-expanded functional)))
-                  (eq :global-function (global-var-kind global-var)))
-             (ir2-convert-global-var ref ir2-block global-var res))
             (t
              ;; if we're here, we should have either a toplevel-xep (some
              ;; global scope function in a different component) or an external
