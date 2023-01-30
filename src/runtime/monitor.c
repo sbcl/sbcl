@@ -314,6 +314,10 @@ static int gc_cmd(char **ptr) {
 static int tlsf_cmd(__attribute__((unused)) char **ptr) {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     tlsf_dump_pool(tlsf_control, tlsf_mem_start, "/dev/tty");
+#ifdef TLSF_CONFIG_DEBUG
+    tlsf_check(tlsf_control);
+    tlsf_check_pool(tlsf_mem_start);
+#endif
 #endif
     return 0;
 }

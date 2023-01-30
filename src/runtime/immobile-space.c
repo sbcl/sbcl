@@ -2187,3 +2187,16 @@ void dump_immobile_text(lispobj* where, lispobj* end, FILE*f)
       }
 }
 #endif
+
+void* expropriate_memory_from_tlsf(size_t amount)
+{
+  extern void* tlsf_pool_shrink(void*,void*,size_t);
+  char* end = (char*)TEXT_SPACE_START + text_space_size;
+  char* start = tlsf_pool_shrink(tlsf_control, end, amount);
+#ifdef TLSF_CONFIG_DEBUG
+  tlsf_check(tlsf_control);
+  tlsf_check_pool(tlsf_mem_start);
+  //fprintf(stderr, "TLSF integrity checks passed\n");
+#endif
+  return start;
+}

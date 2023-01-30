@@ -28,6 +28,28 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
 (require :sb-posix)
 #-sparc (push :test-sprof *features*)
 #+test-sprof (require :sb-sprof)
+
+;; (push :tlsf-stress *features*)
+#+tlsf-stress
+(progn
+ (setq sb-c:*compile-to-memory-space* :immobile)
+ (with-alien ((tlsf-control system-area-pointer :extern)
+              (tlsf-mem-start system-area-pointer :extern))
+   (defun tlsf-checks ()
+     (alien-funcall (extern-alien "tlsf_check" (function void system-area-pointer))
+                    tlsf-control)
+     (alien-funcall (extern-alien "tlsf_check_pool" (function void system-area-pointer))
+                    tlsf-mem-start)
+    (let ((msg #.(format nil "TLSF checks passed~%")))
+       (sb-unix:unix-write 2 msg 0 (length msg))))
+   (defun tlsf-dump ()
+     (alien-funcall (extern-alien "tlsf_dump_pool"
+       (function void system-area-pointer system-area-pointer c-string))
+       tlsf-control tlsf-mem-start "/dev/stdout")))
+  (compile 'tlsf-checks)
+  (compile 'tlsf-dump)
+  (push #'tlsf-checks sb-ext:*after-gc-hooks*))
+
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread)
@@ -204,6 +226,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
                    #+test-sprof (sb-sprof:report :type :flat)
+                   #+tlsf-stress (cl-user::tlsf-dump)
                    (gc :gen 7)
                    (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
                    (exit :code (if (unexpected-failures) 1 104))))))

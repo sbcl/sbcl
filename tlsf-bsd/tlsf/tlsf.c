@@ -1086,7 +1086,7 @@ void tlsf_dump_freelists(tlsf_t tlsf, FILE *f)
 #ifdef LISP_FEATURE_64_BIT
 void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
 {
-    FILE* f = fopen(pathname, "w");
+    FILE* f = fopen(pathname, "a");
     if (tlsf) tlsf_dump_freelists(tlsf, f);
     fprintf(f, "  Free     &header         header        nbytes     &prev_header\n");
     fprintf(f, "                                       (incl hdr)\n");
@@ -1107,5 +1107,43 @@ void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
     }
     fprintf(f, "-- end --\n");
     fclose(f);
+}
+#endif
+
+void* tlsf_pool_shrink(control_t* tlsf, uintptr_t* space_end, size_t amount)
+{
+    tlsf_assert(0 == (amount & (amount - 1)) && "size must be a power of two");
+    uintptr_t* end_word = space_end - 1;
+    block_header_t* trailer = block_from_ptr(end_word);
+    if (!block_is_free(trailer)
+        && trailer->_nwords == 2
+        && block_is_prev_free(trailer)) {
+        block_header_t* frontier = block_prev(trailer);
+        if (block_size(frontier) < amount + 4096) return 0; // arb safety factor
+        uintptr_t* new_end_word = (uintptr_t*)((char*)end_word - amount);
+        // copy 'prev_physical_block', the new header word, and a padding word
+        memcpy(new_end_word-2, end_word-2, 3*sizeof(uintptr_t));
+        block_remove(tlsf, frontier);
+        block_set_size(frontier, block_size(frontier) - amount);
+        block_insert(tlsf, frontier);
+        return (char*)space_end - amount;
+    } else {
+        return 0; // fail
+    }
+}
+/* incomplete */
+#if 0
+void* tlsf_pool_grow(control_t* tlsf, uintptr_t* space_end, size_t amount)
+{
+    tlsf_assert(0 == (amount & (amount - 1)) && "size must be a power of two");
+    uintptr_t* end_word = space_end - 1;
+    block_header_t* trailer = block_from_ptr(end_word);
+    if (!block_is_free(trailer)
+        && trailer->_nwords == 2
+        && block_is_prev_free(trailer)) {
+        block_header_t* frontier = block_prev(trailer);
+    } else {
+        return 0; // fail
+    }
 }
 #endif
