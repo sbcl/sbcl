@@ -1029,11 +1029,7 @@
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
                                :debug-name
-                               (or name (name-lambdalike thing))))))
-    ((lambda-with-lexenv)
-     (ir1-convert-inline-lambda thing
-                                :source-name source-name
-                                :debug-name debug-name))))
+                               (or name (name-lambdalike thing))))))))
 
 (declaim (end-block))
 

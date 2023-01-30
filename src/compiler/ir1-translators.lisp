@@ -585,9 +585,6 @@ Return VALUE without evaluating it."
          `(lambda ,(strip-lambda-list (third thing) :name) ,(name-context))))
     ((lambda)
      `(lambda ,(strip-lambda-list (second thing) :name) ,@(name-context)))
-    ((lambda-with-lexenv)
-     ;; FIXME: Get the original DEFUN name here.
-     `(lambda ,(fifth thing)))
     (otherwise
      (compiler-error "Not a valid lambda expression:~%  ~S"
                      thing))))
@@ -604,7 +601,7 @@ Return VALUE without evaluating it."
 ;;; apparent function associated to it.
 (defun find-or-convert-fun-leaf (thing start)
   (cond
-    ((typep thing '(cons (member lambda named-lambda lambda-with-lexenv)))
+    ((typep thing '(cons (member lambda named-lambda)))
      (let ((ctran (make-ctran))
            (leaf (ir1-convert-lambdalike thing
                                          :debug-name (name-lambdalike thing))))

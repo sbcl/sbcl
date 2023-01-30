@@ -21,7 +21,7 @@
   (let ((lambda (if (typep expr '(cons (eql function) (cons t null)))
                     (cadr expr)
                     expr)))
-    (if (typep lambda '(cons (member lambda named-lambda lambda-with-lexenv)))
+    (if (typep lambda '(cons (member lambda named-lambda)))
         (values lambda nil)
         (values `(lambda ()
                  ;; why PROGN? So that attempts to eval free declarations
