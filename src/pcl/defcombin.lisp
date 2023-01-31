@@ -263,22 +263,17 @@
 ;;; multiple methods with the same specializers in the same method
 ;;; group are unclear by the spec: a portion of the standard implies
 ;;; that an error should be signalled, and another is more lenient.
-;;;
-;;; It is reasonable to allow a single method group of * to bypass all
-;;; rules, as this is explicitly stated in the standard.
-
-(defun group-cond-clause (name tests specializer-cache star-only)
+(defun group-cond-clause (name tests specializer-cache order-matters-test)
   (let ((maybe-error-clause
-         (if star-only
-             `(setq ,specializer-cache .specializers.)
-             `(if (and (equal ,specializer-cache .specializers.)
-                       (not (null .specializers.)))
-                  (return-from .long-method-combination-function.
-                    '(error 'long-method-combination-error
-                      :format-control "More than one method of type ~S ~
+          `(if (and ,order-matters-test
+                    (equal ,specializer-cache .specializers.)
+                    (not (null .specializers.)))
+               (return-from .long-method-combination-function.
+                 '(error 'long-method-combination-error
+                   :format-control "More than one method of type ~S ~
                                        with the same specializers."
-                      :format-arguments (list ',name)))
-                  (setq ,specializer-cache .specializers.)))))
+                   :format-arguments (list ',name)))
+               (setq ,specializer-cache .specializers.))))
     `((or ,@tests)
       ,maybe-error-clause
       (push .method. ,name))))
@@ -296,13 +291,33 @@
         (multiple-value-bind (name tests description order required)
             (parse-method-group-specifier method-group-specifier)
           (declare (ignore description))
-          (let ((specializer-cache (gensym)))
+          (let* ((specializer-cache (gensym))
+                 (order-var (gensym "O"))
+                 (order-constantp (constantp order))
+                 (order-value (and order-constantp (constant-form-value order))))
             (push name names)
             (push specializer-cache specializer-caches)
-            (push (group-cond-clause name tests specializer-cache
-                                     (and (eq (cadr method-group-specifier) '*)
-                                          (= nspecifiers 1)))
-                  cond-clauses)
+            (unless order-constantp
+              (push `(,order-var ,order) order-vars))
+            (let ((order-matters-test
+                    (cond
+                      ;; It is reasonable to allow a single method
+                      ;; group of * to bypass all rules, as this is
+                      ;; explicitly stated in the standard.
+                      ((and (eq (cadr method-group-specifier) '*)
+                            (= nspecifiers 1))
+                       nil)
+                      ;; an :ORDER value known at compile-time to be
+                      ;; NIL (an SBCL extension) also bypasses the
+                      ;; ordering checks.  (Other :ORDER values do
+                      ;; not.)
+                      (order-constantp (not (eql order-value nil)))
+                      ;; otherwise, check the ORDER value at
+                      ;; method-combination time, bypassing ordering
+                      ;; checks if it is NIL.
+                      (t `(not (eql ,order-var nil))))))
+              (push (group-cond-clause name tests specializer-cache order-matters-test)
+                    cond-clauses))
             (when required
               (push `(when (null ,name)
                       (return-from .long-method-combination-function.
@@ -310,18 +325,15 @@
                           :format-control "No ~S methods."
                           :format-arguments (list ',name))))
                     required-checks))
-            (let* ((order-constantp (and (constantp order)))
-                   (order-value (and order-constantp (constant-form-value order))))
-              (cond
-                ((and order-constantp (eq order-value :most-specific-first))
-                 (push `(setq ,name (nreverse ,name)) order-cleanups))
-                ((and order-constantp (eq order-value :most-specific-last)))
-                (t (let ((order-var (gensym "O")))
-                     (push `(ecase ,order-var
-                              (:most-specific-first (setq ,name (nreverse ,name)))
-                              (:most-specific-last))
-                           order-cleanups)
-                     (push `(,order-var ,order) order-vars))))))))
+            (cond
+              ((and order-constantp (eq order-value :most-specific-first))
+               (push `(setq ,name (nreverse ,name)) order-cleanups))
+              ((and order-constantp
+                    (or (null order-value) (eq order-value :most-specific-last))))
+              (t (push `(ecase ,order-var
+                          (:most-specific-first (setq ,name (nreverse ,name)))
+                          ((nil :most-specific-last)))
+                       order-cleanups))))))
       `(let (,@(nreverse names) ,@specializer-caches ,@order-vars)
         (declare (ignorable ,@specializer-caches))
         ,@declarations

@@ -814,11 +814,11 @@
 (assert (= (wam-test-mc-b 13) 13))
 (defmethod wam-test-mc-b :around ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (= (wam-test-mc-b 13) 26))
+(assert (= (wam-test-mc-b 14) 28))
 (defmethod wam-test-mc-b :somethingelse ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (let ((*error-output* (make-broadcast-stream)))
-  (assert-error (wam-test-mc-b 13)))
+  (assert-error (wam-test-mc-b 15)))
 
 ;;; now, ensure that it fails with a single group with a qualifier-pattern
 ;;; that is not *
@@ -833,11 +833,11 @@
 (assert-error (wam-test-mc-c 13))
 (defmethod wam-test-mc-c :foo ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (= (wam-test-mc-c 13) 13))
+(assert (= (wam-test-mc-c 14) 14))
 (defmethod wam-test-mc-c :bar ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (let ((*error-output* (make-broadcast-stream)))
-  (assert-error (wam-test-mc-c 13)))
+  (assert-error (wam-test-mc-c 15)))
 
 ;;; DEFMETHOD should signal an ERROR if an incompatible lambda list is
 ;;; given:

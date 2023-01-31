@@ -48,6 +48,15 @@ The @code{string} type is considered to be the union of all types
 @code{(array @emph{c} (@emph{size}))} for all non-@code{nil} subtypes @code{@emph{c}} of
 @code{character}, excluding arrays specialized to the empty type.
 
+@item
+@findex @cl{define-method-combination}
+@vindex @cl{nil}
+The @code{:order} long form option in @code{define-method-combination}
+method group specifiers accepts the value @code{nil} as well as
+@code{:most-specific-first} and @code{:most-specific-last}, in order
+to allow programmers to declare that the order of methods playing that
+role in the method combination does not matter.
+
 @end itemize
 
 @node Extensions
