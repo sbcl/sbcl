@@ -8,9 +8,6 @@
  ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("brothertree.impure.lisp"
   "src/code/brothertree.lisp")
- ("redblack.impure.lisp"
-  "tests/bbtree-test-util.lisp"
-  "src/code/redblack.lisp")
  ("case.pure.lisp" "tests/case-test.lisp")
  ("chill.test.sh"
   "src/cold/chill.lisp"
@@ -81,7 +78,7 @@
   "tests/package-test-5.lisp"
   "tests/package-test-6.lisp"
   "tests/package-test-7.lisp")
- ("redblack.pure.lisp" "tests/bbtree-test-util.lisp" "../src/code/redblack.lisp")
+ ("redblack.pure.lisp" "tests/bbtree-test-util.lisp" "src/code/redblack.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"
   "../contrib/sb-aclrepl/tests.lisp")
