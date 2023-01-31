@@ -5295,12 +5295,13 @@
           (t
            (give-up-ir1-transform)))))
 
-(defun next-node (node-or-block &optional type (cast t))
+(defun next-node (node-or-block &key type (cast t) single-predecessor)
   (let ((node node-or-block)
         ctran)
     (tagbody
        (when (block-p node-or-block)
-         (when (cdr (block-pred node-or-block))
+         (when (and single-predecessor
+                    (cdr (block-pred node-or-block)))
            (return-from next-node))
          (setf ctran (block-start node-or-block))
          (go :next-ctran))
@@ -5324,7 +5325,8 @@
               (let* ((succ (first (block-succ (node-block node))))
                      (start (block-start succ)))
                 (when (and start
-                           (null (cdr (block-pred succ))))
+                           (not (and single-predecessor
+                                     (cdr (block-pred succ)))))
                   (setf ctran start)
                   (go :next-ctran))))))))
 
@@ -5344,7 +5346,8 @@
                    (<= '>)
                    (>= '<)))
                (try (consequent alternative)
-                 (let ((then (next-node consequent :non-ref)))
+                 (let ((then (next-node consequent :type :non-ref
+                                                   :single-predecessor t)))
                    (when (and (combination-p then)
                               (eq (combination-kind then) :known)) ;; no notinline
                      (let ((op2 (combination-fun-debug-name then)))
@@ -5373,7 +5376,7 @@
                                                                (if-consequent after-then)
                                                                (if-alternative after-then)))
                                                        (unless reverse-if
-                                                         (let ((ref (next-node alternative :ref nil)))
+                                                         (let ((ref (next-node alternative :type :ref :cast nil)))
                                                            (and ref
                                                                 (constant-p (ref-leaf ref))
                                                                 (null (constant-value (ref-leaf ref)))
