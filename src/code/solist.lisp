@@ -27,10 +27,6 @@
 ;;;   the net memory used decreases, although at larger sizes
 ;;;   the split-ordered list consumes more memory.
 ;;;
-;;;  * finalizer store. very tricky with movable objects
-;;;    might need frequent rebuilds (same as status quo)
-;;;    and the rebuild may need to occur from within C.
-;;;
 ;;;  * exact remembered sets for GC in immobile space
 ;;;
 

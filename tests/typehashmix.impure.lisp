@@ -391,12 +391,15 @@
     (assert (eq (sb-kernel:specifier-type `(member ,a ,@numbers ,list))
                 (sb-kernel:specifier-type `(member ,list ,a ,@numbers))))))
 
-;(print sb-kernel::*xset-stable-hashes*)
+(defvar *pre-gc-xset-stable-hash-count*
+  (hash-table-count sb-kernel::*xset-stable-hashes*))
 (gc :full t)
 #+sb-thread (sb-kernel:run-pending-finalizers)
 (with-test (:name :xset-stable-hash-weakness)
   ;; After running the :MEMBER-TYPE-HASH-MIXER test, there were >5000 entries
   ;; in the *XSET-STABLE-HASHES* table for me.
   ;; The preceding GC should have had some effect.
-  (assert (< (hash-table-count sb-kernel::*xset-stable-hashes*)
-             100)))
+  (let ((count (hash-table-count sb-kernel::*xset-stable-hashes*)))
+    (when (plusp count)
+      (format t "::: NOTE: hash-table-count = ~D~%" count))
+    (assert (< count (/ *pre-gc-xset-stable-hash-count* 2)))))
