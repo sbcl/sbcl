@@ -3980,3 +3980,14 @@
                           `(lambda (l)
                              (declare (optimize (safety 0)))
                              (values-list l))))))))
+
+(with-test (:name :explicit-value-cell-top-level)
+  (ctu:file-compile
+   `((defvar *x*)
+     (let ((v 0))
+       (loop repeat 1
+             do
+             (setf *x* (lambda () (incf v)))))
+     (assert (eql (funcall *x*) 1))
+     (assert (eql (funcall *x*) 2)))
+   :load t))

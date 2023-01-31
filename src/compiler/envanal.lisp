@@ -65,7 +65,7 @@
   (declare (type component component))
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
-      (when (add-lambda-vars-and-let-vars-to-closures lambda)
+      (when (add-lambda-vars-and-let-vars-to-closures lambda t)
         (setq found-it t)))
     found-it))
 
@@ -128,7 +128,7 @@
 ;;; ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES, always runs over all the
 ;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
 ;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
-(defun %add-lambda-vars-to-closures (clambda)
+(defun %add-lambda-vars-to-closures (clambda &optional explicit-value-cell)
   (let ((env (get-lambda-environment clambda))
         (did-something nil))
     (note-unreferenced-fun-vars clambda)
@@ -156,6 +156,8 @@
             (unless (eq set-env env)
               (setf did-something t
                     (lambda-var-indirect var) t)
+              (when explicit-value-cell
+                (setf (lambda-var-explicit-value-cell var) t))
               (close-over var set-env env))))))
     did-something))
 
@@ -167,16 +169,16 @@
 ;;; value cell. We also warn about unreferenced variables here, just
 ;;; because it's a convenient place to do it. We return true if we
 ;;; close over anything.
-(defun add-lambda-vars-and-let-vars-to-closures (clambda)
+(defun add-lambda-vars-and-let-vars-to-closures (clambda &optional explicit-value-cell)
   (declare (type clambda clambda))
   (let ((did-something nil))
-    (when (%add-lambda-vars-to-closures clambda)
+    (when (%add-lambda-vars-to-closures clambda explicit-value-cell)
       (setf did-something t))
     (dolist (lambda-let (lambda-lets clambda))
       ;; There's no need to recurse through full COMPUTE-CLOSURE
       ;; here, since LETS only go one layer deep.
       (aver (null (lambda-lets lambda-let)))
-      (when (%add-lambda-vars-to-closures lambda-let)
+      (when (%add-lambda-vars-to-closures lambda-let explicit-value-cell)
         (setf did-something t)))
     did-something))
 
