@@ -13,65 +13,6 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
-;;;; cost estimation
-
-;;; Return some sort of guess about the cost of a call to a function.
-;;; If the function has some templates, we return the cost of the
-;;; cheapest one, otherwise we return the cost of CALL-NAMED. Calling
-;;; this with functions that have transforms can result in relatively
-;;; meaningless results (exaggerated costs.)
-;;;
-;;; We special-case NULL, since it does have a source tranform and is
-;;; interesting to us.
-(defun fun-guessed-cost (name)
-  (declare (symbol name))
-  (let ((info (info :function :info name))
-        (call-cost (template-cost (template-or-lose 'call-named))))
-    (if info
-        (let ((templates (fun-info-templates info)))
-          (if templates
-              (template-cost (first templates))
-              (case name
-                (null (template-cost (template-or-lose 'if-eq)))
-                (t call-cost))))
-        call-cost)))
-
-;;; Return some sort of guess for the cost of doing a test against
-;;; TYPE. The result need not be precise as long as it isn't way out
-;;; in space. The units are based on the costs specified for various
-;;; templates in the VM definition.
-(defun type-test-cost (type)
-  (declare (type ctype type))
-  (or (when (eq type *universal-type*)
-        0)
-      (when (eq type *empty-type*)
-        0)
-      (let ((found (backend-type-predicate type)))
-        (if found
-            (+ (fun-guessed-cost found) (fun-guessed-cost 'eq))
-            nil))
-      (typecase type
-        (compound-type
-         (reduce #'+ (compound-type-types type) :key 'type-test-cost))
-        (member-type
-         (* (member-type-size type)
-            (fun-guessed-cost 'eq)))
-        (numeric-type
-         (* (if (numeric-type-complexp type) 2 1)
-            (fun-guessed-cost
-             (if (csubtypep type (specifier-type 'fixnum)) 'fixnump 'numberp))
-            (+ 1
-               (if (numeric-type-low type) 1 0)
-               (if (numeric-type-high type) 1 0))))
-        (cons-type
-         (+ (type-test-cost (specifier-type 'cons))
-            (fun-guessed-cost 'car)
-            (type-test-cost (cons-type-car-type type))
-            (fun-guessed-cost 'cdr)
-            (type-test-cost (cons-type-cdr-type type))))
-        (t
-         (fun-guessed-cost 'typep)))))
 
 (defun weaken-integer-type (type &key range-only)
   ;; FIXME: Our canonicalization isn't quite ideal for this. We get
@@ -212,25 +153,17 @@
 ;;; proven that LVAR generates a fixed number of values, then for each
 ;;; value, we check whether it is cheaper to then difference between
 ;;; the proven type and the corresponding type in TYPES.
-(defun maybe-negate-check (lvar types original-types n-required)
+(defun lvar-types-to-check (lvar types original-types n-required)
   (declare (type lvar lvar) (list types original-types))
   (let ((ptypes (values-type-out (lvar-derived-type lvar) (length types))))
     (loop for p in ptypes
           and c in types
           and a in original-types
           and i from 0
-          for cc = (if (>= i n-required)
-                       (type-union c (specifier-type 'null))
-                       c)
-          for diff = (type-difference p cc)
-          collect (if (and diff
-                           ;; FUN-TYPE is weakend to FUNCTION, can't
-                           ;; use that for invereted type testes
-                           (not (type-contains-fun-type-p diff))
-                           (< (type-test-cost diff)
-                              (type-test-cost cc)))
-                      (list t diff a)
-                      (list nil cc a)))))
+          collect (list (if (>= i n-required)
+                            (type-union c (specifier-type 'null))
+                            c)
+                        a))))
 
 ;;; Determine if CAST can be checked.
 ;;; We may check only fixed number of values; in any case the number
@@ -276,14 +209,14 @@
                 (not (values-type-rest dtype)))
            ;; we [almost] know how many values are produced
            (values :simple
-                   (maybe-negate-check value
-                                       (values-type-out ctype n-required)
-                                       (values-type-out atype n-required)
-                                       n-required)))
+                   (lvar-types-to-check value
+                                        (values-type-out ctype n-required)
+                                        (values-type-out atype n-required)
+                                        n-required)))
           ((lvar-single-value-p lvar)
            ;; exactly one value is consumed
            (principal-lvar-single-valuify lvar)
-           (values :simple (maybe-negate-check value
+           (values :simple (lvar-types-to-check value
                                                (list (single-value-type ctype))
                                                (list (single-value-type atype))
                                                n-required)))
@@ -291,7 +224,7 @@
                 (eq (mv-combination-kind dest) :local)
                 (singleton-p (mv-combination-args dest)))
            ;; we know the number of consumed values
-           (values :simple (maybe-negate-check value
+           (values :simple (lvar-types-to-check value
                                                (adjust-list (values-type-types ctype)
                                                             n-consumed
                                                             *universal-type*)
@@ -472,22 +405,17 @@
       `(multiple-value-bind ,temps ,dummy
          ,@(mapcar
             (lambda (temp %type)
-              (destructuring-bind (not type-to-check
-                                   type-to-report) %type
-                (let* ((spec (type-specifier type-to-check t))
-                       (test (if not `(not ,spec) spec)))
-                  `(progn
-                     (unless
-                         ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
-                            (%source-transform-typep temp test))
-                       ,(internal-type-error-call temp
-                                                  (if (fun-designator-type-p type-to-report)
-                                                      ;; Simplify
-                                                      (specifier-type 'function-designator)
-                                                      type-to-report)
-                                                  context))
-                     ,@(and restart
-                            `((restart-point ,restart)))))))
+              (destructuring-bind (type-to-check type-to-report) %type
+                `(progn
+                   (unless (typep ,temp ',(type-specifier type-to-check t))
+                     ,(internal-type-error-call temp
+                                                (if (fun-designator-type-p type-to-report)
+                                                    ;; Simplify
+                                                    (specifier-type 'function-designator)
+                                                    type-to-report)
+                                                context))
+                   ,@(and restart
+                          `((restart-point ,restart))))))
             temps
             types)
          (values ,@temps)))))
