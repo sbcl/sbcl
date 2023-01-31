@@ -471,20 +471,27 @@
            :enable-pie enable-pie)))
     (let ((package-table
            (symbol-global-value
-            (find-target-symbol (package-id "SB-KERNEL") "*PACKAGE-NAMES*" spaces :physical)))
+            (find-target-symbol (package-id "SB-IMPL") "*ALL-PACKAGES*" spaces :physical)))
           (package-alist)
           (symbols (make-hash-table :test 'equal)))
-      (dovector (x (translate (%instance-ref (translate package-table spaces) 0) spaces))
-        (when (%instancep x) ; package
-          (flet ((scan (table)
-                   (scan-symbol-hashset
+      (labels ((scan-symtbl (table)
+                 (scan-symbol-hashset
                     (lambda (str sym)
                       (pushnew (get-lisp-obj-address sym) (gethash str symbols)))
-                    table core)))
-            (let ((package (truly-the package (translate x spaces))))
-              (push (cons (sb-impl::package-id package) package) package-alist)
-              (scan (package-external-symbols package))
-              (scan (package-internal-symbols package))))))
+                    table core))
+               (scan-package (x)
+                 (let ((package (truly-the package (translate x spaces))))
+                   ;; a package can appear in *ALL-PACKAGES* under each of its nicknames
+                   (unless (assoc (sb-impl::package-id package) package-alist)
+                     (push (cons (sb-impl::package-id package) package) package-alist)
+                     (scan-symtbl (package-external-symbols package))
+                     (scan-symtbl (package-internal-symbols package))))))
+        (dovector (x (translate package-table spaces))
+          (cond ((%instancep x) (scan-package x))
+                ((listp x) (loop (if (eq x nil-object) (return))
+                                 (setq x (translate x spaces))
+                                 (scan-package (car x))
+                                 (setq x (cdr x)))))))
       (let ((package-by-id (make-array (1+ (reduce #'max package-alist :key #'car))
                                        :initial-element nil)))
         (loop for (id . package) in package-alist
