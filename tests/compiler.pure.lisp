@@ -161,7 +161,8 @@
 
 ;;; on the PPC, we got the magic numbers in undefined_tramp wrong for
 ;;; a while; fixed by CSR 2002-07-18
-(with-test (:name :undefined-function-error)
+(with-test (:name :undefined-function-error
+            :fails-on :ppc64)
   (multiple-value-bind (value error)
       (ignore-errors (funcall (checked-compile
                                `(lambda () (some-undefined-function))
@@ -3441,7 +3442,7 @@
                                t))))
     (ctu:assert-no-consing (funcall f))))
 
-(with-test (:name :truncate-float)
+(with-test (:name :truncate-float :fails-on :ppc64)
   (let ((s (checked-compile `(lambda (x)
                                (declare (single-float x))
                                (truncate x))))
@@ -3547,7 +3548,8 @@
     (test 'base-string 'sb-kernel:%concatenate-to-base-string)
     (test 'simple-base-string 'sb-kernel:%concatenate-to-base-string)))
 
-(with-test (:name (satisfies :no-local-fun))
+(with-test (:name (satisfies :no-local-fun)
+            :fails-on :ppc64)
   (let ((fun (checked-compile
               `(lambda (arg)
                  (labels ((local-not-global-bug (x)

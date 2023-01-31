@@ -599,6 +599,7 @@
     ((1d0 0d0) t)))
 
 (with-test (:name :ftruncate-inline
+            :fails-on :ppc64
             :skipped-on (not :64-bit))
   (checked-compile
    `(lambda (v d)

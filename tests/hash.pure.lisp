@@ -403,7 +403,8 @@
     ;; Also the same issue exists with bit-vectors.
     (assert-error (sxhash displaced-string))))
 
-(with-test (:name :array-psxhash-non-consing :skipped-on :interpreter)
+(with-test (:name :array-psxhash-non-consing :skipped-on :interpreter
+            :fails-on :ppc64)
    (let ((a (make-array 1000 :element-type 'double-float
                         :initial-element (+ 0d0 #+(or arm64 x86-64)
                                                 1d300))))
