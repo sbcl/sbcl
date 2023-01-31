@@ -83,11 +83,13 @@
                   (:predicate packagep))
   "the standard structure for the description of a package"
   ;; the name of the package, or NIL for a deleted package
+  ;; This is redundant with the 0th element of KEYS
   (%name nil :type (or simple-string null))
   ;; A small integer ID, unless it overflows the global package index
   (id nil :type (or (unsigned-byte #.package-id-bits) null))
-  ;; nickname strings
-  (%nicknames () :type list)
+  ;; Unlike the slot formerly known as %NICKNAMES, the KEYS
+  ;; vector includes the primary name and all nicknames
+  (keys #() :type simple-vector) ; alternating STRING + HASH
   ;; This is essentially the same as the USE-LIST, but it points
   ;; to the external symbol hashtables directly.
   ;; From it we can obtain PACKAGE-USE-LIST on demand.

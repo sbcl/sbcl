@@ -51,7 +51,7 @@ implementation it is ~S." *!default-package-use-list*)
     (setf (symtbl-package (package-external-symbols package)) package)
     (with-package-names (table) ; get exclusive use of name -> package mapping
       ;; If the loop runs to completion, then insert all names,
-      ;; which also assigns %NAME and %NICKNAMES into the package.
+      ;; which also assigns the %NAME and KEYS slots of the package.
       (dolist (string namelist (package-registry-update package namelist))
         (when (setq existing-pkg (%get-package string table))
           (return (setq conflict string)))))
@@ -194,7 +194,7 @@ implementation it is ~S." *!default-package-use-list*)
                                (%set-symbol-package x nil)))))
                     (nullify-home (package-internal-symbols package))
                     (nullify-home (package-external-symbols package)))
-                  (with-package-names (table)
+                  (with-package-names ()
                     (package-registry-update package nil)
                     (awhen (package-id package)
                       (setf (aref *id->package* it) nil (package-id package) nil))
@@ -204,16 +204,14 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; ANSI requires. Setting the other slots to NIL
                           ;; and blowing away the SYMBOL-HASHSETs is just done
                           ;; for tidiness and to help the GC.
-                          (package-%nicknames package) nil))
+                          (package-keys package) #()))
                   (atomic-incf *package-names-cookie*)
                   (when (boundp 'sb-c::*compilation*)
                     (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
                   (setf (package-tables package) #()
                         (package-%shadowing-symbols package) nil
-                        (package-internal-symbols package)
-                        (make-symbol-hashset 0)
-                        (package-external-symbols package)
-                        (make-symbol-hashset 0)))
+                        (package-internal-symbols package) (make-symbol-hashset 0)
+                        (package-external-symbols package) (make-symbol-hashset 0)))
                 (return-from delete-package t)))))))
 
 ;;; Possible FIXME:

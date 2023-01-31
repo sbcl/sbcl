@@ -202,6 +202,7 @@
       sb-c::*compile-file-elapsed-time*
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*
+      sb-impl::*all-packages*
       sb-impl::*package-names-cookie*
       sb-impl::*available-buffers*
       sb-impl::*token-buf-pool*

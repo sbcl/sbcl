@@ -1614,18 +1614,24 @@ core and return a descriptor to it."
                            (remove (find-package "SB-COREFILE")
                                    (package-use-list package))
                            (package-use-list package))))))
-    (write-slots cold-package
-                 :id (make-fixnum-descriptor id)
-                 :%name (string-literal-to-core name)
-                 :%nicknames (list-to-core
-                              (mapcar #'string-literal-to-core nicknames))
-                 :%bits (make-fixnum-descriptor
-                         (if (system-package-p name)
-                             sb-impl::+initial-package-bits+
-                             0))
-                 :doc-string (if (and docstring #-sb-doc nil)
-                                 (string-literal-to-core docstring)
-                                 *nil-descriptor*))
+    (let* ((names (cons name nicknames))
+           (name-descriptors (mapcar #'string-literal-to-core names))
+           (keys (loop for descriptor in name-descriptors
+                       for string in names
+                       nconc (list descriptor
+                              (make-fixnum-descriptor
+                               (%sxhash-simple-string string))))))
+      (write-slots cold-package
+                   :id (make-fixnum-descriptor id)
+                   :keys (vector-in-core keys)
+                   :%name (car name-descriptors)
+                   :%bits (make-fixnum-descriptor
+                           (if (system-package-p name)
+                               sb-impl::+initial-package-bits+
+                               0))
+                   :doc-string (if (and docstring #-sb-doc nil)
+                                   (string-literal-to-core docstring)
+                                   *nil-descriptor*)))
     (push (cons name (mapcar 'sb-xc:package-name use-list)) *package-graph*)
     ;; COLD-INTERN AVERs that the package has an ID, so delay writing
     ;; the shadowing-symbols until the package is ready.

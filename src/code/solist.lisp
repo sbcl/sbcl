@@ -12,12 +12,6 @@
 ;;; bucket vector doubles, one more bit of lesser significance comes into play.
 
 ;;; Some possible uses:
-;;; * Package name table
-;;;   total ordering: name
-;;;   This maybe doesn't need to be lockfree because there are invariants
-;;;   enforced by the global lock.
-;;;   However, it would be nice to remove the global lock.
-;;;
 ;;; * classoid -> layout hash-tables in classoid-subclasses
 ;;;   will maybe fix some deadlock issues by removing locks?
 ;;;   total ordering by an opaque globally unique ID.

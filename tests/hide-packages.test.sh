@@ -67,9 +67,7 @@ run_sbcl <<EOF
                    (string= name "COMMON-LISP-USER")
                    (string= name "KEYWORD"))
          (push (make-weak-pointer name) *weak-ptrs*)
-         (rename-package name (concatenate 'string "HIDDEN-" name))))))
-  ;; The package name hashtable lazily removes keys. Force it do to do so now.
-  (sb-impl::%rebuild-package-names sb-kernel::*package-names*))
+         (rename-package name (concatenate 'string "HIDDEN-" name)))))))
 
 (gc :gen 7)
 (setq *weak-ptrs* (remove-if-not #'weak-pointer-value *weak-ptrs*))
@@ -120,7 +118,9 @@ run_sbcl <<\EOF
   (or ;; package can point to its own name
       (and (packagep this) (eq (package-name this) that))
       ;; name table can point to strings
-      (eq this (sb-impl::info-env-storage sb-kernel::*package-names*))
+      (and (simple-vector-p this)
+           (member this (load-time-value
+                         (mapcar #'sb-impl::package-keys (list-all-packages)))))
       ;; keyword points to its name
       (and (keywordp this) (eq (symbol-name this) that)))))
 
