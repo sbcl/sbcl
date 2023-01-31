@@ -59,7 +59,7 @@
   (let ((*compile-component-hook* fun))
     (apply #'test-util:checked-compile form checked-compile-args)))
 
-(defun ir1-named-calls (lambda-expression)
+(defun ir1-named-calls (lambda-expression &optional (full t))
   (let* ((calls)
          (compiled-fun
           (inspect-ir
@@ -68,7 +68,9 @@
              (do-blocks (block component)
                (do-nodes (node nil block)
                  (when (and (sb-c::basic-combination-p node)
-                            (eq (sb-c::basic-combination-info node) :full))
+                            (if full
+                                (eq (sb-c::basic-combination-info node) :full)
+                                t))
                    (pushnew (sb-c::combination-fun-debug-name node)
                             calls :test 'equal))))))))
     (values calls compiled-fun)))

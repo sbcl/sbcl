@@ -868,3 +868,10 @@
                               (declare (type ,type1 val))
                               (the ,type2 val)))))
       (assert (equal (funcall bug103 (list v)) '((:a)))))))
+
+(with-test (:name :union-type-checks)
+  (assert (not (find 'integerp
+                     (ctu:ir1-named-calls `(lambda (x)
+                                             (declare ((or list fixnum) x))
+                                             (typep x 'integer))
+                                          nil)))))

@@ -107,6 +107,11 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
+            ((let ((intersect (type-intersection otype type))
+                   (fixnum (specifier-type 'fixnum)))
+               (when (and (csubtypep intersect fixnum)
+                          (not (csubtypep type fixnum)))
+                 `(typep object ',(type-specifier intersect)))))
             (t
              (give-up-ir1-transform))))))
 
