@@ -74,11 +74,14 @@ The following keyword args are recognized:
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
   (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
   (when max-depth (warn "MAX-DEPTH is ignored"))
-  (let ((message "~@<No sampling progress; run too short, sampling frequency too low, ~
+  (let ((last-index '#:index)
+        (values '#:values)
+        (message "~@<No sampling progress; run too short, sampling frequency too low, ~
 inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
-    (with-unique-names (values last-index)
-      `(let ((*show-progress* ,show-progress))
-         ,@(when reset '((reset)))
+    `(let ((*show-progress* ,show-progress))
+       ,@(when reset '((reset)))
+       ;; Produce report only if body returns normally
+       (multiple-value-prog1
          (unwind-protect
               (progn
                 (start-profiling :mode ,mode :max-samples ,max-samples
@@ -108,7 +111,7 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
 ;;; or SB-EXT:TIMER depending on whether thread support exists.
 (defglobal *timer* nil)
 
-#-win32
+#+unix
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)
                         (sample-interval *sample-interval*)
@@ -218,6 +221,9 @@ The following keyword args are recognized:
                      sample-interval :repeat-interval sample-interval)))
   (setq *profiling* mode))
 
+;;; Though the profiler doesn't work for #+win32 this definition is kept here
+;;; because otherwise you also have to conditionalize out MAKE-CALL-GRAPH and RESET
+;;; and whatever calls those, and so on.
 (defun stop-profiling ()
   "Stop profiling if profiling."
   (let ((profiling *profiling*))
@@ -228,7 +234,7 @@ The following keyword args are recognized:
         (:alloc
          (setq enable-alloc-profiler 0))
         (:cpu
-         (unix-setitimer :profile 0 0 0 0))
+         #+unix (unix-setitimer :profile 0 0 0 0))
         (:time
          (let ((timer *timer*))
            ;; after this assignment, the timer thread will raise the

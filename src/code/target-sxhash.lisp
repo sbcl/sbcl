@@ -19,37 +19,6 @@
 ;;; a compound object.
 (defconstant +max-hash-depthoid+ 4)
 
-;; Return a number that increments by 1 for each word-pair allocation,
-;; barring complications such as exhaustion of the current page.
-;; The result is guaranteed to be a positive fixnum.
-(declaim (inline address-based-counter-val))
-(defun address-based-counter-val ()
-  (let ((word
-         ;; threads imply gencgc. use the per-thread alloc region pointer
-         #+sb-thread
-         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-mixed-tlab-slot))
-         #+(and (not sb-thread) cheneygc)
-         (sap-int (dynamic-space-free-pointer))
-         ;; dynamic-space-free-pointer increments only when a page is full.
-         ;; Using mixed_region directly is finer-grained.
-         #+(and (not sb-thread) gencgc)
-         (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm::mixed-region) 0)))
-    ;; counter should increase by 1 for each cons cell allocated
-    (ash word (- (1+ sb-vm:word-shift)))))
-
-;;; Return some bits that are dependent on the next address that will be
-;;; allocated, mixed with the previous state (in case addresses get recycled).
-;;; This algorithm, used for stuffing a hash-code into instances of CTYPE
-;;; subtypes and generic functions, is simpler than RANDOM.
-;;; I don't know whether it is more random or less random than a PRNG,
-;;; but it's faster.
-(defun quasi-random-address-based-hash (state mask)
-  (declare (type (simple-array (and fixnum unsigned-byte) (1)) state))
-  ;; Ok with multiple threads - No harm, no foul.
-  (logand (setf (aref state 0) (mix (address-based-counter-val) (aref state 0)))
-          mask))
-
-
 ;;; This is an out-of-line callable entrypoint that the compiler can
 ;;; transform SXHASH into when hashing a non-simple string.
 (defun %sxhash-string (x)
@@ -90,8 +59,6 @@
 ;;; that's what I'm going with.
 ;;;
 (defun %instance-sxhash (instance)
-  ;; to avoid consing in fmix
-  (declare (inline #+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32))
   ;; LAYOUT must not acquire an extra slot for the stable hash,
   ;; because the bitmap length is derived from the instance length.
   ;; It would probably be simple to eliminate this as a special case
@@ -113,8 +80,7 @@
                    #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
                  (get-lisp-obj-address instance))))
     ;; perturb the address
-    (logand (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 addr)
-            most-positive-fixnum)))
+    (murmur-hash-word/+fixnum addr)))
 
 (declaim (inline instance-sxhash))
 (defun instance-sxhash (instance)
@@ -122,13 +88,8 @@
                (instance-header-word (truly-the instance instance)))
       ;; easy case: 1 word beyond the apparent length is a word added
       ;; by GC (which may have resized the object, but we don't need to know).
-      (%instance-ref instance (%instance-length instance))
+      (truly-the hash-code (%instance-ref instance (%instance-length instance)))
       (%instance-sxhash instance)))
-
-;;; Object must be pinned to use this.
-(defmacro fsc-instance-trailer-hash (fin)
-  `(sap-ref-32 (int-sap (get-lisp-obj-address ,fin))
-               (- (+ (* 5 sb-vm:n-word-bytes) 4) sb-vm:fun-pointer-lowtag)))
 
 ;;; Return a pseudorandom number that was assigned on allocation.
 ;;; FIN is a STANDARD-FUNCALLABLE-INSTANCE but we don't care to type-check it.
@@ -138,15 +99,19 @@
 ;;; due to a change in the definition of a method-combination.
 (declaim (inline fsc-instance-hash))
 (defun fsc-instance-hash (fin)
-  (cond #+x86-64
-        ((= (logand (function-header-word (truly-the function fin)) #xFF00)
-            (ash 5 sb-vm:n-widetag-bits)) ; KLUDGE: 5 data words implies 2 raw words
-         ;; get the upper 4 bytes of wordindex 5
-         (with-pinned-objects (fin) (fsc-instance-trailer-hash fin)))
-        (t
-         (truly-the hash-code
-          (sb-pcl::standard-funcallable-instance-hash-code
-           (truly-the sb-pcl::standard-funcallable-instance fin))))))
+  (truly-the hash-code
+   #+compact-instance-header
+   (with-pinned-objects (fin)
+     (let ((hash (sb-vm::compact-fsc-instance-hash
+                  (truly-the sb-pcl::standard-funcallable-instance fin))))
+       ;; There is not more entropy imparted by doing a mix step on a value that had
+       ;; at most 32 bits of randomness, but this makes more of the bits vary.
+       ;; Some uses of the hash might expect the high bits to have randomness in them.
+       ;; This returns a positive fixnum to conform with the requirement on SXHASH.
+       (murmur-hash-word/+fixnum hash)))
+   #-compact-instance-header
+   (sb-pcl::standard-funcallable-instance-hash-code
+    (truly-the sb-pcl::standard-funcallable-instance fin))))
 
 (declaim (inline integer-sxhash))
 (defun integer-sxhash (x)
@@ -278,7 +243,14 @@
              (%sxhash-simple-bit-vector (copy-seq bit-vector))))))))
 
 ;;; To avoid "note: Return type not fixed values ..."
+;;; PATHNAME-SXHASH can't easily be placed in pathname.lisp because that file
+;;; depends on LOGICAL-HOST but the definition of LOGICAL-HOST is complicated
+;;; and seems to belong where it is, in target-pathname.lisp, though maybe not.
 (declaim (ftype (sfunction (t) hash-code) pathname-sxhash))
+
+(defun sap-hash (x)
+  ;; toss in a LOGNOT so that (the word a) and (int-sap a) hash differently
+  (murmur-hash-word/+fixnum (logand (lognot (sap-int x)) most-positive-word)))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
@@ -297,8 +269,7 @@
   ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
   ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
   ;;    it is particularly dumb (by design), so performing that test later
-  ;;    doesn't incur much of a penalty. And our users probably know that
-  ;;    SXHASH on instance doesn't really do anything.
+  ;;    doesn't incur much of a penalty.
   ;; Anyway, afaiu, the code below was previously ordered by gut feeling
   ;; rather than than actual measurement, so having any rationale for ordering
   ;; is better than having no rationale. And as a further comment observes,
@@ -348,6 +319,7 @@
                     (fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
                     9550684))
+               (system-area-pointer (sap-hash x))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 
@@ -356,13 +328,15 @@
 ;;; like SXHASH, but for EQUALP hashing instead of EQUAL hashing
 (macrolet ((hash-float (type key)
              ;; Floats that represent integers must hash as the integer would.
-             (let ((lo (coerce most-negative-fixnum type))
-                   (hi (coerce most-positive-fixnum type)))
+             (let ((lo (symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type)))
+                   (hi (symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))
+                   (bignum-hash (symbolicate 'sxhash-bignum- type)))
                `(let ((key ,key))
-                  (cond ( ;; This clause allows FIXNUM-sized integer
+                  (declare (inline float-infinity-p))
+                  (cond (;; This clause allows FIXNUM-sized integer
                          ;; values to be handled without consing.
                          (<= ,lo key ,hi)
-                         (multiple-value-bind (q r) (floor (the (,type ,lo ,hi) key))
+                         (multiple-value-bind (q r) (truly-the fixnum (floor (the (,type ,lo ,hi) key)))
                            (if (zerop (the ,type r))
                                (sxhash q)
                                (sxhash (coerce key 'double-float)))))
@@ -371,11 +345,17 @@
                          (if (minusp key)
                              (sxhash sb-ext:single-float-negative-infinity)
                              (sxhash sb-ext:single-float-positive-infinity)))
+                        #+64-bit
                         (t
-                         (multiple-value-bind (q r) (floor key)
-                           (if (zerop (the ,type r))
-                               (sxhash q)
-                               (sxhash (coerce key 'double-float))))))))))
+                         (,bignum-hash key))
+                        #-64-bit
+                        (t
+                         ,(if (eq type 'double-float)
+                              `(multiple-value-bind (q r) (floor key)
+                                 (if (zerop (the ,type r))
+                                     (sxhash q)
+                                     (sxhash key)))
+                              `(,bignum-hash key))))))))
 (defun psxhash (key)
   (declare (optimize speed))
   (labels
@@ -589,18 +569,6 @@
                      (t (mix (recurse (car x) (1- depthoid))
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
-
-;;; These "good" hashers act on sb-vm:word, returning a fixnum, do not cons,
-;;; and have better avalanche behavior then SXHASH - changing any one input bit
-;;; should affect each bit of output with equal chance.
-#+64-bit
-(defun good-hash-word->fixnum (x)
-  (declare (inline murmur3-fmix64))
-  (logand (murmur3-fmix64 (truly-the sb-vm:word x)) most-positive-fixnum))
-#-64-bit
-(defun good-hash-word->fixnum (x)
-  (declare (inline murmur3-fmix32))
-  (logand (murmur3-fmix32 (truly-the sb-vm:word x)) most-positive-fixnum))
 
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)

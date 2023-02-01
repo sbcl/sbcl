@@ -240,7 +240,7 @@
 
 (defmacro define-instruction-format ((format-name length-in-bits
                                       &key default-printer include)
-                                     &rest arg-specs)
+                                     &body arg-specs)
   #+sb-xc-host (declare (ignore default-printer))
   "DEFINE-INSTRUCTION-FORMAT (Name Length {Format-Key Value}*) Arg-Def*
   Define an instruction format NAME for the disassembler's use. LENGTH is
@@ -259,6 +259,8 @@
 
   Each ARG-DEF defines one argument in the format, and is of the form
     (Arg-Name {Arg-Key Value}*)
+
+  If ARG-NAME is an integer it is the same as (#.(gensym) :value arg-name ...).
 
   Possible ARG-KEYs (the values are evaluated unless otherwise specified):
 
@@ -342,16 +344,20 @@
         (seen))
     (dolist (arg-spec arg-specs)
       (let* ((arg-name (car arg-spec))
-             (properties (cdr arg-spec))
-             (cell (member arg-name args :key #'arg-name)))
-        (aver (not (memq arg-name seen)))
-        (push arg-name seen)
-        (cond ((not cell)
-               (setq args (nconc args (list (apply #'modify-arg (%make-arg arg-name)
-                                                   length properties)))))
-              (properties
-               (rplaca cell (apply #'modify-arg (copy-structure (car cell))
-                                   length properties))))))
+             (properties (cdr arg-spec)))
+        (when (integerp arg-name)
+          (setf properties (list* :value arg-name
+                                  properties)
+                arg-name (gensym)))
+        (let ((cell (member arg-name args :key #'arg-name)))
+          (aver (not (memq arg-name seen)))
+          (push arg-name seen)
+          (cond ((not cell)
+                 (setq args (nconc args (list (apply #'modify-arg (%make-arg arg-name)
+                                                     length properties)))))
+                (properties
+                 (rplaca cell (apply #'modify-arg (copy-structure (car cell))
+                                     length properties)))))))
     (setf (get name 'inst-format)
           (make-inst-format name (bits-to-bytes length) printer args))))
 

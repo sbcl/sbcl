@@ -48,7 +48,7 @@
 (defun call-with-backtrace (cont test-function &key details)
   (flet ((capture-it (condition)
            (let (backtrace)
-             (sb-debug::map-backtrace
+             (sb-debug:map-backtrace
               (lambda (frame)
                 (multiple-value-bind (name args info)
                     (sb-debug::frame-call frame)

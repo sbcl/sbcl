@@ -31,6 +31,7 @@
 (define-alien-routine "gc_and_save" void
   (file c-string)
   (prepend-runtime int)
+  (purify int)
   (save-runtime-options int)
   (compressed int)
   (compression-level int)
@@ -81,15 +82,15 @@
        sb-kernel::*gc-epoch*))
 
 (defun start-lisp (toplevel callable-exports)
-  (named-lambda start-lisp ()
-    (cond (callable-exports
-           (reinit t)
-           (dolist (export callable-exports)
-             (sb-alien::initialize-alien-callable-symbol export)))
-          (t
-           (handling-end-of-the-world
-            (reinit t)
-            (funcall toplevel))))))
+  (if callable-exports
+      (named-lambda %start-lisp ()
+        (reinit t)
+        (dolist (export callable-exports)
+          (sb-alien::initialize-alien-callable-symbol export)))
+      (named-lambda %start-lisp ()
+        (handling-end-of-the-world
+          (reinit t)
+          (funcall toplevel)))))
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init toplevel-supplied)
@@ -139,13 +140,10 @@ The following &KEY arguments are defined:
      :TOPLEVEL argument cannot be supplied.
 
   :PURIFY
-     If true (the default on cheneygc), do a purifying GC which moves all
-     dynamically allocated objects into static space. This takes
-     somewhat longer than the normal GC which is otherwise done, but
-     it's only done once, and subsequent GC's will be done less often
-     and will take less time in the resulting core file. See the PURIFY
-     function. This parameter has no effect on platforms using the
-     generational garbage collector.
+     If true (the default), then some objects in the restarted core will
+     be memory-mapped as read-only. Among those objects are numeric vectors
+     that were determined to be compile-time constants, and any immutable
+     values according to the language specification such as symbol names.
 
   :ROOT-STRUCTURES
      This should be a list of the main entry points in any newly loaded
@@ -166,8 +164,8 @@ The following &KEY arguments are defined:
      This is only meaningful if the runtime was built with the :SB-CORE-COMPRESSION
      feature enabled. If NIL (the default), saves to uncompressed core files. If
      :SB-CORE-COMPRESSION was enabled at build-time, the argument may also be
-     an integer from -1 to 9, corresponding to zlib compression levels, or T
-     (which is equivalent to the default compression level, -1).
+     an integer from -7 to 22, corresponding to zstd compression levels, or T
+     (which is equivalent to the default compression level, 9).
 
   :APPLICATION-TYPE
      Present only on Windows and is meaningful only with :EXECUTABLE T.
@@ -206,7 +204,7 @@ seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
   #+gencgc
-  (declare (ignore purify) (ignorable root-structures))
+  (declare (ignorable root-structures))
   (when (and callable-exports toplevel-supplied)
     (error ":TOPLEVEL cannot be supplied when there are callable exports."))
   ;; If the toplevel function is not defined, this will signal an
@@ -214,10 +212,10 @@ sufficiently motivated to do lengthy fixes."
   (let ((toplevel (%coerce-callable-to-fun toplevel))
         *streams-closed-by-slad*)
     #+sb-core-compression
-    (check-type compression (or boolean (integer -1 9)))
+    (check-type compression (or boolean (integer -7 22)))
     #-sb-core-compression
     (when compression
-      (error "Unable to save compressed core: this runtime was not built with zlib support"))
+      (error "Unable to save compressed core: this runtime was not built with zstd support"))
     (when *dribble-stream*
       (restart-case (error "Dribbling to ~s is enabled." (pathname *dribble-stream*))
         (continue ()
@@ -227,17 +225,13 @@ sufficiently motivated to do lengthy fixes."
           :report "Abort saving the core."
           (return-from save-lisp-and-die))))
     (when (eql t compression)
-      (setf compression -1))
+      (setf compression 9))
     (flet ((foreign-bool (value)
              (if value 1 0)))
       (let ((name (native-namestring (physicalize-pathname core-file-name)
                                      :as-file t))
             (startfun (start-lisp toplevel callable-exports)))
         (deinit)
-        ;; FIXME: Would it be possible to unmix the PURIFY logic from this
-        ;; function, and just do a GC :FULL T here? (Then if the user wanted
-        ;; a PURIFYed image, he'd just run PURIFY immediately before calling
-        ;; SAVE-LISP-AND-DIE.)
         #+gencgc
         (progn
           ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
@@ -260,6 +254,7 @@ sufficiently motivated to do lengthy fixes."
           ;; since the GC will invalidate the stack.
           (gc-and-save name
                        (foreign-bool executable)
+                       (foreign-bool purify)
                        (foreign-bool save-runtime-options)
                        (foreign-bool compression)
                        (or compression 0)
@@ -309,7 +304,7 @@ sufficiently motivated to do lengthy fixes."
   #-cheneygc (sb-c::coalesce-debug-info) ; Share even more things
 
   #+sb-fasteval (sb-interpreter::flush-everything)
-  (tune-hashtable-sizes-of-all-packages))
+  (tune-hashset-sizes-of-all-packages))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)
@@ -318,7 +313,7 @@ sufficiently motivated to do lengthy fixes."
   (let (error)
     (with-system-mutex (sb-thread::*make-thread-lock*)
       (finalizer-thread-stop)
-      #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
+      (sb-thread::%dispose-thread-structs)
       (let ((threads (sb-thread:list-all-threads))
             (starting
              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
@@ -338,147 +333,30 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  ;; To have any hope of making pathname interning actually work,
-  ;; this CLRHASH would need to be removed. But removing it causes excess
-  ;; garbage retention because weakness doesn't work. It's a catch-22.
-  (clrhash *pathnames*)
+  (when (zerop (hash-table-count sb-kernel::*forward-referenced-wrappers*))
+    ;; I think this table should always be empty but I'm not sure. If it is,
+    ;; recreate it so that we don't preserve an empty vector taking up 16KB
+    (setq sb-kernel::*forward-referenced-wrappers* (make-hash-table :test 'equal)))
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
-  ;; Clearing the hash caches must be done after coalescing ctype instances
-  ;; because coalescing compares by TYPE= which creates more cache entries.
-  (coalesce-ctypes)
+  (sb-kernel::rebuild-ctype-hashsets)
   (drop-all-hash-caches)
   (os-deinit)
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)
-  (invalidate-fd-streams)
   (finalizers-deinit)
+  ;; Try to shrink the pathname cache. It might be largely nulls
+  (rebuild-pathname-cache)
+  (sb-vm::restore-cpu-specific-routines)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
+  (setf sb-c::*compile-elapsed-time* 0
+        sb-c::*compile-file-elapsed-time* 0)
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
-
-;;; Try to produce a unique representative of each ctype in memory as
-;;; compared by TYPE=, redirecting references on to the chosen representative.
-;;; In the base SBCL image this removes about 400 ctypes instances.
-;;; When saving a large application it can (and does) remove thousands more.
-;;; This is actually not about space saving, but reducing non-determinism.
-;;; Because of the random nature of the type caches (using opaque hashes that
-;;; are generated based on memory address) it's totally arbitrary when we create
-;;; new instances of ctypes. Coalescing tries to make it less so.  As to
-;;; reproducibility, the fact that type-hash-value is an unintelligent key
-;;; is a big problem. I can't think of how to easily make it intelligent,
-;;; but it might work to zero them all out, and restore the hash on demand
-;;; (much the way symbol-hash is lazily computed) which ought to be fine
-;;; since all hash caches start out empty.
-;;;
-;;; To make this even more aggressive, it should coalesce "bottom up"
-;;; so that ctypes contained in other ctypes would be uniquified first.
-;;; The algorithm is too naive to do that at present.
-;;;
-;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
-;;; exhaustion (due to inhibited GC), so this takes several passes.
-(defun coalesce-ctypes (&optional verbose)
-  (declare (optimize (sb-c::aref-trapping 0)))
-  (let* ((table (make-hash-table :test 'equal))
-         interned-ctypes
-         referencing-objects)
-    (labels ((interesting-subpart-p (part)
-               ;; Heap objects can point to "dead" stack objects - those
-               ;; from a no-longer-existing stack frame - so only examine
-               ;; outgoing references within the dynamic space.
-               ;; As to why the pointing object didn't die - who knows?
-               (and (eq (heap-allocated-p part) :dynamic)
-                    (typep part 'ctype)
-                    ;; PART is not interesting if it points to an interned
-                    ;; ctype, because that's already a canonical object.
-                    (not (minusp (type-hash-value part)))))
-             (coalesce (type &aux
-                               ;; Deal with ctypes instances whose unparser fails.
-                               (spec (and (not (contains-unknown-type-p type))
-                                          (ignore-errors (type-specifier type)))))
-               ;; There are ctypes that unparse to the same s-expression
-               ;; but are *NOT* TYPE=. Some examples:
-               ;;   classoid LIST  vs UNION-TYPE LIST  = (OR CONS NULL)
-               ;;   classoid FLOAT vs UNION-TYPE FLOAT = (OR SINGLE-FLOAT DOUBLE-FLOAT)
-               ;;   classoid REAL  vs UNION-TYPE REAL  = (OR FLOAT RATIONAL)
-               ;;   classoid RATIO vs INTERSECTION-TYPE RATIO = (AND RATIONAL (NOT INTEGER))
-               (if spec
-                   (dolist (choice (gethash spec table)
-                                   (progn (push type (gethash spec table))
-                                          type))
-                     (when (type= choice type)
-                       (return choice)))
-                   type)))
-      ;; Start by collecting interned types, as well as any object that points
-      ;; to a ctype.
-      ;; Interned ctypes (mostly classoids, but a few others) have the aspect
-      ;; that if two specifiers are equal, then they map to the same internal
-      ;; object. This does not discount the possibility that some other ctype
-      ;; could be EQ to that type, as occurs with array upgrading.
-      (sb-vm:map-allocated-objects
-       (lambda (obj type size)
-         (declare (ignore type size))
-         (when (and (typep obj 'ctype) (minusp (type-hash-value obj)))
-           (push obj interned-ctypes))
-         (macrolet ((examine (form)
-                      ;; when the subpart of OBJ is possibly going
-                      ;; to get coalesced, then record OBJ.
-                      `(when (interesting-subpart-p ,form)
-                         (push obj referencing-objects)
-                         (return-from skip))))
-           ;; Wrap a block named other than NIL since
-           ;; DO-REFERENCED-OBJECTS has several named NIL.
-           (block skip (sb-vm:do-referenced-object (obj examine)))))
-       :all)
-      (when verbose
-        (format t "Found ~d interned types, ~d referencing objects~%"
-                (length interned-ctypes) (length referencing-objects)))
-      (dolist (type interned-ctypes)
-        (setf (gethash (type-specifier type) table) (list type)))
-      (dolist (obj referencing-objects)
-        (let (written)
-          (macrolet ((examine (form &aux (accessor (if (listp form) (car form))))
-                       (cond
-                         ((not (listp form))
-                          ;; do-closure-values passes an access form that
-                          ;; can't be inverted to a writing form
-                          `(progn ,form nil))
-                         ((eq accessor 'data-vector-ref)
-                          `(let ((part ,form))
-                             (when (interesting-subpart-p part)
-                               (let ((new (coalesce part)))
-                                 (unless (eq new part)
-                                   (setf (svref obj ,(caddr form)) new
-                                         written t))))))
-                         ((and (eq accessor '%primitive)
-                               (eq (cadr form) 'sb-c:fast-symbol-global-value))
-                          `(let ((part ,form))
-                             (when (interesting-subpart-p part)
-                               ;; just do it - skip the attempt-to-modify check
-                               (%set-symbol-global-value obj (coalesce part)))))
-                         ((not (memq accessor
-                                     '(%closure-fun
-                                       %fun-layout %instance-layout
-                                       symbol-package symbol-name symbol-%info
-                                       fdefn-name
-                                       %numerator %denominator
-                                       %realpart %imagpart
-                                       %make-lisp-obj ; fdefn referent
-                                       ;; hope no weak pointers point at ctypes
-                                       weak-pointer-value)))
-                          `(let ((part ,form))
-                             (when (interesting-subpart-p part)
-                               (setf ,form (coalesce part))))))))
-            (sb-vm:do-referenced-object (obj examine)
-              (simple-vector
-               :extend
-               (when (and written (logtest sb-vm:vector-addr-hashing-flag
-                                           (get-header-data obj)))
-                 (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::
 (defun coalesce-debug-info ()
@@ -503,9 +381,7 @@ sb-c::
            (let ((di (sb-vm::%%code-debug-info obj)))
              ;; Discard memoized debugger's debug info
              (when (typep di 'sb-c::compiled-debug-info)
-               (let ((thing (sb-c::compiled-debug-info-tlf-num+offset di)))
-                 (when (consp thing)
-                   (setf (sb-c::compiled-debug-info-tlf-num+offset di) (car thing))))))
+               (setf (sb-c::compiled-debug-info-memo-cell di) nil)))
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))
@@ -635,7 +511,7 @@ sb-c::
             (callees (cdr item)))
         (dolist (callee callees)
           (push caller (gethash callee reverse-graph)))))
-    ;; Compute popularity of each code component in varyobj space
+    ;; Compute popularity of each code component in text space
     (map-allocated-objects
      (lambda (obj type size)
        (declare (ignore size))

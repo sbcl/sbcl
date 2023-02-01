@@ -424,6 +424,7 @@
            (type segment segment))
   (setf (dstate-segment dstate) segment)
   (setf (dstate-inst-properties dstate) 0)
+  (setf (dstate-known-register-contents dstate) nil)
   (setf (dstate-cur-offs-hooks dstate)
         (stable-sort (nreverse (copy-list (seg-hooks segment)))
                      (lambda (oh1 oh2)
@@ -1797,6 +1798,8 @@
                   ))))
         (no-debug-blocks () nil)))))
 
+;;; Disabled because it produces poor annotations, especially around
+;;; macros.
 (defvar *disassemble-annotate* nil
   "Annotate DISASSEMBLE output with source code.")
 
@@ -2016,6 +2019,8 @@
       (sb-pcl::%method-function
        ;; user's code is in the fast-function
        (cons fun (recurse (sb-pcl::%method-function-fast-function fun))))
+      (funcallable-instance
+       (list (%funcallable-instance-fun fun)))
       (function
        (list fun)))))
 
@@ -2219,7 +2224,7 @@
       ;; is compiled, so don't fail in function-raw-address.
       (when (fboundp name)
         (let ((address
-               #+immobile-code (sb-vm::function-raw-address name)
+               #+immobile-code (sb-vm::function-raw-address name :rel32)
                #-immobile-code (+ sb-vm:nil-value (sb-vm:static-fun-offset name))))
           (setf (gethash address addr->name) name))))
     ;; Not really a routine, but it uses the similar logic for annotations
@@ -2339,6 +2344,14 @@
 
 (defun note-code-constant (location dstate &optional (how :relative))
   (declare (type disassem-state dstate))
+  (multiple-value-bind (const valid)
+      (code-constant-value location dstate how)
+    (when valid
+      (note (lambda (stream) (prin1-quoted-short const stream)) dstate)
+      (values const t))))
+
+(defun code-constant-value (location dstate &optional (how :relative))
+  (declare (type disassem-state dstate))
   (binding* ((code (seg-code (dstate-segment dstate)))
              ((addr index)
               (ecase how
@@ -2368,9 +2381,7 @@
     (cond ((and code (< 1 index (code-header-words code)))
            (when addr ; ADDR must be word-aligned to be sensible
              (aver (not (logtest addr (ash sb-vm:lowtag-mask -1)))))
-           (let ((const (code-header-ref code index)))
-             (note (lambda (stream) (prin1-quoted-short const stream)) dstate)
-             (values const t)))
+           (values (code-header-ref code index) t))
           (t
            (values nil nil)))))
 
@@ -2532,32 +2543,7 @@
              (dovector (symbol sb-vm:+static-symbols+)
                (when (= (get-lisp-obj-address symbol) address)
                  (return-from found symbol))))
-           ;; Guess whether 'address' is an immobile-space symbol by looking at
-           ;; code header constants. If it matches any constant, assume that it
-           ;; is a use of the constant.  This has false positives of course,
-           ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
-           ;; used in an unboxed context, such as an ADD instruction,
-           ;; might be wrongly construed as an address.
-           #+immobile-space
-           (let ((code (seg-code (dstate-segment dstate))))
-             (when code
-               (loop for i downfrom (1- (code-header-words code))
-                     to sb-vm:code-constants-offset
-                     for const = (code-header-ref code i)
-                     when (eql (get-lisp-obj-address const) address)
-                     do (return-from found const))
-               ;; Kludge: layout of STREAM, FILE-STREAM, and STRING-STREAM can be used
-               ;; as immediate operands without a corresponding boxed header constant.
-               ;; I think we always elide the boxed constant for builtin layouts,
-               ;; but these three have some slightly unusual codegen that causes a PUSH
-               ;; instruction to need some help to show its operand as a lisp object.
-               (dolist (thing (load-time-value (list (find-layout 'stream)
-                                                     (find-layout 'file-stream)
-                                                     (find-layout 'string-stream))
-                                               t))
-                 (when (eql (get-lisp-obj-address thing) address)
-                   (return-from found thing)))))
-           (return-from maybe-note-static-symbol))))
+          (return-from maybe-note-static-symbol))))
     (note (lambda (s) (prin1 symbol s)) dstate)))
 
 (defun get-internal-error-name (errnum)
@@ -2727,13 +2713,14 @@
   ;; nontrivial, the code-generating code is not so useful after the
   ;; initial instruction space is built, so it can all be removed.
   ;; But if you need all these macros to exist for some reason,
-  ;; then define one of the two following features to keep them:
-  #-(or sb-fluid sb-retain-assembler-macros)
+  ;; then define the following feature to keep them:
+  #-sb-retain-assembler-macros
   (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))
 
 ;; Remove macros that only make sense with metadata available.
 ;; Tree shaker will remove everything that the macros depended on.
-(push '("SB-DISASSEM" define-arg-type define-instruction-format)
+(push '("SB-DISASSEM" define-arg-type define-instruction-format
+        gen-arg-forms %gen-arg-forms)
       *!removable-symbols*)

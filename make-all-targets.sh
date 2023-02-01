@@ -1,5 +1,6 @@
 #!/bin/sh
 
+rm -fr obj/xbuild
 mkdir -p obj/xbuild
 
 make -k -j9 -f crossbuild-runner/Makefile \

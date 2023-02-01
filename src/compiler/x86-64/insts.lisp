@@ -190,8 +190,11 @@
                    value))
   :printer (lambda (value stream dstate)
              (cond (stream
+                    ;; This use of MAYBE-NOTE-STATIC-LISPOBJ gets us the
+                    ;; code blob called using canonical 'CALL rel32' form.
                     (or #+immobile-space
-                        (and (integerp value) (maybe-note-lisp-callee value dstate))
+                        (and (integerp value)
+                             (maybe-note-static-lispobj value dstate))
                         (maybe-note-assembler-routine value nil dstate))
                     (print-label value stream dstate))
                    (t
@@ -248,13 +251,9 @@
                    ;; if it is in a location corresponding to an absolute code fixup.
                    (if (and (memq size '(:dword :qword))
                             (memq opcode '(mov cmp push))
-                            (maybe-note-static-symbol value dstate))
+                            (maybe-note-static-lispobj value dstate t))
                        (princ16 value stream)
                        (princ value stream))))))
-
-(define-arg-type signed-imm-data/asm-routine
-  :type 'signed-imm-data
-  :printer #'print-imm/asm-routine)
 
 ;;; Used by those instructions that have a default operand size of
 ;;; :qword. Nevertheless the immediate is at most of size :dword.
@@ -479,7 +478,7 @@
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
            :type 'reg/mem :reader regrm-inst-r/m)
-  (reg     :field (byte 3 11)   :type 'reg)
+  (reg     :field (byte 3 11)   :type 'reg :reader regrm-inst-reg)
   ;; optional fields
   (imm))
 
@@ -517,13 +516,6 @@
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
   (imm     :type 'signed-imm-data))
-
-(define-instruction-format (reg/mem-imm/asm-routine 16
-                                        :include reg/mem-imm
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " imm))
-  (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'signed-imm-data/asm-routine))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (define-instruction-format
@@ -860,14 +852,14 @@
 ;;;; fixup emitters
 
 (defun emit-absolute-fixup (segment fixup &optional quad-p)
-  (note-fixup segment (if quad-p :absolute64 :absolute) fixup)
+  (note-fixup segment (if quad-p :absolute :abs32) fixup)
   (let ((offset (fixup-offset fixup)))
     (if quad-p
         (emit-qword segment offset)
         (emit-signed-dword segment offset))))
 
 (defun emit-relative-fixup (segment fixup)
-  (note-fixup segment :relative fixup)
+  (note-fixup segment :rel32 fixup)
   (emit-signed-dword segment (fixup-offset fixup)))
 
 
@@ -1400,12 +1392,12 @@
   (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
                                          (dstate-setprop dstate +allow-qword-imm+)
                                          value))
-                 (imm nil :type 'signed-imm-data/asm-routine))
+                 (imm nil :type 'signed-imm-data))
             '(:name :tab reg ", " imm))
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
-  (:printer reg/mem-imm/asm-routine ((op '(#b1100011 #b000))))
+  (:printer reg/mem-imm ((op '(#b1100011 #b000))))
   (:emitter
    (let ((size (pick-operand-size prefix dst src)))
      (emit-mov segment size (sized-thing dst size) (sized-thing src size)))))
@@ -1793,15 +1785,6 @@
     (:printer reg/mem ((op '(#b1111111 #b001))))
     (:emitter (emit* segment prefix dst #b1111111 #b001))))
 
-(define-instruction mul (segment dst src)
-  (:printer accum-reg/mem ((op '(#b1111011 #b100))))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (aver (accumulator-p dst))
-     (emit-prefixes segment src nil size)
-     (emit-byte segment (opcode+size-bit #xF6 size))
-     (emit-ea segment src #b100))))
-
 (define-instruction-format (imul-3-operand 16 :include reg-reg/mem)
   (op    :fields (list (byte 6 2) (byte 1 0)) :value '(#b011010 1))
   (width :field (byte 1 1)
@@ -1816,17 +1799,19 @@
                       (min 4 (size-nbyte (inst-operand-size dstate))))))
              (read-signed-suffix (* nbytes 8) dstate)))))
 
-(define-instruction imul (segment dst &optional src imm)
-  ;; default accum-reg/mem printer is wrong here because 1-operand imul
-  ;; is very different from 2-operand, not merely a shorter syntax for it.
-  (:printer accum-reg/mem ((op '(#b1111011 #b101))) '(:name :tab reg/mem))
+(define-instruction imul (segment &prefix prefix dst &optional src imm)
+  ;; 1-operand form of IMUL produces a double-precision result in rDX:rAX.
+  ;; The default accum-reg/mem printer would be very misleading, as it would print
+  ;; something like "IMUL EAX, [mem]" which implies a 32-bit result.
+  (:printer accum-reg/mem ((op '(#b1111011 #b101)))
+            '(:name :tab (:using #'print-sized-reg/mem reg/mem)))
   (:printer ext-reg-reg/mem-no-width ((op #xAF))) ; 2-operand
   (:printer imul-3-operand () '(:name :tab reg ", " reg/mem ", " imm))
   (:emitter
-   (let ((operand-size (matching-operand-size dst src)))
+   (let ((operand-size (pick-operand-size prefix dst src)))
      (cond ((not src) ; 1-operand form affects RDX:RAX or subregisters thereof
             (aver (not imm))
-            (emit-prefixes segment dst nil operand-size)
+            (emit-prefixes segment dst nil (or operand-size :qword))
             (emit-byte segment (opcode+size-bit #xF6 operand-size))
             (emit-ea segment dst #b101))
            (t
@@ -1844,18 +1829,24 @@
               (if imm
                   (emit-imm-operand segment imm imm-size))))))))
 
-(flet ((emit* (segment dst src subcode)
-         (let ((size (matching-operand-size dst src)))
-           (aver (accumulator-p dst))
+(flet ((emit* (segment subcode prefix src junk)
+         (when junk
+           (warn "Do not supply 2 operands to 1-operand MUL,DIV")
+           (aver (accumulator-p src))
+           (setq src junk))
+         (let ((size (pick-operand-size prefix src)))
            (emit-prefixes segment src nil size)
            (emit-byte segment (opcode+size-bit #xF6 size))
            (emit-ea segment src subcode))))
-  (define-instruction div (segment dst src)
+  (define-instruction mul (segment &prefix prefix src &optional junk)
+    (:printer accum-reg/mem ((op '(#b1111011 #b100))))
+    (:emitter (emit* segment #b100 prefix src junk)))
+  (define-instruction div (segment &prefix prefix src &optional junk)
     (:printer accum-reg/mem ((op '(#b1111011 #b110))))
-    (:emitter (emit* segment dst src #b110)))
-  (define-instruction idiv (segment dst src)
+    (:emitter (emit* segment #b110 prefix src junk)))
+  (define-instruction idiv (segment &prefix prefix src &optional junk)
     (:printer accum-reg/mem ((op '(#b1111011 #b111))))
-    (:emitter (emit* segment dst src #b111))))
+    (:emitter (emit* segment #b111 prefix src junk))))
 
 (define-instruction bswap (segment &prefix prefix dst)
   (:printer ext-reg-no-width ((op #b11001)))
@@ -2770,10 +2761,14 @@
          (setq dst (sized-thing dst size)
                src (sized-thing src size))
          (cond ((xmm-register-p dst)
-                (emit-sse-inst segment dst src #x66 #x6e))
+                (emit-sse-inst segment dst src #x66 #x6e
+                               :operand-size (and (ea-p src)
+                                                  :do-not-set)))
                (t
                 (aver (xmm-register-p src))
-                (emit-sse-inst segment src dst #x66 #x7e)))))
+                (emit-sse-inst segment src dst #x66 #x7e
+                               :operand-size (and (ea-p dst)
+                                                  :do-not-set))))))
   (define-instruction movd (segment dst src)
     (:emitter (move-xmm<->gpr segment dst src :dword))
     . #.(append (sse-inst-printer 'xmm-reg/mem #x66 #x6e
@@ -3319,62 +3314,57 @@
 ;;; The code object we're fixing up is pinned whenever this is called.
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (sb-vm::with-code-instructions (sap code)
-    (when (eq flavor :gc-barrier)
-      ;; the VALUE is nbits, so convert it to an AND mask
-      (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
-      (return-from fixup-code-object :immediate))
-    ;; All x86-64 fixup locations contain an implicit addend at the location
-    ;; to be fixed up. The addend is always zero for certain <KIND,FLAVOR> pairs,
-    ;; but we don't need to assert that.
-    (incf value (if (eq kind :absolute64)
-                    (signed-sap-ref-64 sap offset)
-                    (signed-sap-ref-32 sap offset)))
-    (ecase kind
-     (:absolute ; 32 bits. most are unsigned, except :layout-id which is signed
-      (if (eq flavor :layout-id)
-          (setf (signed-sap-ref-32 sap offset) value)
-          (setf (sap-ref-32 sap offset) value)))
-     (:relative
-      ;; Replace word with the difference between VALUE and current pc.
-      ;; JMP/CALL are relative to the next instruction,
-      ;; so add 4 bytes for the size of the displacement itself.
-      ;; Relative fixups don't exist with movable code,
-      ;; so in the #-immobile-code case, there's nothing to assert.
-      #+(and immobile-code (not sb-xc-host))
-      (unless (immobile-space-obj-p code)
-        (error "Can't compute fixup relative to movable object ~S" code))
-      (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
-     (:absolute64
-      ;; These are used for jump tables and are not recorded in code fixups.
-      ;; GC knows to adjust the values if code is moved.
-      (setf (sap-ref-64 sap offset) value))))
-  #-immobile-code
-  ;; Change asm routine indirect calls to not store the fixup,
-  ;; because the indirect address is in static space.
-  (when (and (eq flavor :assembly-routine*) (eq kind :absolute)) (setq kind :static))
+  (let ((sap (code-instructions code)))
+    (case flavor
+      (:gc-barrier ; the VALUE is nbits, so convert it to an AND mask
+       (setf (sap-ref-32 sap offset) (1- (ash 1 value))))
+      (:layout-id ; layout IDs are signed quantities on x86-64
+       (setf (signed-sap-ref-32 sap offset) value))
+      (:alien-data-linkage-index
+       (setf (sap-ref-32 sap offset) (* value alien-linkage-table-entry-size)))
+      (:alien-code-linkage-index
+       (let ((addend (sap-ref-32 sap offset)))
+         (setf (sap-ref-32 sap offset) (+ (* value alien-linkage-table-entry-size) addend))))
+      (t
+       ;; All x86-64 fixup locations contain an implicit addend at the location
+       ;; to be fixed up. The addend is always zero for certain <KIND,FLAVOR> pairs,
+       ;; but we don't need to assert that.
+       (incf value (if (eq kind :absolute)
+                       (signed-sap-ref-64 sap offset)
+                       (signed-sap-ref-32 sap offset)))
+       (ecase kind
+         (:abs32 ; 32 unsigned bits
+          (setf (sap-ref-32 sap offset) value))
+         (:rel32
+          ;; Replace word with the difference between VALUE and current pc.
+          ;; JMP/CALL are relative to the next instruction,
+          ;; so add 4 bytes for the size of the displacement itself.
+          ;; Relative fixups don't exist with movable code,
+          ;; so in the #-immobile-code case, there's nothing to assert.
+          #+(and immobile-code (not sb-xc-host))
+          (unless (immobile-space-obj-p code)
+            (error "Can't compute fixup relative to movable object ~S" code))
+          (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
+         (:absolute
+          ;; These are used for jump tables and are not recorded in %code-fixups.
+          ;; GC knows to adjust the values if code is moved.
+          (setf (sap-ref-64 sap offset) value))))))
+  nil)
+
+(defun sb-c::pack-retained-fixups (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
-  ;; Note that:
-  ;;  (1) Call fixups occur in both :RELATIVE and :ABSOLUTE kinds.
-  ;;      We can ignore the :RELATIVE kind, except for foreign call,
-  ;;      as those point to the linkage table which has an absolute address
-  ;;      and therefore might change in displacement from the call site
-  ;;      if the immobile code space is relocated on startup.
-  ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
-  #+immobile-space
-  (return-from fixup-code-object
-    (case flavor
-      ((:named-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
-        :assembly-routine :assembly-routine* :static-call) ; -> varyobj subspace
-       (if (eq kind :absolute) :absolute))
-      (:foreign
-       ;; linkage-table calls using the "CALL rel32" format need to be saved,
-       ;; because the linkage table resides at a fixed address.
-       ;; Space defragmentation can handle the fixup automatically,
-       ;; but core relocation can't - it can't find all the call sites.
-       (if (eq kind :relative) :relative))))
-  nil) ; non-immobile-space builds never record code fixups
+  ;; Note that call fixups occur in both :REL32 and :ABS32 kinds. We can ignore the :REL32 kind.
+  (dolist (note fixup-notes (sb-c:pack-code-fixup-locs abs32-fixups nil imm-fixups))
+    (let* ((fixup (fixup-note-fixup note))
+           (offset (fixup-note-position note))
+           (flavor (fixup-flavor fixup)))
+      (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
+            #+immobile-space
+            ((and (eq (fixup-note-kind note) :abs32)
+                  (memq flavor ; these all point to fixedobj space
+                        '(:fdefn-call :layout :immobile-symbol :symbol-value)))
+             (push offset abs32-fixups))))))
 
 ;;; Coverage support
 
@@ -3432,7 +3422,9 @@
                (location= dst2 dst1)
                (eq size1 :qword)
                (eq size2 :dword))
-      (setf (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,src1))
+      (setf (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,(if (integerp src1)
+                                                                   (ldb (byte 32 0) src1)
+                                                                   src1)))
       next)))
 
 ;;; "AND r, imm1" + "AND r, imm2" -> "AND r, (imm1 & imm2)"

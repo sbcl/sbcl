@@ -13,6 +13,8 @@
 
 ;;;; general warm init compilation policy
 
+(defvar *objfile-prefix* "obj/from-self/")
+
 ;;; First things first, bootstrap the WARNING handler.
 sb-kernel::
 (setq **initial-handler-clusters**
@@ -51,7 +53,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
   (assert (= (logand byte sb-vm:lowtag-mask) sb-vm:list-pointer-lowtag)))
 (gc :full t)
 
-;;; Verify that all defstructs except for one were compiled in a null lexical
+;;; Verify that all defstructs with a few exceptions were compiled in a null lexical
 ;;; environment. Compiling any call to a structure constructor would like to
 ;;; know whether some slots get their default value especially if the default
 ;;; is incompatible with the slot type (consider MISSING-ARG, e.g).
@@ -61,12 +63,14 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
   (do-all-symbols (s)
     (let ((dd (sb-kernel:find-defstruct-description s nil)))
       (when (and dd (not (sb-kernel::dd-null-lexenv-p dd)))
-        (let ((pkg (symbol-package (sb-kernel:dd-name dd))))
-          (unless (member (package-name pkg)
-                          '("SB-RBTREE.WORD" "SB-RBTREE.MAP")
-                          :test 'string=)
-            (push (sb-kernel:dd-name dd) result))))))
-  (assert (equal result '(sb-c::conset))))
+        (push (sb-kernel:dd-name dd) result))))
+  (assert (null (set-difference
+                 result
+                 '(sb-c::conset sb-kernel:args-type
+                   sb-kernel:array-type
+                   sb-kernel:character-set-type
+                   sb-kernel:numeric-type
+                   sb-kernel:member-type)))))
 
 ;;; Assert that genesis preserved shadowing symbols.
 (let ((p sb-assem::*backend-instruction-set-package*))
@@ -84,7 +88,17 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
       ;; in case there is more than one set of floating-point formats.
       (assert (eq (read stream) :default))
       (sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
-        (let ((*package* (find-package "SB-KERNEL")))
+        (let ((*readtable* (copy-readtable))
+              (*package* (find-package "SB-KERNEL")))
+          (set-dispatch-macro-character
+           #\# #\. (lambda (stream subchar arg)
+                     (declare (ignore subchar arg))
+                     (let ((expr (read stream t nil t)))
+                       (ecase (car expr)
+                         (sb-kernel:make-single-float
+                          (sb-kernel:make-single-float (second expr)))
+                         (sb-kernel:make-double-float
+                          (sb-kernel:make-double-float (second expr) (third expr)))))))
           (dolist (expr (read stream))
             (destructuring-bind (fun args . result) expr
               (let ((result (if (eq (first result) 'sb-kernel::&values)
@@ -151,8 +165,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                    (concatenate 'string *sbclroot* stem)
                    :output-file
                    (merge-pathnames
-                    (concatenate
-                     'string sb-fasl::*!target-obj-prefix*
+                    (concatenate 'string *objfile-prefix*
                      (subseq stem 0 (1+ (position #\/ stem :from-end t))))))))
            (flet ((report-recompile-restart (stream)
                     (format stream "Recompile file ~S" stem))
@@ -164,6 +177,9 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
+                            (sb-c::*force-system-tlab*
+                             (or (search "src/pcl" stem)
+                                 (search "src/code/aprof" stem)))
                             (sb-ext:*derive-function-types*
                               (unless (search "/pcl/" stem)
                                 t)))
@@ -201,6 +217,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                          ;; rather than asking what to do here?
                          #+(or x86 x86-64) ;; these should complete without warnings
                          (cerror "Ignore warnings" "Compile completed with warnings")))
+                  #+nil (sb-impl::show-hash-cache-statistics)
                   (unless (handler-bind
                               ((sb-kernel:redefinition-with-defgeneric
                                 #'muffle-warning))
@@ -236,7 +253,8 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
     (let (list)
       (sb-int:dohash ((name vop) sb-c::*backend-parsed-vops*)
         (declare (ignore vop))
-        (push (cons (gethash name sb-c::*static-vop-usage-counts* 0) name) list))
+        (unless (char= (char (string name) 0) #\!)
+          (push (cons (gethash name sb-c::*static-vop-usage-counts* 0) name) list)))
       (dolist (cell (sort list #'> :key #'car))
         (format output "~7d ~s~%" (car cell) (cdr cell))))))
 

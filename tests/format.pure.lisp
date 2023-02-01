@@ -150,3 +150,10 @@
              (format nil control-string '(1 2)))))
       (assert (string= s1 "hello (1 2)"))
       (assert (string= s2 "Yello (1 2)")))))
+
+(with-test (:name :return-value)
+  (let ((formatter (funcall (checked-compile `(lambda () (formatter "~a"))))))
+    (with-output-to-string (s)
+      (assert (null (funcall formatter s 1)))
+      (assert (equal (funcall formatter s 1 2) '(2))))
+    (assert (null (format (make-array 3 :element-type 'character :fill-pointer 0) formatter 1 2)))))

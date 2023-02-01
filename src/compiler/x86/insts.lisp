@@ -2406,32 +2406,21 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  #+sb-xc-host (declare (notinline code-object-size)) ; forward ref
-  (sb-vm::with-code-instructions (sap code)
-    (when (eq flavor :gc-barrier)
-      ;; the VALUE is nbits, so convert it to an AND mask
-      (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
-      (return-from fixup-code-object :immediate))
+  (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
        (case flavor
          (:layout-id
-          (setf (signed-sap-ref-32 sap offset) value)
-          nil) ; do not record this
+          (setf (signed-sap-ref-32 sap offset) value))
+         (:gc-barrier
+          ;; the VALUE is nbits, so convert it to an AND mask
+          (setf (sap-ref-32 sap offset) (1- (ash 1 value))))
          (t
-          ;; Word at sap + offset contains a value to be replaced by
-          ;; adding that value to fixup.
-          (let ((final-val (+ value (sap-ref-32 sap offset))))
-            (setf (sap-ref-32 sap offset) final-val)
-            ;; Record absolute fixups that point into CODE itself, with one
-            ;; exception: fixups within the range of unboxed words containing
-            ;; jump tables are automatically adjusted if the code moves.
-            (and (sb-vm::self-referential-code-fixup-p final-val code)
-                 (>= offset (ash (code-jump-table-words code) word-shift))
-                 :absolute)))))
+          ;; 32-bit quantity at SAP + offset contains an
+          ;; addend to be replaced by adding it to VALUE.
+          (setf (sap-ref-32 sap offset) (+ value (sap-ref-32 sap offset))))))
       (:relative
        ;; VALUE is the actual address wanted.
        ;; Replace word with displacement to get there.
@@ -2443,11 +2432,34 @@
               ;; The CPU calculates based off the next instruction.
               (rel-val (ldb (byte 32 0) (- value loc-sap 4))))
          (declare (type (unsigned-byte 32) loc-sap rel-val))
-         (setf (sap-ref-32 sap offset) rel-val))
-       ;; Record relative fixups pointing outside of this object.
-       (when (eq (sb-vm::containing-memory-space code) :dynamic)
-         (aver (not (sb-vm::self-referential-code-fixup-p value code)))
-         :relative)))))
+         (setf (sap-ref-32 sap offset) rel-val)))))
+  nil)
+
+(defun sb-c::pack-retained-fixups (fixup-notes)
+  (let (abs-fixups rel-fixups imm-fixups)
+    (dolist (note fixup-notes)
+      (let* ((fixup (fixup-note-fixup note))
+             (offset (fixup-note-position note))
+             (kind (fixup-note-kind note))
+             (flavor (fixup-flavor fixup)))
+        (cond ((and (eq kind :absolute) (eq flavor :code-object))
+               ;; If there are N jump table entries, then any code-object fixups occurring
+               ;; at offsets 4, 8, 12, ..., 4*N are to patch in the jump vectors, and
+               ;; do need need to be explicitly retained. GC knows how to fix them again.
+               ;; (Offset 0 is the jump table count word)
+               ;; We care where the patch occurs, and NOT where the patch points to.
+               (unless (<= offset (* sb-vm:n-word-bytes (sb-c::component-n-jump-table-entries)))
+                 (push offset abs-fixups)))
+              ((and (eq kind :relative) (member flavor '(:assembly-routine :foreign)))
+               (push offset rel-fixups))
+              ((eq flavor :gc-barrier)
+               (push offset imm-fixups))
+              ((or (and (eq kind :absolute)
+                        (member flavor '(:assembly-routine :foreign :foreign-dataref)))
+                   (member flavor '(:layout-id :symbol-tls-index)))) ; discard
+              (t
+               (bug "Unexpected fixup")))))
+    (sb-c:pack-code-fixup-locs abs-fixups rel-fixups imm-fixups)))
 
 ;;; Coverage support
 

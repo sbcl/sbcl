@@ -16,8 +16,7 @@
            sb-vm:instance-widetag sb-vm:instance-pointer-lowtag nil)
 
 (defoptimizer (%make-structure-instance stack-allocate-result)
-    ((defstruct-description &rest args) node dx)
-  (declare (ignore args dx))
+    ((defstruct-description &rest args))
   (aver (constant-lvar-p defstruct-description))
   ;; A structure instance can be stack-allocated if it has no raw
   ;; slots, or if we're on a target with a conservatively-scavenged
@@ -29,14 +28,11 @@
       (not (dd-has-raw-slot-p (lvar-value defstruct-description)))))
 
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
-  (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
 #+(and gencgc c-stack-is-control-stack)
 (defoptimizer (%make-instance/mixed stack-allocate-result) ((n) node dx)
-  (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
 (defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)
-  (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
@@ -195,8 +191,7 @@
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
-    ((dd slot-specs &rest args) node block name words type lowtag inits)
-  (declare (ignore inits))
+    ((dd slot-specs &rest args) node block name words type lowtag)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
@@ -297,7 +292,10 @@
               ;; Nonetheless it's far better than it was. In all other scenarios, don't pass
               ;; a constant TN, because we don't know that generated code is better.
               (cond #+x86-64 ; still moar cringe
-                    ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value))
+                    ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value)
+                          ;; check for constant named-ness to not
+                          ;; trigger load form processing.
+                          (not (leaf-has-source-name-p (nth-value 1 (lvar-value value)))))
                      (funcall setter (tnify i) (emit-constant (lvar-value value))))
                     (t
                      ;; FIXME: for simple-vector, fixnums should get stored via an ANY-REG
@@ -343,12 +341,10 @@
                  node block (list value-tn) (node-lvar node))))))))
 
 ;;; Stack allocation optimizers per platform support
-(defoptimizer (make-array-header* stack-allocate-result) ((&rest args) node dx)
-    args dx
-    t)
+(defoptimizer (make-array-header* stack-allocate-result) ((&rest args))
+  t)
 (defoptimizer (allocate-vector stack-allocate-result)
       ((#+ubsan poisoned type length words) node dx)
-    (declare (ignorable #+ubsan poisoned type length))
     (and
      ;; Can't put unboxed data on the stack unless we scavenge it
      ;; conservatively.
@@ -368,7 +364,6 @@
                                            sb-vm:vector-data-offset)))))))
 (defoptimizer (allocate-vector ltn-annotate)
     ((#+ubsan poisoned type length words) call ltn-policy)
-  (declare (ignore #+ubsan poisoned type length words))
   (vectorish-ltn-annotate-helper call ltn-policy
                                  (if (sb-c:msan-unpoison sb-c:*compilation*)
                                      'sb-vm::allocate-vector-on-stack+msan-unpoison
@@ -391,30 +386,24 @@
         (annotate-1-value-lvar arg))))
 
 ;;; ...lists
-(progn
-  (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore dx))
-    (not (null args)))
-  (defoptimizer (list* stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore dx))
-    (not (null (rest args))))
-  (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore args dx))
-    t))
+
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
 
 ;;; ...conses
-(defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore args dx))
-    t)
-(defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore args dx))
-    t)
+(defoptimizer (cons stack-allocate-result) ((&rest args))
+  t)
+(defoptimizer (%make-complex stack-allocate-result) ((&rest args))
+  t)
 
 ;;; MAKE-LIST optimizations
 #+x86-64
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
-    (declare (ignore element))
     (or (eq dx 'truly-dynamic-extent)
         (zerop (policy node safety))
         ;; At most one page (this is more paranoid than %listify-rest-args).
@@ -426,7 +415,6 @@
                          (specifier-type
                           `(integer 0 ,(/ +backend-page-bytes+ sb-vm:n-word-bytes 2))))))
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
-    (declare (ignore length element))
     (vectorish-ltn-annotate-helper call ltn-policy
                                    'sb-vm::allocate-list-on-stack
                                    'sb-vm::allocate-list-on-heap)))
@@ -490,3 +478,35 @@
                     (primitive-object-slots (primitive-object 'array)))
                '(fill-pointer elements data
                  displacement displaced-p displaced-from dimensions)))
+
+(define-vop (touch-object)
+  (:translate touch-object)
+  (:args (object))
+  (:ignore object)
+  (:policy :fast-safe)
+  (:arg-types t)
+  (:generator 0))
+
+#+(or x86 x86-64)
+(define-vop ()
+  (:translate touch-object-identity)
+  (:args (object :scs (descriptor-reg any-reg sap-reg
+                       signed-reg unsigned-reg)
+                 :target res))
+  (:policy :fast-safe)
+  (:results (res :scs (descriptor-reg)))
+  (:generator 0
+    (move res object)))
+
+;;; By pure coincidence, almost all the architectures that lack a +-MODFX vop
+;;; have an instruction named ADD with the same argument order.
+;;; MIPS needs to use ADDU to avoid trapping on overflow.
+#+(or arm mips ppc sparc)
+(define-vop (+-modfx)
+  (:translate +-modfx)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg)) (y :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:results (res :scs (any-reg)))
+  (:result-types fixnum)
+  (:generator 1 (inst #+mips addu #-mips add res x y)))

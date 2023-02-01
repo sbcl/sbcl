@@ -68,6 +68,7 @@
                      slots)))
         (inform slots #'sb-pcl::slot-reader-name reader-function-type)
         (inform slots #'sb-pcl::slot-boundp-name reader-function-type)
+        (inform slots #'sb-pcl::slot-makunbound-name reader-function-type)
         (inform slots #'sb-pcl::slot-writer-name writer-function-type)))))
 
 (defun %%compiler-defclass (name readers writers slots)
@@ -345,23 +346,22 @@
               (eq type t))
          '(function constantly-0))
         (t
-         (let* ((initform (if (eq type t)
-                              initform
-                              `(sb-c::with-source-form ,source-form
-                                (the* (,type :source-form ,initform
-                                       ;; Don't want to insert a cast,
-                                       ;; as a subclass may change the type,
-                                       ;; just report this at compile-time.
-                                             :use-annotations t)
-                                      ,initform))))
+         (let* ((initform `(sb-c::with-source-form ,source-form
+                             (the* (,type :source-form ,initform
+                                    ;; Don't want to insert a cast,
+                                    ;; as a subclass may change the type,
+                                    ;; just report this at compile-time.
+                                          :use-annotations t)
+                                   ,initform)))
                 (entry (assoc initform *initfunctions-for-this-defclass*
                               :test #'equal)))
            (unless entry
              (setq entry (list initform
                                (gensym)
-                               `(function (lambda ()
-                                  (declare (optimize
-                                            (sb-c:store-coverage-data 0)))
+                               `(function
+                                 (lambda ()
+                                  (declare (optimize (sb-c:store-coverage-data 0)
+                                                     (sb-c:verify-arg-count 0)))
                                   ,initform))))
              (push entry *initfunctions-for-this-defclass*))
            (cadr entry)))))

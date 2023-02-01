@@ -38,10 +38,10 @@
                   *the-class-standard-method*
                   *the-class-standard-reader-method*
                   *the-class-standard-writer-method*
-                  *the-class-standard-boundp-method*
                   *the-class-global-reader-method*
                   *the-class-global-writer-method*
                   *the-class-global-boundp-method*
+                  *the-class-global-makunbound-method*
                   *the-class-standard-generic-function*
                   *the-class-standard-direct-slot-definition*
                   *the-class-standard-effective-slot-definition*
@@ -218,7 +218,9 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-bitmap (wrapper-bitmap old-layout)))
+        ;; The "%" accessor reads the bitmap from the layout,
+        ;; not from its related defstruct-description.
+        (let ((old-bitmap (%layout-bitmap old-layout)))
           (unless (= old-bitmap bitmap)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
@@ -230,35 +232,43 @@ between the ~A definition and the ~A definition"
                 name old-context context)
           t))))
 
+;;; Used by the loader to forward-reference layouts for classes whose
+;;; definitions may not have been loaded yet. This allows type tests
+;;; to be loaded when the type definition hasn't been loaded yet.
+;;;
+;;; If we can't find any existing layout, then we create a new one
+;;; with the supplied information, storing it in
+;;; *FORWARD-REFERENCED-LAYOUTS*. If we can find the layout, then
+;;; return it, after checking for compatibility. If incompatible, we
+;;; allow the layout to be replaced, altered or left alone.
 (defun load-layout (name depthoid inherits length bitmap flags)
-  (let* ((layout
-          (or (binding* ((classoid (find-classoid name nil) :exit-if-null))
-                (classoid-wrapper classoid))
-              (let ((table *forward-referenced-wrappers*))
-                (with-world-lock ()
+  (let* ((table *forward-referenced-wrappers*)
+         (classoid (find-classoid name nil))  ; thread safety
+         (new-layout (make-layout (hash-layout-name name)
+                                  (or classoid (make-undefined-classoid name))
+                                  :depthoid depthoid :inherits inherits
+                                  :length length :bitmap bitmap :flags flags))
+         (existing-layout
+           (or (and classoid (classoid-wrapper classoid))
+               (with-world-lock ()
                  (let ((classoid (find-classoid name nil)))
+                   (when classoid
+                     (setf (wrapper-classoid new-layout) classoid))
                    (or (and classoid (classoid-wrapper classoid))
-                       (ensure-gethash
-                        name table
-                        (make-layout
-                         (hash-layout-name name)
-                         (or classoid (make-undefined-classoid name))
-                         :depthoid depthoid :inherits inherits
-                         :length length :bitmap bitmap :flags flags))))))))
+                       (ensure-gethash name table new-layout))))))
          (classoid
-          (or (find-classoid name nil) (wrapper-classoid layout))))
-    (if (or (eq (wrapper-invalid layout) :uninitialized)
-            (not *type-system-initialized*))
-        (setf (wrapper-classoid layout) classoid)
-        ;; There was an old layout already initialized with old
-        ;; information, and we'll now check that old information
-        ;; which was known with certainty is consistent with current
-        ;; information which is known with certainty.
-        (when (warn-if-altered-layout "current" layout "compile time"
-                                    length inherits depthoid bitmap)
-          (error "The loaded code expects an incompatible layout for class ~S."
-                 (wrapper-proper-name layout))))
-    layout))
+           (or (find-classoid name nil) (wrapper-classoid existing-layout))))
+    (cond ((or (eq (wrapper-invalid existing-layout) :uninitialized)
+               (not *type-system-initialized*))
+           (setf (wrapper-classoid existing-layout) classoid))
+          ;; There was an old layout already initialized with old
+          ;; information, and we'll now check that old information
+          ;; which was known with certainty is consistent with current
+          ;; information which is known with certainty.
+          ((warn-if-altered-layout "current" existing-layout "compile time"
+                                   length inherits depthoid bitmap)
+           (%redefine-defstruct classoid existing-layout new-layout)))
+    existing-layout))
 
 (defun classoid-lock (classoid)
   #+sb-xc-host (declare (ignore classoid))
@@ -269,10 +279,13 @@ between the ~A definition and the ~A definition"
         (if (eq oldval nil) lock oldval))))
 
 (defun add-subclassoid (super sub wrapper)
+  (declare (sb-c::tlab :system))
   (with-system-mutex ((classoid-lock super))
     (let ((table (classoid-subclasses super))
           (count 0))
       (cond ((hash-table-p table)
+             ;; If the table needs to resize, it'll stay on the heap
+             ;; even if we're using an arena.
              (setf (gethash sub table) wrapper))
             ((dolist (cell table)
                (when (eq (car cell) sub)
@@ -288,8 +301,10 @@ between the ~A definition and the ~A definition"
             (t
              ;; Upgrade to a hash-table
              (let ((new #+sb-xc-host (make-hash-table :test 'eq)
-                        #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
-                                                      :test 'eq)))
+                        #-sb-xc-host
+                        (sb-vm:without-arena "add-subclassoid"
+                            (make-hash-table :hash-function #'type-hash-value
+                                             :test 'eq))))
                (loop for (key . val) in table do (setf (gethash key new) val))
                (setf (gethash sub new) wrapper)
                (setf (classoid-subclasses super) new)
@@ -464,6 +479,7 @@ between the ~A definition and the ~A definition"
 ;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)
   (declare (simple-vector layouts))
+  (declare (sb-c::tlab :system))
   (let ((length (length layouts))
         (max-depth -1))
     (dotimes (i length)
@@ -780,6 +796,22 @@ between the ~A definition and the ~A definition"
 (define-type-class classoid :enumerable #'classoid-enumerable-p
                     :might-contain-other-types nil)
 
+(defmacro classoid-bits (x)
+  ;; CLASSOIDs have a deterministic hash based on the symbol naming the classoid,
+  ;; but HASH-LAYOUT-NAME will pick a pseudo-random hash if NAME is NIL.
+  `(logior ,(ctype-class-bits 'classoid)
+           (logand (hash-layout-name ,x) +ctype-hash-mask+)))
+;;; Now that the type-class has an ID, the various constructors can be defined.
+(macrolet ((def-make (name args &aux (allocator (symbolicate "!ALLOC-" name)))
+             `(defun ,(symbolicate "MAKE-" name) ,args
+                (declare (inline ,allocator))
+                (,allocator (classoid-bits name) ,@(remove '&key args)))))
+  (def-make undefined-classoid (name))
+  (def-make condition-classoid (&key name))
+  (def-make structure-classoid (&key name))
+  (def-make standard-classoid (&key name pcl-class))
+  (def-make static-classoid (&key name)))
+
 (defun classoid-inherits-from (sub super-or-name)
   (declare (type classoid sub)
            (type (or symbol classoid) super-or-name))
@@ -831,14 +863,8 @@ between the ~A definition and the ~A definition"
                  (%ensure-classoid-valid class2 layout2 errorp))
       (return-from %ensure-both-classoids-valid nil))))
 
-;;; Simple methods for TYPE= and SUBTYPEP should never be called when
-;;; the two classes are equal, since there are EQ checks in those
-;;; operations.
-(define-type-method (classoid :simple-=) (type1 type2)
-  (aver (not (eq type1 type2)))
-  (values nil t))
-
 (define-type-method (classoid :simple-subtypep) (class1 class2)
+  ;; Simple method should never be called on EQ args since there is an EQ check higher up
   (aver (not (eq class1 class2)))
   (with-world-lock () ; FIXME: why such coarse lock granularity here?
     (if (%ensure-both-classoids-valid class1 class2)
@@ -944,7 +970,7 @@ between the ~A definition and the ~A definition"
 
 (define-type-method (classoid :negate) (type) (make-negation-type type))
 
-(define-type-method (classoid :unparse) (type)
+(define-type-method (classoid :unparse) (flags type)
   (classoid-proper-name type))
 
 ;;;; built-in classes
@@ -1034,7 +1060,7 @@ between the ~A definition and the ~A definition"
               :prototype-form sb-pcl:+slot-unbound+)
          (fdefn :codes (,sb-vm:fdefn-widetag)
                 :predicate fdefn-p
-                :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
+                :prototype-form (find-or-create-fdefn '(setf car)))
          (random-class             ; used for unknown type codes
           ;; Make the PROTOTYPE slot unbound.
           :prototype-form sb-pcl:+slot-unbound+)
@@ -1109,7 +1135,7 @@ between the ~A definition and the ~A definition"
          (fixnum
           :translation (integer ,most-negative-fixnum ,most-positive-fixnum)
           :inherits (integer rational real number)
-          :codes ,(mapcar #'symbol-value sb-vm::fixnum-lowtags)
+          :codes ,sb-vm::fixnum-lowtags
           :prototype-form 42)
          (bignum
           :translation (and integer (not fixnum))
@@ -1345,7 +1371,7 @@ between the ~A definition and the ~A definition"
                       (setf (classoid-cell-classoid
                              (find-classoid-cell name :create t))
                             (!make-built-in-classoid
-                             :%bits (pack-ctype-bits classoid name)
+                             :%bits (classoid-bits name)
                              :name name
                              :translation #+sb-xc-host (if trans-p :initializing nil)
                                           #-sb-xc-host translation

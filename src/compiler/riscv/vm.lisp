@@ -247,7 +247,10 @@
     (system-area-pointer
      immediate-sc-number)
     (character
-     immediate-sc-number)))
+     immediate-sc-number)
+    (structure-object
+     (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc zero-sc-number)

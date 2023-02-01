@@ -85,7 +85,7 @@ gc_general_alloc(__attribute__((unused)) void* ignore,
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords) {
     return gc_copy_object(object, nwords, 0, 0);
 }
-lispobj  copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj  copy_potential_large_object(lispobj object, sword_t nwords,
                                     __attribute__((unused)) void* region,
                                     __attribute__((unused)) int page_type) {
     return gc_copy_object(object, nwords, 0, 0);
@@ -394,7 +394,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     if (((uword_t)addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
         ((uword_t)addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
 #if defined(SUNOS) || defined(SOLARIS)
-        os_invalidate(addr, length);
+        os_deallocate(addr, length);
 #else
         os_protect(addr, length, 0);
 #endif
@@ -540,7 +540,7 @@ verify_range(int purified, lispobj *base, lispobj *end)
     lispobj* where = base;
     int len, i;
     lispobj layout;
-    for ( ; where < end ; where += OBJECT_SIZE(*where, where) ) {
+    for ( ; where < end ; where += object_size(where) ) {
         if (is_cons_half(*where)) {
           CHECK_PTR(where+0, where[0]);
           CHECK_PTR(where+1, where[1]);
@@ -562,7 +562,7 @@ verify_range(int purified, lispobj *base, lispobj *end)
           case FDEFN_WIDETAG:
             CHECK_PTR(where+1, where[1]);
             CHECK_PTR(where+2, where[2]);
-            CHECK_PTR(where+3, fdefn_callee_lispobj((struct fdefn*)where));
+            CHECK_PTR(where+3, decode_fdefn_rawfun((struct fdefn*)where));
             break;
           case CLOSURE_WIDETAG:
           case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -586,7 +586,7 @@ void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname)
     f = fopen(pathname, "w");
     while (where < limit) {
         fprintf(f, "%p: %x\n", where, *where);
-        where += OBJECT_SIZE(*where, where);
+        where += object_size(where);
     }
     fprintf(f, "--\n");
     fclose(f);

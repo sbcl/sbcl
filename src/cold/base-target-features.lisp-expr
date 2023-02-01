@@ -110,19 +110,10 @@
  ; :sb-show-assem
 
  ;; Compile the C runtime with support for low-level debugging output
- ;; through FSHOW and FSHOW_SIGNAL.  If enabled, this feature allows
+ ;; through FSHOW.  If enabled, this feature allows
  ;; users to turn on such debugging output using environment variables at
  ;; run-time.
  ; :sb-qshow
-
- ;; Setting this makes SBCL more "fluid", i.e. more amenable to
- ;; modification at runtime, by suppressing various INLINE declarations,
- ;; compiler macro definitions, FREEZE-TYPE declarations; and by
- ;; suppressing various burning-our-ships-behind-us actions after
- ;; initialization is complete; and so forth. This tends to clobber the
- ;; performance of the system, so unless you have some special need for
- ;; this when hacking SBCL itself, you don't want this set.
- ; :sb-fluid
 
  ;; Enable code for collecting statistics on usage of various operations,
  ;; useful for performance tuning of the SBCL system itself. This code
@@ -286,9 +277,9 @@
  ;; foreign code that uses a 32-bit off_t.
  ; :largefile
 
- ;; SBCL has optional support for zlib-based compressed core files.  Enable
+ ;; SBCL has optional support for zstd-based compressed core files.  Enable
  ;; this feature to compile it in.  Obviously, doing so adds a dependency
- ;; on zlib.
+ ;; on zstd.
  ; :sb-core-compression
 
  ;; On certain thread-enabled platforms, synchronization between threads

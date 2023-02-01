@@ -15,18 +15,12 @@
 # more information.
 
 run_compiler=`pwd`/run-compiler.sh
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./expect.sh
 . ./subr.sh
 
 use_test_subdirectory
 
 echo //entering foreign.test.sh
-
-# simple way to make sure we're not punting by accident:
-# setting PUNT to anything other than 104 will make non-dlopen
-# and non-linkage-table platforms fail this
-PUNT=$EXIT_TEST_WIN
 
 ## Make some shared object files to test with.
 
@@ -210,10 +204,6 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   (define-alien-routine return-ushort-test unsigned-short (p unsigned-short :copy))
   (define-alien-routine return-int-test int (p int :copy))
   (define-alien-routine return-uint-test unsigned-int (p unsigned-int :copy))
-
-  ;; compiling this gets us the FOP-FOREIGN-DATAREF-FIXUP on
-  ;; linkage-table ports
-  (defvar *extern* (extern-alien "negative_short" short))
 
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until

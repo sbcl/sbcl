@@ -163,41 +163,11 @@
 ;;; "scope" and "frame" are basically synonymous here.
 ;;; The existence of both terms is a minor accident.
 
-;; Binding frame specification for LET and LET*
-;; This is a prototype stack-frame rather than a runtime stack frame in that
-;; one exists per syntactic form, not per dynamic invocation of same.
-(defstruct (frame (:include decl-scope)
-                  (:copier nil) (:predicate nil)
-                  (:constructor make-let-frame
-                                (declarations %policy
-                                 symbols special-b values sexpr specials)))
-  ;; If more symbols exist than values, the remainder are free specials.
-  (symbols    nil :read-only t :type simple-vector)
-  ;; Bitmask over symbols. 1 in bit N means bind the Nth symbol as special.
-  (special-b  nil :read-only t :type integer)
-  ;; A let frame can't have zero values. (It would be converted to LOCALLY)
-  (values nil :read-only t :type simple-vector)
-  (sexpr      nil :read-only t) ; code to execute
-  ;; To avoid reconstituting the first PROGV operand from the special-b mask
-  ;; and vector of all bound symbols, store the bound specials as follows:
-  ;;   for LET    - a list of all bound specials
-  ;;   for LET*   - a list of singleton lists of bound specials
-  ;;   for LAMBDA - possibly both of the preceding: a list for mandatory args
-  ;;                and lists of singleton lists for &optional/&rest/&key.
-  (specials   nil :read-only t))
-
 (defmethod print-object ((self frame) stream)
   (print-unreadable-object (self stream :type t :identity t)))
 
 (declaim (inline frame-size))
 (defun frame-size (frame) (length (frame-values frame)))
-
-;;; A LET* frame is just like a LET frame.
-(defstruct (let*-frame
-             (:include frame) (:predicate nil) (:copier nil)
-             (:constructor make-let*-frame
-                           (declarations %policy symbols special-b
-                            values sexpr specials))))
 
 ;;; BASIC-ENV stores a policy for its body, but if evaluation has not reached
 ;;; the body forms of a LET*, then the old policy is in effect. This is due to
@@ -214,30 +184,6 @@
              (if (eql (sb-c::policy-presence-bits policy) 0)
                  (env-policy (env-parent env))
                  policy)))))
-
-;; Fancy binding frame specification
-(defstruct (lambda-frame (:include let*-frame) (:predicate nil) (:copier nil))
-  ;; Unlike for a LET* frame the count of bound values can not be determined
-  ;; from the length of the VALUES vector, which contains various extra markers
-  ;; dictating how the arguments are to be parsed.
-  (n-bound-vars  0   :read-only t :type fixnum)
-  ;; Number of mandatory and optional arguments.
-  (min-args      0   :read-only t :type fixnum)
-  (n-optional    0   :read-only t :type fixnum)
-  ;; Packed flags indicating presence of &REST/&KEY/&ALLOW-OTHER-KEYS.
-  (keyword-bits  0   :read-only t :type fixnum)
-  ;; A BLOCK name in which to wrap the lambda's evaluable forms.
-  ;; This behaves exactly the same as using a block-env around the forms,
-  ;; however a lambda-env consumes only 8 words plus 2 for the freshly consed
-  ;; catch tag; whereas a var-env + block-env would consume 6 + 6 + 2, which
-  ;; entails 40% more overhead to enter the most trivial interpreted function.
-  (block-name    0   :read-only t :type (or (eql 0) symbol))
-  ;; SHARE-BLOCK-P is T if BLOCK-NAME can be created concurrently
-  ;; with variable bindings. If NIL when a block-name is present,
-  ;; then another environment is allocated to enclose the block,
-  ;; which is not as big a win as combining the block-env and var-env,
-  ;; but still beneficial as it avoids separately calling the block handler.
-  (share-block-p nil :read-only t :type boolean))
 
 (defconstant +restp-bit+  #b100)
 (defconstant +keyp-bit+   #b010)
@@ -1250,29 +1196,24 @@
               )))
     lexenv))
 
-;;; Produce the source representation expected by :INLINE-EXPANSION-DESIGNATOR.
-(defun reconstruct-syntactic-closure-env (env &aux guts)
-  (loop
-    (awhen (env-declarations env)
-      (setq guts `((:declare ,(apply 'append (mapcar 'cdr it)) ,@guts))))
-    (multiple-value-bind (kind data)
-        (typecase env
-          (macro-env
-           (values :macro
-                   (map 'list
-                        (lambda (f)
-                          ;; The name of each macro is (MACROLET symbol).
-                          (cons (second (fun-name f))
-                                (fun-lambda-expression f)))
-                        (env-payload env))))
-          (symbol-macro-env
-           (values :symbol-macro
-                   (map 'list (lambda (x y) (list (car x) y))
-                        (env-symbols env) (env-payload env)))))
-      (when kind
-        (setq guts `((,kind ,data ,@guts)))))
-    (unless (setq env (env-parent env))
-      (return (car guts)))))
+(defun inline-syntactic-closure-lambda (lambda env)
+  (labels ((frob (env decls)
+             (unless (or (basic-env-p env)
+                         (macro-env-p env)
+                         (symbol-macro-env-p env))
+               (return-from inline-syntactic-closure-lambda nil))
+             (let ((parent (env-parent env)))
+               (dolist (decl-spec (env-declarations env))
+                 (dolist (decl (cdr decl-spec))
+                   (push decl decls)))
+               (if parent
+                   (frob parent decls)
+                   decls))))
+    (let ((decls (frob env '()))
+          (expansion (sb-walker:macroexpand-all lambda env)))
+      (if decls
+          `(sb-c::lambda-with-lexenv ((declare ,@decls)) ,@(cdr expansion))
+          expansion))))
 
 ;;; Return INLINE or NOTINLINE if FNAME has a lexical declaration,
 ;;; otherwise NIL for no information.

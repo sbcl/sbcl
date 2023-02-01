@@ -47,10 +47,6 @@
 
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
 
-(defun !format-cold-init ()
-  (sb-format::!late-format-init)
-  (sb-format::!format-directives-init))
-
 ;;; Allows the SIGNAL function to be called early.
 (defun !signal-function-cold-init ()
   #+sb-devel
@@ -106,7 +102,7 @@
                (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
                 (if (eql (char buf 0) #\newline) 0 1)))))))
 
-(defun xc-sanity-checks ()
+(defun !xc-sanity-checks ()
   ;; Verify on startup that some constants were dumped reflecting the
   ;; correct action of our vanilla-host-compatible functions.  For
   ;; now, just SXHASH is checked.
@@ -115,20 +111,18 @@
   ;; side effect of data recording when invoking compile-time
   ;; functions aren't propagated back to process that forked the
   ;; children doing the grunt work.
-  (let ((sxhash-crosscheck
-          '#.(let (pairs)
-               ;; De-duplicate, which reduces the list from ~8000 entries to ~1000 entries.
-               ;; But make sure that any key which isolated repeated has the same value
-               ;; at each repetition.
-               (dolist (pair sb-c::*sxhash-crosscheck* (coerce pairs 'simple-vector))
-                 (let ((found (assoc (car pair) pairs)))
-                   (if found
-                       (aver (= (cdr found) (cdr pair)))
-                       (push pair pairs)))))))
-    (loop for (object . hash) across sxhash-crosscheck
-          unless (= (sxhash object) hash)
-            do (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
-                      object hash (sxhash object)))))
+  (let ((list (with-open-file (stream "output/sxhash-calls.lisp-expr"
+                                      :if-does-not-exist nil)
+                (when stream
+                  (let ((*package* (find-package "SB-KERNEL"))) (read stream))))))
+    (when list
+      (dolist (item list)
+        (destructuring-bind (object hash) item
+          (unless (= (sxhash object) hash)
+            (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
+                   object hash (sxhash object)))))
+      (format t "~&cross-compiler SXHASH tests passed: ~D cases~%"
+              (length list)))))
 
 ;;; called when a cold system starts up
 (defun !cold-init ()
@@ -136,6 +130,8 @@
 
   (/show0 "entering !COLD-INIT")
   #+sb-show (setq */show* t)
+  (setq sb-vm::*immobile-codeblob-tree* nil
+        sb-vm::*dynspace-codeblob-tree* nil)
   (setq sb-kernel::*defstruct-hooks* '(sb-kernel::!bootstrap-defstruct-hook)
         sb-kernel::*struct-accesss-fragments-delayed* nil)
   (let ((stream (!make-cold-stderr-stream)))
@@ -144,7 +140,6 @@
           *trace-output* stream))
   (show-and-call !signal-function-cold-init)
   (show-and-call !printer-control-init) ; needed before first instance of FORMAT or WRITE-STRING
-  (setq *unparse-fun-type-simplify* nil) ; needed by TLFs in target-error.lisp
   (setq sb-unix::*unblock-deferrables-on-enabling-interrupts-p* nil) ; needed by LOAD-LAYOUT called by CLASSES-INIT
   (setq *print-length* 6
         *print-level* 3)
@@ -167,14 +162,21 @@
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
   (show-and-call !function-names-init)
+  (show-and-call !pathname-cold-init)
 
   ;; And now *CURRENT-THREAD*
   (sb-thread::init-main-thread)
 
+  ;; not sure why this is needed on some architectures. Dark magic.
+  (setf (fdefn-fun (find-or-create-fdefn '%coerce-callable-for-call))
+        #'%coerce-callable-to-fun)
+  (show-and-call !loader-cold-init)
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
   ;; And be extra paranoid - ensure that it really gets called.
-  (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
+  (locally
+      (declare (notinline fboundp) (optimize safety)) ; is unsafely flushable
+    (fboundp '(setf !zzzzzz)))
 
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility. Also
@@ -229,9 +231,15 @@
                (funcall (second toplevel-thing))))
         ((cons (eql :load-time-value-fixup))
          (destructuring-bind (object index value) (cdr toplevel-thing)
-           (aver (typep object 'code-component))
-           (aver (unbound-marker-p (code-header-ref object index)))
-           (setf (code-header-ref object index) (svref *!load-time-values* value))))
+           (let ((replacement (svref *!load-time-values* value)))
+             (etypecase object
+               (code-component
+                (aver (unbound-marker-p (code-header-ref object index)))
+                (setf (code-header-ref object index) replacement))
+               (cons
+                (aver (= index 0))
+                (aver (unbound-marker-p (car object)))
+                (rplaca object replacement))))))
         ((cons (eql :named-constant))
          (destructuring-bind (object index name) (cdr toplevel-thing)
            (aver (typep object 'code-component))
@@ -245,6 +253,12 @@
   (unless (!c-runtime-noinform-p) (terpri))
 
   (makunbound '*!cold-toplevels*) ; so it gets GC'd
+
+  ;; Need the static-space replica of the assembly routine jump vector
+  ;; filled in, and the static space vector of static fdefns.
+  ;; This matters only for code that gets compiled to dynamic space,
+  ;; so it's OK that it occurs somewhat late in cold-init.
+  #+x86-64 (sb-vm::validate-asm-routine-vector)
 
   #+win32 (show-and-call reinit-internal-real-time)
 
@@ -266,9 +280,8 @@
   (mapcar #'proclaim sb-c::*queued-proclaims*)
   (makunbound 'sb-c::*queued-proclaims*)
 
-  (show-and-call !loader-cold-init)
   (show-and-call os-cold-init-or-reinit)
-  (show-and-call !pathname-cold-init)
+  (show-and-call !lpn-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
   (/show "Enabled buffered streams")
@@ -311,7 +324,7 @@
       (logically-readonlyize (sb-c::sc-move-vops sc))
       (logically-readonlyize (sb-c::sc-move-costs sc))))
 
-  (show-and-call xc-sanity-checks)
+  (show-and-call !xc-sanity-checks)
 
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
@@ -389,11 +402,11 @@ process to continue normally."
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
+      #+x86-64 (sb-vm::validate-asm-routine-vector)
       (rebuild-package-vector))
-    ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
-    (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
+    (rebuild-pathname-cache)
     (os-cold-init-or-reinit)
     #-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
@@ -407,7 +420,8 @@ process to continue normally."
   (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)
     (sb-debug::disable-debugger))
   (call-hooks "initialization" *init-hooks*)
-  #+sb-thread (finalizer-thread-start))
+  #+sb-thread (finalizer-thread-start)
+  (sb-vm::!setup-cpu-specific-routines))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code

@@ -298,7 +298,7 @@
 ;;;; Comparison routines.
 
 (macrolet
-    ((define-cond-assem-rtn (name translate static-fn cmp not-p)
+    ((define-cond-assem-rtn (name translate static-fn cmp branch)
        `(define-assembly-routine (,name
                                   (:cost 10)
                                   (:return-style :full-call)
@@ -320,7 +320,7 @@
           (inst bne temp DO-STATIC-FUN)
           ,cmp
 
-          (inst ,(if not-p 'beq 'bne) temp DONE)
+          (inst ,branch temp DONE)
           (inst move res null-tn)
           (load-symbol res t)
 
@@ -334,10 +334,10 @@
           (inst j lip)
           (inst move cfp-tn csp-tn))))
 
-  (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y) t)
-  (define-cond-assem-rtn generic-<= <= two-arg-<= (inst slt temp x y) nil)
-  (define-cond-assem-rtn generic-> > two-arg-> (inst slt temp y x) t)
-  (define-cond-assem-rtn generic->= >= two-arg->= (inst slt temp y x) nil))
+  (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y) beq)
+  (define-cond-assem-rtn generic-> > two-arg-> (inst slt temp y x) beq)
+  (define-cond-assem-rtn generic-<= <= two-arg-<= (inst slt temp y x) bne)
+  (define-cond-assem-rtn generic->= >= two-arg->= (inst slt temp x y) bne))
 
 
 (define-assembly-routine (generic-eql

@@ -126,6 +126,9 @@
   (defmacro accessor-slot-boundp (object slot-name &environment env)
     (call-gf 'slot-boundp-name object slot-name env))
 
+  (defmacro accessor-slot-makunbound (object slot-name &environment env)
+    (call-gf 'slot-makunbound-name object slot-name env))
+
   (defmacro accessor-slot-value (object slot-name &environment env)
     `(truly-the (values t &optional)
                 ,(call-gf 'slot-reader-name object slot-name env)))

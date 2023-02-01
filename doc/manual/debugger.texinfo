@@ -825,6 +825,9 @@ that all variable values are available at any known location within
 the scope of the binding.  This has a speed penalty in addition to the
 obvious space penalty.
 
+Inlining of local functions is inhibited so that they may be
+@code{trace}d.
+
 @item > (max speed space)
 If @code{debug} is greater than both @code{speed} and @code{space},
 the command @command{return} can be used to continue execution by
@@ -1085,6 +1088,8 @@ function entry or exit.
 @include var-sb-debug-star-max-trace-indentation-star.texinfo
 
 @include var-sb-debug-star-trace-encapsulate-default-star.texinfo
+
+@include var-sb-debug-star-trace-report-default-star.texinfo
 
 @comment FIXME rudi 2004-03-26: encapsulate is (per TODO file as of
 @comment 0.8.9) in a state of flux.  When it's sorted out, revive the

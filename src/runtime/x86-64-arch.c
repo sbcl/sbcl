@@ -421,7 +421,6 @@ sigill_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *siginfo,
                os_context_t *context) {
     unsigned char* pc = (void*)OS_CONTEXT_PC(context);
-#ifndef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     if (*(unsigned short *)pc == UD2_INST) {
         OS_CONTEXT_PC(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
@@ -431,7 +430,6 @@ sigill_handler(int __attribute__((unused)) signal,
         OS_CONTEXT_PC(context) += 1;
         return sigtrap_handler(signal, siginfo, context);
     }
-#endif
 
     fake_foreign_function_call(context);
 #ifdef LISP_FEATURE_LINUX
@@ -497,8 +495,6 @@ sigfpe_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 void
 arch_install_interrupt_handlers()
 {
-    SHOW("entering arch_install_interrupt_handlers()");
-
     /* Note: The old CMU CL code here used sigtrap_handler() to handle
      * SIGILL as well as SIGTRAP. I couldn't see any reason to do
      * things that way. So, I changed to separate handlers when
@@ -509,7 +505,7 @@ arch_install_interrupt_handlers()
      * OS I haven't tested on?) and we have to go back to the old CMU
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
-#if !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER) && !defined(LISP_FEATURE_WIN32)
+#ifndef LISP_FEATURE_WIN32
     ll_install_handler(SIGILL , sigill_handler);
     ll_install_handler(SIGTRAP, sigtrap_handler);
 #endif
@@ -517,14 +513,12 @@ arch_install_interrupt_handlers()
 #if defined(X86_64_SIGFPE_FIXUP) && !defined(LISP_FEATURE_WIN32)
     ll_install_handler(SIGFPE, sigfpe_handler);
 #endif
-
-    SHOW("returning from arch_install_interrupt_handlers()");
 }
 
 void
 arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
-    char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
+    char *reloc_addr = (char*)ALIEN_LINKAGE_TABLE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
     if (datap) {
         *(uword_t *)reloc_addr = (uword_t)target_addr;
         return;
@@ -590,43 +584,69 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-/// Return the Lisp object that fdefn's raw_addr slot jumps to.
-/// This will either be:
-/// (1) a simple-fun,
-/// (2) a funcallable-instance with an embedded trampoline that makes
-///     it resemble a simple-fun in terms of call convention, or
-/// (3) a code-component with no simple-fun within it, that makes
-///     closures and other funcallable-instances look like simple-funs.
-/// If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
-lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
-    lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
-    if (!raw_addr || points_to_asm_code_p((lispobj)raw_addr))
-        // technically this should return the address of the code object
-        // containing asm routines, but it's fine to return 0.
-        return 0;
-    // If the object to which raw_addr points was already forwarded,
-    // this returns the "old" pointer, prior to forwarding, so that
-    // scavenging that pointer alters it. Otherwise scav_fdefn would not
-    // decide to rewrite the raw_addr slot of the fdefn.
-    // This logic is rather nasty, but I don't know what else to do.
-    lispobj word;
-    if (header_widetag(word = raw_addr[-2]) == SIMPLE_FUN_WIDETAG
-        || (word == FORWARDING_HEADER &&
-            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-2)))
-            == SIMPLE_FUN_WIDETAG))
-        return make_lispobj(raw_addr - 2, FUN_POINTER_LOWTAG);
-    int widetag;
-    if ((widetag = header_widetag(word = raw_addr[-4])) == CODE_HEADER_WIDETAG
-        || (word == FORWARDING_HEADER &&
-            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
-            == CODE_HEADER_WIDETAG))
-        return make_lispobj(raw_addr - 4, OTHER_POINTER_LOWTAG);
-    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG
-        || (word == FORWARDING_HEADER &&
-            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
-            == FUNCALLABLE_INSTANCE_WIDETAG))
-        return make_lispobj(raw_addr - 4, FUN_POINTER_LOWTAG);
-    lose("Unknown object in fdefn raw addr: %p", raw_addr);
+static __attribute__((unused)) boolean codeblob_p(lispobj ptr) {
+    return lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+           widetag_of((lispobj*)(ptr-OTHER_POINTER_LOWTAG)) == CODE_HEADER_WIDETAG;
+}
+
+/* Return the tagged pointer for which 'entrypoint' is the starting address.
+ * This will be one of the following:
+ * 1. a fun-pointer which is either
+ *   - a simple-fun header located 2 words before the entrypoint.
+ *     N.B.: This returns the SIMPLE-FUN, and _not_ its containing codeblob.
+ *   - a funcallable-instance with an embedded trampoline that make it
+ *     equivalent to a simple-fun
+ * 2. a code-component with no simple-fun within it, that makes closures
+ *    callable like simple-funs. The code header is at entrypoint minus 4 words.
+ *
+ * By first reading at (entrypoint - 2*N_WORD_BYTES) this does the right thing
+ * when 'entrypoint' is actually type 2, because the word accessed will not be
+ * an object header or forwarding marker (it will be whatever %CODE-DEBUG-INFO is).
+ * Whereis if this were type 1, but we read at (entrypoint - 4*N_WORD_BYTES) first,
+ * then we could perceive random uninitialized bytes of the preceding object.
+ */
+lispobj entrypoint_taggedptr(uword_t entrypoint) {
+    if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
+    // First try
+    lispobj* phdr = (lispobj*)(entrypoint - 2*N_WORD_BYTES);
+    if (forwarding_pointer_p(phdr)) {
+        gc_dcheck(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
+        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+    }
+    int widetag = widetag_of(phdr);
+    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG || widetag == SIMPLE_FUN_WIDETAG) {
+        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+    }
+    // Second try
+    phdr = (lispobj*)(entrypoint - 4*N_WORD_BYTES);
+    /* It is nearly impossible for forwarding to arise, by this reasoning:
+     * Case A: if some thread references the codeblob that wraps a closure,
+     *  then the codeblob is pinned; hence not forwarded.
+     * Case B: if not executing (or otherwise referenced from stack/registers),
+     *  there can exist no other tagged reference to the codeblob.
+     * Aside from the FDEFN that owns it, the only other untagged reference would
+     * be from the search tree, which isn't scavenged. (The entire tree dies after GC.)
+     * It's conceivable the debugger could store a tagged pointer to this entrypoint
+     * in something, but I tried to make it do so, and couldn't. I was, however, able
+     * to artificially cause forwarding by putting closure trampolines in symbols */
+    if (forwarding_pointer_p(phdr))
+        gc_dcheck(codeblob_p(forwarding_pointer_value(phdr)));
+    else
+        gc_dcheck(widetag_of(phdr) == CODE_HEADER_WIDETAG);
+    return make_lispobj(phdr, OTHER_POINTER_LOWTAG);
+}
+/* Return the lisp object that fdefn's raw_addr slot jumps to.
+ * In the event that the referenced object was forwarded, this returns the un-forwarded
+ * object (the forwarded value is used to assert some invariants though).
+ * If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
+ *
+ * Some legacy baggage is evident: in the first implementation of immobile fdefns,
+ * an fdefn used a 'jmp rel32' (relative to itself), and so you could decode the
+ * jump target only given the address of the fdefn. That is no longer true; fdefns use
+ * absolute jumps. Therefore it is possible to call entrypoint_taggedptr() with any
+ * raw_addr, whether or not you know the fdefn whence the raw_addr was obtained. */
+lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
+    return entrypoint_taggedptr((uword_t)fdefn->raw_addr);
 }
 
 #include "genesis/vector.h"
@@ -716,12 +736,9 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
     // Wasn't the point of code serial# that you don't store
     // code blob pointers into the various profiling buffers? (FIXME?)
     if (code) {
-        /* If the first of the two stores is at an even index, then the second
-         * "notice" call is redundant because it will certainly be on the same card.
-         * Doing both calls is future-proof though. */
-        notice_pointer_store(&v->data[index]);
-        notice_pointer_store(&v->data[index+1]);
+        vector_notice_pointer_store(&v->data[index]);
         v->data[index] = make_lispobj(code, OTHER_POINTER_LOWTAG);
+        // do not need to take notice of a fixnum store
         v->data[index+1] = make_fixnum((lispobj)pc - (lispobj)code);
     } else {
         gc_assert(!((uword_t)pc & LOWTAG_MASK));
@@ -739,7 +756,14 @@ allocation_tracker_counted(uword_t* sp)
         if (index == 0)
             index = 2; // reserved overflow counter for fixed-size alloc
         uword_t disp = index * 8;
-        int base_reg = word_at_pc >> 56;
+        int base_reg = -1;
+        if ((word_at_pc & 0xff) == 0xE8) {
+            // following is a 1-byte NOP and a dummy "TEST imm8" where the imm8
+            // encodes a register number.
+            base_reg = word_at_pc >> 56;
+        } else {
+            lose("Unexpected instruction format @ %p", pc);
+        }
         // rewrite call into: LOCK INC QWORD PTR, [Rbase+n] ; opcode = 0xFF / 0
         uword_t new_inst = 0xF0 | ((0x48|(base_reg>>3)) << 8) // w + possibly 'b'
             | (0xFF << 16) | ((0x80L+(base_reg&7)) << 24) | (disp << 32);

@@ -217,8 +217,8 @@ value for the symbol (based on the symbol name), which avoids having
 to recompute the hash from the name every time it is required.
 
 The other additional slot, on threaded systems only, is the TLS index,
-which is either @code{no-tls-value-marker-widetag} or an unboxed byte
-offset within the TLS area to the TLS slot associated with the symbol.
+which is a byte offset within the TLS area to the TLS slot associated
+with the symbol.
 Because the unboxed offset is aligned to a word boundary it appears as
 a @code{fixnum} when viewed as boxed data.  It is not, in general,
 safe to increment this value as a @code{fixnum}, however, in case

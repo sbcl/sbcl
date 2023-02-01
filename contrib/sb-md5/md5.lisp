@@ -69,6 +69,7 @@
 
 (in-package sb-md5)
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-ext:restrict-compiler-policy 'space 1) ; lp#1988683
   (setf (sb-int:system-package-p *package*) t))
 
 #+cmu

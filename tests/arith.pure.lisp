@@ -1032,3 +1032,114 @@
                 a b))
       (- a b))
    (((- (expt 2 sb-vm:n-word-bits) 10) (- (expt 2 sb-vm:n-word-bits) 9)) -1)))
+
+(with-test (:name :>=-fixnum-integer)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (fixnum a))
+      (and (integerp b)
+           (>= a b)))
+   ((1 2) nil)
+   ((2 2) t)
+   ((3 2) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (fixnum a))
+      (and (integerp b)
+           (<= a b)))
+   ((1 2) t)
+   ((2 2) t)
+   ((3 2) nil)))
+
+(with-test (:name :ash-signed-negation-overflow :fails-on :arm)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a)
+                  (sb-vm:signed-word b))
+         (truly-the sb-vm:signed-word (ash a b)))
+    ((-44 (- (expt 2 (1- sb-vm:n-word-bits)))) -1)
+    ((44 2) 176)))
+
+(with-test (:name :-constant-mnf)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (logand most-positive-fixnum
+                 (- (the fixnum a) most-negative-fixnum)))
+    ((10) 10)))
+
+(with-test (:name :unary-truncate-discard-second-value)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (truncate (expt (complex a 0) 0))
+      1)
+   ((1) 1)))
+
+(with-test (:name :unary-truncate-discard-second-value.2)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda (a b)
+      (boole boole-nand
+             (dpb (* b (unwind-protect 0 b)) (byte 31 28) a)
+             (ignore-errors
+              (truncate
+               (eval
+                (values 1 2))))))
+   ((1 2) -2)))
+
+(with-test (:name :logtest-immediate)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (logtest (- (expt 2 63) 3) (the fixnum x)))
+    ((1) t)
+    ((2) nil)))
+
+(with-test (:name :logand-negative-derive)
+  (assert
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                             (checked-compile
+                              `(lambda (a b)
+                                 (declare ((not unsigned-byte) a b))
+                                 (logand a b))))))
+             '(integer * -1))))
+
+(with-test (:name :ash-mod64-constant-folding)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a d)
+         (declare (fixnum a)
+                  ((unsigned-byte 64) d))
+         (setq a -64)
+         (logand d (ash -1 a)))
+    ((0 3) 3)))
+
+(with-test (:name :signed-unsigned-cmp-elision)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a)
+                  ((or (integer -1 0)
+                       (unsigned-byte 64)) b))
+         (let ((v2 (abs b)))
+           (if (> a v2)
+               a
+               (>= a v2))))
+      ((1 2) nil)
+      ((1 1) t)
+      ((3 0) 3)))
+
+(with-test (:name :integer-fixnum-<)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f b &optional a c d e g h i j k l m n o p q r s)
+      (declare (fixnum f))
+      (eval (list 'list a b c d e f g h i j k l m n o p q r s t))
+      (and (integerp b)
+           (< f b)))
+   ((1 t) nil)
+   ((1 10) t)))

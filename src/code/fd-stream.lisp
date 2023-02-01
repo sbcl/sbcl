@@ -40,7 +40,7 @@
 ;;;;  (incf (buffer-tail buffer) n))
 ;;;;
 
-(defstruct (buffer (:constructor %make-buffer (sap length))
+(defstruct (buffer (:constructor !make-buffer (sap length))
                    (:copier nil))
   (sap (missing-arg) :type system-area-pointer :read-only t)
   (length (missing-arg) :type index :read-only t)
@@ -55,10 +55,11 @@
   "Default number of bytes per buffer.")
 
 (defun alloc-buffer (&optional (size +bytes-per-buffer+))
+  (declare (sb-c::tlab :system) (inline !make-buffer))
   ;; Don't want to allocate & unwind before the finalizer is in place.
   (without-interrupts
     (let* ((sap (allocate-system-memory size))
-           (buffer (%make-buffer sap size)))
+           (buffer (!make-buffer sap size)))
       (when (zerop (sap-int sap))
         (error "Could not allocate ~D bytes for buffer." size))
       (finalize buffer (lambda ()
@@ -77,6 +78,7 @@
   buffer)
 
 (defun release-buffer (buffer)
+  (declare (sb-c::tlab :system))
   (reset-buffer buffer)
   (atomic-push buffer *available-buffers*))
 
@@ -209,18 +211,22 @@
 
 (defun line/col-from-charpos
     (stream &optional (charpos (ansi-stream-input-char-pos stream)))
-  (let* ((newlines (form-tracking-stream-newlines stream))
-         (index (position charpos newlines :test #'>= :from-end t)))
-    ;; Line numbers traditionally begin at 1, columns at 0.
-    (if index
-        ;; INDEX is 1 less than the number of newlines seen
-        ;; up to and including this startpos.
-        ;; e.g. index=0 => 1 newline seen => line=2
-        (cons (+ index 2)
-              ;; 1 char after the newline = column 0
-              (- charpos (aref newlines index) 1))
-        ;; zero newlines were seen
-        (cons 1 charpos))))
+  (let ((newlines (form-tracking-stream-newlines stream)))
+   (if charpos
+       (let ((index (position charpos newlines :test #'>= :from-end t)))
+         ;; Line numbers traditionally begin at 1, columns at 0.
+         (if index
+             ;; INDEX is 1 less than the number of newlines seen
+             ;; up to and including this startpos.
+             ;; e.g. index=0 => 1 newline seen => line=2
+             (cons (+ index 2)
+                   ;; 1 char after the newline = column 0
+                   (- charpos (aref newlines index) 1))
+             ;; zero newlines were seen
+             (cons 1 charpos)))
+       ;; No charpos means the error is before reading the first char
+       ;; e.g. an encoding error. Take the last Newline.
+       (cons (1+ (length newlines)) 0))))
 
 ;;;; CORE OUTPUT FUNCTIONS
 
@@ -1931,9 +1937,12 @@
         ;; us with a dangling finalizer (that would close the same
         ;; --possibly reassigned-- FD again), or a stream with a closed
         ;; FD that appears open.
-        (sb-unix:unix-close (fd-stream-fd fd-stream))
-        (set-closed-flame fd-stream)
-        (cancel-finalization fd-stream))
+        (cancel-finalization fd-stream)
+        (let ((fd (fd-stream-fd fd-stream)))
+          (when (and (/= fd -1)
+                     (eq (cas (fd-stream-fd fd-stream) fd -1) fd))
+            (sb-unix:unix-close fd)))
+        (set-closed-flame fd-stream))
     ;; On error unwind from WITHOUT-INTERRUPTS.
     (serious-condition (e)
       (error e)))

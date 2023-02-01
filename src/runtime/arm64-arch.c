@@ -128,11 +128,16 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
     handle_trap(context, code);
 }
+
+void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
+
+#ifndef LISP_FEATURE_DARWIN
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
     lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
 }
+#endif
 
 void arch_install_interrupt_handlers()
 {
@@ -151,7 +156,7 @@ void arch_install_interrupt_handlers()
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
   THREAD_JIT(0);
-  char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
+  char *reloc_addr = (char*)ALIEN_LINKAGE_TABLE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
 
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;

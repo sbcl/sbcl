@@ -316,10 +316,29 @@
   (declare (explicit-check))
   (macrolet ((truncate-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
-                       (res (%unary-truncate (/ number float-div))))
+                       (divided (/ number float-div))
+                       (res (unary-truncate divided)))
                   (values res
                           (- number
-                             (* (coerce res ',rtype) float-div))))))
+                             (* #-round-float
+                                (coerce res ',rtype)
+                                #+round-float
+                                (,(ecase rtype
+                                    (double-float 'round-double)
+                                    (single-float 'round-single))
+                                 divided :truncate)
+                                float-div)))))
+             (single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1))))))))
     (number-dispatch ((number real) (divisor real))
       ((fixnum fixnum) (truncate number divisor))
       (((foreach fixnum bignum) ratio)
@@ -330,20 +349,23 @@
                          (numerator divisor))
              (values quot (/ rem (denominator divisor))))))
       ((fixnum bignum)
-       (bignum-truncate (make-small-bignum number) divisor))
+       (if (single-digit-bignum-p divisor)
+           (bignum-truncate-single-digit (make-small-bignum number) divisor)
+           (bignum-truncate (make-small-bignum number) divisor)))
       ((ratio (or float rational))
        (let ((q (truncate (numerator number)
                           (* (denominator number) divisor))))
          (values q (- number (* q divisor)))))
       ((bignum fixnum)
-       (bignum-truncate number (make-small-bignum divisor)))
+       (bignum-truncate-single-digit number divisor))
       ((bignum bignum)
-       (bignum-truncate number divisor))
-
+       (if (single-digit-bignum-p divisor)
+           (bignum-truncate-single-digit number divisor)
+           (bignum-truncate number divisor)))
       (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
-           (let ((res (%unary-truncate number)))
+           (let ((res (unary-truncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (truncate-float (dispatch-type number))))
       #+long-float
@@ -616,30 +638,64 @@ the first."
          (values most-negative-fixnum-double-float most-positive-fixnum-double-float)))
     ` (cond ((> ,float ,max)
              ,(ecase operation
-                ((= >) nil)
-                (< t)))
+                ((= > >=) nil)
+                ((< <=) t)))
             ((< ,float ,min)
              ,(ecase operation
-                ((= <) nil)
-                (> t)))
+                ((= < <=) nil)
+                ((> >=) t)))
             (t
-             (let ((quot (%unary-truncate ,float)))
+             (sb-c::if-vop-existsp (:translate %unary-floor)
                ,(ecase operation
                   (=
-                   `(and (= quot ,integer)
-                         (= (float quot ,float) ,float)))
+                   `(let ((quot (%unary-truncate ,float)))
+                      (and (= quot ,integer)
+                           (= (float quot ,float) ,float))))
                   (>
-                   `(cond ((> ,integer quot))
-                          ((< ,integer quot)
-                           nil)
-                          ((<= ,integer 0)
-                           (> (float quot ,float) ,float))))
+                   `(,operation ,integer (truly-the fixnum (%unary-floor ,float))))
                   (<
-                   `(cond ((< ,integer quot))
-                          ((> ,integer quot)
-                           nil)
-                          ((>= ,integer 0)
-                           (< (float quot ,float) ,float))))))))))
+                   `(,operation ,integer (truly-the fixnum (%unary-ceiling ,float))))
+                  (>=
+                   `(let ((quot (truly-the fixnum (%unary-floor ,float))))
+                      (or (> ,integer quot)
+                          (and (= ,integer quot)
+                               (= (float quot ,float) ,float)))))
+                  (<=
+                   `(let ((quot (truly-the fixnum (%unary-ceiling ,float))))
+                      (or (< ,integer quot)
+                          (and (= ,integer quot)
+                               (= (float quot ,float) ,float))))))
+               (let ((quot (%unary-truncate ,float)))
+                 ,(ecase operation
+                    (=
+                     `(and (= quot ,integer)
+                           (= (float quot ,float) ,float)))
+                    (>
+                     `(cond ((> ,integer quot))
+                            ((< ,integer quot)
+                             nil)
+                            ((<= ,integer 0)
+                             (> (float quot ,float) ,float))))
+                    (<
+                     `(cond ((< ,integer quot))
+                            ((> ,integer quot)
+                             nil)
+                            ((>= ,integer 0)
+                             (< (float quot ,float) ,float))))
+                    (>=
+                     `(cond ((> ,integer quot))
+                            ((< ,integer quot)
+                             nil)
+                            (t
+                             (or (< ,float 0)
+                                 (= (float quot ,float) ,float)))))
+                    (<=
+                     `(cond ((< ,integer quot))
+                            ((> ,integer quot)
+                             nil)
+                            (t
+                             (or (>= ,float 0)
+                                 (= (float quot ,float) ,float))))))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
@@ -652,6 +708,8 @@ the first."
   (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
     `(((fixnum fixnum) (,op x y))
       ((single-float single-float) (,op x y))
+      (((foreach single-float double-float) double-float)
+       (,op (coerce x 'double-float) y))
       #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
@@ -659,76 +717,91 @@ the first."
       ((long-float (foreach single-float double-float))
        (,op x (coerce y 'long-float)))
       ((fixnum (foreach single-float double-float))
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           (make-fixnum-float-comparer ,op x y (dispatch-type y))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         (make-fixnum-float-comparer ,op x y (dispatch-type y))))
       (((foreach single-float double-float) fixnum)
        (if (eql y 0)
            (,op x (coerce 0 '(dispatch-type x)))
-           (if (float-infinity-p x)
-               ,infinite-x-finite-y
-               (make-fixnum-float-comparer ,(case op
-                                              (> '<)
-                                              (< '>)
-                                              (= '=))
-                                           y x (dispatch-type x)))))
-      (((foreach single-float double-float) double-float)
-       (,op (coerce x 'double-float) y))
+           (with-float-inf-or-nan-test x
+             ,infinite-x-finite-y
+             nil
+             (make-fixnum-float-comparer ,(case op
+                                            (> '<)
+                                            (< '>)
+                                            (>= '<=)
+                                            (<= '>=)
+                                            (= '=))
+                                         y x (dispatch-type x)))))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
       (((foreach single-float double-float #+long-float long-float) ratio)
-       (if (float-infinity-p x)
-           ,infinite-x-finite-y
-           ;; Avoid converting the float into a rational, since it
-           ;; will be taken apart later anyway.
-           (multiple-value-bind (bits exp) (integer-decode-float x)
-             (if (eql bits 0)
-                 (,op 0 y)
-                 (let ((int (if (minusp x) (- bits) bits)))
-                   (if (minusp exp)
-                       (,op (* int (denominator y))
-                            (ash (numerator y) (- exp)))
-                       (,op (ash int exp) y)))))))
+       (with-float-inf-or-nan-test x
+         ,infinite-x-finite-y
+         nil
+         ;; Avoid converting the float into a rational, since it
+         ;; will be taken apart later anyway.
+         (multiple-value-bind (bits exp) (integer-decode-float x)
+           (if (eql bits 0)
+               (,op 0 y)
+               (let ((int (if (minusp x) (- bits) bits)))
+                 (if (minusp exp)
+                     (,op (* int (denominator y))
+                          (ash (numerator y) (- exp)))
+                     (,op (ash int exp) y)))))))
       ((ratio (foreach single-float double-float))
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           (multiple-value-bind (bits exp) (integer-decode-float y)
-             (if (eql bits 0)
-                 (,op x 0)
-                 (let ((int (if (minusp y) (- bits) bits)))
-                   (if (minusp exp)
-                       (,op (ash (numerator x) (- exp))
-                            (* int (denominator x)))
-                       (,op x (ash int exp))))))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         (multiple-value-bind (bits exp) (integer-decode-float y)
+           (if (eql bits 0)
+               (,op x 0)
+               (let ((int (if (minusp y) (- bits) bits)))
+                 (if (minusp exp)
+                     (,op (ash (numerator x) (- exp))
+                          (* int (denominator x)))
+                     (,op x (ash int exp))))))))
       (((foreach single-float double-float) bignum)
-       (if (float-infinity-p x)
-           ,infinite-x-finite-y
-           #+64-bit
-           (,(case op
-               (> 'float-bignum->)
-               (< 'float-bignum-<)
-               (= 'float-bignum-=))
-            x y)
-           #-64-bit
-           (,op (rational x) y)))
+       (with-float-inf-or-nan-test x
+         ,infinite-x-finite-y
+         nil
+         #+64-bit
+         ,(case op
+            (> '(float-bignum-> x y))
+            (< '(float-bignum-< x y))
+            (>= '(not (float-bignum-< x y)))
+            (<= '(not (float-bignum-> x y)))
+            (= '(float-bignum-= x y)))
+         #-64-bit
+         (,op (rational x) y)))
       ((bignum float)
-       (if (float-infinity-p y)
-           ,infinite-y-finite-x
-           #+64-bit
-           (,(case op
-               (> 'float-bignum-<)
-               (< 'float-bignum->)
-               (= 'float-bignum-=))
-            y x)
-           #-64-bit
-           (,op x (rational y))))))
+       (with-float-inf-or-nan-test y
+         ,infinite-y-finite-x
+         nil
+         #+64-bit
+         ,(case op
+            (> '(float-bignum-< y x))
+            (< '(float-bignum-> y x))
+            (>= '(not (float-bignum-> y x)))
+            (<= '(not (float-bignum-< y x)))
+            (= '(float-bignum-= y x)))
+         #-64-bit
+         (,op x (rational y))))))
   )                                     ; EVAL-WHEN
+
+(defmacro dispatch-ratio ((ratio numerator denominator) &body body)
+  `(let ((,numerator (numerator ,ratio))
+         (,denominator (denominator ,ratio)))
+     (if (and (fixnump ,numerator)
+              (fixnump ,denominator))
+         (progn ,@body)
+         (progn ,@body))))
 
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
-                (declare (inline float-infinity-p)
-                         (explicit-check))
+                (declare (explicit-check))
                 (number-dispatch ((x real) (y real))
                   (basic-compare
                    ,op
@@ -737,17 +810,36 @@ the first."
                    :infinite-y-finite-x
                    (,op (coerce 0 '(dispatch-type y)) y))
                   (((foreach fixnum bignum) ratio)
-                   (,op x (,ratio-arg2 (numerator y)
-                                       (denominator y))))
-                  ((ratio integer)
-                   (,op (,ratio-arg1 (numerator x)
-                                     (denominator x))
-                        y))
+                   (dispatch-ratio (y numerator denominator)
+                       (,(case op
+                           (<= '<)
+                           (>= '>)
+                           (t op))
+                        x (,ratio-arg2 numerator
+                                       denominator))))
+                  ((ratio (foreach fixnum bignum))
+                   (dispatch-ratio (x numerator denominator)
+                     (,(case op
+                         (<= '<)
+                         (>= '>)
+                         (t op))
+                      (,ratio-arg1 numerator
+                                   denominator)
+                      y)))
                   ((ratio ratio)
-                   (,op (* (numerator   (truly-the ratio x))
-                           (denominator (truly-the ratio y)))
-                        (* (numerator   (truly-the ratio y))
-                           (denominator (truly-the ratio x)))))
+                   (dispatch-ratio (x numerator-x denominator-x)
+                     (dispatch-ratio (y numerator-y denominator-y)
+                       (or
+                        ,@(case op
+                            ((<= >=)
+                             `((and (eql numerator-x numerator-y)
+                                    (eql denominator-x denominator-y)))))
+                        (,(case op
+                            (<= '<)
+                            (>= '>)
+                            (t op))
+                         (* numerator-x denominator-y)
+                         (* numerator-y denominator-x))))))
                   ,@cases))))
   (def-two-arg-</> two-arg-< < floor ceiling
     ((fixnum bignum)
@@ -762,7 +854,21 @@ the first."
     ((bignum fixnum)
      (bignum-plus-p x))
     ((bignum bignum)
-     (plusp (bignum-compare x y)))))
+     (plusp (bignum-compare x y))))
+  (def-two-arg-</> two-arg-<= <= floor ceiling
+    ((fixnum bignum)
+     (bignum-plus-p y))
+    ((bignum fixnum)
+     (not (bignum-plus-p x)))
+    ((bignum bignum)
+     (<= (bignum-compare x y) 0)))
+  (def-two-arg-</> two-arg->= >= ceiling floor
+    ((fixnum bignum)
+     (not (bignum-plus-p y)))
+    ((bignum fixnum)
+     (bignum-plus-p x))
+    ((bignum bignum)
+     (>= (bignum-compare x y) 0))))
 
 (defun two-arg-= (x y)
   (declare (inline float-infinity-p)
@@ -793,6 +899,100 @@ the first."
     ((complex (or float rational))
      (and (= (realpart x) y)
           (zerop (imagpart x))))))
+
+(macrolet ((make-float-fixnum-range-comparer (operation low high float float-type)
+             (multiple-value-bind (min max)
+                 (ecase float-type
+                   (single-float
+                    (values most-negative-fixnum-single-float most-positive-fixnum-single-float))
+                   (double-float
+                    (values most-negative-fixnum-double-float most-positive-fixnum-double-float)))
+               `(cond
+                  ((or (> ,float ,max)
+                       (< ,float ,min)
+                       (float-inf-or-nan-test ,float nil nil))
+                   nil)
+                  (t
+                   (let ((quot (%unary-truncate ,float)))
+                     ,(ecase operation
+                        (<
+                         `(cond ((or (> quot ,high)
+                                     (< quot ,low)
+                                     (= low high))
+                                 nil)
+                                ((= quot high)
+                                 (and (minusp ,float)
+                                      (/= ,float (float quot))))
+                                ((= quot low)
+                                 (and (plusp ,float)
+                                      (/= ,float (float quot))))
+                                (t)))
+                        (<=
+                         `(cond ((or (> quot ,high)
+                                     (< quot ,low))
+                                 nil)
+                                ((= quot high)
+                                 (or (and (minusp ,float)
+                                          (/= low high))
+                                     (= ,float (float quot))))
+                                ((= quot low)
+                                 (or (plusp ,float)
+                                     (= ,float (float quot))))
+                                (t)))
+                        (<<=
+                         `(cond ((or (> quot ,high)
+                                     (< quot ,low)
+                                     (= low high))
+                                 nil)
+                                ((= quot high)
+                                 (or (minusp ,float)
+                                     (= ,float (float quot))))
+                                ((= quot low)
+                                 (and (plusp ,float)
+                                      (/= ,float (float quot))))
+                                (t)))
+                        (<=<
+                         `(cond ((or (> quot ,high)
+                                     (< quot ,low)
+                                     (= low high))
+                                 nil)
+                                ((= quot high)
+                                 (and (minusp ,float)
+                                      (/= ,float (float quot))))
+                                ((= quot low)
+                                 (or (plusp ,float)
+                                     (= ,float (float quot))))
+                                (t)))))))))
+           (def-range (name op &optional (low-op op) (high-op op))
+               `(defun ,name (low x high)
+                  (declare (explicit-check)
+                           (fixnum low high))
+                  (number-dispatch ((x real))
+                    ((fixnum) (and (,low-op low x)
+                                   (,high-op x high)))
+                    (((foreach single-float double-float))
+                     (make-float-fixnum-range-comparer ,op low high x (dispatch-type x)))
+                    ((bignum) nil)
+                    ((ratio)
+                     (let* ((numerator (numerator x))
+                            (minusp (minusp numerator))
+                            (x (truncate numerator (denominator x))))
+                       (cond ((or (not (fixnump x))
+                                  (< x low)
+                                  (> x high))
+                              nil)
+                             ((= low high)
+                              nil)
+                             ((= x high)
+                              minusp)
+                             ((= x low)
+                              (not minusp))
+                             (t))))))))
+  (def-range range< <)
+  (def-range range<= <=)
+  (def-range range<<= <<= < <=)
+  (def-range range<=< <=< <= <))
+
 
 ;;;; logicals
 
@@ -1373,11 +1573,7 @@ and the number of 0 bits if INTEGER is negative."
 
 (sb-c::when-vop-existsp (:translate sb-vm::ash-modfx)
   (defun sb-vm::ash-mod64 (integer amount)
-    (etypecase integer
-      ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
-      (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
-      (bignum (ldb (byte 64 0)
-                   (ash (logand integer #xffffffffffffffff) amount)))))
+    (ldb (byte 64 0) (ash integer amount)))
 
   (defun sb-vm::ash-modfx (integer amount)
     (if (minusp integer)

@@ -57,9 +57,9 @@
 ;;; down to C wrapper functions.)
 
 #-sb-safepoint
-(defun unblock-gc-signals ()
-  (with-alien ((%unblock-gc-signals (function void) :extern "unblock_gc_signals"))
-    (alien-funcall %unblock-gc-signals)
+(defun unblock-stop-for-gc-signal ()
+  (with-alien ((%unblock (function void) :extern "unblock_gc_stop_signal"))
+    (alien-funcall %unblock)
     nil))
 
 ;;;; interface to installing signal handlers
@@ -90,7 +90,7 @@
     #-sb-safepoint
     (flet ((run-handler (signo info-sap context-sap)
              #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
-             (unblock-gc-signals)
+             (unblock-stop-for-gc-signal)
              (in-interruption () (funcall handler signo info-sap context-sap))))
       (with-pinned-objects (#'run-handler)
         (alien-funcall %sigaction signal
@@ -165,13 +165,6 @@
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
-(defun sigalrm-handler (signal info context)
-  (declare (ignore signal info context))
-  ;; Safepoint invokes the "signal handler" without a signal context,
-  ;; since it's not a signal handler.
-  #-sb-safepoint (declare (type system-area-pointer context))
-  (sb-impl::run-expired-timers))
-
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
   (exit))
@@ -203,7 +196,8 @@
       (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
   #-(or linux android) (%install-handler sigsys #'sigsys-handler)
-  (%install-handler sigalrm #'sigalrm-handler)
+  (when (fboundp 'sigalrm-handler) ; defined in warm build
+    (%install-handler sigalrm (symbol-function 'sigalrm-handler)))
   #-sb-safepoint (%install-handler sigurg #'sigurg-handler)
   (%install-handler sigchld #'sigchld-handler)
   ;; Don't want to silently quit on broken pipes.

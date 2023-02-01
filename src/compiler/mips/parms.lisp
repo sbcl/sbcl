@@ -58,8 +58,8 @@
 (progn
   (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
-  (defconstant linkage-table-entry-size 4)
-  (defconstant linkage-table-growth-direction :down)
+  (defconstant alien-linkage-table-entry-size 4)
+  (defconstant alien-linkage-table-growth-direction :down)
   (setq *linkage-space-predefined-entries* '(("call_into_c" nil)))
 
   ;; C stack grows downward from 0x80000000
@@ -99,22 +99,5 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    two-arg-<=
-    two-arg->=
-    two-arg-/=
-    eql
-    %negate
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    length
-    two-arg-gcd
-    two-arg-lcm)
+    `#(two-arg-<= two-arg->= two-arg-/= ,@common-static-fdefns)
   #'equalp)

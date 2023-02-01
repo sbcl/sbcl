@@ -50,13 +50,16 @@
 
 (sb-xc:defmacro %new-instance (layout size)
   `(let* ((l ,layout)
-          (i (%make-instance ,size)))
+          (i (truly-the ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+                        (%make-instance ,size))))
      (%set-instance-layout i l)
      i))
 (sb-xc:defmacro %new-instance* (layout len)
-  `(let ((i (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
-                (%make-instance ,len)
-                (%make-instance/mixed ,len))))
+  `(let ((i (truly-the
+             ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+             (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
+                 (%make-instance ,len)
+                 (%make-instance/mixed ,len)))))
      (%set-instance-layout i ,layout)
      i))
 
@@ -66,6 +69,7 @@
   (let ((vars (make-gensym-list (length slot-specs))))
     (values (compile nil
                      `(lambda (,@vars)
+                        (declare (optimize (sb-c:store-source-form 0)))
                         (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
 
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
@@ -73,6 +77,7 @@
     (bug "funcallable-structure-instance allocation with slots unimplemented"))
   (values
      (compile nil `(lambda ()
+                     (declare (optimize (sb-c:store-source-form 0)))
                      (let ((object (%make-funcallable-instance ,(dd-length dd))))
                        (setf (%fun-wrapper object) ,(find-layout (dd-name dd)))
                        object)))))
@@ -261,14 +266,17 @@
                                 ,(slot-access-transform :setf '(instance value) key))))
                         (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
                                      ,(slot-access-transform :read '(instance) key))))))
-      ;; Return fragements of code that CLOS can use.
-      ;; We don't return the toplevel DEFUNs because those generally
-      ;; perform an unneeded type-check unless in safety 0.
-      ;; These lambdas don't need to check the instance
-      ;; because it was already subject to type-based dispatch.
-      ;; FIXME: it seems like all these fragments should be packed into a single codebob
-      ;; which will have less overhead than separate blobs.
-      ;; Afaict, the only way to do that is to return one lambda that returns all the lambdas.
+      ;; Return fragements of code that CLOS can use.  We don't return
+      ;; the toplevel DEFUNs because those generally perform an
+      ;; unneeded type-check unless in safety 0.  These CLOS-related
+      ;; lambdas don't need to check the type of the instance because
+      ;; it was already subject to type-based dispatch, and must let
+      ;; unbound markers through for the CLOS machinery to handle.
+      ;;
+      ;; FIXME: it seems like all these fragments should be packed
+      ;; into a single codebob which will have less overhead than
+      ;; separate blobs.  Afaict, the only way to do that is to return
+      ;; one lambda that returns all the lambdas.
       (collect ((result))
         (dolist (dsd (dd-slots dd) (result))
           (binding* ((key (cons dd dsd))
@@ -278,25 +286,24 @@
                      ;; accessor is the global defun
                      (accessor (dsd-accessor-name dsd)))
             (declare (dynamic-extent key))
-            (result (if (dsd-read-only dsd)
+            (result (if (or (dsd-read-only dsd) (not (dsd-always-boundp dsd)))
                         `(named-lambda (setf ,name) (#1=#:v #2=#:x)
                            ,@(if (eql (dsd-type dsd) 't)
                                  ;; no typecheck
                                  `((,writer (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd) #1#) #1#)
                                  `(,(slot-access-transform :setf `(#1# (truly-the ,(dd-name dd) #2#))
-                                                           key :function))))
+                                                           key :function t))))
                         `'(setf ,accessor))
-                    (if nil ; TODO: policy-based selection perhaps?
+                    (if (not (dsd-always-boundp dsd))
                         `(named-lambda ,name (#2#)
-                           ,(if (and (dsd-always-boundp dsd) (dsd-safe-p dsd))
-                                ;; Most slots are always-boundp (don't have a BOA constructor
-                                ;; that omits slots) and safe-p (type-safe for reading),
+                           ,(if (dsd-safe-p dsd)
+                                ;; Most slots are safe-p (type-safe for reading),
                                 ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
                                 ;; plus a rebinding of X with TRULY-THE.
                                 `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
                                 ;; Don't check X, but do check the the fetched value.
                                 (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
-                                                       key)))
+                                                       key :function t)))
                         `',accessor)))))))
 
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
@@ -449,7 +456,7 @@
           comparators)
     ;; use a string for the name since it's not a global function
     `(named-lambda ,(format nil "~A-EQUALP" (dd-name dd)) (a b)
-       (declare (optimize (safety 0)) (type ,(dd-name dd) a b)
+       (declare (optimize (sb-c:store-source-form 0) (safety 0)) (type ,(dd-name dd) a b)
                 (ignorable a b)) ; if zero slots
        (and ,@(group1) ,@(group2) ,@(group3)))))
 
@@ -889,7 +896,7 @@ unless :NAMED is also specified.")))
       (typecase spec
         (symbol
          (typecase spec
-           ((or null (member :conc-name :constructor :copier :predicate :named))
+           ((member nil :conc-name :constructor :copier :predicate :named)
             (warn "slot name of ~S indicates probable syntax error in DEFSTRUCT" spec))
            (keyword
             (style-warn "slot name of ~S indicates possible syntax error in DEFSTRUCT" spec)))
@@ -1036,6 +1043,12 @@ unless :NAMED is also specified.")))
       ;; unless the storage is a specialized numeric vector.
       (when (or rsd-index (neq (dd-type defstruct) 'structure))
         (setf always-boundp t safe-p nil))) ; "demote" to unsafe.
+
+    ;; Check for writable slots in pure structures
+    #+nil
+    (when (dd-pure defstruct)
+      (unless read-only
+        (format t "~&structure ~s slot ~s is writable" defstruct name)))
 
     (let* ((gc-ignorable
             (csubtypep ctype
@@ -1231,7 +1244,10 @@ unless :NAMED is also specified.")))
 ;;; versus
 ;;;    (setf (mystruct-myslot s) newval) ; :MACRO
 ;;; Return NIL on failure.
-(defun slot-access-transform (operation args slot-key &optional (fun-or-macro :macro))
+(defun slot-access-transform (operation args slot-key
+                              &optional
+                                (fun-or-macro :macro)
+                                (external-unbound-handling nil))
   (binding* ((dd (car slot-key))
              (dsd (cdr slot-key))
              ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure)))
@@ -1242,45 +1258,58 @@ unless :NAMED is also specified.")))
        (when (singleton-p args)
          (let* ((instance-form `(the ,(dd-name dd) ,(car args)))
                 (place `(,reader ,instance-form ,index)))
-            ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
-            ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
-            ;; check the type on each read. Assuming that type-checks reject
-            ;; the unbound-marker, then we needn't separately check for it.
-            (cond ((not (dsd-safe-p dsd))
-                   `(the ,type-spec ,place))
-                  (t
-                   (unless (dsd-always-boundp dsd)
-                     (setf place
-                           `(the* ((not (satisfies sb-vm::unbound-marker-p))
-                                   :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
-                                  ,place)))
-                   (if (eq type-spec t) place
-                       `(the* (,type-spec :derive-type-only t) ,place)))))))
+           ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
+           ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
+           ;; check the type on each read. Assuming that type-checks reject
+           ;; the unbound-marker, then we needn't separately check for it, but if
+           ;; we're generating code fragments for CLOS (which does its own
+           ;; EXTERNAL-UNBOUND-HANDLING) we need to let it through explicitly.
+           (cond ((not (dsd-safe-p dsd))
+                  (when (and (not (dsd-always-boundp dsd)) external-unbound-handling)
+                    (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                  `(the ,type-spec ,place))
+                 (t
+                  ;; unless the slot is always bound, or unbound handling is external,
+                  ;; check here for unbound marker.
+                  (unless (or (dsd-always-boundp dsd) external-unbound-handling)
+                    (setf place
+                          `(the* ((not (satisfies sb-vm::unbound-marker-p))
+                                  :context (struct-read-context ,(dd-name dd) . ,(dsd-name dsd)))
+                                 ,place)))
+                  (cond
+                    ((eq type-spec t) place)
+                    (t
+                     (when (and (not (dsd-always-boundp dsd)) external-unbound-handling)
+                       (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                     `(the* (,type-spec :derive-type-only t) ,place))))))))
       (:setf
-        ;; The primitive object slot setting vops take newval last, which matches
-        ;; the order in which a use of SETF has them, but because the vops
-        ;; do not return anything, we have to bind both arguments.
-        (when (and (listp args) (singleton-p (cdr args)))
-          (multiple-value-bind (newval-form instance-form)
-              (ecase fun-or-macro
-                (:function (values (first args) (second args)))
-                (:macro (values (second args) (first args))))
-            (if (eq fun-or-macro :function)
-                ;; This used only for source-transforming (funcall #'(setf myslot) ...).
-                ;; (SETF x) writer functions have been defined as source-transforms instead of
-                ;; inline functions, which improved the semantics around clobbering defstruct
-                ;; writers with random DEFUNs either deliberately or accidentally.
-                ;; Since users can't define source-transforms (not portably anyway),
-                ;; we can easily discern which functions were system-generated.
-                `(let ((#2=#:val
-                        #4=,(if (eq type-spec t)
-                                newval-form
-                                `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
-                                       ,newval-form)))
-                       (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
-                   (,writer #1# ,index #2#)
-                   #2#)
-                `(let ((#1# #3#) (#2# #4#)) (,writer #1# ,index #2#) #2#))))))))
+       ;; The primitive object slot setting vops take newval last, which matches
+       ;; the order in which a use of SETF has them, but because the vops
+       ;; do not return anything, we have to bind both arguments.
+       (when (and (listp args) (singleton-p (cdr args)))
+         (multiple-value-bind (newval-form instance-form)
+             (ecase fun-or-macro
+               (:function (values (first args) (second args)))
+               (:macro (values (second args) (first args))))
+           (if (eq fun-or-macro :function)
+               ;; This used only for source-transforming (funcall #'(setf myslot) ...).
+               ;; (SETF x) writer functions have been defined as source-transforms instead of
+               ;; inline functions, which improved the semantics around clobbering defstruct
+               ;; writers with random DEFUNs either deliberately or accidentally.
+               ;; Since users can't define source-transforms (not portably anyway),
+               ;; we can easily discern which functions were system-generated.
+               `(let ((#2=#:val
+                        #4=,(cond
+                              ((eq type-spec t) newval-form)
+                              (t
+                               (unless (or (dsd-always-boundp dsd) (not external-unbound-handling))
+                                 (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                               `(the* (,type-spec :context (struct-context ,(dd-name dd) . ,(dsd-name dsd)))
+                                      ,newval-form))))
+                      (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
+                  (,writer #1# ,index #2#)
+                  #2#)
+               `(let ((#1# #3#) (#2# #4#)) (,writer #1# ,index #2#) #2#))))))))
 
 ;;; Apply TRANSFORM - a special indicator stored in :SOURCE-TRANSFORM
 ;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
@@ -1304,12 +1333,6 @@ unless :NAMED is also specified.")))
                  (slot-access-transform (if (consp name) :setf :read)
                                         (cdr sexpr) transform :function)))))
     (values result (not result))))
-
-;;; Return a LAMBDA form which can be used to set a slot
-(defun slot-setter-lambda-form (dd dsd)
-  `(lambda (newval instance)
-     (declare (optimize (debug 0)))
-     ,(slot-access-transform :setf '(instance newval) (cons dd dsd))))
 
 ;;; Blow away all the compiler info for the structure CLASS. Iterate
 ;;; over this type, clearing the compiler structure type info, and
@@ -1524,7 +1547,7 @@ or they must be declared locally notinline at each call site.~@:>"
   (declare (type wrapper old-layout new-layout))
   (if (wrapper-info old-layout)
       (let ((old-bitmap (wrapper-bitmap old-layout))
-            (new-bitmap (wrapper-bitmap new-layout)))
+            (new-bitmap (%layout-bitmap new-layout)))
         ;; The number of extra ID words has to match, as does the number of bitmap
         ;; words, or else GC will croak when parsing the bitmap.
         (and (= (calculate-extra-id-words (wrapper-depthoid old-layout))
@@ -1606,26 +1629,17 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;       word2: (u) layout
 ;;;       word3: (t) implementation-fun
 ;;;       word4: (t) tagged slots ...
-;;;   Compact header:
-;;;     External trampoline:             #b...1111        -1
+;;;   Compact header:                    #b...1000        -7
 ;;;       word0:     header/layout
 ;;;       word1: (*) entry address
-;;;       word2: (t) implementation-fun
-;;;       word3: (t) tagged slots ...
-;;;     Internal trampoline:             #b..00110         6
-;;;       word0:     header/layout
-;;;       word1: (*) entry address [= word 4]
-;;;       word2: (t) implementation-fun
-;;;       word3: (t) tagged slot
-;;;       word4: (u) machine code
-;;;       word5: (u) machine code
+;;;       word2: (u) machine instructions
+;;;       word3: (u) machine instructions
+;;;       word4: (t) implementation-fun
+;;;       word5: (t) tagged slots ...
 ;;; (*) entry address can be treated as either tagged or raw.
 ;;;     For some architectures it has a lowtag, but points to
 ;;;     read-only space. For others it is a fixnum.
 ;;;     In either case the GC need not observe the value.
-;;;     Compact-header with external trampoline can indicate
-;;;     all slots as tagged. The other two cases above have at
-;;;     least one slot which must be marked raw.
 ;;;
 ;;; Ordinary instance with only tagged slots:
 ;;;   Non-compact header:                #b...1110        -2
@@ -2044,7 +2058,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                   (if (eq type t)
                                       var
                                       `(the* (,type :context
-                                              (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                              (struct-context ,(dd-name dd) . ,(dsd-name dsd)))
                                              ,var))))
                               (dd-slots dd) lambda-list))))))
     (destructuring-bind (llks &optional req opt rest keys aux) args
@@ -2177,10 +2191,14 @@ or they must be declared locally notinline at each call site.~@:>"
                                             metaclass-constructor)
           (dd-slots dd)
           (mapcar (lambda (slot-name)
-                    (make-dsd slot-name t (symbolicate conc-name slot-name)
-                              (pack-dsd-bits (prog1 slot-index (incf slot-index))
-                                             nil t t nil nil)
-                              nil))
+                    (multiple-value-bind (slot-name type)
+                        (if (consp slot-name)
+                            (values (first slot-name) (second slot-name))
+                            (values slot-name t))
+                        (make-dsd slot-name type (symbolicate conc-name slot-name)
+                                  (pack-dsd-bits (prog1 slot-index (incf slot-index))
+                                                 nil t t nil nil)
+                                  nil)))
                   slot-names)
           (dd-length dd) slot-index
           (dd-bitmap dd) (calculate-dd-bitmap dd))
@@ -2232,8 +2250,17 @@ or they must be declared locally notinline at each call site.~@:>"
                           `((macrolet ((the-layout ()
                                          (info :type :compiler-layout ',class-name)))
                               (setf (%fun-wrapper object) (the-layout)))))))
-             `((defun ,constructor (,@slot-names &aux (object ,allocate))
+             `((defun ,constructor (,@(mapcar (lambda (x)
+                                                (if (consp x)
+                                                    (car x)
+                                                    x))
+                                       slot-names) &aux (object ,allocate))
                  ,@set-layout
+                 #+x86-64
+                 ,@(when (and (eq dd-type 'funcallable-structure)
+                              ;; fmt-control is not an executable function
+                              (neq class-name 'sb-format::fmt-control))
+                     '((sb-vm::write-funinstance-prologue object)))
                  ,@(mapcar (lambda (dsd)
                              `(setf (,(dsd-accessor-name dsd) object) ,(dsd-name dsd)))
                            (dd-slots dd))
@@ -2350,8 +2377,8 @@ or they must be declared locally notinline at each call site.~@:>"
                           (flet ((pred (x y)
                                    (or (string< x y)
                                        (and (string= x y)
-                                            (let ((xpn (package-name (cl:symbol-package x)))
-                                                  (ypn (package-name (cl:symbol-package y))))
+                                            (let ((xpn (cl:package-name (cl:symbol-package x)))
+                                                  (ypn (cl:package-name (cl:symbol-package y))))
                                               (string< xpn ypn))))))
                             (sort (%hash-table-alist subclassoids)
                                   #'pred

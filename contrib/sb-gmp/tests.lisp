@@ -1,5 +1,6 @@
 (defpackage "SB-GMP-TESTS"
-  (:use "COMMON-LISP" "SB-GMP" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "COMMON-LISP" "SB-GMP"))
 
 (in-package "SB-GMP-TESTS")
 

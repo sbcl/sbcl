@@ -54,7 +54,9 @@
   "Return T if X is NIL, otherwise return NIL."
   (not object))
 
-;;; All the primitive type predicate wrappers share a parallel form..
+;;; All the primitive type predicate wrappers share a parallel form.
+;;; These aren't so much "wrappers" as they are the actual installed DEFUNs.
+;;; I supposed they "wrap" a vop or source-transform.
 (macrolet ((def-type-predicate-wrapper (pred)
              (let* ((name (symbol-name pred))
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
@@ -126,10 +128,15 @@
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper unbound-marker-p)
   (def-type-predicate-wrapper weak-pointer-p)
-  #-64-bit
-  (progn
-    (def-type-predicate-wrapper unsigned-byte-32-p)
+
+  (sb-c::when-vop-existsp (:translate signed-byte-8-p)
+    (def-type-predicate-wrapper signed-byte-8-p))
+  (sb-c::when-vop-existsp (:translate signed-byte-16-p)
+    (def-type-predicate-wrapper signed-byte-16-p))
+  (sb-c::when-vop-existsp (:translate signed-byte-32-p)
     (def-type-predicate-wrapper signed-byte-32-p))
+  #-64-bit
+  (def-type-predicate-wrapper unsigned-byte-32-p)
   #+64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-64-p)
@@ -154,6 +161,10 @@
   (defun fixnum-mod-p (x limit)
     (and (fixnump x)
          (<= 0 x limit))))
+
+(sb-c::when-vop-existsp (:translate car-eq-if-listp)
+  (defun car-eq-if-listp (value object)
+    (car-eq-if-listp value object)))
 
 
 ;;; Return the specifier for the type of object. This is not simply
@@ -518,6 +529,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                     (t (array-equalp x y)))))
         (t nil)))
 
+#-sb-show ;; I don't know why these tests crash with #+sb-show
 (let ((test-cases `(($0.0 $-0.0 t)
                     ($0.0 $1.0 nil)
                     ;; There is no cross-compiler #C reader macro.

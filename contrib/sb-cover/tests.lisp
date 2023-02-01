@@ -1,19 +1,13 @@
-(defpackage sb-cover-test (:use :cl :asdf :uiop))
+(defpackage sb-cover-test (:use :cl))
 
 (in-package sb-cover-test)
 
-(defparameter *source-directory*
-  (system-source-directory :sb-cover))
-(defparameter *output-directory*
-  (apply-output-translations *source-directory*))
-
-(setf *default-pathname-defaults* (translate-logical-pathname *default-pathname-defaults*))
+(defparameter *source-directory* cl-user::*source-directory*)
+(defparameter *output-directory* cl-user::*coverage-report-directory*)
 
 (defun compile-load (x)
-  (flet ((in-dir (dir type)
-           (translate-logical-pathname (subpathname dir x :type type))))
-    (load (compile-file (in-dir *source-directory* "lisp")
-                        :output-file (in-dir *output-directory* "fasl")))))
+  (load (compile-file (merge-pathnames (merge-pathnames x ".*lisp") *source-directory*)
+                      :output-file *output-directory*)))
 
 (defun report ()
   (handler-case
@@ -41,13 +35,14 @@
 (catch 'ok
   (handler-case
       (sb-cover:report #p"/tmp/foo")
-    (error ()
-      (throw 'ok nil)))
+    (error (c)
+      (when (search "does not designate a directory" (princ-to-string c))
+        (throw 'ok nil))))
   (error "REPORT with a non-pathname directory did not signal an error."))
 
 (report)
 
-(assert (probe-file (subpathname *output-directory* "cover-index.html")))
+(assert (probe-file (merge-pathnames "cover-index.html" *output-directory*)))
 
 ;;; Only the top level forms have been executed
 (assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
@@ -133,6 +128,25 @@
 (assert (= (sb-cover::ok-of (getf sb-cover::*counts* :expression))
            (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 
-;; Clean up after the tests
-(map nil #'delete-file
-     (directory (merge-pathnames #p"*.html" *output-directory*)))
+;; Make sure we handle non-local exits from function calls correctly.
+(sb-cover:clear-coverage)
+(compile-load "test-data-5")
+(outer)
+(report)
+
+(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
+(assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+(assert (= 12 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 16 (sb-cover::all-of (getf sb-cover::*counts* :expression))))
+
+;; And then ensure that non-local exits from local calls are handled
+;; correctly as well.
+(sb-cover:clear-coverage)
+(compile-load "test-data-6")
+(nlx-from-flet)
+(report)
+
+(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
+(assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+(assert (= 7 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 11 (sb-cover::all-of (getf sb-cover::*counts* :expression))))

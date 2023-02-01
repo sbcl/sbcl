@@ -213,7 +213,7 @@
   (:results (result :scs (any-reg))
             (num :scs (any-reg control-stack)))
   (:save-p :force-to-stack)
-  (:args-var top-tn-ref)
+  (:arg-refs top-tn-ref)
   (:vop-var vop)
   (:generator 30
     ;; The 'top' arg contains the %esp value saved at the time the

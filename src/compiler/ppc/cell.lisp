@@ -75,7 +75,7 @@
       (inst stwx new thread-base-tn temp)
       DONT-STORE-TLS
 
-      (inst cmpwi result no-tls-value-marker-widetag)
+      (inst cmpwi result no-tls-value-marker)
       (inst bne CHECK-UNBOUND))
 
     (inst li temp (- (* symbol-value-slot n-word-bytes)
@@ -107,7 +107,7 @@
 
 ;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
 (define-vop (symbol-global-value checked-cell-ref)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
@@ -118,7 +118,7 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 #+sb-thread
 (progn
@@ -129,7 +129,7 @@
     (:generator 4
       (loadw tls-slot symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx temp thread-base-tn tls-slot)
-      (inst cmpwi temp no-tls-value-marker-widetag)
+      (inst cmpwi temp no-tls-value-marker)
       (inst beq GLOBAL-VALUE)
       (inst stwx value thread-base-tn tls-slot)
       (inst b DONE)
@@ -139,7 +139,7 @@
 
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
-    (:translate symeval)
+    (:translate symbol-value)
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
@@ -148,7 +148,7 @@
     (:generator 9
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx value thread-base-tn value)
-      (inst cmpwi value no-tls-value-marker-widetag)
+      (inst cmpwi value no-tls-value-marker)
       (inst bne CHECK-UNBOUND)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       CHECK-UNBOUND
@@ -162,11 +162,11 @@
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
     (:policy :fast)
-    (:translate symeval)
+    (:translate symbol-value)
     (:generator 8
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx value thread-base-tn value)
-      (inst cmpwi value no-tls-value-marker-widetag)
+      (inst cmpwi value no-tls-value-marker)
       (inst bne DONE)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       DONE)))
@@ -175,9 +175,9 @@
 #-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (fast-symbol-value fast-symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (set %set-symbol-global-value)))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
@@ -193,7 +193,7 @@
   (:generator 9
     (loadw value object symbol-tls-index-slot other-pointer-lowtag)
     (inst lwzx value thread-base-tn value)
-    (inst cmpwi value no-tls-value-marker-widetag)
+    (inst cmpwi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -211,7 +211,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; car slot, so we have to strip off the two low bits to make sure

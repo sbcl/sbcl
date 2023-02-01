@@ -309,9 +309,6 @@
 (define-source-transform oddp (x) `(logtest ,x 1))
 (define-source-transform evenp (x) `(not (logtest ,x 1)))
 
-;;; Note that all the integer division functions are available for
-;;; inline expansion.
-
 (macrolet ((deffrob (fun)
              `(define-source-transform ,fun (x &optional (y nil y-p))
                 (declare (ignore y))
@@ -1106,6 +1103,13 @@
 (defun interval-sqr (x)
   (declare (type interval x))
   (interval-func (lambda (x) (sb-xc:* x x)) (interval-abs x)))
+
+(defun interval<n (interval n)
+  (let ((high (interval-high interval)))
+    (and high
+         (if (consp high)
+             (<= (car high) n)
+             (< high n)))))
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -1450,7 +1454,6 @@
                        #'sb-xc:*))
 
 (defoptimizer (%multiply-high derive-type) ((x y) node)
-  (declare (ignore x y))
   (%signed-multiply-high-derive-type-optimizer node))
 
 (defun /-derive-type-aux (x y same-arg)
@@ -1611,6 +1614,8 @@
          ;; are REAL so the result is a REAL.
          'real)))
 
+(defvar *conservative-quotient-bound* t)
+
 (defun truncate-derive-type-quot (number-type divisor-type)
   (let* ((rem-type (rem-result-type number-type divisor-type))
          (number-interval (numeric-type->interval number-type))
@@ -1627,11 +1632,16 @@
                         (interval-high divisor-interval))))
              (specifier-type (if (listp res) res 'integer))))
           (t
-           (let ((quot (truncate-quotient-bound
-                        (interval-div number-interval
-                                      divisor-interval))))
-             (specifier-type `(integer ,(or (interval-low quot) '*)
-                                       ,(or (interval-high quot) '*))))))))
+           (multiple-value-bind (quot conservative)
+               (if (and (eql (interval-high divisor-interval) 1)
+                        (eql (interval-low divisor-interval) 1))
+                   (values number-interval nil)
+                   (values (interval-div number-interval
+                                         divisor-interval)))
+             (let* ((*conservative-quotient-bound* conservative)
+                    (quot (truncate-quotient-bound quot)))
+               (specifier-type `(integer ,(or (interval-low quot) '*)
+                                         ,(or (interval-high quot) '*)))))))))
 
 (defun truncate-derive-type-rem (number-type divisor-type)
   (let* ((rem-type (rem-result-type number-type divisor-type))
@@ -1695,7 +1705,7 @@
         (rem (two-arg-derive-type number divisor
                                   #'truncate-derive-type-rem-aux #'rem)))
     (when (and quot rem)
-      (make-values-type :required (list quot rem)))))
+      (make-values-type (list quot rem)))))
 
 (defun %unary-truncate-derive-type-aux (number)
   (truncate-derive-type-quot number (specifier-type '(integer 1 1))))
@@ -1714,6 +1724,22 @@
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
                        #'%unary-truncate))
+
+(defoptimizer (unary-truncate derive-type) ((number))
+  (let* ((one (specifier-type '(integer 1 1)))
+         (quot (one-arg-derive-type number
+                                    (lambda (x)
+                                      (truncate-derive-type-quot-aux x one nil))
+                                    #'truncate))
+         (rem (one-arg-derive-type number
+                                   (lambda (x) (truncate-derive-type-rem-aux x one nil))
+                                   #'rem)))
+    (when (and quot rem)
+      (make-values-type (list quot rem)))))
+
+(deftransform unary-truncate ((number) (integer))
+  '(values number 0))
+
 #-round-float
 (progn
   (defun ftruncate-derive-type-quot (number-type divisor-type)
@@ -1742,7 +1768,7 @@
           (rem (two-arg-derive-type number divisor
                                     #'truncate-derive-type-rem-aux #'rem)))
       (when (and quot rem)
-        (make-values-type :required (list quot rem)))))
+        (make-values-type (list quot rem)))))
 
 
   (defoptimizer (%unary-ftruncate derive-type) ((number))
@@ -1868,7 +1894,7 @@
                      (rem (two-arg-derive-type
                            number divisor #'derive-r #'mod)))
                  (when (and quot rem)
-                   (make-values-type :required (list quot rem))))))))))
+                   (make-values-type (list quot rem))))))))))
 
   (def floor floor-quotient-bound floor-rem-bound)
   (def ceiling ceiling-quotient-bound ceiling-rem-bound))
@@ -1879,7 +1905,8 @@
   (let ((result-sym (gensym)))
     `(let ((,result-sym ,result))
        (,direction ,result-sym
-                   (if (and (floatp ,bound)
+                   (if (and *conservative-quotient-bound*
+                            (floatp ,bound)
                             (/= ,result-sym 0))
                        1
                        0)))))
@@ -2217,7 +2244,6 @@
                      (t `(,high))))))
 
 (defoptimizer (random derive-type) ((bound &optional state))
-  (declare (ignore state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
 
 ;;;; miscellaneous derive-type methods
@@ -2317,7 +2343,7 @@
              #-sb-xc-host type))))))
 
 (defoptimizer (values derive-type) ((&rest values))
-  (make-values-type :required (mapcar #'lvar-type values)))
+  (make-values-type (mapcar #'lvar-type values)))
 
 (defun signum-derive-type-aux (type)
   (if (eq (numeric-type-complexp type) :complex)
@@ -2412,7 +2438,6 @@
     (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (declare (ignore posn num))
   (let ((size (lvar-type size)))
     (if (and (numeric-type-p size)
              (csubtypep size (specifier-type 'integer)))
@@ -2423,7 +2448,6 @@
         *universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
-  (declare (ignore num))
   (let ((size (lvar-type size))
         (posn (lvar-type posn)))
     (if (and (numeric-type-p size)
@@ -2470,11 +2494,9 @@
                  `(unsigned-byte* ,raw-bit-count)))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
-  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
-  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word)
@@ -2524,7 +2546,6 @@
              (logand int (lognot mask)))))
 
 (defoptimizer (mask-signed-field derive-type) ((size x))
-  (declare (ignore x))
   (let ((size (lvar-type size)))
     (if (numeric-type-p size)
         (let ((size-high (numeric-type-high size)))
@@ -2731,7 +2752,7 @@
 (macrolet ((def (name fun type &optional (types `(,type ,type)))
              `(when-vop-existsp (:translate ,name)
                 (defun ,name (x y type)
-                  (declare (,type x y))
+                  (declare (type ,type x y))
                   (let ((r (,fun x y)))
                     (unless (typep r type)
                       (error 'type-error :expected-type type :datum r))
@@ -2892,6 +2913,15 @@
                         `(ash x ,shift))
                    (logand x ,mask))))))
 
+;;; Floats could be transformed if we had some declaration to ignore NaNs
+(deftransform truncate ((x y) (rational (or (rational (0) *)
+                                            (rational * (0))))
+                        *
+                        :important nil)
+  (if (same-leaf-ref-p x y)
+      `(values 1 0)
+      (give-up-ir1-transform)))
+
 ;;; And the same for REM.
 (deftransform rem ((x y) (integer (constant-arg integer)) *)
   "convert remainder mod 2^k to LOGAND"
@@ -2907,7 +2937,6 @@
 
 (defoptimizer (truncate constraint-propagate)
     ((x y) node gen)
-  (declare (ignore node x))
   (when (csubtypep (lvar-type y) (specifier-type 'rational))
     (let ((var (ok-lvar-lambda-var y gen)))
       (when var
@@ -2915,7 +2944,6 @@
 
 (defoptimizer (/ constraint-propagate)
     ((x y) node gen)
-  (declare (ignore node x))
   (when (csubtypep (lvar-type y) (specifier-type 'rational))
     (let ((var (ok-lvar-lambda-var y gen)))
       (when var
@@ -3386,7 +3414,9 @@
          (when (eql sum #x20)
            (let ((sum (+ ac bc)))
              (or (and (> sum 161) (< sum 213))
+                 #-sb-unicode
                  (and (> sum 415) (< sum 461))
+                 #-sb-unicode
                  (and (> sum 463) (< sum 477))))))))
 
 (defun transform-constant-char-equal (a b &optional (op 'char=))
@@ -3678,21 +3708,17 @@
               ;; and not adjustable, because #() and "" are equal.
               (or (array-type-non-empty-p x-type)
                   (array-type-non-empty-p y-type))
-              (flet ((upgraded-et (type)
-                       (multiple-value-bind (specialized supetype)
-                           (array-type-upgraded-element-type type)
-                         (or supetype specialized))))
-                (let ((number-ctype (specifier-type 'number))
-                      (x-et (upgraded-et x-type))
-                      (y-et (upgraded-et y-type)))
-                  (and (neq x-et *wild-type*)
-                       (neq y-et *wild-type*)
-                       (cond ((types-equal-or-intersect x-et y-et)
-                              nil)
-                             ((csubtypep x-et number-ctype)
-                              (not (types-equal-or-intersect y-et number-ctype)))
-                             ((types-equal-or-intersect y-et number-ctype)
-                              (not (types-equal-or-intersect x-et number-ctype))))))))
+              (let ((number-ctype (specifier-type 'number))
+                    (x-et (type-array-element-type x-type))
+                    (y-et (type-array-element-type y-type)))
+                (and (neq x-et *wild-type*)
+                     (neq y-et *wild-type*)
+                     (cond ((types-equal-or-intersect x-et y-et)
+                            nil)
+                           ((csubtypep x-et number-ctype)
+                            (not (types-equal-or-intersect y-et number-ctype)))
+                           ((types-equal-or-intersect y-et number-ctype)
+                            (not (types-equal-or-intersect x-et number-ctype)))))))
          nil)
         ((types-equal-or-intersect x-type y-type)
          (if (and (types-equal-or-intersect x-type combination-type)
@@ -3805,12 +3831,29 @@
   (neq *empty-type* (type-intersection (specifier-type 'float)
                                        (lvar-type lvar))))
 
+#+(or arm arm64 x86-64 x86)
+(flet ((maybe-invert (op inverted x y)
+         (cond
+           ((and (not (vop-existsp :translate >=))
+                 (csubtypep (lvar-type x) (specifier-type 'float))
+                 (csubtypep (lvar-type y) (specifier-type 'float)))
+            `(or (,op x y) (= x y)))
+           ;; Don't invert if either argument can be a float (NaNs)
+           ((or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
+            (give-up-ir1-transform))
+           (t
+            `(if (,inverted x y) nil t)))))
+  (deftransform >= ((x y) (number number) * :node node)
+    "invert or open code"
+    (maybe-invert '> '< x y))
+  (deftransform <= ((x y) (number number) * :node node)
+    "invert or open code"
+    (maybe-invert '< '> x y)))
+
+;;; FIXME: for some reason these do not survive cold-init with <=
+#-(or arm arm64 x86-64 x86)
 (flet ((maybe-invert (node op inverted x y)
          (cond
-           #+(or x86-64 arm64) ;; have >=/<= VOPs
-           ((and (csubtypep (lvar-type x) (specifier-type 'float))
-                 (csubtypep (lvar-type y) (specifier-type 'float)))
-            (give-up-ir1-transform))
            ;; Don't invert if either argument can be a float (NaNs)
            ((or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
             (delay-ir1-transform node :constraint)
@@ -3912,16 +3955,19 @@
           (t
            (do* ((i (1- nargs) (1- i))
                  (last nil current)
-                 (current (sb-xc:gensym) (sb-xc:gensym))
+                 (current (gensym) (gensym))
                  (vars (list current) (cons current vars))
                  (result t (if not-p
                                `(if (,predicate ,current ,last)
                                     nil ,result)
                                `(if (,predicate ,current ,last)
                                     ,result nil))))
-               ((zerop i)
-                `((lambda ,vars (declare (type ,type ,@vars)) ,result)
-                  ,@args)))))))
+                ((zerop i)
+                 `((lambda ,vars
+                     ;; the first two arguments will be checked by the comparison function.
+                     (declare (type ,type ,@(subseq vars 2)))
+                     ,result)
+                   ,@args)))))))
 
 (define-source-transform = (&rest args) (multi-compare '= args nil 'number))
 (define-source-transform < (&rest args) (multi-compare '< args nil 'real))
@@ -4029,6 +4075,48 @@
                   `(,',comparator x ,(,round (lvar-value y)))))))
   (def < ceiling)
   (def > floor))
+
+(macrolet ((def (comparator not-equal round)
+             `(progn
+                (deftransform ,comparator
+                    ((x y) (rational (constant-arg float)))
+                  "open-code RATIONAL to FLOAT comparison"
+                  (let ((y (lvar-value y)))
+                    (when (float-infinity-or-nan-p y)
+                      (give-up-ir1-transform))
+                    (setf y (rational y))
+                    (multiple-value-bind (qout rem)
+                        (if (csubtypep (lvar-type x)
+                                       (specifier-type 'integer))
+                            (,round y)
+                            (values y 0))
+                      `(,(if (zerop rem)
+                             ',comparator
+                             ',not-equal)
+                        x ,qout))))
+                (deftransform ,comparator
+                    ((x y) (integer (constant-arg ratio)))
+                  "open-code INTEGER to RATIO comparison"
+                  `(,',not-equal x ,(,round (lvar-value y)))))))
+  (def <= < ceiling)
+  (def >= > floor))
+
+(macrolet ((def (name x y type-x type-y)
+             `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node)
+                (cond ((csubtypep (lvar-type i) (specifier-type 'fixnum))
+                       (give-up-ir1-transform))
+                      (t
+                       ;; Give the range-transform optimizers a chance to trigger.
+                       (delay-ir1-transform node :ir1-phases)
+                       `(and (fixnump i)
+                             (let ((i (truly-the fixnum i)))
+                               (,',name ,',x ,',y))))))))
+
+  (def < i f (integer #.most-negative-fixnum) fixnum)
+  (def > f i fixnum (integer #.most-negative-fixnum))
+
+  (def > i f (integer * #.most-positive-fixnum) fixnum)
+  (def < f i fixnum (integer * #.most-positive-fixnum)))
 
 (deftransform = ((x y) (rational (constant-arg float)))
   "open-code RATIONAL to FLOAT comparison"
@@ -4637,7 +4725,6 @@
           (lambda (node) (check-format-args node fun arg-n nil)))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
-  (declare (ignore control args))
   (when (lvar-value-is-nil dest)
     (specifier-type 'simple-string)))
 
@@ -4837,7 +4924,6 @@
            result-typeoid))))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
-  (declare (ignore function))
   (when (csubtypep (lvar-type nameoid)
                    (specifier-type 'null))
     (values-specifier-type '(values function boolean boolean))))
@@ -5029,8 +5115,7 @@
 
 ;;; Can fold only when time-zone is supplied.
 (defoptimizer (encode-universal-time optimizer)
-    (#1=(second minute hour date month year time-zone) node)
-  (declare (ignore . #1#))
+    ((second minute hour date month year time-zone) node)
   (when (every #'constant-lvar-p (basic-combination-args node))
     (constant-fold-call node)
     t))
@@ -5076,7 +5161,7 @@
     (base-char `(sb-impl::%make-base-string-ostream))
     (t (give-up-ir1-transform))))
 
-(flet ((xform (symbol match-kind fallback)
+(flet ((xform (symbol match-kind)
          (when (constant-lvar-p symbol)
            (let* ((symbol (lvar-value symbol))
                   (kind (info :variable :kind symbol))
@@ -5103,14 +5188,15 @@
                             (boundp symbol)
                             (typep (symbol-value symbol) '(or character symbol
                                                            fixnum #+64-bit single-float))))
-               (return-from xform symbol))))
-         fallback))
+               symbol)))))
   (deftransform symbol-global-value ((symbol))
-    (xform symbol :global `(sym-global-val symbol)))
+    (or (xform symbol :global)
+        (give-up-ir1-transform)))
   (deftransform symbol-value ((symbol))
-    (xform symbol :special `(symeval symbol))))
+    (or (xform symbol :special)
+        (give-up-ir1-transform))))
 
-(deftransform symeval ((symbol) ((constant-arg symbol)))
+(deftransform symbol-value ((symbol) ((constant-arg symbol)))
   (let* ((symbol (lvar-value symbol))
          (kind (info :variable :kind symbol)))
     (if (and (eq kind :constant)
@@ -5136,6 +5222,13 @@
   (deftransform set ((symbol value) ((constant-arg symbol) t))
     (xform symbol :special)))
 
+(deftransform symbol-package ((s) (symbol) *)
+  (if (cast-p (lvar-uses s))
+      ;; Avoid inlining a type check because %symbol-package is not
+      ;; cast-externally-checkable-p
+      (give-up-ir1-transform)
+      `(%symbol-package s)))
+
 (deftransforms (prin1-to-string princ-to-string) ((object) (number) * :important nil)
   `(stringify-object object))
 
@@ -5145,7 +5238,6 @@
 #+sb-thread
 (progn
 (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
-  (declare (ignore mutex))
   (let ((type (lvar-fun-type function)))
     (when (fun-type-p type)
       (let ((null-p (not (and (constant-lvar-p waitp)
@@ -5168,6 +5260,12 @@
           (t
            (give-up-ir1-transform)))))
 
+;;; Add transforms in reverse of the order you want them tried
+;;; (because of stupid semantics)
+(deftransform fboundp ((symbol) (symbol))
+  `(let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+     (and (not (eq fdefn 0))
+          (fdefn-fun (truly-the fdefn fdefn)))))
 ;;; Normally we don't create fdefns by side-effect of calling FBOUNDP,
 ;;; but this transform is neutral in terms of the sum of code and data size.
 ;;; So for the cost of an FDEFN that might never store a function, the code
@@ -5186,7 +5284,7 @@
                        (block-start succ)
                        (let ((start-cleanup (block-start-cleanup succ)))
                          (and (neq (node-enclosing-cleanup node) start-cleanup)
-                              (do-nested-cleanups (cleanup (node-lexenv node) t)
+                              (do-nested-cleanups (cleanup (node-block node) t)
                                 (when (eq cleanup start-cleanup)
                                   (return t))
                                 (when (eq (cleanup-kind cleanup) :dynamic-extent)
@@ -5196,3 +5294,223 @@
            nil)
           (t
            (give-up-ir1-transform)))))
+
+(defun next-node (node-or-block &key type (cast t) single-predecessor)
+  (let ((node node-or-block)
+        ctran)
+    (tagbody
+       (when (block-p node-or-block)
+         (when (and single-predecessor
+                    (cdr (block-pred node-or-block)))
+           (return-from next-node))
+         (setf ctran (block-start node-or-block))
+         (go :next-ctran))
+     :next
+       (setf ctran (node-next node))
+     :next-ctran
+       (cond (ctran
+              (setf node (ctran-next ctran))
+              (typecase node
+                (ref (unless (eq type :non-ref)
+                       (return-from next-node node)))
+                (cast
+                 (unless cast
+                   (return-from next-node node)))
+                (enclose)
+                (t (return-from next-node
+                     (unless (eq type :ref)
+                       node))))
+              (go :next))
+             (t
+              (let* ((succ (first (block-succ (node-block node))))
+                     (start (block-start succ)))
+                (when (and start
+                           (not (and single-predecessor
+                                     (cdr (block-pred succ)))))
+                  (setf ctran start)
+                  (go :next-ctran))))))))
+
+(defun range-transform (op a b node)
+  (unless (delay-ir1-optimizer node :ir1-phases)
+    (let ((if (node-dest node)))
+      (labels ((flip (op)
+                 (case op
+                   (< '>)
+                   (> '<)
+                   (<= '>=)
+                   (>= '<=)))
+               (invert (op)
+                 (case op
+                   (< '>=)
+                   (> '<=)
+                   (<= '>)
+                   (>= '<)))
+               (try (consequent alternative)
+                 (let ((then (next-node consequent :type :non-ref
+                                                   :single-predecessor t)))
+                   (when (and (combination-p then)
+                              (eq (combination-kind then) :known)) ;; no notinline
+                     (let ((op2 (combination-fun-debug-name then)))
+                       (when (memq op2 '(< <= > >=))
+                         (flet ((try2 (&optional reverse-if)
+                                  (let ((a a)
+                                        (b b)
+                                        (op op)
+                                        (op2 op2))
+                                    (destructuring-bind (a2 b2) (combination-args then)
+                                      (when (and (cond ((same-leaf-ref-p a a2))
+                                                       ((same-leaf-ref-p a b2)
+                                                        (rotatef a2 b2)
+                                                        (setf op2 (flip op2)))
+                                                       ((same-leaf-ref-p b a2)
+                                                        (rotatef a b)
+                                                        (setf op (flip op))))
+                                                 (memq op2
+                                                       (case op
+                                                         ((< <=) '(> >=))
+                                                         ((> >=) '(< <=))))
+                                                 (let ((after-then (next-node then)))
+                                                   (if (if-p after-then)
+                                                       (eq alternative
+                                                           (if reverse-if
+                                                               (if-consequent after-then)
+                                                               (if-alternative after-then)))
+                                                       (unless reverse-if
+                                                         (let ((ref (next-node alternative :type :ref :cast nil)))
+                                                           (and ref
+                                                                (constant-p (ref-leaf ref))
+                                                                (null (constant-value (ref-leaf ref)))
+                                                                (eq (node-lvar ref)
+                                                                    (node-lvar then))
+                                                                (eq (next-node ref)
+                                                                    (next-node then))))))))
+                                        (let* ((integerp (csubtypep (lvar-type a) (specifier-type 'integer)))
+                                              (form
+                                                (cond ((when (and integerp
+                                                                  (constant-lvar-p b)
+                                                                  (constant-lvar-p b2))
+                                                         (let ((b (lvar-value b))
+                                                               (b2 (lvar-value b2)))
+                                                           (multiple-value-bind (l h)
+                                                               (case op
+                                                                 (>=
+                                                                  (if (eq op2 '<=)
+                                                                      (values b b2)
+                                                                      (values b (1- b2))))
+                                                                 (<=
+                                                                  (if (eq op2 '>=)
+                                                                      (values b2 b)
+                                                                      (values (1+ b2) b)))
+                                                                 (>
+                                                                  (if (eq op2 '<=)
+                                                                      (values (1+ b) b2)
+                                                                      (values (1+ b) (1- b2))))
+                                                                 (<
+                                                                  (if (eq op2 '>=)
+                                                                      (values b2 (1- b))
+                                                                      (values (1+ b2) (1- b)))))
+                                                             (cond ((not l) nil)
+                                                                   ((and (= l most-negative-fixnum)
+                                                                         (= h most-positive-fixnum))
+                                                                    `(fixnump x))
+                                                                   ((and (= l 0)
+                                                                         (= h most-positive-word))
+                                                                    `(#-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p
+                                                                      x))
+                                                                   ((and (= l (- (expt 2 (1- sb-vm:n-word-bits))))
+                                                                         (= h (1- (expt 2 (1- sb-vm:n-word-bits)))))
+                                                                    `(#-64-bit signed-byte-32-p #+64-bit signed-byte-64-p
+                                                                      x)))))))
+                                                      ((not (and (csubtypep (lvar-type b) (specifier-type 'fixnum))
+                                                                 (csubtypep (lvar-type b2) (specifier-type 'fixnum))))
+                                                       nil)
+                                                      ((or (not integerp)
+                                                           (and (vop-existsp :translate range<)
+                                                                (or (vop-existsp :named range<)
+                                                                    (and (constant-lvar-p b)
+                                                                         (constant-lvar-p b2)))))
+                                                       `(,(case op
+                                                            (>=
+                                                             (case op2
+                                                               (<= 'range<=)
+                                                               (< 'range<=<)))
+                                                            (>
+                                                             (case op2
+                                                               (<= 'range<<=)
+                                                               (< 'range<)))
+                                                            (<=
+                                                             (case op2
+                                                               (>= 'range<=)
+                                                               (> 'range<<=)))
+                                                            (<
+                                                             (case op2
+                                                               (>= 'range<=<)
+                                                               (> 'range<))))
+                                                         l x h))
+                                                      ((csubtypep (lvar-type a) (specifier-type 'fixnum))
+                                                       nil)
+                                                      (t
+                                                       `(and (fixnump x)
+                                                             ,(case op
+                                                                (>=
+                                                                 (case op2
+                                                                   (<= '(<= l (truly-the fixnum x) h))
+                                                                   (< '(and (<= l (truly-the fixnum x)) (< (truly-the fixnum x) h)))))
+                                                                (>
+                                                                 (case op2
+                                                                   (<= '(and (< l (truly-the fixnum x)) (<= (truly-the fixnum x) h)))
+                                                                   (< '(< l (truly-the fixnum x) h))))
+                                                                (<=
+                                                                 (case op2
+                                                                   (>= '(<= l (truly-the fixnum x) h))
+                                                                   (> '(and (< l (truly-the fixnum x)) (<= (truly-the fixnum x) h)))))
+                                                                (<
+                                                                 (case op2
+                                                                   (>= '(and (<= l (truly-the fixnum x)) (< (truly-the fixnum x) h)))
+                                                                   (> '(< l (truly-the fixnum x) h))))))))))
+                                          (when form
+                                            (kill-if-branch-1 if (if-test if)
+                                                              (node-block if)
+                                                              alternative)
+                                            (setf (combination-args node) nil)
+                                            (setf (lvar-dest b) then
+                                                  (lvar-dest a) then)
+                                            (flush-combination node)
+                                            (setf (combination-args then)
+                                                  (case op
+                                                    ((>= >)
+                                                     (list b a b2))
+                                                    (t
+                                                     (list b2 a b))))
+                                            (flush-dest a2)
+                                            (transform-call then
+                                                            `(lambda (l x h)
+                                                               (declare (ignorable l h))
+                                                               ,(if reverse-if
+                                                                    `(not ,form)
+                                                                    form))
+                                                            'range<))
+                                          t))))))
+                           (cond ((try2))
+                                 (t
+                                  (setf op2 (invert op2))
+                                  (try2 t))))))))))
+        (when (and (if-p if)
+                   (immediately-used-p (node-lvar node) node t))
+          (cond ((try (if-consequent if) (if-alternative if)))
+                (t
+                 ;; Deal with (not (< .. ...)) which is transformed from >=.
+                 (setf op (invert op))
+                 (try (if-alternative if) (if-consequent if)))))))))
+
+(defoptimizer (> optimizer) ((a b) node)
+  (range-transform '> a b node))
+
+(defoptimizer (< optimizer) ((a b) node)
+  (range-transform '< a b node))
+
+(defoptimizer (>= optimizer) ((a b) node)
+  (range-transform '>= a b node))
+
+(defoptimizer (<= optimizer) ((a b) node)
+  (range-transform '<= a b node))

@@ -671,36 +671,3 @@
   (with-stream-class (simple-stream stream)
     (setf (sm external-format stream) (find-external-format ef)))
   ef)
-
-;;;
-;;; NULL STRATEGY FUNCTIONS
-;;;
-
-(declaim (ftype j-read-char-fn null-read-char))
-(defun null-read-char (stream eof-error-p eof-value blocking)
-  (declare (ignore blocking))
-  (sb-impl::eof-or-lose stream eof-error-p eof-value))
-
-(declaim (ftype j-read-chars-fn null-read-chars))
-(defun null-read-chars (stream string search start end blocking)
-  (declare (ignore stream string search start end blocking))
-  (values 0 :eof))
-
-(declaim (ftype j-unread-char-fn null-unread-char))
-(defun null-unread-char (stream relaxed)
-  (declare (ignore stream relaxed)))
-
-(declaim (ftype j-write-char-fn null-write-char))
-(defun null-write-char (character stream)
-  (declare (ignore stream))
-  character)
-
-(declaim (ftype j-write-chars-fn null-write-chars))
-(defun null-write-chars (string stream start end)
-  (declare (ignore string stream))
-  (- end start))
-
-(declaim (ftype j-listen-fn null-listen))
-(defun null-listen (stream)
-  (declare (ignore stream))
-  nil)

@@ -528,7 +528,7 @@
                                                (vector-extra-data vector))
                                            (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: magic
                     (cond ((= widetag simple-vector-widetag)
-                           (fill vector (%make-lisp-obj no-tls-value-marker-widetag)))
+                           (fill vector (%make-lisp-obj unwritten-vector-element-marker)))
                           ((array-may-contain-random-bits-p widetag)
                            ;; Leave the last word alone for base-string,
                            ;; in case the mandatory trailing null is part of a data word.
@@ -740,7 +740,7 @@ of specialized arrays is supported."
                (tagbody ,@forms))))))))
 
 (macrolet ((%ref (accessor-getter extra-params)
-             `(funcall (,accessor-getter array) array index ,@extra-params))
+             `(sb-c::%funcall-no-nargs (,accessor-getter array) array index ,@extra-params))
            (define (accessor-name slow-accessor-name accessor-getter
                                   extra-params check-bounds)
              `(progn
@@ -756,7 +756,8 @@ of specialized arrays is supported."
                                      (safety 0)))
                   (%ref ,accessor-getter ,extra-params))
                 (defun ,slow-accessor-name (array index ,@extra-params)
-                  (declare (optimize speed (safety 0)))
+                  (declare (optimize speed (safety 0))
+                           (array array))
                   (if (not (%array-displaced-p array))
                       ;; The reasonably quick path of non-displaced complex
                       ;; arrays.
@@ -764,14 +765,14 @@ of specialized arrays is supported."
                         (%ref ,accessor-getter ,extra-params))
                       ;; The real slow path.
                       (with-array-data
-                          ((vector array)
+                          ((array array)
                            (index (locally
                                       (declare (optimize (speed 1) (safety 1)))
                                     (,@check-bounds index)))
                            (end)
                            :force-inline t)
                         (declare (ignore end))
-                        (,accessor-name vector index ,@extra-params)))))))
+                        (%ref ,accessor-getter ,extra-params)))))))
   (define hairy-data-vector-ref slow-hairy-data-vector-ref
     %find-data-vector-reffer
     nil (progn))
@@ -788,7 +789,8 @@ of specialized arrays is supported."
     (new-value) (check-bound array (%array-dimension array 0))))
 
 (defun hairy-ref-error (array index &optional new-value)
-  (declare (ignore index new-value))
+  (declare (ignore index new-value)
+           (optimize (sb-c:verify-arg-count 0)))
   (error 'type-error
          :datum array
          :expected-type 'vector))
@@ -804,9 +806,9 @@ of specialized arrays is supported."
                            (ignorable index))
                   ,(if type
                        `(data-vector-ref (the ,atype vector)
-                                         (locally
-                                             (declare (optimize (safety 1)))
-                                           (the index
+                                         (the index
+                                              (locally
+                                                  (declare (optimize (safety 1)))
                                                 (,@check-form index))))
                        `(data-nil-vector-ref (the ,atype vector) index)))))
            (define-setter (saetp check-form)
@@ -828,7 +830,7 @@ of specialized arrays is supported."
                                        ;; a cheaper one.
                                        (declare (optimize (speed 1)
                                                           (safety 1)))
-                                     (the* (,type :context :aref) new-value)))
+                                     (the* (,type :context 'sb-c::aref-context) new-value)))
                   ;; Low-level setters return no value
                   new-value)))
            (define-reffers (symbol deffer check-form slow-path)
@@ -850,7 +852,6 @@ of specialized arrays is supported."
                         collect `(setf (svref ,symbol ,widetag)
                                        (,deffer ,saetp ,check-form))))))
   (defun !hairy-data-vector-reffer-init ()
-    (!blt-copiers-cold-init)
     (define-reffers %%data-vector-reffers%% define-reffer
       (progn)
       #'slow-hairy-data-vector-ref)
@@ -1039,7 +1040,7 @@ of specialized arrays is supported."
 
 (defun array-element-ctype (array)
   ;; same as (SPECIFIER-TYPE (ARRAY-ELEMENT-TYPE ARRAY)) but more efficient
-  (svref (load-time-value *saetp-widetag-ctype*)
+  (svref *saetp-widetag-ctype*
          (- (ash (array-underlying-widetag array) -2) 32)))
 
 (defun array-element-type (array)
@@ -1122,26 +1123,26 @@ of specialized arrays is supported."
          :format-control "~S is not an array with a fill pointer."
          :format-arguments (list vector)))
 
-(declaim (inline fill-pointer))
+
 (defun fill-pointer (vector)
   "Return the FILL-POINTER of the given VECTOR."
   (declare (explicit-check))
-  (if (array-has-fill-pointer-p vector)
-      (%array-fill-pointer vector)
-      (fill-pointer-error vector)))
+  (fill-pointer vector))
 
 (defun %set-fill-pointer (vector new)
   (declare (explicit-check))
-  (cond ((not (array-has-fill-pointer-p vector)) (fill-pointer-error vector))
-        ((> (the index new) (%array-available-elements vector))
-         (let ((max (%array-available-elements vector)))
-           (error 'simple-type-error
-                  :datum new
-                  :expected-type (list 'integer 0 max)
-                  :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
-                  :format-arguments (list new max))))
+  (cond ((not (and (arrayp vector)
+                   (array-has-fill-pointer-p vector)))
+         (fill-pointer-error vector))
         (t
-         (setf (%array-fill-pointer vector) new))))
+         (let ((max (%array-available-elements vector)))
+           (when (> (the fixnum new) max)
+             (error 'simple-type-error
+                    :datum new
+                    :expected-type (list 'integer 0 max)
+                    :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
+                    :format-arguments (list new max)))
+           (setf (%array-fill-pointer vector) (truly-the index new))))))
 
 ;;; FIXME: It'd probably make sense to use a MACROLET to share the
 ;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
@@ -1163,21 +1164,34 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-(defun !blt-copiers-cold-init ()
-  (let ((array (make-array 32 :initial-element nil)))
-    (macrolet ((init ()
-                 `(progn
-                    ,@(loop for saetp across *specialized-array-element-type-properties*
-                            when (and (not (member (saetp-specifier saetp) '(t nil)))
-                                      (<= (saetp-n-bits saetp) n-word-bits))
-                              collect `(setf (svref array ,(ash (- (saetp-typecode saetp) 128) -2))
-                                             #',(intern (format nil "UB~D-BASH-COPY"
-                                                                (saetp-n-bits saetp))
-                                                        "SB-KERNEL"))))))
-      (init))
-    (setf (fdefinition 'blt-copier-for-widetag)
-          (lambda (x)
-            (aref array (ash (- x 128) -2))))))
+#-system-tlabs
+(defmacro reallocate-vector-with-widetag (old-vector &rest args)
+  (declare (ignore old-vector))
+  `(allocate-vector-with-widetag ,@args))
+
+;;; This does not try to allow for resizing (ARRAY NIL) - there's no backing storage anyway.
+;;; However, ADJUST-ARRAY apparently thinks it can resize non-simple arrays of
+;;; element type NIL, but fails in ZAP-ARRAY-DATA-AUX. e.g.:
+;;;   (adjust-array (make-array '(10 10) :element-type nil) '(20 20))
+;;; allocates a non-simple 10x10 array pointing to a (SIMPLE-ARRAY NIL 100)
+;;; and then gets "An attempt to access an array of element-type NIL was made"
+;;; because it doesn't know not to try to copy elements.
+;;; So unless we think that that is one of the most pressing issues that demands
+;;; a fix, who cares how we reallocate?
+;;; If you're manipulating such arrays, quite literally you deserve to lose.
+;;; FIXME: does not support #+ubsan, which is fairly bit-rotted, so ... meh.
+#+system-tlabs
+(defun reallocate-vector-with-widetag (old-vector widetag length n-bits-shift)
+  (declare (type (unsigned-byte 8) widetag)
+           (type index length))
+  ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
+  ;; but a single case involving it now.
+  (let* ((full-length (+ length (if (= widetag simple-base-string-widetag) 1 0)))
+         (nwords (the fixnum (vector-length-in-words full-length n-bits-shift))))
+    (if (sb-vm::force-to-heap-p old-vector)
+        (locally (declare (sb-c::tlab :system))
+          (allocate-vector widetag length nwords))
+        (allocate-vector widetag length nwords))))
 
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
@@ -1196,8 +1210,8 @@ of specialized arrays is supported."
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
               ;; FIXME: mark prefix of shadow bits assigned, suffix unassigned
-              (allocate-vector-with-widetag #+ubsan nil
-                                            widetag new-length n-bits-shift)))
+              (reallocate-vector-with-widetag old-data #+ubsan nil
+                                              widetag new-length n-bits-shift)))
         ;; Copy the data
         (if (= widetag simple-vector-widetag) ; the most common case
             (replace (truly-the simple-vector new-data) ; transformed
@@ -1327,9 +1341,10 @@ of specialized arrays is supported."
                       ;; if total size is unchanged, and it was not a displaced array,
                       ;; then this array owns the data and can retain it.
                       old-data
-                      (let ((data (allocate-vector-with-widetag #+ubsan t
-                                                                widetag new-total-size
-                                                                n-bits-shift)))
+                      (let ((data
+                             (reallocate-vector-with-widetag old-data #+ubsan t
+                                                             widetag new-total-size
+                                                             n-bits-shift)))
                         (replace data old-data
                                  :start1 0 :end1 new-total-size
                                  :start2 old-start :end2 old-end)
@@ -1371,15 +1386,38 @@ of specialized arrays is supported."
 ;;; dangerous to do so: shrinking the size of an object accessible
 ;;; to another thread could cause it to access an out-of-bounds element.
 ;;; GC should generally be fine no matter what happens, because it either
-;;; reads the old length or the new length. If the old, and unboxed,
-;;; the whole vector is skipped; if simple-vector, then at worst it reads
-;;; the header word for a filler, which is a valid element (yup really!).
-;;; If it reads the new length, then the next object is filler.
-(defun %shrink-vector (vector new-length)
+;;; reads the old length or the new length. If it reads the old length,
+;;; then the whole vector is skipped if unboxed; if it reads the new length,
+;;; then the next object is a filler.
+;;; Exception: for SIMPLE-VECTOR we always zeroized the unused tail,
+;;; because the garbage collector can scan certain pages without regard
+;;; to object boundaries. The situation we need to avoid is this:
+;;;       "old" #(...............|.....)
+;;;       "new" #(..........)Fill|.....
+;;;                              ^ page boundary
+;;; where GC reads the objects on the page just after the filler
+;;; because it doesn't know not to.
+;;;
+(defmacro make-filler (n)
+  `(logior (ash ,n #+64-bit 32 #-64-bit ,n-widetag-bits) filler-widetag))
+(defmacro filler-nwords (header)
+  `(ash ,header #+64-bit -32 #-64-bit ,(- n-widetag-bits)))
+
+(defun %shrink-vector (vector new-length
+                              &aux (old-length (length vector))
+                                   (new-length* new-length))
   (declare (vector vector))
-  (unless (or (array-header-p vector) (typep vector '(simple-array nil (*))))
-    (let ((old-length (length vector))
-          (new-length new-length))
+  (cond
+    ((simple-vector-p vector)
+     ;; We do in fact call %SHRINK-VECTOR a lot from sequence functions
+     ;; that overallocate a temporary result. In all places where that happens,
+     ;; the discarded suffix was never used. So assuming pre-zeroed heap,
+     ;; it kind of just worked. But I don't want to assume that.
+     ;; For what it's worth, adding this assertion prior to FILL:
+     ;;   (WHEN (FIND 0 VECTOR :START OLD-LENGTH :TEST #'NEQ) (BUG "No can do"))
+     ;; produced no failures in the regression suite.
+     (when (< new-length old-length) (fill vector 0 :start new-length)))
+    ((not (or (array-header-p vector) (typep vector '(simple-array nil (*)))))
       (when (simple-base-string-p vector)
         ;; We can blindly store the hidden #\null at NEW-LENGTH, but it would
         ;; appear to be an out-of-bounds access if the length is not
@@ -1390,14 +1428,11 @@ of specialized arrays is supported."
         ;; Now treat both the old and new lengths as if they include
         ;; the byte that holds the implicit string terminator.
         (incf old-length)
-        (incf new-length))
+        (incf new-length*))
       (let* ((n-bits-shift (aref %%simple-array-n-bits-shifts%%
                                  (%other-pointer-widetag vector)))
              (old-nwords (ceiling (ash old-length n-bits-shift) n-word-bits))
-             (new-nwords (ceiling (ash new-length n-bits-shift) n-word-bits)))
-        ;; If we want to impose a constraint that unused bytes above the
-        ;; new length and below the physical end are 0,
-        ;; then now would be the time to enforce that.
+             (new-nwords (ceiling (ash new-length* n-bits-shift) n-word-bits)))
         (when (< new-nwords old-nwords)
           (with-pinned-objects (vector)
             ;; VECTOR-SAP is only for unboxed vectors. Use the vop directly.
@@ -1417,8 +1452,7 @@ of specialized arrays is supported."
                     ;; if GC sees this bit pattern prior to setting the new length;
                     ;; but even for SIMPLE-VECTOR, it's OK, it turns out.
                     (setf (sap-ref-word data (ash aligned-new word-shift))
-                          (logior (ash (1- diff) n-widetag-bits)
-                                  filler-widetag)))))))))))
+                          (make-filler diff)))))))))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)
@@ -1775,7 +1809,7 @@ function to be removed without further warning."
 ;;; Finally, the DISPATCH-FOO macro is defined which does the actual
 ;;; dispatching when called. It expects arguments that match PARAMS.
 ;;;
-(defmacro sb-impl::!define-array-dispatch (style dispatch-name params &body body)
+(defmacro sb-impl::!define-array-dispatch (style dispatch-name params nil-array &body body)
   #-(or x86 x86-64) (setq style :call)
   (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
         (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
@@ -1812,7 +1846,9 @@ function to be removed without further warning."
                             (defun ,fun-name ,params
                               (declare (type (simple-array ,specifier (*))
                                              ,(first params)))
-                              ,@body)
+                              ,@(if (null specifier)
+                                    nil-array
+                                    body))
                             (setf (svref ,table-name ,typecode) #',fun-name))))
        (defmacro ,dispatch-name (&rest args)
          (check-type (first args) symbol)
@@ -1893,5 +1929,4 @@ function to be removed without further warning."
 
 (defun weak-vector-p (x)
   (and (simple-vector-p x)
-       #+(or x86 x86-64) (test-header-data-bit x (ash vector-weak-flag array-flags-data-position))
-       #-(or x86 x86-64) (logtest (get-header-data x) (ash vector-weak-flag array-flags-data-position))))
+       (test-header-data-bit x (ash vector-weak-flag array-flags-data-position))))

@@ -11,10 +11,12 @@
            #:random-type
            #:type-evidently-=
            #:ctype=
+           #:type-specifiers-equal
            #:assert-tri-eq
            #:random-type
 
            ;; thread tools
+           #:*n-cpus*
            #:make-kill-thread #:make-join-thread
            #:wait-for-threads
            #:process-all-interrupts
@@ -36,6 +38,9 @@
            #:scratch-file-name
            #:*scratch-file-prefix*
            #:with-scratch-file
+           #:with-test-directory
+           #:generate-test-directory-name
+           #:*test-directory*
            #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
@@ -49,6 +54,14 @@
 
 (defvar *threads-to-kill*)
 (defvar *threads-to-join*)
+
+(defvar *n-cpus*
+  (max 1
+       #-win32 (sb-alien:alien-funcall
+                (sb-alien:extern-alien "sysconf"
+                                       (function sb-alien:long sb-alien:int))
+                sb-unix::sc-nprocessors-onln)
+       #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int)))
 
 (defun setenv (name value)
   #-win32
@@ -80,15 +93,16 @@
 (defun type-evidently-= (x y)
   (and (subtypep x y) (subtypep y x)))
 
-(defun ctype= (left right)
+(defun type-specifiers-equal (left right)
   (let ((a (sb-kernel:values-specifier-type left)))
     ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
     ;; operation if A and B are EQ.
     ;; To actually exercise the type operation, remove the memoized parse.
     (sb-int:drop-all-hash-caches)
     (let ((b (sb-kernel:values-specifier-type right)))
-      (assert (not (eq a b)))
       (sb-kernel:type= a b))))
+;;; This isn't a great name. Prefer to use TYPE-SPECIFIERS-EQUAL instead
+(defun ctype= (a b) (type-specifiers-equal a b))
 
 (defmacro assert-tri-eq (expected-result expected-certainp form)
   (sb-int:with-unique-names (result certainp)
@@ -259,17 +273,18 @@
 ;;; but the nice side effect is that the tests finish quicker.
 (defmacro with-test ((&key fails-on broken-on skipped-on name serial slow)
                      &body body)
-  (flet ((name-ok (x y)
-           (declare (ignore y))
-           (typecase x
-             (symbol (let ((package (symbol-package x)))
-                       (or (null package)
-                           (sb-int:system-package-p package)
-                           (eql package (find-package "CL"))
-                           (eql package (find-package "KEYWORD")))))
-             (integer t))))
-    (unless (tree-equal name name :test #'name-ok)
-      (error "test name must be all-keywords: ~S" name)))
+  ;; Failing and skipped tests are written into a summary file which is later read back.
+  ;; To guarantee readability there can't be symbols in random packages.
+  (setq name (sb-int:named-let ensure-ok ((x name))
+               (etypecase x
+                 (cons (cons (ensure-ok (car x)) (ensure-ok (cdr x))))
+                 (symbol (let ((package (symbol-package x)))
+                           (if (or (null package)
+                                   (sb-int:system-package-p package)
+                                   (eql package (find-package "CL"))
+                                   (eql package (find-package "KEYWORD")))
+                               x (copy-symbol x))))
+                 (integer x))))
   (cond
     ((broken-p broken-on)
      `(progn
@@ -647,25 +662,38 @@
 
 (defun %checked-compile-and-assert-one-case
     (form optimize function args-thunk expected test allow-conditions)
-  (let ((args (multiple-value-list (funcall args-thunk))))
-    (flet ((failed-to-signal (expected-type)
-             (error "~@<Calling the result of compiling~
+  (if (eq args-thunk :return-type)
+      (let ((type (sb-kernel:%simple-fun-type function)))
+       (unless (or (eq type 'function)
+                   (type-specifiers-equal (caddr type) expected)
+                   #.(and (not (member :unwind-to-frame-and-call-vop sb-impl:+internal-features+))
+                          '(member '(debug 3) optimize :test #'equal)))
+         (error "~@<The derived type of~
+                   ~/test-util::print-form-and-optimize/ ~
+                   is ~/sb-impl:print-type-specifier/
+                   while
+                    ~/sb-impl:print-type-specifier/
+                   is expected~@:>"
+                (cons form optimize) type expected)))
+      (let ((args (multiple-value-list (funcall args-thunk))))
+        (flet ((failed-to-signal (expected-type)
+                 (error "~@<Calling the result of compiling~
                       ~/test-util::print-form-and-optimize/ ~
                       ~/test-util::print-arguments/~
                       returned normally instead of signaling a ~
                       condition of type ~
                       ~/sb-impl:print-type-specifier/.~@:>"
-                    (cons form optimize) args expected-type))
-           (signaled-unexpected (conditions)
-             (error "~@<Calling the result of compiling~
+                        (cons form optimize) args expected-type))
+               (signaled-unexpected (conditions)
+                 (error "~@<Calling the result of compiling~
                       ~/test-util::print-form-and-optimize/ ~
                       ~/test-util::print-arguments/~
                       signaled unexpected condition~P~
                       ~/test-util::print-signaled-conditions/~
                       .~@:>"
-                    (cons form optimize) args (length conditions) conditions))
-           (returned-unexpected (values expected test)
-             (error "~@<Calling the result of compiling~
+                        (cons form optimize) args (length conditions) conditions))
+               (returned-unexpected (values expected test)
+                 (error "~@<Calling the result of compiling~
                      ~/test-util::print-form-and-optimize/ ~
                      ~/test-util::print-arguments/~
                      returned values~@:_~@:_~
@@ -673,34 +701,34 @@
                      which is not ~S to~@:_~@:_~
                      ~2@T~<~{~S~^~@:_~}~:>~@:_~@:_~
                      .~@:>"
-                    (cons form optimize) args
-                    (list values) test (list expected))))
-      (multiple-value-bind (values conditions)
-          (apply #'call-capturing-values-and-conditions function args)
-        (typecase expected
-          ((cons (eql condition) (cons t null))
-           (let* ((expected-condition-type (second expected))
-                  (unexpected (remove-if (lambda (condition)
-                                           (typep condition
-                                                  expected-condition-type))
-                                         conditions))
-                  (expected (set-difference conditions unexpected)))
-             (cond
-               (unexpected
-                (signaled-unexpected unexpected))
-               ((null expected)
-                (failed-to-signal expected-condition-type)))))
-          (t
-           (let ((expected (funcall expected)))
-             (cond
-               ((and conditions
-                     (not (and allow-conditions
-                               (every (lambda (condition)
-                                        (typep condition allow-conditions))
-                                      conditions))))
-                (signaled-unexpected conditions))
-               ((not (funcall test values expected))
-                (returned-unexpected values expected test))))))))))
+                        (cons form optimize) args
+                        (list values) test (list expected))))
+          (multiple-value-bind (values conditions)
+              (apply #'call-capturing-values-and-conditions function args)
+            (typecase expected
+              ((cons (eql condition) (cons t null))
+               (let* ((expected-condition-type (second expected))
+                      (unexpected (remove-if (lambda (condition)
+                                               (typep condition
+                                                      expected-condition-type))
+                                             conditions))
+                      (expected (set-difference conditions unexpected)))
+                 (cond
+                   (unexpected
+                    (signaled-unexpected unexpected))
+                   ((null expected)
+                    (failed-to-signal expected-condition-type)))))
+              (t
+               (let ((expected (funcall expected)))
+                 (cond
+                   ((and conditions
+                         (not (and allow-conditions
+                                   (every (lambda (condition)
+                                            (typep condition allow-conditions))
+                                          conditions))))
+                    (signaled-unexpected conditions))
+                   ((not (funcall test values expected))
+                    (returned-unexpected values expected test)))))))))))
 
 (defun %checked-compile-and-assert-one-compilation
     (form optimize other-checked-compile-args cases)
@@ -765,20 +793,22 @@
                                             (optimize :quick))
                                          form &body cases)
   (flet ((make-case-form (case)
-           (destructuring-bind (args values &key (test ''equal testp)
-                                     allow-conditions)
-               case
-             (let ((conditionp (typep values '(cons (eql condition) (cons t null)))))
-               (when (and testp conditionp)
-                 (sb-ext:with-current-source-form (case)
-                   (error "~@<Cannot use ~S with ~S ~S.~@:>"
-                          values :test test)))
-               `(list (lambda () (values ,@args))
-                      ,(if conditionp
-                           `(list 'condition ,(second values))
-                           `(lambda () (multiple-value-list ,values)))
-                      ,test
-                      ,allow-conditions)))))
+           (if (typep case '(cons (member :return-type)))
+               `',case
+               (destructuring-bind (args values &key (test ''equal testp)
+                                                     allow-conditions)
+                   case
+                 (let ((conditionp (typep values '(cons (eql condition) (cons t null)))))
+                   (when (and testp conditionp)
+                     (sb-ext:with-current-source-form (case)
+                       (error "~@<Cannot use ~S with ~S ~S.~@:>"
+                              values :test test)))
+                   `(list (lambda () (values ,@args))
+                          ,(if conditionp
+                               `(list 'condition ,(second values))
+                               `(lambda () (multiple-value-list ,values)))
+                          ,test
+                          ,allow-conditions))))))
     `(%checked-compile-and-assert
       ,form (list :name ,name
                   :allow-warnings ,allow-warnings
@@ -910,6 +940,35 @@
             (let ((,var ,tempname)) ,@forms) ; rebind, as test might asssign into VAR
          (ignore-errors (delete-file ,tempname))))))
 
+(defvar *test-directory*)
+
+(defun generate-test-directory-name ()
+  ;; Why aren't we using TMPDIR???
+  (merge-pathnames
+   (make-pathname :directory `(:relative ,(write-to-string (sb-unix:unix-getpid))))
+   (parse-native-namestring (posix-getenv "TEST_DIRECTORY")
+                            nil *default-pathname-defaults*
+                            :as-directory t)))
+
+(defun call-with-test-directory (fn)
+  ;; FIXME: this writes into the source directory depending on whether
+  ;; TEST_DIRECTORY has been made to point elsewhere or not.
+  (let ((test-directory (generate-test-directory-name)))
+    (ensure-directories-exist test-directory)
+    (unwind-protect
+         ;; WHY REBIND *DEFAULT-PATHNAME-DEFAULTS* ? THIS SUCKS!
+         ;; (It means we can't use the WITH-TEST-DIRECTORY macro for most things)
+         (let ((*default-pathname-defaults* test-directory)
+               (*test-directory* test-directory))
+           (funcall fn test-directory))
+      (delete-directory test-directory :recursive t))))
+
+(defmacro with-test-directory ((&optional (test-directory-var (gensym)))
+                               &body body)
+  `(call-with-test-directory (lambda (,test-directory-var)
+                               (declare (ignorable ,test-directory-var))
+                               ,@body)))
+
 ;;; Take a list of lists and assemble them as though they are
 ;;; instructions inside the body of a vop. There is no need
 ;;; to use the INST macro in front of each list.
@@ -968,3 +1027,8 @@
   (when (find-package "SB-SPROF")
     (format t "INFO: disabling SB-SPROF~%")
     (funcall (intern "STOP-PROFILING" "SB-SPROF"))))
+
+;;; This unexported symbol emulates SB-RT. Please don't use it in new tests
+(defmacro deftest (name form &rest results) ; use SB-RT syntax
+  `(test-util:with-test (:name ,(sb-int:keywordicate name))
+     (assert (equalp (multiple-value-list ,form) ',results))))

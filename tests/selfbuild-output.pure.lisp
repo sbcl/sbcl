@@ -1,7 +1,10 @@
 
 (with-test (:name :make-list-%make-list-not-called
                   :fails-on (:not :x86-64))
-  (assert (not (ctu:find-named-callees #'make-list))))
+  (assert (not (ctu:asm-search "%MAKE-LIST" #'make-list))))
+
+(with-test (:name :copy-structure-efficient-case)
+  (assert (not (ctu:asm-search "ASH" #'copy-structure))))
 
 ;;; Make sure that we see the literal value of
 ;;; SB-UNICODE::+CHARACTER-MISC-DATABASE+

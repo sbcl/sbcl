@@ -22,24 +22,20 @@
     (when (lexenv-cleanup lexenv2)
       (setf (lexenv-cleanup lexenv2) nil))))
 
-(defun lexenv-enclosing-cleanup (lexenv)
-  (declare (type lexenv lexenv))
-  (do ((lexenv2 lexenv
-                (lambda-call-lexenv (lexenv-lambda lexenv2))))
-      ((null lexenv2) nil)
-    (awhen (lexenv-cleanup lexenv2)
-      (return it))))
-
 ;;; Return the innermost cleanup enclosing NODE, or NIL if there is
 ;;; none in its function. If NODE has no cleanup, but is in a LET,
 ;;; then we must still check the environment that the call is in.
 (defun node-enclosing-cleanup (node)
   (declare (type node node))
-  (lexenv-enclosing-cleanup (node-lexenv node)))
+  (do ((lexenv (node-lexenv node)
+               (lambda-call-lexenv (lexenv-lambda lexenv))))
+      ((null lexenv) nil)
+    (let ((cup (lexenv-cleanup lexenv)))
+      (when cup (return cup)))))
 
-(defun map-nested-cleanups (function lexenv &optional return-value)
-  (declare (type lexenv lexenv))
-  (do ((cleanup (lexenv-enclosing-cleanup lexenv)
+(defun map-nested-cleanups (function block &optional return-value)
+  (declare (type cblock block))
+  (do ((cleanup (block-end-cleanup block)
                 (node-enclosing-cleanup (cleanup-mess-up cleanup))))
       ((not cleanup) return-value)
     (funcall function cleanup)))
@@ -75,12 +71,12 @@
 ;;;; lvar use hacking
 
 ;;; Return a list of all the nodes which use LVAR.
-(declaim (ftype (sfunction (lvar) list) find-uses))
 (defun find-uses (lvar)
+  (declare (type lvar lvar) #-sb-xc-host (values list))
   (ensure-list (lvar-uses lvar)))
 
-(declaim (ftype (sfunction (lvar) lvar) principal-lvar))
 (defun principal-lvar (lvar)
+  (declare (type lvar lvar))
   (labels ((pl (lvar)
              (let ((use (lvar-uses lvar)))
                (if (cast-p use)
@@ -155,12 +151,11 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
 ;;; changed.
-(declaim (ftype (sfunction (node) (values))
-                delete-lvar-use
-                %delete-lvar-use))
+
 ;;; Just delete NODE from its LVAR uses; LVAR is preserved so it may
 ;;; be given a new use.
 (defun %delete-lvar-use (node)
+  (declare (type node node))
   (let ((lvar (node-lvar node)))
     (when lvar
       (if (listp (lvar-uses lvar))
@@ -175,6 +170,7 @@
 ;;; Delete NODE from its LVAR uses; if LVAR has no other uses, delete
 ;;; its DEST's block, which must be unreachable.
 (defun delete-lvar-use (node)
+  (declare (type node node))
   (let ((lvar (node-lvar node)))
     (when lvar
       (%delete-lvar-use node)
@@ -191,8 +187,8 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
 ;;; changed.
-(declaim (ftype (sfunction (node (or lvar null)) (values)) add-lvar-use))
 (defun add-lvar-use (node lvar)
+  (declare (type node node) (type (or lvar null) lvar))
   (aver (not (node-lvar node)))
   (when lvar
     (let ((uses (lvar-uses lvar)))
@@ -209,14 +205,18 @@
 
 ;;; Return true if LVAR destination is executed immediately after
 ;;; NODE. Cleanups are ignored.
-(defun immediately-used-p (lvar node)
+(defun immediately-used-p (lvar node &optional single-predecessor)
   (declare (type lvar lvar) (type node node))
   (aver (eq (node-lvar node) lvar))
   (let ((dest (lvar-dest lvar)))
     (acond ((node-next node)
             (eq (ctran-next it) dest))
-           (t (eq (block-start (first (block-succ (node-block node))))
-                  (node-prev dest))))))
+           (t
+            (let ((succ (first (block-succ (node-block node)))))
+              (and (not (and single-predecessor
+                             (cdr (block-pred succ))))
+                   (eq (block-start succ)
+                       (node-prev dest))))))))
 
 ;;; Returns the defined (usually untrusted) type of the combination,
 ;;; or NIL if we couldn't figure it out.
@@ -285,10 +285,10 @@
              (lvar-almost-immediately-used-p lvar))))))
 
 
-;;;; BLOCK UTILS
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)
+  (declare (type cblock block))
   (or (block-delete-p block)
       (eq (functional-kind (block-home-lambda block)) :deleted)))
 
@@ -297,27 +297,18 @@
 (defun node-to-be-deleted-p (node)
   (block-to-be-deleted-p (node-block node)))
 
-(declaim (ftype (sfunction (clambda) cblock) lambda-block))
-(defun lambda-block (clambda)
-  (node-block (lambda-bind clambda)))
-(declaim (ftype (sfunction (clambda) component) lambda-component))
-(defun lambda-component (clambda)
-  (block-component (lambda-block clambda)))
+(defun lambda-block (lambda)
+  (declare (type clambda lambda))
+  (node-block (lambda-bind lambda)))
 
-(declaim (ftype (sfunction (cblock) node) block-start-node))
+(defun lambda-component (lambda)
+  (declare (type clambda lambda))
+  (block-component (lambda-block lambda)))
+
 (defun block-start-node (block)
+  (declare (type cblock block))
   (ctran-next (block-start block)))
 
-;;; Return the enclosing cleanup for environment of the first or last
-;;; node in BLOCK.
-(defun block-start-cleanup (block)
-  (node-enclosing-cleanup (block-start-node block)))
-(defun block-end-cleanup (block)
-  (node-enclosing-cleanup (block-last block)))
-
-;;; Return the lexenv of the last node in BLOCK.
-(defun block-end-lexenv (block)
-  (node-lexenv (block-last block)))
 
 ;;;; lvar substitution
 
@@ -395,7 +386,7 @@
         thereis
         (loop for parent = lexenv then (lexenv-parent parent)
               while parent
-              thereis (and (eq parent parent-lexenv)))))
+              thereis (eq parent parent-lexenv))))
 
 ;;; Handle
 ;;; (dx-let ((x (let ((m (make-array)))
@@ -447,9 +438,13 @@
             (let ((var (ref-leaf value-ref)))
               (when (and (lambda-var-p (ref-leaf value-ref))
                          (not (lambda-var-sets (ref-leaf value-ref))))
-                (when (member (functional-kind (lambda-var-home var))
-                              '(:external :optional))
-                  (return-from set-slot-old-p t))
+                (let ((home (lambda-var-home var)))
+                  (when (member (functional-kind home) '(:external :optional))
+                    (return-from set-slot-old-p
+                      (eq (lambda-environment (if (eq (functional-kind home) :external)
+                                                  (main-entry (functional-entry-fun home))
+                                                  home))
+                          (node-environment allocator)))))
                 (setf uses (principal-lvar-ref-use value-lvar)))))
           (when uses
             (if (consp uses)
@@ -620,10 +615,38 @@
   (declare (type node node) #-sb-xc-host (inline node-home-lambda))
   (the environment (lambda-environment (node-home-lambda node))))
 
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
+(defun block-start-cleanup (block)
+  (node-enclosing-cleanup (block-start-node block)))
+(defun block-end-cleanup (block)
+  (node-enclosing-cleanup (block-last block)))
+
+;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(defun block-home-lambda (block)
+  (declare (type cblock block)
+           #-sb-xc-host (inline node-home-lambda))
+  (node-home-lambda (block-last block)))
+
+;;; Return the IR1 environment for BLOCK.
+(defun block-environment (block)
+  (declare (type cblock block))
+  (lambda-environment (block-home-lambda block)))
+
 (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
+
+;; If there's a possibility the variable might be unbound, then its
+;; references are unflushable.
+(defun flushable-reference-p (node)
+  (let ((leaf (ref-leaf node)))
+    (not (and (global-var-p leaf)
+              (member (global-var-kind leaf)
+                      '(:special :global :unknown))
+              (not (or (always-boundp (leaf-source-name leaf))
+                       (policy node (< safety 3))))))))
 
 (defun flushable-callable-arg-p (name arg-count)
   (typecase name
@@ -690,55 +713,6 @@
         (let ((name (lvar-fun-name (combination-fun call) t)))
           (memq name (lexenv-flushable (node-lexenv call)))))))
 
-;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
-;;; if there is none.
-;;;
-;;; There can legitimately be no home lambda in dead code early in the
-;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
-;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
-;;; where the block is just a placeholder during parsing and doesn't
-;;; actually correspond to code which will be written anywhere.
-(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
-(defun block-home-lambda-or-null (block)
-  #-sb-xc-host (declare (inline node-home-lambda))
-  (if (node-p (block-last block))
-      ;; This is the old CMU CL way of doing it.
-      (node-home-lambda (block-last block))
-      ;; Now that SBCL uses this operation more aggressively than CMU
-      ;; CL did, the old CMU CL way of doing it can fail in two ways.
-      ;;   1. It can fail in a few cases even when a meaningful home
-      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
-      ;;      an IF.
-      ;;   2. It can fail when converting a form which is born orphaned
-      ;;      so that it never had a meaningful home lambda, e.g. a form
-      ;;      which follows a RETURN-FROM or GO form.
-      (let ((pred-list (block-pred block)))
-        ;; To deal with case 1, we reason that
-        ;; previous-in-target-execution-order blocks should be in the
-        ;; same lambda, and that they seem in practice to be
-        ;; previous-in-compilation-order blocks too, so we look back
-        ;; to find one which is sufficiently initialized to tell us
-        ;; what the home lambda is.
-        (if pred-list
-            ;; We could get fancy about this, flooding through the
-            ;; graph of all the previous blocks, but in practice it
-            ;; seems to work just to grab the first previous block and
-            ;; use it.
-            (node-home-lambda (block-last (first pred-list)))
-            ;; In case 2, we end up with an empty PRED-LIST and
-            ;; have to punt: There's no home lambda.
-            nil))))
-
-;;; Return the non-LET LAMBDA that holds BLOCK's code.
-(defun block-home-lambda (block)
-  (declare (type cblock block))
-  (the clambda (block-home-lambda-or-null block)))
-
-;;; Return the IR1 environment for BLOCK.
-(defun block-environment (block)
-  (declare (type cblock block))
-  (lambda-environment (block-home-lambda block)))
-
 ;;;; DYNAMIC-EXTENT related
 
 (defun lambda-var-original-name (leaf)
@@ -759,6 +733,8 @@
                                   (principal-lvar-use (cast-value use))
                                   use)))
       (unless (or
+               (eq (cleanup-dx-kind  (lvar-dynamic-extent lvar))
+                   'dynamic-extent-no-note)
                ;; If we're flushing, don't complain if we can flush the combination.
                (and flush
                     (or
@@ -807,99 +783,47 @@
 
 (defun use-good-for-dx-p (use dx)
   (and (not (node-to-be-deleted-p use))
-       (or (dx-combination-p use dx)
-           (and (cast-p use)
-                (not (cast-type-check use))
-                (lvar-good-for-dx-p (cast-value use) dx))
-           (and (trivial-lambda-var-ref-p use)
-                (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
-                  (or (eq use uses)
-                      (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx)))))))
+       (typecase use
+         (combination
+          (and (eq (combination-kind use) :known)
+               (let ((info (combination-fun-info use)))
+                 (or (awhen (fun-info-stack-allocate-result info)
+                       (funcall it use dx))
+                     (awhen (fun-info-result-arg info)
+                       (lvar-good-for-dx-p (nth it (combination-args use))
+                                           dx))))))
+         (cast
+          (and (not (cast-type-check use))
+               (lvar-good-for-dx-p (cast-value use) dx)))
+         (ref
+          (and (trivial-lambda-var-ref-p use)
+               (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
+                 (or (eq use uses)
+                     (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use)
+                                         dx))))))))
 
 (defun lvar-good-for-dx-p (lvar dx)
-  (let ((uses (lvar-uses lvar)))
-    (cond
-      ((null uses)
-       nil)
-      ((consp uses)
-       (every (lambda (use)
-                (use-good-for-dx-p use dx))
-              uses))
-      (t
-       (use-good-for-dx-p uses dx)))))
-
-(defun known-dx-combination-p (use dx)
-  (and (eq (combination-kind use) :known)
-       (let ((info (combination-fun-info use)))
-         (or (awhen (fun-info-stack-allocate-result info)
-               (funcall it use dx))
-             (awhen (fun-info-result-arg info)
-               (lvar-good-for-dx-p (nth it (combination-args use))
-                                   dx))))))
-
-;;; Bound to NIL in RECHECK-DYNAMIC-EXTENT-LVARS, so that the
-;;; combinations that didn't get converted are not treated as dx-safe.
-(defvar *dx-combination-p-check-local* t)
-
-(defun dx-combination-p (use dx)
-  (let (seen)
-    (labels ((recurse (use)
-               (and (combination-p use)
-                    (not (memq use seen))
-                    (or
-                     ;; Known, and can do DX.
-                     (known-dx-combination-p use dx)
-                     ;; Possibly a not-yet-eliminated lambda which ends up returning the
-                     ;; results of an actual known DX combination.
-                     (and *dx-combination-p-check-local*
-                          (let* ((fun (combination-fun use))
-                                 (ref (principal-lvar-use fun))
-                                 (clambda (when (ref-p ref)
-                                            (ref-leaf ref)))
-                                 (creturn (when (lambda-p clambda)
-                                            (lambda-return clambda)))
-                                 (result-use (when (return-p creturn)
-                                               (principal-lvar-use (return-result creturn)))))
-                            ;; Unlikely to have enough recursive local
-                            ;; functions to warrant a hash-table
-                            (push use seen)
-                            ;; FIXME: We should be able to deal with multiple uses here as well.
-                            (and (recurse result-use)
-                                 (combination-args-flow-cleanly-p use result-use dx))))))))
-      (recurse use))))
-
-(defun combination-args-flow-cleanly-p (combination1 combination2 dx)
-  (labels ((recurse (combination)
-             (or (eq combination combination2)
-                 (if (known-dx-combination-p combination dx)
-                     (let* ((lvar (combination-lvar combination))
-                            (dest (and lvar
-                                       (lvar-dest lvar))))
-                       (and (combination-p dest)
-                            (recurse dest)))
-                     (let* ((fun1 (combination-fun combination))
-                            (ref1 (principal-lvar-use fun1))
-                            (clambda1 (when (ref-p ref1) (ref-leaf ref1))))
-                       (when (lambda-p clambda1)
-                         (dolist (var (lambda-vars clambda1) t)
-                           (dolist (var-ref (lambda-var-refs var))
-                             (let* ((lvar (ref-lvar var-ref))
-                                    (dest (and lvar (principal-lvar-dest lvar))))
-                               (unless (or (not dest)
-                                           (and (combination-p dest) (recurse dest)))
-                                 (return-from combination-args-flow-cleanly-p nil)))))))))))
-    (recurse combination1)))
+  (aver (lvar-uses lvar))
+  (do-uses (use lvar t)
+    (unless (use-good-for-dx-p use dx)
+      (return nil))))
 
 (defun ref-good-for-dx-p (ref)
- (let* ((lvar (ref-lvar ref))
-        (dest (when lvar (lvar-dest lvar))))
-   (and (combination-p dest)
-        (eq :known (combination-kind dest))
-        (awhen (combination-fun-info dest)
-          (or (ir1-attributep (fun-info-attributes it) dx-safe)
-              (and (not (combination-lvar dest))
-                   (awhen (fun-info-result-arg it)
-                     (eql lvar (nth it (combination-args dest))))))))))
+  (let* ((lvar (ref-lvar ref))
+         (dest (when lvar (lvar-dest lvar))))
+    (and (combination-p dest)
+         (case (combination-kind dest)
+           (:known
+            (awhen (combination-fun-info dest)
+              (or (ir1-attributep (fun-info-attributes it) dx-safe)
+                  (and (not (combination-lvar dest))
+                       (awhen (fun-info-result-arg it)
+                         (eql lvar (nth it (combination-args dest))))))))
+           (:local
+            (every #'trivial-lambda-var-ref-p
+                   (lambda-var-refs (lvar-lambda-var lvar))))))))
+
+(defvar *dx-lexenv*)
 
 (defun trivial-lambda-var-ref-p (use)
   (and (ref-p use)
@@ -909,12 +833,13 @@
                     (neq (lambda-var-extent var) 'indefinite-extent))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
-             ;; bound by a non-XEP system lambda, no other REFS that aren't
+             ;; bound by a non-XEP lambda, no other REFS that aren't
              ;; DX-SAFE, or are result-args when the result is discarded.
-             (when (and (lambda-system-lambda-p home)
-                        (neq :external (lambda-kind home))
+             (when (and (neq :external (lambda-kind home))
+                        (lexenv-contains-lambda home *dx-lexenv*)
                         (dolist (ref refs t)
-                          (unless (or (eq use ref) (ref-good-for-dx-p ref))
+                          (unless (or (eq use ref)
+                                      (ref-good-for-dx-p ref))
                             (return nil))))
                ;; the LAMBDA this var is bound by has only a single REF, going
                ;; to a combination
@@ -957,44 +882,7 @@
           (loop for v in vars
                 for arg in (combination-args combination)
                 when (eq v var)
-                return arg))))))
-
-;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
-(defun handle-nested-dynamic-extent-lvars (dx lvar)
-  (let ((uses (lvar-uses lvar)))
-    ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
-    ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
-    ;; to process uses of single-use LVARs.
-    (when (node-p uses)
-      (when (node-to-be-deleted-p uses)
-        (return-from handle-nested-dynamic-extent-lvars))
-      (node-ends-block uses))
-    ;; If this LVAR's USE is good for DX, it is either a CAST, or it
-    ;; must be a regular combination whose arguments are potentially DX as well.
-    (flet ((recurse (use)
-             (etypecase use
-               (cast
-                (handle-nested-dynamic-extent-lvars
-                 dx (cast-value use)))
-               (combination
-                (loop for arg in (combination-args use)
-                      ;; deleted args show up as NIL here
-                      when (and arg
-                                (lvar-good-for-dx-p arg dx))
-                      append (handle-nested-dynamic-extent-lvars
-                              dx arg)))
-               (ref
-                (let* ((other (trivial-lambda-var-ref-lvar use)))
-                  (unless (eq other lvar)
-                    (handle-nested-dynamic-extent-lvars
-                     dx other)))))))
-      (cons (cons dx lvar)
-            (if (listp uses)
-                (loop for use in uses
-                      when (use-good-for-dx-p use dx)
-                      nconc (recurse use))
-                (when (use-good-for-dx-p uses dx)
-                  (recurse uses)))))))
+                  return arg))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
@@ -1004,17 +892,17 @@
 
 ;;; Return the (reversed) list for the PATH in the original source
 ;;; (with the Top Level Form number last).
-(declaim (ftype (sfunction (list) list) source-path-original-source))
 (defun source-path-original-source (path)
-  (declare (list path) (inline member))
+  (declare (list path) (inline member)
+           #-sb-xc-host (values list))
   (cddr (member 'original-source-start path :test #'eq)))
 
 ;;; Return the Form Number of PATH's original source inside the Top
 ;;; Level Form that contains it. This is determined by the order that
 ;;; we walk the subforms of the top level source form.
-(declaim (ftype (sfunction (list) (or null index)) source-path-form-number))
 (defun source-path-form-number (path)
-  (declare (inline member))
+  (declare (type list path) (inline member)
+           #-sb-xc-host (values (or null index)))
   (cadr (member 'original-source-start path :test #'eq)))
 
 ;;; Return a list of all the enclosing forms not in the original
@@ -1063,31 +951,6 @@
             (setf path (common-suffix path
                                       (node-source-path use)))))
         (list (node-source-form use)))))
-
-;;; Return the LAMBDA that is CTRAN's home, or NIL if there is none.
-(declaim (ftype (sfunction (ctran) (or clambda null))
-                ctran-home-lambda-or-null))
-(defun ctran-home-lambda-or-null (ctran)
-  ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
-  ;; implementation might not be quite right, or might be uglier than
-  ;; necessary. It appears that the original Python never found a need
-  ;; to do this operation. The obvious things based on
-  ;; NODE-HOME-LAMBDA of CTRAN-USE usually work; then if that fails,
-  ;; BLOCK-HOME-LAMBDA of CTRAN-BLOCK works, given that we
-  ;; generalize it enough to grovel harder when the simple CMU CL
-  ;; approach fails, and furthermore realize that in some exceptional
-  ;; cases it might return NIL. -- WHN 2001-12-04
-  (cond ((ctran-use ctran)
-         (node-home-lambda (ctran-use ctran)))
-        ((ctran-block ctran)
-         (block-home-lambda-or-null (ctran-block ctran)))
-        (t
-         (bug "confused about home lambda for ~S" ctran))))
-
-;;; Return the LAMBDA that is CTRAN's home.
-(declaim (ftype (sfunction (ctran) clambda) ctran-home-lambda))
-(defun ctran-home-lambda (ctran)
-  (ctran-home-lambda-or-null ctran))
 
 (declaim (inline cast-single-value-p))
 (defun cast-single-value-p (cast)
@@ -1408,8 +1271,9 @@
 
 ;;; Unlink a block from the next/prev chain. We also null out the
 ;;; COMPONENT.
-(declaim (ftype (sfunction (cblock) (values)) remove-from-dfo))
+(declaim (inline remove-from-dfo))
 (defun remove-from-dfo (block)
+  (declare (type cblock block))
   (let ((next (block-next block))
         (prev (block-prev block)))
     (setf (block-component block) nil)
@@ -1419,6 +1283,7 @@
 
 ;;; Add BLOCK to the next/prev chain following AFTER. We also set the
 ;;; COMPONENT to be the same as for AFTER.
+(declaim (inline add-to-dfo))
 (defun add-to-dfo (block after)
   (declare (type cblock block after))
   (let ((next (block-next after))
@@ -1433,8 +1298,8 @@
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
-(declaim (ftype (sfunction (component) (values)) clear-flags))
 (defun clear-flags (component)
+  (declare (type component component))
   (let ((head (component-head component))
         (tail (component-tail component)))
     (setf (block-flag head) t)
@@ -1445,8 +1310,8 @@
 
 ;;; Make a component with no blocks in it. The BLOCK-FLAG is initially
 ;;; true in the head and tail blocks.
-(declaim (ftype (sfunction () component) make-empty-component))
 (defun make-empty-component ()
+  #-sb-xc-host (declare (values component))
   (let* ((head (make-block-key :start nil :component nil))
          (tail (make-block-key :start nil :component nil))
          (res (make-component head tail)))
@@ -1494,24 +1359,6 @@
             ((not ctran))
           (setf (ctran-block ctran) new-block))
         new-block))))
-
-;;; This is called by locall-analyze-fun-1 after it convers a call to
-;;; FUN into a local call.
-;;; Presumably, the function can be no longer reused by new calls to
-;;; FUN, so the whole thing has to be removed from (FREE-FUN *IR1-NAMESPACE*).
-(defun note-local-functional (fun &aux (free-funs (free-funs *ir1-namespace*)))
-  (declare (type functional fun))
-  (when (and (leaf-has-source-name-p fun)
-             (eq (leaf-source-name fun) (functional-debug-name fun)))
-    (let* ((name (leaf-source-name fun))
-           (defined-fun (gethash name free-funs)))
-      (when (and (defined-fun-p defined-fun)
-                 ;; KLUDGE: We must not blow away the free-fun entry
-                 ;; while block compiling. It would be better to get
-                 ;; rid of this function entirely and untangle this
-                 ;; mess, since this is really a workaround.
-                 (not (eq (block-compile *compilation*) t)))
-        (remhash name free-funs)))))
 
 
 ;;;; deleting stuff
@@ -1708,13 +1555,8 @@
 (defun delete-ref (ref)
   (declare (type ref ref))
   (let* ((leaf (ref-leaf ref))
-         (refs (delq1 ref (leaf-refs leaf)))
-         (home (node-home-lambda ref)))
+         (refs (delq1 ref (leaf-refs leaf))))
     (setf (leaf-refs leaf) refs)
-    (when (and (typep leaf '(or clambda lambda-var))
-               (not (find home refs :key #'node-home-lambda)))
-      ;; It was the last reference from this lambda, remove it
-      (sset-delete leaf (lambda-calls-or-closes home)))
     (cond ((null refs)
            (typecase leaf
              (lambda-var
@@ -2370,67 +2212,32 @@ is :ANY, the function name is not checked."
         (sb-xc:typep object '(or (unboxed-array (*)) number)))))
 
 ;;; Return a LEAF which represents the specified constant object.
-;;;
-;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
-;;; when file-compiling, but not when using COMPILE.
-;;; FIXME:
-;;;  - EQUAL (the comparator in the similarity hash-table) is both too strict
-;;;    and not strict enough. Too strict because it won't compare simple-vector;
-;;;    not strict enough because base-string and character-string can't coalesce.
-;;;    We deal with this fine, but a real SIMILAR kind of hash-table would be nice.
-;;;  - arrays other than the handled kinds can be similar.
-(defun find-constant (object &optional name
-                             &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
-  (cond
-    ((not (producing-fasl-file))
-     ;;  "The consequences are undefined if literal objects are destructively modified
-     ;;   For this purpose, the following operations are considered destructive:
-     ;;   array - Storing a new value into some element of the array ..."
-     ;; so a string, once used as a literal in source, becomes logically immutable.
-     #-sb-xc-host
-     (when (sb-xc:typep object '(simple-array * (*)))
-       (logically-readonlyize object nil))
-     ;;  "The functions eval and compile are required to ensure that literal objects
-     ;;   referenced within the resulting interpreted or compiled code objects are
-     ;;   the _same_ as the corresponding objects in the source code.
-     ;;   ...
-     ;;   The constraints on literal objects described in this section apply only to
-     ;;   compile-file; eval and compile do not copy or coalesce constants."
-     ;;   (http://www.lispworks.com/documentation/HyperSpec/Body/03_bd.htm)
-     ;; The preceding notwithstanding, numbers are always freely copyable and coalescible.
-     (if namespace
-         (values (ensure-gethash object (eql-constants namespace) (make-constant object)))
-         (make-constant object)))
-    ((if name
-         ;; Git rev eded4f76 added an assertion that a named non-fixnum is referenced
-         ;; via its name at (defconstant +share-me-4+ (* 2 most-positive-fixnum))
-         ;; I'm not sure that test makes any sense, but whatever...
-         (sb-xc:typep object '(or fixnum character symbol))
-         (sb-xc:typep object '(or number character symbol)))
-     (values (ensure-gethash object (eql-constants namespace) (make-constant object))))
-    (t
-     ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when
-     ;; file-compiling.
-     (let ((coalescep (coalescible-object-p object)))
-       ;; When COALESCEP is true, the similarity table is "useful" for
-       ;; this object.
-       (if name
-           ;; If the constant is named, always look in the named-constants table first.
-           ;; This ensure that there is no chance of referring to the constant at load-time
-           ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
-           (ensure-gethash name
-                           (named-constants namespace)
-                           (make-constant object (ctype-of object) name))
-           ;; If the constant is anonymous, just make a new constant
-           ;; unless it is EQL or similar to an existing leaf.
-           (or (gethash object (eql-constants namespace))
-               (and coalescep
-                    (get-similar object (similar-constants namespace)))
-               (let ((new (make-constant object)))
-                 (setf (gethash object (eql-constants namespace)) new)
-                 (when coalescep
-                   (setf (get-similar object (similar-constants namespace)) new))
-                 new)))))))
+(defun find-constant (object)
+  (let* ((namespace *ir1-namespace*)
+         (eql-constants (eql-constants namespace))
+         (file-compile-p (producing-fasl-file)))
+    (cond
+      ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when
+      ;; file-compiling.
+      ((and file-compile-p (coalescible-object-p object))
+       (let ((similar-constants (similar-constants namespace)))
+         (or (gethash object eql-constants)
+             (get-similar object similar-constants)
+             (let ((new (make-constant object)))
+               (setf (gethash object eql-constants) new)
+               (setf (gethash object similar-constants) new)))))
+      (t
+       ;;  "The consequences are undefined if literal objects are destructively modified
+       ;;   For this purpose, the following operations are considered destructive:
+       ;;   array - Storing a new value into some element of the array ..."
+       ;; so a string, once used as a literal in source, becomes logically immutable.
+       #-sb-xc-host
+       (when (and (not file-compile-p)
+                  (sb-xc:typep object '(simple-array * (*))))
+         (logically-readonlyize object nil))
+       (or (gethash object eql-constants)
+           (setf (gethash object eql-constants)
+                 (make-constant object)))))))
 
 ;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot
@@ -2495,8 +2302,8 @@ is :ANY, the function name is not checked."
 
 ;;;; functional hackery
 
-(declaim (ftype (sfunction (functional) clambda) main-entry))
 (defun main-entry (functional)
+  (declare (type functional functional) #-sb-xc-host (values clambda))
   (etypecase functional
     (clambda functional)
     (optional-dispatch
@@ -2506,8 +2313,9 @@ is :ANY, the function name is not checked."
 ;;; MV-BIND when it appears in an MV-CALL. All fixed arguments must be
 ;;; optional with null default and no SUPPLIED-P. There must be a
 ;;; &REST arg with no references.
-(declaim (ftype (sfunction (functional) boolean) looks-like-an-mv-bind))
 (defun looks-like-an-mv-bind (functional)
+  (declare (type functional functional)
+           #-sb-xc-host (values boolean))
   (and (optional-dispatch-p functional)
        (do ((arg (optional-dispatch-arglist functional) (cdr arg)))
            ((null arg) nil)
@@ -2538,6 +2346,7 @@ is :ANY, the function name is not checked."
 ;;; Return true if function is an external entry point. This is true
 ;;; of normal XEPs (:EXTERNAL kind) and also of top level lambdas
 ;;; (:TOPLEVEL kind.)
+(declaim (inline xep-p))
 (defun xep-p (fun)
   (declare (type functional fun))
   (not (null (member (functional-kind fun) '(:external :toplevel)))))
@@ -2590,7 +2399,7 @@ is :ANY, the function name is not checked."
            (values nil nil)))))
 
 (defun combination-fun-debug-name (combination)
-  (let ((uses (principal-lvar-use (combination-fun combination))))
+  (let ((uses (principal-lvar-use (basic-combination-fun combination))))
     (when (ref-p uses)
       (let ((leaf (ref-leaf uses)))
         (typecase leaf
@@ -2670,7 +2479,6 @@ is :ANY, the function name is not checked."
     (functional
      (assure-functional-live-p leaf))))
 
-
 (defun call-full-like-p (call)
   (declare (type basic-combination call))
   (let ((kind (basic-combination-kind call)))
@@ -2686,9 +2494,8 @@ is :ANY, the function name is not checked."
                 (not (fun-info-ltn-annotate info))
                 (dolist (template (fun-info-templates info) t)
                   (when (eq (template-ltn-policy template) :fast-safe)
-                    (multiple-value-bind (val win)
-                        (valid-fun-use call (template-type template))
-                      (when (or val (not win)) (return nil)))))))))))
+                    (when (valid-fun-use call (template-type template))
+                      (return))))))))))
 
 ;;;; careful call
 
@@ -2696,10 +2503,9 @@ is :ANY, the function name is not checked."
 ;;; resulting of the evaluation. If an error is signalled during the
 ;;; application, then return the condition and NIL as the
 ;;; second value.
-(declaim (ftype (sfunction ((or symbol function) list)
-                          (values t boolean))
-                careful-call))
 (defun careful-call (function args)
+  (declare (type (or symbol function) function)
+           (type list args))
   (handler-case (values (multiple-value-list (apply function args)) t)
     ;; When cross-compiling, being "careful" is the wrong thing - our code should
     ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
@@ -2740,9 +2546,8 @@ is :ANY, the function name is not checked."
 ;;; lvars ARGS. It returns the lvar if the keyword is present, or NIL
 ;;; otherwise. The legality and constantness of the keywords should
 ;;; already have been checked.
-(declaim (ftype (sfunction (list keyword) (or lvar null))
-                find-keyword-lvar))
 (defun find-keyword-lvar (args key)
+  (declare (type list args) (type keyword key))
   (do ((arg args (cddr arg)))
       ((null arg) nil)
     (when (eq (lvar-value (first arg)) key)
@@ -2751,8 +2556,8 @@ is :ANY, the function name is not checked."
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that alternating lvars in ARGS are constant and that there
 ;;; is an even number of args.
-(declaim (ftype (sfunction (list) boolean) check-key-args-constant))
 (defun check-key-args-constant (args)
+  (declare (type list args) #-sb-xc-host (values boolean))
   (do ((arg args (cddr arg)))
       ((null arg) t)
     (unless (and (rest arg)
@@ -2762,8 +2567,8 @@ is :ANY, the function name is not checked."
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that the list of lvars ARGS is a well-formed &KEY arglist
 ;;; and that only keywords present in the list KEYS are supplied.
-(declaim (ftype (sfunction (list list) boolean) check-transform-keys))
 (defun check-transform-keys (args keys)
+  (declare (list args keys) #-sb-xc-host (values boolean))
   (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
            ((null arg) t)
@@ -2773,8 +2578,8 @@ is :ANY, the function name is not checked."
 ;;;; miscellaneous
 
 ;;; Called by the expansion of the EVENT macro.
-(declaim (ftype (sfunction (event-info (or node null)) *) %event))
 (defun %event (info node)
+  (declare (type event-info info) (type (or node null) node))
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)
              (policy (or node *lexenv*)
@@ -2881,14 +2686,15 @@ is :ANY, the function name is not checked."
       (when (eq :rest kind)
         (return t)))))
 
-;;; Don't substitute single-ref variables on high-debug / low speed, to
-;;; improve the debugging experience. ...but don't bother keeping those
-;;; from system lambdas.
-(defun preserve-single-use-debug-var-p (call var)
-  (and (policy call (eql preserve-single-use-debug-variables 3))
+;;; Don't substitute single-ref variables on high-debug / low speed,
+;;; to improve the debugging experience, unless it is a special
+;;; variable or a temporary variable used for hairy function entries.
+(defun preserve-single-use-debug-var-p (node var)
+  (and (policy node (eql preserve-single-use-debug-variables 3))
        (not (lambda-var-specvar var))
-       (or (not (lambda-var-p var))
-           (not (lambda-system-lambda-p (lambda-var-home var))))))
+       (not (and (combination-p node)
+                 (typep (leaf-debug-name (combination-lambda node))
+                        '(cons (member hairy-function-entry) t))))))
 
 ;;; Call (lambda (arg lambda-var type)), for a mv-combination ARG can
 ;;; be NIL when it produces multiple values.
@@ -3024,7 +2830,7 @@ is :ANY, the function name is not checked."
 (defun propagate-lvar-annotations (new old &optional (propagate-dependencies t))
   (when propagate-dependencies
     (loop for dep in (lvar-dependent-annotations old)
-          do (nsubst new old (lvar-function-designator-annotation-deps dep))
+          do (nsubst new old (lvar-dependent-annotation-deps dep))
           when (lvar-p new)
           do
           (pushnew dep (lvar-dependent-annotations new) :test #'eq))
@@ -3056,42 +2862,41 @@ is :ANY, the function name is not checked."
                                                           source-path)))))
                     collect annotation)))))))
 
-(defun lvar-constants (lvar &optional seen)
-  (let* ((uses (lvar-uses lvar))
-         (lvar (or (and (ref-p uses)
-                        (let ((ref (principal-lvar-ref lvar)))
-                          (and ref
-                               (or
-                                (lambda-var-ref-lvar ref)
-                                (node-lvar ref)))))
-                   lvar)))
-    (cond ((constant-lvar-p lvar)
-           (values :values (list (lvar-value lvar))))
-          ((constant-lvar-uses-p lvar)
-           (values :values (lvar-uses-values lvar)))
-          ((ref-p uses)
-           (let* ((ref (principal-lvar-ref lvar))
-                  (leaf (and ref
-                             (ref-leaf ref))))
-             (when (lambda-var-p leaf)
-               (let ((seen (or seen
-                               (make-hash-table :test #'eq)))
-                     constants)
-                 (setf (gethash lvar seen) t)
-                 (map-lambda-var-refs-from-calls
-                  (lambda (call lvar)
-                    (unless (gethash lvar seen)
-                      (setf (gethash lvar seen) t)
-                      (multiple-value-bind (type values)
-                          (lvar-constants lvar seen)
-                        (case type
-                          (:values
-                           (push (cons call values) constants))
-                          (:calls
-                           (setf constants (nconc values constants)))))))
-                  leaf)
-                 (when constants
-                   (values :calls constants)))))))))
+(defun lvar-constants (lvar)
+  (named-let recurse ((lvar lvar) (seen nil))
+    (let* ((uses (lvar-uses lvar))
+           (lvar (or (and (ref-p uses)
+                          (let ((ref (principal-lvar-ref lvar)))
+                            (and ref
+                                 (or
+                                  (lambda-var-ref-lvar ref)
+                                  (node-lvar ref)))))
+                     lvar)))
+      (cond ((constant-lvar-p lvar)
+             (values :values (list (lvar-value lvar))))
+            ((constant-lvar-uses-p lvar)
+             (values :values (lvar-uses-values lvar)))
+            ((ref-p uses)
+             (let* ((ref (principal-lvar-ref lvar))
+                    (leaf (and ref
+                               (ref-leaf ref))))
+               (when (lambda-var-p leaf)
+                 (let ((seen (or seen (alloc-xset)))
+                       constants)
+                   (add-to-xset lvar seen)
+                   (map-lambda-var-refs-from-calls
+                    (lambda (call lvar)
+                      (unless (xset-member-p lvar seen)
+                        (add-to-xset lvar seen)
+                        (multiple-value-bind (type values) (recurse lvar seen)
+                          (case type
+                            (:values
+                             (push (cons call values) constants))
+                            (:calls
+                             (setf constants (nconc values constants)))))))
+                    leaf)
+                   (when constants
+                     (values :calls constants))))))))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
   (loop for annot in (lvar-annotations lvar)
@@ -3214,6 +3019,10 @@ is :ANY, the function name is not checked."
                                                      (list (node-source-form use))
                                                      :condition condition)))))))
 
+(defun process-lvar-sequence-bounds-annotation (lvar annotation)
+  (destructuring-bind (start end) (lvar-dependent-annotation-deps annotation)
+    (check-sequence-ranges lvar start end annotation)))
+
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))
                (lvar-fun-is
@@ -3239,13 +3048,19 @@ is :ANY, the function name is not checked."
                     (lvar-function-annotation
                      (check-function-lvar lvar annot))
                     (lvar-type-annotation
-                     (process-lvar-type-annotation lvar annot)))
+                     (process-lvar-type-annotation lvar annot))
+                    (lvar-sequence-bounds-annotation
+                     (process-lvar-sequence-bounds-annotation lvar annot)))
               (setf (lvar-annotation-fired annot) t))))))
 
 (defun add-annotation (lvar annotation)
   (unless (eq (lvar-annotations lvar)
               (pushnew annotation (lvar-annotations lvar)
                        :key #'type-of))
+    (when (typep annotation 'lvar-dependent-annotation)
+      (loop for lvar in (lvar-dependent-annotation-deps annotation)
+            when (lvar-p lvar)
+            do (push annotation (lvar-dependent-annotations lvar))))
     (unless (lvar-annotation-source-path annotation)
       (setf (lvar-annotation-source-path annotation)
             (if (boundp '*current-path*)
@@ -3258,44 +3073,3 @@ is :ANY, the function name is not checked."
                  (node-lexenv (lvar-dest lvar)))
                 *lexenv*)))
     t))
-
-;;; Return functional for DEFINED-FUN which has been converted in policy
-;;; corresponding to the current one, or NIL if no such functional exists.
-;;;
-;;; Also check that the parent of the functional is visible in the current
-;;; environment and is in the current component.
-(defun defined-fun-functional (defined-fun)
-  (let ((functionals (defined-fun-functionals defined-fun)))
-    ;; FIXME: If we are block compiling, forget about finding the
-    ;; right functional. Just pick the first one we see and hope
-    ;; people don't mix inlined functions and policy with block
-    ;; compiling. (For now)
-    (when (block-compile *compilation*)
-      (return-from defined-fun-functional (first functionals)))
-    (when functionals
-      (let* ((sample (car functionals))
-             (there (lambda-parent (if (lambda-p sample)
-                                       sample
-                                       (optional-dispatch-main-entry sample)))))
-        (when there
-          (labels ((lookup (here)
-                     (unless (eq here there)
-                       (if here
-                           (lookup (lambda-parent here))
-                           ;; We looked up all the way up, and didn't find the parent
-                           ;; of the functional -- therefore it is nested in a lambda
-                           ;; we don't see, so return nil.
-                           (return-from defined-fun-functional nil)))))
-            (lookup (lexenv-lambda *lexenv*)))))
-      ;; Now find a functional whose policy matches the current one, if we already
-      ;; have one.
-      (let ((policy (lexenv-%policy *lexenv*)))
-        (dolist (functional functionals)
-          (when (and (not (memq (functional-kind functional) '(:deleted :zombie)))
-                     (policy= policy (lexenv-%policy (functional-lexenv functional)))
-                     ;; Is it in the same component
-                     (let ((home-lambda (lambda-home (main-entry functional))))
-                       (and (not (memq (functional-kind home-lambda) '(:deleted :zombie)))
-                            (eq (lambda-component home-lambda)
-                                *current-component*))))
-            (return functional)))))))

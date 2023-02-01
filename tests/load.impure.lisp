@@ -131,7 +131,7 @@
   (let ((before (gensym)))
     `(let ((,before *counter*)
            *loaded-pathname* *loaded-truename*)
-       (load ,load-argument :print t :verbose t)
+       (load ,load-argument :print 'yes :verbose t)
        (assert (and (= (1+ ,before) *counter*)
                     #-win32 ;kludge
                     (equal ,(if pathname `(merge-pathnames ,pathname))
@@ -438,7 +438,7 @@
   (let* ((s (make-string-output-stream))
          (output (compile-file *tmp-filename*)))
     (let ((*standard-output* s))
-      (load output :print t))
+      (load output :print 0))
     (delete-file output)
     (assert (not (string= (get-output-stream-string s) "")))
     (delete-file *tmp-filename*)))

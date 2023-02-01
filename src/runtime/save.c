@@ -42,7 +42,7 @@
 #include "search.h"
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-# include <zlib.h>
+# include <zstd.h>
 #endif
 
 #define GENERAL_WRITE_FAILURE_MSG "error writing to core file"
@@ -91,31 +91,42 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
             }
         }
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-    } else if ((compression >= -1) && (compression <= 9)) {
-# define ZLIB_BUFFER_SIZE (1u<<16)
-        z_stream stream;
-        unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
+    } else if ((compression >= -7) && (compression <= 22)) {
+        int ret;
+        ZSTD_inBuffer input;
+        input.src = addr;
+        input.size = bytes;
+        input.pos = 0;
+
+        size_t buf_size = ZSTD_CStreamOutSize();
+        unsigned char* buf = successful_malloc(buf_size);
+        ZSTD_outBuffer output;
+        output.dst = buf;
+        output.size = buf_size;
+
         unsigned char * written, * end;
         long total_written = 0;
-        int ret;
-        stream.zalloc = NULL;
-        stream.zfree = NULL;
-        stream.opaque = NULL;
-        stream.avail_in = bytes;
-        stream.next_in  = (void*)addr;
-        ret = deflateInit(&stream, compression);
-        if (ret != Z_OK)
-            lose("deflateInit: %i", ret);
+        ZSTD_CStream *stream = ZSTD_createCStream();
+        if (stream == NULL)
+            lose("failed to create zstd compression context");
+        ret = ZSTD_initCStream(stream, compression);
+        if (ZSTD_isError(ret))
+            lose("ZSTD_initCStream failed with error: %s",
+                 ZSTD_getErrorName(ret));
         do {
-            stream.avail_out = ZLIB_BUFFER_SIZE;
-            stream.next_out = buf;
-            ret = deflate(&stream, Z_FINISH);
-            if (ret < 0) lose("zlib deflate error: %i... exiting", ret);
+            output.pos = 0;
+            if (input.pos < bytes)
+                ret = ZSTD_compressStream(stream, &output, &input);
+            else
+                ret = ZSTD_endStream(stream, &output);
+            if (ZSTD_isError(ret))
+                lose("ZSTD_compressStream2 failed with error: %s",
+                     ZSTD_getErrorName(ret));
             written = buf;
-            end     = buf+ZLIB_BUFFER_SIZE-stream.avail_out;
-            total_written += end - written;
+            end = buf + output.pos;
+            total_written += output.pos;
             while (written < end) {
-                long count = fwrite(written, 1, end-written, file);
+                long count = fwrite(written, 1, output.pos, file);
                 if (count > 0) {
                     written += count;
                 } else {
@@ -123,18 +134,17 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
                     lose("core file is incomplete or corrupt");
                 }
             }
-        } while (stream.avail_out == 0);
-        deflateEnd(&stream);
-        free(buf);
+        } while (ret != 0);
         printf("compressed %lu bytes into %lu at level %i\n",
                bytes, total_written, compression);
-# undef ZLIB_BUFFER_SIZE
+
+        ZSTD_freeCStream(stream);
 #endif
     } else {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
         lose("Unknown core compression level %i, exiting", compression);
 #else
-        lose("zlib-compressed core support not built in this runtime");
+        lose("zstd-compressed core support not built in this runtime");
 #endif
     }
 
@@ -144,27 +154,15 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
     }
 };
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
-#define FTELL _ftelli64
-#define FSEEK _fseeki64
-typedef __int64 ftell_type;
-#else
-#define FTELL ftell
-#define FSEEK fseek
-typedef long ftell_type;
-#endif
-
 static long write_bytes(FILE *file, char *addr, size_t bytes,
                         os_vm_offset_t file_offset, int compression)
 {
     ftell_type here, data;
 
 #ifdef LISP_FEATURE_WIN32
-    size_t count;
-    /* touch every single page in the space to force it to be mapped. */
-    for (count = 0; count < bytes; count += 0x1000) {
-        volatile int temp = addr[count];
-    }
+    // I can't see how we'd ever attempt writing from uncommitted memory,
+    // but this is better than was was previously here (a "touch" loop over all pages)
+    os_commit_memory(addr, bytes);
 #endif
 
     fflush(file);
@@ -184,7 +182,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 {
     size_t words, bytes, data, compressed_flag;
     static char *names[] = {NULL, "dynamic", "static", "read-only",
-                            "immobile", "immobile"};
+                            "fixedobj", "text"};
 
     compressed_flag
             = ((core_compression_level != COMPRESSION_LEVEL_NONE)
@@ -313,12 +311,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
           * entry type code, plus this count itself) */
          (5 * MAX_CORE_SPACE_ID) + 2, file);
     output_space(file,
-                 READ_ONLY_CORE_SPACE_ID,
-                 (lispobj *)READ_ONLY_SPACE_START,
-                 read_only_space_free_pointer,
-                 core_start_pos,
-                 core_compression_level);
-    output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
                  static_space_free_pointer,
@@ -338,6 +330,15 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  (void*)dynamic_space_highwatermark(),
                  core_start_pos,
                  core_compression_level);
+    /* FreeBSD really doesn't like to give you the address you asked for
+     * on dynamic space. We have a better chance at satisfying the request
+     * if we haven't already mapped R/O space below it. */
+    output_space(file,
+                 READ_ONLY_CORE_SPACE_ID,
+                 (lispobj *)READ_ONLY_SPACE_START,
+                 read_only_space_free_pointer,
+                 core_start_pos,
+                 core_compression_level);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     output_space(file,
                  IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
@@ -350,9 +351,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     // i.e. if code resided between dynamic and fixedobj space, then dynamic
     // space would need to have it pages renumbered when code is pulled out.
     output_space(file,
-                 IMMOBILE_VARYOBJ_CORE_SPACE_ID,
-                 (lispobj *)VARYOBJ_SPACE_START,
-                 varyobj_free_pointer,
+                 IMMOBILE_TEXT_CORE_SPACE_ID,
+                 (lispobj *)TEXT_SPACE_START,
+                 text_space_highwatermark,
                  core_start_pos,
                  core_compression_level);
 #endif

@@ -76,6 +76,10 @@
   ;; is the offset in the table of the code object needing to be
   ;; patched, and <offset> is the offset that must be patched.
   (patch-table (make-hash-table :test 'eq) :type hash-table)
+  ;; a list of the table handles for all of the DEBUG-INFO structures
+  ;; dumped in this file. These structures must be back-patched with
+  ;; source location information when the compilation is complete.
+  (debug-info () :type list)
   ;; This is used to keep track of objects that we are in the process
   ;; of dumping so that circularities can be preserved. The key is the
   ;; object that we have previously seen, and the value is the object
@@ -89,9 +93,7 @@
   ;; try to dump a structure that isn't in this hash table, we lose.
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
   ;; a hash table of slots to be saved when dumping an instance.
-  (saved-slot-names (make-hash-table :test 'eq) :type hash-table)
-  ;; DEBUG-SOURCE written at the very beginning
-  (source-info nil :type (or null sb-c::debug-source)))
+  (saved-slot-names (make-hash-table :test 'eq) :type hash-table))
 (declaim (freeze-type fasl-output))
 
 ;;; Similarity hash table logic.
@@ -162,6 +164,7 @@
 ;; Unlike EQUAL-HASH, we never call EQ-HASH, because there is generally no reason
 ;; to try to look up an object that lacks a content-based hash value.
 (defun similar-hash (x)
+  (declare (special sb-c::*compile-object*))
   (named-let recurse ((x x))
     ;; There is no depth cutoff - X must not be circular,
     ;; which was already determined as a precondition to calling this,
@@ -425,9 +428,7 @@
     ;; sanity checks
     (aver (zerop (hash-table-count (fasl-output-patch-table fasl-output))))
     ;; End the group.
-    (dump-fop 'fop-verify-empty-stack fasl-output)
-    (dump-fop 'fop-verify-table-size fasl-output (fasl-output-table-free fasl-output))
-    (dump-fop 'fop-end-group fasl-output))
+    (dump-fop 'fop-end-group fasl-output (fasl-output-table-free fasl-output)))
 
   ;; That's all, folks.
   (close (fasl-output-stream fasl-output) :abort abort-p)
@@ -602,16 +603,13 @@
 
 ;;; Emit a funcall of the function and return the handle for the
 ;;; result.
-(defun fasl-dump-load-time-value-lambda (fun file no-skip)
+(defun fasl-dump-load-time-value-lambda (fun file)
   (declare (type sb-c::clambda fun) (type fasl-output file))
   (let ((handle (gethash (sb-c::leaf-info fun)
                          (fasl-output-entry-table file))))
     (aver handle)
     (dump-push handle file)
-    ;; Can't skip MAKE-LOAD-FORM due to later references
-    (if no-skip
-        (dump-fop 'fop-funcall-no-skip file 0)
-        (dump-fop 'fop-funcall file 0)))
+    (dump-fop 'fop-funcall file 0))
   (dump-pop file))
 
 ;;; Return T iff CONSTANT has already been dumped. It's been dumped if
@@ -726,7 +724,7 @@
   (declare (inline assoc))
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
         (t
-         (let ((s (package-name pkg)))
+         (let ((s (sb-xc:package-name pkg)))
            (dump-fop 'fop-named-package-save file (length s))
            ;; Package names are always dumped as varint-encoded character strings
            ;; except on non-unicode builds.
@@ -1000,8 +998,9 @@
            (dump-fop 'fop-keyword-symbol-save file length+flag))
           (t
            (let ((pkg-index (dump-package pkg file)))
-             (dump-fop 'fop-symbol-in-package-save file
-                       length+flag pkg-index))))
+             (if (eq (find-symbol pname pkg) :inherited)
+                 (dump-fop 'fop-symbol-in-package-save file length+flag pkg-index)
+                 (dump-fop 'fop-symbol-in-package-internal-save file length+flag pkg-index)))))
 
     (unless dumped-as-copy
       (dump-chars pname file base-string-p)
@@ -1032,48 +1031,72 @@
   (assert (<= (length +fixup-kinds+) 8))) ; fixup-kind fits in 3 bits
 
 (defconstant-eqx +fixup-flavors+
-  #(:assembly-routine :assembly-routine* :asm-routine-nil-offset
+  #(:assembly-routine :assembly-routine*
     :gc-barrier :symbol-tls-index
-    :foreign :foreign-dataref :code-object
-    :layout :immobile-symbol :named-call :static-call
+    :alien-code-linkage-index :alien-data-linkage-index
+    :foreign :foreign-dataref
+    :code-object
+    :layout :immobile-symbol :fdefn-call :static-call
     :symbol-value
     :layout-id)
   #'equalp)
 
 ;;; Pack the aspects of a fixup into an integer.
+;;; DATA is for asm routine fixups. The routine can be represented in 7 bits,
+;;; so the fixup can be reduced to one word instead of an integer and a symbol.
 (declaim (inline !pack-fixup-info))
-(defun !pack-fixup-info (offset kind flavor)
-  ;; ARM gets "error during constant folding"
-  #+arm (declare (notinline position))
-  (logior (ash (the (mod 16) (or (position flavor +fixup-flavors+)
-                                 (error "Bad fixup flavor ~s" flavor)))
-               3)
+(defun !pack-fixup-info (offset kind flavor data)
+  (logior ;; 3 bits
           (the (mod 8) (or (position kind +fixup-kinds+)
                            (error "Bad fixup kind ~s" kind)))
-          (ash offset 7)))
+          ;; 4 bits
+          (ash (the (mod 16) (or (position flavor +fixup-flavors+)
+                                 (error "Bad fixup flavor ~s" flavor)))
+               3)
+          ;; 7 bits
+          (ash (the (mod 128) data) 7)
+          ;; whatever it needs
+          (ash offset 14)))
 
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
 (declaim (inline !unpack-fixup-info))
-(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor)
-  ;; ARM gets "error during constant folding"
-  #+arm (declare (notinline aref))
-  (values (ash packed-info -7)
+(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor data)
+  (values (ash packed-info -14)
           (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
-          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))))
+          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))
+          (ldb (byte 7 7) packed-info)))
+
+#+(or arm arm64 riscv sparc) ; these don't have any retained packed fixups (yet)
+(defun sb-c::pack-retained-fixups (fixup-notes)
+  (declare (ignore fixup-notes))
+  0) ; as if from PACK-CODE-FIXUP-LOCS
 
 ;;; Dump all the fixups.
 ;;;  - foreign (C) symbols: named by a string
 ;;;  - code object references: don't need a name.
 ;;;  - everything else: a symbol for the name.
-(defun dump-fixups (fixups fasl-output &aux (n 0))
-  (declare (list fixups) (type fasl-output fasl-output))
-  (dolist (note fixups n)
+(defun dump-fixups (fixup-notes alloc-points fasl-output &aux (nelements 2))
+  (declare (type list fixup-notes) (type fasl-output fasl-output))
+  ;; "retained" fixups are those whose offset in the code needs to be
+  ;; remembered for subsequent reapplication by the garbage collector,
+  ;; or in some cases, on core startup.
+  (dump-object (sb-c::pack-retained-fixups fixup-notes) fasl-output)
+  (dump-object alloc-points fasl-output)
+  (dolist (note fixup-notes nelements)
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
-           (info (!pack-fixup-info (fixup-note-position note)
-                                   (fixup-note-kind note)
-                                   flavor))
+           (named (not (member flavor '(:code-object :gc-barrier))))
+           (data
+            (or #-sb-xc-host ; ASM routine indices aren't known to the cross-compiler
+                (when (member flavor '(:assembly-routine :assembly-routine*))
+                  (setq named nil)
+                  (the (integer 1 *) ; data can't be 0
+                       (cddr (gethash name (%code-debug-info *assembler-routines*)))))
+                0))
+           (info
+            (!pack-fixup-info (fixup-note-position note) (fixup-note-kind note)
+                              flavor data))
            (operand
             (ecase flavor
               ((:code-object :gc-barrier) (the null name))
@@ -1086,7 +1109,7 @@
                           (t name)))))
               (:layout-id
                (the wrapper name))
-              ((:assembly-routine :assembly-routine* :asm-routine-nil-offset
+              ((:assembly-routine :assembly-routine*
                :symbol-tls-index
                ;; Only #+immobile-space can use the following two flavors.
                ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
@@ -1095,11 +1118,12 @@
                ;; but its global value must be an immobile object.
                :immobile-symbol :symbol-value)
                (the symbol name))
-              ((:foreign :foreign-dataref) (the string name))
-              ((:named-call :static-call) name))))
-      (dump-object operand fasl-output)
-      (dump-integer info fasl-output))
-    (incf n)))
+              ((:alien-code-linkage-index :alien-data-linkage-index
+                :foreign :foreign-dataref) (the string name))
+              ((:fdefn-call :static-call) name))))
+      (dump-object info fasl-output)
+      (incf nelements (cond (named (dump-object operand fasl-output) 2)
+                            (t 1))))))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
@@ -1117,12 +1141,10 @@
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
-  (let* ((n-fixups (dump-fixups fixups fasl-output))
-         (2comp (component-info component))
+  (let* ((2comp (component-info component))
          (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants))
-         (n-named-calls 0))
-    (dump-object alloc-points fasl-output)
+         (n-fdefns 0))
     (collect ((patches)
               (named-constants))
       ;; Dump the constants, noting any :ENTRY constants that have to
@@ -1154,8 +1176,12 @@
                     (dump-fop 'fop-misc-trap fasl-output)))))
                (:load-time-value
                 (dump-push (cadr entry) fasl-output))
-               ((:named-call :fdefinition)
-                (when (eq (car entry) :named-call) (incf n-named-calls))
+               (:fdefinition
+                ;; It's possible for other fdefns to be found in the header, but they can't
+                ;; have resulted from IR2 conversion. They would have had to come from
+                ;; something like (load-time-value (find-or-create-fdefn ...))
+                ;; which is fine, but they don't count for this purpose.
+                (incf n-fdefns)
                 (dump-object (cadr entry) fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
@@ -1166,26 +1192,33 @@
                 (dump-specialized-vector (make-array (cdr entry)
                                                      :element-type '(unsigned-byte 8)
                                                      :initial-element #xFF)
-                                         fasl-output))))
+                                         fasl-output))
+               #+arm64
+               (:tls-index
+                (dump-object (cdr entry) fasl-output)
+                (dump-fop 'fop-tls-index fasl-output))))
             (null
              (dump-fop 'fop-misc-trap fasl-output)))))
 
       ;; Dump the debug info.
       (let ((info (sb-c::debug-info-for-component component)))
-        (setf (sb-c::debug-info-source info)
-              (fasl-output-source-info fasl-output))
-        (dump-object info fasl-output))
+        (fasl-validate-structure info fasl-output)
+        (dump-object info fasl-output)
+        (push (dump-to-table fasl-output)
+              (fasl-output-debug-info fasl-output)))
 
-      (dump-fop 'fop-load-code fasl-output
-                (logior (ash header-length 1)
-                        (if (sb-c::code-immobile-p component) 1 0))
-                code-length n-fixups)
+      (let ((n-fixup-elts (dump-fixups fixups alloc-points fasl-output)))
+        (dump-fop 'fop-load-code fasl-output
+                  (logior (ash header-length 1)
+                          (if (sb-c::code-immobile-p component) 1 0))
+                  code-length
+                  n-fixup-elts))
       ;; Fasl dumper/loader convention allows at most 3 integer args.
       ;; Others have to be written with explicit calls.
       (dump-integer-as-n-bytes (length (sb-c::ir2-component-entries 2comp))
                                4 ; output 4 bytes
                                fasl-output)
-      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-named-calls)
+      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-fdefns)
                                4 ; output 4 bytes
                                fasl-output)
       (dump-segment code-segment code-length fasl-output)
@@ -1204,8 +1237,7 @@
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
 (defun dump-assembler-routines (code-segment octets fixups alloc-points routines file)
-  (let ((n-fixups (dump-fixups fixups file)))
-    (dump-object alloc-points file)
+  (let ((n-fixup-elts (dump-fixups fixups alloc-points file)))
     ;; The name -> address table has to be created before applying fixups
     ;; because a fixup may refer to an entry point in the same code component.
     ;; So these go on the stack last, i.e. nearest the top.
@@ -1213,12 +1245,12 @@
     ;; except possibly when there are multiple entry points to one routine
     (dolist (routine (reverse routines))
       (dump-object (car routine) file)
-      (dump-integer (+ (label-position (cadr routine))
-                       (caddr routine))
+      (dump-integer (+ (label-position (cadr routine)) (caddr routine))
                     file))
     (dump-fop 'fop-assembler-code file)
-    (dolist (word (list (length octets) (length routines) n-fixups))
-      (dump-word word file))
+    (dump-word (length routines) file)
+    (dump-word (length octets) file)
+    (dump-word n-fixup-elts file)
     (write-segment-contents code-segment (fasl-output-stream file))
     (dump-pop file)))
 
@@ -1237,8 +1269,6 @@
 (defun fasl-dump-component (component code-segment code-length fixups alloc-points file)
   (declare (type component component))
   (declare (type fasl-output file))
-
-  (dump-fop 'fop-verify-table-size file (fasl-output-table-free file))
 
   #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
@@ -1322,48 +1352,45 @@
   (dump-push-previously-dumped-fun fun fasl-output)
   (dump-fop 'fop-funcall-for-effect fasl-output 0)
   (values))
+
+;;; Dump some information to allow partial reconstruction of the
+;;; DEBUG-SOURCE structure.
+(defun fasl-dump-partial-source-info (info file)
+  (declare (type sb-c::source-info info) (type fasl-output file))
+  (let ((partial (sb-c::debug-source-for-info info)))
+    (dump-object (sb-c::debug-source-namestring partial) file)
+    (dump-object (sb-c::debug-source-created partial) file)
+    (dump-object (sb-c::debug-source-plist partial) file)
+    (dump-fop 'fop-note-partial-source-info file)))
+
+;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
+;;; all of the dumped DEBUG-INFO structures. We clear the
+;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
+;;; different source info may be dumped.
+(defun fasl-dump-source-info (info file)
+  (declare (type sb-c::source-info info) (type fasl-output file))
+  (let ((res (sb-c::debug-source-for-info info)))
+    (fasl-validate-structure res file)
+    (dump-object res file)
+    (let ((res-handle (dump-pop file)))
+      (dolist (info-handle (fasl-output-debug-info file))
+        (dump-push res-handle file)
+        (symbol-macrolet
+            ((debug-info-source-index
+               (let ((dd (find-defstruct-description 'sb-c::debug-info)))
+                 (dsd-index (find 'source (dd-slots dd)
+                                  :key #'dsd-name :test 'string=)))))
+          (dump-fop 'fop-structset file info-handle debug-info-source-index)))))
+
+  (setf (fasl-output-debug-info file) nil)
+  (values))
 
 ;;;; dumping structures
 
-;;; Even as late as calling DUMP-STRUCTURE we might have to deduce that a
-;;; user's "custom" MAKE-LOAD-FORM amounts to MAKE-LOAD-FORM-SAVING-SLOTS
-;;; with the default of all slots. Why: suppose you have some structure
-;;;   (DEFSTRUCT MYSTRUCT A)
-;;; and a macro that returns literal instances of the structure:
-;;;   (DEFMACRO FUNNYMAC (N) (MAKE-MYSTRUCT :A N))
-;;; and a DEFVAR that uses the structure:
-;;;   (DEFVAR *A* (FUNNYMAC 1))
-;;;
-;;; Now, because the fopcompiler expands macros more than once - at least once
-;;; in FOPCOMPILABLE-P and then again in FOPCOMPILE - we see _different_
-;;; instances of MYSTRUCT each of those times. We don't memoize the expansion.
-;;; The two structures are similar but not EQ, and only the instance produced
-;;; during FOPCOMPILABLE-P was entered in the FASL-OUTPUT-VALID-STRUCTURES table.
-;;; The other structure instance isn't there, but we need it to be legal to dump.
-;;;
-;;; This problem is not just theoretical.  We ourselves do just that, e.g.:
-;;;   (defvar *cpus* (... (sb-alien:alien-funcall ...)))
-;;; and the expansion of alien-funcall involves an ALIEN-TYPE literal
-;;; which gets multiply expanded exactly as described above.
-(defun load-form-is-default-mlfss-p (struct)
-  ;; FIXME? this is called while writing a fasl and so might need
-  ;; to invoke MAKE-LOAD-FORM, long after IR1 conversion has happened.
-  ;; Surely this is not the best design.
-  (and (typep struct 'structure-object)
-       (multiple-value-bind (creation-form init-form)
-           (handler-case (make-load-form struct (make-null-lexenv))
-             (error (condition) (sb-c:compiler-error condition)))
-         (multiple-value-bind (ss-creation-form ss-init-form)
-             (make-load-form-saving-slots struct)
-           (and (equal creation-form ss-creation-form)
-                (equal init-form ss-init-form))))))
-
 (defun dump-structure (struct file)
   (unless (or (gethash struct (fasl-output-valid-structures file))
-              (typep struct
-                     '(or sb-c::debug-info sb-c::debug-fun sb-c::debug-source
-                          sb-c:definition-source-location sb-c::debug-name-marker))
-              (load-form-is-default-mlfss-p struct))
+              ;; Assume that DEBUG-FUNs are always valid to dump.
+              (typep struct 'sb-c::debug-fun))
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)

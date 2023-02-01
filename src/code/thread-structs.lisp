@@ -11,6 +11,12 @@
 
 (in-package "SB-THREAD")
 
+;;; An AVL tree of threads keyed by 'struct thread'. NIL is the empty tree.
+(sb-ext:define-load-time-global *all-threads* ())
+;;; Next TLS index to use. This is shifted by n-fixnum-tag-bits because it holds
+;;; a word-aligned raw integer, not a fixnum (but it looks like a fixnum)
+(sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
+
 ;;; It's possible to make futex/non-futex switchable at runtime by ensuring that
 ;;; these synchronization primitive structs contain all the slots for the union
 ;;; of any kind of backing object.  Some of the #+sb-futex/#-sb-futex cases in
@@ -21,10 +27,6 @@
 ;;; compete for a mutex, the pthread code seems to do a better job at reducing
 ;;; cycles spent in the OS.
 
-;;; N.B.: If you alter this definition, then you need to verify that FOP-FUNCALL
-;;; in genesis can properly emulate MAKE-MUTEX for the altered structure,
-;;; or even better, make sure that genesis can emulate any constructor,
-;;; provided that it is sufficiently trivial.
 (sb-xc:defstruct (mutex (:constructor make-mutex (&key name))
                         (:copier nil))
   "Mutex type."
@@ -37,8 +39,7 @@
   ;; but the "funny fixnum" representation - i.e. N_WORD_BITS bits of significance, but
   ;; cast as fixnum when read - avoids consing on 32-bit builds, and also not all of them
   ;; implement RAW-INSTANCE-CAS which would be otherwise needed.
-  (%owner 0 :type #+64-bit sb-vm:word
-                  #-64-bit fixnum))
+  (%owner 0 :type fixnum))
 
 (sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."

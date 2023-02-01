@@ -134,6 +134,11 @@
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*))
                         (simple-array (signed-byte 8) (*))
                         null))
+  ;; If all code locations in this function are in the same top level
+  ;; form, then this is the number of that form, otherwise NIL. If
+  ;; NIL, then each code location represented in the BLOCKS specifies
+  ;; the TLF number.
+  (tlf-number nil :type (or index null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The
@@ -191,9 +196,6 @@
   (return-pc-pass (missing-arg) :type sc+offset)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset)
-  ;; When block compiling a single code object can have multiple top level forms,
-  ;; in that case it's a (cons (pack-tlf-num+offset tlf offset) integer)
-  ;; otherwise just an integer:
   ;; An integer which contains between 4 and 6 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
@@ -203,7 +205,7 @@
   ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
-  (encoded-locs (missing-arg) :type (or cons unsigned-byte) :read-only t)
+  (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
   (next))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc
@@ -234,11 +236,8 @@
     (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
-  (let* ((encoding (compiled-debug-fun-encoded-locs cdf))
-         (encoding (if (consp encoding)
-                       (cdr encoding)
-                       encoding))
-         (input-pointer 0))
+  (let ((encoding (compiled-debug-fun-encoded-locs cdf))
+        (input-pointer 0))
     (flet ((decode-varint (&aux (accumulator 0) (shift 0))
              (loop
               (let ((byte (ldb (byte 8 input-pointer) encoding)))
@@ -394,6 +393,10 @@
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
+  ;; The FILE-POSITIONs of the truly top level forms read from this
+  ;; file (if applicable). The vector element type will be chosen to
+  ;; hold the largest element.
+  (start-positions nil :type (or (simple-array * (*)) null) :read-only t)
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
   (plist *source-plist* :read-only t))
 
@@ -416,18 +419,9 @@
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)
-  ;; Packed integers. Also can be a cons of that plus an alist which
-  ;; maps SB-C::COMPILED-DEBUG-FUN to SB-DI::COMPILED-DEBUG-FUN instances.
-  (tlf-num+offset (missing-arg) :type (or integer cons (eql :multiple))))
-
-;;; The TLF-NUMBER and CHAR-OFFSET of a compiled-debug-info can each be NIL,
-;;; but aren't often. However, to allow that, convert NIL to 0 and non-nil
-;;; value N to N+1.
-(defun pack-tlf-num+offset (tlf-number char-offset)
-  (with-adjustable-vector (v)
-    (write-var-integer (if tlf-number (1+ tlf-number) 0) v)
-    (write-var-integer (if char-offset (1+ char-offset) 0) v)
-    (integer-from-octets v)))
+  ;; The CDR is an alist which maps SB-C::COMPILED-DEBUG-FUN to
+  ;; SB-DI::COMPILED-DEBUG-FUN instances. Null when unassigned.
+  (memo-cell nil :type list))
 
 ;;;; file reading
 ;;;;

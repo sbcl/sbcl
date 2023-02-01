@@ -56,7 +56,7 @@
              :ref-known (flushable movable)
              :ref-trans %numerator
              :init :arg)
-  (denominator :type integer
+  (denominator :type (integer 1)
                :ref-known (flushable movable)
                :ref-trans %denominator
                :init :arg))
@@ -218,11 +218,12 @@ during backtrace.
   ;;   unless the function is non-simple, in which case
   ;;   they store a descriptorized (fun-pointer lowtag)
   ;;   pointer to the closure tramp
-  ;; - x86-64 with immobile-code feature stores a JMP instruction
-  ;;   to the function entry address. Special considerations
-  ;;   pertain to undefined functions, FINs, and closures.
   ;; - all others store a native pointer to the function entry address
-  ;;   or closure tramp
+  ;;   or closure tramp. x86-64 with immobile-code constrains this
+  ;;   to holding the address of a SIMPLE-FUN or an object that
+  ;;   has the simple-fun call convention- either a generic-function with
+  ;;   a self-contained trampoline, or closure or funcallable-instance
+  ;;   wrapped in a simplifying trampoline.
   (raw-addr :c-type "char *"))
 
 ;;; a simple function (as opposed to hairier things like closures
@@ -274,14 +275,11 @@ during backtrace.
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
-  (trampoline :init :funcallable-instance-tramp)
+  (trampoline #-compact-instance-header :init
+              #-compact-instance-header :funcallable-instance-tramp)
   #-compact-instance-header (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
-  ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'
-  ;; (at least for the builds with compact-instance-header)
-  ;; then for both funcallable and non-funcallable instances,
-  ;; the CLOS slot vector will be in the word 5 bytes past the tagged pointer.
-  ;; This shouldn't be too hard to arrange, since nothing needs to know where
-  ;; the tagged function lives except the funcallable instance trampoline.
+  #+compact-instance-header (instword1)
+  #+compact-instance-header (instword2)
   (function :type function
             :ref-known (flushable) :ref-trans %funcallable-instance-fun
             :set-known () :set-trans (setf %funcallable-instance-fun))
@@ -375,6 +373,15 @@ during backtrace.
          :set-trans %set-symbol-global-value
          :set-known ())
 
+  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
+  ;; for symbols. If we ensured that any function bound to a symbol had a
+  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
+  ;; then we would only need to store that function's raw entry address here,
+  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
+  ;; to a symbol would need a tiny trampoline, which is already the case
+  ;; for #+immobile-code.
+  (fdefn :ref-trans %symbol-fdefn :ref-known ()
+         :cas-trans cas-symbol-fdefn)
   ;; The private accessor for INFO reads the slot verbatim.
   ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
   ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
@@ -389,18 +396,9 @@ during backtrace.
         :type (or instance list)
         :init :null)
   (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
-  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
-  ;; for symbols. If we ensured that any function bound to a symbol had a
-  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
-  ;; then we would only need to store that function's raw entry address here,
-  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
-  ;; to a symbol would need a tiny trampoline, which is already the case
-  ;; for #+immobile-code.
-  (fdefn :ref-trans %symbol-fdefn :ref-known ()
-         :cas-trans cas-symbol-fdefn)
   #-compact-symbol
   (package-id :type index ; actually 16 bits. (Could go in the header)
-              :ref-trans sb-impl::symbol-package-id
+              :ref-trans symbol-package-id
               :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.
@@ -441,7 +439,7 @@ during backtrace.
                           :widetag simd-pack-widetag)
   (tag :ref-trans %simd-pack-tag
        :attributes (movable flushable)
-       :type fixnum)
+       :type (unsigned-byte 4))
   (lo-value :c-type "long" :type (unsigned-byte 64))
   (hi-value :c-type "long" :type (unsigned-byte 64)))
 
@@ -451,7 +449,7 @@ during backtrace.
                           :widetag simd-pack-256-widetag)
   (tag :ref-trans %simd-pack-256-tag
        :attributes (movable flushable)
-       :type fixnum)
+       :type (unsigned-byte 4))
   (p0 :c-type "long" :type (unsigned-byte 64))
   (p1 :c-type "long" :type (unsigned-byte 64))
   (p2 :c-type "long" :type (unsigned-byte 64))
@@ -462,23 +460,26 @@ during backtrace.
 ;;; These slots hold frequently-referenced constants.
 ;;; If we can't do that for some reason - like, say, the safepoint page
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
-(defglobal *thread-header-slot-names*
-  (append #+x86-64
-          '(t-nil-constants
-            msan-xor-constant
-            ;; The following slot's existence must NOT be conditional on #+msan
-            msan-param-tls) ; = &__msan_param_tls
-          #+immobile-space '(function-layout
-                             varyobj-space-addr
-                             varyobj-card-count
-                             varyobj-card-marks)))
+(defconstant-eqx +thread-header-slot-names+
+    `#(#+x86-64
+       ,@'(t-nil-constants
+           alien-linkage-table-base
+           msan-xor-constant
+           ;; The following slot's existence must NOT be conditional on #+msan
+           msan-param-tls) ; = &__msan_param_tls
+       #+immobile-space
+       ,@'(function-layout
+           text-space-addr
+           text-card-count
+           text-card-marks))
+  #'equalp)
 
 (macrolet ((assign-header-slot-indices ()
              (let ((i 0))
                `(progn
-                  ,@(mapcar (lambda (x)
-                              `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
-                            *thread-header-slot-names*)))))
+                  ,@(map 'list (lambda (x)
+                                 `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
+                            +thread-header-slot-names+)))))
   (assign-header-slot-indices))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -491,7 +492,7 @@ during backtrace.
 (define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of the start routine into new_thread_trampoline.
-  ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
+  ;; tls[0] = NO_TLS_VALUE_MARKER because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
 
@@ -560,6 +561,8 @@ during backtrace.
   (state-word :c-type "struct thread_state_word")
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
+  ;;
+  (arena)
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)
@@ -577,10 +580,13 @@ during backtrace.
   ;; print an approximation of the CSP as needed.
   #+sb-thread
   (control-stack-pointer :c-type "lispobj *")
-  #+mach-exception-handler
-  (mach-port-name :c-type "mach_port_name_t")
   #+ppc64 (card-table)
 
+  ;; A few extra thread-local allocation buffers for special purposes
+  ;; #-sb-thread probably won't use these, to be determined...
+  (symbol-tlab :c-type "struct alloc_region" :length 3)
+  (sys-mixed-tlab :c-type "struct alloc_region" :length 3)
+  (sys-cons-tlab :c-type "struct alloc_region" :length 3)
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)
   (tot-bytes-alloc-unboxed)
@@ -589,7 +595,7 @@ during backtrace.
   (et-find-freeish-page)
   (et-bzeroing)
   (obj-size-histo :c-type "size_histogram"
-                  :length #.(+ histogram-small-bins sb-vm:n-word-bits))
+                  :length #.(+ histogram-small-bins n-word-bits))
 
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
@@ -662,13 +668,7 @@ during backtrace.
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
-;;; MIXED-REGION is at the beginning of static space
-;;; Be sure to update "#define main_thread_mixed_region" etc
-;;; if these get changed.
-#-sb-thread
-(progn (defconstant mixed-region static-space-start)
-       (defconstant cons-region (+ mixed-region (* 3 n-word-bytes)))
-       (defconstant boxed-region (+ cons-region (* 3 n-word-bytes))))
+#+sb-xc-host (defun get-nil-taggedptr () nil-value)
 
 ;;; Start of static objects:
 ;;;
@@ -713,7 +713,7 @@ during backtrace.
 ;;; This constant is the number of words to report that NIL consumes
 ;;; when Lisp asks for its primitive-object-size. So we say that it consumes
 ;;; all words from the start of static-space objects up to the next object.
-(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
+(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- symbol-size) 2)))
 
 ;;; Address at which to start scanning static symbols when heap-walking.
 ;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.
@@ -721,3 +721,61 @@ during backtrace.
 ;;; size of NIL in bytes that we report for primitive-object-size.
 (defconstant static-space-objects-start
   (+ nil-symbol-slots-start (ash (1- sizeof-nil-in-words) word-shift)))
+
+(defconstant lockfree-list-tail-value
+  (+ static-space-objects-start
+     (* (length +static-symbols+) (ash (align-up symbol-size 2) word-shift))
+     instance-pointer-lowtag))
+
+;;; Lockfree lists: we want the C structure definition to be autogenerated,
+;;; and the end-of-list node to be static so IMMEDIATE-CONSTANT-SC is true of it.
+;;; Thereby the C implementation is easier as well.
+(in-package "SB-LOCKLESS")
+(sb-xc:defstruct (list-node
+             (:conc-name nil)
+             (:constructor %make-sentinel-node ())
+             (:copier nil))
+    (%node-next nil))
+;;; We look for +TAIL+ in IMMEDIATE-CONSTANT-SC.
+#+sb-xc-host
+(progn (defstruct list-node)
+       (defvar +tail+ (make-list-node)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; This constant is magic and is assigned by genesis
+  (setf (info :variable :kind '+tail+) :constant))
+
+;;; Specialized list variants will be created for
+;;;  fixnum, integer, real, string, generic "comparable"
+;;; but the node type and list type is the same regardless of key type.
+(sb-xc:defstruct (linked-list
+                   (:constructor %make-lfl
+                                 (head inserter deleter finder inequality equality))
+                   (:conc-name list-))
+  (head       nil :type list-node :read-only t)
+  (inserter   nil :type function :read-only t)
+  (deleter    nil :type function :read-only t)
+  (finder     nil :type function :read-only t)
+  (inequality nil :type function :read-only t)
+  (equality   nil :type function :read-only t))
+
+;; NODE-HASH is a fixnum. Negatives probably don't do the right thing
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits))
+;;; The more bins there are, the more dummy nodes.
+;;; Dummy nodes constitute extra space overhead.
+(defparameter *desired-elts-per-bin* 4)
+(sb-xc:defstruct (split-ordered-list
+                   (:include linked-list)
+                   (:conc-name so-)
+                   (:copier nil)
+                   (:constructor %%make-split-ordered-list
+                    (head hashfun inserter deleter finder
+                     inequality equality valuesp)))
+  (count 0 :type sb-ext:word)
+  (threshold 0 :type sb-ext:word)
+  (hashfun #'error :type (sfunction (t) (and fixnum unsigned-byte)))
+  (bins '(#() . 1) :type (cons simple-vector (integer 1 (#.+hash-nbits+))))
+  (elts-per-bin *desired-elts-per-bin* :type (integer 1 20))
+  ;; If VALUESP is NIL, then this is a set, otherwise it is a map.
+  (valuesp nil))

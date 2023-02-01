@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and win32 x86-64) (exit :code 104) ;; This is extremely win64-specific.
+#-(and win32 x86-64) (invoke-restart 'run-tests::skip-file) ;; This is extremely win64-specific.
 
 (with-scratch-file (dll "dll")
   (run-program "gcc" `("-shared" "-o" ,dll "win64-exceptions.c")

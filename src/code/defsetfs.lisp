@@ -171,9 +171,6 @@
 (defsetf subseq (sequence start &optional end) (v)
   `(progn (replace ,sequence ,v :start1 ,start :end1 ,end) ,v))
 
-;;; from fdefinition.lisp
-(defsetf fdefinition %set-fdefinition)
-
 ;;; from kernel.lisp
 #-darwin-jit
 (progn
@@ -306,7 +303,7 @@ place with bits from the low-order end of the new value."
              (byte (if (cdr byte-args) (cons 'byte byte-args) (car byte-args)))
              ((place-tempvars place-tempvals stores setter getter)
               (get-setf-expansion place env))
-             (newval (sb-xc:gensym "NEW"))
+             (newval (gensym "NEW"))
              (new-int `(,store-fun
                         ,(if (eq load-fun 'logbitp) `(if ,newval 1 0) newval)
                         ,byte ,getter)))
@@ -361,3 +358,21 @@ with bits from the corresponding position in the new value."
 (defun 1-arg-t   (a) (declare (ignore a)) t)
 (defun 2-arg-nil (a b) (declare (ignore a b)) nil)
 (defun 3-arg-nil (a b c) (declare (ignore a b c)) nil)
+
+(in-package "SB-VM")
+
+(defun blt-copier-for-widetag (x)
+  (declare ((mod 256) x))
+  (aref (load-time-value
+         (map-into (make-array 32)
+                   (lambda (x) (and x
+                                    (symbol-function x)))
+                   '#.(let ((a (make-array 32 :initial-element nil)))
+                        (dovector (saetp *specialized-array-element-type-properties* a)
+                          (when (and (not (member (saetp-specifier saetp) '(t nil)))
+                                     (<= (saetp-n-bits saetp) n-word-bits))
+                            (setf (svref a (logand #x1F (ash (saetp-typecode saetp) -2)))
+                                  (intern (format nil "UB~D-BASH-COPY" (saetp-n-bits saetp))
+                                          "SB-KERNEL"))))))
+         t)
+        (logand #x1F (ash x -2))))

@@ -1,4 +1,3 @@
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 use_test_subdirectory
@@ -6,7 +5,7 @@ use_test_subdirectory
 tmpcore=$TEST_FILESTEM.core
 
 run_sbcl <<EOF
-  (defvar *x* (cons (sb-kernel::make-unknown-type :specifier 'hash-table) (sb-kernel:specifier-type 'hash-table)))
+  (defvar *x* (cons (sb-kernel::make-unknown-type 'hash-table) (sb-kernel:specifier-type 'hash-table)))
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \

@@ -11,6 +11,9 @@ set -e
 
 b=${1:?"missing base directory name argument"}
 
+# FIXME: why include each Makefile in the binary distribution
+# if by definition everything is already built?
+
 tar -cf $b-binary.tar \
     $b/output/sbcl.core $b/src/runtime/sbcl $b/output/prefix.def \
     $b/src/runtime/sbcl.mk \
@@ -22,10 +25,8 @@ tar -cf $b-binary.tar \
     $b/contrib/asdf-module.mk \
     `for contrib in $(cd $b/contrib && echo *); do
          src_dir=$b/contrib/$contrib
-         cache_dir=$b/obj/asdf-cache/$contrib
-         if test -d $src_dir && test -f $cache_dir/test-passed.test-report; then
+         if test -d $src_dir && test -f $b/obj/sbcl-home/contrib/$contrib.fasl; then
              echo $src_dir/Makefile
-             echo $cache_dir/test-passed.test-report
          fi
      done` \
     $b/obj/sbcl-home

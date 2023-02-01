@@ -75,7 +75,8 @@
   (let* ((first  (or (ir2-block-start-vop 2block)
                      (return-from move-value-target)))
          (second (vop-next first)))
-    (when (and (eq (vop-name first) 'move)
+    (when (and (memq (vop-name first) '(move sb-vm::double-move
+                                        sb-vm::single-move))
                (or (not second)
                    (eq (vop-name second) 'branch)))
       (values (tn-ref-tn (vop-args first))
@@ -91,24 +92,46 @@
 (defun cmovp (label a b)
   (declare (type label label)
            (type cblock a b))
-  (cond ((eq label (ir2-block-%label (block-info a))))
-        ((eq label (ir2-block-%label (block-info b)))
-         (rotatef a b))
-        (t (return-from cmovp)))
-  (let ((succ-a (block-succ a))
-        (succ-b (block-succ b)))
-    (when (and (singleton-p succ-a)
-               (singleton-p succ-b)
-               (eq (car succ-a) (car succ-b))
-               (singleton-p (block-pred a))
-               (singleton-p (block-pred b)))
-      (multiple-value-bind (value-a target)
-          (move-value-target (block-info a))
-        (multiple-value-bind (value-b targetp)
-            (move-value-target (block-info b))
-          (and value-a value-b (eq target targetp)
-               (values (block-label (car succ-a))
-                       target value-a value-b)))))))
+  (let ((a2 (block-info a))
+        (b2 (block-info b)))
+   (cond ((eq label (ir2-block-%label a2)))
+         ((eq label (ir2-block-%label b2))
+          (rotatef a b)
+          (rotatef a2 b2))
+         (t (return-from cmovp)))
+   (let ((succ-a (block-succ a))
+         (succ-b (block-succ b)))
+     (cond ((and (singleton-p succ-a)
+                 (singleton-p succ-b)
+                 (eq (car succ-a) (car succ-b))
+                 (singleton-p (block-pred a))
+                 (singleton-p (block-pred b)))
+            (multiple-value-bind (value-a target)
+                (move-value-target a2)
+              (multiple-value-bind (value-b targetp)
+                  (move-value-target b2)
+                (and value-a value-b (eq target targetp)
+                     (values (block-label (car succ-a))
+                             target value-a value-b)))))
+           ;; A branch jumping over a move.
+           ((and (singleton-p succ-a)
+                 (singleton-p (block-pred a))
+                 (equal (car succ-a)
+                        b))
+            (multiple-value-bind (value target)
+                (move-value-target a2)
+              (when value
+                (values (block-label b)
+                        target value target))))
+           ((and (singleton-p succ-b)
+                 (singleton-p (block-pred b))
+                 (equal (car succ-b)
+                        a))
+            (multiple-value-bind (value target)
+                (move-value-target b2)
+              (when value
+                (values (block-label a)
+                        target target value))))))))
 
 #-x86-64
 (defun sb-vm::computable-from-flags-p (res x y flags)
@@ -122,59 +145,47 @@
 ;; 4. Convert the result from the common representation
 ;; 5. Jump to the successor
 (defun convert-one-cmov (cmove-vop
-                         value-if arg-if
-                         value-else arg-else
-                         target res
-                         flags info
-                         label
-                         vop node 2block
+                         value-if value-else
+                         res flags
+                         label vop node 2block
                          &aux (prev (vop-prev vop)))
   (delete-vop vop)
+  (let ((last (ir2-block-last-vop 2block)))
+    (when (and last
+               (eq (vop-name last) 'branch))
+      (delete-vop last)))
   (cond
-    ((and (constant-tn-p arg-if)
-          (constant-tn-p arg-else)
+    ((and (constant-tn-p value-if)
+          (constant-tn-p value-else)
           (sb-vm::computable-from-flags-p
-           res (tn-value arg-if) (tn-value arg-else) flags))
+           res (tn-value value-if) (tn-value value-else) flags))
      (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
-                    (reference-tn-list (list arg-if arg-else) nil)
+                    (reference-tn-list (list value-if value-else) nil)
                     (reference-tn res t)
-                    (list* flags info)))
+                    (list flags)))
     (t
-     (flet ((reuse-if-eq-arg (value-if vop)
-             ;; Most of the time this means:
-             ;; if X is already NIL, don't load it again.
-             (when (and vop
-                        (eq (vop-name vop) 'if-eq)
-                        (constant-tn-p value-if))
-               (let* ((args (vop-args vop))
-                      (x-tn (tn-ref-tn args))
-                      (test (tn-ref-tn (tn-ref-across args))))
-                 (when (and (constant-tn-p test)
-                            (equal (tn-value value-if)
-                                   (tn-value test))
-                            (eq (tn-primitive-type x-tn)
-                                (tn-primitive-type res)))
-                   x-tn))))
-            (load-and-coerce (dst src)
-             (when (and dst (neq dst src))
-               (emit-and-insert-vop node 2block
-                                    (template-or-lose 'move)
-                                    (reference-tn src nil)
-                                    (reference-tn dst t)
-                                    (ir2-block-last-vop 2block)))))
-       (let ((reuse (reuse-if-eq-arg value-if prev)))
-         (if reuse
-             (setf arg-if reuse)
-             (load-and-coerce arg-if   value-if)))
-       (load-and-coerce arg-else value-else))
+     (when (and prev
+                (eq (vop-name prev) 'if-eq)
+                (constant-tn-p value-if))
+       ;; Most of the time this means:
+       ;; if X is already NIL don't load it again.
+       (let* ((args (vop-args prev))
+              (x-tn (tn-ref-tn args))
+              (test (tn-ref-tn (tn-ref-across args))))
+         (when (and (constant-tn-p test)
+                    (equal (tn-value value-if)
+                           (tn-value test))
+                    (eq (tn-primitive-type x-tn)
+                        (tn-primitive-type res)))
+           (setf value-if x-tn))))
      (emit-template node 2block (template-or-lose cmove-vop)
-                    (reference-tn-list (remove nil (list arg-if arg-else))
+                    (reference-tn-list (list value-if value-else)
                                        nil)
                     (reference-tn res t)
-                    (list* flags info))))
-    (emit-move node 2block res target)
-    (vop branch node 2block label)
-    (update-block-succ 2block (list label)))
+                    (list flags))))
+
+  (vop branch node 2block label)
+  (update-block-succ 2block (list label)))
 
 (defun maybe-convert-one-cmov (vop)
   ;; The test and branch-if may be split between two IR1 blocks
@@ -183,46 +194,20 @@
          (succ (block-succ (node-block node)))
          (a    (first succ))
          (b    (second succ)))
-
     (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
       (multiple-value-bind (label target value-a value-b)
           (cmovp jump-target a b)
         (unless label
           (return-from maybe-convert-one-cmov))
-        (multiple-value-bind (cmove-vop arg-a arg-b res info)
-            (convert-conditional-move-p node target value-a value-b)
-          (unless cmove-vop
-            (return-from maybe-convert-one-cmov))
-          (when not-p
-            (rotatef value-a value-b)
-            (rotatef arg-a arg-b))
-          (flet ((safe-coercion-p (from to)
-                   (let ((from (tn-primitive-type from))
-                         (to (tn-primitive-type to)))
-                     ;; These moves will be repositioned before the test VOP,
-                     ;; which may be restricting their type.
-                     ;; Avoid the moves that may touch memory and
-                     ;; thus fail on immediate values.
-                     (not (and (eq from *backend-t-primitive-type*)
-                               (memq (primitive-type-name to)
-                                     '(#+64-bit sb-vm::unsigned-byte-64
-                                       #+64-bit sb-vm::unsigned-byte-63
-                                       #+64-bit sb-vm::signed-byte-64
-                                       #-64-bit sb-vm::unsigned-byte-32
-                                       #-64-bit sb-vm::unsigned-byte-31
-                                       #-64-bit sb-vm::signed-byte-32
-                                       #-64-bit single-float
-                                       double-float
-                                       complex-single-float
-                                       complex-double-float
-                                       system-area-pointer)))))))
-            (when (and (safe-coercion-p value-a arg-a)
-                       (safe-coercion-p value-b arg-b))
-              (convert-one-cmov cmove-vop value-a arg-a
-                                value-b arg-b
-                                target  res
-                                flags info
-                                label vop node (vop-block vop)))))))))
+        (multiple-value-bind (cmove-vop) (convert-conditional-move-p target)
+          (when cmove-vop
+            (when not-p
+              (rotatef value-a value-b))
+            (convert-one-cmov cmove-vop
+                              value-a value-b target
+                              flags
+                              label vop node (vop-block vop))
+            t))))))
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
@@ -312,134 +297,134 @@
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
 (defun ir2-optimize-jumps (component)
-  (let ((*2block-info* (make-hash-table :test #'eq)))
-    (initialize-ir2-blocks-flow-info component)
-    (flet ((start-vop (block)
-             (do ((block block (ir2-block-next block)))
-                 ((null block) nil)
-               (let ((vop (ir2-block-start-vop block)))
-                 (when vop
-                   (if (eq (vop-name vop) 'sb-c:note-environment-start)
-                       (let ((next (vop-next vop)))
-                         (when next
-                           (return next)))
-                       (return vop))))))
-           (delete-chain (block)
-             (do ((block block (ir2-block-next block)))
-                 ((null block) nil)
-               ;; Just pop any block, *2block-info* is only used here
-               ;; and it just needs to know the number of predecessors,
-               ;; not their identity.
-               (pop (ir2block-predecessors block))
-               (if (ir2block-predecessors block)
-                   (return)
-                   (let ((vop (ir2-block-start-vop block)))
+  (flet ((start-vop (block)
+           (do ((block block (ir2-block-next block)))
+               ((or
+                 (null block)
+                 (not (singleton-p (ir2block-predecessors block)))) nil)
+             (let ((vop (ir2-block-start-vop block)))
+               (when vop
+                 (if (eq (vop-name vop) 'sb-c:note-environment-start)
+                     (let ((next (vop-next vop)))
+                       (when next
+                         (return next)))
+                     (return vop))))))
+         (delete-chain (block)
+           (do ((block block (ir2-block-next block)))
+               ((null block) nil)
+             ;; Just pop any block, *2block-info* is only used here
+             ;; and it just needs to know the number of predecessors,
+             ;; not their identity.
+             (pop (ir2block-predecessors block))
+             (if (ir2block-predecessors block)
+                 (return)
+                 (let ((vop (ir2-block-start-vop block)))
+                   (when vop
+                     (when (eq (vop-name vop) 'sb-c:note-environment-start)
+                       (setf vop (vop-next vop)))
                      (when vop
-                       (when (eq (vop-name vop) 'sb-c:note-environment-start)
-                         (setf vop (vop-next vop)))
-                       (when vop
-                         (aver (eq (vop-name vop) 'branch))
-                         (delete-vop vop)
-                         (return t)))))))
-           (next-label (block)
-             (do ((block (ir2-block-next block)
-                    (ir2-block-next block)))
-                 ((null block) nil)
-               (let ((label (or (ir2-block-%trampoline-label block)
-                                (ir2-block-%label block))))
-                 (cond (label
-                        (return label))
-                       ((ir2-block-start-vop block)
-                        (return nil)))))))
-      (labels ((unchain-jumps (vop)
-                 ;; Handle any branching vop except a multiway branch
-                 (setf (first (vop-codegen-info vop))
-                       (follow-jumps (first (vop-codegen-info vop)))))
-               (follow-jumps (target-label &optional (delete t))
-                 (declare (type label target-label))
-                 (let* ((target-block (gethash target-label *2block-info*))
-                        (target-vop (start-vop target-block)))
-                   (cond ((and target-vop
-                               (eq (vop-name target-vop) 'branch)
-                               (neq (first (vop-codegen-info target-vop))
-                                    target-label))
-                          (when delete
-                            (setf delete (delete-chain target-block)))
-                          (follow-jumps (first (vop-codegen-info target-vop)) delete))
-                         (t
-                          target-label))))
-               (remove-jump-overs (branch-if branch)
-                 ;; Turn BRANCH-IF #<L1>, BRANCH #<L2>, L1:
-                 ;; into BRANCH-IF[NOT] L2
-                 (when (and branch
-                            (eq (vop-name branch) 'branch))
-                   (let* ((branch-if-info (vop-codegen-info branch-if))
-                          (branch-if-target (first branch-if-info))
-                          (branch-target (first (vop-codegen-info branch)))
-                          (next (next-label (vop-block branch))))
-                     (when (eq branch-if-target next)
-                       (setf (first branch-if-info) branch-target)
-                       ;; Reverse the condition
-                       (setf (second branch-if-info) (not (second branch-if-info)))
-                       (delete-vop branch)))))
-               (conditional-p (vop)
-                 (let ((info (vop-info vop)))
-                   (eq (vop-info-result-types info) :conditional))))
-        ;; Pass 1: conditional | unconditional jump to an unconditional jump
-        ;; should take the label of the latter.
-        (do-ir2-blocks (block component)
-          (let ((last (ir2-block-last-vop block)))
-            (when last
-              (case (vop-name last)
-                (branch
-                 (unchain-jumps last)
-                 ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
-                 ;; Multiway can't coexist with any other branch preceding or following
-                 ;; in the block, so we don't have to check for that, just a BRANCH-IF.
-                 (let ((prev (vop-prev last)))
-                   (when (and prev
-                              (or (eq (vop-name prev) 'branch-if)
-                                  (conditional-p prev)))
-                     (unchain-jumps prev))))
-                (branch-if
-                 (unchain-jumps last))
-                (multiway-branch-if-eq
-                 ;; codegen-info = (labels else-label key-type keys original-comparator)
-                 (let ((info (vop-codegen-info last)))
-                   ;; Don't delete the branches when they reach zero
-                   ;; predecessors as multiway-branch-if-eq inserts
-                   ;; extra jumps which are not in the original ir2
-                   ;; and do not correspond to any predecessors.
-                   (setf (car info) (mapcar (lambda (x)
-                                              (follow-jumps x nil))
-                                            (car info))
-                         (cadr info) (follow-jumps (cadr info) nil))))
-                (t
-                 (when (conditional-p last)
-                   (unchain-jumps last)))))))
-        ;; Pass 2
-        ;; Need to unchain the jumps before handling jump-overs,
-        ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
-        ;; target of some other BRANCH
-        (do-ir2-blocks (block component)
-          (let ((last (ir2-block-last-vop block)))
-            (case (and last (vop-name last))
-              (branch-if
-               (remove-jump-overs last
-                                  (start-vop (ir2-block-next block))))
+                       (aver (eq (vop-name vop) 'branch))
+                       (delete-vop vop)
+                       (return t)))))))
+         (next-label (block)
+           (do ((block (ir2-block-next block)
+                  (ir2-block-next block)))
+               ((null block) nil)
+             (let ((label (or (ir2-block-%trampoline-label block)
+                              (ir2-block-%label block))))
+               (cond (label
+                      (return label))
+                     ((ir2-block-start-vop block)
+                      (return nil)))))))
+    (labels ((unchain-jumps (vop)
+               ;; Handle any branching vop except a multiway branch
+               (setf (first (vop-codegen-info vop))
+                     (follow-jumps (first (vop-codegen-info vop)))))
+             (follow-jumps (target-label &optional (delete t))
+               (declare (type label target-label))
+               (let* ((target-block (gethash target-label *2block-info*))
+                      (target-vop (start-vop target-block)))
+                 (cond ((and target-vop
+                             (eq (vop-name target-vop) 'branch)
+                             (neq (first (vop-codegen-info target-vop))
+                                  target-label))
+                        (when delete
+                          (setf delete (delete-chain target-block)))
+                        (follow-jumps (first (vop-codegen-info target-vop)) delete))
+                       (t
+                        target-label))))
+             (remove-jump-overs (branch-if branch)
+               ;; Turn BRANCH-IF #<L1>, BRANCH #<L2>, L1:
+               ;; into BRANCH-IF[NOT] L2
+               (when (and branch
+                          (eq (vop-name branch) 'branch))
+                 (let* ((branch-if-info (vop-codegen-info branch-if))
+                        (branch-if-target (first branch-if-info))
+                        (branch-target (first (vop-codegen-info branch)))
+                        (next (next-label (vop-block branch))))
+                   (when (eq branch-if-target next)
+                     (setf (first branch-if-info) branch-target)
+                     ;; Reverse the condition
+                     (setf (second branch-if-info) (not (second branch-if-info)))
+                     (delete-vop branch)))))
+             (conditional-p (vop)
+               (let ((info (vop-info vop)))
+                 (eq (vop-info-result-types info) :conditional))))
+      ;; Pass 1: conditional | unconditional jump to an unconditional jump
+      ;; should take the label of the latter.
+      (do-ir2-blocks (block component)
+        (let ((last (ir2-block-last-vop block)))
+          (when last
+            (case (vop-name last)
               (branch
-               ;; A block may end up having BRANCH-IF + BRANCH after coverting an IF
+               (unchain-jumps last)
+               ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
+               ;; Multiway can't coexist with any other branch preceding or following
+               ;; in the block, so we don't have to check for that, just a BRANCH-IF.
                (let ((prev (vop-prev last)))
                  (when (and prev
                             (or (eq (vop-name prev) 'branch-if)
                                 (conditional-p prev)))
-                   (remove-jump-overs prev last))))
+                   (unchain-jumps prev))))
+              (branch-if
+               (unchain-jumps last))
+              (multiway-branch-if-eq
+               ;; codegen-info = (labels else-label key-type keys original-comparator)
+               (let ((info (vop-codegen-info last)))
+                 ;; Don't delete the branches when they reach zero
+                 ;; predecessors as multiway-branch-if-eq inserts
+                 ;; extra jumps which are not in the original ir2
+                 ;; and do not correspond to any predecessors.
+                 (setf (car info) (mapcar (lambda (x)
+                                            (follow-jumps x nil))
+                                          (car info))
+                       (cadr info) (follow-jumps (cadr info) nil))))
               (t
-               (when (and last
-                          (conditional-p last))
-                 (remove-jump-overs last
-                                    (start-vop (ir2-block-next block))))))))
-        (delete-fall-through-jumps component)))))
+               (when (conditional-p last)
+                 (unchain-jumps last)))))))
+      ;; Pass 2
+      ;; Need to unchain the jumps before handling jump-overs,
+      ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
+      ;; target of some other BRANCH
+      (do-ir2-blocks (block component)
+        (let ((last (ir2-block-last-vop block)))
+          (case (and last (vop-name last))
+            (branch-if
+             (remove-jump-overs last
+                                (start-vop (ir2-block-next block))))
+            (branch
+             ;; A block may end up having BRANCH-IF + BRANCH after coverting an IF
+             (let ((prev (vop-prev last)))
+               (when (and prev
+                          (or (eq (vop-name prev) 'branch-if)
+                              (conditional-p prev)))
+                 (remove-jump-overs prev last))))
+            (t
+             (when (and last
+                        (conditional-p last))
+               (remove-jump-overs last
+                                  (start-vop (ir2-block-next block))))))))
+      (delete-fall-through-jumps component))))
 
 (defun next-vop (vop)
   (or (vop-next vop)
@@ -464,48 +449,6 @@
               ((ir2-block-last-vop prev)
                (return (ir2-block-last-vop prev)))))))
 
-(defun immediate-templates (fun &optional (constants t))
-  (let ((primitive-types (list (primitive-type-or-lose 'character)
-                               (primitive-type-or-lose 'fixnum)
-                               (primitive-type-or-lose 'sb-vm::positive-fixnum)
-                               #-x86 ;; i387 is weird
-                               (primitive-type-or-lose 'double-float)
-                               #-x86
-                               (primitive-type-or-lose 'single-float)
-                               .
-                               #+(or 64-bit 64-bit-registers)
-                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-63)
-                                (primitive-type-or-lose 'sb-vm::unsigned-byte-64)
-                                (primitive-type-or-lose 'sb-vm::signed-byte-64))
-                               #-(or 64-bit 64-bit-registers)
-                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-31)
-                                (primitive-type-or-lose 'sb-vm::unsigned-byte-32)
-                                (primitive-type-or-lose 'sb-vm::signed-byte-32)))))
-    (loop for template in (fun-info-templates (fun-info-or-lose fun))
-          when (and (typep (template-result-types template) '(cons (eql :conditional)))
-                    (loop for type in (template-arg-types template)
-                          always (and (consp type)
-                                      (case (car type)
-                                        (:or
-                                         (loop for type in (cdr type)
-                                               always (memq type primitive-types)))
-                                        (:constant constants)))))
-          collect (template-name template))))
-
-(define-load-time-global *comparison-vops*
-    (append (immediate-templates 'eq)
-            (immediate-templates '=)
-            (immediate-templates '>)
-            (immediate-templates '<)
-            (immediate-templates 'char<)
-            (immediate-templates 'char>)
-            (immediate-templates 'char=)))
-
-(define-load-time-global *commutative-comparison-vops*
-    (append (immediate-templates 'eq nil)
-            (immediate-templates 'char= nil)
-            (immediate-templates '= nil)))
-
 (defun vop-arg-list (vop)
   (let ((args (loop for arg = (vop-args vop) then (tn-ref-across arg)
                     while arg
@@ -522,49 +465,34 @@
                args1)
            args2)))
 
-(defoptimizer (vop-optimize branch-if) (branch-if)
-  (cond ((boundp '*2block-info*)
-         (maybe-convert-one-cmov branch-if))
-        #+(or arm arm64 x86 x86-64)
-        (t
-         ;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
-         ;; into CMP X,Y BRANCH-IF M BRANCH-IF N
-         ;; Run it after CMOVs are converted.
-         ;; While it's portable the VOPs are not validated for
-         ;; compatibility on other backends yet.
-         (let ((prev (vop-prev branch-if)))
-           (when (and prev
-                      (memq (vop-name prev) *comparison-vops*))
-             (let ((next (next-vop branch-if))
-                   transpose)
-               (when (and next
-                          (memq (vop-name next) *comparison-vops*)
-                          (or (vop-args-equal prev next)
-                              (and (or (setf transpose
-                                             (memq (vop-name prev) *commutative-comparison-vops*))
-                                       (memq (vop-name next) *commutative-comparison-vops*))
-                                   (vop-args-equal prev next t))))
-                 (when transpose
-                   ;; Could flip the flags for non-commutative operations
-                   (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
-                         for arg in (nreverse (vop-arg-list prev))
-                         do (change-tn-ref-tn tn-ref arg)))
-                 (setf (sb-assem::label-comment (car (vop-codegen-info branch-if)))
-                       :merged-ifs)
-                 (delete-vop next))))))))
+;; cmov conversion needs to know the SCs
+(defoptimizer (vop-optimize branch-if select-representations) (branch-if)
+  (maybe-convert-one-cmov branch-if)
+  nil)
 
 (defun next-start-vop (block)
-  (loop for 2block = block then (ir2-block-next 2block)
-        while (and 2block
-                   (= (length (ir2block-predecessors 2block)) 1))
-        when (ir2-block-start-vop 2block) return it))
+  (loop thereis (ir2-block-start-vop block)
+        while (and (= (length (ir2block-predecessors block)) 1)
+                   (setf block (ir2-block-next block)))))
 
 (defun branch-destination (branch &optional (true t))
-  (destructuring-bind (label not-p flags) (vop-codegen-info branch)
-    (declare (ignore flags))
+  (unless (typep (vop-codegen-info branch) '(cons t (cons t)))
+    (let ((next (vop-next branch)))
+      (if (and next
+               (eq (vop-name next) 'branch-if))
+          (setf branch next)
+          (return-from branch-destination))))
+  (destructuring-bind (label not-p &rest rest) (vop-codegen-info branch)
+    (declare (ignore rest))
     (if (eq not-p true)
-        (next-start-vop (ir2-block-next (vop-block branch)))
-        (next-start-vop (gethash label *2block-info*)))))
+        (if (eq branch (ir2-block-last-vop (vop-block branch)))
+            (next-start-vop (ir2-block-next (vop-block branch)))
+            (let ((next (next-vop branch)))
+              (and (eq (vop-name next) 'branch)
+                   (next-start-vop (gethash (car (vop-codegen-info next)) *2block-info*)))))
+        (let ((dest (gethash label *2block-info*)))
+          (when dest
+            (next-start-vop dest))))))
 
 ;;; Replace (BOUNDP X) + (BRANCH-IF) + {(SYMBOL-VALUE X) | anything}
 ;;; by (FAST-SYMBOL-VALUE X) + (UNBOUND-MARKER-P) + BRANCH-IF
@@ -577,8 +505,7 @@
 (defoptimizer (vop-optimize boundp) (vop)
   (let ((sym (tn-ref-tn (vop-args vop)))
         (next (vop-next vop)))
-    (unless (and (boundp '*2block-info*)
-                 next (eq (vop-name next) 'branch-if))
+    (unless (and next (eq (vop-name next) 'branch-if))
       (return-from vop-optimize-boundp-optimizer nil))
     ;; Only replace if the BOUNDP=T consequent starts with SYMBOL-VALUE so that
     ;; a bad example such as (IF (BOUNDP '*FOO*) (PRINT 'HI) *FOO*)
@@ -586,20 +513,20 @@
     (let* ((successors (ir2block-successors (vop-block next)))
            (info (vop-codegen-info next))
            (label-block (gethash (car info) *2block-info*))
-           (symeval-vop
+           (symbol-value-vop
             (ir2-block-start-vop
              (cond ((eq (second info) nil) label-block) ; not negated test.
                    ;; When negated, the BOUNDP case goes to the "other" successor
                    ;; block, i.e. whichever is not started by the #<label>.
                    ((eq label-block (first successors)) (second successors))
                    (t (first successors))))))
-      (when (and symeval-vop
-                 (or (eq (vop-name symeval-vop) 'symbol-value)
+      (when (and symbol-value-vop
+                 (or (eq (vop-name symbol-value-vop) 'symbol-value)
                      ;; Expect SYMBOL-GLOBAL-VALUE only for variables of kind :GLOBAL.
-                     (and (eq (vop-name symeval-vop) 'symbol-global-value)
+                     (and (eq (vop-name symbol-value-vop) 'symbol-global-value)
                           (constant-tn-p sym)
                           (eq (info :variable :kind (tn-value sym)) :global)))
-                 (eq sym (tn-ref-tn (vop-args symeval-vop)))
+                 (eq sym (tn-ref-tn (vop-args symbol-value-vop)))
                  ;; If the symbol is either a compile-time known symbol,
                  ;; or can only be the same thing for both vops,
                  ;; then we're fine to combine.
@@ -610,11 +537,11 @@
                  ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,
                  ;; and if coming from the BRANCH-IF, jump to the block that contained
                  ;; everything else except the SYMBOL-VALUE vop.
-                 (not (cdr (ir2block-predecessors (vop-block symeval-vop)))))
-        (let ((replacement (if (eq (vop-name symeval-vop) 'symbol-global-value)
+                 (not (cdr (ir2block-predecessors (vop-block symbol-value-vop)))))
+        (let ((replacement (if (eq (vop-name symbol-value-vop) 'symbol-global-value)
                                'fast-symbol-global-value
                                'fast-symbol-value))
-              (result-tn (tn-ref-tn (vop-results symeval-vop))))
+              (result-tn (tn-ref-tn (vop-results symbol-value-vop))))
           (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                (template-or-lose replacement)
                                (reference-tn sym nil) (reference-tn result-tn t) next)
@@ -627,33 +554,47 @@
           ;; BRANCH-IF test is automagically correct after substitution.
           ;; Of course, this is machine-dependent.
           (delete-vop vop)
-          (delete-vop symeval-vop)
+          (delete-vop symbol-value-vop)
           next)))))
 
 ;;; Optimize (if x ... nil) to reuse the NIL coming from X.
-(defoptimizer (vop-optimize if-eq) (if-eq)
-  (when (boundp '*2block-info*)
-    (let ((branch-if (vop-next if-eq)))
-      (when (and branch-if
-                 (eq (vop-name branch-if) 'branch-if))
-        (let* ((args (vop-args if-eq))
-               (x (tn-ref-tn args))
-               (y (tn-ref-tn (tn-ref-across args))))
-          (flet ((constant-p (x)
-                   (or (constant-tn-p x)
-                       (type= (tn-type x)
-                              (specifier-type 'null)))))
-           (when (constant-p y)
-             (let ((move (branch-destination branch-if)))
-               (when (and move
-                          (eq (vop-name move) 'move))
-                 (let* ((args (vop-args move))
-                        (from (tn-ref-tn args)))
-                   (when (and (constant-p from)
-                              (eq (tn-leaf y)
-                                  (tn-leaf from)))
-                     (change-tn-ref-tn args x)))))))
-          nil)))))
+(defoptimizer (vop-optimize if-eq regalloc) (if-eq)
+  (let ((branch-if (vop-next if-eq)))
+    (when (and branch-if
+               (eq (vop-name branch-if) 'branch-if))
+      (let* ((args (vop-args if-eq))
+             (x (tn-ref-tn args))
+             (y (tn-ref-tn (tn-ref-across args))))
+        (flet ((constant-p (x)
+                 (or (constant-tn-p x)
+                     (type= (tn-type x)
+                            (specifier-type 'null)))))
+          (when (and
+                 (not (member (sb-name (sc-sb (tn-sc x)))
+                              #+(or x86 x86-64)
+                              '(sb-vm::stack)
+                              #-(or x86 x86-64)
+                              '(sb-vm::control-stack sb-vm::non-descriptor-stack)))
+                 (constant-p y))
+            (let ((move (branch-destination branch-if)))
+              (when (and move
+                         (eq (vop-name move) 'move)
+                         (singleton-p (ir2block-predecessors (vop-block move))))
+                (let* ((args (vop-args move))
+                       (from (tn-ref-tn args)))
+                  (when (and (constant-p from)
+                             (eq (tn-leaf y)
+                                 (tn-leaf from))
+                             ;; It might not make sense if there are NULL-TN or ZERO-TN.
+                             #-(or x86 x86-64)
+                             (or (not (or (type= (tn-type from)
+                                                 (specifier-type 'null))
+                                          #+arm64
+                                          (eql (constant-value (tn-leaf from)) 0)))
+                                 (location= x y)))
+                    (change-tn-ref-tn args x)
+                    (setf (tn-ref-load-tn args) nil)))))))
+        nil))))
 
 ;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
 ;;; of the test is an immediate value, then return the conditional vop.
@@ -966,17 +907,19 @@
              (value (if plusp
                         1
                         (car (vop-codegen-info next)))))
-        (when (and (not (tn-ref-next (tn-reads result)))
+        (when (and (tn-reads result)
+                   (not (tn-ref-next (tn-reads result)))
                    (eq result (tn-ref-tn (vop-args next))))
           (check-type value bit)
-          (let ((template (template-or-lose #+arm64
-                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
-                                                'sb-vm::data-vector-ref/simple-bit-vector-eq
-                                                'sb-vm::data-vector-ref/simple-bit-vector-c-eq)
-                                            #+x86-64
-                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref-with-offset/simple-bit-vector)
-                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-eq
-                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-c-eq))))
+          (let* ((template (template-or-lose #+arm64
+                                             (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
+                                                 'sb-vm::data-vector-ref/simple-bit-vector-eq
+                                                 'sb-vm::data-vector-ref/simple-bit-vector-c-eq)
+                                             #+x86-64
+                                             (if (eq (vop-name vop) 'sb-vm::data-vector-ref-with-offset/simple-bit-vector)
+                                                 'sb-vm::data-vector-ref-with-offset/simple-bit-vector-eq
+                                                 'sb-vm::data-vector-ref-with-offset/simple-bit-vector-c-eq)))
+                 (flags (make-conditional-flags (cdr (template-result-types template)))))
             (prog1
                 (emit-and-insert-vop (vop-node vop)
                                      (vop-block vop)
@@ -984,92 +927,91 @@
                                      (reference-tn-refs (vop-args vop) nil)
                                      nil
                                      vop
-                                     (vop-codegen-info vop))
-              ;; copy the condition flag
+                                     (append (vop-codegen-info vop) (list flags)))
               (setf (third (vop-codegen-info branch))
-                    (cdr (template-result-types template)))
+                    flags)
               (when (eq value 1)
                 (setf (second (vop-codegen-info branch))
                       (not (second (vop-codegen-info branch)))))
               (delete-vop vop)
               (delete-vop next))))))))
 
-(when (vop-existsp :named sb-vm::<-integer-fixnum)
+(when-vop-existsp (:named sb-vm::<-integer-fixnum)
   ;; The <-integer-fixnum VOPs already perform dispatch for fixnum/bignum,
   ;; and load the header byte.
   ;; Replace the preceding INTEGERP VOP with an appropriate
   ;; <-integer-fixnum, which checks for INTEGER.
   (defoptimizer (vop-optimize integerp) (vop)
-    (when (boundp '*2block-info*)
-      (destructuring-bind (target not-p) (vop-codegen-info vop)
-        (let ((target-block (gethash target *2block-info*)))
-          (when target-block
-            (let* ((next (if (eq vop (ir2-block-last-vop (vop-block vop)))
-                             (ir2-block-next (vop-block vop))
-                             (let ((next (next-vop vop)))
-                               (and (eq (vop-name next) 'branch)
-                                    (gethash (car (vop-codegen-info next)) *2block-info*)))))
-                   (not-target-block (if not-p
-                                         target-block
-                                         next))
-                   (target-block (if not-p
-                                     next
-                                     target-block))
-                   (cmp (ir2-block-start-vop target-block)))
-              (when (and cmp
-                         (singleton-p (ir2block-predecessors target-block)))
-                (let ((integer (tn-ref-tn (vop-args vop)))
-                      (args (vop-args cmp))
-                      tns)
-                  (when (case (vop-name cmp)
-                          ((sb-vm::>-integer-fixnum sb-vm::<-integer-fixnum)
-                           (when (eq (tn-ref-tn args) integer)
-                             (setf tns (list integer (tn-ref-tn (tn-ref-across args))))))
-                          ((sb-vm::>-fixnum-integer sb-vm::<-fixnum-integer)
-                           (when (eq (tn-ref-tn (tn-ref-across args)) integer)
-                             (setf tns (list (tn-ref-tn args) integer)))))
-                    (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
-                      (let* ((cmp-next-block (ir2-block-next (vop-block cmp)))
-                             (cmp-target-block (gethash cmp-target *2block-info*)))
-                        (flet ((invert ()
-                                 (template-or-lose
-                                  (case (vop-name cmp)
-                                    (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
-                                    (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
-                                    (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
-                                    (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
-                          (multiple-value-bind (new-vop new-target new-not-p)
-                              (cond ((and not-p
-                                          (eq not-target-block cmp-next-block))
-                                     (if cmp-not-p
-                                         (values (invert) cmp-target nil)
-                                         (values (vop-info cmp) cmp-target nil)))
-                                    ((and not-p
-                                          (eq not-target-block cmp-target-block))
-                                     (if cmp-not-p
-                                         (values (vop-info cmp) cmp-target t)
-                                         (values (invert) cmp-target t)))
-                                    ((and (not not-p)
-                                          (eq not-target-block cmp-target-block))
-                                     (if cmp-not-p
-                                         (values (vop-info cmp) (ir2-block-%label target-block) nil)
-                                         (values (invert) (ir2-block-%label target-block) nil)))
-                                    ((and (not not-p)
-                                          (eq not-target-block cmp-next-block))
-                                     (if cmp-not-p
-                                         (values (invert) cmp-target nil)
-                                         (values (vop-info cmp) cmp-target nil)))
-                                    (t
-                                     (return-from vop-optimize-integerp-optimizer)))
-                            (prog1
-                                (emit-and-insert-vop (vop-node vop) (vop-block vop)
-                                                     new-vop
-                                                     (reference-tn-list tns nil)
-                                                     nil vop
-                                                     (list new-target new-not-p))
-                              (delete-vop vop)
-                              (delete-vop cmp))))))))))))
-        nil))))
+    (destructuring-bind (target not-p) (vop-codegen-info vop)
+      (let ((target-block (gethash target *2block-info*)))
+        (when target-block
+          (let* ((next (if (eq vop (ir2-block-last-vop (vop-block vop)))
+                           (ir2-block-next (vop-block vop))
+                           (let ((next (next-vop vop)))
+                             (and (eq (vop-name next) 'branch)
+                                  (gethash (car (vop-codegen-info next)) *2block-info*)))))
+                 (not-target-block (if not-p
+                                       target-block
+                                       next))
+                 (target-block (if not-p
+                                   next
+                                   target-block))
+                 (cmp (ir2-block-start-vop target-block)))
+            (when (and cmp
+                       (singleton-p (ir2block-predecessors target-block)))
+              (let ((integer (vop-args vop))
+                    (args (vop-args cmp))
+                    tn-refs)
+                (when (case (vop-name cmp)
+                        ((sb-vm::>-integer-fixnum sb-vm::<-integer-fixnum)
+                         (when (eq (tn-ref-tn args) (tn-ref-tn integer))
+                           (setf tn-refs (list integer (tn-ref-across args)))))
+                        ((sb-vm::>-fixnum-integer sb-vm::<-fixnum-integer)
+                         (when (eq (tn-ref-tn (tn-ref-across args))
+                                   (tn-ref-tn integer))
+                           (setf tn-refs (list args integer)))))
+                  (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
+                    (let* ((cmp-next-block (ir2-block-next (vop-block cmp)))
+                           (cmp-target-block (gethash cmp-target *2block-info*)))
+                      (flet ((invert ()
+                               (template-or-lose
+                                (case (vop-name cmp)
+                                  (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
+                                  (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
+                                  (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
+                                  (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
+                        (multiple-value-bind (new-vop new-target new-not-p)
+                            (cond ((and not-p
+                                        (eq not-target-block cmp-next-block))
+                                   (if cmp-not-p
+                                       (values (invert) cmp-target nil)
+                                       (values (vop-info cmp) cmp-target nil)))
+                                  ((and not-p
+                                        (eq not-target-block cmp-target-block))
+                                   (if cmp-not-p
+                                       (values (vop-info cmp) cmp-target t)
+                                       (values (invert) cmp-target t)))
+                                  ((and (not not-p)
+                                        (eq not-target-block cmp-target-block))
+                                   (if cmp-not-p
+                                       (values (vop-info cmp) (ir2-block-%label target-block) nil)
+                                       (values (invert) (ir2-block-%label target-block) nil)))
+                                  ((and (not not-p)
+                                        (eq not-target-block cmp-next-block))
+                                   (if cmp-not-p
+                                       (values (invert) cmp-target nil)
+                                       (values (vop-info cmp) cmp-target nil)))
+                                  (t
+                                   (return-from vop-optimize-integerp-optimizer)))
+                          (prog1
+                              (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                                   new-vop
+                                                   (reference-tn-ref-list tn-refs nil)
+                                                   nil vop
+                                                   (list new-target new-not-p))
+                            (delete-vop vop)
+                            (delete-vop cmp))))))))))))
+      nil)))
 
 ;;; No need to reset the stack pointer just before returning.
 (defoptimizer (vop-optimize reset-stack-pointer) (vop)
@@ -1097,6 +1039,191 @@
   (let ((tn (tn-ref-tn (vop-results vop))))
     (when (not (tn-reads tn))
       (delete-vop vop))))
+
+;;; Load the WIDETAG once for a series of type tests.
+(when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
+  (defoptimizer (vop-optimize %other-pointer-subtype-p) (vop)
+    (let (vops
+          stop
+          null
+          (value (tn-ref-tn (vop-args vop))))
+      (labels ((good-vop-p (vop)
+                 (and (singleton-p (ir2block-predecessors (vop-block vop)))
+                      (or (getf sb-vm::*other-pointer-type-vops* (vop-name vop))
+                          (eq (vop-name vop) '%other-pointer-subtype-p))
+                      (eq (tn-ref-tn (vop-args vop)) value)))
+               (chain (vop &optional (collect t))
+                 (let ((next (branch-destination vop nil)))
+                   (cond ((and next
+                               (or (neq (vop-name vop) 'symbolp)
+                                   (and (not null)
+                                        (setf null (branch-destination vop)))))
+                          (when collect
+                            (push vop vops))
+                          (cond ((good-vop-p next)
+                                 (chain next))
+                                ((not stop)
+                                 (setf stop (vop-block next)))))
+                         ((not stop)
+                          (setf stop (vop-block vop)))))
+                 (let ((true (branch-destination vop)))
+                   (when (and true
+                              (good-vop-p true))
+                     (push true vops)
+                     (chain true nil))))
+               (ir2-block-label (block)
+                 (or (ir2-block-%label block)
+                     (setf (ir2-block-%label block) (gen-label)))))
+        (chain vop)
+        (when (> (length vops) 1)
+          (let ((widetag (make-representation-tn (primitive-type-or-lose 'sb-vm::unsigned-byte-64)
+                                                 sb-vm:unsigned-reg-sc-number))
+                (block (vop-block vop)))
+            (setf (tn-type value)
+                  (tn-ref-type (vop-args vop)))
+            (emit-and-insert-vop (vop-node vop)
+                                 block
+                                 (template-or-lose 'sb-vm::load-other-pointer-widetag)
+                                 (reference-tn value nil)
+                                 (reference-tn widetag t)
+                                 vop
+                                 (list (ir2-block-label stop)
+                                       (and null
+                                            (ir2-block-label (vop-block null)))))
+            (update-block-succ block
+                               (cons stop
+                                     (ir2block-successors block)))
+
+            (let ((test-vop (template-or-lose 'sb-vm::test-widetag)))
+              (loop for vop in vops
+                    for info = (vop-codegen-info vop)
+                    for tags = (if (eq (vop-name vop) '%other-pointer-subtype-p)
+                                   (third info)
+                                   (getf sb-vm::*other-pointer-type-vops* (vop-name vop)))
+                    do
+                    (let ((next (vop-next vop)))
+                      (when (and next
+                                 (eq (vop-name next) 'branch-if))
+                        (setf info (vop-codegen-info next))
+                        (delete-vop next))
+                      (emit-and-insert-vop (vop-node vop)
+                                           (vop-block vop)
+                                           test-vop
+                                           (reference-tn widetag nil)
+                                           nil
+                                           vop
+                                           (list (first info) (second info) tags)))
+                    (delete-vop vop)))))))
+    nil)
+
+  (loop for (vop) on sb-vm::*other-pointer-type-vops* by #'cddr
+        do
+        (set-vop-optimizer (template-or-lose vop)
+                           #'vop-optimize-%other-pointer-subtype-p-optimizer)))
+
+(when-vop-existsp (:named sb-vm::load-instance-layout)
+  (defoptimizer (vop-optimize structure-typep) (vop)
+    (let (vops
+          stop
+          (value (tn-ref-tn (vop-args vop))))
+      (labels ((good-vop-p (vop)
+                 (and (singleton-p (ir2block-predecessors (vop-block vop)))
+                      (eq (vop-name vop) 'structure-typep)
+                      (eq (tn-ref-tn (vop-args vop)) value)))
+               (chain (vop &optional (collect t))
+                 (let ((next (branch-destination vop nil)))
+                   (cond (next
+                          (when collect
+                            (push vop vops))
+                          (cond ((good-vop-p next)
+                                 (chain next))
+                                ((not stop)
+                                 (setf stop (vop-block next)))))
+                         ((not stop)
+                          (setf stop (vop-block vop)))))
+                 (let ((true (branch-destination vop)))
+                   (when (and true
+                              (good-vop-p true))
+                     (push true vops)
+                     (chain true nil))))
+               (ir2-block-label (block)
+                 (or (ir2-block-%label block)
+                     (setf (ir2-block-%label block) (gen-label)))))
+        (chain vop)
+        (when (> (length vops) 1)
+          (let ((layout (make-representation-tn *backend-t-primitive-type*
+                                                sb-vm:descriptor-reg-sc-number))
+                (block (vop-block vop)))
+            (setf (tn-type value)
+                  (tn-ref-type (vop-args vop)))
+            (emit-and-insert-vop (vop-node vop)
+                                 block
+                                 (template-or-lose 'sb-vm::load-instance-layout)
+                                 (reference-tn value nil)
+                                 (reference-tn layout t)
+                                 vop
+                                 (list (ir2-block-label stop)))
+            (update-block-succ block
+                               (cons stop
+                                     (ir2block-successors block)))
+            (let ((test-vop (template-or-lose 'sb-vm::structure-typep*)))
+              (loop for vop in vops
+                    for info = (vop-codegen-info vop)
+                    do
+                    (emit-and-insert-vop (vop-node vop)
+                                         (vop-block vop)
+                                         test-vop
+                                         (reference-tn layout nil)
+                                         nil
+                                         vop
+                                         info)
+                    (delete-vop vop)))))))
+    nil))
+
+(defmacro vop-bind (args results vop &body body)
+  (flet ((gen (accessor operands)
+           (loop for op in operands
+                 for name = (gensym "TN-REF")
+                 and tn-ref = `(,accessor ,vop) then `(tn-ref-across ,name)
+                 collect `(,name ,tn-ref)
+                 collect `(,op (tn-ref-tn ,name)))))
+   `(let* (,@(gen 'vop-args args)
+           ,@(gen 'vop-results results))
+      ,@body)))
+
+(defun tn-reader (tn &key single-writer
+                          single-reader)
+  (let ((reads (tn-reads tn))
+        (writes (tn-writes tn)))
+    (and reads writes
+         (not (and single-reader
+                   (tn-ref-next reads)))
+         (not (and single-writer
+                   (tn-ref-next writes)))
+         (tn-ref-vop reads))))
+
+(defun tn-single-writer-p (tn)
+  (let ((writes (tn-writes tn)))
+    (and writes
+         (not (tn-ref-next writes)))))
+
+(defoptimizer (vop-optimize sb-vm::move-from-word/fixnum)
+    (vop)
+  (vop-bind (in) (out) vop
+    (when (tn-single-writer-p in)
+      (let ((to (tn-reader out :single-writer t)))
+        (when (and to
+                   (eq (vop-name to) 'sb-vm::move-to-word/fixnum))
+          (vop-bind (in2) (out2) to
+            (when (eq out in2)
+              (emit-and-insert-vop
+               (vop-node to) (vop-block to)
+               (template-or-lose 'sb-vm::word-move)
+               (reference-tn in nil)
+               (reference-tn out2 t)
+               to)
+              (delete-vop to)
+              nil)))))))
 
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
@@ -1150,15 +1277,20 @@
           (delete-vop first)
           new))))) ; return suitable value for RUN-VOP-OPTIMIZERS
 
-(defun run-vop-optimizers (component)
+(defun run-vop-optimizers (component &optional stage (without-stage (not stage)))
   (do-ir2-blocks (block component)
     (let ((vop (ir2-block-start-vop block)))
-      (loop (unless vop (return))
+      (loop while vop
+            do
             ;; Avoid following the NEXT pointer of a deleted vop, which despite
             ;; possibly being accidentally correct, is dubious.
             ;; Optimizer must return NIL or a VOP whence to resume scanning.
             (setq vop (or (awhen (vop-info-optimizer (vop-info vop))
-                            (funcall it vop))
+                            (if (consp it)
+                                (and (eq (cdr it) stage)
+                                     (funcall (car it) vop))
+                                (and without-stage
+                                     (funcall it vop))))
                           (vop-next vop)))))))
 
 (defun merge-instance-set-vops (vop)
@@ -1207,21 +1339,39 @@
               (setq vop (or (awhen optimizer (funcall it vop))
                             (vop-next vop))))))))
 
-(defun ir2-optimize (component)
+(defun ir2-optimize (component &optional stage)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
-    (when (and *compiler-trace-output*
-               (member :pre-ir2-optimize *compile-trace-targets*))
-      (let ((*standard-output* *compiler-trace-output*))
-        ;; We really ought to print the IR1 before IR2 but this achieves its
-        ;; purpose of helping figure out what changes were made to IR2.
-        (format t "~&Before IR2-optimize:~%")
-        (print-ir2-blocks component)))
-    ;; Look for if/else chains before cmovs, because a cmov
-    ;; affects whether the last if/else is recognizable.
-    #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
-    (run-vop-optimizers component)
-    (delete-unused-ir2-blocks component))
+    (case stage
+      (regalloc
+       (run-vop-optimizers component stage)
+       (delete-no-op-vops component)
+       (ir2-optimize-jumps component)
+       (optimize-constant-loads component))
+      (select-representations
+       ;; Give the optimizers a second opportunity to alter newly inserted vops
+       ;; by looking for patterns that have a shorter expression as a single vop.
+       (run-vop-optimizers component stage t)
+       (delete-unused-ir2-blocks component)
+       ;; Try to combine consecutive uses of %INSTANCE-SET.
+       ;; This can't be done prior to selecting representations
+       ;; because SELECT-REPRESENTATIONS might insert some
+       ;; things like MOVE-FROM-DOUBLE which makes the
+       ;; "consecutive" vops no longer consecutive.
+       (ir2-optimize-stores component))
+      (t
+       (when (and *compiler-trace-output*
+                  (member :pre-ir2-optimize *compile-trace-targets*))
+         (let ((*standard-output* *compiler-trace-output*))
+           ;; We really ought to print the IR1 before IR2 but this achieves its
+           ;; purpose of helping figure out what changes were made to IR2.
+           (format t "~&Before IR2-optimize:~%")
+           (print-ir2-blocks component)))
+       ;; Look for if/else chains before cmovs, because a cmov
+       ;; affects whether the last if/else is recognizable.
+       #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
+       (run-vop-optimizers component)
+       (delete-unused-ir2-blocks component))))
 
   (values))
 

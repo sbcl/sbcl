@@ -35,10 +35,12 @@
   (offset 0 :type (or sb-vm:signed-word label)
             :read-only t))
 
+;;; A FIXUP-NOTE tells you where the assembly patch is to be performed
 (defstruct (fixup-note
              (:constructor make-fixup-note (kind fixup position))
              (:copier nil))
-  kind
-  fixup
-  position)
+  ;; KIND is architecture-dependent (see the various 'vm' files)
+  (kind nil :type symbol)
+  (fixup (missing-arg) :type fixup)
+  (position 0 :type fixnum))
 (declaim (freeze-type fixup fixup-note))

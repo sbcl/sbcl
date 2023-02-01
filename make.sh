@@ -82,12 +82,11 @@ maybetime sh make-host-2.sh
 maybetime sh make-target-2.sh
 maybetime sh make-target-contrib.sh
 
-# contrib/Makefile shouldn't be counted in NCONTRIBS.
-# "find contrib/* -name Makefile" would still find contrib/./Makefile.
-# "find contrib/{sb-*,asdf}/Makefile" could work,
-# but as long as we only have 1 directory level, 'ls' should be adequate.
-NCONTRIBS=`ls -1 contrib/*/Makefile | wc -l`
-NPASSED=`find obj/asdf-cache -name test-passed.test-report -print | wc -l`
+# contrib/Makefile shouldn't be counted in NCONTRIBS nor should asdf and uiop.
+# The asdf directory produces 2 fasls, so is unlike all our other contribs
+# and would therefore mess up the accounting here if included.
+NCONTRIBS=`ls -1 contrib/sb-*/Makefile | wc -l`
+NPASSED=`ls obj/sbcl-home/contrib/sb-*.fasl | wc -l`
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
 echo "contributed modules. If you would like to run more extensive tests on"

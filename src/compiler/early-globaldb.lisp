@@ -90,6 +90,7 @@
 ;;; The reverse mapping is obtained by reading the META-INFO.
 (declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
 (define-load-time-global *info-types* (make-array (ash 1 info-number-bits) :initial-element nil))
+#+sb-xc-host (defvar *get-info-value-histo* (make-array 64))
 
 (defstruct (meta-info
             (:constructor
@@ -199,26 +200,23 @@
 ;;; and when running target code, calls with legal constants for the first two
 ;;; arguments are transformed.
 (macrolet ((def (name lambda-list form)
+             ;; AVER is not defined yet
              (assert (and (member 'category lambda-list)
                           (member 'kind lambda-list)))
              `(define-compiler-macro ,name ,(append '(&whole .whole.) lambda-list)
-                (if (and (keywordp category) (keywordp kind))
-                    ;; In the target Lisp, it's a STYLE-WARNING if this macro
-                    ;; defers to a full call to #'INFO.
-                    ;; If the cross-compilation host, if any info-type is
-                    ;; defined, then it's an error not to find the meta-info.
-                    ;; If no info-types are defined, silently defer.
-                    (let ((meta-info
-                           (and #+sb-xc-host (find-if #'identity *info-types*)
-                                (meta-info category kind #-sb-xc-host nil))))
-                      (if meta-info
-                          ,form
-                          (progn
-                            #-sb-xc-host
-                            (style-warn "(~S ~S) is not a defined info type."
-                                        category kind)
-                            .whole.)))
-                    .whole.))))
+                (when (and (keywordp category) (keywordp kind))
+                  ;; In the target Lisp, it's a STYLE-WARNING if this macro
+                  ;; defers to a full call to #'INFO.
+                  ;; If the cross-compilation host, if any info-type is
+                  ;; defined, then it's an error not to find the meta-info.
+                  ;; If no info-types are defined, silently defer.
+                  (let ((meta-info (meta-info category kind #+sb-xc-host nil)))
+                    (when meta-info
+                      (return-from ,(if (eq name 'clear-info) 'clear-info 'info)
+                        ,form))))
+                ;; This flags some calls in make-host-2 that have non-constant args
+                ;; (format t "~&Could not xform ~S ~S ~S~%" ',name category kind)
+                .whole.)))
 
   ;; ECL bug workaround: INFO ceases to be a valid macrolet name
   ;; because it tries to run the compiler-macro before the local macro.
@@ -288,3 +286,54 @@
              (meta-info-number (meta-info category kind))
              `(meta-info-number (meta-info ,category ,kind)))
         ,name #',proc))))
+
+#+sb-xc-host
+(progn
+(defun calc-globaldb-lookup-freq-dist ()
+  (sort (loop with histo = *get-info-value-histo*
+              for i below 64
+              when (plusp (aref histo i))
+              collect (let ((info (aref *info-types* i)))
+                        (cons (cons (meta-info-category info) (meta-info-kind info))
+                              (aref histo i))))
+        #'> :key #'cdr))
+(defun print-globaldb-lookup-freq-dist (list)
+  (dolist (x list) (format t "~8d ~s~%" (cdr x) (car x)))))
+
+;;; This priority order could be computed during make-host-2 based on what calls
+;;; we observe, and then injected into the target compiler. But instead I'm just
+;;; hardcoding what I observed on a particular run of make-host-2 based on
+;;; the output of PRINT-GLOBALDB-LOOKUP-FREQ-DIST. It won't change much.
+(defglobal *info-priority-order*
+    '(nil ; 0 can't be used
+      (:type . :builtin)
+      (:function . :info)
+      (:function . :ir1-convert)
+      (:function . :source-transform)
+      (:function . :kind)
+      (:variable . :kind)
+      (:type . :classoid-cell)
+      (:function . :compiler-macro-function)
+      (:function . :deprecated)
+      (:function . :inlinep)
+      (:function . :type)
+      (:function . :macro-function)
+      (:function . :where-from)
+      (:type . :kind)
+      (:function . :inlining-data)
+      (:function . :assumed-type)
+      (:type . :deprecated)
+      (:type . :expander)
+      (:function . :emitted-full-calls)
+      (:setf . :expander)
+      (:type . :compiler-layout)
+      (:variable . :wired-tls)
+      (:function . :walker-template)
+      (:variable . :deprecated)
+      (:variable . :macro-expansion)
+      (:variable . :where-from)
+      (:variable . :type)
+      (:variable . :always-bound)
+      (:source-location . :declaration)
+      (:alien-type . :translator)
+      (:alien-type . :kind)))

@@ -14,27 +14,27 @@
 
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg)
-                 :target rdi))
+                 :target c-arg))
   (:temporary (:sc unsigned-reg
-               :offset rdi-offset
+               :offset #+win32 rcx-offset #-win32 rdi-offset
                :from :eval)
-              rdi)
+              c-arg)
   (:temporary (:sc unsigned-reg
                :offset rax-offset
                :target result
                :from :eval
                :to (:result 0))
               rax)
-  (:temporary (:sc unsigned-reg) call-target)
+  (:temporary (:sc unsigned-reg) rsp-save)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100
-    (move rdi object)
-    (inst mov call-target rsp-tn) ; save RSP temporarily elsewhere
+    (move c-arg object)
+    (inst mov rsp-save rsp-tn) ; save RSP temporarily elsewhere
     (inst and rsp-tn -16) ; align as required for ABI
-    (inst push call-target) ; push twice to preserve alignment
-    (inst push call-target)
-    (inst mov call-target (make-fixup "debug_print" :foreign))
-    (inst call call-target)
+    (inst push rsp-save) ; push twice to preserve alignment
+    (inst push rsp-save)
+    #+immobile-space (inst call (make-fixup "debug_print" :foreign))
+    #-immobile-space (inst call (ea (make-fixup "debug_print" :foreign 8)))
     (inst pop rsp-tn) ; restore the original RSP
     (move result rax)))

@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-win32 (exit :code 104)
+#-win32 (invoke-restart 'run-tests::skip-file)
 
 (with-test (:name :dbg-print-exception-c)
   (handler-case

@@ -371,7 +371,12 @@ struct lisp_startup_options lisp_startup_options;
 
 struct cmdline_options {
     char *core;
-    char **argv;
+#ifdef LISP_FEATURE_WIN32
+    wchar_t
+#else
+    char
+#endif
+     **argv;
     boolean disable_lossage_handler_p;
     int merge_core_pages;
 };
@@ -734,13 +739,19 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 #endif
 
     define_var("nil", NIL, 1);
-    define_var("t", T, 1);
+    define_var("t", LISP_T, 1);
 
     if (!options.disable_lossage_handler_p)
         enable_lossage_handler();
 
     os_link_runtime();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef CALLBACK_WRAPPER_TRAMPOLINE // not defined if #-sb-thread
+     // Assign the static lisp symbol's value the address of the C function
+    // of the same name. Needed when alien linkage table is relocatable.
+    extern void callback_wrapper_trampoline();
+    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)callback_wrapper_trampoline;
+#endif
     /* Delayed until after dynamic space has been mapped, fixups made,
      * and/or immobile-space linkage entries written,
      * since it was too soon earlier to handle write faults. */

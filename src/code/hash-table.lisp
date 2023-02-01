@@ -77,20 +77,21 @@
                                 next-vector
                                 hash-vector)))
 
-  (gethash-impl #'error :type function :read-only t)
-  (puthash-impl #'error :type function :read-only t)
-  (remhash-impl #'error :type function :read-only t)
-  (clrhash-impl #'error :type function :read-only t)
+  (gethash-impl #'error :type (sfunction * (values t boolean)) :read-only t)
+  (puthash-impl #'error :type (sfunction * t) :read-only t)
+  (remhash-impl #'error :type (sfunction * t) :read-only t)
+  (clrhash-impl #'error :type (sfunction * t) :read-only t)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
   ;; above the high water mark.  If you store non-immediate data past
   ;; that mark, you're sure to have problems.
   (pairs nil :type simple-vector)
-  ;; A potential index into the k/v vector. It should be checked first
-  ;; when searching. There's no reason to allow NIL here,
-  ;; because worst case there won't be a hit at this index.
-  (cache 0 :type index)
+  ;; MRU physical index of a key in the k/v vector. If < (LENGTH PAIRS)
+  ;; the cell can be examined first in GETHASH and PUTHASH. The "unknown" value
+  ;; is not 0 because that would look valid but could accidentally return a
+  ;; false match if the user's key is EQ to element 0 in the pair vector.
+  (cache (- array-dimension-limit 2) :type index)
   ;; The index vector. This may be larger than the capacity to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))
@@ -107,14 +108,13 @@
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents address-based hashing on the
   ;; respective key.
   (hash-vector nil :type (or null (simple-array hash-table-index (*))))
-  ;; flags: WEAKNESS | KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZEDP
+  ;; flags: WEAKNESS | KIND | WEAKP | {notused} | USERFUNP | SYNCHRONIZED
   ;; WEAKNESS is 2 bits, KIND is 2 bits, the rest are 1 bit each
   ;;   - WEAKNESS     : {K-and-V, K, V, K-or-V}, irrelevant unless WEAKP
   ;;   - KIND         : {EQ, EQL, EQUAL, EQUALP}, irrelevant if USERFUNP
   ;;   - WEAKP        : table is weak
-  ;;   - FINALIZERSP  : table is the global finalizer store
   ;;   - USERFUNP     : table has a nonstandard hash function
-  ;;   - SYCHRONIZEDP : all operations are automatically guarded by a mutex
+  ;;   - SYNCHRONIZED : all operations are automatically guarded by a mutex
   ;; If you change these, be sure to check the definition of hash_table_weakp()
   ;; in 'gc-private.h'
   (flags 0 :type (unsigned-byte 8) :read-only t)
@@ -162,6 +162,12 @@
   ;; disable GC during rehash as a consequence of key movement.
   #+hash-table-metrics (n-rehash+find 0 :type word)
   #+hash-table-metrics (n-lsearch     0 :type word)
+  ;; this counter is incremented if we observe that GC marked the table invalid
+  ;; while already in the midst of being rehashed due to invalidation.
+  #+hash-table-metrics (n-rehash-again 0 :type word)
+  ;; this counter is incremented if the fast-read-lock (implicit in the
+  ;; 'stamp' field) implies that there was an inconsistent view of the table
+  #+hash-table-metrics (n-stamp-change 0 :type word)
 
   ;; only for debugging system bootstrap when hash-tables are completely
   ;; broken (which seems to be quite often as I optimize them)
@@ -194,11 +200,7 @@
   (smashed-cells nil)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
-  (next-weak-hash-table nil :type null)
-  ;; List of values (i.e. the second half of the k/v pair) culled out during
-  ;; GC, used only by the finalizer hash-table. This informs Lisp of the IDs
-  ;; (small fixnums) of the finalizers that need to run.
-  (culled-values nil :type list))
+  (next-weak-hash-table nil :type null))
 
 (sb-xc:defmacro hash-table-lock (table)
   `(let ((ht ,table)) (or (hash-table-%lock ht) (install-hash-table-lock ht))))

@@ -11,8 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(or sb-eval sb-fasteval)
-(sb-ext:exit :code 104)
+#-(or sb-eval sb-fasteval) (invoke-restart 'run-tests::skip-file)
 
 (setf sb-ext:*evaluator-mode* :interpret)
 
@@ -112,7 +111,7 @@
 (with-test (:name :inline-fun-captures-decl :fails-on (not :sb-fasteval))
   (assert (equal (sb-int:fun-name-inline-expansion 'some-inline-fun)
                  '(sb-c:lambda-with-lexenv
-                   (:declare ((muffle-conditions compiler-note))) (x)
+                   ((declare (muffle-conditions compiler-note))) (x)
                    (block some-inline-fun (- x))))))
 
 (defun typecase-test (node)

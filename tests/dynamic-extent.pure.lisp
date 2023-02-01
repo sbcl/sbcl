@@ -328,10 +328,12 @@
 (defstruct list-container listy-slot)
 (defun make-var-length-dx-list (n thunk)
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
-    (funcall thunk s)))
+    (values (funcall (the function thunk) s))))
 ;; stack-allocatable lists are necessary but not sufficient
 (with-test (:name (:dx-list :make-list) :skipped-on (not :x86-64))
-  (assert (null (ctu:find-named-callees #'make-var-length-dx-list)))
+  (let ((calls (ctu:asm-search "CALL" #'make-var-length-dx-list)))
+    ;; Call nothing but the funarg
+    (assert (eql (length calls) 1)))
   (assert-no-consing (make-var-length-dx-list
                       50 (lambda (x) (declare (ignore x))))))
 
@@ -775,9 +777,12 @@
 
 (defun test-hash-table ()
   (setf (gethash 5 *table*) 13)
-  (gethash 5 *table*))
+  (setf (gethash 6 *table*) 14)
+  (values (gethash 5 *table*)
+          (gethash 6 *table*)))
 
 (with-test (:name (:no-consing :hash-tables))
+  (test-hash-table) ;; initialize all the vectors first
   (assert-no-consing (test-hash-table)))
 
 ;;; Both with-pinned-objects and without-gcing should not cons
@@ -892,11 +897,11 @@
          (b (list x y z))
          (c (list a b)))
     (declare (dynamic-extent c))
-    (values (first c) (second c))))
+    (values a b)))
 (with-test (:name :let-converted-vars-dx-allocated-bug)
-  (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
-    (assert (and (equal i j)
-                 (equal i (list 1 2 3))))))
+  (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug-default 1 2 3)
+    (assert (equal i j))
+    (assert (equal i (list 1 2 3)))))
 
 ;;; workaround for bug 419 -- real issue remains, but check that the
 ;;; bandaid holds.
@@ -929,7 +934,7 @@
   (assert (eql n (funcall fun nil))))
 
 (macrolet ((def (n f1 f2 f3)
-             (let ((name (sb-pcl::format-symbol :cl-user "DX-FLET-TEST.~A" n)))
+             (let ((name (sb-int:package-symbolicate "DX-FLET-TEST." (write-to-string n))))
                `(progn
                   (defun-with-dx ,name (s)
                     (flet ((f (x)
@@ -1117,7 +1122,7 @@
     (test `(lambda () (declare (dynamic-extent #'bar)))
           :allow-style-warnings 'style-warning)
     (test `(lambda () (declare (dynamic-extent bar)))
-          :allow-style-warnings 'style-warning)
+          :allow-warnings 'warning)
     (test `(lambda (bar) (cons bar (lambda () (declare (dynamic-extent bar)))))
           :allow-notes 'sb-ext:compiler-note)
     (test `(lambda ()
@@ -1694,3 +1699,33 @@
                       x)))
              (declare (dynamic-extent *)))))
     ((1) 1)))
+
+(with-test (:name :let-setf-aref)
+  (checked-compile
+   `(lambda ()
+      (declare (optimize debug))
+      (let ((x (let ((z (make-array 3)))
+                 (setf (aref z 0) 10)
+                 (setf (aref z 0) 20)
+                 z)))
+        (declare (dynamic-extent x))
+        (aref x 0)))
+   :allow-notes nil))
+
+(with-test (:name :dx-multi-use-with-cast)
+  (checked-compile '(lambda (bar)
+                     (declare (inline make-foo1))
+                     (let ((a (if bar
+                                  (make-foo1 :x 2)
+                                  (cons 1 2))))
+                       (declare (dynamic-extent a))
+                       (print a)))))
+
+(with-test (:name :dx-propagation-dx-already-exists)
+  (checked-compile '(lambda ()
+                     (let ((x (let ((m (make-array 3)))
+                                (declare (dynamic-extent m))
+                                (fill m 0)
+                                m)))
+                       (declare (dynamic-extent x))
+                       (print x)))))

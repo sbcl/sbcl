@@ -36,9 +36,10 @@
      "Psalter_Pahlavi" "Grantha" "Mro" "Siddham" "Khojki" "Nabataean" "Tirhuta"
      "Khudawadi" "Old_North_Arabian" "Warang_Citi" "Linear_A" "Old_Permic"
      "Ahom" "Anatolian_Hieroglyphs" "Hatran" "Multani" "Old_Hungarian"
-     "SignWriting"))
+     "SignWriting" "Adlam" "Bhaiksuki" "Marchen" "Newa" "Osage" "Tangut"
+     "Masaram_Gondi" "Nushu" "Soyombo" "Zanabazar_Square"))
 
  (*line-break-classes*
-    ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EX" "GL"
-     "HL" "HY" "ID" "IN" "IS" "LF" "NL" "NS" "NU" "OP" "PO" "PR" "QU" "RI" "SA"
-     "SG" "SP" "SY" "WJ" "ZW")))
+    ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EB" "EM"
+     "EX" "GL" "HL" "HY" "ID" "IN" "IS" "LF" "NL" "NS" "NU" "OP" "PO" "PR" "QU"
+     "RI" "SA" "SG" "SP" "SY" "WJ" "ZW" "ZWJ")))

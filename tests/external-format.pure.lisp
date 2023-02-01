@@ -15,6 +15,17 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;;; I have absolutely no idea what's going on with ppc64 little-endian,
+;;; but this file's realtime is just ridiculous on the test machine
+;;; and it totally dominates the time taken in parallel-exec:
+;;;    big-endian:    real        0m3.265s
+;;;    little-endian: real        2m53.039s
+;;; Whereas, with this one file eliminated on ppc64le, the total wallclock
+;;; time for parallel-exec (with 12 workers) is approximately 94 seconds
+;;; on either machine. What is so horrible about our external-format codecs
+;;; that it antagonizes the little-endian CPU so badly?
+#+(and ppc64 little-endian) (invoke-restart 'run-tests::skip-file)
+
 (defmacro do-external-formats ((xf) &body body)
   (let ((nxf (gensym)))
     `(sb-int:dovector (,nxf sb-impl::*external-formats*)
@@ -1069,5 +1080,26 @@
                                     :external-format :euc-jp)
                    (read-line f))))
   (delete-file *test-path*))
-
-;;;; success
+
+;; test for lp#659107
+(with-test (:name :cmdline-setq-external-format
+                  :skipped-on (not :sb-unicode))
+  (with-scratch-file (script "lisp")
+    (with-open-file (stream script :direction :output
+                                   :if-exists :supersede
+                                   :if-does-not-exist :create
+                                   :external-format :utf16le)
+      (format stream "(defvar s \"what? ~A\"~%)" (name-char "GRINNING_FACE"))
+      (format stream "(sb-ext:exit :code
+ (if (and (string= (subseq s 0 6) \"what? \") (char= (char s 6) #\\grinning_face)) 0 1))~%"))
+    (let ((process (run-program
+                    sb-ext:*runtime-pathname*
+                    (list "--core" sb-int:*core-string*
+                          "--noinform" "--no-sysinit" "--no-userinit" "--noprint"
+                          "--disable-debugger"
+                          "--eval" "(setq *default-external-format* :utf16le)"
+                          "--load" script)
+                    :error t)))
+        #+win32
+        (process-close process)
+        (assert (zerop (process-exit-code process))))))

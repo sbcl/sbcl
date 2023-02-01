@@ -48,7 +48,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:translate sb-impl::symbol-package-id)
+  (:translate symbol-package-id)
   (:policy :fast-safe)
   (:generator 5
    (inst cmpld symbol null-tn)
@@ -78,11 +78,9 @@
   (:info name offset lowtag)
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:vop-var vop)
+  (:ignore name)
   (:generator 1
-    ;; gencgc does not need to emit the barrier for constructors
-    (unless (member name '(%make-structure-instance make-weak-pointer
-                           %make-ratio %make-complex))
-      (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value))
+    (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -129,7 +127,7 @@
     (inst bne DONT-STORE-TLS)
     (inst stdx new thread-base-tn temp)
     DONT-STORE-TLS
-    (inst cmpdi result no-tls-value-marker-widetag)
+    (inst cmpdi result no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
 
     (inst li temp (- (* symbol-value-slot n-word-bytes)
@@ -161,7 +159,7 @@
 
 ;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
 (define-vop (symbol-global-value checked-cell-ref)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:generator 9
     ;; TODO: can this be made branchless somehow?
     (inst cmpld object null-tn)
@@ -179,7 +177,7 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:ignore offset lowtag)
   (:generator 7
     (inst cmpld object null-tn)
@@ -199,7 +197,7 @@
   (:generator 4
     (load-tls-index tls-slot symbol)
     (inst ldx temp thread-base-tn tls-slot)
-    (inst cmpdi temp no-tls-value-marker-widetag)
+    (inst cmpdi temp no-tls-value-marker)
     (inst beq GLOBAL-VALUE)
     (inst stdx value thread-base-tn tls-slot)
     (inst b DONE)
@@ -210,7 +208,7 @@
 
 ;; With Symbol-Value, we check that the value isn't the trap object.
 (define-vop (symbol-value)
-  (:translate symeval)
+  (:translate symbol-value)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -221,7 +219,7 @@
     (inst beq NULL)
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -239,13 +237,13 @@
   ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
   ;; CSR, 2003-04-22
   (:policy :fast)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 8
     (inst cmpld object null-tn)
     (inst beq NULL)
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne DONE)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst b DONE)
@@ -267,7 +265,7 @@
     (inst beq (if not-p out target))
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -281,7 +279,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 4
     (when (not-nil-tn-ref-p args)
       (loadw res symbol symbol-hash-slot other-pointer-lowtag)
@@ -358,7 +356,7 @@
       (inst addi lip function
             (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
       (inst beq normal-fn)
-      (inst addi lip null-tn (make-fixup 'closure-tramp :asm-routine-nil-offset))
+      (inst addi lip null-tn (make-fixup 'closure-tramp :assembly-routine*))
       (emit-label normal-fn)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -371,7 +369,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst addi temp null-tn (make-fixup 'undefined-tramp :asm-routine-nil-offset))
+    (inst addi temp null-tn (make-fixup 'undefined-tramp :assembly-routine*))
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; Binding and Unbinding.
@@ -459,7 +457,9 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:info offset)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
+    (emit-gc-store-barrier object nil (list temp))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
@@ -540,13 +540,11 @@
 #-sb-xc-host
 (defun code-header-ref (code index)
   (declare (index index))
-  (let ((fdefns-start (sb-impl::code-fdefns-start-index code))
-        (count (code-n-named-calls code)))
-    (declare ((unsigned-byte 16) fdefns-start count))
-    (values
-    (if (and (>= index fdefns-start) (< index (+ fdefns-start count)))
-        (%primitive code-header-ref+tag code index other-pointer-lowtag)
-        (%primitive code-header-ref+tag code index 0)))))
+  (binding* (((start count) (code-header-fdefn-range code))
+             (end (+ start count)))
+    (values (if (and (>= index start) (< index end))
+                (%primitive code-header-ref+tag code index other-pointer-lowtag)
+                (%primitive code-header-ref+tag code index 0)))))
 
 (define-vop (code-header-set)
   (:translate code-header-set)

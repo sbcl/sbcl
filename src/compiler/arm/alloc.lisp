@@ -75,8 +75,7 @@
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info label length stack-allocate-p)
-  (:ignore label)
+  (:info length stack-allocate-p)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 10

@@ -88,10 +88,8 @@
                      (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
                      (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
                      (decompositions (read-ub8-vector (file "decomp" "dat")))
-                     (primary-compositions (read-ub8-vector (file "comp" "dat")))
                      (case-data (read-ub8-vector (file "case" "dat")))
                      (case-pages (read-ub8-vector (file "casepages" "dat")))
-                     (collations (read-ub8-vector (file "collation" "dat")))
                      (high-pages (make-ubn-vector ucd-high-pages 2))
                      (low-pages (make-ubn-vector ucd-low-pages 2))
                      (%*character-case-pages*% (make-ubn-vector case-pages 1)))
@@ -103,19 +101,6 @@
                     (defconstant-eqx sb-unicode::+character-decompositions+
                         ,(make-ubn-vector decompositions 3) #'equalp)
                     (defconstant-eqx +character-case-pages+ ,%*character-case-pages*% #'equalp)
-                    (declaim (hash-table **character-primary-compositions**))
-                    (define-load-time-global **character-primary-compositions**
-                        ,(let ((info (make-ubn-vector primary-compositions 3))
-                               (alist))
-                           (dotimes (i (/ (length info) 3))
-                             (let* ((3i (* 3 i))
-                                    (key (dpb (aref info 3i) (byte 21 21) (aref info (1+ 3i))))
-                                    (value (aref info (+ 3i 2))))
-                               (push (cons key value) alist)))
-                           `(%stuff-hash-table (make-hash-table #+64-bit :test #+64-bit #'eq
-                                                                :size ,(/ (length info) 3))
-                                               ,(nreverse (coerce alist 'vector)))))
-
                     ,@(let* ((unicode-table
                                  (make-array
                                   (* 64 (1+ (aref %*character-case-pages*%
@@ -173,39 +158,6 @@
                                            (aref table (1+ (* i 2))) upper)))))
                           `((defconstant-eqx +character-unicode-cases+ ,unicode-table #'equalp)
                             (defconstant-eqx +character-cases+ ,table #'equalp)))
-
-                    (define-load-time-global **character-collations**
-                             ,(let* ((n-entries
-                                         (with-open-file (s (file "n-collation-entries" "lisp-expr"))
-                                           (read s)))
-                                     (table)
-                                     (index 0)
-                                     (info (make-ubn-vector collations 4))
-                                     (len (length info)))
-                                (loop while (< index len) do
-                                      (let* ((entry-head (aref info index))
-                                             (cp-length (ldb (byte 4 28) entry-head))
-                                             (key-length (ldb (byte 5 23) entry-head))
-                                             (key 0)
-                                             (codepoints nil))
-                                        (aver (and (/= cp-length 0) (/= key-length 0)))
-                                        (loop repeat cp-length do
-                                              (push (dpb 0 (byte 10 22) (aref info index))
-                                                    codepoints)
-                                              (incf index))
-                                        (setf codepoints (nreverse codepoints))
-                                        (dotimes (i key-length)
-                                          (setf (ldb (byte 32 (* i 32)) key) (aref info index))
-                                          (incf index))
-                                        ;; verify the validity of
-                                        ;; :test 'eq on 64-bit
-                                        #+64-bit (aver (sb-xc:typep (apply #'pack-3-codepoints codepoints)
-                                                                    'sb-xc:fixnum))
-                                        (push (cons (apply #'pack-3-codepoints codepoints) key) table)))
-                                (aver (= (length table) n-entries))
-                                `(%stuff-hash-table
-                                  (make-hash-table :size ,n-entries #+64-bit :test #+64-bit #'eq)
-                                  ,(nreverse (coerce table 'vector)))))
 
                     ,@(with-open-file
                          (stream (file "ucd-names" "lisp-expr"))
@@ -359,7 +311,7 @@
 
 ;;; The character database is made of several arrays.
 ;;; +CHARACTER-MISC-DATABASE+ is an array of bytes that encode character
-;;; attributes. Each entry in the misc database is +misc-width+ (currently 9)
+;;; attributes. Each entry in the misc database is +MISC-WIDTH+ (currently 9)
 ;;; bytes wide. Within each entry, the bytes represent: general category, BIDI
 ;;; class, canonical combining class, digit value, decomposition info, other
 ;;; flags, script, line break class, and age, respectively. Several of the
@@ -392,7 +344,7 @@
 ;;; codepoint, all times two to account for the widtth of the entries. The
 ;;; value in +CHARACTER-LOW-PAGES+ at this point is the misc entry number. To
 ;;; transform a misc entry number into an index into
-;;; +CHARACTER-MISC-DATABASE+, multiply it by +misc-width*. This gives the
+;;; +CHARACTER-MISC-DATABASE+, multiply it by +MISC-WIDTH+. This gives the
 ;;; index of the start of the charater's misc entry in
 ;;; +CHARACTER-MISC-DATABASE+.
 ;;;

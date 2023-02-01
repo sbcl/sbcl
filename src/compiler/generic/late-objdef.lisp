@@ -14,13 +14,7 @@
 #-c-headers-only
 (macrolet ((frob ()
              `(progn ,@*!late-primitive-object-forms*)))
-  (frob)
-  (defknown symbol-extra (t) t (flushable))
-  (def-reffer 'symbol-extra symbol-size other-pointer-lowtag)
-  (defknown (setf symbol-extra) (t t) t ())
-  (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
-
-(defconstant augmented-symbol-size (1+ symbol-size))
+  (frob))
 
 #+sb-thread
 (dovector (slot (primitive-object-slots (primitive-object 'thread)))
@@ -70,8 +64,7 @@
     (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
-    (symbol "symbol"
-            "tiny_mixed" "tiny_boxed") ; trans and size respectively
+    (symbol "symbol")
     ;; Can't transport characters as "other" pointer objects.
     ;; It should be a cons cell half which would go through trans_list()
     (character "immediate")
@@ -81,11 +74,9 @@
     (instance "instance" "lose" "instance")
     (fdefn "fdefn")
 
-    (no-tls-value-marker "immediate")
-
     #+sb-simd-pack (simd-pack "unboxed")
     #+sb-simd-pack-256 (simd-pack-256 "unboxed")
-    (filler "unboxed")
+    (filler "filler" "lose" "filler")
 
     (simple-array "array")
     (simple-array-unsigned-byte-2 "vector_unsigned_byte_2")
@@ -130,7 +121,7 @@
 
 #+sb-xc-host
 (defun write-gc-tables (stream)
-  (format stream "#include \"lispobj.h\"~%")
+  (format stream "#include ~S~%" (sb-fasl::lispobj-dot-h))
   ;; Compute a bitmask of all specialized vector types,
   ;; not including array headers, for maybe_adjust_large_object().
   (let ((min #xff) (bits 0))
@@ -144,7 +135,7 @@
             min (ldb (byte 32 32) bits))
     ;; Union in the bits for other unboxed object types.
     (dolist (entry *scav/trans/size*)
-      (when (member (second entry) '("bignum" "unboxed") :test 'string=)
+      (when (member (second entry) '("bignum" "unboxed" "filler") :test 'string=)
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
     (format stream "static inline int leaf_obj_widetag_p(unsigned char widetag) {~%")
     #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
@@ -183,6 +174,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                 (+ #x80 (case widetag
                           (#.instance-widetag instance-pointer-lowtag)
                           (#.+function-widetags+ fun-pointer-lowtag)
+                          (#.filler-widetag 0)
                           (t other-pointer-lowtag)))))))
     (format stream "unsigned char widetag_lowtag[256] = {")
     (dotimes (line 16)
@@ -213,6 +205,8 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
     #+ppc64
     (progn
       (fill ptrtab "scav_lose")
+      (setf (aref scavtab #xff) "consfiller"
+            (aref sizetab #xff) "consfiller")
       (setf (nth instance-pointer-lowtag ptrtab) "scav_instance_pointer"
             (nth list-pointer-lowtag ptrtab)     "scav_list_pointer"
             (nth fun-pointer-lowtag ptrtab)      "scav_fun_pointer"
@@ -242,13 +236,47 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
  = {~{~%  (void(*)(lispobj*,lispobj))~A~^,~}~%};~%" (length ptrtab) ptrtab)
       (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
-      (format stream "#define size_pointer size_immediate~%")
+      (format stream "#define size_pointer (sizerfn)0~%")
+      (format stream "#define size_immediate (sizerfn)0~%")
       (format stream "#define size_unboxed size_boxed~%")
       (write-table "sword_t (*sizetab[256])(lispobj *where)"
                    "size_" sizetab)
+      (format stream "#undef size_immediate~%")
       (format stream "#undef size_pointer~%")
       (format stream "#undef size_unboxed~%")))
   (format stream "#endif~%"))
+
+(sb-xc:defstruct (arena (:constructor nil))
+  ;; Address of the 'struct arena_memblk' we're currently allocating to.
+  (current-block 0 :type word)
+  ;; Address of the one mandatory 'struct arena_memblk' for this arena
+  (first-block 0 :type word)
+  ;; Arena allocation parameters
+  (original-size 0 :type word)
+  (growth-amount 0 :type word) ; additive
+  (max-extensions 0 :type word)
+  ;; Sum of sizes of currently allocated blocks
+  (length 0 :type word)
+  ;; Sum of unusable bytes resulting from discarding the tail of the
+  ;; most recently claimed chunk when switching from the arena to the heap.
+  (bytes-wasted 0 :type word)
+  ;; How may times extended since allocation or most recent rewind.
+  ;; This is for bounding the maximum extension.
+  (extension-count 0 :type word)
+  ;; Small integer identifier starting from 0
+  (index 0 :type fixnum)
+  ;; T if all memory has been protected with PROT_NONE (for debugging)
+  hidden
+  ;; a counter that increments on each rewind, and which can be used by a threads
+  ;; in a pool to detect that their cached TLAB pointers are invalid
+  (token 0 :type word)
+  userdata
+  ;; Link for global chain of all arenas, needed for GC when 'scavenge_arenas' is 1,
+  ;; so that GC can find all in-use arenas.
+  ;; This is a tagged pointer to the next arena in the chain, terminated by NIL.
+  ;; It is 0 until added to the global chain so we can tell the difference between
+  ;; an arena that was made but never used, and one that was used at some point.
+  (link 0))
 
 ;;; AVLNODE is primitive-object-like because it is needed by C code that looks up
 ;;; entries in the tree of lisp threads.  But objdef doesn't have SB-XC:DEFSTRUCT

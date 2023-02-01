@@ -14,11 +14,8 @@
                                   (push (stem-object-path stem flags :target-compile)
                                         list)))
                               (nreverse list))
-         :defstruct-descriptions (stem-object-path
-                                  "defstructs.lisp-expr" '(:extra-artifact) :target-compile)
-         :tls-init (read-from-file
-                    (stem-object-path "tls-init.lisp-expr"
-                                      '(:extra-artifact) :target-compile))
+         :defstruct-descriptions (find-bootstrap-file "output/defstructs.lisp-expr" t)
+         :tls-init (read-from-file "output/tls-init.lisp-expr" :build-dependent t)
          :c-header-dir-name "output/genesis-2"
          :symbol-table-file-name "src/runtime/sbcl.nm"
          :core-file-name "output/cold-sbcl.core"

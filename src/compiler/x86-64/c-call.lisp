@@ -201,7 +201,6 @@
     (foldable flushable movable))
 
 (defoptimizer (sign-extend derive-type) ((x size))
-  (declare (ignore x))
   (when (sb-c:constant-lvar-p size)
     (specifier-type `(signed-byte ,(sb-c:lvar-value size)))))
 
@@ -224,6 +223,9 @@
     (16 (sign-extend x size))
     (32 (sign-extend x size))))
 
+;;; Note that if jumping _to_ the linkage entry, the jump is to the JMP instruction
+;;; at entry + 0, but if jumping _via_ the linkage index, we can jump to [entry+8]
+;;; which holds the ultimate address to jump to.
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
@@ -232,8 +234,16 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
+  (:vop-var vop)
   (:generator 2
-   (inst mov res (make-fixup foreign-symbol :foreign))))
+    #-immobile-space ; non-relocatable alien linkage table
+    (inst mov res (make-fixup foreign-symbol :foreign))
+    #+immobile-space ; relocatable alien linkage table
+    (cond ((sb-c::code-immobile-p vop)
+           (inst lea res (rip-relative-ea (make-fixup foreign-symbol :foreign))))
+          (t
+           (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
+           (inst lea res (ea (make-fixup foreign-symbol :alien-code-linkage-index) res))))))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -243,8 +253,16 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
+  (:vop-var vop)
   (:generator 2
-   (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))))
+    #-immobile-space ; non-relocatable alien linkage table
+    (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))
+    #+immobile-space ; relocatable alien linkage table
+    (cond ((sb-c::code-immobile-p vop)
+           (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
+          (t
+           (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
+           (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) res))))))
 
 #+sb-safepoint
 (defconstant thread-saved-csp-offset (- (1+ sb-vm::thread-header-slots)))
@@ -264,10 +282,10 @@
       (append
        (loop for gpr in gprs
              collect `(:temporary (:sc any-reg :offset ,gpr :from :eval :to :result)
-                                  ,(car (push (sb-xc:gensym) vars))))
+                                  ,(car (push (gensym) vars))))
        (loop for float to 15
              collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
-                                  ,(car (push (sb-xc:gensym) vars))))
+                                  ,(car (push (gensym) vars))))
        `((:ignore ,@vars))))))
 
 (define-vop (call-out)
@@ -365,11 +383,23 @@
   ;; table jump, and from dynamic space we use "CALL [ea]" format
   ;; where ea is the address of the linkage table entry's operand.
   ;; So while the former is a jump to a jump, we can optimize out
-  ;; one jump in a statically linked executable.
+  ;; one jump in an ELF executable.
+  ;; N.B.: if you change how the call is emitted, you will also have to adjust
+  ;; the UNDEFINED-ALIEN-TRAMP lisp asm routine to recognize the various shapes
+  ;; this instruction sequence can take.
   #-win32
-  (inst call (cond ((tn-p fun) fun)
-                   ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
-                   (t (ea (make-fixup fun :foreign 8)))))
+  (inst call (if (tn-p fun)
+                 fun
+                 #-immobile-space (ea (make-fixup fun :foreign 8))
+                 #+immobile-space
+                 (cond ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
+                       (t
+                        ;; Pick r10 as the lowest unused clobberable register.
+                        ;; RAX has a designated purpose, and RBX is nonvolatile (not always
+                        ;; spilled by Lisp because a C function has to save it if used)
+                        (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
+                        (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn)))))
+
   ;; On win64, we don't support immobile space (yet) and calls go through one of
   ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is
   ;; involved, RBX either points to a linkage table trampoline or to the linkage
@@ -419,17 +449,6 @@
         (let ((delta (align-up amount 8)))
           (inst sub :qword (alien-stack-ptr) delta)))
       (inst mov result (alien-stack-ptr)))))
-
-;;; not strictly part of the c-call convention, but needed for the
-;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so
-;;; that GC won't move them while foreign functions go to work.
-(define-vop (touch-object)
-  (:translate touch-object)
-  (:args (object))
-  (:ignore object)
-  (:policy :fast-safe)
-  (:arg-types t)
-  (:generator 0))
 
 ;;; Callbacks
 
@@ -552,8 +571,11 @@
           #+win32 (inst sub rsp #x20)
           #+win32 (inst and rsp #x-20)
           ;; Call
-          (inst mov rax (foreign-symbol-address "callback_wrapper_trampoline"))
-          (inst call rax)
+          #+immobile-space (inst call (static-symbol-value-ea 'callback-wrapper-trampoline))
+          ;; do this without MAKE-FIXUP because fixup'ing does not happen when
+          ;; assembling callbacks (probably could, but ...)
+          #-immobile-space
+          (inst call (ea (+ (foreign-symbol-address "callback_wrapper_trampoline") 8)))
           ;; Back! Restore frame
           (inst mov rsp rbp)
           (inst pop rbp))

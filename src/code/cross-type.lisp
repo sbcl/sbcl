@@ -69,7 +69,7 @@
 ;;; Defined here so that CROSS-TYPEP can use it.
 ;;; The target variant of this is in src/code/package.
 (defmacro system-package-p (package)
-  `(eql (mismatch "SB-" (package-name ,package)) 3))
+  `(eql (mismatch "SB-" (cl:package-name ,package)) 3))
 
 ;;; This is like TYPEP, except that it asks whether OBJ (a host object acting
 ;;; as a proxy for some logically equivalent object in the target sytem)
@@ -314,6 +314,7 @@
         #-sb-devel
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
+;; TODO: would it be feasible to unify this definition with that in src/code/typep ?
 (defun ctype-of (x)
   (typecase x
     (function
@@ -365,4 +366,5 @@
      (error "can't handle ~S in cross CTYPE-OF" x))))
 
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
-  (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))
+  (declare (ignore x))
+  nil)

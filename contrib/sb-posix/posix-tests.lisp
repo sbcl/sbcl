@@ -1,19 +1,16 @@
 (defpackage "SB-POSIX-TESTS"
-  (:use "COMMON-LISP" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "COMMON-LISP"))
 
 (in-package "SB-POSIX-TESTS")
 
-(defvar *test-directory*
-  (ensure-directories-exist
-   (merge-pathnames (make-pathname :directory '(:relative "test-output"))
-                    (make-pathname :directory
-                                   (pathname-directory *load-truename*)))))
+(defvar *test-directory* test-util:*test-directory*)
 
 (defvar *current-directory* *default-pathname-defaults*)
 
 (defvar *this-file* *load-truename*)
 
-(eval-when (:compile-toplevel :load-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +mode-rwx-all+
     (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
             #-win32
@@ -158,15 +155,12 @@
         (sb-posix:syscall-errno c))))
   #.sb-posix::enoent)
 
-(deftest rmdir.error.2
-  (handler-case
-      (sb-posix:rmdir *this-file*)
-    (sb-posix:syscall-error (c)
-      (sb-posix:syscall-errno c)))
-  #-win32
-  #.sb-posix::enotdir
-  #+win32
-  #.sb-posix::einval)
+(test-util:with-test (:name :rmdir.error.2)
+  (let ((err (handler-case (sb-posix:rmdir *this-file*)
+               (sb-posix:syscall-error (c) (sb-posix:syscall-errno c)))))
+    (assert #-unix (eql err #.sb-posix:einval)
+            ;; non-writable parent dir may return EACCES instead of ENOTDIR
+            #+unix (member err `(,sb-posix:enotdir ,sb-posix:eacces)))))
 
 (deftest rmdir.error.3
   (handler-case
@@ -174,17 +168,11 @@
     (sb-posix:syscall-error (c)
       (typep
        (sb-posix:syscall-errno c)
-       '(member
-         #+(or darwin openbsd)
-         #.sb-posix:eisdir
-         #+win32
-         #.sb-posix::eacces
-         #+win32
-         #.sb-posix::enotempty
-         #+sunos
-         #.sb-posix::einval
-         #-(or darwin openbsd win32 sunos)
-         #.sb-posix::ebusy)))) t)
+       `(member #+(or darwin openbsd freebsd) ,sb-posix:eisdir
+                #+win32 ,sb-posix::eacces #+win32 ,sb-posix::enotempty
+                #+sunos ,sb-posix::einval
+                #-(or darwin openbsd freebsd win32 sunos) ,sb-posix::ebusy))))
+  t)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
@@ -390,6 +378,7 @@
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))
     ;; creat() with a string as argument
     (let ((fd (sb-posix:creat file sb-posix:s-iwrite)))
+      (declare (ignorable fd))
       #+win32
       (sb-posix:close fd))
     ;; if this test fails, it will probably be with
@@ -435,7 +424,7 @@
                       :type sb-posix:f-wrlck
                       :whence sb-posix:seek-set
                       :start 0 :len 10))
-            (pathname "fcntl.flock.1")
+            (pathname (merge-pathnames #P"fcntl.flock.1" *test-directory*))
             kid-status)
         (catch 'test
           (with-open-file (f pathname :direction :output)
@@ -470,7 +459,7 @@
                       :type sb-posix:f-wrlck
                       :whence sb-posix:seek-set
                       :start 0 :len 10))
-            (pathname "fcntl.flock.2")
+            (pathname (merge-pathnames #P"fcntl.flock.2" *test-directory*))
             kid-status)
         (catch 'test
           (with-open-file (f pathname :direction :output)
@@ -534,32 +523,30 @@
   t)
 
 #-darwin
-(deftest readdir/dirent-name
-    (let ((dir (sb-posix:opendir *current-directory*)))
-      (unwind-protect
-           (equal (sort (loop for entry = (sb-posix:readdir dir)
-                           until (sb-alien:null-alien entry)
-                           collect (sb-posix:dirent-name entry))
-                        #'string<)
-                  (sort (append '("." "..")
-                                (mapcar (lambda (p)
-                                          (let ((string (enough-namestring p *current-directory*)))
-                                            (if (pathname-name p)
-                                                string
-                                                (subseq string 0 (1- (length string))))))
-                                        (directory (make-pathname
-                                                    :name :wild
+(test-util:with-test (:name :readdir/dirent-name)
+  (let* ((dir (sb-posix:opendir *current-directory*))
+         (posix-readdir (loop for entry = (sb-posix:readdir dir)
+                              until (sb-alien:null-alien entry)
+                              collect (sb-posix:dirent-name entry)))
+         (cl-directory
+          (append '("." "..")
+                  (mapcar (lambda (p)
+                            (let ((string (enough-namestring p *current-directory*)))
+                              (if (pathname-name p)
+                                  string
+                                  (subseq string 0 (1- (length string))))))
+                          (directory (make-pathname :name :wild
                                                     :type :wild
                                                     :defaults *current-directory*)
-                                                   :resolve-symlinks nil)))
-                        #'string<))
-        (sb-posix:closedir dir)))
-  t)
+                                     :resolve-symlinks nil)))))
+    (sb-posix:closedir dir)
+    (assert (equal (sort posix-readdir #'string<)
+                   (sort cl-directory #'string<)))))
 
-
-(deftest write.1
-    (progn
-      (let ((fd (sb-posix:open (merge-pathnames "write-test.txt" *test-directory*)
+(test-util:with-test (:name :write.1)
+  (multiple-value-bind (n str)
+     (test-util:with-scratch-file (tmpname)
+      (let ((fd (sb-posix:open tmpname
                                (logior sb-posix:o-creat sb-posix:o-wronly)
                                (logior sb-posix:s-irusr sb-posix:s-iwusr)))
             (retval nil))
@@ -568,10 +555,8 @@
                (setf retval (sb-posix:write fd (sb-sys:vector-sap buf) 3)))
           (sb-posix:close fd))
 
-        (with-open-file (inf (merge-pathnames "write-test.txt" *test-directory*)
-                             :direction :input)
-          (values retval (read-line inf)))))
-  3 "foo")
+        (with-open-file (inf tmpname) (values retval (read-line inf)))))
+    (assert (and (eql n 3) (equal str "foo")))))
 
 #-(or android win32)
 (deftest pwent.1
@@ -590,7 +575,7 @@
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getpwnam "almost-certainly-does-not-exist")
                          nil)
-      (t (cond) t))
+      (t (cond) (declare (ignore cond)) t))
   nil)
 
 #-(or android win32)
@@ -613,7 +598,7 @@
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getgrnam "almost-certainly-does-not-exist")
                          nil)
-      (t (cond) t))
+      (t (cond) (declare (ignore cond)) t))
   nil)
 
 #+nil
@@ -700,6 +685,7 @@
     #.(concatenate 'string "/" (make-string 255 :initial-element #\a)))
 
   ;; The error tests are in the order of exposition from SUSv3.
+  #-freebsd
   (deftest readlink.error.1
       (let* ((subdir-pathname (merge-pathnames
                                (make-pathname
@@ -715,9 +701,9 @@
                (sb-posix:syscall-error (c)
                  (sb-posix:syscall-errno c)))
           (ignore-errors
-            (sb-posix:chmod subdir-pathname #o777)
-            (sb-posix:unlink link-pathname)
-            (sb-posix:rmdir subdir-pathname))))
+           (sb-posix:chmod subdir-pathname #o777)
+           (sb-posix:unlink link-pathname)
+           (sb-posix:rmdir subdir-pathname))))
     #.sb-posix:eacces)
   (deftest readlink.error.2
       (let* ((non-link-pathname (make-pathname :name "readlink.error.2"

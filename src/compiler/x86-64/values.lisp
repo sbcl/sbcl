@@ -90,6 +90,7 @@
   (:temporary (:sc descriptor-reg :from (:argument 0) :to (:result 1)) list)
   (:temporary (:sc unsigned-reg :offset rax-offset :to (:result 1)) rax)
   (:vop-var vop)
+  (:node-var node)
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
@@ -102,8 +103,11 @@
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (%test-lowtag list rax LOOP nil list-pointer-lowtag)
-    (cerror-call vop 'bogus-arg-to-values-list-error list)
+    (cond ((policy node (> safety 0))
+           (%test-lowtag list rax LOOP nil list-pointer-lowtag)
+           (cerror-call vop 'bogus-arg-to-values-list-error list))
+          (t
+           (inst jmp LOOP)))
 
     DONE
     (unless (eq (tn-kind count) :unused)
@@ -151,4 +155,3 @@
     (inst jmp :nz LOOP)
 
     DONE))
-

@@ -316,11 +316,13 @@
            (values result (if result 0 (get-last-error)))
            name nil))
 
+(defconstant +movefile-replace-existing+ 1)
+
 (defun sb-unix:unix-rename (name1 name2)
   (declare (type sb-unix:unix-pathname name1 name2))
-  (syscall (("MoveFile" t) lispbool system-string system-string)
+  (syscall (("MoveFileEx" t) lispbool system-string system-string dword)
            (values result (if result 0 (get-last-error)))
-           name1 name2))
+           name1 name2 +movefile-replace-existing+))
 
 (defun sb-unix::posix-getenv (name)
   (declare (type simple-string name))

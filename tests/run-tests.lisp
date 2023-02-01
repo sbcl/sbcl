@@ -56,6 +56,8 @@
            ((string= arg "--report-target")
             (setf *report-target* (pop remainder)))
            ((string= arg "--no-color"))
+           ((string= arg "--slow")
+            (push :slow *features*))
            (t
             (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
@@ -66,7 +68,7 @@
     (pure-runner (pure-cload-files) 'cload-test log)
     (impure-runner (impure-load-files) 'load-test log)
     (impure-runner (impure-cload-files) 'cload-test log)
-    #-win32 (impure-runner (sh-files) 'sh-test log)
+    (impure-runner (sh-files) 'sh-test log)
     (log-file-elapsed-time "GRAND TOTAL" start-time log))
   (unless (eq *report-style* :describe)
     (report :describe *standard-output*))
@@ -250,13 +252,16 @@
            (stem= (a b)
              (string= (stem-of a) (stem-of b)))
            (starts-with-p (string prefix)
-             (= (mismatch string prefix) (length prefix))))
+             (= (mismatch string prefix) (length prefix)))
+           (within-directory-p (path directory)
+             (starts-with-p (namestring (merge-pathnames path))
+                            (namestring directory))))
     (unless (eq (pathname-host filename) sb-impl::*physical-host*)
       (return-from check-manifest))
     (let ((string (namestring filename)))
       (when (or (find #\* (stem-of filename)) ; wild
                 (starts-with-p string "/dev/") ; dev/null and dev/random
-                (starts-with-p string "/proc/self")
+                (starts-with-p string "/proc/")
                 ;; Temp files created by test-util's scratch file routine
                 (starts-with-p (stem-of string) *scratch-file-prefix*)
                 ;; These have been accepted as okay for a while.  Test
@@ -265,9 +270,10 @@
                 (starts-with-p string "/tmp/")
                 (starts-with-p string "/var/tmp/")
                 (starts-with-p string "/private/var/folders/")
+                (and (boundp '*test-directory*)
+                     (within-directory-p filename *test-directory*))
                 (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
-                                             "a.txt" "b.lisp"
                                              "no-such-file")
                         :test #'string=)
                 (string= (pathname-name filename) "i-am-not") ; any extension
@@ -283,11 +289,19 @@
   (flet ((maybe (p s) (and (find-package p)
                            (find-symbol s p))))
     `(sb-c::*code-serialno*
+      sb-c::*compile-elapsed-time*
+      sb-c::*compile-file-elapsed-time*
+      sb-impl::*finalizer-rehashlist*
+      sb-impl::*finalizers-triggered*
+      sb-impl::*all-packages*
       sb-impl::*package-names-cookie*
       sb-impl::*available-buffers*
       sb-impl::*token-buf-pool*
       sb-impl::*user-hash-table-tests*
-      sb-impl::**finalizer-store**
+      sb-impl::*pn-dir-table*
+      sb-impl::*pn-table*
+      sb-vm::*immobile-codeblob-tree*
+      sb-vm::*dynspace-codeblob-tree*
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
       sb-kernel::*type-cache-nonce*
       sb-ext:*gc-run-time*
@@ -303,6 +317,8 @@
       ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
       ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
       ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
+      ,(maybe "SB-SYS" "*THRUPTION-PENDING*")
+      ,(maybe "SB-THREAD" "*ALLOCATOR-METRICS*")
       sb-pcl::*dfun-constructors*
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*)))
@@ -350,7 +366,8 @@
            (n-new (when (and (slot-exists-p gf 'sb-pcl::methods)
                              (slot-boundp gf 'sb-pcl::methods))
                     (length (sb-mop:generic-function-methods gf)))))
-      (assert (eql n-old n-new)))))
+      (unless (eql n-old n-new)
+        (error "Generic-Function change: ~S (had ~D methods)" gf n-old)))))
 
 (defun tersely-summarize-globaldb ()
   (let* ((symbols-with-properties)
@@ -392,9 +409,9 @@
                                ignored-stream-classoids)
                 collect (sb-kernel:classoid-name key))
           (sort symbols-with-properties #'string<)
-          (sb-impl::info-env-count sb-int:*info-environment*)
-          (hash-table-count types-ht)
-          (hash-table-count setfs-ht))))
+          (loop for key being each hash-key of types-ht collect key)
+          (loop for key being each hash-key of setfs-ht collect key)
+          (list (sb-impl::info-env-count sb-int:*info-environment*)))))
 
 (defun structureish-classoid-ancestors (classoid)
   (map 'list 'sb-kernel:wrapper-classoid
@@ -428,21 +445,33 @@
       (unless (member package initial-packages)
         (push package delete)))
     ;; Do all UNUSE-PACKAGE operations first
-    (dolist (package delete )
+    (dolist (package delete)
       (unuse-package (package-use-list package) package))
     ;; Then all deletions
-    (mapc 'delete-package delete))
+    (mapc 'delete-package delete)
+    (when delete
+      (format t "::: NOTE: Deleted ~D package~:P~%" (length delete))))
+  ;; Remove PRINT-OBJECT methods specialized on uninterned symbols
+  (let ((gf #'print-object))
+    (dolist (method (sb-mop:generic-function-methods gf))
+      (let ((first-specializer
+             (class-name (car (sb-mop:method-specializers method)))))
+        (unless (symbol-package first-specializer)
+          (remove-method gf method)))))
   (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
         for index from 0
         unless (equal x y)
-     do (let ((diff (list (set-difference x y)
-                          (set-difference y x))))
-          (if (equal diff '((sb-gray:fundamental-character-output-stream
-                             sb-gray:fundamental-character-input-stream) nil))
-              (warn "Ignoring mystery change to gray stream classoids")
-              (let ((*print-pretty* nil))
-                (error "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
-                       index diff))))))
+          do (let ((diff (list (set-difference x y)
+                               (set-difference y x))))
+               (cond
+                 ((equal diff '(nil nil))) ; reordering only, from rehash?
+                 ((equal diff '((sb-gray:fundamental-character-output-stream
+                                 sb-gray:fundamental-character-input-stream) nil))
+                  (warn "Ignoring mystery change to gray stream classoids"))
+                 (t
+                  (let ((*print-pretty* nil))
+                    (error "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
+                           index diff)))))))
 
 (defun pure-runner (files test-fun log)
   (unless files
@@ -463,11 +492,15 @@
                        (search ".impure-cload" (namestring file)))))
              (packages-to-use '("ASSERTOID" "TEST-UTIL"))
              (initial-packages (list-all-packages))
+             ;; It is not only permitted to change this GC parameter in tests, it is
+             ;; _encouraged_ as a way to show insensitivity to object address stability.
+             (gen0-gcs-before-promo (generation-number-of-gcs-before-promotion 0))
              (global-symbol-values (when actually-pure
                                      (collect-symbol-values)))
              (gf-summary (summarize-generic-functions))
              (globaldb-summary (when actually-pure
                                  (tersely-summarize-globaldb)))
+             (logical-hosts sb-impl::*logical-hosts*)
              (test-package
               (if actually-pure
                   (make-package
@@ -546,12 +579,16 @@
             (skip-file ())))
         (sb-impl::disable-stepping)
         (sb-int:unencapsulate 'open 'open-guard)
+        (unless (eql (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo)
+          (format t "~&::: NOTE: nursery space promotion rate restored to nominal~%")
+          (setf (generation-number-of-gcs-before-promotion 0) gen0-gcs-before-promo))
+        (setq sb-impl::*logical-hosts* logical-hosts)
         (when actually-pure
           (setq sb-disassem::*disassem-inst-space* nil
                 sb-disassem::*assembler-routines-by-addr* nil)
           (compare-symbol-values global-symbol-values)
-          (compare-gf-summary gf-summary)
           (globaldb-cleanup initial-packages globaldb-summary)
+          (compare-gf-summary gf-summary)
           (dolist (symbol '(sb-pcl::compile-or-load-defgeneric
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
@@ -585,7 +622,9 @@
      ,*break-on-failure*
      ,*break-on-expected-failure*
      ,*break-on-error*
-     ,(eq *test-evaluator-mode* :interpret))))
+     ,(eq *test-evaluator-mode* :interpret)
+     ,(and (member :slow *features*)
+           t))))
 
 (defun impure-runner (files test-fun log)
   (when files
@@ -656,4 +695,23 @@
   (filter-test-files "*.impure-cload.lisp"))
 
 (defun sh-files ()
-  (filter-test-files "*.test.sh"))
+  (let ((result (filter-test-files "*.test.sh")))
+    #+unix result
+    ;; Rather than hack up the shell scripts which don't pass on #-unix
+    ;; (which would require at least a few lines of shell script and lisp
+    ;; to invoke SBCL and exit with some other code), just confine the kludge
+    ;; to this file.
+    #-unix
+    (if *explicit-test-files*
+        result
+      (remove-if
+       (lambda (x)
+         (member (pathname-name x)
+                 '("filesys.test" ; too many assertions about symlinks to care about just yet
+                   ;; foreign-test-noop-dlclose-test.c:1:10: fatal error: dlfcn.h: No such file or directory
+                   "foreign.test"
+                   ;; No built SBCL here (.../tests/run-sbcl-test-5863): run 'sh make.sh' first!
+                   "run-sbcl.test"
+                   "side-effectful-pathnames.test") ; no idea
+                 :test 'string=))
+        result))))

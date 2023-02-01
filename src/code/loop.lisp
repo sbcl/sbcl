@@ -290,10 +290,10 @@ code to be loaded.
              (:constructor !make-loop-universe)
              (:copier nil)
              (:predicate nil))
-  keywords             ; hash table, value = (fn-name . extra-data)
-  iteration-keywords   ; hash table, value = (fn-name . extra-data)
-  for-keywords         ; hash table, value = (fn-name . extra-data)
-  path-keywords)       ; hash table, value = (fn-name . extra-data)
+  (keywords nil :read-only t)             ; hash table, value = (fn-name . extra-data)
+  (iteration-keywords nil :read-only t)   ; hash table, value = (fn-name . extra-data)
+  (for-keywords nil :read-only t)         ; hash table, value = (fn-name . extra-data)
+  (path-keywords nil :read-only t))       ; hash table, value = (fn-name . extra-data)
 (declaim (sb-ext:freeze-type loop-universe))
 (defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
@@ -1073,11 +1073,11 @@ code to be loaded.
 (defstruct (loop-collector
             (:copier nil)
             (:predicate nil))
-  name
-  class
+  (name nil :read-only t)
+  (class nil :read-only t)
   (history nil)
   (tempvars nil)
-  specified-type
+  (specified-type nil :read-only t)
   dtype
   (data nil)) ;collector-specific data
 (declaim (sb-ext:freeze-type loop-collector))
@@ -1368,7 +1368,7 @@ code to be loaded.
 
 (defun loop-for-across (var val data-type)
   (loop-make-var var nil data-type)
-  (let ((vector-var (sb-xc:gensym "LOOP-ACROSS-VECTOR-"))
+  (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
         (index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
@@ -1650,14 +1650,14 @@ code to be loaded.
             (setq endform (if limit-constantp
                               `',limit-value
                               (loop-make-var
-                                 (sb-xc:gensym "LOOP-LIMIT-") form
+                                 (gensym "LOOP-LIMIT-") form
                                  `(and ,indexv-type real)))))
            (:by
             (multiple-value-setq (form stepby-constantp stepby)
               (loop-constant-fold-if-possible form
                                               `(and ,indexv-type (real (0)))))
             (unless stepby-constantp
-              (loop-make-var (setq stepby (sb-xc:gensym "LOOP-STEP-BY-"))
+              (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
                  form
                  `(and ,indexv-type (real (0)))
                  t)))

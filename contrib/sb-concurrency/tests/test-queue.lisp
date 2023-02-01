@@ -260,3 +260,38 @@
                  (= n cc (1+ c))
                  (= n dc (1+ d)))))))
   t)
+
+;;; I don't remember if funcallable instances with #-immobile-space
+;;; work the way I need them to for this test.
+#+(and sb-thread x86-64 immobile-space)
+(progn
+  (defvar *bigfun*
+    '(lambda (arg)
+      (macrolet ((foo (x)
+                   (sleep .2) ; brute-force the "slow-to-compile" aspect
+                   `(list ,x)))
+        (foo arg)))
+    "A hypothetical function that is slow to compile")
+  (defun test-non-bg-compile ()
+    (let ((f (compile nil *bigfun*)))
+      (sleep .2)
+      (funcall f 'x)))
+  (defun test-bg-compile ()
+    (let ((f (sb-concurrency::promise-compile *bigfun*)))
+      (sleep .2)
+      (funcall f 'x)))
+  (defun seconds-to-call (f label)
+    (let ((before (get-internal-real-time)))
+      (funcall f)
+      (let* ((after (get-internal-real-time))
+             (sec (float (/ (- after before) internal-time-units-per-second))))
+        (format t "~&::: INFO: ~A time = ~F~%" label sec)
+        sec)))
+
+  (test-util:with-test (:name :compilation-queue :skipped-on :sbcl)
+    (when (>= *cpus* 2)
+      ;; serial execution should take at least .2 + .2 sec = .4 sec
+      (assert (>= (seconds-to-call 'test-non-bg-compile "Serial") .39))
+      ;; concurrent execution should take about .2 sec
+      ;; but again leave some wiggle room
+      (assert (<= (seconds-to-call 'test-bg-compile "Parallel") .25)))))

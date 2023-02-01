@@ -9,7 +9,7 @@
  * With gencgc we steal a GC card having generation = 0 so that it
  * won't look like a root page. Optionally, malloc / free can be used
  * for testing a fallback algorithm that works with cheneygc.
- * The fallback is succeptible to deadlock with multiple threads
+ * The fallback is susceptible to deadlock with multiple threads
  * and therefore not suitable for production use.
  * (if a foreign call entails malloc, and malloc potentially acquires a
  * mutex, and the Lisp thread making the foreign call is stopped for GC,
@@ -62,6 +62,7 @@ static void release_pages_impl()
 #else
 
 static page_index_t private_cons_page_chain = -1;
+#define GC_PRIVATE_CONS_GENERATION 6
 
 static struct cons* private_cons_impl()
 {
@@ -72,21 +73,27 @@ static struct cons* private_cons_impl()
     if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_PAGE_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
-        page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
+        page = get_alloc_start_page(PAGE_TYPE_UNBOXED);
         page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
-                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED, 0);
-        // See question about last_page in gc_alloc_large
-        set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);
+                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED,
+                                  GC_PRIVATE_CONS_GENERATION);
+        set_alloc_start_page(PAGE_TYPE_UNBOXED, page);
 
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
-            fprintf(stderr, "GC-private page @ %p\n", page_header);
+            fprintf(stderr, "GC-private page %"PAGE_INDEX_FMT" @ %p\n", page, page_header);
         gc_assert(last_page == page);
         gc_dcheck(page_cards_all_marked_nonsticky(page));
-        page_table[page].gen = 0;
+        page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         page_table[page].type = PAGE_TYPE_UNBOXED;
-        zero_dirty_pages(page, page, 0);
+#ifdef LISP_FEATURE_DARWIN_JIT
+        // UNBOXED pages do not generally required zero-fill.
+        // arm64+Darwin might perform zeroing to alter MMU-based protection.
+        zeroize_pages_if_needed(page, page, PAGE_TYPE_UNBOXED);
+#elif defined LISP_FEATURE_WIN32
+        os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
+#endif
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);
@@ -100,15 +107,16 @@ static struct cons* private_cons_impl()
 
 static void release_pages_impl()
 {
-    struct cons* list;
+    struct cons *list, *next;
     if (private_cons_page_chain >= 0) {
-        for (list = (struct cons*)page_address(private_cons_page_chain) ;
-             list ;
-             list = (struct cons*)list->cdr) {
+          for (list = (struct cons*)page_address(private_cons_page_chain) ;
+               list ; list = next) {
             page_index_t index = find_page_index(list);
+            next = (struct cons*)list->cdr; // read prior to decommitting (if we do that)
             if (PRIVATE_CONS_DEBUG)
                 fprintf(stderr, "Freeing GC-private page @ %p (index %ld)\n",
                         list, (long)index);
+            set_page_need_to_zero(index, 1);
             set_page_bytes_used(index, 0);
             reset_page_flags(index);
         }
@@ -129,12 +137,19 @@ uword_t gc_private_cons(uword_t car, uword_t cdr)
         cons = private_cons_impl();
     cons->car = car;
     cons->cdr = cdr;
+#if PRIVATE_CONS_DEBUG
+    if (cdr) fprintf(stderr, "private_cons(%p,%p)=%p\n", (void*)car, (void*)cdr, cons);
+#endif
     return (uword_t)cons;
 }
 
 /* Push all the conses in 'list' onto the recycle list. */
 void gc_private_free(struct cons* list)
 {
+#if PRIVATE_CONS_DEBUG
+    { int n = 0; struct cons* tail = list; while(tail) ++n, tail = (void*)tail->cdr;
+      if (n>1) fprintf(stderr, "private_free(%p){%d}\n", list, n); }
+#endif
     struct cons* head = list;
     while (list->cdr)
         list = (struct cons*)list->cdr;

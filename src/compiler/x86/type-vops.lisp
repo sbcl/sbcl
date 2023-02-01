@@ -169,6 +169,10 @@
 
 ;;;; other integer ranges
 
+(define-vop (fixnump simple-type-predicate)
+  (:translate fixnump)
+  (:generator 4 (%test-fixnum value nil target not-p)))
+
 (define-vop (fixnump/unsigned-byte-32 simple-type-predicate)
   (:args (value :scs (unsigned-reg)))
   (:info)

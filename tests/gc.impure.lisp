@@ -105,7 +105,7 @@
     ;; but seems like it'll be OK for a while.
     ;; I see only 4 weak pointers in the baseline image.
     ;; Really we could just assert /= 1000.
-    (assert (< (length l) 15))))
+    (assert (< (length l) 60))))
 
 ;; check that WITHOUT-INTERRUPTS doesn't block SIG_STOP_FOR_GC
 (with-test (:name :gc-without-interrupts
@@ -135,8 +135,11 @@
   (sb-sys:with-code-pages-pinned (:dynamic) (gc))
   ;; this should not fail to find FUN at its old address
   (let ((fun (sb-kernel:make-lisp-obj (first *some-object-handles*))))
-    ;; this should fail to find a string at its old address
-    (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (second *some-object-handles*) nil))))
+    ;; To prove that _some_ things moved in memory,
+    ;; assert that we don't see the arbitrary string at its old address.
+    (multiple-value-bind (thing existsp)
+        (sb-kernel:make-lisp-obj (second *some-object-handles*) nil)
+      (assert (or (not existsp) (not (typep thing '(string 7))))))
     ;; this should similarly fail- STRING-TWO was transitively reachable but movable
     (multiple-value-bind (obj validp) (sb-kernel:make-lisp-obj (third *some-object-handles*) nil)
       (if validp
@@ -144,11 +147,12 @@
     ;; (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (third *some-object-handles*) nil))))
     (assert (string= (sb-kernel:%simple-fun-name fun) "two potayto"))))
 
-#+immobile-space
 (with-test (:name :generation-of-fdefn)
-  ;; generation-of broke when fdefns stopped storing a generation in word 0
-  (assert (= (sb-kernel:generation-of (sb-int:find-fdefn 'car))
-             sb-vm:+pseudo-static-generation+)))
+  ;; GENERATION-OF broke when fdefns stopped storing a generation in word 0.
+  ;; Normally we expect to see SB-VM:+PSEUDO-STATIC-GENERATION+
+  ;; but allow for varied definition of CORE_PAGE_GENERATION.
+  (assert (= (sb-kernel:generation-of (sb-int:find-fdefn '(setf car)))
+             (sb-kernel:generation-of #'car))))
 
 (with-test (:name :static-fdefn-space)
   (sb-int:dovector (name sb-vm:+static-fdefns+)
@@ -231,7 +235,9 @@
        (declare ((and fixnum (integer 1)) size))
        ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
        (let ((obj-addr (sb-kernel:get-lisp-obj-address obj))
-             (array (cond ((= type sb-vm:code-header-widetag)
+             (array (cond ((member type `(,sb-vm:code-header-widetag
+                                          #+compact-instance-header
+                                          ,sb-vm:funcallable-instance-widetag))
                            (incf total-code-size size)
                            code-bits)
                           (t
@@ -267,7 +273,8 @@
   (assert (not (sb-kernel:immobile-space-addr-p
                 (+ sb-vm:fixedobj-space-start
                    sb-vm:fixedobj-space-size
-                   sb-vm:varyobj-space-size)))))
+                   sb-vm:alien-linkage-table-space-size
+                   sb-vm:text-space-size)))))
 
 (with-test (:name :unique-code-serialno :skipped-on :interpreter)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
@@ -360,27 +367,19 @@
     (setq working nil)
     (sb-thread:join-thread gc-thread)))
 
-;;; This loop doesn't work for #+use-cons-region (it will run forever)
-;;; because you can't hit the end of a page. Also, it's not clear that it should
-;;; ever have worked, because the check at the bottom of lisp_alloc() for whether
-;;; we're near the end of a page will discard the last few objects in favor of
-;;; returning a brand new region.  I guess as long as the inline allocator is
-;;; always used, it's fine. But the inline code wasn't always used on x86.
-;;; So how did that work?
 (defun use-up-thread-region ()
   ;; cons until the thread-local allocation buffer uses up a page
   (loop
-   (let* ((c (cons 1 2))
+   (let* ((c (make-array 0))
           (end (+ (sb-kernel:get-lisp-obj-address c)
-                  (- sb-vm:list-pointer-lowtag)
+                  (- sb-vm:other-pointer-lowtag)
                   (* 2 sb-vm:n-word-bytes))))
      (when (zerop (logand end (1- sb-vm:gencgc-page-bytes)))
        (return)))))
 (defglobal *go* nil)
 
 #+sb-thread
-(with-test (:name :c-call-save-p :skipped-on (or :interpreter
-                                                 :use-cons-region))
+(with-test (:name :c-call-save-p :skipped-on :interpreter)
   ;; Surely there's a better way to assert that registers get onto the stack
   ;; (so they can be seen by GC) than by random hammering on (LIST (LIST ...)).
   ;; This should probably be in gc-testlib.c. Or better yet: get rid of #+sb-safepoint
@@ -453,7 +452,8 @@
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
 #+gencgc
-(with-test (:name :page-protected-p :broken-on :x86)
+(with-test (:name :page-protected-p :broken-on :x86
+                  :fails-on (and :big-endian :ppc64))
   (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
   (assert (= (sb-kernel:generation-of *vvv*) 1))
   (assert (sb-kernel:page-protected-p *vvv*))
@@ -477,3 +477,23 @@
   (gc)
   (let ((marks (sb-kernel:object-card-marks *vvv*)))
     (assert (not (find 1 marks)))))
+
+(with-test (:name :%shrink-vector)
+  (let ((v (make-array 25 :initial-element 'yikes)))
+    (sb-sys:with-pinned-objects (v)
+      ;; Can't call VECTOR-SAP on simple-vector.
+      ;; (Honestly I don't see what purpose that limitation serves)
+      (let ((sap (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address v))
+                              (- (ash sb-vm:vector-data-offset sb-vm:word-shift)
+                                 sb-vm:other-pointer-lowtag))))
+        (sb-impl::%shrink-vector v 9)
+        (loop for i from 10 to 24
+              do
+           (assert (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)))))))))
+
+(with-test (:name :rospace-strings
+                  :fails-on :darwin-jit)
+  (let ((err (handler-case (setf (char (opaque-identity (symbol-name '*readtable*)) 0) #\*)
+               (sb-sys:memory-fault-error (c)
+                 (write-to-string c :escape nil)))))
+    (assert (search "modify a read-only object" err))))

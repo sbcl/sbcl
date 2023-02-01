@@ -31,7 +31,7 @@
 
 #define GENCGC_PAGE_WORDS (GENCGC_PAGE_BYTES/N_WORD_BYTES)
 extern char *page_address(page_index_t);
-int gencgc_handle_wp_violation(void *);
+int gencgc_handle_wp_violation(void*, void*);
 
 
 #if N_WORD_BITS == 64
@@ -48,15 +48,21 @@ int gencgc_handle_wp_violation(void *);
 # define CONDENSED_PAGE_TABLE 0
 #endif
 
-#if GENCGC_PAGE_WORDS > USHRT_MAX
-# if GENCGC_PAGE_WORDS > UINT_MAX
+/* One bit of page_words_t is the need_zerofill flag.
+ * That leaves 15 bits to store page_words_used. This can represent
+ * a page size of up to 64KiB on 32-bit and 128KiB on 64-bit.
+ * Note that since the allocation quantum is actually 2 words
+ * the words_used is always an even number, and so technically
+ * we could store as "dualwords used" to achieve double the range */
+#if GENCGC_PAGE_WORDS > 32767
 #   error "GENCGC_PAGE_WORDS unexpectedly large."
-# else
-    typedef unsigned int page_words_t;
-# endif
-#else
-  typedef unsigned short page_words_t;
 #endif
+typedef unsigned short page_words_t;
+
+// The flags control the behavior of sync_close_regions()
+#define LOCK_PAGE_TABLE 1
+#define LOCK_CODE_ALLOCATOR 2
+#define CONSUME_REMAINDER 4
 
 /* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following
@@ -80,6 +86,7 @@ int gencgc_handle_wp_violation(void *);
 #define PAGE_TYPE_SMALL_MIXED  4 // #b100
 #define PAGE_TYPE_CONS         5 // #b101
 #define PAGE_TYPE_CODE         7 // #b111
+#define THREAD_PAGE_FLAG       8
 #define SINGLE_OBJECT_FLAG    16
 #define OPEN_REGION_PAGE_FLAG 32
 #define FREE_PAGE_FLAG        0
@@ -113,14 +120,22 @@ struct page {
 
     /* the number of lispwords of this page that are used. This may be less
      * than the usage at an instant in time for pages within the current
-     * allocation regions. MUST be 0 for unallocated pages.
-     */
-    page_words_t words_used_;
+     * allocation regions. The 0th bit of the physical uint16 indicates
+     * that the page needs to be zero-filled for the next use.
+     * Let the C compiler figure it out, so we can't get it wrong in C.
+     * But we need to reverse the order of the packed fields depending on
+     * endianness so that the Lisp side is easier to understand */
+#ifdef LISP_FEATURE_BIG_ENDIAN
+    page_words_t words_used_   : 15;
+    page_words_t need_zerofill :  1;
+#else
+    page_words_t need_zerofill :  1;
+    page_words_t words_used_   : 15;
+#endif
 
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
     // and WALK-DYNAMIC-SPACE.
-    unsigned char
         /*
          * The 4 low bits of 'type' are defined by PAGE_TYPE_x constants.
          *  0000 free
@@ -128,16 +143,12 @@ struct page {
          *  ?010 strictly unboxed data
          *  ?011 mixed boxed/unboxed non-code objects
          *  ?111 code
-         * The next two bits are SINGLE_OBJECT and OPEN_REGION */
-        type :6,
-        /* Whether the page was used at all. This is the only bit that can
-         * be 1 on a free page */
-        need_zerofill :1,
-        /* If this page should not be moved during a GC then this flag
-         * is set. It's only valid during a GC for allocated pages,
-         * and only meaningful for pages in the condemned set.
-         * (It can be spuriously 1 on a page in any generation) */
-        pinned :1;
+         * The next two bits are SINGLE_OBJECT and OPEN_REGION.
+         * The top two can be used for segregating objects by widetag
+         * which will important once we have "destructors" to run for a
+         * for a category of object, such as SYMBOL, hypothetically for
+         * recycling TLS indices or something like that. */
+    unsigned char type;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
@@ -269,8 +280,7 @@ static inline void gc_init_region(struct alloc_region *region)
 
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
-static inline page_index_t
-find_page_index(void *addr)
+static inline page_index_t find_page_index(void *addr)
 {
     if (addr >= (void*)DYNAMIC_SPACE_START) {
         page_index_t index = ((uintptr_t)addr -
@@ -283,22 +293,34 @@ find_page_index(void *addr)
 
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
+extern unsigned char* gc_page_pins;
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     // Single-object pages can be pinned, but the object doesn't go
-    // in the hashtable. I'm a little surprised that the return value
-    // should be 0 in such case, but I think this never gets called
-    // on large objects because they've all been "moved" to newspace
-    // by adjusting the page table. Perhaps this should do:
-    //   gc_assert(!page_single_obj_p(page))
-    if (!page_table[page].pinned || page_single_obj_p(page)) return 0;
+    // in the hashtable. pinned_p can be queried on those pages,
+    // but the answer is always 'No', because if pinned, the page would
+    // already have had its generation changed to newspace.
+    if (page_single_obj_p(page)) return 0;
+
 #ifdef RETURN_PC_WIDETAG
-    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG)
+    // Yet another complication from the despised LRA objects- with the
+    // refinement of 8 pin bits per page, we either must set all possible bits
+    // for a simple-fun, or map LRAs to the code base address.
+    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
+        // The hash-table stores tagged pointers.
         obj = make_lispobj(fun_code_header(native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
+        page = find_page_index((void*)obj);
+    }
 #endif
-    return hopscotch_containsp(&pinned_objects, obj);
+
+    unsigned char pins = gc_page_pins[page];
+    if (!pins) return 0;
+    unsigned addr_lowpart = obj & (GENCGC_PAGE_BYTES-1);
+    // Divide the page into 8 parts, see whether that part is pinned.
+    unsigned subpage = addr_lowpart / (GENCGC_PAGE_BYTES/8);
+    return (pins & (1<<subpage)) && hopscotch_containsp(&pinned_objects, obj);
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
@@ -309,20 +331,23 @@ from_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0
-        && page_table[page_index].gen == from_space
-        && !pinned_p(obj, page_index);
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == from_space && !pinned_p(obj, page_index);
 }
 
 static boolean __attribute__((unused)) new_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0 && page_table[page_index].gen == new_space;
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == new_space;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-struct fixedobj_page { // 12 bytes per page
+struct fixedobj_page { // 8 bytes per page
+    unsigned int free_index; // index is in bytes. 4 bytes
     union immobile_page_attr {
       int packed;
       struct {
@@ -333,10 +358,6 @@ struct fixedobj_page { // 12 bytes per page
         unsigned char gens_; // a bitmap
       } parts;
     } attr;
-    int free_index; // index is in bytes. 4 bytes
-    short int prior_gc_free_word_index; // index is in words. 2 bytes
-    /* page index of next page with same attributes */
-    short int page_link; // 2 bytes
 };
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)

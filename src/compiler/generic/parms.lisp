@@ -37,6 +37,9 @@
               (* number mult))))))
   #-sb-xc-host (symbol-value 'default-dynamic-space-size))
 
+;; By happenstance this is the same as small-space-size.
+(defconstant alien-linkage-table-space-size #x100000)
+
 #+gencgc
 ;; Define START/END constants for GENCGC spaces.
 ;; Assumptions:
@@ -63,10 +66,12 @@
                ;; And of course, don't use them if unsupported.
                ((:fixedobj-space-start fixedobj-space-start*))
                ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
-               ((:varyobj-space-start  varyobj-space-start*))
-               ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
+               ((:text-space-start text-space-start*))
+               ((:text-space-size  text-space-size*) (* 104 1024 1024))
                (small-space-size #x100000)
-               ((:read-only-space-size ro-space-size) small-space-size))
+               ((:read-only-space-size ro-space-size)
+                #+darwin-jit small-space-size
+                #-darwin-jit 0))
   (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
   (flet ((defconstantish (relocatable symbol value)
            (if (not relocatable) ; easy case
@@ -81,7 +86,7 @@
         ((spaces (append `((read-only ,ro-space-size)
                            #+(and win32 x86-64)
                            (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
-                           (linkage-table ,small-space-size)
+                           #-immobile-space (alien-linkage-table ,alien-linkage-table-space-size)
                            #+sb-safepoint
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
@@ -90,16 +95,17 @@
                            (static-code ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
-                           (varyobj ,varyobj-space-size*))))
+                           (alien-linkage-table ,alien-linkage-table-space-size)
+                           (text ,text-space-size*))))
          (ptr small-spaces-start)
          (small-space-forms
            (loop for (space size var-name) in spaces
                  appending
                  (let* ((relocatable
-                          ;; TODO: linkage-table could move with code, if the CPU
-                          ;; prefers PC-relative jumps, and we emit better code
-                          ;; (which we don't- for x86 we jmp via RBX always)
-                          (member space '(fixedobj varyobj)))
+                          ;; READONLY is usually movable now.
+                          (member space '(fixedobj text
+                                          #+immobile-space alien-linkage-table
+                                          #-darwin-jit read-only)))
                         (start ptr)
                         (end (+ ptr size)))
                    (setf ptr end)
@@ -109,14 +115,15 @@
                          ;; Allow expressly given addresses / sizes for immobile space.
                          ;; The addresses are for testing only - you should not need them.
                          (case space
-                           (varyobj  (setq start (or varyobj-space-start* start)
-                                           end (+ start varyobj-space-size*)))
+                           (text (setq start (or text-space-start* start)
+                                       end (+ start text-space-size*)))
                            (fixedobj (setq start (or fixedobj-space-start* start)
                                            end (+ start fixedobj-space-size*))))
                          `(,(defconstantish relocatable start-sym start)
-                           ,(cond ((not relocatable)
+                           ,(cond ((eq space 'alien-linkage-table)) ; nothing for the -END
+                                  ((not relocatable)
                                    `(defconstant ,(symbolicate space "-SPACE-END") ,end))
-                                  #-sb-xc-host ((eq space 'varyobj)) ; don't emit anything
+                                  #-sb-xc-host ((eq space 'text)) ; don't emit anything
                                   (t
                                    `(defconstant ,(symbolicate space "-SPACE-SIZE")
                                       ,(- end start)))))))))))
@@ -132,6 +139,9 @@
                (ecase n-word-bits
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
+         ;; an arbitrary value to avoid kludging genesis
+         #+(and sb-xc-host (not darwin-jit))
+         (defparameter read-only-space-end read-only-space-start)
          #-soft-card-marks (defconstant cards-per-page 1)
          (defconstant gencgc-card-bytes (/ gencgc-page-bytes cards-per-page))
          (defconstant gencgc-card-shift
@@ -208,8 +218,13 @@
     ,@'(*current-catch-block*
         *current-unwind-protect-block*)
 
-    #+immobile-space *immobile-freelist* ; not per-thread (yet...)
     #+metaspace *metaspace-tracts*
+    *immobile-codeblob-tree* ; for generations 0 through 5 inclusive
+    *immobile-codeblob-vector* ; for pseudo-static-generation
+    *dynspace-codeblob-tree*
+    sb-impl::**finalizer-store**
+    sb-impl::*finalizer-rehashlist*
+    sb-impl::*finalizers-triggered*
 
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread
@@ -219,7 +234,8 @@
     #-sb-thread *stepping*
 
     ;; threading support
-    #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
+    #+sb-thread sb-thread::*starting-threads*
+    *free-tls-index* ; always exists for benefit of C runtime
 
     ;; runtime linking of lisp->C calls (regardless of whether
     ;; the C function is in a dynamic shared object or not)
@@ -237,6 +253,75 @@
      %%data-vector-reffers/check-bounds%%
      %%data-vector-setters%%
      %%data-vector-setters/check-bounds%%))
+  #'equalp)
+
+;;; Each backend must provide some 2-argument math routines as hand-written lisp
+;;; assembly. Those routines punt to a lisp function for anything more complicated
+;;; than fixnum inputs. To call lisp the general function, we need a fixed address
+;;; holding its entry point, namely the static-fdefn. While we do allow boxed constants
+;;; in the assembly code header now, it's not general enough for calling.
+;;;
+;;; Additionally, in the distant-but-memorable past there were things known
+;;; as "static functions" which were essentially just vops that translated a few
+;;; important functions such as LENGTH and %COERCE-CALLABLE-TO-FUN.
+;;; (Surprisingly, LCM and GCD were deemed important enough to merit special status)
+;;; The main purpose of a static function was to call it without reference to
+;;; an #<fdefn>. But those "static functions" were unusual in that they bypassed
+;;; the normal call convention. They were all deleted in the following change series:
+;;;      d65b9573423610589319889a0eeb31c5501862bf Remove define-static-fun on MIPS.
+;;;      f39d1846e90ed20cd529ce2fb701de9ad0293f59 Remove define-static-fun on SPARC.
+;;;      1c190e01a08481440c420c7bb8db5c1800775c01 Remove define-static-fun on ARM.
+;;;      87ae85c665aa1d6c710293632bee495619e5ed62 Remove define-static-fun on PPC.
+;;;      e3c05bb0b955ef41c3b920d151606f195d17d89e Remove define-static-fun on x86.
+;;;      eb210dc031710a35b0ef4f39b775e7960f710790 Remove define-static-fun on ARM64.
+;;;      a8e9e678fb8ef2777d45afb1a8cce93277d44df6 Get rid of define-static-fun on x86-64.
+;;; The corresponding static-fdefns should have been deleted with them.
+;;;
+;;; However, it is still true that some functions are of such importance
+;;; that calling them with 1 fewer instruction and 1 fewer code header constant
+;;; yields measurable space savings. e.g. TWO-ARG-LCM had almost no callers
+;;; so there's no reason to think it's important.
+#|
+(let ((table (make-hash-table)))
+  (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+    (multiple-value-bind (start count) (sb-kernel:code-header-fdefn-range c)
+      (loop for i from start repeat count
+            do (let ((const (sb-kernel:code-header-ref c i)))
+                 (incf (gethash const table 0))))))
+  (dolist (x (sort (sb-int:%hash-table-alist table) #'> :key #'cdr))
+    (format t "~5d ~s~%" (cdr x) (car x))))
+|#
+
+(defconstant-eqx common-static-fdefns
+    '(;; This the standard set of assembly routines that need to call into lisp.
+      ;; A few backends add TWO-ARG-/= and others to this, in their {arch}/parms
+      two-arg-+
+      two-arg--
+      two-arg-*
+      two-arg-/
+      two-arg-<
+      two-arg->
+      two-arg-=
+      eql
+      %negate
+      ;; These next ones are not called from assembly code, but from lisp.
+      length
+      error
+      format
+      equalp
+      sb-c::check-ds-list
+      sb-c::check-ds-list/&rest
+      write-string
+      write-char
+      princ
+      ;; A scientific but cursory examination of one particular application
+      ;; revealed that the most popular functions to be referenced from any other
+      ;; are the hairy vector accessors. Those two alone accounted for 18% of all
+      ;; fdefn pointers in the core. A couple others were high on the list as well.
+      hairy-data-vector-set
+      hairy-data-vector-ref
+      %ldb
+      sb-kernel:vector-unsigned-byte-8-p)
   #'equalp)
 
 ;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about

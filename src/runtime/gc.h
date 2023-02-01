@@ -66,7 +66,6 @@ extern os_vm_size_t bytes_consed_between_gcs;
  * lisp signal handler array, or other similar array */
 #define VERIFYING_UNFORMATTED 512
 
-#ifdef LISP_FEATURE_GENCGC
 #define MAX_ERR_OBJS 5
 struct verify_state {
     lispobj* object_addr;
@@ -78,11 +77,11 @@ struct verify_state {
     lispobj err_objs[5];
 };
 void hexdump_spaces(struct verify_state*, char *reason);
-int verify_heap(int flags);
-int hexdump_and_verify_heap(int flags);
-#endif
+int verify_heap(lispobj*, int flags);
+int hexdump_and_verify_heap(lispobj*, int flags);
 
 page_index_t gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
                                    int page_type, generation_index_t gen);
 
+extern void tlsf_dump_pool(void*, void*, char *pathname);
 #endif /* _GC_H_ */

@@ -11,24 +11,21 @@
 
 (in-package "SB-UNICODE")
 
-(defconstant-eqx +special-numerics+
-    #.(sb-cold:read-from-file "output/numerics.lisp-expr")
-    #'equalp)
-
-(sb-ext:define-load-time-global **proplist-properties**
-    (let* ((list '#.(sb-cold:read-from-file "output/misc-properties.lisp-expr"))
-           (hash (make-hash-table :size (length list))))
-      (loop for (symbol ranges) on list by #'cddr
-            do (setf (gethash symbol hash)
-                     (coerce ranges '(vector (unsigned-byte 32)))))
-      hash))
+(eval-when (:compile-toplevel)
+  (defun plist-to-alist (list)
+    (loop for (key value) on list by #'cddr collect (cons key value))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *proplist-properties*
+    (mapcar (lambda (x) (cons (car x) (sb-xc:coerce (cdr x) '(vector (unsigned-byte 32)))))
+            '#.(plist-to-alist (sb-cold:read-from-file "output/misc-properties.lisp-expr")))))
 
 (sb-ext:define-load-time-global **confusables**
-    (let* ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr"))
-           (hash (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))))
-      (loop for (source . target) in data
+    (let ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr")))
+      (sb-impl::%stuff-hash-table
+        (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))
+        (loop for (source . target) in data
             when (and #-sb-unicode (< source char-code-limit))
-            do (flet ((minimize (x)
+            collect (flet ((minimize (x)
                         (case (length x)
                           (1
                            (elt x 0))
@@ -39,14 +36,15 @@
                           (t
                            (logically-readonlyize
                             (possibly-base-stringize (map 'string #'code-char x)))))))
-                 (setf (gethash (code-char source) hash) (minimize target))))
-      hash))
+                      (cons (code-char source) (minimize target))))
+        t)))
 
 (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-    (let* ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr"))
-           (hash (make-hash-table :test #'eq :size (length list))))
-      (loop for (k v) in list do (setf (gethash k hash) v))
-      hash))
+    (let ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
+      (sb-impl::%stuff-hash-table
+       (make-hash-table :test #'eq :size (length list))
+       (loop for (k v) in list collect (cons k v))
+       t)))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
@@ -96,8 +94,19 @@
   "Returns T if CHARACTER has the specified PROPERTY.
 PROPERTY is a keyword representing one of the properties from PropList.txt,
 with underscores replaced by dashes."
-  (ordered-ranges-member (char-code character)
-                         (gethash property **proplist-properties**)))
+  (macrolet ((get-ub32-vector ()
+               ;; This ECASE gets optimized into parallel arrays,
+               ;; and does not depend on jump tables
+               `(ecase property ,@(mapcar (lambda (x) (list (car x) (cdr x)))
+                                          *proplist-properties*))))
+    (ordered-ranges-member (char-code character) (get-ub32-vector))))
+
+(define-compiler-macro proplist-p (&whole form character property)
+  (if (keywordp property)
+      `(ordered-ranges-member (char-code ,character)
+                              ,(or (cdr (assoc property *proplist-properties*))
+                                   (error "No such property ~S" property)))
+      form))
 
 (eval-when (:compile-toplevel)
   (defvar *slurped-random-constants*
@@ -158,7 +167,16 @@ that have a digit value but no decimal digit value"
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (double-vector-binary-search (char-code character) +special-numerics+)
+  (or (gethash character
+               (load-time-value
+                (let ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr")))
+                  (sb-impl::%stuff-hash-table
+                   (make-hash-table :test #'eq :size (length list))
+                   (loop for (k . v) in list
+                         when (< k char-code-limit)
+                         collect (cons (code-char k) v))
+                   t))
+                t))
       (digit-value character)))
 
 (defun mirrored-p (character)
@@ -242,8 +260,8 @@ If the character is not a Hangul syllable or Jamo, returns NIL"
 (defun line-break-class (character &key resolve)
   "Returns the line breaking class of CHARACTER, as specified in UAX #14.
 If :RESOLVE is NIL, returns the character class found in the property file.
-If :RESOLVE is non-NIL, centain line-breaking classes will be mapped to othec
-classes as specified in the applicable standards. Addinionally, if :RESOLVE
+If :RESOLVE is non-NIL, certain line-breaking classes will be mapped to other
+classes as specified in the applicable standards. Additionally, if :RESOLVE
 is :EAST-ASIAN, Ambigious (class :AI) characters will be mapped to the
 Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (listp character)) (setf character (car character)))
@@ -260,9 +278,9 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
     (when resolve
       (setf raw-class
             (case raw-class
-              (:ai (if (eql resolve :east-asion) :ID :AL))
+              (:ai (if (eql resolve :east-asian) :ID :AL))
               ; If we see :CM when resolving, we have a CM that isn't subject
-              ; to LB9, so we do LB10
+              ; to LB9, so we do LB10 (:ZWJ handled in LINE-BREAK-ANNOTATE)
               ((:xx :cm) :al)
               (:sa (if (member (general-category character) '(:Mn :Mc))
                        :CM :AL))
@@ -435,8 +453,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
       (nreverse chars))))
 
 (defun primary-composition (char1 char2)
-  (flet ((maybe (fn x) (when x (funcall fn x)))
-         (composition-hangul-syllable-type (cp)
+  (flet ((composition-hangul-syllable-type (cp)
            (cond
              ((and (<= #x1100 cp) (<= cp #x1112)) :L)
              ((and (<= #x1161 cp) (<= cp #x1175)) :V)
@@ -446,19 +463,25 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (declare (inline composition-hangul-syllable-type))
     (let ((c1 (char-code char1))
           (c2 (char-code char2)))
-      (maybe
-       #'code-char
        (cond
          ((gethash (dpb c1 (byte 21 21) c2)
-                   **character-primary-compositions**))
+                   (load-time-value
+                    (let ((data '#.(sb-cold:read-from-file "output/comp.lisp-expr")))
+                      (sb-impl::%stuff-hash-table
+                       (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
+                       (loop for pair across data
+                             when (< (cdr pair) char-code-limit) ; Why is this even defined if #-sb-unicode?
+                             collect (cons (car pair) (code-char (cdr pair))))
+                       t))
+                    t)))
          ((and (eql (composition-hangul-syllable-type c1) :L)
                (eql (composition-hangul-syllable-type c2) :V))
           (let ((lindex (- c1 #x1100))
                 (vindex (- c2 #x1161)))
-            (+ #xac00 (* lindex 588) (* vindex 28))))
+            (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
          ((and (eql (composition-hangul-syllable-type c1) :LV)
                (eql (composition-hangul-syllable-type c2) :T))
-          (+ c1 (- c2 #x11a7))))))))
+          (code-char (+ c1 (- c2 #x11a7))))))))
 
 (defun canonically-compose (list)
   (let* ((result list)
@@ -769,10 +792,70 @@ The result is not guaranteed to have the same length as the input."
 ;;; In all the breaking methods:
 ;;; (brk) establishes a break between `first` and `second`
 ;;; (nobrk) prevents a break between `first` and `second`
-;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `htird`
+;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `third`
 
-;; Word breaking sets this to make their algorithms less tricky
-(defvar *other-break-special-graphemes* nil)
+;;; Unicode 9.0-10.0 only: obsoleted in 11.0
+(defun emoji-grapheme-break-class (char)
+  (let ((code (char-code char))
+        (e-base
+          #(#x261D
+            #x26F9
+            #x270A #x270B #x270C #x270D
+            #x1F385
+            #x1F3C2 #x1F3C3 #x1F3C4
+            #x1F3C7
+            #x1F3CA #x1F3CB #x1F3CC
+            #x1F442 #x1F443
+            #x1F446 #x1F447 #x1F448 #x1F449 #x1F44A #x1F44B #x1F44C #x1F44D #x1F44E #x1F44F #x1F450
+            #x1F46E
+            #x1F470 #x1F471 #x1F472 #x1F473 #x1F474 #x1F475 #x1F476 #x1F477 #x1F478
+            #x1F47C
+            #x1F481 #x1F482 #x1F483
+            #x1F485 #x1F486 #x1F487
+            #x1F4AA
+            #x1F574 #x1F575
+            #x1F57A
+            #x1F590
+            #x1F595 #x1F596
+            #x1F645 #x1F646 #x1F647
+            #x1F64B #x1F64C #x1F64D #x1F64E #x1F64F
+            #x1F6A3
+            #x1F6B4 #x1F6B5 #x1F6B6
+            #x1F6C0
+            #x1F6CC
+            #x1F918 #x1F919 #x1F91A #x1F91B #x1F91C
+            #x1F91E #x1F91F
+            #x1F926
+            #x1F930 #x1F931 #x1F932 #x1F933 #x1F934 #x1F935 #x1F936 #x1F937 #x1F938 #x1F939
+            #x1F93D #x1F93E
+            #x1F9D1 #x1F9D2 #x1F9D3 #x1F9D4 #x1F9D5 #x1F9D6 #x1F9D7 #x1F9D8 #x1F9D9 #x1F9DA #x1F9DB #x1F9DC #x1F9DD))
+        (glue-after-zwj
+          #(#x2640
+            #x2642
+            #x2695 #x2696
+            #x2708
+            #x2764
+            #x1F308
+            #x1F33E
+            #x1F373
+            #x1F393
+            #x1F3A4
+            #x1F3A8
+            #x1F3EB
+            #x1F3ED
+            #x1F48B
+            #x1F4BB #x1F4BC
+            #x1F527
+            #x1F52C
+            #x1F5E8
+            #x1F680
+            #x1F692)))
+    (cond
+      ((binary-search code e-base) :e-base)
+      ((<= #x1F3FB code #x1F3FF) :e-modifier)
+      ((binary-search code glue-after-zwj) :glue-after-zwj)
+      ((<= #x1F466 code #x1F469) :e-base-gaz))))
+
 (defun grapheme-break-class (char)
   "Returns the grapheme breaking class of CHARACTER, as specified in UAX #29."
   (let ((cp (when char (char-code char)))
@@ -787,36 +870,53 @@ The result is not guaranteed to have the same length as the input."
       ((not char) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
-      ((or (member gc '(:Mn :Me))
-           (proplist-p char :other-grapheme-extend)
-           (and *other-break-special-graphemes*
-                (member gc '(:Mc :Cf)) (not (<= #x200B cp #x200D))))
-       :extend)
-      ((or (member gc '(:Zl :Zp :Cc :Cs :Cf))
+      ((or (and (member gc '(:Zl :Zp :Cc :Cs :Cf))
+                (not (proplist-p char :prepended-concatenation-mark))
+                (not (<= #x200C cp #x200D))
+                ;; not documented but in the normative file
+                (not (<= #xE0020 cp #xE007F)))
            ;; From Cn and Default_Ignorable_Code_Point
            (eql cp #x2065) (eql cp #xE0000)
            (<= #xFFF0 cp #xFFF8)
            (<= #xE0002 cp #xE001F)
            (<= #xE0080 cp #xE00FF)
            (<= #xE01F0 cp #xE0FFF)) :control)
+      ((or (member gc '(:Mn :Me))
+           (proplist-p char :other-grapheme-extend))
+       :extend)
+      ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
+      ((or
+        ;; Consonant_Preceding_Repha
+        (= cp #x0D4E) (= cp #x11941) (= cp #x11D46)
+        ;; Consonant_Prefixed
+        (<= #x111C2 cp #x111C3) (= cp #x1193F) (= cp #x11A3A) (<= #x11A84 cp #x11A89)
+        (proplist-p char :prepended-concatenation-mark))
+       :prepend)
       ((and (or (eql gc :Mc)
                 (eql cp #x0E33) (eql cp #x0EB3))
             (not (binary-search cp not-spacing-mark))) :spacing-mark)
-      (t (hangul-syllable-type char)))))
+      ((hangul-syllable-type char))
+      ((emoji-grapheme-break-class char)))))
 
 (macrolet ((def (name extendedp)
              `(defun ,name (function string)
-                (do ((length (length string))
-                     (start 0)
-                     (end 1 (1+ end))
-                     (c1 nil)
-                     (c2 (and (> (length string) 0) (grapheme-break-class (char string 0)))))
-                    ((>= end length)
-                     (if (= end length) (progn (funcall function string start end) nil)))
+                (do* ((length (length string))
+                      (start 0)
+                      (end 1 (1+ end))
+                      (c1 nil)
+                      (c2 (and (> (length string) 0) (grapheme-break-class (char string 0))))
+                      (emoji-modifier-sequence-p nil)
+                      (nri (if (eql c2 :regional-indicator) 1 0)))
+                     ((>= end length)
+                      (if (= end length) (progn (funcall function string start end) nil)))
                   (flet ((brk () (funcall function string start end) (setf start end)))
                     (declare (truly-dynamic-extent #'brk))
                     (shiftf c1 c2 (grapheme-break-class (char string end)))
+                    (if (eql c2 :regional-indicator) (incf nri) (setf nri 0))
+                    (setf emoji-modifier-sequence-p
+                          (or (member c1 '(:e-base :e-base-gaz))
+                              (and emoji-modifier-sequence-p (eql c1 :extend))))
                     (cond
                       ((and (eql c1 :cr) (eql c2 :lf)))
                       ((or (member c1 '(:control :cr :lf))
@@ -826,10 +926,12 @@ The result is not guaranteed to have the same length as the input."
                            (and (or (eql c1 :v) (eql c1 :lv))
                                 (or (eql c2 :v) (eql c2 :t)))
                            (and (eql c2 :t) (or (eql c1 :lvt) (eql c1 :t)))))
-                      ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator)))
-                      ((eql c2 :extend))
+                      ((member c2 '(:extend :zwj)))
                       ,@(when extendedp
-                              `(((or (eql c2 :spacing-mark) (eql c1 :prepend)))))
+                          `(((or (eql c2 :spacing-mark) (eql c1 :prepend)))))
+                      ((and emoji-modifier-sequence-p (eql c2 :e-modifier)))
+                      ((and (eql c1 :zwj) (member c2 '(:glue-after-zwj :e-base-gaz))))
+                      ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator) (evenp nri)))
                       (t (brk))))))))
   (def map-legacy-grapheme-boundaries nil)
   (def map-grapheme-boundaries t))
@@ -865,6 +967,11 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
           #(#x3031 #x3035 #x309B #x309C
             #x30A0 #x30A0 #x30FC #x30FC
             #xFF70 #xFF70)))
+        (also-aletter
+         #(#x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
+           #x02DE #x02DF #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
+           #x02F6 #x02F7 #x02F8 #x02F9 #x02FA #x02FB #x02FC #x02FD #x02FE #x02FF
+           #x05F3 #xA720 #xA721 #xA789 #xA78A #xAB5B))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
          #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
@@ -876,26 +983,28 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
       ((not char) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
-      ((= cp #x27) :single-quote)
-      ((= cp #x22) :double-quote)
       ((ordered-ranges-member cp newlines) :newline)
       ((or (eql (grapheme-break-class char) :extend)
-           (eql gc :mc)) :extend)
+           (and (eql gc :mc) (not (= cp #x200D)))) :extend)
+      ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
       ((and (eql gc :Cf) (not (<= #x200B cp #x200D))) :format)
       ((or (eql (script char) :katakana)
            (ordered-ranges-member cp also-katakana)) :katakana)
       ((and (eql (script char) :Hebrew) (eql gc :lo)) :hebrew-letter)
-      ((and (or (alphabetic-p char) (= cp #x05F3))
+      ((and (or (alphabetic-p char) (binary-search cp also-aletter))
             (not (or (ideographic-p char)
                      (eql (line-break-class char) :sa)
                      (eql (script char) :hiragana)))) :aletter)
+      ((= cp #x27) :single-quote)
+      ((= cp #x22) :double-quote)
       ((binary-search cp midnumlet) :midnumlet)
       ((binary-search cp midletter) :midletter)
       ((binary-search cp midnum) :midnum)
       ((or (and (eql gc :Nd) (not (<= #xFF10 cp #xFF19))) ;Fullwidth digits
            (eql cp #x066B)) :numeric)
-      ((eql gc :Pc) :extendnumlet)
+      ((or (eql gc :Pc) (= cp #x202F)) :extendnumlet)
+      ((emoji-grapheme-break-class char))
       (t nil))))
 
 (defmacro flatpush (thing list)
@@ -909,28 +1018,52 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
 (defun words (string)
   "Breaks STRING into words according to the default
 word breaking rules specified in UAX #29. Returns a list of strings"
-  (let ((chars (mapcar
-                 #'(lambda (s)
-                     (let ((l (coerce s 'list)))
-                       (if (cdr l) l (car l))))
-                 (let ((*other-break-special-graphemes* t)) (graphemes string))))
-         words word flag)
+  (let ((chars (coerce string 'list))
+        words word flag)
     (flatpush (car chars) word)
     (do ((first (car chars) second)
          (tail (cdr chars) (cdr tail))
-         (second (cadr chars) (cadr tail)))
+         (second (cadr chars) (cadr tail))
+         (nri 0))
         ((not first) (nreverse (mapcar #'(lambda (l) (coerce l 'string)) words)))
-      (flet ((brk () (push (nreverse word) words) (setf word nil) (flatpush second word))
+      (flet ((extended-word-break-class (list)
+               (loop for tail on list
+                     for thing = (car tail)
+                     for class = (word-break-class thing)
+                     while thing
+                     unless (or (eql class :format) (eql class :extend) (eql class :zwj))
+                       return class))
+             (brk () (push (nreverse word) words) (setf word nil) (flatpush second word))
              (nobrk () (flatpush second word)))
         (let ((c1 (word-break-class first))
               (c2 (word-break-class second))
-              (c3 (when (and tail (cdr tail)) (word-break-class (cadr tail)))))
+              (c3 (extended-word-break-class (cdr tail))))
+          (when (eql c1 :regional-indicator)
+            (incf nri (if (atom first) 1 (count :regional-indicator first :key #'word-break-class))))
           (cond
-            (flag (nobrk) (setf flag nil))
+            ;; handle multiple no-breaks
+            (flag
+             (nobrk)
+             (unless (or (eql c2 :format) (eql c2 :extend) (eql c2 :zwj))
+               (setf flag nil)))
+            ((and (eql c1 :cr) (eql c2 :lf)) (nobrk))
             ;; CR+LF are bound together by the grapheme clustering
             ((or (eql c1 :newline) (eql c1 :cr) (eql c1 :lf)
                  (eql c2 :newline) (eql c2 :cr) (eql c2 :lf)) (brk))
-            ((or (eql c2 :format) (eql c2 :extend)) (nobrk))
+            ((and (eql c1 :zwj)
+                  (or (eql c2 :glue-after-zwj) (eql c2 :e-base-gaz)))
+             (nobrk))
+            ((or (eql c2 :format) (eql c2 :extend) (eql c2 :zwj))
+             ;; handle Any x (Format|Extend|ZWJ)
+             (nobrk)
+             ;; handle "Ignore except after sot, CR, LF, Newline [and ZWJ]"
+             (unless (member c1 '(:cr :lf :newline :zwj))
+               ;; so that the next iteration preserves first:
+               (setf second first)
+               ;; so that we don't spuriously count the preserved first
+               ;; as a new regional-indicator:
+               (when (eql c1 :regional-indicator)
+                 (decf nri (if (atom first) 1 (count :regional-indicator first :key #'word-break-class))))))
             ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
                   (or (eql c2 :aletter) (eql c2 :hebrew-letter))) (nobrk))
             ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
@@ -956,7 +1089,11 @@ word breaking rules specified in UAX #29. Returns a list of strings"
                               '(:aletter :hebrew-letter :katakana
                                 :numeric :extendnumlet)) (eql c1 :extendnumlet)))
              (nobrk))
-            ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator)) (nobrk))
+            ((and (or (eql c1 :e-base) (eql c1 :e-base-gaz))
+                  (eql c2 :e-modifier))
+             (nobrk))
+            ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator) (oddp nri))
+             (nobrk))
             (t (brk))))))))
 
 (defun sentence-break-class (char)
@@ -974,6 +1111,7 @@ word breaking rules specified in UAX #29. Returns a list of strings"
       ((= cp 10) :LF)
       ((= cp 13) :CR)
       ((or (eql (grapheme-break-class char) :extend)
+           (= cp #x200D)
            (eql gc :mc)) :extend)
       ((or (eql cp #x0085) (<= #x2028 cp #x2029)) :sep)
       ((and (eql gc :Cf) (not (<= #x200C cp #x200D))) :format)
@@ -985,7 +1123,7 @@ word breaking rules specified in UAX #29. Returns a list of strings"
            (<= #x066B cp #x066C)) :numeric)
       ((binary-search cp aterms) :aterm)
       ((binary-search cp scontinues) :scontinue)
-      ((proplist-p char :sterm) :sterm)
+      ((proplist-p char :sentence-terminal) :sterm)
       ((and (or (member gc '(:Po :Ps :Pe :Pf :Pi))
                 (eql (line-break-class char) :qu)))
        :close)
@@ -1101,14 +1239,15 @@ sentence breaking rules specified in UAX #29"
          (when
              (and cluster
                   (or
-                   (not (eql type :cm))
-                   (and (eql type :cm)
+                   (not (or (eql type :cm) (eql type :zwj)))
+                   (and (or (eql type :cm) (eql type :zwj))
                         (member last-seen '(nil :BK :CR :LF :NL :SP :ZW)))))
            (if (cdr cluster)
                (push (nreverse cluster) clusters)
                (push (car cluster) clusters))
            (setf cluster nil))
-         (unless (eql type :cm) (setf last-seen type))
+         (unless (or (eql type :cm) (eql type :zwj))
+           (setf last-seen type))
          (push char cluster))
     (if (cdr cluster)
         (push (nreverse cluster) clusters)
@@ -1118,7 +1257,7 @@ sentence breaking rules specified in UAX #29"
 (defun line-break-annotate (string)
   (let ((chars (line-prebreak string))
         first second t1 t2 tail (ret (list :cant))
-        state after-spaces)
+        state after-spaces nri)
     (macrolet ((cmpush (thing)
                  (let ((gthing (gensym)))
                    `(let ((,gthing ,thing))
@@ -1130,7 +1269,9 @@ sentence breaking rules specified in UAX #29"
                (between (a b action)
                  (let ((atest (if (eql a :any) t
                                   (if (listp a)
-                                      `(member t1 ,a)
+                                      (if (eql (car a) 'not)
+                                          `(not (member t1 ,(cadr a)))
+                                          `(member t1 ,a))
                                       `(eql t1 ,a))))
                        (btest (if (eql b :any) t
                                   (if (listp b)
@@ -1170,73 +1311,78 @@ sentence breaking rules specified in UAX #29"
       (setf first (car chars))
       (setf tail (cdr chars))
       (setf second (car tail))
+      (setf nri 0)
       (tagbody
-         top
+       top
          (when (not first) (go end))
          (setf t1 (line-break-class first :resolve t))
          (setf t2 (line-break-class second :resolve t))
-         (between :any :nil :must)
+         (if (and (eql t1 :ri) (eql t2 :ri)) (incf nri) (setf nri 0))
+         (between :any :nil :must)      ; LB3
          (when (and (eql state :eat-spaces) (eql t2 :sp))
-            (cmpush :cant) (cmpush second) (go tail))
-         (between :bk :any :must)
-         (between :cr :lf :cant)
-         (between '(:cr :lf :nl) :any :must)
-         (between :any '(:zw :bk :cr :lf :nl) :cant)
+           (cmpush :cant) (cmpush second) (go tail))
+         (between :bk :any :must)                    ; LB4
+         (between :cr :lf :cant)                     ; LB5
+         (between '(:cr :lf :nl) :any :must)         ; LB5
+         (between :any '(:zw :bk :cr :lf :nl) :cant) ; LB6, LB7
          (when after-spaces (cmpush after-spaces) (cmpush second)
                (setf state nil after-spaces nil) (go tail))
-         (after-spaces :zw :any :can)
-         (between :any :wj :cant)
-         (between :wj :any :cant)
-         (between :gl :any :cant)
-         (between '(:ZW :WJ :SY :SG :SA :RI :QU :PR :PO :OP :NU :NS :NL
-                    :LF :IS :IN :ID :HL :GL :EX :CR :CP :CM :CL :CJ :CB
-                    :BK :BB :B2 :AL :AI :JL :JV :JT :H2 :H3 :XX)
-                  :gl :cant)
-         (between :any '(:cl :cp :ex :is :sy) :cant)
-         (after-spaces :op :any :cant)
-         (after-spaces :qu :op :cant)
-         (after-spaces '(:cl :cp) :ns :cant)
-         (after-spaces :b2 :b2 :cant)
-         (between :any :sp :cant) ;; Goes here to deal with after-spaces
-         (between :sp :any :can)
-         (between :any :qu :cant)
-         (between :qu :any :cant)
-         (between :any :cb :can)
-         (between :cb :any :can)
+         (after-spaces :zw :any :can)        ; LB8
+         (between :zwj '(:id :eb :em) :cant) ; LB8a
+         ;; LB9 and LB10 (for CM) handled in LINE-BREAK-CLASS / LINE-PREBREAK
+         (when (eql t1 :zwj) (setf t1 :al))          ; LB10 (for ZWJ)
+         (when (eql t2 :zwj) (setf t2 :al))          ; LB10 (for ZWJ)
+         (between :any :wj :cant)                    ; LB11
+         (between :wj :any :cant)                    ; LB11
+         (between :gl :any :cant)                    ; LB12
+         (between (not '(:sp :ba :hy)) :gl :cant)    ; LB12a
+         (between :any '(:cl :cp :ex :is :sy) :cant) ; LB13
+         (after-spaces :op :any :cant)               ; LB14
+         (after-spaces :qu :op :cant)                ; LB15
+         (after-spaces '(:cl :cp) :ns :cant)         ; LB16
+         (after-spaces :b2 :b2 :cant)                ; LB17
+         (between :any :sp :cant) ; LB7, here after all AFTER-SPACES calls
+         (between :sp :any :can)  ; LB18
+         (between :any :qu :cant) ; LB19
+         (between :qu :any :cant) ; LB19
+         (between :any :cb :can)  ; LB20
+         (between :cb :any :can)  ; LB20
          (when (and (eql t1 :hl) (member t2 '(:hy :ba)))
            (cmpush :cant) (cmpush second)
            (setf first second tail (cdr tail))
            (setf second (car tail))
            (cmpush (if second :cant :must)) (cmpush second)
-           (setf after-spaces :can) (go tail))
-         (between :any '(:ba :hy :ns) :cant)
-         (between :bb :any :cant)
-         (between :sy :hl :cant)
-         (between '(:al :hl :ex :id :in :nu) :in :cant)
-         (between :id :po :cant)
-         (between '(:al :hl) :nu :cant)
-         (between '(:nu :po) '(:al :hl) :cant)
-         (between :pr '(:id :al :hl) :cant)
-         (between '(:cl :cp :nu) '(:po :pr) :cant)
-         (between :nu '(:po :pr :nu) :cant)
-         (between '(:po :pr) :op :cant)
-         (between '(:po :pr :hy :is :sy) :nu :cant)
-         (between :jl '(:jl :jv :h2 :h3) :cant)
-         (between '(:jv :h2) '(:jv :jt) :cant)
-         (between '(:jt :h3) :jt :cant)
-         (between '(:jl :jv :jt :h2 :h3) '(:in :po) :cant)
-         (between :pr '(:jl :jv :jt :h2 :h3) :cant)
-         (between '(:al :hl :is) '(:al :hl) :cant)
-         (between '(:al :hl :nu) :op :cant)
-         (between :cp '(:al :hl :nu) :cant)
-         (between :ri :ri :cant)
-         (between :any :any :can)
-         tail
+           (setf after-spaces :can) (go tail)) ; LB21a
+         (between :any '(:ba :hy :ns) :cant)   ; LB21
+         (between :bb :any :cant)              ; LB21
+         (between :sy :hl :cant)               ; LB21b
+         (between '(:al :hl :ex :id :eb :em :in :nu) :in :cant) ; LB22
+         (between '(:al :hl) :nu :cant)                         ; LB23
+         (between :nu '(:al :hl) :cant)                         ; LB23
+         (between :pr '(:id :eb :em) :cant)        ; LB23a
+         (between '(:id :eb :em) :po :cant)        ; LB23a
+         (between '(:pr :po) '(:al :hl) :cant)     ; LB24
+         (between '(:al :hl) '(:pr :po) :cant)     ; LB24
+         (between '(:cl :cp :nu) '(:po :pr) :cant) ; LB25, first six cases
+         (between '(:po :pr) :op :cant) ; LB25, two ? x OP cases
+         (between '(:po :pr :hy :is :sy :nu) :nu :cant) ; LB25, six ? x NU cases
+         (between :jl '(:jl :jv :h2 :h3) :cant)         ; LB26
+         (between '(:jv :h2) '(:jv :jt) :cant)          ; LB26
+         (between '(:jt :h3) :jt :cant)                 ; LB26
+         (between '(:jl :jv :jt :h2 :h3) '(:in :po) :cant) ; LB27
+         (between :pr '(:jl :jv :jt :h2 :h3) :cant)        ; LB27
+         (between '(:al :hl :is) '(:al :hl) :cant) ; LB28, LB29
+         (between '(:al :hl :nu) :op :cant)        ; LB30
+         (between :cp '(:al :hl :nu) :cant)        ; LB30
+         (between :ri :ri (if (oddp nri) :cant :can)) ; LB30a
+         (between :eb :em :cant)
+         (between :any :any :can)       ; LB31
+       tail
          (setf first second)
          (setf tail (cdr tail))
          (setf second (car tail))
          (go top)
-         end)
+       end)
       ;; LB3 satisfied by (:any :nil) -> :must
       (setf ret (nreverse ret))
       ret)))
@@ -1313,6 +1459,15 @@ it defaults to 80 characters"
 (defun variable-p (x)
   (<= 1 x +maximum-variable-primary-element+))
 
+(macrolet ((collations-hash-table ()
+             (let ((data (let ((*read-base* 16))
+                           (sb-cold:read-from-file "output/collation.lisp-expr"))))
+               #+64-bit (dovector (item data) (aver (fixnump (car item))))
+               `(load-time-value
+                 (sb-impl::%stuff-hash-table
+                  (make-hash-table :size ,(length data) #+64-bit :test #+64-bit 'eq)
+                  ',data t)
+                 t))))
 (defun collation-key (string start end)
   (let (char1
         (char2 (code-char 0))
@@ -1327,26 +1482,27 @@ it defaults to 80 characters"
       (t
        ;; There are never more than three characters in a contraction, right?
        (return-from collation-key nil)))
-    (let ((packed-key (gethash (pack-3-codepoints
-                                (char-code char1)
-                                (char-code char2)
-                                (char-code char3))
-                               **character-collations**)))
+    (let* ((code1 (char-code char1))
+           (packed-key (gethash (pack-3-codepoints code1 (char-code char2) (char-code char3))
+                                (collations-hash-table))))
       (if packed-key
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
-            (let* ((cp (char-code char1))
+            (let* ((unified-ideograph-p (proplist-p char1 :unified-ideograph))
+                   (tangut-p (<= #x17000 code1 #x18AFF))
+                   (nushu-p (<= #x1B170 code1 #x1B2FF))
+                   (boffset 0)
                    (base
-                     (cond ((not (proplist-p char1 :unified-ideograph))
-                            #xFBC0)
-                           ((or (<= #x4E00 cp #x9FFF)
-                                (<= #xF900 cp #xFAFF))
+                     (cond ((and unified-ideograph-p
+                                 (or (<= #x4E00 code1 #x9FFF) (<= #xF900 code1 #xFAFF)))
                             #xFB40)
-                           (t
-                            #xFB80)))
-                   (a (+ base (ash cp -15)))
-                   (b (logior #.(ash 1 15) (logand cp #x7FFFF))))
-              (list (list a #x20 #x2) (list b 0 0))))))))
+                           (unified-ideograph-p #xFB80)
+                           (tangut-p (setq boffset #x17000) #xFB00)
+                           (nushu-p (setq boffset #x1B170) #xFB01)
+                           (t #xFBC0)))
+                   (a (+ base (if (or tangut-p nushu-p) 0 (ash code1 -15))))
+                   (b (logior #x8000 (if (or tangut-p nushu-p) (- code1 boffset) (logand code1 #x7FFF)))))
+              (list (list a #x20 #x2) (list b 0 0)))))))))
 
 (defun sort-key (string)
   (let* ((str (normalize-string string :nfd))
@@ -1426,7 +1582,7 @@ If :STRICT is NIL, UNICODE= tests compatibility equavalence instead."
 
 (defun unicode-equal (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
   "Determines whether STRING1 and STRING2 are canonically equivalent after
-casefoldin8 (that is, ignoring case differences) according to Unicode. The
+casefolding (that is, ignoring case differences) according to Unicode. The
 START and END arguments behave like the arguments to STRING=. If :STRICT is
 NIL, UNICODE= tests compatibility equavalence instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
@@ -1437,7 +1593,7 @@ NIL, UNICODE= tests compatibility equavalence instead."
 
 (defun unicode< (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Determines whether STRING1 sorts before STRING2 using the Unicode Collation
-Algorithm, The function uses an untailored Default Unicode Collation Element Table
+Algorithm. The function uses an untailored Default Unicode Collation Element Table
 to produce the sort keys. The function uses the Shifted method for dealing
 with variable-weight characters, as described in UTS #10"
   (let* ((s1 (subseq string1 start1 end1))
@@ -1493,3 +1649,5 @@ according to the IDNA confusableSummary.txt table"
            (skeleton1 (normalize-string (canonically-deconfuse str1) form))
            (skeleton2 (normalize-string (canonically-deconfuse str2) form)))
       (string= skeleton1 skeleton2)))
+
+(clear-info :function :compiler-macro-function 'proplist-p)

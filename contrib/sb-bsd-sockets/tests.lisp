@@ -1,13 +1,8 @@
 (defpackage "SB-BSD-SOCKETS-TEST"
-  (:use "CL" "SB-BSD-SOCKETS" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "CL" "SB-BSD-SOCKETS"))
 
 (in-package :sb-bsd-sockets-test)
-
-(defmacro deftest* ((name &key fails-on) form &rest results)
-  `(progn
-     (when (sb-impl::featurep ',fails-on)
-       (pushnew ',name sb-rt::*expected-failures*))
-     (deftest ,name ,form ,@results)))
 
 ;;; a real address
 (deftest make-inet-address
@@ -56,6 +51,7 @@
                                      :protocol (get-protocol-by-name "tcp"))
           (error nil)
           (:no-error (x) x))
+    (format t "~&Will test IPv4~%")
     (push :ipv4-support *features*)))
 
 #+ipv4-support
@@ -73,7 +69,7 @@
   t)
 
 #+ipv4-support
-(deftest* (make-inet-socket-wrong)
+(deftest make-inet-socket-wrong
     ;; fail to make a socket: check correct error return.  There's no nice
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
@@ -91,7 +87,7 @@
   t)
 
 #+ipv4-support
-(deftest* (make-inet-socket-keyword-wrong)
+(deftest make-inet-socket-keyword-wrong
     ;; same again with keywords
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol :udp)
@@ -123,18 +119,21 @@
   t)
 
 #+ipv4-support
-(deftest* (non-block-socket)
+(deftest non-block-socket
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
     (setf (non-blocking-mode s) t)
     (non-blocking-mode s))
   t)
 
 #+ipv4-support
-(deftest inet-socket-bind
+(test-util:with-test (:name :inet-socket-bind)
   (let* ((tcp (get-protocol-by-name "tcp"))
          (address (make-inet-address "127.0.0.1"))
          (s1 (make-instance 'inet-socket :type :stream :protocol tcp))
-         (s2 (make-instance 'inet-socket :type :stream :protocol tcp)))
+         (s2 (make-instance 'inet-socket :type :stream :protocol tcp))
+         (failure)
+         (got-addrinuse))
+    (format t "~&::: INFO: made sockets~%")
     (unwind-protect
          ;; Given the functions we've got so far, if you can think of a
          ;; better way to make sure the bind succeeded than trying it
@@ -143,19 +142,25 @@
            (socket-bind s1 address 0)
            (handler-case
                (let ((port (nth-value 1 (socket-name s1))))
-                 (socket-bind s2 address port)
+                 (socket-bind s2 address port) ; should fail
                  nil)
-             (address-in-use-error () t)))
+             (address-in-use-error () (setq got-addrinuse t))
+             (condition (c) (setq failure c))))
       (socket-close s1)
-      (socket-close s2)))
-  t)
+      (socket-close s2))
+    (cond (failure (error "BIND failed with ~A" failure))
+          ((not got-addrinuse) (error "Expected ADDRESS-IN-USE err")))))
 
-(deftest inet6-socket-bind
+(test-util:with-test (:name :inet6-socket-bind)
+  (let ((notsupp)
+        (failure)
+        (got-addrinuse))
   (handler-case
       (let* ((tcp (get-protocol-by-name "tcp"))
              (address (make-inet6-address "::1"))
              (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
              (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
+        (format t "~&::: INFO: made sockets~%")
         (unwind-protect
              ;; Given the functions we've got so far, if you can think of a
              ;; better way to make sure the bind succeeded than trying it
@@ -170,16 +175,20 @@
                  (declare (ignore x))
                  (handler-case
                      (let ((port (nth-value 1 (socket-name s1))))
-                       (socket-bind s2 address port)
+                       (socket-bind s2 address port) ; should fail
                        nil)
-                   (address-in-use-error () t))))
+                   (address-in-use-error () (setq got-addrinuse t))
+                   (condition (c) (setq failure c)))))
           (socket-close s1)
           (socket-close s2)))
-    ((or address-family-not-supported protocol-not-supported-error) () t))
-  t)
+    ((or address-family-not-supported protocol-not-supported-error) ()
+      (setq notsupp t)))
+  (cond (notsupp (format t "~&INFO: not supported~%"))
+        (failure (error "BIND failed with ~A" failure))
+        ((not got-addrinuse) (error "Expected ADDRESS-IN-USE err")))))
 
 #+ipv4-support
-(deftest* (simple-sockopt-test)
+(deftest simple-sockopt-test
   ;; test we can set SO_REUSEADDR on a socket and retrieve it, and in
   ;; the process that all the weird macros in sockopt happened right.
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
@@ -367,6 +376,7 @@
                      (lambda ()
                        (socket-connect client-sock #(127 0 0 1) port)
                        (socket-close client-sock)))))
+               (sb-thread:join-thread client-connect-thread :timeout 20)
                (setf server-sock (socket-accept listen-sock)))
 
              ;; Wait for input. This should return when we get EOF

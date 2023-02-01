@@ -27,8 +27,9 @@
                     (default-structure-print lexenv stream depth))))
              (:copier nil)
              (:constructor make-null-lexenv ())
-             (:constructor make-almost-null-lexenv (%policy handled-conditions
-                                                    flushable lambda parent))
+             (:constructor make-almost-null-lexenv
+                           (%policy handled-conditions flushable lambda parent
+                            &optional user-data))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
                             &aux (handled-conditions nil)))
@@ -79,9 +80,12 @@
   ;; be able to affect it from :WITH-COMPILATION-UNIT.) NIL here also
   ;; works as a convenient null-lexenv identifier.
   (%policy nil :type (or null policy))
-  ;; A list associating extra user info to symbols.  The entries
-  ;; are of the form (:declare name . value),
+  ;; A list associating extra user info to symbols.
+  ;; sb-cltl2 entries are of the form (:declare name . value),
   ;; (:variable name key . value), or (:function name key . value)
+  ;; The NO-COMPILER-MACRO declartion is also stored here (because it
+  ;; can't be attached to a function, as compiler macros can be
+  ;; defined on macros).
   (user-data nil :type list)
   (parent nil)
   ;; Cache of all visible variables, including the ones coming from
@@ -245,6 +249,10 @@
   (arg-specs nil :type list)
   (result-specs nil :type list)
   type)
+
+(defstruct (lvar-sequence-bounds-annotation
+            (:include lvar-dependent-annotation)
+            (:copier nil)))
 
 (defstruct (lvar-type-annotation
             (:include lvar-annotation)
@@ -692,7 +700,8 @@
   ;; locall call analysis) and is rechecked by environment
   ;; analysis. (For closures this is a list of the LVAR of the enclose
   ;; after environment analysis.)
-  (nlx-info nil :type list))
+  (nlx-info nil :type list)
+  (dx-kind nil))
 (defprinter (cleanup :identity t)
   kind
   mess-up
@@ -702,13 +711,8 @@
 (defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (lambda (missing-arg) :type clambda :read-only t)
-  ;; This ultimately converges to a list of all the LAMBDA-VARs and
-  ;; NLX-INFOs needed from enclosing environments by code in this
-  ;; environment. In the meantime, it may be
-  ;;   * NIL at object creation time
-  ;;   * a superset of the correct result, generated somewhat later
-  ;;   * smaller and smaller sets converging to the correct result as
-  ;;     we notice and delete unused elements in the superset
+  ;; a list of all the LAMBDA-VARS and NLX-INFOs needed from enclosing
+  ;; environments by code in this environment.
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
   ;; into this environment
@@ -753,15 +757,14 @@
 ;;; ENVIRONMENT-NLX-INFO.
 (defstruct (nlx-info
             (:copier nil)
-            (:constructor make-nlx-info (cleanup block)))
+            (:constructor make-nlx-info (cleanup block exit)))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
   ;; this thus provides a good indication of what kind of exit is
   ;; being done.
   (cleanup (missing-arg) :type cleanup)
-  ;; the ``continuation'' exited to (the block, succeeding the EXIT
-  ;; nodes). If this exit is from an escape function (CATCH or
+  ;; the continuation exited to. If this exit is from an escape function (CATCH or
   ;; UNWIND-PROTECT), then environment analysis deletes the
   ;; escape function and instead has the %NLX-ENTRY use this
   ;; continuation.
@@ -771,6 +774,7 @@
   ;; ENTRY must also be used to disambiguate, since exits to different
   ;; places may deliver their result to the same continuation.
   (block (missing-arg) :type cblock)
+  (exit (missing-arg) :type exit)
   ;; the entry stub inserted by environment analysis. This is a block
   ;; containing a call to the %NLX-ENTRY funny function that has the
   ;; original exit destination as its successor. Null only
@@ -783,6 +787,7 @@
   (info nil))
 (defprinter (nlx-info :identity t)
   block
+  exit
   target
   info)
 (!set-load-form-method nlx-info (:xc :target) :ignore-it)
@@ -846,7 +851,8 @@
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent))
+  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent
+                            dynamic-extent-no-note))
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)
@@ -935,17 +941,19 @@
   ;; global environment.
   (inlinep nil :type inlinep)
   (inline-expansion nil :type (or cons null))
-  ;; List of functionals corresponding to this DEFINED-FUN: either from the
-  ;; conversion of a NAMED-LAMBDA, or from inline-expansion (see
-  ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
-  ;; which the function is used.
-  (functionals nil :type list)
-  (named-lambda-p nil))
+  ;; Was the function defined in this compilation block?
+  (same-block-p nil :type boolean)
+  ;; The block-local definition of this function (either because it
+  ;; was semi-inline, or because it was defined in this block). If
+  ;; this function is not an entry point, then this may be deleted or
+  ;; LET-converted. NULL if we haven't converted the expansion yet.
+  (functional nil :type (or functional null)))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
   inlinep
-  (functionals :test functionals))
+  same-block-p
+  (functional :test functional))
 
 ;;;; function stuff
 
@@ -1171,7 +1179,6 @@
 (defstruct (clambda (:include functional)
                     (:conc-name lambda-)
                     (:predicate lambda-p)
-                    (:constructor make-lambda)
                     (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list)
@@ -1201,11 +1208,10 @@
   (lets nil :type list)
   ;; all the ENTRY nodes in this function and its LETs, or null in a LET
   (entries nil :type list)
-  ;; CLAMBDAs which are locally called by this lambda, and other
-  ;; objects (closed-over LAMBDA-VARs and XEPs) which this lambda
-  ;; depends on in such a way that DFO shouldn't put them in separate
-  ;; components.
-  (calls-or-closes (make-sset) :type (or null sset))
+  ;; a set of all the functions directly called from this function
+  ;; (or one of its LETs) using a non-LET local call. This may include
+  ;; deleted functions because nobody bothers to clear them out.
+  (calls (make-sset) :type (or null sset))
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
   ;;
   ;; In CMU CL, and old SBCL, this was also NILed out when LET
@@ -1226,11 +1232,7 @@
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null))
-  (allow-instrumenting *allow-instrumenting* :type boolean)
-  ;; True if this is a system introduced lambda: it may contain user code, but
-  ;; the lambda itself is not, and the bindings introduced by it are considered
-  ;; transparent by the nested DX analysis.
-  (system-lambda-p nil :type boolean))
+  (allow-instrumenting *allow-instrumenting* :type boolean))
 (defprinter (clambda :conc-name lambda- :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
@@ -1422,7 +1424,6 @@
   ;; sorted sets of constraints we like to iterate over
   (eql-var-constraints     nil :type (or null (array t 1)))
   (inheritable-constraints nil :type (or null (array t 1)))
-  (private-constraints     nil :type (or null (array t 1)))
   (equality-constraints    nil :type (or null (array t 1)))
 
   source-form)
@@ -1556,7 +1557,8 @@
 ;;; an MV-COMBINATION isn't COMBINATION-P.
 (defstruct (combination (:include basic-combination)
                         (:constructor make-combination (fun))
-                        (:copier nil)))
+                        (:copier nil))
+  (pass-nargs t :type boolean))
 (defprinter (combination :identity t)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
@@ -1772,8 +1774,21 @@
                         (lexenv thing)
                         (node (node-lexenv thing))
                         (functional (functional-lexenv thing)))))))
+
+;;; The basic interval type. It can handle open and closed intervals.
+;;; A bound is open if it is a list containing a number, just like
+;;; Lisp says. NIL means unbounded.
+(defstruct (interval (:constructor %make-interval (low high))
+                     (:copier nil))
+  low high)
+
+(defstruct (conditional-flags
+            (:constructor make-conditional-flags (flags))
+            (:copier nil))
+  flags)
 
 ;;;; Freeze some structure types to speed type testing.
 
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      environment tail-set nlx-info leaf))
+                      environment tail-set nlx-info leaf interval
+                      conditional-flags))

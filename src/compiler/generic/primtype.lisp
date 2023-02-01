@@ -196,6 +196,12 @@
             *backend-t-primitive-type*
             (primitive-type type)))))
 
+#+sb-simd-pack
+(defun simd-pack-mask->tag (mask)
+  (aver (= (logcount mask) 1))
+  (the (integer 0 (#.(length +simd-pack-element-types+)))
+       (1- (integer-length mask))))
+
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
 ;;; exactly equivalent to the argument Lisp type.
@@ -212,7 +218,7 @@
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux
-               :hash-function #'type-hash-value
+               :hash-function #'sb-kernel::type-%bits
                :hash-bits 9
                :values 2)
               ((type eq))
@@ -436,61 +442,19 @@
              (part-of character)))
         #+sb-simd-pack
         (simd-pack-type
-         (let* ((eltypes (simd-pack-type-element-type type))
-                (count (count 1 eltypes))
-                (position (position 1 eltypes)))
-           (if (= count 1)
-               (cond
-                 ((eql position (position '(unsigned-byte 8) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-ub8))
-                 ((eql position (position '(unsigned-byte 16) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-ub16))
-                 ((eql position (position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-ub32))
-                 ((eql position (position '(unsigned-byte 64) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-ub64))
-                 ((eql position (position '(signed-byte 8) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-sb8))
-                 ((eql position (position '(signed-byte 16) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-sb16))
-                 ((eql position (position '(signed-byte 32) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-sb32))
-                 ((eql position (position '(signed-byte 64) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-sb64))
-                 ((eql position (position 'single-float *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-single))
-                 ((eql position (position 'double-float *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-double))
-                 (t (any)))
+         (let ((mask (simd-pack-type-tag-mask type)))
+           (if (= (logcount mask) 1)
+               (values (primitive-type-or-lose
+                        (svref +simd-pack-128-primtypes+ (simd-pack-mask->tag mask)))
+                       t)
                (any))))
         #+sb-simd-pack-256
         (simd-pack-256-type
-         (let* ((eltypes (simd-pack-256-type-element-type type))
-                (count (count 1 eltypes))
-                (position (position 1 eltypes)))
-           (if (= count 1)
-               (cond
-                 ((eql position (position '(unsigned-byte 8) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-ub8))
-                 ((eql position (position '(unsigned-byte 16) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-ub16))
-                 ((eql position (position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-ub32))
-                 ((eql position (position '(unsigned-byte 64) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-ub64))
-                 ((eql position (position '(signed-byte 8) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-sb8))
-                 ((eql position (position '(signed-byte 16) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-sb16))
-                 ((eql position (position '(signed-byte 32) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-sb32))
-                 ((eql position (position '(signed-byte 64) *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-sb64))
-                 ((eql position (position 'single-float *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-single))
-                 ((eql position (position 'double-float *simd-pack-element-types* :test #'equal))
-                  (exactly simd-pack-256-double))
-                 (t (any)))
+         (let ((mask (simd-pack-256-type-tag-mask type)))
+           (if (= (logcount mask) 1)
+               (values (primitive-type-or-lose
+                        (svref +simd-pack-256-primtypes+ (simd-pack-mask->tag mask)))
+                       t)
                (any))))
         (cons-type
          (part-of list))

@@ -19,13 +19,11 @@
   make-load-form-saving-slots
   sb-vm:map-allocated-objects
   sb-ext:primitive-object-size
-  sb-vm::remove-static-links
-  sb-vm::blt-copier-for-widetag)
+  sb-vm::remove-static-links)
  ;; CLOS implementation
  (sb-mop:class-finalized-p
   sb-mop:class-prototype
   sb-mop:class-slots
-  sb-pcl::eql-specializer-to-ctype
   sb-pcl::try-finalize-inheritance
   sb-mop:finalize-inheritance
   sb-mop:generic-function-name
@@ -39,6 +37,7 @@
   sb-mop:slot-definition-allocation
   sb-mop:slot-definition-name
   sb-pcl::slot-accessor-std-p
+  slot-missing
   slot-unbound
   sb-pcl::specializer-applicable-using-type-p
   sb-pcl::specializer-class-or-nil
@@ -135,7 +134,7 @@
   sb-interpreter:lexenv-from-env
   sb-interpreter::lexically-unlocked-symbol-p
   sb-interpreter:list-locals
-  sb-interpreter::reconstruct-syntactic-closure-env)
+  sb-interpreter::inline-syntactic-closure-lambda)
  ;; Simple-streams symbols in SB-IMPL
  (sb-impl::s-%charpos
   sb-impl::s-%clear-output
@@ -167,9 +166,6 @@
   sb-impl::get-processes-status-changes
   sb-impl::step-form
   sb-impl::step-values
-  sb-impl::stringify-package-designator
-  sb-impl::stringify-string-designator
-  sb-impl::stringify-string-designators
   sb-impl::unencapsulate-generic-function)
  ;; The following functions are in fact defined during make-host-2
  ;; but they are non-toplevel so they appear to be undefined.
@@ -182,6 +178,7 @@
   sb-impl::bytes-per-utf8-character-aref
   sb-impl::bytes-per-utf8-character-sap-ref-8
   sb-impl::user-homedir-namestring
+  sb-lockless:make-so-map/addr
   sb-c::apply-core-fixups
   sb-c::compiled-debug-info-char-offset
   sb-c::compiled-debug-info-tlf-number

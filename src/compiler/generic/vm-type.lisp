@@ -63,6 +63,10 @@
 (sb-xc:deftype bignum-index () `(mod ,maximum-bignum-length))
 (sb-xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 
+(sb-xc:deftype half-bignum-element-type () `(unsigned-byte ,(/ sb-vm:n-word-bits 2)))
+(sb-xc:deftype half-bignum-index () `(mod ,(* maximum-bignum-length 2)))
+(sb-xc:deftype half-bignum-length () `(mod ,(1+ (* maximum-bignum-length 2))))
+
 ;;; an index into an integer
 (sb-xc:deftype bit-index ()
   `(integer 0 ,(* (1- (ash 1 (- sb-vm:n-word-bits sb-vm:n-widetag-bits)))
@@ -99,18 +103,20 @@
 
 (declaim (ftype (sfunction (ctype) ctype) %upgraded-array-element-type))
 (defun %upgraded-array-element-type (eltype)
-  (if (or (eq eltype *wild-type*)
+  (cond ((eq eltype *universal-type*) eltype) ; don't waste time iterating
+        ((or (eq eltype *wild-type*)
           ;; This is slightly dubious, but not as dubious as
           ;; assuming that the upgraded-element-type should be
           ;; equal to T, given the way that the AREF
           ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
-          (contains-unknown-type-p eltype))
-      *wild-type*
-      (dovector (stype
-                 (literal-ctype-vector *parsed-specialized-array-element-types*)
-                 *universal-type*)
-       (when (csubtypep eltype stype)
-         (return stype)))))
+             (contains-unknown-type-p eltype))
+         *wild-type*)
+        (t
+         (dovector (saetp sb-vm:*specialized-array-element-type-properties*
+                          *universal-type*)
+           (let ((stype (sb-vm:saetp-ctype saetp)))
+             (when (csubtypep eltype stype)
+               (return stype)))))))
 
 (defun upgraded-array-element-type (spec &optional environment)
   "Return the element type that will actually be used to implement an array

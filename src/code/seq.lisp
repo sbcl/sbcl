@@ -483,6 +483,8 @@
 ;;; Also, there should only be as many different ways to copy
 ;;; as there are different element sizes.
 (!define-array-dispatch :jump-table vector-subseq-dispatch (array start end)
+  ((declare (ignore array))
+   (make-array (- end start) :element-type nil))
   (declare (optimize speed (safety 0)))
   (declare (type index start end))
   (subseq array start end))
@@ -899,7 +901,7 @@ many elements are copied."
   (let ((length (length vector)))
     (with-array-data ((vector vector) (start) (end)
                       :check-fill-pointer t)
-      (declare (ignore start))
+      (declare (ignorable start))
       (let* ((tag (%other-pointer-widetag vector))
              (new-vector (sb-vm::allocate-vector-with-widetag
                           #+ubsan nil tag length
@@ -914,6 +916,18 @@ many elements are copied."
                        (svref vector right-index))))
               ((word-specialized-vector-tag-p tag)
                (reverse-word-specialized-vector vector new-vector end))
+              #+(or arm64 x86-64)
+              ((typep vector '(or (simple-array base-char (*))
+                               (simple-array (signed-byte 8) (*))
+                               (simple-array (unsigned-byte 8) (*))))
+               (sb-vm::simd-reverse8 new-vector vector start length))
+              #+(or arm64 x86-64)
+              ((typep vector '(or #+sb-unicode
+                               (simple-array character (*))
+                               (simple-array (signed-byte 32) (*))
+                               (simple-array (unsigned-byte 32) (*))
+                               (simple-array single-float (*))))
+               (sb-vm::simd-reverse32 new-vector vector start length))
               (t
                (let ((getter (the function (svref %%data-vector-reffers%% tag)))
                      (setter (the function (svref %%data-vector-setters%% tag))))
@@ -929,7 +943,7 @@ many elements are copied."
 ;;;; NREVERSE
 
 (defun list-nreverse (list)
-  (do ((1st (cdr list) (if (endp 1st) 1st (cdr 1st)))
+  (do ((1st (cdr (truly-the list list)) (cdr 1st))
        (2nd list 1st)
        (3rd '() 2nd))
       ((atom 2nd) 3rd)
@@ -947,11 +961,12 @@ many elements are copied."
             (%vector-raw-bits vector right-index) left)))
   vector)
 
-(defun vector-nreverse (vector)
-  (declare (vector vector))
-  (when (> (length vector) 1)
-    (with-array-data ((vector vector) (start) (end)
-                      :check-fill-pointer t)
+(defun vector-nreverse (original-vector)
+  (declare (vector original-vector))
+  (when (> (length original-vector) 1)
+    (with-array-data ((vector original-vector) (start) (end)
+                      :check-fill-pointer t
+                      :force-inline t)
       (let ((tag (%other-pointer-widetag vector)))
         (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index start (1+ left-index))
@@ -964,6 +979,20 @@ many elements are copied."
                          (svref vector right-index) left))))
               ((word-specialized-vector-tag-p tag)
                (nreverse-word-specialized-vector vector start end))
+              #+(or arm64 x86-64)
+              ((typep vector '(or (simple-array base-char (*))
+                               (simple-array (signed-byte 8) (*))
+                               (simple-array (unsigned-byte 8) (*))))
+               (return-from vector-nreverse
+                 (sb-vm::simd-nreverse8 original-vector vector start end)))
+              #+(or arm64 x86-64)
+              ((typep vector '(or #+sb-unicode
+                               (simple-array character (*))
+                               (simple-array (signed-byte 32) (*))
+                               (simple-array (unsigned-byte 32) (*))
+                               (simple-array single-float (*))))
+               (return-from vector-nreverse
+                 (sb-vm::simd-nreverse32 original-vector vector start end)))
               (t
                (let* ((getter (the function (svref %%data-vector-reffers%% tag)))
                       (setter (the function (svref %%data-vector-setters%% tag))))
@@ -975,7 +1004,7 @@ many elements are copied."
                          (right (funcall getter vector right-index)))
                      (funcall setter vector left-index right)
                      (funcall setter vector right-index left)))))))))
-  vector)
+  original-vector)
 
 (defun nreverse (sequence)
   "Return a sequence of the same elements in reverse order; the argument
@@ -1345,6 +1374,10 @@ many elements are copied."
 ;;; seqtran can generate code which accesses the array of specialized
 ;;; functions, so we need the array for this, not a jump table.
 (!define-array-dispatch :call vector-map-into (data start end fun sequences)
+    ((declare (ignore fun sequences))
+     (unless (zerop (- end start))
+       (sb-c::%type-check-error/c data 'nil-array-accessed-error nil))
+     0)
   (declare (type index start end)
            (type function fun)
            (type list sequences))
@@ -1375,7 +1408,6 @@ many elements are copied."
 ;;; safety is turned off for vectors and lists but kept for generic
 ;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
-  (declare (optimize (sb-c::check-tag-existence 0)))
   (declare (dynamic-extent function))
   (let ((really-fun (%coerce-callable-to-fun function)))
     (etypecase result-sequence
@@ -1908,6 +1940,16 @@ many elements are copied."
     (apply #'sb-sequence:remove-if-not predicate sequence args)))
 
 ;;;; REMOVE-DUPLICATES
+
+(defun hash-table-test-p (fun)
+  (or (eq fun #'eq)
+      (eq fun #'eql)
+      (eq fun #'equal)
+      (eq fun #'equalp)
+      (eq fun 'eq)
+      (eq fun 'eql)
+      (eq fun 'equal)
+      (eq fun 'equalp)))
 
 ;;; Remove duplicates from a list. If from-end, remove the later duplicates,
 ;;; not the earlier ones. Thus if we check from-end we don't copy an item

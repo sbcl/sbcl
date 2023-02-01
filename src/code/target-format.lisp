@@ -20,7 +20,7 @@
 ;;; And it's possible that we could decide to install a closure as
 ;;; the fin-fun but I don't think that's necessary.
 (sb-kernel:!defstruct-with-alternate-metaclass fmt-control
-  :slot-names (string symbols memo)
+  :slot-names ((string simple-string) symbols memo)
   :constructor %make-fmt-control
   :superclass-name function
   :metaclass-name static-classoid
@@ -102,7 +102,8 @@
        (%format stream control-string format-arguments)))
     (string
      (with-output-to-string (stream destination)
-       (%format stream control-string format-arguments)))
+       (%format stream control-string format-arguments))
+     nil)
     ((member t)
      (%format *standard-output* control-string format-arguments)
      nil)
@@ -113,27 +114,30 @@
 (defun %format (stream string-or-fun orig-args &optional (args orig-args))
   (if (and (functionp string-or-fun) (not (typep string-or-fun 'fmt-control)))
       (apply string-or-fun stream args)
-      (catch 'up-and-out
-        (let* ((string (etypecase string-or-fun
-                         (simple-string
-                          string-or-fun)
-                         (string
-                          (coerce string-or-fun 'simple-string))
-                         (fmt-control
-                          (fmt-control-string string-or-fun))))
-               (*default-format-error-control-string* string)
-               (*logical-block-popper* nil)
-               (tokens
-                (if (functionp string-or-fun)
-                    (or (fmt-control-memo string-or-fun)
-                        ;; Memoize the parse back into the object
-                        (setf (fmt-control-memo string-or-fun)
-                              (%tokenize-control-string
-                               string 0 (length string)
-                               (fmt-control-symbols string-or-fun))))
-                    (tokenize-control-string string))))
-          (interpret-directive-list stream tokens orig-args args)))))
-
+      (truly-the
+       (values t &optional)
+       (catch 'up-and-out
+         (let* ((string (etypecase string-or-fun
+                          (simple-string
+                           string-or-fun)
+                          (string
+                           (coerce string-or-fun 'simple-string))
+                          ;; Not just more compact than testing for fmt-control
+                          ;; but also produces a better error message.
+                          (function
+                           (fmt-control-string string-or-fun))))
+                (*default-format-error-control-string* string)
+                (*logical-block-popper* nil)
+                (tokens
+                  (if (functionp string-or-fun)
+                      (or (fmt-control-memo string-or-fun)
+                          ;; Memoize the parse back into the object
+                          (setf (fmt-control-memo string-or-fun)
+                                (%tokenize-control-string
+                                 string 0 (length string)
+                                 (fmt-control-symbols string-or-fun))))
+                      (tokenize-control-string string))))
+           (interpret-directive-list stream tokens orig-args args))))))
 
 (!begin-collecting-cold-init-forms)
 (define-load-time-global *format-directive-interpreters* nil)
@@ -180,16 +184,13 @@
      (pop args)))
 
 (defmacro def-complex-format-interpreter (char lambda-list &body body)
+  (aver (not (lower-case-p char)))
   (let ((defun-name
-            (intern (format nil
-                            "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
-                            char)))
+            (intern (format nil "~:C-INTERPRETER" char)))
         (directive '.directive) ; expose this var to the lambda. it's easiest
-        (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
-    `(!cold-init-forms
-      (setf
-       (aref *format-directive-interpreters* ,(char-code (char-upcase char)))
-       (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
+        (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
+    `(progn
+       (defun ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
          ,@(if lambda-list
                `((let ,(mapcar (lambda (var)
@@ -198,10 +199,13 @@
                                (butlast lambda-list))
                    (values (progn ,@body) args)))
                `((declare (ignore ,directive ,directives))
-                 ,@body)))))))
+                 ,@body)))
+       (!cold-init-forms
+        (setf (aref *format-directive-interpreters* (char-code ,char))
+              #',defun-name)))))
 
 (defmacro def-format-interpreter (char lambda-list &body body)
-  (let ((directives (sb-xc:gensym "DIRECTIVES")))
+  (let ((directives (gensym "DIRECTIVES")))
     `(def-complex-format-interpreter ,char (,@lambda-list ,directives)
        ,@body
        ,directives)))
@@ -1241,6 +1245,15 @@
       (apply symbol stream (next-arg) colonp atsignp (args)))))
 
 (!defun-from-collected-cold-init-forms !format-directives-init)
+
+(defvar sb-int::**tokenize-control-string-cache-vector**-stats) ; might not be DEFVARed
+(defun sb-impl::!format-cold-init ()
+  (!late-format-init)
+  (!format-directives-init)
+  ;; cold-init requires these assignments if hash-cache profiling is enabled
+  (setq **tokenize-control-string-cache-vector** (make-array 128 :initial-element 0))
+  (setq sb-int::**tokenize-control-string-cache-vector**-stats
+        (make-array 3 :initial-element 0 :element-type 'fixnum)))
 
 (push '("SB-FORMAT"
         def-format-directive def-complex-format-directive

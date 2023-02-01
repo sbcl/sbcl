@@ -18,6 +18,72 @@
      (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
      ,@body))
 
+(defmacro with-input-utf8-file
+    ((s name &key (eszets 0) (registereds 1) (copyrights 1)) &body body)
+  ;; KLUDGE: Unicode data files in general have registered and
+  ;; copyright marks (non-ASCII characters) in the header;
+  ;; additionally, CaseFolding.txt as distributed by Unicode contains
+  ;; a non-ASCII character, an eszet, within a comment to act as an
+  ;; example.  We can't in general assume that our host lisp will let
+  ;; us read those, and we can't portably write that we don't care
+  ;; about the text content of anything on a line after a hash because
+  ;; text decoding happens at a lower level.  So here we rewrite data
+  ;; files to exclude the UTF-8 sequences corresponding to those
+  ;; characters (and error if we see any other UTF-8 sequence).
+  (let ((in (gensym "IN"))
+        (out (gensym "OUT")))
+    `(let ((filename (format nil "~A.txt" ,name)))
+       (with-open-file (,in (make-pathname :name ,name :type "txt"
+                                           :defaults *unicode-character-database*)
+                            :element-type '(unsigned-byte 8))
+         (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
+         (with-open-file (,out (make-pathname :name ,name :type "txt"
+                                              :defaults *output-directory*)
+                               :element-type '(unsigned-byte 8)
+                               :direction :output
+                               :if-exists :supersede
+                               :if-does-not-exist :create)
+           (setf (gethash (format nil "output/~A.txt" ,name) *ucd-outputs*) 'made)
+           (do ((inbyte (read-byte ,in nil nil) (read-byte ,in nil nil))
+                (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
+                (eszet-count 0)
+                (copyright (map '(vector (unsigned-byte 8)) 'char-code "<copyright>"))
+                (copyright-count 0)
+                (registered (map '(vector (unsigned-byte 8)) 'char-code "<registered>"))
+                (registered-count 0))
+               ((null inbyte)
+                (unless (= eszet-count ,eszets)
+                  (error "Unexpected number of eszets in ~A: ~D (expected ~D)"
+                         filename eszet-count ,eszets))
+                (unless (= copyright-count ,copyrights)
+                  (error "Unexpected number of copyright symbols in ~A: ~D (expected ~D)"
+                         filename copyright-count ,copyrights))
+                (unless (= registered-count ,registereds)
+                  (error "Unexpected number of registered symbols in ~A: ~D (expected ~D)"
+                         filename registered-count ,registereds)))
+             (cond
+               ((= inbyte #xc3)
+                (let ((second (read-byte ,in nil nil)))
+                  (cond
+                    ((null second)
+                     (error "No continuation after #xc3 in ~A" filename))
+                    ((= second #x9f) (incf eszet-count) (write-sequence eszet ,out))
+                    (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
+                              filename second)))))
+               ((= inbyte #xc2)
+                (let ((second (read-byte ,in nil nil)))
+                  (cond
+                    ((null second)
+                     (error "No continuation after #xc2 in ~A" filename))
+                    ((= second #xa9) (incf copyright-count) (write-sequence copyright ,out))
+                    ((= second #xae) (incf registered-count) (write-sequence registered ,out)))))
+               ((>= inbyte #x7f)
+                (error "Unexpected octet in ~A: #x~X" filename inbyte))
+               (t (write-byte inbyte ,out))))))
+       (with-open-file (,s (make-pathname :name ,name :type "txt"
+                                          :defaults *output-directory*))
+         ,@body))))
+
 (defmacro with-output-dat-file ((s name) &body body)
   `(with-open-file (,s (make-pathname :name ,name :type "dat"
                                       :defaults *output-directory*)
@@ -83,6 +149,10 @@
        do (setf (gethash string hash) index))
     hash))
 
+(defun index-or-lose (key table kind)
+  (or (gethash key table)
+      (error "unknown ~A: ~S" kind key)))
+
 (defun clear-flag (bit integer)
   (logandc2 integer (ash 1 bit)))
 
@@ -98,7 +168,7 @@
               :adjustable t)) ; 10000 is not a significant number
 
 (defparameter *decomposition-corrections*
-  (with-input-txt-file (s "NormalizationCorrections")
+  (with-input-utf8-file (s "NormalizationCorrections")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        do (when (position #\; line)
@@ -113,7 +183,7 @@
 
 (defparameter *compositions* (make-hash-table :test #'equal))
 (defparameter *composition-exclusions*
-  (with-input-txt-file (s "CompositionExclusions")
+  (with-input-utf8-file (s "CompositionExclusions")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        when (and (> (length line) 0) (char/= (char line 0) #\#))
@@ -125,7 +195,7 @@
 (defparameter *different-casefolds* nil)
 
 (defparameter *case-mapping*
-  (with-input-txt-file (s "SpecialCasing")
+  (with-input-utf8-file (s "SpecialCasing")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -161,7 +231,7 @@ Length should be adjusted when the standard changes.")
 (defparameter *line-break-classes* (init-indices '*line-break-classes*))
 
 (defparameter *east-asian-width-table*
-  (with-input-txt-file (s "EastAsianWidth")
+  (with-input-utf8-file (s "EastAsianWidth")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -169,14 +239,14 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let ((range (parse-codepoint-range codepoints))
-                  (index (gethash value *east-asian-widths*)))
+                  (index (index-or-lose value *east-asian-widths* "East Asian width")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
   "Table of East Asian Widths. Used in the creation of misc entries.")
 
 (defparameter *script-table*
-  (with-input-txt-file (s "Scripts")
+  (with-input-utf8-file (s "Scripts")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -184,30 +254,34 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let ((range (parse-codepoint-range codepoints))
-                  (index (gethash (subseq value 1) *scripts*)))
+                  (index (index-or-lose (subseq value 1) *scripts* "script")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
 "Table of scripts. Used in the creation of misc entries.")
 
 (defparameter *line-break-class-table*
-  (with-input-txt-file (s "LineBreak")
+  (with-input-utf8-file (s "LineBreak")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
        do (destructuring-bind (codepoints value)
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
-            (let ((range (parse-codepoint-range codepoints))
-                  ;; Hangul syllables temporarily go to "Unkwown"
-                  (index (gethash value *line-break-classes* 0)))
+            (let* ((range (parse-codepoint-range codepoints))
+                   ;; Hangul syllables are marked as "Unknown", and programmatically
+                   ;; handled in SB-UNICODE:LINE-BREAK-CLASS
+                   (value
+                     (or (and (member value '("JL" "JV" "JT" "H2" "H3") :test 'string=) "XX")
+                         value))
+                   (index (index-or-lose value *line-break-classes* "line break")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
 "Table of line break classes. Used in the creation of misc entries.")
 
 (defparameter *age-table*
-  (with-input-txt-file (s "DerivedAge")
+  (with-input-utf8-file (s "DerivedAge")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -260,12 +334,12 @@ Length should be adjusted when the standard changes.")
            (when (ordered-ranges-member code-point vector)
              (gethash class *bidi-classes*))))
     (cond
-      ((in
-         #(#x0600 #x07BF #x08A0 #x08FF #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
-           #x1EE00 #x1EEFF) "AL"))
-      ((in
-         #(#x0590 #x05FF #x07C0 #x089F #xFB1D #xFB4F #x10800 #x10FFF #x1E800 #x1EDFF
-           #x1EF00 #x1EFFF) "R"))
+      ((in #(#x0600 #x07BF #x0860 #x086F #x08A0 #x08FF
+             #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
+             #x1EE00 #x1EEFF) "AL"))
+      ((in #(#x0590 #x05FF #x07C0 #x085F #x0870 #x089F
+             #xFB1D #xFB4F #x10800 #x10FFF #x1E800 #x1EDFF
+             #x1EF00 #x1EFFF) "R"))
       ((in #(#x20A0 #x20CF) "ET"))
       ;; BN is non-characters and default-ignorable.
       ;; Default-ignorable will be dealt with elsewhere
@@ -373,7 +447,7 @@ Length should be adjusted when the standard changes.")
          (ncount (* vcount tcount))
          (table (make-hash-table)))
     (declare (ignore lcount))
-    (with-input-txt-file (*standard-input* "Jamo")
+    (with-input-utf8-file (*standard-input* "Jamo")
       (loop for line = (read-line nil nil)
             while line
             if (position #\; line)
@@ -419,12 +493,9 @@ Length should be adjusted when the standard changes.")
         (progn
           (setf *block-first* code-point)
           nil)
-        (let* ((gc-index (or (gethash general-category *general-categories*)
-                             (error "unknown general category ~A"
-                                    general-category)))
-               (bidi-index (or (gethash bidi-class *bidi-classes*)
-                               (error "unknown bidirectional class ~A"
-                                      bidi-class)))
+        (let* ((gc-index
+                 (index-or-lose general-category *general-categories* "general category"))
+               (bidi-index (index-or-lose bidi-class *bidi-classes* "bidirectional class"))
                (ccc (parse-integer canonical-combining-class))
                (digit-index (if (string= "" digit) 128 ; non-digits have high bit
                                 (let ((%digit (parse-integer digit)))
@@ -560,61 +631,18 @@ Length should be adjusted when the standard changes.")
              (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc))))))
 
 (defun fixup-casefolding ()
-  ;; KLUDGE: CaseFolding.txt as distributed by Unicode contains a
-  ;; non-ASCII character, an eszet, within a comment to act as an
-  ;; example.  We can't in general assume that our host lisp will let
-  ;; us read that, and we can't portably write that we don't care
-  ;; about the text content of anything on a line after a hash because
-  ;; text decoding happens at a lower level.  So here we rewrite the
-  ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
-  ;; to the eszet character.
-  (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
-                                     :defaults *unicode-character-database*)
-                      :element-type '(unsigned-byte 8))
-    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
-    (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
-                                        :defaults *output-directory*)
-                         :direction :output
-                         :if-exists :supersede
-                         :if-does-not-exist :create
-                         :element-type '(unsigned-byte 8))
-      (setf (gethash "output/CaseFolding.txt" *ucd-outputs*) 'made)
-      ;; KLUDGE: it's inefficient, though simple, to do the I/O
-      ;; byte-by-bite.
-      (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))
-           (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
-           (eszet-count 0)
-           (filename "CaseFolding.txt"))
-          ((null inbyte)
-           (unless (= eszet-count 1)
-             (error "Unexpected number of eszets in ~A: ~D"
-                    filename eszet-count)))
-        (cond
-          ((= inbyte #xc3)
-           (let ((second (read-byte in nil nil)))
-              (cond
-                ((null second)
-                 (error "No continuation after #xc3 in ~A" filename))
-                ((= second #x9f) (incf eszet-count) (write-sequence eszet out))
-                (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
-                          filename second)))))
-          ((>= inbyte #x7f)
-           (error "Unexpected octet in ~A: #x~X" filename inbyte))
-          (t (write-byte inbyte out))))))
-  (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
-                                    :defaults *output-directory*))
-    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
+  (with-input-utf8-file (s "CaseFolding" :eszets 1)
     (loop for line = (read-line s nil nil)
-       while line
-       unless (or (not (position #\; line)) (equal (position #\# line) 0))
-       do (destructuring-bind (original type mapping comment)
-              (split-string line #\;)
-            (declare (ignore comment))
-            (let ((cp (parse-integer original :radix 16))
-                  (fold (parse-codepoints mapping :singleton-list nil)))
-              (unless (or (string= type " S") (string= type " T"))
-                (when (not (equal (cdr (gethash cp *case-mapping*)) fold))
-                  (push (cons cp fold) *different-casefolds*))))))))
+          while line
+          unless (or (not (position #\; line)) (equal (position #\# line) 0))
+            do (destructuring-bind (original type mapping comment)
+                   (split-string line #\;)
+                 (declare (ignore comment))
+                 (let ((cp (parse-integer original :radix 16))
+                       (fold (parse-codepoints mapping :singleton-list nil)))
+                   (unless (or (string= type " S") (string= type " T"))
+                     (when (not (equal (cdr (gethash cp *case-mapping*)) fold))
+                       (push (cons cp fold) *different-casefolds*))))))))
 
 (defun fixup-ages ()
   (let ((age (sort
@@ -670,7 +698,7 @@ Length should be adjusted when the standard changes.")
       (push result **proplist-properties**))))
 
 (defun slurp-proplist ()
-  (with-input-txt-file (s "PropList")
+  (with-input-utf8-file (s "PropList")
     (parse-property s) ;; Initial comments
     (parse-property s :white-space)
     (parse-property s :bidi-control)
@@ -700,12 +728,14 @@ Length should be adjusted when the standard changes.")
     (parse-property s :logical-order-exception)
     (parse-property s :other-id-start)
     (parse-property s :other-id-continue)
-    (parse-property s :sterm)
+    (parse-property s :sentence-terminal)
     (parse-property s :variation-selector)
     (parse-property s :pattern-white-space)
-    (parse-property s :pattern-syntax))
+    (parse-property s :pattern-syntax)
+    (parse-property s :prepended-concatenation-mark)
+    (parse-property s :regional-indicator))
 
-  (with-input-txt-file (s "DerivedNormalizationProps")
+  (with-input-utf8-file (s "DerivedNormalizationProps")
     (parse-property s) ;; Initial comments
     (parse-property s) ;; FC_NFKC_Closure
     (parse-property s) ;; FC_NFKC_Closure
@@ -737,10 +767,11 @@ Length should be adjusted when the standard changes.")
 (defun parse-collation-line (line)
   (destructuring-bind (%code-points %keys) (split-string line #\;)
     (let* ((code-points (parse-codepoints %code-points))
+           (%keys (subseq %keys 0 (search " #" %keys)))
            (keys
-            (remove
-             ""
-             (split-string (remove #\[ (remove #\Space %keys)) #\]) :test #'string=))
+             (remove
+              ""
+              (split-string (remove #\[ (remove #\Space %keys)) #\]) :test #'string=))
            (ret
             (loop for key in keys
                for variable-p = (position #\* key)
@@ -754,15 +785,6 @@ Length should be adjusted when the standard changes.")
                                           (max primary *maximum-variable-key*)))
                    (bitpack-collation-key primary secondary tertiary)))))
     (values code-points ret))))
-
-(defparameter *collation-table*
-  (with-input-txt-file (stream "allkeys")
-    (loop with hash = (make-hash-table :test #'equal)
-       for line = (read-line stream nil nil) while line
-       unless (eql 0 (position #\# line))
-       do (multiple-value-bind (codepoints keys) (parse-collation-line line)
-            (setf (gethash codepoints hash) keys))
-       finally (return hash))))
 
 
 ;;; Other properties
@@ -787,7 +809,7 @@ Length should be adjusted when the standard changes.")
   "List of confusable codepoint sets")
 
 (defparameter *bidi-mirroring-glyphs*
-  (with-input-txt-file (s "BidiMirroring")
+  (with-input-utf8-file (s "BidiMirroring")
     (loop for line = (read-line s nil nil) while line
           when (and (plusp (length line))
                     (char/= (char line 0) #\#))
@@ -799,7 +821,7 @@ Length should be adjusted when the standard changes.")
 
 (defparameter *blocks*
   (let (ranges names)
-    (with-input-txt-file (stream "Blocks")
+    (with-input-utf8-file (stream "Blocks")
       (loop
        (let ((line (read-line stream nil nil)))
          (cond ((not line) (return))
@@ -820,13 +842,6 @@ Used to look up block data.")
   (write-byte (ldb (byte 8 16) code-point) stream)
   (write-byte (ldb (byte 8 8) code-point) stream)
   (write-byte (ldb (byte 8 0) code-point) stream))
-
-(defun write-4-byte (value stream)
-  (declare (type (unsigned-byte 32) value))
-  (write-byte (ldb (byte 8 24) value) stream)
-  (write-byte (ldb (byte 8 16) value) stream)
-  (write-byte (ldb (byte 8 8) value) stream)
-  (write-byte (ldb (byte 8 0) value) stream))
 
 (defun output-misc-data ()
   (with-output-dat-file (stream "ucdmisc")
@@ -895,14 +910,14 @@ Used to look up block data.")
     (print (length *decompositions*))))
 
 (defun output-composition-data ()
-  (with-output-dat-file (stream "comp")
+  (with-output-lisp-expr-file (stream "comp")
     (let (comp)
       (maphash (lambda (k v) (push (cons k v) comp)) *compositions*)
-      (setq comp (sort comp #'< :key #'cdr))
-      (loop for (k . v) in comp
-         do (write-codepoint (car k) stream)
-           (write-codepoint (cdr k) stream)
-           (write-codepoint v stream)))))
+      (format stream "#(~%")
+      (loop for (k . v) in (sort comp #'< :key #'cdr)
+         do (format stream "(~D . ~D) ; #x~X + #x~X~%"
+                    (logior (ash (car k) 21) (cdr k)) v (car k) (cdr k)))
+      (format stream ")~%"))))
 
 (defun output-case-data ()
   (let (casing-pages points-with-case)
@@ -934,37 +949,32 @@ Used to look up block data.")
       (print casing-pages stream))))
 
 (defun output-collation-data ()
-  (with-output-dat-file (stream "collation")
-    (flet ((length-tag (list1 list2)
-             ;; takes two lists of UB32 (with the caveat that list1[0]
-             ;; needs its high 8 bits free (codepoints always have
-             ;; that) and do
-             (let* ((l1 (length list1)) (l2 (length list2))
-                    (tag (dpb l1 (byte 4 28) (dpb l2 (byte 5 23) (car list1)))))
-               (assert (<= l1 3))
-               (write-4-byte tag stream)
-               (map nil #'(lambda (l) (write-4-byte l stream)) (append (cdr list1) list2)))))
-      (let (coll)
-        (maphash (lambda (k v) (push (cons k v) coll)) *collation-table*)
-        (labels ((sorter (o1 o2)
-                   (cond
-                     ((null o1) t)
-                     ((null o2) nil)
-                     (t (or (< (car o1) (car o2))
-                            (and (= (car o1) (car o2))
-                                 (sorter (cdr o1) (cdr o2))))))))
-          (setq coll (sort coll #'sorter :key #'car)))
-        (loop for (k . v) in coll
-           do (length-tag k v)))))
+  (with-output-lisp-expr-file (output "collation")
+    (format output ";;;; This is 'allkeys.txt' converted to Lisp syntax~%")
+    (format output ";;;; Assume *READ-BASE* is 16.~%#(~%")
+    (with-input-txt-file (input "allkeys")
+      (loop for line = (read-line input nil nil) while line
+            unless (or (string= line "")
+                       (eql 0 (position #\@ line)) (eql 0 (position #\# line)))
+            do
+         (multiple-value-bind (codepoints keys) (parse-collation-line line)
+           (format output "(~x . ~x)~%"
+                   ;; Pack up to 3 codepoints, rightmost in the highest bits
+                   (destructuring-bind (first &optional second third) codepoints
+                     (cond (third (logior (ash third 42) (ash second 21) first))
+                           (second (logior (ash second 21) first))
+                           (t first)))
+                   ;; Pack the blob of "keys" using 32 bits each
+                   (let ((sum 0))
+                     ;; reversal here is magic. Don't worry about getting it wrong-
+                     ;; unicode-collation.pure checks that.
+                     (dolist (part (reverse keys) sum)
+                       (setq sum (logior (ash sum 32) part))))))))
+    (format output ")~%"))
   (with-output-lisp-expr-file (*standard-output* "other-collation-info")
     (write-string ";;; The highest primary variable collation index")
     (terpri)
-    (prin1 *maximum-variable-key*) (terpri))
-  (with-output-lisp-expr-file (*standard-output* "n-collation-entries")
-    (write-string ";;; The number of entries in the collation table")
-    (terpri)
-    (prin1 (hash-table-count *collation-table*))
-    (terpri)))
+    (prin1 *maximum-variable-key*) (terpri)))
 
 (defun output (&optional (*output-directory* *output-directory*))
   (output-misc-data)
@@ -994,12 +1004,9 @@ Used to look up block data.")
     (setf *unicode-1-names* nil))
 
   (with-output-lisp-expr-file (*standard-output* "numerics")
-    (let ((result (make-array (* (length *different-numerics*) 2))))
-      (loop for (code . value) in (sort *different-numerics* #'< :key #'car)
-         for i by 2
-         do (setf (aref result i) code
-                  (aref result (1+ i)) (read-from-string value)))
-      (prin1 result)))
+    (prin1 (mapcar (lambda (x) (cons (car x) (read-from-string (cdr x))))
+                   ;; Print it low to high. It was collected with PUSH
+                   (reverse *different-numerics*))))
   (with-output-lisp-expr-file (*standard-output* "titlecases")
     (prin1 *different-titlecases*))
   (with-output-lisp-expr-file (*standard-output* "foldcases")

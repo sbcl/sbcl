@@ -1,1 +1,1 @@
-:little-endian :sb-thread
+:little-endian :sb-thread :darwin-jit

@@ -28,7 +28,8 @@
     (ecase type
       (reader (slot-info-reader info))
       (writer (slot-info-writer info))
-      (boundp (slot-info-boundp info)))))
+      (boundp (slot-info-boundp info))
+      (makunbound (slot-info-makunbound info)))))
 
 (defmethod (setf slot-accessor-function) (function
                                           (slotd effective-slot-definition)
@@ -37,12 +38,14 @@
     (ecase type
       (reader (setf (slot-info-reader info) function))
       (writer (setf (slot-info-writer info) function))
-      (boundp (setf (slot-info-boundp info) function)))))
+      (boundp (setf (slot-info-boundp info) function))
+      (makunbound (setf (slot-info-makunbound info) function)))))
 
 (defconstant +slotd-reader-function-std-p+ 1)
 (defconstant +slotd-writer-function-std-p+ 2)
 (defconstant +slotd-boundp-function-std-p+ 4)
-(defconstant +slotd-all-function-std-p+ 7)
+(defconstant +slotd-makunbound-function-std-p+ 8)
+(defconstant +slotd-all-function-std-p+ 15)
 
 (defmethod slot-accessor-std-p ((slotd effective-slot-definition) type)
   (let ((flags (slot-value slotd 'accessor-flags)))
@@ -52,7 +55,8 @@
         (logtest flags (ecase type
                         (reader +slotd-reader-function-std-p+)
                         (writer +slotd-writer-function-std-p+)
-                        (boundp +slotd-boundp-function-std-p+))))))
+                        (boundp +slotd-boundp-function-std-p+)
+                        (makunbound +slotd-makunbound-function-std-p+))))))
 
 (defmethod (setf slot-accessor-std-p) (value
                                        (slotd effective-slot-definition)
@@ -60,7 +64,8 @@
   (let ((mask (ecase type
                 (reader +slotd-reader-function-std-p+)
                 (writer +slotd-writer-function-std-p+)
-                (boundp +slotd-boundp-function-std-p+)))
+                (boundp +slotd-boundp-function-std-p+)
+                (makunbound +slotd-makunbound-function-std-p+)))
         (flags (slot-value slotd 'accessor-flags)))
     (declare (type fixnum mask flags))
     (setf (slot-value slotd 'accessor-flags)
@@ -72,11 +77,12 @@
   (let* ((name (slot-value slotd 'name)) ; flushable? (is it ever unbound?)
          (class (slot-value slotd '%class)))
     (declare (ignore name))
-    (dolist (type '(reader writer boundp))
+    (dolist (type '(reader writer boundp makunbound))
       (let* ((gf-name (ecase type
                               (reader 'slot-value-using-class)
                               (writer '(setf slot-value-using-class))
-                              (boundp 'slot-boundp-using-class)))
+                              (boundp 'slot-boundp-using-class)
+                              (makunbound 'slot-makunbound-using-class)))
              (gf (gdefinition gf-name)))
         ;; KLUDGE: this logic is cut'n'pasted from
         ;; GET-ACCESSOR-METHOD-FUNCTION, which (for STD-CLASSes) is
@@ -97,11 +103,12 @@
                   (apply fun args))))))))
 
 (defmethod finalize-internal-slot-functions ((slotd effective-slot-definition))
-  (dolist (type '(reader writer boundp))
+  (dolist (type '(reader writer boundp makunbound))
     (let* ((gf-name (ecase type
                       (reader 'slot-value-using-class)
                       (writer '(setf slot-value-using-class))
-                      (boundp 'slot-boundp-using-class)))
+                      (boundp 'slot-boundp-using-class)
+                      (makunbound 'slot-makunbound-using-class)))
            (gf (gdefinition gf-name)))
       (compute-slot-accessor-info slotd type gf))))
 
@@ -111,11 +118,11 @@
 ;;; SLOT-VALUE-USING-CLASS) or SLOT-BOUNDP-USING-CLASS for reading/
 ;;; writing/testing effective slot SLOTD.
 ;;;
-;;; TYPE is one of the symbols READER, WRITER or BOUNDP, depending on
-;;; GF.  Store the effective method in the effective slot definition
-;;; object itself; these GFs have special dispatch functions calling
-;;; effective methods directly retrieved from effective slot
-;;; definition objects, as an optimization.
+;;; TYPE is one of the symbols READER, WRITER, BOUNDP or MAKUNBOUND,
+;;; depending on GF.  Store the effective method in the effective slot
+;;; definition object itself; these GFs have special dispatch
+;;; functions calling effective methods directly retrieved from
+;;; effective slot definition objects, as an optimization.
 ;;;
 ;;; FIXME: Change the function name to COMPUTE-SVUC-SLOTD-FUNCTION,
 ;;; or some such.
@@ -149,7 +156,8 @@
                 (declare (notinline allocate-instance))
                 (with-slots (prototype) class
                   (or prototype
-                      (setf prototype (allocate-instance class)))))))
+                      (setf prototype (sb-vm:without-arena "class-prototype"
+                                        (allocate-instance class))))))))
   (def std-class)
   (def condition-class)
   (def structure-class))
@@ -254,7 +262,7 @@
     (or (cdr cell)
         (when (car cell)
           (setf (cdr cell)
-                (sb-thread:with-mutex (*specializer-lock*)
+                (with-system-mutex (*specializer-lock*)
                   (let (collect)
                     (dolist (m (car cell) (nreverse collect))
                 ;; the old PCL code used COLLECTING-ONCE which used
@@ -669,10 +677,10 @@
             (set-condition-slot-value x v slot-name)))
     (setf (slot-info-boundp info)
           (lambda (x)
-            (multiple-value-bind (v c)
-                (ignore-errors (condition-slot-value x slot-name))
-              (declare (ignore v))
-              (null c))))
+            (condition-slot-boundp x slot-name)))
+    (setf (slot-info-makunbound info)
+          (lambda (x)
+            (condition-slot-makunbound x slot-name)))
     slotd))
 
 (defmethod compute-slots :around ((class condition-class))
@@ -688,8 +696,8 @@
     (error "Structure slots must have :INSTANCE allocation.")))
 
 (defun make-structure-class-defstruct-form (name direct-slots include)
-  (let* ((conc-name (format-symbol *package* "~S structure class " name))
-         (constructor (format-symbol *package* "~Aconstructor" conc-name))
+  (let* ((conc-name (pkg-format-symbol *package* "~S structure class " name))
+         (constructor (pkg-format-symbol *package* "~Aconstructor" conc-name))
          (included-name (class-name include))
          (included-slots
           (when include
@@ -804,7 +812,7 @@
                               (when defstruct-p
                                 (let* ((slot-name (getf pl :name))
                                        (accessor
-                                        (format-symbol *package*
+                                        (pkg-format-symbol *package*
                                                        "~S structure class ~A"
                                                        name slot-name)))
                                   (setq pl (list* :defstruct-accessor-symbol
@@ -1312,6 +1320,8 @@
            (slot-definition-internal-reader-function slotd)
            :internal-writer-function
            (slot-definition-internal-writer-function slotd)
+           :always-bound-p
+           (slot-definition-always-bound-p slotd)
            (call-next-method))))
 
 ;;; NOTE: For bootstrapping considerations, these can't use MAKE-INSTANCE
@@ -1351,34 +1361,16 @@
                              :method-class-function #'writer-method-class
                              'source source-location)))
 
-(defmethod add-boundp-method ((class slot-class) generic-function slot-name slot-documentation source-location)
-  (add-method generic-function
-              (make-a-method (constantly (find-class 'standard-boundp-method))
-                             class
-                             ()
-                             (list (or (class-name class) 'object))
-                             (list class)
-                             (make-boundp-method-function class slot-name)
-                             (or slot-documentation "automatically generated boundp method")
-                             :slot-name slot-name
-                             'source source-location)))
-
 (defmethod remove-reader-method ((class slot-class) generic-function)
   (let ((method
-         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
-              (get-method generic-function () (list class) nil))))
+          (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
+               (get-method generic-function () (list class) nil))))
     (when method (remove-method generic-function method))))
 
 (defmethod remove-writer-method ((class slot-class) generic-function)
   (let ((method
          (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 2)
               (get-method generic-function () (list *the-class-t* class) nil))))
-    (when method (remove-method generic-function method))))
-
-(defmethod remove-boundp-method ((class slot-class) generic-function)
-  (let ((method
-         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
-              (get-method generic-function () (list class) nil))))
     (when method (remove-method generic-function method))))
 
 ;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION
@@ -1400,9 +1392,6 @@
 
 (defmethod make-writer-method-function ((class slot-class) slot-name)
   (make-std-writer-method-function class slot-name))
-
-(defmethod make-boundp-method-function ((class slot-class) slot-name)
-  (make-std-boundp-method-function class slot-name))
 
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))
@@ -1619,9 +1608,7 @@
                            ((fixnump location)
                             (clos-slots-ref oslots location))
                            ((not location)
-                            (let ((location (slot-info-location (cdr cell))))
-                              (aver (integerp location))
-                              (clos-slots-ref oslots (slot-info-location (cdr cell)))))
+                            (clos-slots-ref oslots (slot-info-location (cdr cell))))
                            (t (bug "non-FIXNUM non-NULL location in cell: ~S" cell)))))
              (unless (unbound-marker-p value)
                (let ((new (assq name layout)))

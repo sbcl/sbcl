@@ -14,8 +14,6 @@
 
 (in-package "SB-VM")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 (defconstant-eqx +float-trap-alist+
     `((:underflow . ,float-underflow-trap-bit)
       (:overflow . ,float-overflow-trap-bit)
@@ -40,13 +38,13 @@
   #'equal)
 
 ;;; Return a mask with all the specified float trap bits set.
-(defun float-trap-mask (names)
-  (reduce #'logior
-          (mapcar (lambda (x)
-                    (or (cdr (assoc x +float-trap-alist+))
-                        (error "unknown float trap kind: ~S" x)))
-                  names)))
-) ; EVAL-WHEN
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun float-trap-mask (names)
+    (reduce #'logior
+            (mapcar (lambda (x)
+                      (or (cdr (assoc x +float-trap-alist+))
+                          (error "unknown float trap kind: ~S" x)))
+                    names))))
 
 ;;; interpreter stubs for floating point modes get/setters for
 ;;; some architectures have been removed, as they are implemented

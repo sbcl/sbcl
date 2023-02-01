@@ -12,7 +12,7 @@
 (in-package "SB-C")
 
 ;;; Unique number assigned into high 4 bytes of 64-bit code size slot
-;;; so that we can sort the contents of varyobj space in a more-or-less
+;;; so that we can sort the contents of text space in a more-or-less
 ;;; predictable manner based on the order in which code was loaded.
 ;;; This wraps around at 32 bits, but it's still deterministic.
 (define-load-time-global *code-serialno* 0)
@@ -29,10 +29,6 @@
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)
-  ;; A hashtable translating ENTRY-INFO structures to a list of pairs
-  ;; (<code object> . <offset>) describing the places that need to be
-  ;; backpatched to point to the function for ENTRY-INFO.
-  (patch-table (make-hash-table :test 'eq) :type hash-table)
   ;; A list of all the DEBUG-INFO objects created, kept so that we can
   ;; backpatch with the source info.
   (debug-info () :type list))

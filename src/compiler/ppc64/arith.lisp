@@ -190,13 +190,26 @@
              `(progn
                 (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum) fast-fixnum-binop-c)
                   (:translate ,translate)
-                  (:generator 1 (generate-fast-+-c r x (fixnumize (,translate y)))))
+                  (:generator 1
+                    (cond ((and (eq ',translate '-)
+                                (= y most-negative-fixnum))
+                           (inst lr temp-reg-tn (fixnumize y))
+                           (inst sub r x temp-reg-tn))
+                          (t
+                           (generate-fast-+-c r x (fixnumize (,translate y)))))))
                 (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed) fast-signed-binop-c)
                   (:translate ,translate)
-                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y))))
+                  (:generator ,untagged-penalty
+                    (cond ((and (eq ',translate '-)
+                                (= y (- (expt 2 (1- n-word-bits)))))
+                           (inst lr temp-reg-tn y)
+                           (inst sub r x temp-reg-tn))
+                          (t
+                           (generate-fast-+-c r x (,translate y))))))
                 (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned) fast-unsigned-binop-c)
                   (:translate ,translate)
-                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y)))))))
+                  (:generator ,untagged-penalty
+                    (generate-fast-+-c r x (,translate y)))))))
   (define-const-binop + 4)
   (define-const-binop - 4))
 
@@ -1092,6 +1105,35 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst sld result digit count)))
+
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mulld temp dividend c)
+    (inst rldicl temp temp 0 32) ; drop the high 32 bits, keep the low 32 bits
+    (inst mulld temp temp divisor)
+    (inst srdi remainder temp 32))) ; take the high 32 bits
+(define-vop ()
+  (:translate fastrem-64)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mulld temp dividend c) ; want only the low 64 bits
+    (inst mulhdu remainder temp divisor))) ; want only the high 64 bits
 
 (in-package "SB-C")
 

@@ -104,40 +104,16 @@
 
 (define-vop ()
   (:translate sap+)
-  (:args (ptr :scs (sap-reg) :target res
-              :load-if (not (location= ptr res)))
-         (offset :scs (signed-reg immediate)))
+  (:args (ptr :scs (sap-reg sap-stack) :target res :load-if nil)
+         (offset :scs (signed-reg signed-stack immediate)))
   (:arg-types system-area-pointer signed-num)
-  (:results (res :scs (sap-reg) :from (:argument 0)
-                 :load-if (not (location= ptr res))))
+  (:results (res :scs (sap-reg sap-stack) :load-if nil))
+  (:vop-var vop)
   (:result-types system-area-pointer)
-  (:temporary (:sc signed-reg) temp)
+  (:temporary (:sc signed-reg) temp) ; TODO: add an :unused-if on this
   (:policy :fast-safe)
   (:generator 1
-    (cond ((and (sc-is ptr sap-reg) (sc-is res sap-reg)
-                (not (location= ptr res)))
-           (sc-case offset
-             (signed-reg
-              (inst lea res (ea ptr offset)))
-             (immediate
-              (let ((value (tn-value offset)))
-                (cond ((typep value '(signed-byte 32))
-                       (inst lea res (ea value ptr)))
-                      (t
-                       (inst mov temp value)
-                       (inst lea res (ea ptr temp))))))))
-          (t
-           (move res ptr)
-           (sc-case offset
-             (signed-reg
-              (inst add res offset))
-             (immediate
-              (let ((value (tn-value offset)))
-                (cond ((typep value '(signed-byte 32))
-                       (inst add res (tn-value offset)))
-                      (t
-                       (inst mov temp value)
-                       (inst add res temp))))))))))
+    (emit-inline-add-sub 'add ptr offset res temp vop 'identity)))
 
 (define-vop ()
   (:translate sap-)
@@ -398,6 +374,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
   (:result-types system-area-pointer)
   (:generator 2
     (let ((disp (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
-      (if (location= sap vector)
-          (inst add sap disp)
-          (inst lea sap (ea disp vector))))))
+      (flet ((2-operand-add (dst src)
+               (cond ((eql src 1) (inst inc dst))
+                     (t (inst add dst src)))))
+        (if (location= sap vector)
+            (2-operand-add sap disp)
+            (inst lea sap (ea disp vector)))))))

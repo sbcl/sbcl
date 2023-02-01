@@ -20,5 +20,9 @@ extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolea
 lispobj *search_all_gc_spaces(void *pointer); // 'search.c' provides
 lispobj *search_dynamic_space(void *pointer); // Provided by 'gencgc' or 'cheneygc'
 lispobj *search_immobile_space(void *pointer);
+int bsearch_greatereql_uword(uword_t item, uword_t* array, int nelements);
+int bsearch_lesseql_uword(uword_t item, uword_t* array, int nelements);
+int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements);
+int bsearch_lesseql_uint32(uint32_t item, uint32_t* array, int nelements);
 
 #endif

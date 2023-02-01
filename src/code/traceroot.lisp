@@ -17,23 +17,6 @@
 (define-alien-variable  "gc_object_watcher" unsigned)
 (define-alien-variable  "gc_traceroot_criterion" int)
 
-#+sb-thread
-(defun find-symbol-from-tls-index (index)
-  (unless (zerop index)
-    ;; Search interned symbols first since that's probably enough
-    (do-all-symbols (symbol)
-      (when (= (sb-kernel:symbol-tls-index symbol) index)
-        (return-from find-symbol-from-tls-index symbol)))
-    ;; A specially bound uninterned symbol? how awesome
-    (sb-vm:map-allocated-objects
-     (lambda (obj type size)
-       (declare (ignore size))
-       (when (and (= type sb-vm:symbol-widetag)
-                  (= (sb-kernel:symbol-tls-index obj) index))
-         (return-from find-symbol-from-tls-index obj)))
-     :all))
-  0)
-
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
 ;;;
@@ -89,7 +72,7 @@
                        (symbol
                         (unless (eql root-kind 1)
                           #+sb-thread
-                          (find-symbol-from-tls-index (ash extra sb-vm:n-fixnum-tag-bits))
+                          (sb-vm::symbol-from-tls-index (ash extra sb-vm:n-fixnum-tag-bits))
                           #-sb-thread
                           extra)))
                   (awhen (and thread (sb-thread:thread-name thread))
@@ -137,7 +120,15 @@
                         pathname sb-impl::host hash-table)
                     (format stream "~S~%" obj))
                    (t
-                    (format stream "a ~(~a~)" (type-of obj))
+                    ;; We want to distinguish between SB-PCL::CACHE and every other type
+                    ;; that anyone invents named CACHE (of which there are many!) but not be
+                    ;; so pedantic as to print as COMMON-LISP:CONS
+                    (let ((type (type-of obj)))
+                      (if (and (symbolp type) (eq (symbol-package type) *cl-package*))
+                          ;; Putting (FORMAT stream (IF "s1" "s2") type) here failed the post-build
+                          ;; assertion about strings containing SB- packages. (FIXME)
+                          (format stream "a ~(~a~)" type)
+                          (format stream "a ~/sb-ext:print-symbol-with-prefix/" type)))
                     (when (consp obj)
                       (write-string " = " stream)
                       (write obj :stream stream :level 1 :length 3 :pretty nil))
@@ -169,7 +160,8 @@
                            (:print (or boolean (eql :verbose)))))
                 search-roots))
 (defun search-roots (weak-pointers &key (criterion :oldest) (gc nil)
-                                        (ignore nil) (print t))
+                                        (ignore '(* ** *** / // ///))
+                                        (print t))
   "Find roots keeping the targets of WEAK-POINTERS alive.
 
 WEAK-POINTERS must be a single SB-EXT:WEAK-POINTER or a list of those,
@@ -261,7 +253,7 @@ Experimental: subject to change without prior notice."
                             (:static 2))))
     (cond (gc
            (setf gc-traceroot-criterion criterion-value)
-           (sb-sys:with-pinned-objects (param)
+           (sb-sys:with-pinned-objects (param (elt param 1))
              (setf gc-object-watcher (sb-kernel:get-lisp-obj-address param)))
            (gc :full t)
            (setf gc-object-watcher 0))

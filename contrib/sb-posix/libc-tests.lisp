@@ -1,5 +1,4 @@
-(defpackage #:sb-libc-tests (:use #:cl #:sb-rt))
-(in-package "SB-LIBC-TESTS")
+(in-package "SB-POSIX-TESTS")
 
 (defparameter *tests* ; unicode strings (by default unless #-sb-unicode)
   #("1.20203" "3.4400" "3240.2205" "10088.92" "12.3" "1000000000e-2"

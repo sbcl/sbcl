@@ -28,6 +28,24 @@
 (define-move-fun (store-double 2) (vop x y)
                  ((double-reg) (double-stack))
   (storew x (current-nfp-tn vop) (tn-offset y)))
+
+(define-move-fun (load-fp-immediate 1) (vop x y)
+                 ((single-immediate) (single-reg)
+                  (double-immediate) (double-reg))
+  (let ((x (tn-value x)))
+    (cond ((or (eql x $0f0)
+               (eql x $0d0))
+           (inst fmov y zr-tn))
+          ((encode-fp-immediate  x)
+           (inst fmov y x))
+          ((load-immediate-word tmp-tn (if (double-float-p x)
+                                           (double-float-bits x)
+                                           (single-float-bits x))
+                                t)
+           (inst fmov y tmp-tn))
+          (t
+           (load-inline-constant y x)))))
+
 
 ;;;; Move VOPs:
 
@@ -189,7 +207,6 @@
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
-
 ;;;
 ;;; Move from a descriptor to a complex float register
 ;;;
@@ -337,22 +354,16 @@
 
 (define-vop (float-compare)
   (:args (x) (y))
-  (:variant-vars format is-=)
+  (:variant-vars is-=)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (note-this-location vop :internal-error)
-    (ecase format
-      (:single
-       (if is-=
-           (inst fcmp x y)
-           (inst fcmpe x y)))
-      (:double
-       (if is-=
-           (inst fcmp x y)
-           (inst fcmpe x y))))))
+    (if is-=
+        (inst fcmp x y)
+        (inst fcmpe x y))))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
@@ -367,14 +378,14 @@
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :single ,is-=))
+                  (:variant ,is-=))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :double  ,is-=)))))
+                  (:variant ,is-=)))))
   (frob < :mi </single-float </double-float nil)
   (frob > :gt >/single-float >/double-float nil)
-  (frob <= :le <=/single-float <=/double-float nil)
+  (frob <= :ls <=/single-float <=/double-float nil)
   (frob >= :ge >=/single-float >=/double-float nil)
   (frob = :eq =/single-float =/double-float t))
 
@@ -414,7 +425,7 @@
                   (:variant ,is-=)))))
   (frob < :mi </single-float-zero </double-float-zero nil)
   (frob > :gt >/single-float-zero >/double-float-zero nil)
-  (frob <= :le <=/single-float-zero <=/double-float-zero nil)
+  (frob <= :ls <=/single-float-zero <=/double-float-zero nil)
   (frob >= :ge >=/single-float-zero >=/double-float-zero nil)
   (frob = :eq eql/single-float-zero eql/double-float-zero t))
 
@@ -464,7 +475,9 @@
     single-reg single-float double-reg double-float))
 
 (macrolet ((frob (trans from-sc from-type inst)
-             `(define-vop (,(symbolicate trans "/" from-type))
+             `(define-vop (,(if (find #\/ (string trans))
+                                trans
+                                (symbolicate trans "/" from-type)))
                 (:args (x :scs (,from-sc)))
                 (:results (y :scs (signed-reg)))
                 (:arg-types ,from-type)
@@ -480,7 +493,11 @@
   (frob %unary-truncate/single-float single-reg single-float fcvtzs)
   (frob %unary-truncate/double-float double-reg double-float fcvtzs)
   (frob %unary-round single-reg single-float fcvtns)
-  (frob %unary-round double-reg double-float fcvtns))
+  (frob %unary-round double-reg double-float fcvtns)
+  (frob %unary-ceiling single-reg single-float fcvtps)
+  (frob %unary-ceiling double-reg double-float fcvtps)
+  (frob %unary-floor single-reg single-float fcvtms)
+  (frob %unary-floor double-reg double-float fcvtms))
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res
@@ -658,7 +675,9 @@
   (:translate floating-point-modes)
   (:policy :fast-safe)
   (:generator 3
-    (inst mrs res :fpsr)))
+    (inst mrs res :fpsr)
+    (inst mrs tmp-tn :fpcr)
+    (inst orr res res tmp-tn)))
 
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :target res))
@@ -669,6 +688,7 @@
   (:policy :fast-safe)
   (:generator 3
     (inst msr :fpsr new)
+    (inst msr :fpcr new)
     (move res new)))
 
 ;;;; Complex float VOPs

@@ -40,15 +40,13 @@ tests/*.so
 tests/run-tests-*
 tests/last-random-state.lisp-expr
 tests/ansi-test/
+tools-for-build/avx2*
 tools-for-build/determine-endianness
 tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/mmap-rwx
 tools-for-build/where-is-mcontext
-contrib/*/test-passed
-contrib/*/test-output
 contrib/asdf/asdf-upstream
-contrib/sb-cover/test-output
 doc/manual/*.html
 version.lisp-expr

@@ -137,7 +137,7 @@
 (declaim (inline info-env-adjust-count))
 (defun info-env-adjust-count (table delta)
   ;; Inform the compiler that this is not possibly a bignum,
-  ;; since it's true upper bound is the info storage threshold.
+  ;; since its true upper bound is the info storage threshold.
   (truly-the info-cell-index (atomic-incf (info-env-count table) delta)))
 
 (declaim (inline make-info-forwarding-pointer

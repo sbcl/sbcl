@@ -672,9 +672,10 @@ The source locations are stored in SOURCE-MAP."
         (return-from return
           (sb-impl::read-list stream ignore)))
       (let* ((thelist (list nil))
+             (rt *readtable*)
              (listtail thelist))
-        (do ((firstchar (sb-impl::flush-whitespace stream)
-                        (sb-impl::flush-whitespace stream)))
+        (do ((firstchar (sb-impl::flush-whitespace stream rt)
+                        (sb-impl::flush-whitespace stream rt)))
             ((char= firstchar #\) ) (cdr thelist))
           (when (char= firstchar #\.)
             (let ((nextchar (read-char stream t)))
@@ -684,8 +685,8 @@ The source locations are stored in SOURCE-MAP."
                               (sb-int:simple-reader-error
                                stream
                                "Nothing appears before . in list.")))
-                           ((sb-impl::whitespace[2]p nextchar)
-                            (setq nextchar (sb-impl::flush-whitespace stream))))
+                           ((sb-impl::whitespace[2]p nextchar rt)
+                            (setq nextchar (sb-impl::flush-whitespace stream rt))))
                      (rplacd listtail
                              (sb-impl::read-after-dot
                               stream nextchar (if *read-suppress* 0 -1)))

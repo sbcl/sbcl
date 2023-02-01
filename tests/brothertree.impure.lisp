@@ -1,7 +1,8 @@
-#+interpreter (sb-ext:exit :code 104)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (let ((*evaluator-mode* :compile))
-  (load "../src/code/brothertree.lisp"))
+  (handler-bind ((warning #'muffle-warning))
+    (load "../src/code/brothertree.lisp")))
 
 (in-package sb-brothertree)
 
@@ -12,8 +13,8 @@
                                     (n-unary-internal 0)
                                     (n-unary-leaf 0))
   (sb-int:named-let recurse ((depth 0) (node root)
-                             (min most-negative-fixnum)
-                             (max most-positive-fixnum))
+                             (min -1)
+                             (max (1+ sb-ext:most-positive-word)))
     (etypecase node
      (unary-node
       (assert (not (unary-node-p (child node))))
@@ -116,11 +117,11 @@
     ;(print *cases*)
     nil))
 
-(defun random-big-list (count)
+(defun random-big-list (count &optional (maxval (ash 1 30)))
   (let ((h (make-hash-table)))
     (loop
        (when (zerop count) (return (loop for k being each hash-key of h collect k)))
-       (let ((n (random (min most-positive-fixnum (ash 1 30)))))
+       (let ((n (random (min most-positive-fixnum maxval))))
         (unless (gethash n h)
           (setf (gethash n h) t)
           (decf count))))))
@@ -239,6 +240,54 @@
     (time (setq tree (delete-from-brothertree tree deletion-order)))
     (assert (null tree))
     ))
+
+(macrolet ((define-c-wrapper (lisp-name c-name)
+             `(defun ,lisp-name (key tree)
+                (declare (sb-vm:word key))
+                (sb-sys:with-pinned-objects (tree)
+                  (let ((result
+                         (sb-alien:alien-funcall
+                          (sb-alien:extern-alien ,c-name
+                                                 (function sb-alien:unsigned sb-alien:unsigned
+                                                           sb-alien:unsigned))
+                                        key
+                                        (sb-kernel:get-lisp-obj-address tree))))
+                    (unless (eql result sb-vm:nil-value)
+                      ;; have to use *UNSAFE* make-lisp-obj here because "safe" make-lisp-obj
+                      ;; will not allow you to see an object in an open allocation region.
+                      ;; (could we close the region flushing the trees nodes to the page table?)
+                      (sb-kernel:%make-lisp-obj result)))))))
+  (define-c-wrapper c-find<= "brothertree_find_lesseql")
+  (define-c-wrapper c-find>= "brothertree_find_greatereql"))
+
+(test-util:with-test (:name :find-inequality)
+  (dotimes (i 10) ; try with various trees resulting from different shuffles
+    (let* ((list (test-util:shuffle (loop for i from 100 by 100 repeat 25 collect i)))
+           (tree (tree-from-list list)))
+      (assert (not (find<= 99 tree)))
+      (assert (not (c-find<= 99 tree)))
+      (assert (not (find>= 10000 tree)))
+      (assert (not (c-find>= 10000 tree)))
+      (loop for key from 100 by 100 repeat 25
+            do
+         (let ((node (find<= key tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= key tree) node)))
+         (let ((node (find>= key tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= key tree) node)))
+         (let ((node (find<= (1+ key) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= (1+ key) tree) node)))
+         (let ((node (find>= (1- key) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= (1- key) tree) node)))
+         (let ((node (find<= (+ key 99) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= (+ key 99) tree) node)))
+         (let ((node (find>= (- key 99) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= (- key 99) tree) node)))))))
 
 (test-util:with-test (:name :insert-delete)
   (try-delete-everything (tree-from-list (random-big-list 2500))))

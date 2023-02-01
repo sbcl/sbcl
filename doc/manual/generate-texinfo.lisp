@@ -9,8 +9,6 @@
 
 (defvar *contrib-directory* #P"../../contrib/")
 
-(defvar *asdf-object-cache-directory* #P"../../obj/asdf-cache/")
-
 (defvar *documented-packages*
   '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-MOP"
     "SB-PCL" "SB-SYS" "SB-SEQUENCE" "SB-UNICODE" "SB-PROFILE"
@@ -32,8 +30,9 @@
         finally (return result)))
 
 (defun generate-docstrings-texinfo (runtime
-                                    &key (docstring-directory "docstrings/"))
-  (let* ((contribs (sort (documented-contribs) #'string< :key #'car))
+                                    &key (docstring-directory "docstrings/")
+                                   (blocklist '()))
+  (let* ((contribs (sort (documented-contribs :exclude (append '("asdf") blocklist)) #'string< :key #'car))
          (packages (sort (append *documented-packages*
                                  (map 'list #'cdr contribs))
                          #'string<)))
@@ -92,10 +91,10 @@
 
 ;;;; Entry point
 
-(destructuring-bind (program runtime docstring-directory) *posix-argv*
+(destructuring-bind (program runtime docstring-directory blocklist) *posix-argv*
   (declare (ignore program))
   (generate-docstrings-texinfo
-   runtime :docstring-directory docstring-directory)
+   runtime :docstring-directory docstring-directory :blocklist (uiop:split-string blocklist))
 
   (expand-variables)
   (generate-external-format-texinfo))

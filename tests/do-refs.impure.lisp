@@ -72,19 +72,19 @@
 
 (test-util:with-test (:name :walk-slots-fdefn)
   (let* ((closure (funcall (compile nil '(lambda (x)  (lambda () x))) t))
-         (symbol (gensym)))
-    (setf (fdefinition symbol) closure)
+         (fname `(cas ,(gensym))))
+    (setf (fdefinition fname) closure)
     (walk-slots-test*
-     (sb-int:find-fdefn symbol)
+     (sb-int:find-fdefn fname)
      (lambda (slots)
        #+immobile-code
        (and (= (length slots) 3)
-            (symbolp (first slots))
+            (equal (first slots) fname)
             (closurep (second slots))
             (code-component-p (third slots)))
        #-immobile-code
        (and (= (length slots) 2)
-            (symbolp (first slots))
+            (equal (first slots) fname)
             (closurep (second slots)))))))
 
 (defclass mystdinst ()

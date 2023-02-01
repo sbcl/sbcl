@@ -68,7 +68,6 @@
   #-sb-xc-host (comparator (missing-arg) :type function :read-only t)
   ;; the type specifier, which must specify a numeric type.
   (raw-type (missing-arg) :type symbol :read-only t)
-  (init-vop (missing-arg) :type symbol :read-only t) ; FIXME: remove
   ;; How many words are each value of this type?
   (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
   ;; Necessary alignment in units of words.  Note that instances
@@ -97,20 +96,14 @@
 ;; By making this a cold-init function, it is possible to use raw slots
 ;; in cold toplevel forms.
 (defun !raw-slot-data-init ()
-  (macrolet ((make-raw-slot-data (&rest args &key accessor-name &allow-other-keys)
-               (declare (ignorable accessor-name))
-               #+sb-xc-host
-               `(!make-raw-slot-data ,@args)
-               #-sb-xc-host
-               (let ((access (cadr accessor-name)))
+  (macrolet ((make-raw-slot-data (&rest args)
+               #+sb-xc-host `(!make-raw-slot-data ,@args)
+               #-sb-xc-host ; unwrap the QUOTE from the args (this is a macro)
+               (let ((access (cadr (getf args :accessor-name)))
+                     (type (cadr (getf args :raw-type))))
                  `(!make-raw-slot-data
                    :accessor-fun #',access
-                   :comparator
-                   ;; Not a symbol, because there aren't any so-named functions.
-                   (named-lambda ,(string (symbolicate access "="))
-                       (index x y)
-                     (declare (optimize speed (safety 0)))
-                     (= (,access x index) (,access y index)))
+                   :comparator #',(symbolicate "RAW-" type "SLOT=")
                    ;; Ignore the :ACCESSOR-NAME initarg
                    ,@args :allow-other-keys t))))
     (let ((double-float-alignment
@@ -126,15 +119,12 @@
       (vector
        (make-raw-slot-data :raw-type 'sb-vm:word
                            :accessor-name '%raw-instance-ref/word
-                           :init-vop 'sb-vm::raw-instance-init/word
                            :n-words 1)
        (make-raw-slot-data :raw-type 'sb-vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
-                           :init-vop 'sb-vm::raw-instance-init/signed-word
                            :n-words 1)
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
-                           :init-vop 'sb-vm::raw-instance-init/single
                            ;; KLUDGE: On 64 bit architectures, we
                            ;; could pack two SINGLE-FLOATs into the
                            ;; same word if raw slots were indexed
@@ -148,30 +138,38 @@
                            :n-words 1)
        (make-raw-slot-data :raw-type 'double-float
                            :accessor-name '%raw-instance-ref/double
-                           :init-vop 'sb-vm::raw-instance-init/double
                            :alignment double-float-alignment
                            :n-words (/ 8 sb-vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-single-float
                            :accessor-name '%raw-instance-ref/complex-single
-                           :init-vop 'sb-vm::raw-instance-init/complex-single
                            :n-words (/ 8 sb-vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-double-float
                            :accessor-name '%raw-instance-ref/complex-double
-                           :init-vop 'sb-vm::raw-instance-init/complex-double
                            :alignment double-float-alignment
                            :n-words (/ 16 sb-vm:n-word-bytes))
        #+long-float
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
-                           :init-vop 'sb-vm::raw-instance-init/long
                            :n-words #+x86 3 #+sparc 4)
        #+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
-                           :init-vop 'sb-vm::raw-instance-init/complex-long
                            :n-words #+x86 6 #+sparc 8))))))
 
 #+sb-xc-host (!raw-slot-data-init)
+#-sb-xc-host
+(macrolet ((define-rs= ()
+             ;; Expand by using the host's vector of RSD instances
+             `(progn
+                ,@(loop for rsd across *raw-slot-data*
+                        collect
+                        (let ((type (raw-slot-data-raw-type rsd))
+                              (reader (raw-slot-data-accessor-name rsd)))
+                          `(defun  ,(symbolicate "RAW-" type "SLOT=") (index x y)
+                             (declare (optimize speed (safety 0)))
+                             (= (,reader x index) (,reader y index))))))))
+  (define-rs=))
+
 #+sb-xc
 (declaim (type (simple-vector #.(length *raw-slot-data*)) *raw-slot-data*))
 
@@ -187,87 +185,43 @@
          (let ((,index-var (dsd-index ,dsd)))
            ,@body)))))
 
-;;; PAD, if T (the default), includes a final word that may be present at the
-;;; end of the structure due to alignment requirements.
-;;; TYPE should be supplied only by 'editcore' for manipulating an on-disk core
-;;; mapped an address that differs from the core's desired address.
-;;; I have a love/hate relationship with this macro.
-;;; It's more efficient than iterating over DSD-SLOTS, and editcore would
-;;; have a harder time using DSD-SLOTS. But it's too complicated.
 #-sb-xc-host
-(defmacro do-instance-tagged-slot ((index-var thing &optional (pad t) layout-expr)
-                                   &body body)
-  (with-unique-names (instance layout mask bitmap-index bitmap-limit nbits end)
-    `(let* ((,instance ,thing)
-            (,layout ,(or layout-expr
-                          ;; %INSTANCE-LAYOUT is defknown'ed to return a LAYOUT,
-                          ;; but heap walking might encounter an instance with no layout,
-                          ;; hence the need to access the layout without assuming
-                          ;; it to be of that type.
-                          `(let ((l #+compact-instance-header
-                                    (%primitive %instance-layout ,instance)
-                                    #-compact-instance-header
-                                    (%instance-ref ,instance 0)))
-                             (truly-the sb-vm:layout
-                                        (if (eql l 0) #.(find-layout 't) l)))))
-            ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
-            ;; because it's not user-visible data.
-            (,mask (ash (%raw-instance-ref/signed-word ,layout (type-dd-length sb-vm:layout))
-                        (- sb-vm:instance-data-start)))
-            ;; Start counting from the next bitmap word as we've consumed one already
-            (,bitmap-index (1+ (type-dd-length sb-vm:layout)))
-            (,bitmap-limit (%instance-length ,layout))
-            ;; If this was the last word of the bitmap, then the high bit
-            ;; is infinitely sign-extended, and we can keep right-shifting
-            ;; the mask word indefinitely. Most bitmaps will have only 1 word.
-            (,nbits (if (= ,bitmap-index ,bitmap-limit)
-                        sb-vm:instance-length-mask
-                        (- sb-vm:n-word-bits sb-vm:instance-data-start))))
-       (declare (type sb-vm:signed-word ,mask)
-                (type fixnum ,nbits))
-       (do ((,index-var sb-vm:instance-data-start (1+ ,index-var))
-            (,end ,(if pad
-                       ;; target instances have an odd number of payload words.
-                       `(logior (%instance-length ,instance) 1)
-                       `(%instance-length ,instance))))
-           ((>= ,index-var ,end))
-         (declare (type index ,index-var))
-         ;; If mask was fully consumed, fetch the next bitmap word
-         (when (zerop ,nbits)
-           (setq ,mask (%raw-instance-ref/signed-word ,layout ,bitmap-index)
-                 ,nbits (if (= (incf (truly-the index ,bitmap-index)) ,bitmap-limit)
-                            sb-vm:instance-length-mask
-                            sb-vm:n-word-bits)))
-         (when (logbitp 0 ,mask) ,@body)
-         (setq ,mask (ash ,mask -1)
-               ,nbits (truly-the fixnum (1- ,nbits)))))))
+(progn
+(defmacro do-layout-bitmap ((index-var taggedp-var layout count) &body guts)
+  `(let* ((layout ,layout)
+          (bitmap-word-index (bitmap-start layout))
+          (bitmap-word-limit (%instance-length layout))
+          ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
+          ;; because it's not user-visible data.
+          (mask (ash (%raw-instance-ref/signed-word
+                      layout (prog1 bitmap-word-index (incf bitmap-word-index)))
+                     ,(- sb-vm:instance-data-start)))
+          ;; If this was the last word of the bitmap, then the high bit
+          ;; is infinitely sign-extended, and we can keep right-shifting
+          ;; the mask word indefinitely. Most bitmaps will have only 1 word.
+          (nbits (if (= bitmap-word-index bitmap-word-limit)
+                     ,sb-vm:instance-length-mask
+                     ,(- sb-vm:n-word-bits sb-vm:instance-data-start))))
+     (declare (type sb-vm:signed-word mask)
+              (type fixnum nbits))
+     (do ((,index-var sb-vm:instance-data-start (1+ ,index-var))
+          (end ,count))
+         ((>= ,index-var end))
+       (declare (type (unsigned-byte 14) ,index-var end))
+       ;; If mask was fully consumed, fetch the next bitmap word
+       (when (zerop nbits)
+         (setq mask (%raw-instance-ref/signed-word layout bitmap-word-index)
+               nbits (if (= (incf (truly-the index bitmap-word-index))
+                            bitmap-word-limit)
+                         ,sb-vm:instance-length-mask
+                         ,sb-vm:n-word-bits)))
+       (let ((,taggedp-var (logbitp 0 mask))) ,@guts)
+       (setq mask (ash mask -1)
+             nbits (truly-the fixnum (1- nbits))))))
 
-;;; FIXME: at the earliest opportunity, either express DO-INSTANCE-TAGGED-SLOT
-;;; in terms of DO-LAYOUT-BITMAP or apply this diff:
-#|
---- a/src/code/early-raw-slots.lisp
-+++ b/src/code/early-raw-slots.lisp
-@@ -194,6 +194,7 @@
- ;;; I have a love/hate relationship with this macro.
- ;;; It's more efficient than iterating over DSD-SLOTS, and editcore would
- ;;; have a harder time using DSD-SLOTS. But it's too complicated.
- #-sb-xc-host
- (defmacro do-instance-tagged-slot ((index-var thing &optional (pad t) layout-expr)
-                                    &body body)
-@@ -210,12 +211,12 @@
-                                     (%instance-ref ,instance 0)))
-                              (truly-the sb-vm:layout
-                                         (if (eql l 0) #.(find-layout 't) l)))))
-+            (,bitmap-index (bitmap-start ,layout))
-             ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
-             ;; because it's not user-visible data.
--            (,mask (ash (%raw-instance-ref/signed-word ,layout (type-dd-length sb-vm:layout))
-+            (,mask (ash (%raw-instance-ref/signed-word
-+                         ,layout (prog1 ,bitmap-index (incf ,bitmap-index)))
-                         (- sb-vm:instance-data-start)))
--            ;; Start counting from the next bitmap word as we've consumed one already
--            (,bitmap-index (1+ (type-dd-length sb-vm:layout)))
-             (,bitmap-limit (%instance-length ,layout))
-             ;; If this was the last word of the bitmap, then the high bit
-             ;; is infinitely sign-extended, and we can keep right-shifting
-|#
+(defmacro do-instance-tagged-slot ((index-var thing) &body body)
+  (with-unique-names (instance layout taggedp)
+    `(let* ((,instance ,thing)
+            (,layout (%instance-layout ,instance)))
+       (do-layout-bitmap (,index-var ,taggedp ,layout (%instance-length ,instance))
+         (when ,taggedp ,@body))))))

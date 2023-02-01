@@ -22,22 +22,23 @@ if [ -z "$1" ] ; then
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
         SBCL_HOME=$SBCL_TOP/obj/sbcl-home/; export SBCL_HOME
-        SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
         SBCLRUNTIME="`command -v sbcl`"
     fi
+    . $SBCL_TOP/output/build-config
 else
     SBCLRUNTIME="$1"
-    shift
+    SBCL_CONTRIB_BLOCKLIST=
 fi
+shift
 
 if [ -z "$1" ] ; then
     DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 else
     DOCSTRINGDIR="$1"
-    shift
 fi
+shift
 
 ${SBCLRUNTIME}                                                          \
     --noinform --no-sysinit --no-userinit --noprint --disable-debugger  \
-    --script generate-texinfo.lisp "${SBCLRUNTIME}" "${DOCSTRINGDIR}"
+    --script generate-texinfo.lisp "${SBCLRUNTIME}" "${DOCSTRINGDIR}" "${SBCL_CONTRIB_BLOCKLIST}"

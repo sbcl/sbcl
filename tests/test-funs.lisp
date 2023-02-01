@@ -17,8 +17,8 @@
       (format t "~2&Tests ordered by descending elapsed time:~%")
       (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
         (let ((*print-pretty* nil))
-          (format t "~6d ~a~%" (car x) (cdr x))))
-      (format t "~6d TOTAL TIME (~a)~%" actual-total file))))
+          (format t "~8d ~a~%" (car x) (cdr x))))
+      (format t "~8d TOTAL TIME (~a)~%" actual-total file))))
 
 (defun clear-test-status ()
   (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
@@ -37,7 +37,10 @@
         (start-time (get-internal-real-time)))
     (declare (special test-util::*deferred-test-forms*))
     (makunbound 'test-util::*deferred-test-forms*)
-    (let ((*features* (append *features* sb-impl:+internal-features+)))
+    (let ((*features* (append *features* #+(and (or arm arm64) (not darwin))
+                                         (unless (getf (sb-int:get-floating-point-modes) :traps)
+                                           '(:no-float-traps))
+                                         sb-impl:+internal-features+)))
       (load file :external-format :utf-8))
     (when (boundp 'test-util::*deferred-test-forms*)
       ;; Execute all tests that were wrapped in WITH-TEST
@@ -83,7 +86,8 @@
   (progn
     (test-util::setenv "TEST_SBCL_EVALUATOR_MODE"
                         (string-downcase *test-evaluator-mode*))
-    (let ((process (sb-ext:run-program (or #+sunos (posix-getenv "SHELL")
+    ;; Why would it ever be wrong to use (posix-getenv "SHELL") ???
+    (let ((process (sb-ext:run-program (or #+(or sunos win32) (posix-getenv "SHELL")
                                            "/bin/sh")
                                        (list (native-namestring file))
                                        :output *error-output*)))

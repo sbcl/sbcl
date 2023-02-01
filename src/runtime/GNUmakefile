@@ -35,7 +35,7 @@ include ../../output/prefix.def
 
 CFLAGS += -g -Wall -Wundef -Wsign-compare -Wpointer-arith -O3
 ASFLAGS += $(CFLAGS)
-CPPFLAGS += -I.
+CPPFLAGS += -I. -I../../
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features
@@ -70,12 +70,12 @@ __LDFLAGS__ += -nopie
 endif
 endif
 
-COMMON_SRC = alloc.c backtrace.c breakpoint.c coalesce.c coreparse.c    \
-	dynbind.c funcall.c gc-common.c globals.c hopscotch.c           \
-	interr.c interrupt.c largefile.c main.c                         \
-	monitor.c murmur_hash.c os-common.c parse.c print.c             \
-	purify.c regnames.c runtime.c			                \
-	safepoint.c save.c sc-offset.c search.c thread.c time.c \
+COMMON_SRC = alloc.c arena.c backtrace.c breakpoint.c coalesce.c	\
+	coreparse.c dynbind.c funcall.c gc-common.c globals.c		\
+	hopscotch.c interr.c interrupt.c largefile.c main.c		\
+	math.c monitor.c murmur_hash.c os-common.c parse.c print.c      \
+	regnames.c runtime.c safepoint.c save.c                         \
+	sc-offset.c search.c stringspace.c thread.c time.c              \
 	validate.c var-io.c vars.c wrap.c
 
 ifndef LISP_FEATURE_WIN32
@@ -86,7 +86,7 @@ C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
 SRCS = $(C_SRC) ${ASSEM_SRC}
 
-OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
+OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o
 
 LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
@@ -94,7 +94,9 @@ targets: $(TARGET) $(OBJTARGET) sbcl.mk
 
 LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o,$(OBJS))
 ldb: $(LIBSBCL)
-	$(CC) -DSTANDALONE_LDB -I. -o ldb monitor.c thread.c $(LDB_OBJS) $(LIBS)
+	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
+	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-thread.o thread.c
+	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-thread.o $(LDB_OBJS) $(LIBS)
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
@@ -107,9 +109,9 @@ heap-reloc-test: ../../tests/heap-reloc/fake-mman.c $(OBJS)
 
 # Enable compiling gencgc with even more assertions and/or
 # data collection, with COMPILING_TESTS. Not really used yet.
-gc-unit-tests.o: CFLAGS=-DCOMPILING_TESTS
+gc-unit-tests.o: CFLAGS=-g -DCOMPILING_TESTS
 unit-tests: gc-unit-tests.o libsbcl.a
-	cc -g -no-pie -o $@ $^ -ldl -lpthread -lm
+	$(CC) -g -no-pie -o $@ $^ -ldl -lpthread -lm
 
 # ld -r -o sbcl.o works on Linux, but not on other platforms.
 # On macOS, it fails to keep debug sections.
@@ -122,7 +124,7 @@ libsbcl.a: $(OBJS)
 
 PIC_OBJS = $(subst .o,.pic.o,$(OBJS))
 libsbcl.so: $(PIC_OBJS)
-	cc -shared -o $@ $^ $(LIBS)
+	$(CC) -shared -o $@ $^ $(LIBS)
 # for this to work, you must have with-gcc-tls in your build features already.
 # can't define it here because then it conflicts if you have it in both places.
 %.pic.o: %.c
@@ -137,7 +139,10 @@ shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \
 		../../output/sbcl.core pie-shrinkwrap-sbcl.s
-comma := , # "Commas ... cannot appear in the text of an argument as written"
+# "Commas ... cannot appear in the text of an argument as written"
+# There can not be any space after the comma on the next line,
+# or else it becomes part of the expansion of $(comma)
+comma := ,
 shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
 	$(CC) -no-pie $(filter-out -Wl$(comma)--export-dynamic, $(LINKFLAGS)) \
  $(CFLAGS) -o $@ $^ $(LIBS)

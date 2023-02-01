@@ -17,6 +17,10 @@
 
 (in-package "SB-LOCKLESS")
 
+(export '(make-ordered-list lfl-insert lfl-delete lfl-find
+          lfl-insert*/t lfl-delete*/t lfl-find*/t
+          do-lockfree-list lfl-keys make-marked-ref))
+
 ;;; The changes to GC to support this code were as follows:
 ;;;
 ;;; * If an instance is flagged as being a LFlist node, then the first data slot
@@ -26,6 +30,10 @@
 ;;;   to, pinning a lockfree list node may implicitly pin not only that node but
 ;;;   also the successor node, since there would otherwise be no way to reconstruct
 ;;;   (in Lisp) a tagged pointer to the successor of a node pending deletion.
+;;;   Pinning a node always binds *PINNED-OBJECTS* and never relies on conservative
+;;;   stack scan even for the architectures that have conservative stack.
+;;;   arm64 and x86-64 uses PSEUDO-ATOMIC, which produces shorter code than
+;;;   WITH-PINNED-OBJECTS.
 ;;;
 ;;; * Copying a lockfree list node tries to copy the successor nodes into adjacent
 ;;;   memory just like copying a chain of cons cells. This is inessential but nice.
@@ -48,23 +56,23 @@
 (defun ptr-markedp (bits) (fixnump bits))
 (defun node-markedp (node) (fixnump (%node-next node)))
 
-;;; Lockless lists should be terminated by *tail-atom*.
-;;; The value of %NODE-NEXT of the tail atom is chosen such that we will never
-;;; violate the type assertion in GET-NEXT if pointer is inadvertently
-;;; followed out of the tail atom. It would mostly work to use NIL as the %NEXT,
-;;; but just in terms of whether the %MAKE-LISP-OBJ expression is correct.
-;;; (ORing in instance-pointer-lowtag does not change NIL's representation.)
-;;; However, using NIL would violates the type assertion.
-(define-load-time-global *tail-atom*
-  (let ((node (%make-sentinel-node)))
-    (setf (%node-next node) node)))
+;;; Lockfree lists are terminated by +TAIL+. The %NEXT bits in +TAIL+
+;;; must not imply that the node is marked for deletion.
+(setf (%node-next +tail+) nil)
+(assert (not (node-markedp +tail+)))
 
-(defmacro endp (node) `(eq ,node (load-time-value *tail-atom*)))
+(defmacro endp (node) `(eq ,node ,+tail+))
+
+;;; WORD< uses fixnum-valued keys to represent aligned addresses
+;;; a la DESCRIPTOR-SAP.
+(declaim (inline word<))
+(defun word< (a b) (< (get-lisp-obj-address a) (get-lisp-obj-address b)))
 
 (defconstant-eqx +predefined-key-types+
   #((fixnum  lfl-insert/fixnum  lfl-delete/fixnum  lfl-find/fixnum < =)
     (integer lfl-insert/integer lfl-delete/integer lfl-find/integer < =)
     (real    lfl-insert/real    lfl-delete/real    lfl-find/real < =)
+    (word    lfl-insert/word    lfl-delete/word    lfl-find/word word< eq)
     (string  lfl-insert/string  lfl-delete/string  lfl-find/string
              string< string=))
   #'equalp)
@@ -90,7 +98,7 @@
                          (coerce test 'function))
                  (error "Must specify both :SORT and :TEST"))))
     (let ((head (%make-sentinel-node)))
-      (setf (%node-next head) *tail-atom*)
+      (setf (%node-next head) +tail+)
       (funcall constructor
                head insert delete find inequality equality))))
 
@@ -99,7 +107,7 @@
 ;;; MAKE-MARKED-REF can only be called in the scope of WITH-PINNED-OBJECTS.
 ;;; The critical invariant is that once a 'next' pointer has been turned into
 ;;; a fixnum, it CAN NOT change. Therefore, the object that GC implicitly pins
-;;; - along with the explicit pin of NODE within MARKED+NEXT - is definitely the
+;;; - along with the explicit pin of NODE within GET-NEXT - is definitely the
 ;;; object whose tagged pointer is reconstructed. This is exactly why we choose
 ;;; the tagged state as the normal state and the untagged state as deleted.
 ;;; If that were reversed (so tag bits = deleted, no tag bits = normal) to be like
@@ -111,17 +119,26 @@
 (defun make-marked-ref (x)
   (%make-lisp-obj (logandc2 (get-lisp-obj-address x) sb-vm:lowtag-mask)))
 
+(sb-c::when-vop-existsp (:translate get-next)
+  (defun get-next (node) (get-next node)))
+(sb-c::unless-vop-existsp (:translate get-next)
 (declaim (inline get-next))
 (defun get-next (node)
+  ;; You must not call GET-NEXT on +TAIL+ because the 'next' of +TAIL+ is NIL,
+  ;; and (LOGIOR NIL-VALUE INSTANCE-POINTER-LOWTAG) isn't necessarily NIL.
+  ;; It would be a bogus pointer on ppc64 because of rearranged lowtags.
+  ;; arm64 and x86-64 are missing this AVER (because the vop doesn't do it),
+  ;; but as long as some of the platforms test this, we should be reasonably ok.
+  ;; (I could assign 'next' of +TAIL+ as +TAIL+ like it used to be, and remove this.)
+  (aver (neq node +tail+))
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
-  (#+cheneygc sb-sys:without-gcing #+gencgc progn
-   (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
-          (%next (%node-next node)))
-      (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
-      (values (truly-the list-node
-               (%make-lisp-obj (logior (get-lisp-obj-address %next)
-                                       sb-vm:instance-pointer-lowtag)))
-              %next))))
+  (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
+         (%next (%node-next node)))
+    (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
+    (values (truly-the list-node
+                       (%make-lisp-obj (logior (get-lisp-obj-address %next)
+                                               sb-vm:instance-pointer-lowtag)))
+            %next))))
 
 (defmethod print-object ((list linked-list) stream)
   (print-unreadable-object (list stream :type t)
@@ -142,9 +159,11 @@
          (print-unreadable-object (node stream :type t)
            (format stream "(~:[~;*~]~S ~S)"
                    (node-markedp node) (node-key node) (node-data node))))
-        ((eq node *tail-atom*)
-         (print-unreadable-object (node stream :type t)
-           (write '*tail-atom* :stream stream)))
+        ((eq node +tail+)
+         (if *read-eval*
+             (format stream "#.~S" '+tail+)
+             (print-unreadable-object (node stream :type t)
+               (write '+tail+ :stream stream))))
         (t
          (print-unreadable-object (node stream :type t :identity t)))))
 
@@ -177,7 +196,7 @@
        ;; It's the head node if nothing else. The head can't be marked for deletion.
        ;; So if this node is marked, you're using this function wrongly.
        ;; There ought to have been some unmarked node to the left.
-       (aver (not (ptr-markedp bits)))
+       #+debug (aver (not (ptr-markedp bits)))
        (tagbody
         advance
             (setq left this left-node-next next)
@@ -243,14 +262,17 @@
   `(loop
     ;; Step 1: find
     (multiple-value-bind (this predecessor)
-        (,search ,@(if (eq type 't) '(list)) (list-head list) key)
+        (,search ,@(if (eq type 't) '(list)) head key)
       (when (or (endp this)
                 (not (,compare= key (truly-the ,type (node-key this)))))
         (return nil))
       (let ((succ (%node-next this)))
         (unless (fixnump succ)
           ;; Pin here because we're taking the address of the successor object.
-          ;; Instead we could use bit-test-and-set on the x86 architecture.
+          ;; This is the ordinary WITH-PINNED-OBJECTS which manipulates
+          ;; *PINNED-OBJECTS* only if precise GC. Compare/contrast with
+          ;; GET-NEXT which _always_ binds *PINNED-OBJECTS* except for
+          ;; the architectures that provide a vop employing pseudo-atomic.
           (with-pinned-objects (succ)
             ;; Step 2: logically delete 'this'
             (when (eq (cas (%node-next this) succ (make-marked-ref succ)) succ)
@@ -260,43 +282,58 @@
                 (,search ,@(if (eq type 't) '(list)) (list-head list) key))
               (return t))))))))
 
-(defmacro define-variation (type compare< compare=)
-  (let ((search (symbolicate "LFL-SEARCH/" type)))
+(defmacro define-variation (name type compare< compare=)
+  (let ((search (symbolicate "LFL-SEARCH/" name)))
     `(progn
        (declaim (ftype (sfunction (,@(if (eq type 't) '(linked-list)) list-node ,type)
                                   (values list-node list-node))
                        ,search))
        (defun ,search (,@(if (eq type 't) '(list)) head key)
+         (declare (explicit-check)) ; actually no check
          (declare (optimize (debug 0)))
-         (lfl-search-macro ,compare< ,type))
+         (let ((head (truly-the list-node head))
+               (key (truly-the ,type key)))
+           (lfl-search-macro ,compare< ,type)))
 
-       (defun ,(symbolicate "LFL-INSERT/"type) (list key data)
+       (defun ,(symbolicate "LFL-INSERT/" name) (list key data)
          (declare (linked-list list) (,type key))
          (let ((head (list-head list)))
            (lfl-insert-macro ,search ,compare= ,type)))
-
        ;; same as INSERT, but starting from any node
-       (defun ,(symbolicate "LFL-INSERT*/"type) (list head key data)
+       (defun ,(symbolicate "LFL-INSERT*/" name) (list head key data)
          (declare (linked-list list) (ignorable list) (,type key))
          (lfl-insert-macro ,search ,compare= ,type))
 
-       (defun ,(symbolicate "LFL-DELETE/"type) (list key)
+       (defun ,(symbolicate "LFL-DELETE/" name) (list key)
          (declare (linked-list list) (,type key))
+         (let ((head (list-head list)))
+           (lfl-delete-macro ,search ,compare= ,type)))
+       ;; same as DELETE, but starting from any node
+       (defun ,(symbolicate "LFL-DELETE*/" name) (list head key)
+         (declare (linked-list list) (ignorable list) (,type key))
          (lfl-delete-macro ,search ,compare= ,type))
 
-       (defun ,(symbolicate "LFL-FIND/"type) (list key)
+       (defun ,(symbolicate "LFL-FIND/" name) (list key)
          (declare (linked-list list) (,type key))
          (let ((node (,search ,@(if (eq type 't) '(list)) (list-head list) key)))
            (when (and (not (endp node))
                       (,compare= key (truly-the ,type (node-key node))))
+             node)))
+       ;; same as FIND, but starting from any node
+       (defun ,(symbolicate "LFL-FIND*/" name) (list head key)
+         (declare (linked-list list) (ignorable list) (,type key))
+         (let ((node (,search ,@(if (eq type 't) '(list)) head key)))
+           (when (and (not (endp node))
+                      (,compare= key (truly-the ,type (node-key node))))
              node))))))
 
-(define-variation real < =) ; uses general case of math functions
+(define-variation real real < =) ; uses general case of math functions
 ;; TODO: implement an INTEGER< assembly routine perhaps?
-(define-variation integer < =) ; comparator= reduces to INTEGER-EQL
-(define-variation fixnum < =)
-(define-variation string string< string=)
-(define-variation t
+(define-variation integer integer < =) ; comparator= reduces to INTEGER-EQL
+(define-variation fixnum fixnum < =)
+(define-variation string string string< string=)
+(define-variation word fixnum word< eq)
+(define-variation t t
   (lambda (a b) (funcall (list-inequality list) a b))
   (lambda (a b) (funcall (list-equality list) a b)))
 
@@ -342,7 +379,7 @@
 ;;; a complete snapshot of the list.
 (defun copy-lfl (lfl)
   (labels ((copy-chain (node)
-             (if (eq node *tail-atom*)
+             (if (eq node +tail+)
                  node
                  (let ((copy (copy-structure node))
                        (copy-of-next (copy-chain (get-next node))))

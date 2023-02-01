@@ -204,14 +204,13 @@
 (defmacro compute-splat-bits (value)
   ;; :SAFE-DEFAULT means any unspecific value that is safely a default.
   ;; Heap allocation uses 0 since that costs nothing.
-  ;; Stack allocation pick no-tls-value-marker even though it differs from the heap.
   ;; If the user wanted a specific value, it could have been explicitly given.
   `(if (typep ,value 'sb-vm:word)
        ,value
        (case ,value
          (:unbound (unbound-marker-bits))
          ((nil) (bug "Should not see SPLAT NIL"))
-         (t #+ubsan no-tls-value-marker-widetag
+         (t #+ubsan unwritten-vector-element-marker
             #-ubsan 0))))
 
 ;;; This logic was formerly in ALLOCATE-VECTOR-ON-STACK.

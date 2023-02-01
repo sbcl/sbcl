@@ -1,4 +1,4 @@
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (with-test (:name (:two-threads-running-gc)
                   :broken-on :sb-safepoint)

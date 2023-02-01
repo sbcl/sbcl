@@ -27,7 +27,8 @@
 ;;; isn't declared as a variable, but to set its SYMBOL-VALUE anyway.
 ;;;
 ;;; This bug was in sbcl-0.6.11.13.
-(print (setq improperly-declared-var '(1 2)))
+(locally (declare (sb-ext:muffle-conditions warning))
+  (print (setq improperly-declared-var '(1 2))))
 (assert (equal (symbol-value 'improperly-declared-var) '(1 2)))
 (makunbound 'improperly-declared-var)
 ;;; This is a slightly different way of getting the same symptoms out
@@ -201,3 +202,13 @@
   (multiple-value-bind (ok tested) (make-array-fill-nil)
     ;; should not inhibit stack allocation, should check that NIL is OK
     (assert (and ok (eql tested 1)))))
+
+(defun push-values-constants (k)
+  (let (*)
+    (if k
+        (eval k)
+        (load-time-value t))))
+
+(with-test (:name :push-values-constants)
+  (assert (eql (push-values-constants 1) 1))
+  (assert (eql (push-values-constants nil) t)))

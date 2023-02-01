@@ -16,6 +16,8 @@
   ;; Loop over all code objects
   `(let* ((call (find-inst #xE8 (get-inst-space)))
           (jmp  (find-inst #xE9 (get-inst-space)))
+          (mov-ea (find-inst #x8B (get-inst-space)))
+          (mov-imm-acc (find-inst #xB8 (get-inst-space)))
           (dstate (make-dstate nil))
           (sap (int-sap 0))
           (seg (sb-disassem::%make-segment :sap-maker (lambda () sap))))
@@ -39,8 +41,8 @@
           (when (= obj-type code-header-widetag) ,@body))
         ;; Slowness here is bothersome, especially for SB-VM::REMOVE-STATIC-LINKS,
         ;; so skip right over all fixedobj pages.
-        (ash varyobj-space-start (- n-fixnum-tag-bits))
-        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))))))
+        (ash text-space-start (- n-fixnum-tag-bits))
+        (%make-lisp-obj (sap-int *text-space-free-pointer*)))))))
 
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components
@@ -114,33 +116,75 @@
     (vector-push-extend (fill-pointer relocs) code-components)
     (values code-components relocs)))
 
+(export 'sb-vm::statically-link-core "SB-VM")
+(declaim (inline rip-relative-p))
+(defun rip-relative-p (modrm-byte) (= (logand modrm-byte #b11000111) #b00000101))
+
 (defun sb-vm::statically-link-core (&key callers)
   (do-immobile-code (code)
     (when (or (not callers)
               (and (plusp (code-n-entries code))
                    (member (%simple-fun-name (%code-entry-point code 0)) callers)))
       (let* ((fixups)
+             (all-fdefns
+              (do ((i sb-vm:code-constants-offset (1+ i))
+                   (end (code-header-words code))
+                   (list))
+                  ((= i end) list)
+                (let ((const (code-header-ref code i)))
+                  (typecase const
+                    (fdefn (push const list))
+                    ;; CONS may occur due to previous invocation of statically-link.
+                    ((cons fdefn) (push (car const) list))))))
+             (observable-fdefns) ; ones that an instruction explicitly dereferences
              (code-begin (- (get-lisp-obj-address code) sb-vm:other-pointer-lowtag))
              (code-end (+ code-begin (sb-vm::code-object-size code)))
+             (boxed-begin (+ code-begin (* sb-vm:code-constants-offset sb-vm:n-word-bytes)))
+             (boxed-end (+ code-begin (* (code-header-words code) sb-vm:n-word-bytes)))
              (code-insts (code-instructions code)))
         (do-functions (fun addr)
           ;; Loop over function's assembly code
           (dx-flet ((process-inst (chunk inst)
-                      (when (or (eq inst jmp) (eq inst call))
-                        (let ((target (+ (near-jump-displacement chunk dstate)
-                                         (dstate-next-addr dstate))))
-                          ;; Do not call FIND-CALLED-OBJECT if the target is
-                          ;; within the same code object
-                          (unless (and (<= code-begin target) (< target code-end))
-                            (let ((fdefn (sb-vm::find-called-object target)))
-                              (when (fdefn-p fdefn)
-                                (push (cons (+ (sap- sap code-insts)
-                                               (sb-disassem:dstate-cur-offs dstate)
-                                               1)
-                                            fdefn)
-                                      fixups))))))))
+                      (cond
+                        ;; find FDEFNs as the source of move-immediate-to-register.
+                        ;; There can be false positives, but that's OK.
+                        ((and (eq inst mov-imm-acc)
+                              ;; ensure not a 64-bit move
+                              (eql (sb-disassem::dstate-inst-properties dstate) 0))
+                         (let ((value (sap-ref-32 sap (1+ (dstate-cur-offs dstate)))))
+                           (dolist (fdefn all-fdefns)
+                             (when (eql (get-lisp-obj-address fdefn) value)
+                               (pushnew fdefn observable-fdefns)))))
+                        ;; find FDEFNs in code header as the source of MOV EA to register
+                        ((and (eq inst mov-ea)
+                              (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8B)
+                              (rip-relative-p (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
+                         (let ((addr (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                                        (dstate-next-addr dstate))))
+                           (when (and (not (logtest addr (ash sb-vm:lowtag-mask -1))) ; aligned
+                                      (<= boxed-begin addr) (< addr boxed-end))
+                             (let ((const (sap-ref-lispobj (int-sap addr) 0)))
+                               (when (fdefn-p const)
+                                 (pushnew const observable-fdefns))))))
+                        ;; find FDEFN as the target of JMP/CALL
+                        ((or (eq inst jmp) (eq inst call))
+                         (let ((target (+ (near-jump-displacement chunk dstate)
+                                          (dstate-next-addr dstate))))
+                           ;; Can't be an FDEFN if within the same code object
+                           (unless (and (<= code-begin target) (< target code-end))
+                             (let ((fdefn (dolist (fdefn all-fdefns)
+                                            (when (= target (+ (get-lisp-obj-address fdefn)
+                                                               ;; KLUDGE: 2 = address of 'jmp' inst
+                                                               (- 2 other-pointer-lowtag)))
+                                              (return fdefn)))))
+                               (when (and fdefn (neq (info :function :inlinep (fdefn-name fdefn))
+                                                     'notinline))
+                                 (push (cons (+ (sap- sap code-insts)
+                                                (1+ (sb-disassem:dstate-cur-offs dstate)))
+                                             fdefn)
+                                       fixups)))))))))
             (map-segment-instructions #'process-inst seg dstate)))
-        (sb-vm::statically-link-code-obj code fixups)))))
+        (sb-vm::statically-link-code-obj code fixups observable-fdefns)))))
 
 ;;; While concurrent use of un-statically-link is unlikely, misuse could easily
 ;;; cause heap corruption. It's preventable by ensuring that this is atomic
@@ -156,10 +200,8 @@
     (let ((fun-entry (sb-vm::fdefn-raw-addr fdefn))
           (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
       (flet ((code-statically-links-fdefn-p (code)
-               (let ((fdefns-start (+ code-constants-offset
-                                      (* code-slots-per-simple-fun
-                                         (code-n-entries code)))))
-                 (dotimes (i (code-n-named-calls code))
+               (multiple-value-bind (fdefns-start count) (code-header-fdefn-range code)
+                 (dotimes (i count)
                    (let ((constant (code-header-ref code (+ fdefns-start i))))
                      (when (or (eq constant fdefn)
                                (and (consp constant) (eq (car constant) fdefn)))

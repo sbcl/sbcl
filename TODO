@@ -47,11 +47,6 @@ PEEPHOLE OPTIMIZER
 
   Have you ever read SBCL disassembly?
 
-DEFGLOBAL
-
-  Global lexical variables. Esp. since with threads special variable
-  accesses is no speed daemon.
-
 FINISHING EXTERNAL FORMATS
 
   Byte order marks. Newline conventions. A way to specify an external
@@ -75,11 +70,6 @@ ADVICE/FWRAP
   latter returns the underlying definition, whereas the first returns
   the encapsulation.
 
-GENERIC FUNCTION TRACING
-
-  This sucks currently. It would also be good to be able to trace
-  individual methods.
-
 POLICY MADNESS
 
   The interactions between various optimization policies are far from
@@ -87,11 +77,6 @@ POLICY MADNESS
   it. One option would be to have just a few (eg. DEBUG, SMALL,
   FAST-SAFE, FAST-UNSAFE) "dominant" policies, and expose the rest
   as separately declarable optimization toggles.
-
-  MAYBE-INLINE is also nice, but it would be good if someone could
-  figure out how to get rid of it while retaining the semantics it
-  provides. Inlining recursive functions is also something to think
-  about.
 
   INHIBIT-WARNINGS really needs to go away.
 
@@ -101,13 +86,10 @@ WINDOWS
 
 DARWIN
 
-  Needs love, particularly threads and exceptions/signals. slam.sh is
-  also broken there.
+  Needs love, particularly threads and exceptions/signals.
 
 DRAGONFLY
   Multithreading does not work. Possibly because of bug in mmap/munmap.
-  Hint: Comment out call to os_invalidate in perform_thread_post_mortem
-  and threads will work, but space will not be freed, of course.
 
 MISC CLEANUPS
 
@@ -120,13 +102,6 @@ MISC CLEANUPS
 	** use %COMPILE where COMPILE-TOP-LEVEL used to be used
 	** remove redundant COMPILE-TOP-LEVEL and
 		FUNCTIONAL-KIND=:TOP-LEVEL stuff from the compiler
-   * outstanding embarrassments
-	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
-		reasonable to support this as a crutch when initially
-		bootstrapping from balky xc hosts with their own
-		idiosyncratic ideas of what merits FAILURE-P, but it's
-		embarrassing to have to use it when bootstrapping
-		under SBCL!),
    * miscellaneous simple refactoring
 	* belated renaming:
 		** rename %PRIMITIVE to %VOP

@@ -330,8 +330,7 @@
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info label length stack-allocate-p)
-  (:ignore label)
+  (:info length stack-allocate-p)
   (:temporary (:sc any-reg) temp)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)

@@ -275,13 +275,7 @@
   (sb-alien:define-alien-routine bug-316075 void (result char :out)))
 (with-test (:name :bug-316075 :fails-on :win32)
   #+win32 (error "fail")
-  ;; The interpreter gives you a style-warning because the "undefined alien"
-  ;; first occurs here during compilation of the test case. But if compiling
-  ;; by default, then the warning already happened above at DEFINE-ALIEN-ROUTINE
-  ;; because when that got compiled, it warned, which inhibited further
-  ;; warnings for the same foreign symbol.
-  (checked-compile '(lambda () (multiple-value-list (bug-316075)))
-                   :allow-style-warnings t))
+  (checked-compile '(lambda () (multiple-value-list (bug-316075)))))
 
 ;;; Bug #316325: "return values of alien calls assumed truncated to
 ;;; correct width on x86"
@@ -526,24 +520,32 @@
                 (sb-alien::coerce-to-interpreted-function form2)))))
 
 (with-test (:name :undefined-alien-name
-            :skipped-on (not (or :x86-64 :arm :arm64)))
-  (handler-case (funcall (checked-compile `(lambda ()
-                                             (alien-funcall (extern-alien "bar" (function (values)))))
-                                          :allow-style-warnings t))
-    (t (c)
-      (assert (typep c 'sb-kernel::undefined-alien-function-error))
-      (assert (equal (cell-error-name c) "bar")))))
+            :skipped-on (not (or :x86-64 :arm64)))
+  (dolist (memspace '(:dynamic #+immobile-space :immobile))
+    (let ((lispfun
+           (let ((sb-c::*compile-to-memory-space* memspace))
+             (checked-compile `(lambda ()
+                                 (alien-funcall (extern-alien "bar" (function (values)))))
+                              :allow-style-warnings t))))
+      (handler-case (funcall lispfun)
+        (t (c)
+          (assert (typep c 'sb-kernel::undefined-alien-function-error))
+          (assert (equal (cell-error-name c) "bar")))))))
 
 (with-test (:name :undefined-alien-name-via-linkage-table-trampoline
-            :skipped-on (not (or :x86-64 :arm :arm64)))
-  (handler-case (funcall (checked-compile
-                          `(lambda ()
-                             (with-alien ((fn (* (function (values)))
-                                              (sb-sys:int-sap (sb-sys:foreign-symbol-address "baz"))))
-                               (alien-funcall fn)))))
-    (t (c)
-      (assert (typep c 'sb-kernel::undefined-alien-function-error))
-      (assert (equal (cell-error-name c) "baz")))))
+            :skipped-on (not (or :x86-64 :arm64)))
+  (dolist (memspace '(:dynamic #+immobile-space :immobile))
+    (let ((lispfun
+           (let ((sb-c::*compile-to-memory-space* memspace))
+             (checked-compile
+              `(lambda ()
+                 (with-alien ((fn (* (function (values)))
+                                  (sb-sys:int-sap (sb-sys:foreign-symbol-address "baz"))))
+                   (alien-funcall fn)))))))
+      (handler-case (funcall lispfun)
+        (t (c)
+          (assert (typep c 'sb-kernel::undefined-alien-function-error))
+          (assert (equal (cell-error-name c) "baz")))))))
 
 (defconstant fleem 3)
 ;; We used to expand into
@@ -555,3 +557,10 @@
 
 (with-test (:name :no-vector-sap-of-array-nil)
   (assert-error (sb-sys:vector-sap (opaque-identity (make-array 5 :element-type nil)))))
+
+(cl:in-package "SB-KERNEL")
+(test-util:with-test (:name :hash-consing)
+  (assert (eq (parse-alien-type '(integer 9) nil)
+              (parse-alien-type '(integer 9) nil)))
+  (assert (eq (parse-alien-type '(* (struct nil (x int) (y int))) nil)
+              (parse-alien-type '(* (struct nil (x int) (y int))) nil))))

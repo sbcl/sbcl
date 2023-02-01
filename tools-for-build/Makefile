@@ -7,19 +7,16 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-# it is illogical that this makefile pulls in Makefile.features,
-# which is presumed not to exist, and which when it does exist causes
-# confusion as to what flags should be added in for a generic C compile.
-# Why do we do this???
--include genesis/Makefile.features
+-include genesis/Makefile.features # for grovel-headers
 -include Config
 
-CPPFLAGS+=-I../src/runtime
+# Do not append to CFLAGS otherwise -I can override the -I below.
+CFLAGS:=-I../src/runtime $(CFLAGS)
 LDFLAGS:=$(LDFLAGS)
 LDLIBS:=$(OS_LIBS)
 
-all: grovel-headers determine-endianness where-is-mcontext mmap-rwx
+all: grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2
 
 clean:
-	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx
+	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2
 	rm -f *.exe

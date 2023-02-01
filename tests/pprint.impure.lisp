@@ -424,6 +424,9 @@
 ;; force MACDADDY to be a closure over X.
 (let ((x 3)) (defmacro macdaddy (a b &body z) a b z `(who-cares ,x)) (incf x))
 
+(defun indentation-of (name)
+  (sb-pretty::macro-indentation (macro-function name)))
+
 (with-test (:name :closure-macro-arglist)
   ;; assert correct test setup - MACDADDY is a closure if compiling,
   ;; or a funcallable-instance if not
@@ -433,7 +436,7 @@
   ;; MACRO-INDENTATION used %simple-fun-arglist instead of %fun-arglist.
   ;; Depending on your luck it would either not return the right answer,
   ;; or crash, depending on what lay at 4 words past the function address.
-  (assert (= (sb-pretty::macro-indentation 'macdaddy) 2)))
+  (assert (= (indentation-of 'macdaddy) 2)))
 
 (defmacro try1 (a b &body fool) `(baz ,a ,b ,fool))
 (defmacro try2 (a b &optional &body fool) `(baz ,a ,b ,fool))
@@ -442,12 +445,12 @@
 (defmacro try5 (a b &optional . fool) `(baz ,a ,b ,fool))
 (defmacro try6 (a b &optional c . fool) `(baz ,a ,b ,c ,fool))
 (with-test (:name :macro-indentation)
-  (assert (= (sb-pretty::macro-indentation 'try1) 2))
-  (assert (= (sb-pretty::macro-indentation 'try2) 2))
-  (assert (= (sb-pretty::macro-indentation 'try3) 3))
-  (assert (= (sb-pretty::macro-indentation 'try4) 2))
-  (assert (= (sb-pretty::macro-indentation 'try5) 2))
-  (assert (= (sb-pretty::macro-indentation 'try6) 3)))
+  (assert (= (indentation-of 'try1) 2))
+  (assert (= (indentation-of 'try2) 2))
+  (assert (= (indentation-of 'try3) 3))
+  (assert (= (indentation-of 'try4) 2))
+  (assert (= (indentation-of 'try5) 2))
+  (assert (= (indentation-of 'try6) 3)))
 
 (defclass ship () ())
 (let ((ppd (copy-pprint-dispatch)))

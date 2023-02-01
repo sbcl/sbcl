@@ -28,6 +28,7 @@ Options:
   --report-skipped-tests        Include tests :skipped-on target SBCL in
                                 the test report.
   --no-color                    Disable coloring of results.
+  --slow                        Enable slow tests.
 
 If no test files are specified, runs all tests.
 EOF

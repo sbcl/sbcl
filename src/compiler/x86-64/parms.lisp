@@ -17,8 +17,7 @@
 (defconstant sb-assem:+inst-alignment-bytes+ 1)
 
 (defconstant +backend-fasl-file-implementation+ :x86-64)
-(defconstant-eqx +fixup-kinds+ #(:absolute :relative :absolute64)
-  #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:abs32 :rel32 :absolute) #'equalp)
 
 ;;; This size is supposed to indicate something about the actual granularity
 ;;; at which you can map memory.  We just hardwire it, but that may or may not
@@ -97,7 +96,7 @@
                      :read-only-space-size #+metaspace #.(* 2 1024 1024)
                                            #-metaspace 0
                      :fixedobj-space-size #.(* 40 1024 1024)
-                     :varyobj-space-size #.(* 130 1024 1024)
+                     :text-space-size #.(* 130 1024 1024)
                      :dynamic-space-start #x1000000000)
 
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
@@ -105,12 +104,12 @@
 
 #-(or linux darwin)
 (!gencgc-space-setup #x20000000
-                     #-win32 :read-only-space-size #-win32 0
+                     :read-only-space-size 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 
-(defconstant linkage-table-growth-direction :up)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
 
 
 (defenum (:start 8)
@@ -157,43 +156,40 @@
      ;; interrupt handling
     #-sb-thread *pseudo-atomic-bits*     ; ditto
     #-sb-thread *binding-stack-pointer* ; ditto
+    ;; Since the text space and alien linkage table might both get relocated on startup
+    ;; under #+immobile-space, an alien callback wrapper can't wire in the address
+    ;; of a word that holds the C function pointer to callback_wrapper_trampoline.
+    ;; (There is no register that points to a known address when entering the callback)
+    ;; A static symbol works well for this, and is sensible considering that
+    ;; the assembled wrappers also reside in static space.
+    #+(and sb-thread immobile-space) callback-wrapper-trampoline
     *cpu-feature-bits*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(length
-    two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    eql
-    %negate
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    two-arg-gcd
-    two-arg-lcm
-    ensure-symbol-hash
-    sb-impl::install-hash-table-lock
-    update-object-layout
-    %coerce-callable-to-fun)
+    `#(ensure-symbol-hash sb-impl::install-hash-table-lock update-object-layout
+       ,@common-static-fdefns)
   #'equalp)
 
 #+sb-simd-pack
-(defglobal *simd-pack-element-types*
-    '(single-float
-      double-float
-      (unsigned-byte 8)
-      (unsigned-byte 16)
-      (unsigned-byte 32)
-      (unsigned-byte 64)
-      (signed-byte 8)
-      (signed-byte 16)
-      (signed-byte 32)
-      (signed-byte 64)))
+(progn
+  (defconstant-eqx +simd-pack-element-types+
+      #(single-float double-float
+        (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32) (unsigned-byte 64)
+        (signed-byte 8) (signed-byte 16) (signed-byte 32) (signed-byte 64))
+    #'equalp)
+  (defconstant sb-kernel::+simd-pack-wild+
+    (ldb (byte (length +simd-pack-element-types+) 0) -1))
+  (defconstant-eqx +simd-pack-128-primtypes+
+      #(simd-pack-single simd-pack-double
+        simd-pack-ub8 simd-pack-ub16 simd-pack-ub32 simd-pack-ub64
+        simd-pack-sb8 simd-pack-sb16 simd-pack-sb32 simd-pack-sb64)
+    #'equalp)
+  (defconstant-eqx +simd-pack-256-primtypes+
+      #(simd-pack-256-single simd-pack-256-double
+        simd-pack-256-ub8 simd-pack-256-ub16 simd-pack-256-ub32 simd-pack-256-ub64
+        simd-pack-256-sb8 simd-pack-256-sb16 simd-pack-256-sb32 simd-pack-256-sb64)
+    #'equalp))
 
 (defconstant undefined-fdefn-header
   ;; This constant is constructed as follows: Take the INT opcode

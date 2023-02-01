@@ -14,7 +14,7 @@
 
 ;;; Compare the substrings specified by STRING1 and STRING2 and return
 ;;; two values, the last index and the difference between the last characters
-(defun %sp-string-compare (string1 start1 end1 string2 start2 end2)
+(defun %sp-string-compare (string1 string2 start1 end1 start2 end2)
   (let* ((end1 (or end1
                    (length string1)))
          (end2 (or end2
@@ -59,7 +59,7 @@
                                   (char-code char2)))))))))))
 
 ;;; Doesn't need to return a mismatch index
-(defun %sp-string= (string1 start1 end1 string2 start2 end2)
+(defun %sp-string= (string1 string2 start1 end1 start2 end2)
   (let* ((end1 (or end1
                    (length string1)))
          (end2 (or end2

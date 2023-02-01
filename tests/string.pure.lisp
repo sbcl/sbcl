@@ -278,3 +278,80 @@ claim that any particular result from these edge cases constitutes a bug.
   (assert-error
    (funcall (opaque-identity 'make-string) 10
             :element-type '(member #\a #\b #\c) :initial-element #\x)))
+
+(with-test (:name :%sp-string-compare-argument-order)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (string/= "_" (the simple-string x)))
+   (("_") nil)
+   (("a") 0)))
+
+(with-test (:name :string=-derive-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (equal (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x y)
+                                        (declare (ignorable x y))
+                                        ,fun)))))
+                  ',expected))))
+    (check (string= (the (simple-string 1) x)
+                    (the (simple-string 2) y)) null)
+    (check (string= (the (simple-base-string 1) x)
+                    (the (simple-base-string 2) y)) null)
+    (check (string= (the (simple-array character (1)) x)
+                    (the (simple-array character (2)) y)) null)))
+
+(with-test (:name :string/=-derive-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (type-specifiers-equal
+            (second
+             (third
+              (sb-kernel:%simple-fun-type
+               (checked-compile '(lambda (x y)
+                                  (declare (ignorable x y))
+                                  ,fun)))))
+            ',expected))))
+    (check (string/= (the (simple-string 4) x)
+                     (the (simple-string 1) y)
+                     :start1 1 :end1 * :end2 0) (or (integer 1 1) null))))
+
+#+sb-unicode
+(with-test (:name :possibly-base-stringize)
+  ;;  simple-base, base non-simple
+  (let* ((str (make-string 4 :element-type 'base-char))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (eq res str)))
+  (let* ((str (make-array 4 :element-type 'base-char
+                          :displaced-to (make-string 4 :element-type 'base-char)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  ;;  simple-character w/ASCII only, non-simple character w/ASCII only
+  (let* ((str (make-string 4))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  (let* ((str (make-array 4 :element-type 'character
+                          :displaced-to (make-string 4)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  ;; simple-character w/Unicode, non-simple character w/Unicode
+  (let* ((str (make-string 4 :initial-element #\u3f4))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (eq res str) (typep res 'sb-kernel:simple-character-string))))
+  (let* ((str (make-array 4 :element-type 'character
+                          :displaced-to
+                          (make-string 4 :initial-element #\u3f5)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'sb-kernel:simple-character-string)))))
+(with-test (:name :possibly-base-stringize-dx :skipped-on :interpreter)
+  (let* ((str (make-string 4 :element-type 'base-char))
+         (res (sb-int:possibly-base-stringize-to-heap str)))
+    (declare (sb-int:truly-dynamic-extent str))
+    (assert (if (sb-kernel:dynamic-space-obj-p str)
+                (eq res str)
+                (not (eq res str))))))

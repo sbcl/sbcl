@@ -1,0 +1,1 @@
+(foo.delete-package-redefpackage)

@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and x86-64 sb-thread (not win32)) (sb-ext:exit :code 104) ;; not implemented elsewhere
+#-(and x86-64 sb-thread (not win32)) (invoke-restart 'run-tests::skip-file) ;; not implemented elsewhere
 
 (defstruct fruitbasket x y z)
 (with-test (:name :aprof-smoketest-struct

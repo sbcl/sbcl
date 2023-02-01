@@ -78,8 +78,7 @@
     (push (sb-kernel:%instance-ref struct i) result))
   (nreverse result))
 
-(with-test (:name :sign-extended-bitmap
-            :fails-on :interpreter)
+(with-test (:name :sign-extended-bitmap)
   ;; could have 100 or 101 physical payload slots depending on
   ;; presence of a padding word
   (assert (>= (length (collect-slot-values (make-100slots))) 100)))
@@ -102,8 +101,7 @@
 (defvar *afoo* (make-foo1))
 (assert (= (sb-kernel:wrapper-length (sb-kernel:wrapper-of *afoo*))
            (sb-kernel:%instance-length *afoo*)))
-(with-test (:name :tagged-slot-iterator-macro
-            :fails-on :interpreter)
+(with-test (:name :tagged-slot-iterator-macro)
   ;; on 32-bit, the logical length is 14, which means 15 words (with header),
   ;; but slot index 14 (word index 15) exists after padding to 16 memory words.
   ;; It is allowed to hold a fixnum (or any non-pointer) but naught else.
@@ -118,8 +116,8 @@
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
     (assert (equalp (nreverse l)
-                    #-64-bit `((3 aaay) (9 bee) (13 cee) (14 #xdead))
-                    #+64-bit `((2 aaay) (6 bee) (9 cee) (10 #xdead))))))
+                    #-64-bit `((3 aaay) (9 bee) (13 cee))
+                    #+64-bit `((2 aaay) (6 bee) (9 cee))))))
 
 (defvar *anotherfoo* (make-foo1))
 
@@ -174,7 +172,3 @@
 (with-test (:name :copy-structure-bignum-bitmap)
   (assert (zerop (foo-lotsaslots-s0
                   (copy-structure (make-foo-lotsaslots))))))
-
-(load "compiler-test-util.lisp")
-(with-test (:name :copy-structure-efficient-case)
-  (assert (not (ctu:find-named-callees #'copy-structure :name 'ash))))

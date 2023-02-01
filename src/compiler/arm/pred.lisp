@@ -30,15 +30,16 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
+    (let ((flags (conditional-flags-flags flags)))
       (aver (null (rest flags)))
       (inst b
             (if not-p
                 (negate-condition (first flags))
                 (first flags))
-            dest)))
+            dest))))
 
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
+(defun convert-conditional-move-p (dst-tn)
+  (declare (ignore dst-tn))
   nil)
 
 

@@ -287,7 +287,7 @@ fun_end_breakpoint_trap:
 fun_end_breakpoint_end:
 
 @@ FIXME: writing this as a lisp assembly routine would eliminate all the
-@@ preprocessor noise. There's no reasom it can't be done, but we lack
+@@ preprocessor noise. There's no reason it can't be done, but we lack
 @@ instruction encoders for: stmfd, ldmfd, stmea, ldmea, fstmfdd, fldfdd.
 
 #define DEFINE_TRAMPOLINE(name, entry) \

@@ -18,7 +18,7 @@
 ;;; and :alien-callbacks is almost everywhere defined.
 ;;; However mips doesn't seem to correctly implement them,
 ;;; making the feature indicator somewhat useless)
-#+(or (not alien-callbacks) mips) (exit :code 104)
+#+(or (not alien-callbacks) mips) (invoke-restart 'run-tests::skip-file)
 
 ;;; simple callback for a function
 

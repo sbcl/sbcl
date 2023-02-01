@@ -8,7 +8,8 @@
 ;;;; files for more information.
 
 (defpackage :sb-introspect-test/xref
-  (:use "SB-INTROSPECT" "CL" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "SB-INTROSPECT" "CL"))
 
 (in-package :sb-introspect-test/xref)
 

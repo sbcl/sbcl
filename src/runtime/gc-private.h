@@ -34,11 +34,11 @@ gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
     }
     return collector_alloc_fallback(region, nbytes, page_type);
 }
-lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 #else
 void *gc_general_alloc(void*,sword_t,int);
-lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    void*, int page_type);
 #endif
 
@@ -64,7 +64,9 @@ void really_note_transporting(lispobj old,void*new,sword_t nwords);
 #define NOTE_TRANSPORTING(old, new, nwords) /* do nothing */
 #endif
 
-extern uword_t gc_copied_nwords;
+// In-situ live objects are those which get logically "moved" from oldspace to newspace
+// by frobbing the generation byte in the page table, not copying.
+extern uword_t gc_copied_nwords, gc_in_situ_live_nwords;
 static inline lispobj
 gc_copy_object(lispobj object, size_t nwords, void* region, int page_type)
 {
@@ -109,6 +111,7 @@ extern sword_t scavenge(lispobj *start, sword_t n_words);
 extern void scavenge_interrupt_contexts(struct thread *thread);
 extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
 extern void scan_binding_stack(void);
+extern void scan_finalizers();
 extern void cull_weak_hash_tables(int (*[4])(lispobj,lispobj));
 extern void smash_weak_pointers(void);
 extern boolean scan_weak_hashtable(struct hash_table *hash_table,
@@ -148,10 +151,6 @@ extern void scrub_thread_control_stack(struct thread *);
 #endif
 static inline int header_rememberedp(lispobj header) {
   return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
-}
-
-static inline boolean filler_obj_p(lispobj* obj) {
-    return widetag_of(obj) == CODE_HEADER_WIDETAG && obj[1] == 0;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -248,7 +247,7 @@ static inline lispobj encode_weakptr_next(void* x) {
 
 static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     // Better already be fixed in position or we're in trouble
-    gc_assert(!from_space_p(make_lispobj(wp,OTHER_POINTER_LOWTAG)));
+    gc_dcheck(!compacting_p() || !from_space_p(make_lispobj(wp,OTHER_POINTER_LOWTAG)));
     /* Link 'wp' into weak_pointer_chain using its 'next' field.
      * We ensure that 'next' is always NULL when the weak pointer isn't
      * in the chain, and not NULL otherwise. The end of the chain
@@ -306,8 +305,6 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 #define hashtable_kind(ht) ((ht->flags >> (4+N_FIXNUM_TAG_BITS)) & 3)
 #define hashtable_weakp(ht) (ht->flags & (8<<N_FIXNUM_TAG_BITS))
 #define hashtable_weakness(ht) (ht->flags >> (6+N_FIXNUM_TAG_BITS))
-
-#if defined(LISP_FEATURE_GENCGC)
 
 extern unsigned char* gc_card_mark;
 
@@ -383,43 +380,39 @@ static inline void unprotect_page(void* addr, unsigned char mark)
 }
 #endif
 
-// Two helpers to avoid invoking the memory fault signal handler.
+// Helpers to avoid invoking the memory fault signal handler.
 // For clarity, distinguish between words which *actually* need to frob
 // physical (MMU-based) protection versus those which don't,
 // but are forced to call mprotect() because it's the only choice.
 // Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
 // the ensuing store toggles the WP bit without invoking the fault handler.
-static inline void notice_pointer_store(void* addr) {
+static inline void notice_pointer_store(__attribute__((unused)) void* base_addr,
+                                        __attribute__((unused)) void* slot_addr) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    int card = addr_to_card_index(addr);
+    int card = addr_to_card_index(base_addr);
     // STICKY is stronger than MARKED. Only change if UNMARKED.
     if (gc_card_mark[card] == CARD_UNMARKED) gc_card_mark[card] = CARD_MARKED;
 #else
-    page_index_t index = find_page_index(addr);
+    page_index_t index = find_page_index(slot_addr);
     gc_assert(index >= 0);
-    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page(addr, CARD_MARKED);
+    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page(slot_addr, CARD_MARKED);
 #endif
+}
+static inline void vector_notice_pointer_store(void* addr) {
+    notice_pointer_store(addr, addr);
 }
 static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
 {
-  // there's nothing to "ensure" if using software card marks
+    // there's nothing to "ensure" if using software card marks
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    notice_pointer_store(addr);
+    // #-soft-card-marks ignores the first argument of notice_pointer_store()
+    notice_pointer_store(0, addr);
 #endif
 }
 
 // #+soft-card-mark: this expresion is true of both CARD_MARKED and STICKY_MARK
 // #-soft-card-mark: this expresion is true of both CARD_MARKED and WP_CLEARED_AND_MARKED
 #define card_dirtyp(index) (gc_card_mark[index] & MARK_BYTE_MASK) != CARD_UNMARKED
-
-#else
-
-/* cheneygc */
-#define notice_pointer_store(dummy)
-#define ensure_non_ptr_word_writable(dummy)
-#define NON_FAULTING_STORE(operation, addr) operation
-
-#endif
 
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]
@@ -444,13 +437,9 @@ static inline int instance_length(lispobj header)
     return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
 }
 
-// One bit differentiates FUNCALLABLE_INSTANCE_WIDETAG from INSTANCE_WIDETAG.
-// This is index of that bit.
-#ifdef LISP_FEATURE_64_BIT
-#  define FUNINSTANCE_SELECTOR_BIT_NUMBER 3
-#else
-#  define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
-#endif
+// This is index of the bit that differentiates FUNCALLABLE_INSTANCE_WIDETAG
+// from INSTANCE_WIDETAG.
+#define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
 static inline boolean instanceoid_widetag_p(unsigned char widetag) {
     return (widetag | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER)) == FUNCALLABLE_INSTANCE_WIDETAG;
 }
@@ -486,10 +475,12 @@ static inline int layout_depth2_id(struct layout* layout) {
     int32_t* vector = (int32_t*)&layout->uw_id_word0;
     return vector[0];
 }
-// Keep in sync with hardwired IDs in src/compiler/generic/genesis.lisp
+// Keep in sync with hardwired IDs in CHOOSE-LAYOUT-ID
+// in src/compiler/generic/layout-ids.lisp
 #define WRAPPER_LAYOUT_ID 2
 #define LAYOUT_LAYOUT_ID 3
 #define LFLIST_NODE_LAYOUT_ID 4
+#define BROTHERTREE_UNARY_NODE_LAYOUT_ID 5
 
 /// Return true if 'thing' is a layout.
 /// This predicate is careful, as is it used to verify heap invariants.
@@ -547,6 +538,38 @@ struct slab_header {
 
 #ifdef MAX_CONSES_PER_PAGE
 static const int CONS_PAGE_USABLE_BYTES = MAX_CONSES_PER_PAGE*CONS_SIZE*N_WORD_BYTES;
+#endif
+
+#include "genesis/cons.h"
+/* Return true if 'addr' has a lowtag and widetag that correspond,
+ * given that the words at 'addr' are within range for an allocated page.
+ * 'addr' could be a pointer to random data, and this check is merely
+ * a heuristic. False positives are possible. */
+static inline boolean plausible_tag_p(lispobj addr)
+{
+    if (listp(addr))
+        return is_cons_half(CONS(addr)->car)
+            && is_cons_half(CONS(addr)->cdr)
+            // -1 can be left by the */signed=>integer vop
+            // and is also useful as filler on cons pages.
+            && CONS(addr)->car != (uword_t)-1;
+    unsigned char widetag = widetag_of(native_pointer(addr));
+    return other_immediate_lowtag_p(widetag)
+        && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
+}
+
+#ifdef LISP_FEATURE_64_BIT
+# define make_filler_header(n) (((uword_t)(n)<<32)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>32)
+#else
+# define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
+#endif
+
+#ifdef LISP_FEATURE_BIG_ENDIAN
+# define assign_widetag(addr, byte) ((unsigned char*)addr)[N_WORD_BYTES-1] = byte
+#else
+# define assign_widetag(addr, byte) *(unsigned char*)addr = byte
 #endif
 
 #endif /* _GC_PRIVATE_H_ */

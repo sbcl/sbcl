@@ -41,7 +41,8 @@
   (let ((ht (make-hash-table :test 'eq)))
     (setf (gethash (make-symbol "GOO") ht) 1)
     (assert (is-address-sensitive ht)))
-  (dolist (test '(eql equal equalp))
+  ;; EQUAL tables don't use SYMBOL-HASH
+  (dolist (test '(eql equalp))
     (let ((ht (make-hash-table :test test)))
       (setf (gethash (make-symbol "GOO") ht) 1)
       (assert (not (is-address-sensitive ht))))))
@@ -53,7 +54,8 @@
     (let ((ht (make-hash-table :test test)))
       (setf (gethash (make-instance 'ship) ht) 1)
       (assert (is-address-sensitive ht))))
-  (dolist (test '(equal equalp))
+  ;; EQUAL tables don't use INSTANCES-SXHASH
+  (dolist (test '(equalp))
     (let ((ht (make-hash-table :test test)))
       (setf (gethash (make-instance 'ship) ht) 1)
       (assert (not (is-address-sensitive ht))))))
@@ -207,7 +209,7 @@
     (with-locked-hash-table (h) (setf (gethash 'foo h) 1))))
 
 (with-test (:name :hash-table-iterator-no-notes
-                  :fails-on (:or :ppc :ppc64))
+                  :fails-on (:or :arm :ppc :ppc64))
   (let ((f
          (checked-compile
           '(lambda (h)

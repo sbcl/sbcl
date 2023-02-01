@@ -5,24 +5,23 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;; Undo default contribs mufflage so that DECLARATION-INFORMATION tests pass.
-sb-ext::(declaim (unmuffle-conditions compiler-note))
+;; These tests pass under sb-interpreter but not sb-eval
+#+interpreter (unless (find-package "SB-INTERPRETER") (invoke-restart 'run-tests::skip-file))
 
 (defpackage :sb-cltl2-tests
-  (:use :sb-cltl2 :cl :sb-rt :sb-ext :sb-kernel :sb-int))
+  (:import-from #:test-util #:deftest)
+  (:use :sb-cltl2 :cl :sb-ext :sb-kernel :sb-int))
 
 (in-package :sb-cltl2-tests)
 
-(rem-all-tests)
-
-(defmacro *x*-value ()
-  (declare (special *x*))
-  *x*)
+(defmacro x-value ()
+  (declare (special x))
+  x)
 
 (deftest compiler-let.1
-    (let ((*x* :outer))
-      (compiler-let ((*x* :inner))
-        (list *x* (*x*-value))))
+    (let ((x :outer))
+      (compiler-let ((x :inner))
+        (list x (x-value))))
   ;; See the X3J13 writeup for why the interpreter
   ;; might return (and does return) a different answer.
   #.(if (eq sb-ext:*evaluator-mode* :compile)
@@ -105,6 +104,7 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
   t)
 (deftest macroexpand-all.9
     (let ((global-symbol-macro 3))
+      (declare (ignore global-symbol-macro))
       (macrolet ((frob (&environment env form)
                    `',(macroexpand-all form env)))
         (equalp (frob global-symbol-macro) 'global-symbol-macro)))
@@ -284,6 +284,7 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest variable-info.local-special/shadows-lexical
     (let ((x 3))
+      (declare (ignore x))
       (let ((x 3))
         (declare (special x))
         (var-info x)))
@@ -291,12 +292,14 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest variable-info.lexical
     (let ((x 8))
+      x
       (var-info x))
   (:lexical t nil))
 
 (deftest variable-info.lexical.type
     (let ((x 42))
       (declare (fixnum x))
+      x
       (var-info x))
   (:lexical t ((type . fixnum))))
 
@@ -310,6 +313,7 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest variable-info.lexical.type.3
     (let ((x 42))
+      x
       (locally (declare (fixnum x))
         (var-info x)))
   (:lexical t ((type . fixnum))))
@@ -533,17 +537,17 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
      'foo
      (augment-environment nil
                           :function '(foo)
-                          :declare  '((ftype (sfunction (integer) integer) foo))))
+                          :declare  '((ftype (sfunction () integer) foo))))
   :function
   t
-  ((ftype function (integer) (values integer &optional))))
+  ((ftype function () (values integer &optional))))
 
 
 (deftest augment-environment.macro
     (macroexpand '(mac feh)
                  (augment-environment
                   nil
-                  :macro (list (list 'mac #'(lambda (form benv)
+                  :macro (list (list 'mac #'(lambda (form env)
                                               (declare (ignore env))
                                               `(quote ,form ,form ,form))))))
   (quote (mac feh) (mac feh) (mac feh))
@@ -567,6 +571,7 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest augment-environment.nest
     (let ((x 1))
+      (declare (ignore x))
       (ct
        (let* ((e (augment-environment lexenv :variable '(y))))
          (list
@@ -601,11 +606,11 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
        (declare (ignore ,a ,b))
        ,c)))
 
+(define-declaration zaphod (spec env)
+  (declare (ignore env))
+  (values :declare (cons 'zaphod spec)))
 (deftest define-declaration.declare
     (progn
-      (define-declaration zaphod (spec env)
-        (declare (ignore env))
-        (values :declare (cons 'zaphod spec)))
       (locally (declare (zaphod beblebrox))
          (locally (declare (zaphod and ford))
            (ct (declaration-information 'zaphod lexenv)))))
@@ -614,20 +619,17 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.declare2
     (progn
-      (define-declaration zaphod (spec env)
-        (declare (ignore env))
-        (values :declare (cons 'zaphod spec)))
       (locally
            (declare (zaphod beblebrox)
                     (special x))
          (ct (declaration-information 'zaphod lexenv))))
   (zaphod beblebrox))
 
+(define-declaration vogon (spec env)
+  (declare (ignore env))
+  (values :variable `((,(cadr spec) vogon-key vogon-value))))
 (deftest define-declaration.variable
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (locally (declare (vogon poetry))
         (ct
          (assoc 'vogon-key
@@ -640,9 +642,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.variable.special
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (let (x)
         (declare (vogon x))
         (declare (special x))
@@ -654,9 +653,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.variable.special2
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (let (x)
         (declare (special x))
         (declare (vogon x))
@@ -668,12 +664,11 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.variable.mask
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (let (x)
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (let (x)
+          (declare (ignore x))
           (ct
            (assoc
             'vogon-key
@@ -682,11 +677,9 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.variable.macromask
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (let (x)
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (symbol-macrolet ((x 42))
           (ct
            (assoc
@@ -696,13 +689,12 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.variable.macromask2
     (progn
-      (define-declaration vogon (spec env)
-        (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key vogon-value))))
       (symbol-macrolet ((x 42))
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (list
          (let (x)
+           (declare (ignore x))
            (ct
             (assoc
              'vogon-key
@@ -713,18 +705,21 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
            (third (multiple-value-list (variable-information 'x lexenv))))))))
   (nil (vogon-key . vogon-value)))
 
-(deftest define-declaration.variable.mask2
-    (progn
+(progn
       (define-declaration vogon-a (spec env)
         (declare (ignore env))
         (values :variable `((,(cadr spec) vogon-key a))))
       (define-declaration vogon-b (spec env)
         (declare (ignore env))
-        (values :variable `((,(cadr spec) vogon-key b))))
+        (values :variable `((,(cadr spec) vogon-key b)))))
+(deftest define-declaration.variable.mask2
+    (progn
       (let (x)
-        (declare (vogon-a x))
+        (declare (vogon-a x)
+                 (ignore x))
         (let (x)
-          (declare (vogon-b x)))
+          (declare (vogon-b x)
+                   (ignore x)))
         (ct
          (assoc
           'vogon-key
@@ -747,11 +742,11 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 
 
+(define-declaration sad (spec env)
+  (declare (ignore env))
+  (values :function `((,(cadr spec) emotional-state sad))))
 (deftest define-declaration.function
     (progn
-      (define-declaration sad (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state sad))))
       (locally (declare (zaphod beblebrox))
         (locally (declare (sad robot))
           (ct
@@ -763,9 +758,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.function.lexical
     (progn
-      (define-declaration sad (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state sad))))
       (flet ((robot nil))
         (locally (declare (sad robot))
           (ct
@@ -778,9 +770,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.function.lexical2
     (progn
-      (define-declaration sad (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state sad))))
       (labels ((robot nil))
         (declare (sad robot))
         (ct
@@ -792,9 +781,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.function.mask
     (progn
-      (define-declaration sad (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state sad))))
       (labels ((robot nil))
         (declare (sad robot))
         (labels ((robot nil))
@@ -808,9 +794,6 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
 
 (deftest define-declaration.function.mask2
     (progn
-      (define-declaration sad (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state sad))))
       (locally
           (declare (sad robot))
         (labels ((robot nil))
@@ -821,11 +804,11 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
                                 lexenv)))))))
   nil)
 
+(define-declaration happy (spec env)
+  (declare (ignore env))
+  (values :function `((,(cadr spec) emotional-state happy))))
 (deftest define-declaration.function2
     (progn
-      (define-declaration happy (spec env)
-        (declare (ignore env))
-        (values :function `((,(cadr spec) emotional-state happy))))
       (locally (declare (zaphod beblebrox))
         (locally (declare (sad robot))
           (locally (declare (happy robot))
@@ -857,3 +840,14 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
       (list (eval form)
             (eval (sb-cltl2:macroexpand-all form))))
   (:good :good))
+
+(deftest with-a-compiler-macro
+    (multiple-value-bind (fun w f)
+        (compile nil '(lambda ()
+                       (define-compiler-macro #1=#:cm ()
+                        (macrolet ((env (&environment env)
+                                     (sb-cltl2:function-information '#1# env)))
+                          (env)))))
+      (declare (ignore fun))
+      (or w f))
+  nil)

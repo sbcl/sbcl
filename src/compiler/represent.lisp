@@ -569,21 +569,22 @@
 
         (change-tn-ref-tn val pass-tn)
         (let* ((this-fp
-                (cond ((not (sc-number-stack-p pass-sc)) fp-tn)
-                      (nfp-tn)
-                      (t
-                       (aver (eq how :known-return))
-                       (setq nfp-tn (make-number-stack-pointer-tn))
-                       (setf (tn-sc nfp-tn)
-                             (svref *backend-sc-numbers*
-                                    (first (primitive-type-scs
-                                            (tn-primitive-type nfp-tn)))))
-                       (emit-context-template
-                        node block
-                        (template-or-lose 'compute-old-nfp)
-                        nfp-tn vop)
-                       (aver (not (sc-number-stack-p (tn-sc nfp-tn))))
-                       nfp-tn)))
+                 (cond ((or (eq how :fixed)
+                            (not (sc-number-stack-p pass-sc))) fp-tn)
+                       (nfp-tn)
+                       (t
+                        (aver (eq how :known-return))
+                        (setq nfp-tn (make-number-stack-pointer-tn))
+                        (setf (tn-sc nfp-tn)
+                              (svref *backend-sc-numbers*
+                                     (first (primitive-type-scs
+                                             (tn-primitive-type nfp-tn)))))
+                        (emit-context-template
+                         node block
+                         (template-or-lose 'compute-old-nfp)
+                         nfp-tn vop)
+                        (aver (not (sc-number-stack-p (tn-sc nfp-tn))))
+                        nfp-tn)))
                (new (emit-move-arg-template node block res val-tn this-fp
                                             pass-tn vop))
                (after
@@ -595,7 +596,9 @@
                        (ir2-block-start-vop block)))))
           (coerce-some-operands (vop-args new) pass-tn
                                 (vop-info-arg-load-scs res)
-                                after)))))
+                                after)
+          (when (vop-info-after-sc-selection (vop-info new))
+            (funcall (vop-info-after-sc-selection (vop-info new)) new))))))
   (values))
 
 (defun maybe-move-from-fixnum+-1 (x y &optional x-tn-ref)
@@ -694,7 +697,9 @@
                           (eq (car (vop-codegen-info last)) (ir2-block-%label dest-block))
                           (setf branch last)))))
       (let ((dest (tn-ref-tn (vop-results dest-vop))))
-        (when (and (eq (tn-sc x) (tn-sc dest))
+        (when (and (or (eq (tn-sc x) (tn-sc dest))
+                       (and (eq (sc-number (tn-sc x)) sb-vm:constant-sc-number)
+                            (eq (sc-number (tn-sc dest)) sb-vm:descriptor-reg-sc-number)))
                    (eq (find-move-vop x nil (tn-sc dest) (tn-primitive-type dest) #'sc-move-vops)
                        (vop-info vop)))
           (let ((new-block (split-ir2-block dest-vop))
@@ -776,12 +781,11 @@
 ;;; Arrange boxed constants so that all :NAMED-CALL constants are first,
 ;;; then constant leaves, and finally LOAD-TIME-VALUE constants.
 ;;; There exist a few reasons for placing all the FDEFNs first:
-;;;  * FDEFNs which are referenced for lisp call - as opposed to referenced
-;;;    in #'FUN syntax - could be stored as untagged pointers which would
-;;;    benefit the PPC64 architecture by removing a few instructions from each
-;;;    use of such fdefn by not having to subtract its lowtag prior to loading
-;;;    from both the fun and raw-fun slots. GC would need to be aware of the
-;;;    untagged pointer convention.
+;;;  * FDEFNs which are referenced for call (versus for value as in #'FUN)
+;;;    may be stored in the code header as untagged pointers. This benefits PPC64
+;;;    because lowtag subtraction can't be had "for free" due to the architectural
+;;;    requirement that lispword-aligned loads need a displacement that is
+;;;    a multiple of 4, which OTHER-POINTER-LOWTAG does not satisfy.
 ;;;  * In the current approach for so-called "static" linking of immobile code,
 ;;;    we change code instruction bytes so that they call into a simple-fun
 ;;;    directly rather than through an fdefn, but the approach is subject to a
@@ -808,11 +812,11 @@
              (dovector (constant unsorted)
                (incf old-offset)
                (when (eql pass (cond ((constant-p constant) 2)
-                                     ((eq (car constant) :named-call) 1)
+                                     ((eq (car constant) :fdefinition) 1)
                                      (t 3)))
                  (let ((new-offset (vector-push-extend constant sorted)))
                    (push (cons old-offset new-offset) renumbering))))))
-      (scan 1)  ; first all the called fdefinitions
+      (scan 1)  ; first all the fdefinitions use for call or global function ref (as in #'FUN)
       (scan 2)  ; then IR1 constants
       (scan 3)) ; then various flavors of load-time magic
     ;; Update the TN-OFFSET slot.
@@ -831,11 +835,14 @@
   (let (zero-tn)
     (flet ((zero-tn ()
              (or zero-tn
-                 (setf zero-tn
-                       (component-live-tn
-                        (make-wired-tn nil
-                                       sb-vm:any-reg-sc-number
-                                       sb-vm::zr-offset))))))
+                 (progn
+                   (setf zero-tn
+                         (component-live-tn
+                          (make-wired-tn nil
+                                         sb-vm:any-reg-sc-number
+                                         sb-vm::zr-offset))
+                         (tn-type zero-tn) (specifier-type '(eql 0)))
+                   zero-tn))))
       (do ((tn tn (tn-next tn)))
           ((null tn))
         (when (and (constant-tn-p tn)
@@ -892,13 +899,19 @@
                             (svref *backend-sc-numbers* sc)))
                      ;; Translate primitive type scs into constant scs
                      ((= sc sb-vm:descriptor-reg-sc-number)
-                      (setf (tn-sc tn)
-                            (svref *backend-sc-numbers* sb-vm:constant-sc-number)
-                            (tn-offset tn)
-                            (or (position (tn-leaf tn)
-                                          (ir2-component-constants 2comp))
-                                (vector-push-extend (tn-leaf tn)
-                                                    (ir2-component-constants 2comp)))))
+                      (cond #+(or arm64 x86-64)
+                            ((eql (tn-value tn) $0f0)
+                             ;; Can be loaded using just SINGLE-FLOAT-WIDETAG.
+                             (setf (tn-sc tn)
+                                   (svref *backend-sc-numbers* sb-vm:immediate-sc-number)))
+                            (t
+                             (setf (tn-sc tn)
+                                   (svref *backend-sc-numbers* sb-vm:constant-sc-number)
+                                   (tn-offset tn)
+                                   (or (position (tn-leaf tn)
+                                                 (ir2-component-constants 2comp))
+                                       (vector-push-extend (tn-leaf tn)
+                                                           (ir2-component-constants 2comp)))))))
                      (t
                       (setf (tn-sc tn)
                             (svref *backend-sc-numbers*
@@ -935,10 +948,6 @@
 
     #+arm64
     (choose-zero-tn (ir2-component-constant-tns 2comp))
-
-    ;; Give the optimizers a second opportunity to alter newly inserted vops
-    ;; by looking for patterns that have a shorter expression as a single vop.
-    (run-vop-optimizers component)
 
     (macrolet ((frob (slot restricted)
                  `(do ((tn (,slot 2comp) (tn-next tn)))

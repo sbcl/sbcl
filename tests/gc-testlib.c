@@ -36,7 +36,16 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Fill to the end of the card
     int filler_nwords = (GENCGC_CARD_BYTES >> WORD_SHIFT) - 2;
-    *where = ((filler_nwords - 1) << N_WIDETAG_BITS) | FILLER_WIDETAG;
+    *where = make_filler_header(filler_nwords);
+
+    // Assert that no tagged pointer can point to the filler
+    // fprintf(stderr, "Filler @ %p: %"OBJ_FMTX"\n", where, *where);
+    int lowtag;
+    for (lowtag=1; lowtag<=LOWTAG_MASK; ++lowtag) {
+        lispobj addr = make_lispobj(where, lowtag);
+        gc_assert(!plausible_tag_p(addr));
+    }
+
     where += filler_nwords;
 
     // Create the funcallable instance, total length 6 words
@@ -47,7 +56,7 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Fill to the end of the card
     filler_nwords = (GENCGC_CARD_BYTES >> WORD_SHIFT) - 6;
-    *where = ((filler_nwords - 1) << N_WIDETAG_BITS) | FILLER_WIDETAG;
+    *where = make_filler_header(filler_nwords);
     where += filler_nwords;
 
     result[0] = instance;
@@ -56,14 +65,23 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
 static void perform_gc(lispobj* stackptr)
 {
-    extern void close_current_thread_tlab(), update_immobile_nursery_bits();
+    extern void close_current_thread_tlab();
     extern void garbage_collect_generation(generation_index_t, int, void*);
 
     gc_active_p = 1;
-    gc_close_collector_regions();
+    gc_close_collector_regions(0); // TODO: should be THREAD_PAGE_FLAG
     close_current_thread_tlab();
-    update_immobile_nursery_bits();
-    verify_heap(VERIFY_PRE_GC);
+
+    /* We have to clobber the dynamic space codeblob tree because ordinarily
+     * it gets smashed at the start of collect_garbage(), and since this test
+     * bypasses collect_garbage(), the GC might have problems later.
+     * (Not exactly sure how, but "header not OK for code page" was triggering)
+     * So, handily, since there are no concurrency issues in this test,
+     * it doesn't matter that the GC can't utilize the tree. It falls back
+     * to scanning code pages linearly in preserve_pointer which is fine. */
+    SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
+
+    verify_heap(stackptr, VERIFY_PRE_GC);
     garbage_collect_generation(0, 0, stackptr);
     gc_active_p = 0;
 }

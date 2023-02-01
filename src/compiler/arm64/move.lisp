@@ -11,29 +11,33 @@
 
 (in-package "SB-VM")
 
-(defun load-immediate-word (y val)
-  (let (single-mov)
+(defun load-immediate-word (y val &optional single-instruction)
+  (let (single-mov
+        ffff-count
+        zero-count
+        (val (ldb (byte 64 0) val)))
     (flet ((single-mov ()
-             (setf single-mov
-                   (or (= (loop for i below 64 by 16
-                                for part = (ldb (byte 16 i) val)
-                                unless (= part #xFFFF)
-                                count t)
-                          1)
-                       (= (loop for i below 64 by 16
-                                for part = (ldb (byte 16 i) val)
-                                count (plusp part))
-                          1)))))
+             (loop for i below 64 by 16
+                   for part = (ldb (byte 16 i) val)
+                   count (/= part #xFFFF) into ffff
+                   count (plusp part) into zero
+                   finally
+                   (setf ffff-count ffff
+                         zero-count zero
+                         single-mov (or (= ffff 1)
+                                        (= zero 1))))))
       (cond ((typep val '(unsigned-byte 16))
-             (inst movz y val))
-            ((typep val '(and (signed-byte 16) (integer * -1)))
-             (inst movn y (lognot val)))
+             (inst movz y val)
+             y)
             ((typep (ldb (byte 64 0) (lognot val)) '(unsigned-byte 16))
-             (inst movn y (ldb (byte 64 0) (lognot val))))
+             (inst movn y (ldb (byte 64 0) (lognot val)))
+             y)
             ((encode-logical-immediate val)
-             (inst orr y zr-tn val))
+             (inst orr y zr-tn val)
+             y)
             ((and
               (not (single-mov))
+              (not single-instruction)
               (let ((descriptorp (memq (tn-offset y) descriptor-regs)))
                 (flet ((try (i part fill)
                          (let ((filled (dpb fill (byte 16 i) val)))
@@ -49,8 +53,10 @@
                                     (try i part 0)
                                     (try i part
                                          (ldb (byte 16 (mod (+ i 16) 64))
-                                              val))))))))
+                                              val)))))))
+             y)
             ((and (not single-mov)
+                  (not single-instruction)
                   (let ((a (ldb (byte 16 0) val))
                         (b (ldb (byte 16 16) val))
                         (c (ldb (byte 16 32) val))
@@ -77,8 +83,11 @@
                               ((= b d)
                                (try b a 0 c 32))
                               ((= c d)
-                               (try c a 0 b 16))))))))
-            ((minusp val)
+                               (try c a 0 b 16)))))))
+             y)
+            ((and (< ffff-count zero-count)
+                  (or single-mov
+                      (not single-instruction)))
              (loop with first = t
                    for i below 64 by 16
                    for part = (ldb (byte 16 i) val)
@@ -86,8 +95,10 @@
                    do
                    (if (shiftf first nil)
                        (inst movn y (ldb (byte 16 0) (lognot part)) i)
-                       (inst movk y part i))))
-            (t
+                       (inst movk y part i)))
+             y)
+            ((or single-mov
+                 (not single-instruction))
              (loop with first = t
                    for i below 64 by 16
                    for part = (ldb (byte 16 i) val)
@@ -95,13 +106,21 @@
                    do
                    (if (shiftf first nil)
                        (inst movz y part i)
-                       (inst movk y part i)))))))
-  y)
+                       (inst movk y part i)))
+             y)))))
 
 (defun add-sub-immediate (x &optional (temp tmp-tn))
   (cond ((not (integerp x))
          x)
         ((add-sub-immediate-p x)
+         x)
+        (t
+         (load-immediate-word temp x))))
+
+(defun ccmp-immediate (x &optional (temp tmp-tn))
+  (cond ((not (integerp x))
+         x)
+        ((typep x '(unsigned-byte 5))
          x)
         (t
          (load-immediate-word temp x))))
@@ -124,7 +143,11 @@
               (tagged (dpb bits (byte 32 32) single-float-widetag)))
          (load-immediate-word y tagged)))
       (symbol
-       (load-symbol y val)))))
+       (load-symbol y val))
+      (structure-object
+       (if (eq val sb-lockless:+tail+)
+           (inst add y null-tn (- sb-vm::lockfree-list-tail-value sb-vm:nil-value))
+           (bug "immediate structure-object ~S" val))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate)
@@ -173,23 +196,19 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
-            :load-if (not (or (location= x y)
-                              (and (sc-is x immediate)
-                                   (sc-is y control-stack)
-                                   (eql (tn-value x) 0))))))
+            :scs (any-reg descriptor-reg zero)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:generator 0
-    (let ((x (if (and (sc-is x immediate)
-                      (eql (tn-value x) 0))
-                 zr-tn
-                 x)))
-      (cond ((location= x y))
-            ((sc-is y control-stack)
-             (store-stack-tn y x))
-            (t
-             (move y x))))))
+    (cond ((location= x y))
+          ((sc-is y control-stack)
+           (store-stack-tn y x))
+          ((and (sc-is x any-reg)
+                (eql (tn-offset x) zr-offset))
+           (inst mov y 0))
+          (t
+           (move y x)))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg)
@@ -199,23 +218,19 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
-            :load-if (not (and (sc-is x immediate)
-                               (sc-is y control-stack)
-                               (eql (tn-value x) 0))))
+            :scs (any-reg descriptor-reg zero))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
       ((any-reg descriptor-reg)
-       (move y x))
+       (if (and (sc-is x any-reg)
+                (eql (tn-offset x) zr-offset))
+           (inst mov y 0)
+           (move y x)))
       (control-stack
-       (store-stack-offset (if (and (sc-is x immediate)
-                                    (eql (tn-value x) 0))
-                               zr-tn
-                               x)
-                           fp y)))))
+       (store-stack-offset x fp y)))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -408,7 +423,7 @@
 ;;; ARG is a fixnum or bignum; figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
-  (:results-var results)
+  (:result-refs results)
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 4

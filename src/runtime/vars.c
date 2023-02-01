@@ -91,8 +91,7 @@ void flush_vars()
     }
 }
 
-struct var *lookup_by_name(name)
-char *name;
+struct var *lookup_by_name(char *name)
 {
     struct var *var;
 
@@ -102,8 +101,7 @@ char *name;
     return NULL;
 }
 
-struct var *lookup_by_obj(obj)
-lispobj obj;
+struct var *lookup_by_obj(lispobj obj)
 {
     struct var *var;
 

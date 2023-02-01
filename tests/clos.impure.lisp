@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+interpreter (sb-ext:exit :code 104)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (load "compiler-test-util.lisp")
 (defpackage "CLOS-IMPURE"
@@ -814,11 +814,11 @@
 (assert (= (wam-test-mc-b 13) 13))
 (defmethod wam-test-mc-b :around ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (= (wam-test-mc-b 13) 26))
+(assert (= (wam-test-mc-b 14) 28))
 (defmethod wam-test-mc-b :somethingelse ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (let ((*error-output* (make-broadcast-stream)))
-  (assert-error (wam-test-mc-b 13)))
+  (assert-error (wam-test-mc-b 15)))
 
 ;;; now, ensure that it fails with a single group with a qualifier-pattern
 ;;; that is not *
@@ -833,11 +833,11 @@
 (assert-error (wam-test-mc-c 13))
 (defmethod wam-test-mc-c :foo ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (= (wam-test-mc-c 13) 13))
+(assert (= (wam-test-mc-c 14) 14))
 (defmethod wam-test-mc-c :bar ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (let ((*error-output* (make-broadcast-stream)))
-  (assert-error (wam-test-mc-c 13)))
+  (assert-error (wam-test-mc-c 15)))
 
 ;;; DEFMETHOD should signal an ERROR if an incompatible lambda list is
 ;;; given:
@@ -1016,6 +1016,14 @@
                          &optional new-value)
   (declare (ignore new-value))
   (values op 1 2 3))
+(defmethod cwasm-sv ((o class-with-all-slots-missing))
+  (slot-value o 'baz))
+(defmethod cwasm-ssv (nv (o class-with-all-slots-missing))
+  (setf (slot-value o 'baz) nv))
+(defmethod cwasm-sbp ((o class-with-all-slots-missing))
+  (slot-boundp o 'baz))
+(defmethod cwasm-smk ((o class-with-all-slots-missing))
+  (slot-makunbound o 'baz))
 
 (with-test (:name :slot-value-missing)
   (assert (equal (multiple-value-list
@@ -1024,6 +1032,9 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (slot-value x 'bar))
                            (make-instance 'class-with-all-slots-missing)))
+                 '(slot-value)))
+  (assert (equal (multiple-value-list
+                  (cwasm-sv (make-instance 'class-with-all-slots-missing)))
                  '(slot-value))))
 
 (with-test (:name :slot-boundp-missing)
@@ -1033,6 +1044,9 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (slot-boundp x 'bar))
                            (make-instance 'class-with-all-slots-missing)))
+                 '(t)))
+  (assert (equal (multiple-value-list
+                  (cwasm-sbp (make-instance 'class-with-all-slots-missing)))
                  '(t))))
 
 (with-test (:name :slot-setf-missing)
@@ -1042,7 +1056,21 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (setf (slot-value x 'bar) 20))
                            (make-instance 'class-with-all-slots-missing)))
-                 '(20))))
+                 '(20)))
+  (assert (equal (multiple-value-list
+                  (cwasm-ssv 30 (make-instance 'class-with-all-slots-missing)))
+                 '(30))))
+
+(with-test (:name :slot-makunbound-missing)
+  (let ((instance (make-instance 'class-with-all-slots-missing)))
+    (assert (equal (multiple-value-list (slot-makunbound instance 'foo))
+                   (list instance)))
+    (assert (equal (multiple-value-list
+                    (funcall (lambda (x) (slot-makunbound x 'bar)) instance))
+                   (list instance)))
+    (assert (equal (multiple-value-list
+                    (cwasm-smk instance))
+                   (list instance)))))
 
 (macrolet ((try (which)
              `(assert (eq ((lambda (x)

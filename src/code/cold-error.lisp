@@ -79,10 +79,10 @@
   (declare (explicit-check))
   (%signal (apply #'coerce-to-condition datum 'simple-condition 'signal arguments)))
 (defun %signal (condition)
-  (let ((handler-clusters *handler-clusters*)
-        (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%signal)))
+  (let ((handler-clusters *handler-clusters*))
     (when *break-on-signals*
-      (maybe-break-on-signal condition))
+      (let ((sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%signal)))
+        (maybe-break-on-signal condition)))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
         ((null cluster)
          nil)
@@ -93,23 +93,11 @@
       ;; would lead to infinite recursive SIGNAL calls.
       (let ((*handler-clusters* handler-clusters))
         (dolist (handler cluster)
-          (macrolet ((cast-to-fun (f possibly-symbolp)
-                       ;; For efficiency the cases are tested in this order:
-                       ;;  - FUNCTIONP is just a lowtag test
-                       ;;  - FDEFN-P is a lowtag + widetag.
-                       ;; Avoiding a SYMBOLP test is fine because
-                       ;; SYMBOL-FUNCTION rejects bogosity anyway.
-                       `(let ((f ,f))
-                          (cond ((functionp f) f)
-                                (,(if possibly-symbolp `(fdefn-p f) 't)
-                                  (sb-c:safe-fdefn-fun f))
-                                ,@(if possibly-symbolp
-                                      `((t (symbol-function f))))))))
-            (let ((test (car (truly-the cons handler))))
-              (when (if (%instancep test) ; a condition classoid cell
-                        (classoid-cell-typep test condition)
-                        (funcall (cast-to-fun test nil) condition))
-                (funcall (cast-to-fun (cdr handler) t) condition)))))))))
+          (let ((test (car (truly-the cons handler))))
+            (when (if (%instancep test) ; a condition classoid cell
+                      (classoid-cell-typep test condition)
+                      (funcall test condition))
+              (funcall (cdr handler) condition))))))))
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 

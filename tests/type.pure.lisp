@@ -11,6 +11,10 @@
 
 (enable-test-parallelism)
 
+(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type #\z))))
+(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type 1.0))))
+(assert (sb-kernel:member-type-p (sb-kernel:make-eql-type -0.0s0)))
+
 (with-test (:name (typexpand-1 typexpand typexpand-all :check-lexenv))
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
@@ -775,6 +779,10 @@
   (let ((type '(or (integer * -1) (rational -1/2 1/2) (integer 1) (not integer))))
     (assert-tri-eq t t (subtypep t type))))
 
+(with-test (:name (:rational-union :wider-equivalent-to-t))
+  (let ((type '(or (integer * -2) (rational -3/2 3/2) (integer 2) (not integer))))
+    (assert-tri-eq t t (subtypep t type))))
+
 (with-test (:name (:rational-union :no-integers-in-rational))
   (let ((type '(or (integer 1 1) (rational 1/2 1/2))))
     (assert-tri-eq t t (subtypep type 'rational))
@@ -797,7 +805,8 @@
                  (t2 '(or (not (cons t (real -1 1)))
                        (not (cons sequence (eql 2))))))
              (assert-tri-eq t t (subtypep t1 t2))
-             (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1))))))))
+             (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1))))))
+    (bug039)))
 
 (with-test (:name (:rational-union :lp1912863 :bug041))
   (flet ((bug041 ()
@@ -806,7 +815,8 @@
                  (t3 '(cons simple-array t)))
              (assert-tri-eq t t (subtypep t1 t2))
              (assert-tri-eq t t (subtypep `(not (or ,t2 ,t3)) `(not ,t1)))
-             (assert-tri-eq t t (subtypep `(and (not ,t2) (not ,t3)) `(not ,t1))))))))
+             (assert-tri-eq t t (subtypep `(and (not ,t2) (not ,t3)) `(not ,t1))))))
+    (bug041)))
 
 (with-test (:name (:lp1916040 :answer))
   (let* ((t1 '(cons sequence short-float))
@@ -817,3 +827,51 @@
 (with-test (:name (:lp1916233))
   (assert-tri-eq t t (subtypep '(cons (or (simple-array ratio) simple-array) nil) nil))
   (assert-tri-eq t t (subtypep '(or (array ratio) sequence) t)))
+
+(defun my-widetag-of (x)
+  (sb-sys:sap-ref-8 (sb-sys:int-sap (sb-kernel:get-lisp-obj-address x))
+                    (- sb-vm:other-pointer-lowtag)))
+;;; I'll bet that nothing anywhere tests this
+(with-test (:name :nil-has-symbol-widetag
+            :skipped-on (:or :ppc64 :big-endian))
+  (assert (= (my-widetag-of nil) (my-widetag-of t))))
+
+(with-test (:name :array-rank-deriver-negation)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a) (array-rank (the (not (array t)) a))))))
+           `(values array-rank &optional))))
+
+(with-test (:name (:rational-intersection :lp1998008))
+  (flet ((bug101 ()
+           (let ((t1 '(or (not (real 1 3)) (eql 2))))
+             (assert-tri-eq t t (subtypep `(not (not ,t1)) t1))
+             (assert-tri-eq t t (subtypep t1 `(not (not ,t1)))))))
+    (bug101)))
+
+(with-test (:name (:rational-intersection :integer-bounds))
+  (let ((t1 '(and (not integer) (rational 3 5)))
+        (t2 '(and (not integer) (rational (3) (5)))))
+    (assert-tri-eq t t (subtypep t1 t2))
+    (assert-tri-eq t t (subtypep t2 t1))
+    (assert-tri-eq t t (subtypep `(not ,t1) `(not ,t2)))
+    (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1)))))
+
+(with-test (:name (:cons-union :lp1999352))
+  (let* ((v (list :a))
+         (type1 `(cons (or atom (eql ,v))))
+         (type2 `(cons (or (member :a 2) cons) list)))
+    (let ((bug103 (compile nil
+                           `(lambda (val)
+                              (declare (type ,type1 val))
+                              (the ,type2 val)))))
+      (assert (equal (funcall bug103 (list v)) '((:a)))))))
+
+(with-test (:name :union-type-checks)
+  (assert (not (find 'integerp
+                     (ctu:ir1-named-calls `(lambda (x)
+                                             (declare ((or list fixnum) x))
+                                             (typep x 'integer))
+                                          nil)))))

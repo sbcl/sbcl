@@ -20,16 +20,28 @@
 
 (defvar *trace-encapsulate-default* t
   "the default value for the :ENCAPSULATE option to TRACE")
+
+(defvar *trace-report-default* 'trace
+  "the default value for the :REPORT option to TRACE")
+
 
 ;;;; internal state
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
-;;; entry for a closure is the shared function entry object.
+;;; entry for a closure is the shared function entry object. The entry
+;;; for a method is a (CL:METHOD name qualifiers* (specializers*))
+;;; list.
 (define-load-time-global *traced-funs*
-    (make-hash-table :test 'eq :synchronized t))
+    (make-hash-table :test 'equal :synchronized t))
+
+;;; a hash-table that maps the name of outer functions to local
+;;; functions keys in the *TRACED-FUNS* hash-table, e.g.: NAME-X ->
+;;; ((NAME-Y :IN NAME-X) (NAME-Z :IN NAME-X)).
+(define-load-time-global *traced-locals*
+    (make-hash-table :test 'equal :synchronized t))
 
 (deftype trace-report-type ()
-  '(member nil trace))
+  '(or symbol function))
 
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
@@ -39,8 +51,6 @@
                                 (prin1 (trace-info-what x) stream)))))
   ;; the original representation of the thing traced
   (what nil :type (or function cons symbol))
-  ;; Is WHAT a function name whose definition we should track?
-  (named nil)
   ;; Is tracing to be done by encapsulation rather than breakpoints?
   ;; T implies NAMED.
   (encapsulated *trace-encapsulate-default*)
@@ -64,7 +74,7 @@
   ;; (the default.)
 
   ;; report type
-  (report 'trace :type trace-report-type)
+  (report *trace-report-default* :type trace-report-type)
   ;; current environment forms
   (condition nil)
   (break nil)

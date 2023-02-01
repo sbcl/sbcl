@@ -377,12 +377,13 @@
 #+sb-assembling
 (defun ensure-thread-base-tn-loaded ()
   #-sb-thread
-  (progn
+  (let ((fixup (make-fixup "all_threads" :foreign-dataref)))
     ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
     ;; to stack, because we do do not give the register allocator access to it.
     ;; And call_into_lisp saves it as per convention, not that it matters,
     ;; because there's no way to get back into C code anyhow.
-    (inst mov thread-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+    #-immobile-space (inst mov thread-tn (ea fixup))
+    #+immobile-space (inst mov thread-tn (rip-relative-ea fixup))
     (inst mov thread-tn (ea thread-tn))))
 
 ;;; Perform a store to code, updating the GC card mark bit.
@@ -413,11 +414,11 @@
       #+immobile-space
       (progn
         (inst mov rax object)
-        (inst sub rax (thread-slot-ea thread-varyobj-space-addr-slot))
+        (inst sub rax (thread-slot-ea thread-text-space-addr-slot))
         (inst shr rax (1- (integer-length immobile-card-bytes)))
-        (inst cmp rax (thread-slot-ea thread-varyobj-card-count-slot))
+        (inst cmp rax (thread-slot-ea thread-text-card-count-slot))
         (inst jmp :ae try-dynamic-space)
-        (inst mov rdi (thread-slot-ea thread-varyobj-card-marks-slot))
+        (inst mov rdi (thread-slot-ea thread-text-card-marks-slot))
         (inst bts :dword :lock (ea rdi-tn) rax)
         (inst jmp store))
       TRY-DYNAMIC-SPACE
@@ -463,10 +464,12 @@
 ;;; However the WITH-REGISTERS-PRESERVED macro seems to think that it is utilized
 ;;; only by asm code in *ASSEMBLER-ROUTINES*. I had trouble with it otherwise.
 (define-assembly-routine (alloc-code (:return-style :raw))
-    ((:arg arg (signed-reg) rdx-offset)
+    ((:arg c-arg1 (signed-reg) rdi-offset)
+     (:arg c-arg2 (signed-reg) rsi-offset)
      (:res res (descriptor-reg) rdx-offset))
+  (progn c-arg1 c-arg2) ; "use" the args
+  ;; Don't preserve the register which holds the lisp return value
   (with-registers-preserved (c :except rdx-tn)
-    (inst mov rdi-tn arg)
     (pseudo-atomic ()
       (inst call (make-fixup "alloc_code_object" :foreign)))
     (move res rax-tn)))

@@ -1,0 +1,8 @@
+(require :sb-posix)
+(let* ((pathname (test-util:generate-test-directory-name))
+       (test-util:*test-directory* pathname))
+  (ensure-directories-exist pathname)
+  (format t "~&::: NOTE: using test-directory ~S~%" pathname)
+  (unwind-protect (load "../contrib/sb-posix/posix-tests.lisp")
+    (delete-directory pathname :recursive t)))
+(load "../contrib/sb-posix/libc-tests.lisp")

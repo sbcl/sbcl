@@ -34,21 +34,23 @@
 
 (defun dfun-arg-symbol (arg-number)
   (or (nth arg-number *dfun-arg-symbols*)
-      (format-symbol *pcl-package* ".ARG~A." arg-number)))
+      (pcl-format-symbol ".ARG~A." arg-number)))
 
 (declaim (list *slot-vector-symbols*))
 (define-load-time-global *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
 
 (defun slot-vector-symbol (arg-number)
   (or (nth arg-number *slot-vector-symbols*)
-      (format-symbol *pcl-package* ".SLOTS~A." arg-number)))
+      (pcl-format-symbol ".SLOTS~A." arg-number)))
 
 (declaim (inline make-dfun-required-args))
 (defun make-dfun-required-args (count)
   (declare (type index count))
-  (let (result)
-    (dotimes (i count (nreverse result))
-      (push (dfun-arg-symbol i) result))))
+  ;; N.B.: don't PUSH and NREVERSE here. COLLECT will cons in the system TLAB,
+  ;; but NREVERSE won't because we don't inline NREVERSE.
+  (collect ((result))
+    (dotimes (i count (result))
+      (result (dfun-arg-symbol i)))))
 
 (defun make-dfun-lambda-list (nargs applyp)
   (let ((required (make-dfun-required-args nargs)))
@@ -71,7 +73,7 @@
     ;; of the vop operand restrictions or something that I don't understand.
     ;; Which is to say, PCL compilation reliably broke when changed to INDEX.
     (if applyp
-        (values (append required '(&more .more-context. .more-count.))
+        (values (sb-impl::sys-tlab-append required '(&more .more-context. .more-count.))
                 required
                 '((sb-c:%listify-rest-args
                    .more-context. (the (and unsigned-byte fixnum)
@@ -114,6 +116,9 @@
 (defun emit-one-class-writer (class-slot-p)
   (emit-reader/writer :writer 1 class-slot-p))
 
+(defun emit-one-class-makunbound (class-slot-p)
+  (emit-reader/writer :makunbound 1 class-slot-p))
+
 (defun emit-two-class-reader (class-slot-p)
   (emit-reader/writer :reader 2 class-slot-p))
 
@@ -122,6 +127,9 @@
 
 (defun emit-two-class-writer (class-slot-p)
   (emit-reader/writer :writer 2 class-slot-p))
+
+(defun emit-two-class-makunbound (class-slot-p)
+  (emit-reader/writer :makunbound 2 class-slot-p))
 
 ;;; --------------------------------
 
@@ -134,6 +142,9 @@
 (defun emit-one-index-writers (class-slot-p)
   (emit-one-or-n-index-reader/writer :writer nil class-slot-p))
 
+(defun emit-one-index-makunbounds (class-slot-p)
+  (emit-one-or-n-index-reader/writer :makunbound nil class-slot-p))
+
 (defun emit-n-n-readers ()
   (emit-one-or-n-index-reader/writer :reader t nil))
 
@@ -142,6 +153,9 @@
 
 (defun emit-n-n-writers ()
   (emit-one-or-n-index-reader/writer :writer t nil))
+
+(defun emit-n-n-makunbounds ()
+  (emit-one-or-n-index-reader/writer :makunbound t nil))
 
 ;;; --------------------------------
 
@@ -187,7 +201,7 @@
                          ,form)))))
     (values (if *precompiling-lap*
                 `#',lambda
-                (pcl-compile lambda))
+                (pcl-compile lambda :safe))
             nil)))
 
 ;;; note on implementation for CMU 17 and later (including SBCL):
@@ -203,7 +217,7 @@
         (closure-variables ())
         (read-form (emit-slot-read-form class-slot-p 'index 'slots)))
     (ecase reader/writer
-      ((:reader :boundp)
+      ((:reader :boundp :makunbound)
        (setq instance (dfun-arg-symbol 0)
              arglist  (list instance)))
       (:writer (setq instance (dfun-arg-symbol 1)
@@ -240,6 +254,9 @@
                 (:boundp
                  `((let ((value ,read-form))
                      (return-from access (not (unbound-marker-p value))))))
+                (:makunbound
+                 `(progn (setf ,read-form +slot-unbound+)
+                         ,instance))
                 (:writer
                  `((return-from access (setf ,read-form ,(car arglist)))))))
           (funcall miss-fn ,@arglist))))))
@@ -261,6 +278,7 @@
     (ecase reader/writer
       (:reader (emit-boundp-check read-form miss-fn arglist))
       (:boundp `(not (unbound-marker-p ,read-form)))
+      (:makunbound `(progn (setf ,read-form +slot-unbound+) ,(car arglist)))
       (:writer `(setf ,read-form ,(car arglist))))))
 
 (defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
@@ -276,7 +294,7 @@
                                           class-slot-p)
   (multiple-value-bind (arglist metatypes)
       (ecase reader/writer
-        ((:reader :boundp)
+        ((:reader :boundp :makunbound)
          (values (list (dfun-arg-symbol 0))
                  '(standard-instance)))
         (:writer (values (list (dfun-arg-symbol 0) (dfun-arg-symbol 1))
@@ -350,9 +368,7 @@
          (wrapper-bindings (mapcan (lambda (arg mt)
                                      (unless (eq mt t)
                                        (incf index)
-                                       `((,(format-symbol *pcl-package*
-                                                          "WRAPPER-~D"
-                                                          index)
+                                       `((,(pcl-format-symbol "WRAPPER-~D" index)
                                           ,(emit-fetch-wrapper
                                             mt arg miss-tag (pop slot-vars))))))
                                    args metatypes))

@@ -23,9 +23,7 @@
           sb-c::%check-bound
           sb-kernel:%bit-pos-fwd/1))
 
-(defun inspect-ir (form fun &rest checked-compile-args)
-  (let ((*compile-component-hook* fun))
-    (apply #'checked-compile form checked-compile-args)))
+(import 'ctu:inspect-ir)
 
 (defun ir-full-calls (form)
   (let (calls)
@@ -78,6 +76,33 @@
                         (setf (aref v 0) (aref v 1))))
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
+
+(with-test (:name :bounds-check-constants-svref)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (v)
+                        (values (svref v 1)
+                                (svref v 0))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
+
+(with-test (:name :bounds-check-variable-svref)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x i)
+                        (values (svref x i)
+                                (svref x i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
+
+(with-test (:name :bounds-check-length)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x y)
+                        (when (< x (length y))
+                          (svref y x))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0)))
 
 (with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
@@ -335,3 +360,38 @@
                                            (list 1))))
                             (f)))))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :instance-constraint-intersection)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (x)
+                         (typecase x
+                           (stream 2)
+                           (hash-table 1))))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :aref-full-call-no-type-check)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (x)
+                         (aref x 0)))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :call-full-like-p-constants)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (a b)
+                         (< (truly-the double-float a) b)))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :constant-substitution)
+  (let ((calls (ir-calls
+                `(lambda (a b)
+                   (or (eq a 2)
+                       (eq b 10))))))
+    (assert (not (find-if
+                  (lambda (call)
+                    (let ((fun (sb-c::ref-leaf (sb-c::lvar-uses (sb-c::combination-fun call)))))
+                      (and (sb-c::functional-p fun)
+                           (eq (sb-c::functional-kind fun) :let))))
+                  calls)))))

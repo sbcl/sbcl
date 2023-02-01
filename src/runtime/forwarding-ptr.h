@@ -12,24 +12,13 @@ in_gc_p(void) {
 
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
-    lispobj first_word=*pointer;
-#ifdef LISP_FEATURE_GENCGC
-    return (first_word == FORWARDING_HEADER);
+#if defined LISP_FEATURE_64_BIT && defined LISP_FEATURE_LITTLE_ENDIAN
+    /* Read exactly 1 byte. The upper bytes can store the original object size.
+     * With other architectures we will need to pick a byte distinct from any widetag
+     * and any pointer in the low N-LOWTAG-BITS */
+    return *(char*)pointer == 1;
 #else
-    // FIXME: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
-    // an extra test here, which theoretically slowed things down.
-    // This was in response to 044e22192c25578efceedba042554dc9a96124c6
-    // which caused cheneygc to break. But now the latter revision has been
-    // reverted due to performance degradation in gencgc.
-    // The right fix is probably for gc_search_all_spaces() to use a
-    // special version of gc_search_space for ldb. That is unfortunately
-    // made difficult by the call chain:
-    //   search_all_gc_spaces() -> search_{foo}_space() -> gc_search_space().
-    // which requires informing gc_search_space() to be more careful,
-    // and similarly forwarding_pointer_p().
-    return (is_lisp_pointer(first_word)
-            && in_gc_p() /* cheneygc new_space_p() is broken when not in gc */
-            && new_space_p(first_word));
+    return (*pointer == FORWARDING_HEADER);
 #endif
 }
 
@@ -51,11 +40,21 @@ static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) 
   // Unfortunately this also implies we can't assert
   // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
-    gc_dcheck(compacting_p());
+  //gc_dcheck(from_space_p(addr)); // inclusion order problem, too bad
     addr[0] = FORWARDING_HEADER;
     addr[1] = newspace_copy;
 #else
     addr[0] = newspace_copy;
+#endif
+}
+static inline void set_forwarding_pointer_resized(lispobj *addr, lispobj newspace_copy,
+                                                  __attribute__((unused)) int old_nwords)
+{
+#if defined LISP_FEATURE_64_BIT && defined LISP_FEATURE_LITTLE_ENDIAN
+    addr[0] = FORWARDING_HEADER | (old_nwords<<N_WIDETAG_BITS);
+    addr[1] = newspace_copy;
+#else
+    set_forwarding_pointer(addr, newspace_copy);
 #endif
 }
 

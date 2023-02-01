@@ -1,4 +1,4 @@
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (import '(sb-thread:join-thread
           sb-thread:make-mutex
@@ -191,8 +191,6 @@
   (let ((born 0)
         (running 0)
         (died 0))
-    #-pauseless-thread-start (setq running (sb-thread::avl-count tree))
-    #+pauseless-thread-start
     (sb-int:dx-flet ((mapfun (node)
                        (ecase (sb-thread::thread-%visible (sb-thread::avlnode-data node))
                          (0 (incf born)) ; "can't happen" ?

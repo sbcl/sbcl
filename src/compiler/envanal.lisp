@@ -32,14 +32,16 @@
                  (eq (functional-kind x) :deleted))
                (component-new-functionals component)))
   (setf (component-new-functionals component) ())
+  (dolist (fun (component-lambdas component))
+    (reinit-lambda-environment fun))
   (mapc #'add-lambda-vars-and-let-vars-to-closures
         (component-lambdas component))
 
   (find-non-local-exits component)
-  (recheck-dynamic-extent-lvars component)
+  (find-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
-  (analyze-indirect-lambda-vars component)
+  (determine-lambda-var-and-nlx-extent component)
 
   (dolist (fun (component-lambdas component))
     (when (null (leaf-refs fun))
@@ -52,6 +54,21 @@
 
   (values))
 
+;;; This is to be called on a COMPONENT with top level LAMBDAs before
+;;; the compilation of the associated non-top-level code to detect
+;;; closed over top level variables. We just do COMPUTE-CLOSURE on all
+;;; the lambdas. This will pre-allocate environments for all the
+;;; functions with closed-over top level variables. The post-pass will
+;;; use the existing structure, rather than allocating a new one. We
+;;; return true if we discover any possible closure vars.
+(defun pre-environment-analyze-top-level (component)
+  (declare (type component component))
+  (let ((found-it nil))
+    (dolist (lambda (component-lambdas component))
+      (when (add-lambda-vars-and-let-vars-to-closures lambda t)
+        (setq found-it t)))
+    found-it))
+
 ;;; If FUN has an environment, return it, otherwise assign an empty
 ;;; one and return that.
 (defun get-lambda-environment (fun)
@@ -63,6 +80,39 @@
           (dolist (lambda (lambda-lets fun))
             (setf (lambda-environment lambda) res))
           res))))
+
+;;; If FUN has no environment, assign one, otherwise clean up
+;;; variables that have no sets or refs. If a var has no references,
+;;; we remove it from the closure. If it has no sets, we clear the
+;;; INDIRECT flag. This is necessary because pre-analysis is done
+;;; before optimization.
+(defun reinit-lambda-environment (fun)
+  (let ((old (lambda-environment (lambda-home fun))))
+    (cond (old
+           (setf (environment-closure old)
+                 (delete-if
+                  (lambda (x)
+                    (and (lambda-var-p x)
+                         ;; If the home component of the variable has
+                         ;; been compiled already, don't clean it out,
+                         ;; since we already committed to the closure
+                         ;; format.
+                         (let ((home (lambda-var-home x)))
+                           (or (member (functional-kind home) '(:deleted :zombie))
+                               (not (eq (component-info (lambda-component home))
+                                    :dead))))
+                         (null (leaf-refs x))))
+                  (environment-closure old)))
+           (flet ((clear (fun)
+                    (dolist (var (lambda-vars fun))
+                      (unless (lambda-var-sets var)
+                        (setf (lambda-var-indirect var) nil)))))
+             (clear fun)
+             (dolist (let (lambda-lets fun))
+               (clear let))))
+          (t
+           (get-lambda-environment fun))))
+  (values))
 
 ;;; Get NODE's environment, assigning one if necessary.
 (defun get-node-environment (node)
@@ -78,7 +128,7 @@
 ;;; ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES, always runs over all the
 ;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
 ;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
-(defun %add-lambda-vars-to-closures (clambda)
+(defun %add-lambda-vars-to-closures (clambda &optional explicit-value-cell)
   (let ((env (get-lambda-environment clambda))
         (did-something nil))
     (note-unreferenced-fun-vars clambda)
@@ -106,6 +156,8 @@
             (unless (eq set-env env)
               (setf did-something t
                     (lambda-var-indirect var) t)
+              (when explicit-value-cell
+                (setf (lambda-var-explicit-value-cell var) t))
               (close-over var set-env env))))))
     did-something))
 
@@ -117,16 +169,16 @@
 ;;; value cell. We also warn about unreferenced variables here, just
 ;;; because it's a convenient place to do it. We return true if we
 ;;; close over anything.
-(defun add-lambda-vars-and-let-vars-to-closures (clambda)
+(defun add-lambda-vars-and-let-vars-to-closures (clambda &optional explicit-value-cell)
   (declare (type clambda clambda))
   (let ((did-something nil))
-    (when (%add-lambda-vars-to-closures clambda)
+    (when (%add-lambda-vars-to-closures clambda explicit-value-cell)
       (setf did-something t))
     (dolist (lambda-let (lambda-lets clambda))
       ;; There's no need to recurse through full COMPUTE-CLOSURE
       ;; here, since LETS only go one layer deep.
       (aver (null (lambda-lets lambda-let)))
-      (when (%add-lambda-vars-to-closures lambda-let)
+      (when (%add-lambda-vars-to-closures lambda-let explicit-value-cell)
         (setf did-something t)))
     did-something))
 
@@ -166,110 +218,68 @@
       (flood ref-env)))
   (values))
 
-;;; Find LAMBDA-VARs that are marked as needing to support indirect
-;;; access (SET at some point after initial creation) that are present
-;;; in CLAMBDAs not marked as being DYNAMIC-EXTENT (meaning that the
-;;; value-cell involved must be able to survive past the extent of the
-;;; allocating frame), and mark them (the LAMBDA-VARs) as needing
-;;; explicit value-cells.  Because they are already closed-over, the
-;;; LAMBDA-VARs already appear in the closures of all of the CLAMBDAs
-;;; that need checking.
-(defun analyze-indirect-lambda-vars (component)
+;;; Determine whether it is possible for things that can be closed
+;;; over (LAMBDA-VAR and NLX-INFO) to outlive the extent of their home
+;;; environment. If so, then:
+;;;   -- For indirect LAMBDA-VARs, we mark them as needing to support
+;;;      indirect access (SET at some point after initial creation),
+;;;   -- For NLX-INFOs, we mark them as needing to check if their
+;;;      tags are still in scope.
+;;;
+;;; Both happen to entail the creation of heap-allocated value cells
+;;; in the back-end.
+;;;
+;;; Because we have already closed-over all LAMBDA-VARs and NLX-INFOs
+;;; at this point, they already appear in the closures of all of the
+;;; CLAMBDAs that need checking.
+(defun determine-lambda-var-and-nlx-extent (component)
   (dolist (fun (component-lambdas component))
     (let ((entry-fun (functional-entry-fun fun)))
-      ;; We also check the ENTRY-FUN, as XEPs for LABELS or FLET
-      ;; functions aren't set to be DX even if their underlying
-      ;; CLAMBDAs are, and if we ever get LET-bound anonymous function
-      ;; DX working, it would mark the XEP as being DX but not the
-      ;; "real" CLAMBDA.  This works because a FUNCTIONAL-ENTRY-FUN is
-      ;; either NULL, a self-pointer (for :TOPLEVEL functions), a
-      ;; pointer from an XEP to its underlying function (for :EXTERNAL
-      ;; functions), or a pointer from an underlying function to its
-      ;; XEP (for non-:TOPLEVEL functions with XEPs).
+      ;; We treat DYNAMIC-EXTENT declarations on functions as trusted
+      ;; assertions that none of the values closed over survive the
+      ;; extent of the function. We must check the ENTRY-FUN, as XEPs
+      ;; for LABELS or FLET functions aren't set to be DX even if
+      ;; their underlying CLAMBDAs are, and if we ever get LET-bound
+      ;; anonymous function DX working, it would mark the XEP as being
+      ;; DX but not the "real" CLAMBDA.  This works because a
+      ;; FUNCTIONAL-ENTRY-FUN is either NULL, a self-pointer (for
+      ;; :TOPLEVEL functions), a pointer from an XEP to its underlying
+      ;; function (for :EXTERNAL functions), or a pointer from an
+      ;; underlying function to its XEP (for non-:TOPLEVEL functions
+      ;; with XEPs).
       (unless (or (leaf-dynamic-extent fun)
                   ;; Functions without XEPs can be treated as if they
                   ;; are DYNAMIC-EXTENT, even without being so
                   ;; declared, as any escaping closure which /isn't/
                   ;; DYNAMIC-EXTENT but calls one of these functions
-                  ;; will also close over the required variables, thus
-                  ;; forcing the allocation of value cells.  Since the
-                  ;; XEP is stored in the ENTRY-FUN slot, we can pick
-                  ;; off the non-XEP case here.
+                  ;; will also close over the required variables or
+                  ;; exits, thus forcing the allocation of value
+                  ;; cells. Since the XEP is stored in the ENTRY-FUN
+                  ;; slot, we can pick off the non-XEP case here.
                   (not entry-fun)
                   (leaf-dynamic-extent entry-fun))
         (let ((closure (environment-closure (lambda-environment fun))))
-          (dolist (var closure)
-            (when (and (lambda-var-p var)
-                       (lambda-var-indirect var))
-              (setf (lambda-var-explicit-value-cell var) t))))))))
+          (dolist (thing closure)
+            (typecase thing
+              (lambda-var
+               (when (lambda-var-indirect thing)
+                 (setf (lambda-var-explicit-value-cell thing) t)))
+              (nlx-info
+               (let ((exit (nlx-info-exit thing)))
+                 (unless (policy exit (zerop safety))
+                   (setf (nlx-info-safe-p thing) t)
+                   (note-exit-check-elision-failure exit)))))))))))
+
+(defun note-exit-check-elision-failure (exit)
+  (when (policy exit (> speed safety))
+    (let ((*compiler-error-context* (exit-entry exit)))
+      (compiler-notify "~@<Allocating a value-cell at runtime for ~
+                           checking possibly out of extent exit via ~S. Use ~
+                           GO/RETURN-FROM with SAFETY 0, or declare the exit ~
+                           function DYNAMIC-EXTENT to avoid.~:@>"
+                       (node-source-form exit)))))
 
 ;;;; non-local exit
-
-(defvar *functional-escape-info*)
-
-(defun functional-may-escape-p (functional)
-  (binding* ((functional (if (lambda-p functional)
-                             (lambda-home functional)
-                             functional))
-             (table (or *functional-escape-info*
-                        ;; Many components have no escapes, so we
-                        ;; allocate it lazily.
-                        (setf *functional-escape-info*
-                              (make-hash-table :test #'eq))))
-             ((bool ok) (gethash functional table)))
-    (if ok
-        bool
-        (let ((entry (functional-entry-fun functional)))
-          ;; First stick a NIL in there: break cycles.
-          (setf (gethash functional table) nil)
-          ;; Then compute the real value.
-          (setf (gethash functional table)
-                (and
-                 ;; ESCAPE functionals would never escape from their target
-                 (neq (functional-kind functional) :escape)
-                 (or
-                  ;; If the functional has a XEP, it's kind is :EXTERNAL --
-                  ;; which means it may escape. ...but if it
-                  ;; HAS-EXTERNAL-REFERENCES-P, then that XEP is actually a
-                  ;; TL-XEP, which means it's a toplevel function -- which in
-                  ;; turn means our search has bottomed out without an escape
-                  ;; path. AVER just to make sure, though.
-                  (and (eq :external (functional-kind functional))
-                       (if (functional-has-external-references-p functional)
-                           (aver (eq 'tl-xep (car (functional-debug-name functional))))
-                           t))
-                  ;; If it has an entry point that may escape, that just as bad.
-                  (and entry (functional-may-escape-p entry))
-                  ;; If it has references to it in functions that may escape, that's bad
-                  ;; too.
-                  (dolist (ref (functional-refs functional) nil)
-                    (binding* ((lvar (ref-lvar ref) :exit-if-null)
-                               (dest (lvar-dest lvar) :exit-if-null))
-                      (when (functional-may-escape-p (node-home-lambda dest))
-                        (return t)))))))))))
-
-(defun exit-should-check-tag-p (exit)
-  (declare (type exit exit))
-  (let ((exit-lambda (lexenv-lambda (node-lexenv exit))))
-    (unless (or
-             ;; Unsafe but fast...
-             (policy exit (zerop check-tag-existence))
-             ;; Dynamic extent is a promise things won't escape --
-             ;; and an explicit request to avoid heap consing.
-             (member (lambda-extent exit-lambda) '(truly-dynamic-extent dynamic-extent))
-             ;; If the exit lambda cannot escape, then we should be safe.
-             ;; ...since the escape analysis is kinda new, and not particularly
-             ;; exhaustively tested, let alone proven, disable it for SAFETY 3.
-             (and (policy exit (< safety 3))
-                  (not (functional-may-escape-p exit-lambda))))
-      (when (policy exit (> speed safety))
-        (let ((*compiler-error-context* (exit-entry exit)))
-          (compiler-notify "~@<Allocating a value-cell at runtime for ~
-                            checking possibly out of extent exit via ~S. Use ~
-                            GO/RETURN-FROM with SAFETY 0, or declare the exit ~
-                            function DYNAMIC-EXTENT to avoid.~:@>"
-                           (node-source-form exit))))
-      t)))
 
 ;;; Insert the entry stub before the original exit target, and add a
 ;;; new entry to the ENVIRONMENT-NLX-INFO. The %NLX-ENTRY call in the
@@ -293,7 +303,7 @@
          (next-block (first (block-succ exit-block)))
          (entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
-         (info (make-nlx-info cleanup (first (block-succ exit-block))))
+         (info (make-nlx-info cleanup (first (block-succ exit-block)) exit))
          (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
                                          `(%nlx-entry ',info)
@@ -305,7 +315,6 @@
 
     (setf (exit-nlx-info exit) info)
     (setf (nlx-info-target info) new-block)
-    (setf (nlx-info-safe-p info) (exit-should-check-tag-p exit))
     (push info (environment-nlx-info env))
     (push info (cleanup-nlx-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
@@ -341,10 +350,7 @@
              (aver (= (length (block-succ block)) 1))
              (unlink-blocks block (first (block-succ block)))
              (link-blocks block (component-tail (block-component block)))
-             (setf (exit-nlx-info exit) info)
-             (unless (nlx-info-safe-p info)
-               (setf (nlx-info-safe-p info)
-                     (exit-should-check-tag-p exit)))))
+             (setf (exit-nlx-info exit) info)))
           (t
            (insert-nlx-entry-stub exit env)
            (setq info (exit-nlx-info exit))
@@ -367,61 +373,83 @@
 ;;; when we find a block that ends in a non-local EXIT node.
 (defun find-non-local-exits (component)
   (declare (type component component))
-  (let ((*functional-escape-info* nil))
-    (dolist (lambda (component-lambdas component))
-      (dolist (entry (lambda-entries lambda))
-        (let ((target-env (node-environment entry)))
-          (dolist (exit (entry-exits entry))
-            (aver (neq (node-environment exit) target-env))
-            (note-non-local-exit target-env exit))))))
+  (dolist (lambda (component-lambdas component))
+    (dolist (entry (lambda-entries lambda))
+      (let ((target-env (node-environment entry)))
+        (dolist (exit (entry-exits entry))
+          (aver (neq (node-environment exit) target-env))
+          (note-non-local-exit target-env exit)))))
   (values))
 
-;;;; final decision on stack allocation of dynamic-extent structures
-(defun recheck-dynamic-extent-lvars (component)
+
+;;; Starting from the potentially (declared) dynamic extent lvars
+;;; recognized during local call analysis and the declared dynamic
+;;; extent local functions recognized during IR1tran, determine if
+;;; these are actually eligible for dynamic-extent allocation. If so,
+;;; we also transitively mark the otherwise-inaccessible parts of
+;;; these values as dynamic extent.
+(defun find-dynamic-extent-lvars (component)
   (declare (type component component))
-  (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
-    (dolist (lambda (component-lambdas component))
-      ;; If this FUNCTIONAL is marked dynamic extent and also a
-      ;; closure, mark its ENCLOSE as DX by making it use an LVAR if
-      ;; it doesn't have one already.
-      (let ((fun (if (eq (lambda-kind lambda) :optional)
-                     (lambda-optional-dispatch lambda)
-                     lambda)))
-        (when (leaf-dynamic-extent fun)
-          (let ((xep (functional-entry-fun fun)))
-            (when (and xep (environment-closure (get-lambda-environment xep)))
-              (let ((enclose (functional-enclose fun)))
-                (when (and enclose (not (node-lvar enclose)))
-                  (let ((lvar (make-lvar)))
-                    (use-lvar enclose lvar)
-                    (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
-                      (aver (eq (cleanup-mess-up cleanup) enclose))
-                      (setf (lvar-dynamic-extent lvar) cleanup)
-                      (setf (cleanup-nlx-info cleanup) (list lvar)))
-                    (push lvar (component-dx-lvars component)))))))))
-      (dolist (entry (lambda-entries lambda))
-        (let ((cleanup (entry-cleanup entry)))
-          (when (eq (cleanup-kind cleanup) :dynamic-extent)
-            (let ((real-dx-lvars '()))
-              (dolist (what (cleanup-nlx-info cleanup))
-                (declare (type cons what))
-                (let ((dx (car what))
-                      (lvar (cdr what)))
+  (dolist (lambda (component-lambdas component))
+    ;; Mark closures as dynamic-extent allocatable by making the
+    ;; ENCLOSE node for the closure use an LVAR.
+    (let ((fun (if (eq (lambda-kind lambda) :optional)
+                   (lambda-optional-dispatch lambda)
+                   lambda)))
+      (when (leaf-dynamic-extent fun)
+        (let ((xep (functional-entry-fun fun)))
+          ;; We need to have a closure environment to dynamic-extent
+          ;; allocate.
+          (when (and xep (environment-closure (lambda-environment xep)))
+            (let ((enclose (functional-enclose fun)))
+              (when (and enclose (not (node-lvar enclose)))
+                (let ((lvar (make-lvar)))
+                  (use-lvar enclose lvar)
+                  (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
+                    (aver (eq (cleanup-mess-up cleanup) enclose))
+                    (setf (lvar-dynamic-extent lvar) cleanup)
+                    (setf (cleanup-nlx-info cleanup) (list lvar)))
+                  ;; THe node component of ENCLOSE may be a different
+                  ;; component for top level closure references. We
+                  ;; always compile non-top-level components before
+                  ;; top-level components, so this takes effect at the
+                  ;; right time.
+                  (push lvar (component-dx-lvars (node-component enclose))))))))))
+    (dolist (entry (lambda-entries lambda))
+      (let* ((cleanup (entry-cleanup entry))
+             (lvar+extents (cleanup-nlx-info cleanup))
+             (*dx-lexenv* (node-lexenv (cleanup-mess-up cleanup))))
+        (when (eq (cleanup-kind cleanup) :dynamic-extent)
+          (setf (cleanup-nlx-info cleanup) nil)
+          (dolist (lvar+extent lvar+extents)
+            (declare (type cons lvar+extent))
+            (let ((dx (car lvar+extent))
+                  (lvar (cdr lvar+extent)))
+              (labels ((mark-dx (lvar)
+                         (setf (lvar-dynamic-extent lvar) cleanup)
+                         (push lvar (cleanup-nlx-info cleanup))
+                         (push lvar (component-dx-lvars component))
+                         ;; Now look to see if there are otherwise
+                         ;; inaccessible parts of the value in LVAR.
+                         (do-uses (use lvar)
+                           (etypecase use
+                             (cast (mark-dx (cast-value use)))
+                             (combination
+                              (dolist (arg (combination-args use))
+                                (when (and arg
+                                           (lvar-good-for-dx-p arg dx))
+                                  (mark-dx arg))))
+                             (ref
+                              (let ((other (trivial-lambda-var-ref-lvar use)))
+                                (unless (eq other lvar)
+                                  (mark-dx other))))))))
+                ;; Check that the LVAR hasn't been flushed somehow.
+                (when (lvar-uses lvar)
                   (cond ((lvar-good-for-dx-p lvar dx)
-                         ;; Since the above check does deep
-                         ;; checks. we need to deal with the deep
-                         ;; results in here as well.
-                         (dolist (cell (handle-nested-dynamic-extent-lvars
-                                        dx lvar))
-                           (let ((real (principal-lvar (cdr cell))))
-                             (setf (lvar-dynamic-extent real) cleanup)
-                             (pushnew real real-dx-lvars))))
+                         (mark-dx lvar))
                         (t
                          (note-no-stack-allocation lvar)
-                         (setf (lvar-dynamic-extent lvar) nil)))))
-              (setf (cleanup-nlx-info cleanup) real-dx-lvars)
-              (setf (component-dx-lvars component)
-                    (append real-dx-lvars (component-dx-lvars component)))))))))
+                         (setf (lvar-dynamic-extent lvar) nil)))))))))))
   (values))
 
 ;;;; cleanup emission
@@ -446,7 +474,7 @@
   (collect ((code)
             (reanalyze-funs))
     (let ((succ-cleanup (block-start-cleanup succ-block)))
-      (do-nested-cleanups (cleanup (block-end-lexenv (car pred-blocks)))
+      (do-nested-cleanups (cleanup (car pred-blocks))
         (when (eq cleanup succ-cleanup)
           (return))
         (let* ((node (cleanup-mess-up cleanup))

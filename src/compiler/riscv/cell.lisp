@@ -70,7 +70,7 @@
       (inst bne result old DONT-STORE-TLS)
       (storew new lip)
       DONT-STORE-TLS
-      (inst xori temp result no-tls-value-marker-widetag)
+      (inst xori temp result no-tls-value-marker)
       (inst bne temp zero-tn CHECK-UNBOUND))
 
     (inst addi lip symbol (- (* symbol-value-slot n-word-bytes)
@@ -97,7 +97,7 @@
     (load-tls-index tls-slot symbol)
     (inst add lip thread-base-tn tls-slot)
     (loadw temp lip)
-    (inst xori temp temp no-tls-value-marker-widetag)
+    (inst xori temp temp no-tls-value-marker)
     (inst bne temp zero-tn TLS-VALUE)
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (inst j DONE)
@@ -121,7 +121,7 @@
 ;;; With Symbol-Value, we check that the value isn't the trap object.
 #+sb-thread
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars check-boundp)
   (:variant t)
@@ -129,7 +129,7 @@
     (load-tls-index value object)
     (inst add lip thread-base-tn value)
     (loadw value lip)
-    (inst xori temp value no-tls-value-marker-widetag)
+    (inst xori temp value no-tls-value-marker)
     (inst bne temp zero-tn CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -140,7 +140,7 @@
 
 #-sb-thread
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
@@ -162,7 +162,7 @@
     (load-tls-index value object)
     (inst add lip thread-base-tn value)
     (loadw value lip)
-    (inst xori temp value no-tls-value-marker-widetag)
+    (inst xori temp value no-tls-value-marker)
     (inst bne temp zero-tn CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -188,14 +188,14 @@
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symeval))
+  (:translate symbol-value))
 
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 (define-vop (fast-symbol-global-value fast-symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
@@ -218,7 +218,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:translate sb-impl::symbol-package-id)
+  (:translate symbol-package-id)
   (:policy :fast-safe)
   (:generator 1 ; ASSUMPTION: symbol-package-bits = 16
    (inst lhu result symbol (+ (ash symbol-name-slot word-shift)

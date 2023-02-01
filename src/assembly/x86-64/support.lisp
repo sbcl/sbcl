@@ -17,26 +17,18 @@
 (defun uniquify-fixup (name &aux (asmstream *asmstream*))
   (or (cdr (assoc name (sb-assem::asmstream-indirection-table asmstream)))
       (let ((label (gen-label)))
-        ;; This has to be separate from the :ELSEWHERE section because we could be
-        ;; emitting code into :ELSEWHERE when requesting a unique label.
-        (assemble (:indirections)
+        (assemble (:elsewhere)
           (emit-label label)
           (inst jmp (ea (make-fixup name :assembly-routine*))))
         (push (cons name label) (sb-assem::asmstream-indirection-table asmstream))
         label)))
 
-(defun invoke-asm-routine (inst routine vop &optional uniquify)
+(defun invoke-asm-routine (inst routine vop)
   (declare (ignorable vop))
-  (let ((fixup
-         (cond ((sb-c::code-immobile-p vop)
-                (make-fixup routine :assembly-routine))
-               (uniquify
-                (uniquify-fixup routine))
-               (t
-                (ea (make-fixup routine :assembly-routine*))))))
-    (ecase inst
-      (jmp  (inst jmp fixup))
-      (call (inst call fixup)))))
+  (inst* (the (member jmp call) inst)
+         (if (sb-c::code-immobile-p vop)
+             (make-fixup routine :assembly-routine)
+             (ea (make-fixup routine :assembly-routine*)))))
 
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options))
@@ -93,7 +85,7 @@
        ;; KLUDGE: index of FPR-SAVE is 4
        ;; (inst call (ea (make-fixup 'fpr-save :assembly-routine*)))
        (inst call (ea (make-fixup nil :code-object
-                                  (+ (ash code-constants-offset word-shift)
+                                  (+ (component-header-length)
                                      (* 4 sb-vm:n-word-bytes)
                                      (- other-pointer-lowtag)))
                       rip-tn))
@@ -103,7 +95,7 @@
        ;; KLUDGE: index of FPR-RESTORE is 6
        ;; (inst call (ea (make-fixup 'fpr-restore :assembly-routine*)))
        (inst call (ea (make-fixup nil :code-object
-                                  (+ (ash code-constants-offset word-shift)
+                                  (+ (component-header-length)
                                      (* 6 sb-vm:n-word-bytes)
                                      (- other-pointer-lowtag)))
                       rip-tn))

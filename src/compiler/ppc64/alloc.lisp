@@ -161,15 +161,14 @@
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size)
-      (inst addi temp null-tn (make-fixup 'undefined-tramp :asm-routine-nil-offset))
+      (inst addi temp null-tn (make-fixup 'undefined-tramp :assembly-routine*))
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info label length stack-allocate-p)
-  (:ignore label)
+  (:info length stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
@@ -217,7 +216,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst addi result null-tn (make-fixup 'funcallable-instance-tramp :asm-routine-nil-offset))))
+    (inst addi result null-tn (make-fixup 'funcallable-instance-tramp :assembly-routine*))))
 
 (define-vop (fixed-alloc)
   (:args)

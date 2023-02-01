@@ -179,7 +179,7 @@ INSTALLING SBCL
 
     :SB-CORE-COMPRESSION (--with-sb-core-compression)
 
-      Adds zlib as a build-dependency, and makes SBCL able to save
+      Adds zstd as a build-dependency, and makes SBCL able to save
       compressed cores. Not enabled by default.
 
     :SB-XREF-FOR-INTERNALS (--with-sb-xref-for-internals)

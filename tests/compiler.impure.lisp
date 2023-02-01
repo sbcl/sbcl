@@ -20,7 +20,7 @@
 ;; or actually reasonable things to test.
 (when (and (eq sb-ext:*evaluator-mode* :interpret)
            (not (member :sb-fasteval *features*)))
-  (sb-ext:exit :code 104))
+  (invoke-restart 'run-tests::skip-file))
 
 (load "compiler-test-util.lisp")
 
@@ -1007,35 +1007,31 @@
 (defun foo-maybe-inline (x) (quux-marker x))
 
 (with-test (:name :nested-inline-calls)
-  (let ((fun (checked-compile `(lambda (x)
-                               (foo-inline (foo-inline (foo-inline x)))))))
-    (assert (= 0 (ctu:count-full-calls "FOO-INLINE" fun)))
-    (assert (= 3 (ctu:count-full-calls "QUUX-MARKER" fun)))))
+  (let ((fun '(lambda (x) (foo-inline (foo-inline (foo-inline x))))))
+    (assert (= 0 (ctu:count-full-calls 'foo-inline fun)))
+    (assert (= 3 (ctu:count-full-calls 'quux-marker fun)))))
 
 (with-test (:name :nested-maybe-inline-calls)
-  (let ((fun (checked-compile
-              `(lambda (x)
+  (let ((fun `(lambda (x)
                  (declare (optimize (space 0)))
-                 (foo-maybe-inline (foo-maybe-inline (foo-maybe-inline x)))))))
-    (assert (= 0 (ctu:count-full-calls "FOO-MAYBE-INLINE" fun)))
-    (assert (= 1 (ctu:count-full-calls "QUUX-MARKER" fun)))))
+                 (foo-maybe-inline (foo-maybe-inline (foo-maybe-inline x))))))
+    (assert (= 0 (ctu:count-full-calls 'foo-maybe-inline fun)))
+    (assert (= 1 (ctu:count-full-calls 'quux-marker fun)))))
 
 (with-test (:name :inline-calls)
-  (let ((fun (checked-compile `(lambda (x)
-                                 (list (foo-inline x)
-                                       (foo-inline x)
-                                       (foo-inline x))))))
-    (assert (= 0 (ctu:count-full-calls "FOO-INLINE" fun)))
-    (assert (= 3 (ctu:count-full-calls "QUUX-MARKER" fun)))))
+  (let ((fun `(lambda (x)
+                (list (foo-inline x) (foo-inline x) (foo-inline x)))))
+    (assert (= 0 (ctu:count-full-calls 'foo-inline fun)))
+    (assert (= 3 (ctu:count-full-calls 'quux-marker fun)))))
 
 (with-test (:name :maybe-inline-calls)
-  (let ((fun (checked-compile `(lambda (x)
-                                 (declare (optimize (space 0)))
-                                 (list (foo-maybe-inline x)
-                                       (foo-maybe-inline x)
-                                       (foo-maybe-inline x))))))
-    (assert (= 0 (ctu:count-full-calls "FOO-MAYBE-INLINE" fun)))
-    (assert (= 1 (ctu:count-full-calls "QUUX-MARKER" fun)))))
+  (let ((fun `(lambda (x)
+                (declare (optimize (space 0)))
+                (list (foo-maybe-inline x)
+                      (foo-maybe-inline x)
+                      (foo-maybe-inline x)))))
+    (assert (= 0 (ctu:count-full-calls 'foo-maybe-inline fun)))
+    (assert (= 1 (ctu:count-full-calls 'quux-marker fun)))))
 
 (with-test (:name :maybe-inline-let-calls)
   (checked-compile `(lambda (x)
@@ -1181,17 +1177,18 @@
   (assert (= (atanh #C(-0.7d0 1.1d0)) #C(-0.28715567731069275d0 0.9394245539093365d0))))
 
 (with-test (:name :slot-value-on-structure)
-  (let ((f (checked-compile `(lambda (x a b)
+  (multiple-value-bind (callees f)
+      (ctu:ir1-named-calls  `(lambda (x a b)
                                (declare (something-known-to-be-a-struct x))
                                (setf (slot-value x 'x) a
                                      (slot-value x 'y) b)
                                (list (slot-value x 'x)
-                                     (slot-value x 'y))))))
+                                     (slot-value x 'y))))
     (assert (equal '(#\x #\y)
                    (funcall f
                             (make-something-known-to-be-a-struct :x "X" :y "Y")
                             #\x #\y)))
-    (assert (not (ctu:find-named-callees f)))))
+    (assert (not callees))))
 
 (defclass some-slot-thing ()
   ((slot :initarg :slot)))
@@ -1321,12 +1318,15 @@
 
 (with-test (:name (load-time-value :errors))
   (multiple-value-bind (warn fail)
-      (ctu:file-compile
-       `((defvar *load-time-value-error-value* 10)
-         (declaim (fixnum *load-time-value-error-value*))
-         (defun load-time-value-error-test-1 ()
-           (the list (load-time-value *load-time-value-error-value*))))
-       :load t)
+      (progn
+        (ctu:file-compile
+         `((defvar *load-time-value-error-value* 10)
+           (declaim (fixnum *load-time-value-error-value*)))
+         :load t)
+        (ctu:file-compile
+         `((defun load-time-value-error-test-1 ()
+              (the list (load-time-value *load-time-value-error-value*))))
+         :load t))
     (assert warn)
     (assert fail))
   (handler-case (load-time-value-error-test-1)
@@ -2253,9 +2253,13 @@
 (assert (not (sneak-set-dont-set-me2 13)))
 (assert (typep dont-set-me2 'some-constant-thing))
 
-;;; check that non-trivial constants are EQ across different files: this is
-;;; not something ANSI either guarantees or requires, but we want to do it
-;;; anyways.
+;;; Check that non-trivial constants are EQL across different files, as required by the spec:
+;;; From the CLHS glossary (note that `same' without any qualifiers
+;;; means EQL):
+;;; named constant n. a variable that is defined by Common Lisp, by
+;;; the implementation, or by user code (see the macro defconstant) to
+;;; always yield the same value when evaluated. ``The value of a named
+;;; constant may not be changed by assignment or by binding.''
 (defconstant +share-me-1+ 123.456d0)
 (defconstant +share-me-2+ "a string to share")
 (defconstant +share-me-3+ (vector 1 2 3))
@@ -2272,7 +2276,7 @@
                                                              pi)))
     (flet ((test (fa fb)
              (mapc (lambda (a b)
-                     (assert (eq a b)))
+                     (assert (eql a b)))
                    (multiple-value-list (funcall fa))
                    (multiple-value-list (funcall fb)))))
       (test f1 c1)
@@ -2490,18 +2494,19 @@
 
 (test-util:with-test (:name :bug-308941)
   (multiple-value-bind (warn fail)
-      (let ((*check-consistency* t))
-        (ctu:file-compile
-         "(eval-when (:compile-toplevel :load-toplevel :execute)
+      (ctu:file-compile
+       "(eval-when (:compile-toplevel :load-toplevel :execute)
             (defstruct foo3))
           (defstruct bar
             (foo #.(make-foo3)))"
-         :load nil))
+       :load nil)
     ;; ...but the compiler should not break.
     (assert (and warn fail))))
 
 (test-util:with-test (:name :bug-903821)
-  (let* ((fun (test-util:checked-compile
+  (sb-int:binding*
+       (((calls fun)
+          (ctu:ir1-named-calls
                '(lambda (x n)
                  (declare (sb-ext:word x)
                   (type (integer 0 #.(1- sb-vm:n-machine-word-bits)) n)
@@ -2509,8 +2514,7 @@
                  (logandc2 x (ash -1 n)))))
          (thing-not-to-call
           (intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")))
-    (assert (not (member (symbol-function thing-not-to-call)
-                         (ctu:find-named-callees fun))))
+    (assert (not (member thing-not-to-call calls)))
     (assert (= 7 (funcall fun 15 3)))))
 
 (test-util:with-test (:name :bug-997528)
@@ -2651,11 +2655,11 @@
      (lambda (arg) (funcall f (funcall g arg)))))
 
 (with-test (:name :coerce-to-function-smarter)
-  (let ((f (checked-compile
+  (let ((calls (ctu:ir1-named-calls
             '(lambda (x)
               (funcall (compose2 #'integerp #'car) x)))))
     ;; should be completely inlined
-    (assert (null (ctu:find-named-callees f)))))
+    (assert (null calls))))
 
 (with-test (:name :derived-function-type-casts)
   (let ((fasl (compile-file "derived-function-type-casts.lisp"
@@ -3111,3 +3115,35 @@
   (with-scratch-file (fasl "fasl")
     (compile-file "bug-255" :output-file fasl))
   (delete-package :bug255))
+
+(with-test (:name :non-top-level-type-derive)
+  (ctu:file-compile
+   "(defun non-top-level-type-derive () 0)"
+   :load t)
+  (flet ((test (load)
+           (ctu:file-compile
+            "(when nil (defun non-top-level-type-derive () 1))"
+            :load load)
+           (assert (equal (sb-kernel:type-specifier
+                           (sb-int:info :function :type 'non-top-level-type-derive))
+                          '(function () (values (integer 0 0) &optional))))))
+    (test nil)
+    (test t)
+    (assert (eql (funcall 'non-top-level-type-derive) 0)))
+  (ctu:file-compile
+   "(when t (defun non-top-level-type-derive () 1))"
+   :load t)
+  (assert (equal (sb-kernel:type-specifier
+                  (sb-int:info :function :type 'non-top-level-type-derive))
+                 '(function () (values (integer 1 1) &optional))))
+  (assert (eql (funcall 'non-top-level-type-derive) 1)))
+
+(with-test (:name :delete-optional-dispatch-xep)
+  (ctu:file-compile
+   "(defun delete-optional-dispatch-xep (&optional x)
+      (if (= x 0)
+          10
+          (multiple-value-call #'delete-optional-dispatch-xep (1- x))))"
+   :block-compile t ; so the self call is recognized
+   :load t)
+  (assert (= (funcall 'delete-optional-dispatch-xep 3) 10)))

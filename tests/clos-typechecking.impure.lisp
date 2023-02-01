@@ -13,7 +13,7 @@
 ;;;; more information.
 
 ;;; Typechecking should be working, but it isn't.
-#+interpreter (sb-ext:exit :code 104)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (shadow 'slot)
 

@@ -19,7 +19,7 @@ also utilized to allow references to as-of-yet unknown aliens.
 The SBCL implementation is somewhat simplified from the CMUCL one by
 Timothy Moore, but the basic idea and mechanism remain identical:
 instead of having addresses from @code{dlsym(3)} in the core, we have
-addresses to an mmapped memory area (@code{LINKAGE_TABLE_SPACE}) that
+addresses to an mmapped memory area (@code{ALIEN_LINKAGE_TABLE_SPACE}) that
 is initialized at startup to contain jumps & references to the correct
 addresses, based on information stored on the lisp side in
 @code{*LINKAGE-INFO*}.
@@ -72,8 +72,7 @@ is used by SB-POSIX.)
 
 Find a memory area for the linkage-table, and add it for the OS in
 @file{src/compiler/target/parms.lisp} by defining
-@code{SB-VM:LINKAGE-TABLE-SPACE-START} and
-@code{SB-VM:LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
+@code{SB-VM:ALIEN-LINKAGE-TABLE-SPACE-START}. See existing ports and CMUCL for
 examples.
 
 @subsubsection Porting to new architectures
@@ -82,7 +81,7 @@ Write @code{arch_write_linkage_table_entry}.
 
 Write @code{FOREIGN-SYMBOL-DATAREF} VOP.
 
-Define correct @code{SB-VM:LINKAGE-TABLE-ENTRY-SIZE} in
+Define correct @code{SB-VM:ALIEN-LINKAGE-TABLE-ENTRY-SIZE} in
 @file{src/compiler/target/parms.lisp}.
 
 @page
@@ -105,7 +104,7 @@ signalling the appropriate error.
 
 These placeholder addresses get recorded in the linkage-table.
 
-When new shared objects are loaded @code{UPDATE-LINKAGE-TABLE} is
+When new shared objects are loaded @code{UPDATE-ALIEN-LINKAGE-TABLE} is
 called, which in turn attempts to resolve all currently undefined
 aliens, and registers the correct addresses for them in the
 linkage-table.

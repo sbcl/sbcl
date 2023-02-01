@@ -58,16 +58,23 @@ lispobj *static_code_space_free_pointer;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-lispobj *varyobj_free_pointer;
+lispobj *text_space_highwatermark;
 lispobj *fixedobj_free_pointer;
+lispobj ALIEN_LINKAGE_TABLE_SPACE_START;
 #endif
 os_vm_address_t anon_dynamic_space_start;
+// The end of immobile text mapped from disk, equivalently the starting address
+// of new objects handed out by the code allocator.
+lispobj* tlsf_mem_start; // meaningful only if immobile space
 
 #ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */
 lispobj *current_auto_gc_trigger;
 #endif
 
 lispobj lisp_package_vector;
+// Tagged lisp pointer to a 'struct arena' (which is also a lisp DEFSTRUCT)
+// The chain terminates with NIL.
+lispobj arena_chain;
 
 void globals_init(void)
 {

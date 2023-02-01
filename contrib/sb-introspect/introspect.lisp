@@ -460,18 +460,19 @@ If an unsupported TYPE is requested, the function will return NIL.
 (defun find-function-definition-source (function)
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
-         (debug-fun (debug-info-debug-function function debug-info)))
-    (multiple-value-bind (tlf character-offset)
-        (sb-di::debug-fun-tlf-and-offset debug-info debug-fun)
-      (make-definition-source
-       :pathname
-       (when (stringp (debug-source-namestring debug-source))
-         (parse-namestring (debug-source-namestring debug-source)))
-       :character-offset character-offset
-       :form-path (if tlf (list tlf))
-       :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
-       :file-write-date (debug-source-created debug-source)
-       :plist (sb-c::debug-source-plist debug-source)))))
+         (debug-fun (debug-info-debug-function function debug-info))
+         (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+    (make-definition-source
+     :pathname
+     (when (stringp (debug-source-namestring debug-source))
+       (parse-namestring (debug-source-namestring debug-source)))
+     :character-offset
+     (if tlf
+         (elt (sb-c::debug-source-start-positions debug-source) tlf))
+     :form-path (if tlf (list tlf))
+     :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
+     :file-write-date (debug-source-created debug-source)
+     :plist (sb-c::debug-source-plist debug-source))))
 
 (defun translate-source-location (location)
   (if location
@@ -751,6 +752,14 @@ Experimental.
 
 ;;;; ALLOCATION INTROSPECTION
 
+(eval-when (:compile-toplevel :execute)
+  (defmacro pinnedp (addr)
+    `(eql (sb-alien:alien-funcall
+           (sb-alien:extern-alien "sb_introspect_pinnedp"
+                                  (function sb-alien:int sb-alien:unsigned))
+           ,addr)
+          1)))
+
 (defun allocation-information (object)
   "Returns information about the allocation of OBJECT. Primary return value
 indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
@@ -820,19 +829,12 @@ Experimental: interface subject to change."
                          (let* ((wp (page-protected-p object))
                                 (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
-                                (flags (sb-alien:slot page 'sb-vm::flags))
-                                .
-                                #+big-endian
-                                ((type      (ldb (byte 6 2) flags))
-                                 (dontmove  (logbitp 0 flags)))
-                                #+little-endian
-                                ((type      (ldb (byte 6 0) flags))
-                                 (dontmove  (logbitp 7 flags))))
+                                (type (sb-alien:slot page 'sb-vm::flags)))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
                                  :boxed (> (logand type #xf) 1)
-                                 :pinned dontmove
+                                 :pinned (pinnedp (get-lisp-obj-address object))
                                  :large (logbitp 4 type)
                                  :page index)))
                        (list :space space))

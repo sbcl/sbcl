@@ -2232,6 +2232,7 @@
   (:delay 0)
   (:emitter
    (etypecase word
+     #-64-bit
      (fixup
       (note-fixup segment :absolute word)
       (emit-word segment 0))
@@ -2243,6 +2244,7 @@
   (:delay 0)
   (:emitter
    (etypecase dword
+     #+64-bit
      (fixup
       (note-fixup segment :absolute dword)
       (emit-dword segment 0))
@@ -2401,16 +2403,13 @@
     (ecase kind
       (:absolute
        ;; There is an implicit addend currently stored in the fixup location.
-       (incf (sap-ref-32 sap offset) value))
-      (:absolute64
-       (incf (sap-ref-64 sap offset) value))
+       (incf (sap-ref-word sap offset) value))
       (:layout-id
        (aver (zerop (sap-ref-32 sap offset)))
        (setf (signed-sap-ref-32 sap offset) (the layout-id value)))
       (:rldic-m ; This is the M (mask) immediate operand to RLDIC{L,R} which
        ;; appears in (byte 6 5) of the instruction. See EMIT-MD-FORM-INST.
-       (setf (ldb (byte 6 5) (sap-ref-32 sap offset)) (encode-mask6 (- 64 value)))
-       (return-from fixup-code-object :immediate))
+       (setf (ldb (byte 6 5) (sap-ref-32 sap offset)) (encode-mask6 (- 64 value))))
       (:b
        (error "Can't deal with CALL fixups, yet."))
       (:ba
@@ -2431,6 +2430,13 @@
        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
              (ldb (byte 16 0) value)))))
   nil)
+
+(defun sb-c::pack-retained-fixups (fixup-notes)
+  (let (result)
+    (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil nil result))
+      (let ((fixup (fixup-note-fixup note)))
+        (when (eq (fixup-flavor fixup) :gc-barrier)
+          (push (fixup-note-position note) result))))))
 
 (define-instruction store-coverage-mark (segment mark-index temp)
   (:emitter

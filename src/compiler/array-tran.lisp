@@ -113,6 +113,13 @@
      ;; 2002-08-21
      (values *wild-type* nil))))
 
+(defun type-array-element-type (type)
+  (if (csubtypep type (specifier-type 'array))
+      (multiple-value-bind (upgraded other)
+          (array-type-upgraded-element-type type)
+        (or other upgraded))
+      *wild-type*))
+
 (defun declared-array-element-type (type)
   (if (array-type-p type)
       (array-type-element-type type)
@@ -128,7 +135,7 @@
        new-value
        (array-type-specialized-element-type type)
        (lexenv-policy (node-lexenv (lvar-dest new-value)))
-       :aref)))
+       'aref-context)))
   (lvar-type new-value))
 
 (defun supplied-and-true (arg)
@@ -140,9 +147,7 @@
 ;;;; DERIVE-TYPE optimizers
 
 (defun derive-aref-type (array)
-  (multiple-value-bind (uaet other)
-      (array-type-upgraded-element-type (lvar-type array))
-    (or other uaet)))
+  (type-array-element-type (lvar-type array)))
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
   (block nil
@@ -219,60 +224,51 @@
                 (give-up))))))))
 
 (defoptimizer (aref derive-type) ((array &rest subscripts))
-  (declare (ignore subscripts))
   (derive-aref-type array))
 
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
-  (declare (ignore subscripts))
   (assert-new-value-type new-value array))
 
-(macrolet ((define (name)
-             `(defoptimizer (,name derive-type) ((array index))
-                (declare (ignore index))
-                (derive-aref-type array))))
-  (define hairy-data-vector-ref)
-  (define hairy-data-vector-ref/check-bounds)
-  (define data-vector-ref))
+(defoptimizers derive-type
+    (hairy-data-vector-ref hairy-data-vector-ref/check-bounds
+     data-vector-ref)
+    ((array index))
+  (derive-aref-type array))
 
 #+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
-  (declare (ignore index offset))
   (derive-aref-type array))
 
 (defoptimizer (vector-pop derive-type) ((array))
   (derive-aref-type array))
 
-(macrolet ((define (name)
-             `(defoptimizer (,name derive-type) ((array index new-value))
-                (declare (ignore index))
-                (assert-new-value-type new-value array))))
-  (define hairy-data-vector-set)
-  (define hairy-data-vector-set/check-bounds)
-  ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
-  )
+(defoptimizers derive-type
+    (hairy-data-vector-set
+     hairy-data-vector-set/check-bounds)
+    ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
+    ((array index new-value))
+  (assert-new-value-type new-value array))
 
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
 (defun derive-%with-array-data/mumble-type (array)
   (let ((atype (lvar-type array)))
-    (when (array-type-p atype)
-      (specifier-type
-       `(simple-array ,(type-specifier
-                        (array-type-specialized-element-type atype))
-                      (*))))))
+    (cond ((array-type-p atype)
+           (specifier-type
+            `(simple-array ,(type-specifier
+                             (array-type-specialized-element-type atype))
+                           (*))))
+          ((csubtypep atype (specifier-type 'string))
+           (specifier-type 'simple-string)))))
 (defoptimizer (%with-array-data derive-type) ((array start end))
-  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 (defoptimizer (%with-array-data/fp derive-type) ((array start end))
-  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 
 (defoptimizer (row-major-aref derive-type) ((array index))
-  (declare (ignore index))
   (derive-aref-type array))
 
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
-  (declare (ignore index))
   (assert-new-value-type new-value array))
 
 (defun check-array-dimensions (dims node)
@@ -351,7 +347,6 @@
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
      node)
-  (declare (ignore n-bits))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
                           sb-vm:*specialized-array-element-type-properties*
@@ -1353,7 +1348,12 @@
          (dolist (type (cdr types) result)
            (unless (eq (conservative-array-type-complexp type) result)
              (return-from conservative-array-type-complexp :maybe))))))
-    ;; FIXME: intersection type
+    (intersection-type
+     (loop for type in (intersection-type-types type)
+           do (case (conservative-array-type-complexp type)
+                ((t) (return t))
+                ((nil) (return nil)))
+           finally (return :maybe)))
     (t :maybe)))
 
 ;; Let type derivation handle constant cases. We only do easy strength
@@ -1396,13 +1396,7 @@
                       (et (array-type-element-type x)))
                   ;; Need to check if the whole type has the same specialization and simplicity,
                   ;; otherwise it's not clear which part of the type is negated.
-                  (cond ((eql dims '*)
-                         '*)
-                        ((not (every (lambda (dim)
-                                       (eql dim '*))
-                                     dims))
-                         nil)
-                        ((not
+                  (cond ((not
                           (case (array-type-complexp x)
                             ((t)
                              (csubtypep ctype (specifier-type '(not simple-array))))
@@ -1413,6 +1407,12 @@
                         ((not (or (eq et *wild-type*)
                                   (csubtypep ctype
                                              (specifier-type `(array ,(type-specifier et))))))
+                         nil)
+                        ((eq dims '*)
+                         '*)
+                        ((not (every (lambda (dim)
+                                       (eq dim '*))
+                                     dims))
                          nil)
                         (t
                          (list (length dims))))))
@@ -1502,24 +1502,74 @@
   (let ((array-type (lvar-conservative-type vector))
         min-length
         max-length)
-    (when (and
-           (union-type-p array-type)
-           (loop for type in (union-type-types array-type)
-                 always (and (array-type-p type)
-                             (typep (array-type-dimensions type)
-                                    '(cons integer null)))
-                 do (let ((length (car (array-type-dimensions type))))
-                      (cond ((array-type-complexp type)
-                             ;; fill-pointer can start from 0
-                             (setf min-length 0))
-                            ((or (not min-length)
-                                 (< length min-length))
-                             (setf min-length length)))
-                      (when (or (not max-length)
-                                (> length max-length))
-                        (setf max-length length)))))
-      (specifier-type `(integer ,(or min-length 0)
-                                ,max-length)))))
+    (let ((type
+            (when (and (union-type-p array-type)
+                       (loop for type in (union-type-types array-type)
+                             for dim = (catch 'give-up-ir1-transform
+                                         (array-type-dimensions-or-give-up type))
+                             always (typep dim '(cons integer null))
+                             do (let ((length (car dim)))
+                                  (cond ((conservative-array-type-complexp type)
+                                         ;; fill-pointer can start from 0
+                                         (setf min-length 0))
+                                        ((or (not min-length)
+                                             (< length min-length))
+                                         (setf min-length length)))
+                                  (when (or (not max-length)
+                                            (> length max-length))
+                                    (setf max-length length)))))
+              (specifier-type `(integer ,(or min-length 0)
+                                        ,max-length)))))
+      (when (csubtypep array-type (specifier-type 'simple-array))
+        (let ((ref (lvar-uses vector)))
+          (when (ref-p ref)
+            (loop for con in (ref-constraints ref)
+                  for x = (constraint-x con)
+                  for y = (constraint-y con)
+                  when (equality-constraint-p con)
+                  do (let ((constant (and (constant-p y)
+                                          (constant-value y)))
+                           (not-p (constraint-not-p con))
+                           (operator (equality-constraint-operator con)))
+                       (cond (constant
+                              (when (vector-length-constraint-p x)
+                                (case operator
+                                  (eq
+                                   (unless not-p
+                                     (return-from vector-length-derive-type-optimizer
+                                       (specifier-type `(eql ,constant)))))
+                                  (>
+                                   (let ((p (specifier-type (if not-p
+                                                                `(integer 0 ,constant)
+                                                                `(integer (,constant))))))
+                                     (setf type
+                                           (if type
+                                               (type-intersection type p)
+                                               p))))
+                                  (<
+                                   (let ((p (specifier-type (if not-p
+                                                                `(integer ,constant)
+                                                                `(integer 0 (,constant))))))
+                                     (setf type
+                                           (if type
+                                               (type-intersection type p)
+                                               p)))))))
+                             (t
+                              (multiple-value-bind (operator y-type)
+                                  (cond ((vector-length-constraint-p x)
+                                         (values operator y))
+                                        ((vector-length-constraint-p y)
+                                         (values (case operator
+                                                   (< '>)
+                                                   (> '<)
+                                                   (t operator))
+                                                 x)))
+                                (when (ctype-p y-type)
+                                  (setf type
+                                        (type-after-comparison operator not-p (or type
+                                                                                  (specifier-type 'index))
+                                                               y-type)))))))))))
+      type)))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
@@ -1536,6 +1586,10 @@
            `(truly-the index (array-dimension array 0)))
           (t
            `(%array-available-elements array)))))
+
+(unless-vop-existsp (:translate test-header-data-bit)
+  (define-source-transform test-header-data-bit (array mask)
+    `(logtest (get-header-data ,array) ,mask)))
 
 ;;; Any array can be tested for a fill-pointer now, using the header bit.
 ;;; Only a non-simple vector could possibly return true.
@@ -1558,39 +1612,16 @@
              ;; the CONSTRAINT-PROPAGATE-IF optimizer have the most
              ;; chances to run.
              (delay-ir1-transform node :ir1-phases))
-           (if (vop-existsp :named test-header-data-bit)
-               `(test-header-data-bit array
-                                 (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))
-               `(logtest (get-header-data array)
-                         (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
+           `(test-header-data-bit array
+                                  (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))))))
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
-  (let ((array-ref (lvar-uses array))
-        (index-ref (lvar-uses index)))
-    (unless (and
-             (ref-p array-ref)
-             (ref-p index-ref)
-             (or
-              (let* ((index-leaf (ref-leaf index-ref))
-                     (index-value (and (constant-p index-leaf)
-                                       (constant-value index-leaf)))
-                     (index-value (and (integerp index-value)
-                                       index-value)))
-                (loop for constraint in (ref-constraints array-ref)
-                      for y = (constraint-y constraint)
-                      thereis (and
-                               (eq (constraint-kind constraint) 'array-in-bounds-p)
-                               (if index-value
-                                   (and (constant-p y)
-                                        (<= index-value (constant-value y)))
-                                   (eq index-leaf y)))))
-              (loop for constraint in (ref-constraints index-ref)
-                    thereis (and (eq (constraint-kind constraint) 'array-in-bounds-p)
-                                 (eq (constraint-y constraint)
-                                     (ref-leaf array-ref))))))
-      (give-up-ir1-transform)))
-  ;; It's in bounds but it may be of the wrong type
-  `(the (and fixnum unsigned-byte) index))
+(define-source-transform fill-pointer (vector)
+  (let ((vector-sym (gensym "VECTOR")))
+    `(let ((,vector-sym ,vector))
+       (if (and (arrayp ,vector-sym)
+                (array-has-fill-pointer-p ,vector-sym))
+           (%array-fill-pointer ,vector-sym)
+           (sb-vm::fill-pointer-error ,vector-sym)))))
 
 (deftransform check-bound ((array dimension index))
   ;; %CHECK-BOUND will perform both bound and type checking when
@@ -1988,13 +2019,11 @@
                     nil)))))))
 
 (defoptimizer (array-header-p constraint-propagate-if)
-    ((array) node gen)
-  (declare (ignore gen))
+    ((array))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
 
 ;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
 ;;; is of the specified type.
 (defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
-    ((array) node gen)
-  (declare (ignore gen))
+    ((array))
   (values array (specifier-type '(and vector (not simple-array)))))

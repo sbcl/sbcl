@@ -17,6 +17,7 @@ contributed modules.
 * sb-posix::
 * sb-queue::
 * sb-rotate-byte::
+* sb-simd::
 @end menu
 
 @page
@@ -43,4 +44,5 @@ contributed modules.
 @page
 @include sb-rotate-byte/sb-rotate-byte.texinfo
 
-
+@page
+@include sb-simd/sb-simd.texinfo

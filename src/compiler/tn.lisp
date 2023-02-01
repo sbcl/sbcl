@@ -70,9 +70,10 @@
                     (t
                      (delete-1 tn prev setter))))))
              (used-p (tn)
-               (or (tn-reads tn) (tn-writes tn)
-                   (member (tn-kind tn) '(:component :environment))
-                   (not (zerop (sbit aliases (tn-number tn))))))
+               (and (neq (tn-kind tn) :unused)
+                    (or (tn-reads tn) (tn-writes tn)
+                        (member (tn-kind tn) '(:component :environment))
+                        (not (zerop (sbit aliases (tn-number tn)))))))
              (delete-1 (tn prev setter)
                (if prev
                    (setf (tn-next prev) (tn-next tn))
@@ -231,8 +232,8 @@
                                       immed
                                       null-offset
                                       (specifier-type 'null)))))
-             (setf (tn-leaf tn) constant
-                   (leaf-info constant) tn))
+              (setf (tn-leaf tn) constant
+                    (leaf-info constant) tn))
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
@@ -254,7 +255,9 @@
                              #+immobile-space
                              (let ((val (constant-value constant)))
                                (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
-                                   (typep val 'wrapper)))))
+                                   (typep val 'wrapper))))
+                         #+(or arm64 x86-64)
+                         (not (eql (constant-value constant) $0f0)))
                 (let ((constants (ir2-component-constants component)))
                   (setf (tn-offset res)
                         (vector-push-extend constant constants))))
@@ -380,6 +383,22 @@
         (dolist (tn (rest tns))
           (let ((res (reference-tn tn write-p)))
             (setf (tn-ref-across prev) res)
+            (setq prev res)))
+        (setf (tn-ref-across prev) more)
+        first)
+      more))
+
+;;; Copy the tn-ref-type of the TNs.
+(defun reference-tn-ref-list (tn-refs write-p &optional more)
+  (declare (list tn-refs) (type boolean write-p) (type (or tn-ref null) more))
+  (if tn-refs
+      (let* ((first (reference-tn (tn-ref-tn (first tn-refs)) write-p))
+             (prev first))
+        (setf (tn-ref-type first) (tn-ref-type (first tn-refs)))
+        (dolist (tn-ref (rest tn-refs))
+          (let ((res (reference-tn (tn-ref-tn tn-ref) write-p)))
+            (setf (tn-ref-across prev) res
+                  (tn-ref-type res) (tn-ref-type tn-ref))
             (setq prev res)))
         (setf (tn-ref-across prev) more)
         first)

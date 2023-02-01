@@ -31,8 +31,6 @@
                           :deps deps
                           :type type)))
         (when (add-annotation lvar annotation)
-          (loop for lvar in deps
-                do (push annotation (lvar-dependent-annotations lvar)))
           (assert-lvar-type lvar
                             (specifier-type 'function-designator)
                             policy))))))
@@ -193,6 +191,7 @@
                            (functional-type entry-fun))
                           ((and (not (fun-type-p lvar-type))
                                 (lambda-p entry-fun)
+                                (null (lambda-kind entry-fun))
                                 (lambda-tail-set entry-fun))
                            (make-fun-type :wild-args t
                                           :returns

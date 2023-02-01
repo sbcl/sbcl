@@ -116,6 +116,8 @@ struct extra_thread_data
     HANDLE synchronous_io_handle_and_flag;
     void* waiting_on_address; // used only if #+sb-futex
 #endif
+    int arena_count; // number of structures in arena_saveareas
+    arena_state* arena_savearea;
 };
 #define thread_extra_data(thread) \
   ((struct extra_thread_data*)((char*)(thread) + dynamic_values_bytes))
@@ -157,13 +159,15 @@ tls_index_of(struct symbol *symbol) // untagged pointer
 #  define per_thread_value(sym,th) *(lispobj*)(tls_index_of(sym) + (char*)th)
 #endif
 
+#define NO_TLS_VALUE_MARKER (~(uword_t)0)
+
 static inline lispobj
 SymbolValue(lispobj tagged_symbol_pointer, void *thread)
 {
     struct symbol *sym = SYMBOL(tagged_symbol_pointer);
-    if(thread && tls_index_of(sym)) {
+    if (thread && tls_index_of(sym)) {
         lispobj r = per_thread_value(sym, thread);
-        if(r!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
+        if (r != NO_TLS_VALUE_MARKER) return r;
     }
     return sym->value;
 }
@@ -173,7 +177,7 @@ SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
 {
     struct symbol *sym = SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
-        if (per_thread_value(sym, thread) != NO_TLS_VALUE_MARKER_WIDETAG) {
+        if (per_thread_value(sym, thread) != NO_TLS_VALUE_MARKER) {
             per_thread_value(sym, thread) = val;
             return;
         }
@@ -193,14 +197,6 @@ SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
 # define write_TLS_index(index, val, thread, sym) sym->value = val
 # define read_TLS(sym, thread) SYMBOL(sym)->value
 #endif
-
-// FIXME: very random that this is defined in 'thread.h'
-#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
-/* Return 'fun' given a tagged pointer to an fdefn. */
-static inline lispobj FdefnFun(lispobj fdefn)
-{
-    return FDEFN(fdefn)->fun;
-}
 
 /* These are for use during GC, on the current thread, or on prenatal
  * threads only. */
@@ -236,11 +232,10 @@ static inline lispobj FdefnFun(lispobj fdefn)
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-// FIXME: these names should be consistent with one another
 # ifdef LISP_FEATURE_GCC_TLS
 extern __thread struct thread *current_thread;
 # elif !defined LISP_FEATURE_WIN32
-extern pthread_key_t specials;
+extern pthread_key_t current_thread;
 #endif
 #endif
 
@@ -250,7 +245,7 @@ extern pthread_key_t specials;
 # define THREAD_CSP_PAGE_SIZE os_reported_page_size
 #endif
 
-#if defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+#ifdef LISP_FEATURE_WIN32
 #define ALT_STACK_SIZE 0
 #else
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
@@ -323,7 +318,7 @@ static inline struct thread *get_sb_vm_thread(void)
 # ifdef LISP_FEATURE_GCC_TLS
     th = current_thread;
 # else
-    th = pthread_getspecific(specials);
+    th = pthread_getspecific(current_thread);
 # endif
 
 # if defined LISP_FEATURE_X86 && (defined LISP_FEATURE_DARWIN || defined LISP_FEATURE_FREEBSD)
@@ -346,7 +341,7 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 # elif defined LISP_FEATURE_WIN32
     return TlsGetValue(OUR_TLS_INDEX) != 0;
 # else
-    return pthread_getspecific(specials) != NULL;
+    return pthread_getspecific(current_thread) != NULL;
 # endif
 #elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     char *csp = (char *)*os_context_sp_addr(context);
@@ -360,11 +355,6 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 }
 
 extern void record_backtrace_from_context(void*,struct thread*);
-
-#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-extern kern_return_t mach_lisp_thread_init(struct thread *thread);
-extern void mach_lisp_thread_destroy(struct thread *thread);
-#endif
 
 typedef struct init_thread_data {
     sigset_t oldset;

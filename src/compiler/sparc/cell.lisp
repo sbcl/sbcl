@@ -47,7 +47,7 @@
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
@@ -74,7 +74,7 @@
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symeval))
+  (:translate symbol-value))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
@@ -82,7 +82,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; cdr slot, so we have to strip off the two low bits to make sure
@@ -95,9 +95,9 @@
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 (define-vop (fast-symbol-global-value fast-symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 ;;;; FDEFINITION (fdefn) objects.
 (define-vop (fdefn-fun cell-ref)

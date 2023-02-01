@@ -143,20 +143,59 @@
 
 ;;; Reset CTOR to use a default function that will compute an
 ;;; optimized constructor function when called.
+;;;
+;;; Note that lp#1951341 saw a very rare failure which suggested
+;;; a memory ordering issue. Indeed, here is what happened:
+;;;  - thread A allocates a CTOR
+;;;    CTOR    ->   +-------------------------------+
+;;;                 | word 0: funinstance header    |
+;;;                 | word 1: trampline             |
+;;;                 | word 2: layout-of-CTOR        |
+;;;                 | word 3: funinstance function  |
+;;;                 | ... more slots ...            |
+;;;                 +-------------------------------+
+;;;
+;;;  - thread A creates a lambda that captures CTOR
+;;;    CLOSURE ->   +------------------------------+
+;;;                 | word 0: closure header       |
+;;;                 | word 1: underlying function  |
+;;;                 | word 2: CTOR                 |
+;;;                 +------------------------------+
+;;;
+;;; - thread A stores CLOSURE into word 3 of CTOR
+;;;   by way of (SETF (%FUNCALLABLE-INSTANCE-FUN CTOR) ...)
+;;;
+;;; - thread B gets ahold of CTOR - how? I'm not clear
+;;;   on the protocol, but I guess it was already installed
+;;;   as the class's constructor
+;;;
+;;; - thread B reads word 3 out of the CTOR and calls
+;;;   the CLOSURE (successfully entering into its instructions)
+;;;
+;;; - CLOSURE's code loads CTOR from itself and calls
+;;;   INSTALL-OPTIMIZED-CONSTRUCTOR with an argument of 0
+;;;   because B did not observe a store into word 2
+;;;   of CLOSURE
+;;;
+;;; The fix is to use properly paired barriers.
 (defun install-initial-constructor (ctor &optional force-p)
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil
           (ctor-state ctor) 'initial)
-    (setf (%funcallable-instance-fun ctor)
-          (ecase (ctor-type ctor)
-            (ctor
-             (lambda (&rest args)
-               (install-optimized-constructor ctor)
-               (apply ctor args)))
-            (allocator
-             (lambda ()
-               (install-optimized-allocator ctor)
-               (funcall ctor)))))))
+    (let ((closure
+           (ecase (ctor-type ctor)
+             (ctor
+              (lambda (&rest args)
+                (sb-thread:barrier (:read))
+                (install-optimized-constructor ctor)
+                (apply ctor args)))
+             (allocator
+              (lambda ()
+                (sb-thread:barrier (:read))
+                (install-optimized-allocator ctor)
+                (funcall ctor))))))
+      (sb-thread:barrier (:write))
+      (setf (%funcallable-instance-fun ctor) closure))))
 
 (defun make-ctor-function-name (class-name initargs safe-code-p)
   (labels ((arg-name (x)
@@ -467,7 +506,7 @@
     (flet (;; Return the name of parameter number I of a constructor
            ;; function.
            (parameter-name (i)
-             (format-symbol *pcl-package* ".P~D." i))
+             (pcl-format-symbol ".P~D." i))
            ;; Check if CLASS-ARG is a constant symbol.  Give up if
            ;; not.
            (constant-class-p ()
@@ -532,6 +571,24 @@
 (define-load-time-global *the-system-ii-method* nil)
 (define-load-time-global *the-system-si-method* nil)
 
+;;; FIXME:
+;;; 1. these two DEFUNs are structurally similar, even containing the same comment.
+;;;    Can't we at least macrolet-ify them somehow?
+;;; 2. there is probably a lockfree algorithm that would work with weak vectors,
+;;;    making this not require the world lock. Just keep a vector of ctors per
+;;;    class, search in it, if not found, cons a new vector as needed to replace
+;;     the old, and swap that in. Problem: plist manipulation isn't atomic.
+;;     Solution: make it a slot.
+;;; 3. We could easily remove splatted cells now rather than (or in addition to)
+;;;    having UPDATE-CTORS do that.
+(flet ((pushnew-in-ctors (ctor class)
+         ;; Less is more: cons a weak pointer ONLY IF we need it, and not just because
+         ;; we wanted ADJOIN to call weak-pointer-value on it just to discard it.
+         (let ((weakptrs (plist-value class 'ctors)))
+           (dolist (wp weakptrs)
+             (when (eq (weak-pointer-value wp) ctor)
+               (return-from pushnew-in-ctors)))
+           (setf (plist-value class 'ctors) (cons (make-weak-pointer ctor) weakptrs)))))
 (defun install-optimized-constructor (ctor)
   (with-world-lock ()
     (let* ((class-or-name (ctor-class-or-name ctor))
@@ -547,13 +604,12 @@
       (when (eq (wrapper-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
-               :test #'eq :key #'weak-pointer-value)
+      (pushnew-in-ctors ctor class)
       (multiple-value-bind (form locations names optimizedp)
           (constructor-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
               (apply (let ((*compiling-optimized-constructor* t))
-                       (pcl-compile `(lambda ,names ,form) t))
+                       (pcl-compile `(lambda ,names ,form) :unsafe))
                      locations)
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
@@ -572,13 +628,14 @@
       (when (eq (wrapper-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
-               :test #'eq :key #'weak-pointer-value)
+      (pushnew-in-ctors ctor class)
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
-              (let ((*compiling-optimized-constructor* t)) (pcl-compile form t))
+              (let ((*compiling-optimized-constructor* t))
+                (pcl-compile form :unsafe))
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
+) ; end FLET
 
 (defun allocator-function-form (ctor)
   (let ((class (ctor-class ctor)))
@@ -775,13 +832,18 @@
 (defun wrap-in-allocate-forms (ctor body early-unbound-markers-p)
   (let* ((class (ctor-class ctor))
          (wrapper (class-wrapper class)))
+    ;; Prefer to allocate slots first so that potentially we can make this construct
+    ;; the primitive instance and assign its layout and slots while pseudo-atomic.
+    ;; Even if we can't do that, this order of operations can avoid a GC store barrier
+    ;; - it doesn't currently, but it should - because the pointer store is young->old.
+    ;; Best-case we'd allocate two things in one allocation request,
+    ;; but there aren't allocation vops that do that.
     (etypecase class
       (standard-class
-        `(let ((.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start)))
-               (.slots. (make-array
-                         ,(wrapper-length wrapper)
-                         ,@(when early-unbound-markers-p
-                                 '(:initial-element +slot-unbound+)))))
+        `(let ((.slots. (make-array ,(wrapper-length wrapper)
+                                    ,@(when early-unbound-markers-p
+                                        '(:initial-element +slot-unbound+))))
+               (.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start))))
            (%instance-set .instance. sb-vm:instance-data-start .slots.)
            ,body
            .instance.))
@@ -934,10 +996,8 @@
                (unless (initializedp location)
                  (setf (aref slot-vector location)
                        (list kind val type slotd))))
-             (default-init-var-name (i)
-               (format-symbol *pcl-package* ".D~D." i))
-             (location-var-name (i)
-               (format-symbol *pcl-package* ".L~D." i)))
+             (default-init-var-name (i) (pcl-format-symbol ".D~D." i))
+             (location-var-name (i) (pcl-format-symbol ".L~D." i)))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr

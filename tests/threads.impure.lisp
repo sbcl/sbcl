@@ -70,7 +70,7 @@
     (process-all-interrupts))
   (check-deferrables-unblocked-or-lose 0))
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 ;;;; Now the real tests...
 
@@ -389,7 +389,8 @@
   `(handler-case (progn (progn ,@body) nil)
     (sb-ext:timeout () t)))
 
-(with-test (:name (semaphore :wait-forever))
+(with-test (:name (semaphore :wait-forever)
+            :skipped-on (:and :sb-safepoint :linux)) ; hangs
   (let ((sem (make-semaphore :count 0)))
     (assert (raises-timeout-p
               (sb-ext:with-timeout 0.1
@@ -670,18 +671,20 @@
       (let* ((i (sb-kernel:symbol-tls-index mysym))
              (j (+ i sb-vm:n-word-bytes)))
         (assert (eql (sap-ref-word (sb-thread::current-thread-sap) j)
-                     sb-vm:no-tls-value-marker-widetag))
+                     sb-vm:no-tls-value-marker))
         (setf (sap-ref-lispobj (sb-thread::current-thread-sap) i) fool1
               (sap-ref-lispobj (sb-thread::current-thread-sap) j) fool2)
         ;; assert that my pointer arithmetic worked as expected
         (assert (eq (symbol-value mysym) fool1))
         ;; assert that FOOL1 is found by the TLS scan and that FOOL2 is not.
         (let ((list (sb-thread::%thread-local-references)))
+          (assert (not (find sb-vm:no-tls-value-marker list
+                             :key #'sb-kernel:get-lisp-obj-address)))
           (assert (member fool1 list))
           (assert (not (member fool2 list))))
         ;; repair the TLS entry that was corrupted by the test
         (setf (sap-ref-word (sb-thread::current-thread-sap) j)
-              sb-vm:no-tls-value-marker-widetag)))))
+              sb-vm:no-tls-value-marker)))))
 
 
 #|  ;; a cll post from eric marsden
@@ -726,11 +729,6 @@
         (push child threads)))
     (mapc #'join-thread threads)
     (assert (not deadline-handler-run-twice?))))
-
-(with-test (:name (:mutex :finalization))
-  (let ((a nil))
-    (dotimes (i 500000)
-      (setf a (make-mutex)))))
 
 ;; You have to shoehorn this arbitrary sexpr into a feature expression
 ;; to have the test summary show that a test was disabled.

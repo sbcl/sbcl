@@ -51,33 +51,63 @@
     fpr-restore ; KLUDGE: this is element 6 of the entry point vector
     (do-fprs pop :xmm)))
 
-(define-assembly-routine (alloc-tramp) ()
+(define-assembly-routine (switch-to-arena (:return-style :raw)) ()
+  (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC. RSI is a vop temp
+  (with-registers-preserved (c)
+    (pseudo-atomic ()
+      #-system-tlabs (inst break halt-trap)
+      #+system-tlabs (inst call (make-fixup "switch_to_arena" :foreign)))))
+
+(macrolet ((def-routine-pair (name&options vars &body code)
+             `(progn
+                (symbol-macrolet ((system-tlab-p 0))
+                  (define-assembly-routine ,name&options ,vars ,@code))
+                ;; In absence of this feature, don't define extra routines.
+                ;; (Don't want to have a way to mess things up)
+                #+system-tlabs
+                (symbol-macrolet ((system-tlab-p 2))
+                  (define-assembly-routine
+                      (,(symbolicate "SYS-" (car name&options)) . ,(cdr name&options))
+                    ,vars ,@code)))))
+
+(def-routine-pair (alloc-tramp) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst mov rsi-tn system-tlab-p)
     (inst call (make-fixup "alloc" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
+(def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst mov rsi-tn system-tlab-p)
     (inst call (make-fixup "alloc_list" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (listify-&rest (:return-style :none)) ()
+(def-routine-pair (listify-&rest (:return-style :none)) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
     (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst mov rdx-tn system-tlab-p)
     (inst call (make-fixup "listify_rest_arg" :foreign))
     (inst mov (ea 24 rbp-tn) rax-tn)) ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
-(define-assembly-routine (make-list (:return-style :none)) ()
+(def-routine-pair (make-list (:return-style :none)) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
     (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst mov rdx-tn system-tlab-p)
     (inst call (make-fixup "make_list" :foreign))
     (inst mov (ea 24 rbp-tn) rax-tn)) ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+)
+
+(define-assembly-routine (alloc-funinstance) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc_funinstance" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn)))
 
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.
@@ -108,27 +138,39 @@
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
+  ;; This routine computes into RBX the address of the linkage table entry that was called,
+  ;; corresponding to the undefined alien function.
   (inst push rax-tn) ; save registers in case we want to see the old values
   (inst push rbx-tn)
   ;; load RAX with the PC after the call site
   (inst mov rax-tn (ea 16 rsp-tn))
   ;; load RBX with the signed 32-bit immediate from the call instruction
   (inst movsx '(:dword :qword) rbx-tn (ea -4 rax-tn))
+  ;; The decoding seems scary, but it's actually not. Any C call-out instruction has
+  ;; a 4-byte trailing operand, with the preceding byte being unique.
   ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
   ;; if ...              #xE8 then ...                32-bit offset
-  (inst cmp :byte (ea -5 rax-tn) #x25)
-  (inst jmp :e ABSOLUTE)
-  (inst cmp :byte (ea -5 rax-tn) #xE8)
-  (inst jmp :e RELATIVE)
+  ;; if ...              #x92 then it was "call *DISP(%r10)" where r10 is the table base
+  #-immobile-space ; only non-relocatable alien linkage table can use "CALL [ABS]" form
+  (progn (inst cmp :byte (ea -5 rax-tn) #x25)
+         (inst jmp :e ABSOLUTE))
+  #+immobile-space ; only relocatable alien linkage table can use "CALL rel32" form
+  (progn (inst cmp :byte (ea -5 rax-tn) #xE8)
+         (inst jmp :e RELATIVE)
+         (inst cmp :byte (ea -5 rax-tn) #x92)
+         (inst jmp :e ABSOLUTE))
   ;; failing those, assume RBX was valid. ("can't happen")
   (inst mov rbx-tn (ea rsp-tn)) ; restore pushed value of RBX
   (inst jmp trap)
   ABSOLUTE
-  (inst lea rbx-tn (ea -8 rbx-tn))
+  #-immobile-space (inst sub rbx-tn 8)
+  #+immobile-space (inst lea rbx-tn (ea -8 r10-tn rbx-tn))
   (inst jmp TRAP)
   RELATIVE
   (inst add rbx-tn rax-tn)
   TRAP
+  ;; XXX: why aren't we adding something to the stack pointer to balance the two pushes?
+  ;; (I guess we can only THROW at this point, so it doesn't matter)
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
 ;;; the closure trampoline - entered when a global function is a closure
@@ -142,13 +184,15 @@
 ;;; installed as a globally named function. The fdefn contains a jump opcode
 ;;; to a tiny code component specific to the particular closure.
 ;;; The trampoline is responsible for loading RAX, since named calls don't.
-#-immobile-code
+;;; However, #+immobile-code might still need CLOSURE-TRAMP for any fdefn
+;;; for which the compiler chooses not to use "direct" call convention.
 (define-assembly-routine
     (closure-tramp (:return-style :none))
     ()
   (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
+#-compact-instance-header
 (define-assembly-routine
     (funcallable-instance-tramp (:return-style :none))
     ()

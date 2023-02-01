@@ -36,6 +36,10 @@
                    (search "is not"
                            (write-to-string err :escape nil)))))))
 
+;; Regression from R/O space change
+(with-test (:name (apropos-list :smoke-test))
+  (assert (plusp (length (apropos-list "required-foreign")))))
+
 ;;; APROPOS should accept a package designator, not just a package, and
 ;;; furthermore do the right thing when it gets a package designator.
 ;;; (bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-17)
@@ -83,46 +87,6 @@
 ;;; DECLARE should not be a special operator
 (with-test (:name (declare :not special-operator-p))
   (assert (not (special-operator-p 'declare))))
-
-;;; WITH-TIMEOUT should accept more than one form in its body.
-(with-test (:name (sb-ext:with-timeout :forms) :slow t)
-  (handler-bind ((sb-ext:timeout #'continue))
-    (sb-ext:with-timeout 3
-      (sleep 2)
-      (sleep 2))))
-
-;;; SLEEP should not cons except on 32-bit platforms when
-;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
-(with-test (:name (sleep :non-consing)
-            :serial t :skipped-on :interpreter)
-  (handler-case (sb-ext:with-timeout 5
-                  (ctu:assert-no-consing (sleep 0.00001s0))
-                  (locally (declare (notinline sleep))
-                    (ctu:assert-no-consing (sleep 0.00001s0))
-                    (ctu:assert-no-consing (sleep 0.00001d0))
-                    (ctu:assert-no-consing (sleep 1/100000003))))
-    (timeout ())))
-
-;;; Changes to make SLEEP cons less led to SLEEP
-;;; not sleeping at all on 32-bit platforms when
-;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9)).
-(with-test (:name (sleep :bug-1194673))
-  (assert (eq :timeout
-              (handler-case
-                  (with-timeout 0.01
-                    (sleep 0.6))
-                (timeout ()
-                  :timeout)))))
-
-;;; SLEEP should work with large integers as well
-(with-test (:name (sleep :pretty-much-forever)
-            :skipped-on (:and :darwin :sb-safepoint)) ; hangs
-  (assert (eq :timeout
-              (handler-case
-                  (sb-ext:with-timeout 1
-                    (sleep (ash 1 (* 2 sb-vm:n-word-bits))))
-                (sb-ext:timeout ()
-                  :timeout)))))
 
 ;;; DOCUMENTATION should return nil, not signal slot-unbound
 (with-test (:name (documentation :return nil))
@@ -211,56 +175,23 @@
 ;; if address printing is turned off. Should work on any backend, I think.
 (with-test (:name (disassemble :without-addresses))
   (flet ((disassembly-text (lambda-expr)
-         (let ((string
-                (let ((sb-disassem::*disassem-location-column-width* 0)
-                      (*print-pretty* nil)) ; prevent function name wraparound
-                  (with-output-to-string (s)
-                    (disassemble lambda-expr :stream s)))))
-           ;; Return all except the first two lines. This is subject to change
-           ;; any time we muck with the layout unfortunately.
-           (subseq string
-                   (1+ (position #\Newline string
-                                 :start (1+ (position #\Newline string))))))))
-  (let ((string1 (disassembly-text '(lambda (x) (car x))))
-        (string2 (disassembly-text '(lambda (y) (car y)))))
-    (assert (string= string1 string2)))))
+           (let ((string
+                   (let ((sb-disassem::*disassem-location-column-width* 0)
+                         (sb-ext:*disassemble-annotate* nil)
+                         (*print-pretty* nil)) ; prevent function name wraparound
+                     (with-output-to-string (s)
+                       (disassemble lambda-expr :stream s)))))
+             ;; Return all except the first two lines. This is subject to change
+             ;; any time we muck with the layout unfortunately.
+             (subseq string
+                     (1+ (position #\Newline string
+                                   :start (1+ (position #\Newline string))))))))
+    (let ((string1 (disassembly-text '(lambda (x) (car x))))
+          (string2 (disassembly-text '(lambda (y) (car y)))))
+      (assert (string= string1 string2)))))
 
 (with-test (:name :disassemble-assembly-routine)
   (disassemble sb-fasl:*assembler-routines* :stream (make-broadcast-stream)))
-
-;;; This tests that the x86-64 disasembler does not crash
-;;; on LEA with a rip-relative operand and no label.
-(with-test (:name (disassemble :no-labels)
-                  :skipped-on (not :x86-64))
-  (let* ((lines
-          (split-string
-           (with-output-to-string (stream)
-             ;; A smallish function whose code happens to contain
-             ;; the thing under test.
-             (disassemble 'sb-impl::inspector :stream stream))
-          #\Newline))
-         (line (find "; = L0" lines :test 'search)))
-    (assert (search "LEA " line)) ; verify our test precondition
-    ;; Now just disassemble without labels and see that we don't crash
-    (disassemble 'sb-impl::inspector
-                 :use-labels nil
-                 :stream (make-broadcast-stream))))
-
-;;; Check that SLEEP called with ratios (with no common factors with
-;;; 1000000000, and smaller than 1/1000000000) works more or less as
-;;; expected.
-(with-test (:name (sleep ratio))
-  (let ((fun0a (checked-compile '(lambda () (sleep 1/7))))
-        (fun0b (checked-compile '(lambda () (sleep 1/100000000000000000000000000))))
-        (fun1 (checked-compile '(lambda (x) (sleep x))))
-        (start-time (get-universal-time)))
-    (sleep 1/7)
-    (sleep 1/100000000000000000000000000)
-    (funcall fun0a)
-    (funcall fun0b)
-    (funcall fun1 1/7)
-    (funcall fun1 1/100000000000000000000000000)
-    (assert (< (- (get-universal-time) start-time) 2))))
 
 (with-test (:name (sb-ext:assert-version->= :ok))
   (sb-ext:assert-version->= 1 1 13))
@@ -271,11 +202,6 @@
 
 (with-test (:name :bug-1095483)
   (assert-error (fboundp '(cas "foo"))))
-
-(with-test (:name (sleep :return-value))
-  (checked-compile-and-assert ()
-      `(lambda () (sleep 0.001))
-    (() nil)))
 
 (with-test (:name (time :no *print-length* :abbreviation))
   (let ((s (make-string-output-stream)))

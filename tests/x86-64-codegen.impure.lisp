@@ -9,7 +9,10 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-x86-64 (sb-ext:exit :code 104)
+#-x86-64 (invoke-restart 'run-tests::skip-file)
+
+(load "compiler-test-util.lisp")
+(import 'ctu:disassembly-lines)
 
 ;;; This trivial function failed to compile due to rev 88d078fe
 (defun foo (&key k)
@@ -39,22 +42,6 @@
               sb-vm:other-pointer-lowtag)))
     (assert (> a sb-vm:static-space-start))))
 
-(load "compiler-test-util.lisp")
-(defun disassembly-lines (fun)
-  ;; FIXME: I don't remember what this override of the hook is for.
-  (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
-                      (lambda (f &rest args) (declare (ignore f args))))
-  (prog1
-      (mapcar (lambda (x) (string-left-trim " ;" x))
-              (cddr
-               (split-string
-                (with-output-to-string (s)
-                  (let ((sb-disassem:*disassem-location-column-width* 0)
-                        (*print-pretty* nil))
-                    (disassemble fun :stream s)))
-                #\newline)))
-    (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)))
-
 (sb-vm::define-vop (tryme)
     (:generator 1 (sb-assem:inst mov :byte (sb-vm::ea :gs sb-vm::rax-tn) 0)))
 (with-test (:name :try-gs-segment)
@@ -63,16 +50,8 @@
                                       '(lambda () (sb-sys:%primitive tryme))))
                 thereis (search "MOV BYTE PTR GS:[RAX]" line))))
 
-(defun disasm (safety expr &optional (remove-epilogue t))
-  ;; This lambda has a name because if it doesn't, then the name
-  ;; is something stupid like (lambda () in ...) which pretty-prints
-  ;; on a random number of lines.
-  (let ((fun (compile nil
-                      `(sb-int:named-lambda test ()
-                         (declare (optimize (debug 0) (safety ,safety)
-                                            (sb-c:verify-arg-count 0)))
-                         ,expr))))
-    (let ((lines (disassembly-lines fun)))
+(defun strip-assem-junk (fun &optional (remove-epilogue t))
+    (let ((lines (disassembly-lines (compile nil fun))))
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
       (when (string= (car (last lines)) "")
@@ -87,16 +66,35 @@
                       '("MOV RSP, RBP" "CLC" "POP RBP" "RET")
                       (subseq lines (- (length lines) 4))))
           (butlast lines 4)
-          lines))))
+          lines)))
+(defun disasm-load (safety symbol)
+  ;; This lambda has a name because if it doesn't, then the name
+  ;; is something stupid like (lambda () in ...) which pretty-prints
+  ;; on a random number of lines.
+  (strip-assem-junk   `(sb-int:named-lambda test ()
+                         (declare (optimize (debug 0) (safety ,safety)
+                                            (sb-c:verify-arg-count 0)))
+                         ,symbol)))
+(defun disasm-store (sexpr)
+  (strip-assem-junk   `(sb-int:named-lambda test (x)
+                         (declare (ignorable x))
+                         (declare (optimize (debug 0)
+                                            (sb-c:verify-arg-count 0)))
+                         ,sexpr)))
 
 (with-test (:name :symeval-known-thread-local
             :skipped-on (not :sb-thread))
   ;; It should take 1 instruction to read a known thread-local var
-  (assert (= (length (disasm 1 'sb-thread:*current-thread*)) 1))
-  (assert (= (length (disasm 1 'sb-sys:*interrupt-pending*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*gc-inhibit*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*restart-clusters*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*handler-clusters*)) 1)))
+  (assert (= (length (disasm-load 1 'sb-thread:*current-thread*)) 1))
+  (assert (= (length (disasm-load 1 'sb-sys:*interrupt-pending*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*gc-inhibit*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*restart-clusters*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*handler-clusters*)) 1)))
+
+(with-test (:name :set-known-thread-local :skipped-on (or (not :immobile-space)
+                                                          (not :sb-thread)))
+  ;; It should take 1 instruction to write a known thread-local var
+  (assert (= (length (disasm-store '(setq sb-kernel:*gc-inhibit* x))) 1)))
 
 ;; Lack of earmuffs on this symbol allocates it in dynamic space
 (defvar foo)
@@ -113,7 +111,7 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142538F94B20 CMOVEQ RDX, [#x204BF938]  ; *PRINT-BASE*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (let ((text (disasm 0 '*print-base*)))
+  (let ((text (disasm-load 0 '*print-base*)))
     (assert (= (length text) 3)) ; number of lines
     ;; two lines should be annotated with *PRINT-BASE*
     (assert (= (loop for line in text count (search "*PRINT-BASE*" line)) 2)))
@@ -123,7 +121,7 @@
   ;;    488B059EFFFFFF     MOV RAX, [RIP-98]         ; 'FOO
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
-  (let ((text (disasm 0 'foo)))
+  (let ((text (disasm-load 0 'foo)))
     (assert (= (length text) 4))
     ;; two lines should be annotated with FOO
     (assert (= (loop for line in text count (search "FOO" line)) 2))))
@@ -142,7 +140,7 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142518A24C20 CMOVEQ RDX, [#x204CA218] ; *BLUB*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (let ((text (disasm 0 '*blub*)))
+  (let ((text (disasm-load 0 '*blub*)))
     (assert (= (length text) 4))
     ;; two lines should be annotated with *BLUB*
     (assert (= (loop for line in text count (search "*BLUB*" line)) 2)))
@@ -153,7 +151,7 @@
   ;;    4A8B142A           MOV RDX, [RDX+R13]
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
-  (assert (= (length (disasm 0 'blub)) 5)))
+  (assert (= (length (disasm-load 0 'blub)) 5)))
 
 (with-test (:name :object-not-type-error-encoding)
   ;; There should not be a "MOV Rnn, #xSYMBOL" instruction
@@ -170,22 +168,6 @@
     (let ((line (nth (+ index 2) lines)))
       (assert (search "; #<SB-KERNEL:WRAPPER " line))
       (assert (search " SB-ASSEM:LABEL" line)))))
-
-#+immobile-code
-(with-test (:name :reference-assembly-tramp)
-  (dolist (testcase '(("FUNCALLABLE-INSTANCE-TRAMP"
-                       sb-kernel:%make-funcallable-instance)))
-    (let ((lines
-           (split-string
-            (with-output-to-string (stream)
-              (let ((sb-disassem:*disassem-location-column-width* 0))
-                (disassemble (cadr testcase) :stream stream)))
-            #\newline)))
-      (assert (loop for line in lines
-                    thereis (and (search "LEA" line)
-                                 (search "RIP" line) ; require RIP-relative mode
-                                 ;; and verify disassembly
-                                 (search (car testcase) line)))))))
 
 #+immobile-code ; uses SB-C::*COMPILE-TO-MEMORY-SPACE*
 (with-test (:name :static-link-compile-to-memory)
@@ -204,40 +186,7 @@
     (assert (find-line "CALL" "FUNCTION GENSYM"))
     (assert (find-line "JMP" "FUNCTION PRINT")))))
 
-#+immobile-code
-(with-test (:name :static-unlinker)
-  (let ((sb-c::*compile-to-memory-space* :immobile))
-    (declare (muffle-conditions style-warning))
-    (flet ((disassembly-lines (name)
-             (split-string
-              (with-output-to-string (s)
-                (let ((sb-disassem:*disassem-location-column-width* 0))
-                  (disassemble name :stream s)))
-              #\newline))
-           (expect (match lines)
-             (assert (loop for line in lines
-                           thereis (search match line)))))
-      (compile 'h '(lambda (x) (1+ x)))
-      (setf (symbol-function 'g) #'h (symbol-function 'f) #'h)
-      (compile 'c '(lambda (x) (g x)))
-      (compile 'd '(lambda (x) (f (g x))))
-      ;; The FDEFN-FUN of F is same as that of G.
-      ;; Statically linking D should not patch the fdefn calls into static calls
-      ;; because it can't unambiguously be undone without storing additional data
-      ;; about where patches were performed to begin with.
-      (sb-vm::statically-link-core :callers '(c d))
-      (let ((lines (disassembly-lines 'c)))
-        (expect "#<FUNCTION H>" lines))
-      (let ((lines (disassembly-lines 'd)))
-        (expect "#<FUNCTION H>" lines))
-      (setf (symbol-function 'g) #'+)
-      (let ((lines (disassembly-lines 'c)))
-        (expect "#<FDEFN G>" lines))
-      (let ((lines (disassembly-lines 'd)))
-        (expect "#<FDEFN G>" lines)
-        (expect "#<FUNCTION H>" lines)))))
-
-(with-test (:name :c-call :skipped-on (and :win32 :x86-64))
+(with-test (:name :c-call :skipped-on :win32)
   (let* ((lines (split-string
                  (with-output-to-string (s)
                    (let ((sb-disassem:*disassem-location-column-width* 0))
@@ -246,7 +195,7 @@
          (c-call (find "os_deallocate" lines :test #'search)))
     ;; Depending on #+immobile-code it's either direct or memory indirect.
     #+immobile-code (assert (search "CALL #x" c-call))
-    #-immobile-code (assert (search "CALL QWORD PTR [#x" c-call))))
+    #-immobile-code (assert (search "CALL [#x" c-call))))
 
 (with-test (:name :set-symbol-value-imm)
   (let (success)
@@ -392,7 +341,7 @@
   (assert (thing-ref-thing-ref (make-thing :x (make-thing :x 3)) 'foo)))
 
 (with-test (:name :huge-code :skipped-on (not :immobile-code))
-  (sb-vm::allocate-code-object :immobile 0 4 (* 2 1024 1024)))
+  (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))
 
 (defun bbb (x y z)
   ;; I don't want the number of expected comparisons to depend on whether
@@ -573,16 +522,20 @@
     ;; Aside from ECASE failure, there are no other JMPs
     (assert (= (count-assembly-labels lines) 1))))
 
+;;; Assert that the ECASE-FAILURE vop emits a trap and that we don't call ERROR
+;;; (cutting down on the code size for each ECASE)
 (with-test (:name :ecase-failure-trap)
-  (assert (null (ctu:find-named-callees
-                 (checked-compile `(lambda (x)
-                                     (ecase x (:a 1) (:b 2) (:c 3)))))))
-  (assert (null (ctu:find-named-callees
-                 (checked-compile `(lambda (x)
+  ;; test ECASE
+  (assert (ctu:asm-search "ECASE-FAILURE-ERROR"
+                                  `(lambda (x)
+                                     (ecase x (:a 1) (:b 2) (:c 3)))))
+  ;; test ETYPECASE
+  (assert (ctu:asm-search "ETYPECASE-FAILURE-ERROR"
+                                  `(lambda (x)
                                      (etypecase x
                                        ((integer 1 20) 'hi)
                                        ((cons (eql :thing)) 'wat)
-                                       (bit-vector 'hi-again))))))))
+                                       (bit-vector 'hi-again))))))
 
 (with-test (:name :symbol-case-optimization-levels)
   (let ((cases
@@ -634,16 +587,6 @@
                 (sb-kernel:fun-code-header #'sb-kernel:vector-subseq*))
                ;; n-widetags divided by 4, plus jump table count word.
                65)))
-
-sb-vm::(define-vop (cl-user::test)
-  (:generator 0
-   ;; pointless to resize to :qword, but the rule won't try to apply itself
-   ;; to :dword because zeroing the upper 32 bits is a visible effect.
-   (inst mov (reg-in-size rax-tn :qword) (reg-in-size rcx-tn :qword))
-   (inst mov rax-tn rcx-tn)))
-(with-test (:name :mov-mov-elim-ignore-resized-reg
-                  :fails-on :sbcl) ; just don't crash
-  (checked-compile '(lambda () (sb-sys:%primitive test) 0)))
 
 (defstruct a)
 (defstruct (achild (:include a)))
@@ -762,6 +705,7 @@ sb-vm::(define-vop (cl-user::test)
                           (search "CMP DWORD PTR" line)))))
 
 (with-test (:name :thread-local-unbound)
+  (declare (optimize safety))
   (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
     (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
 
@@ -812,11 +756,6 @@ sb-vm::(define-vop (cl-user::test)
                            (search "Invalid argument count trap" line))
                          lines)
                1))))
-
-#+compact-instance-header
-(with-test (:name :gf-self-contained-trampoline)
-  (let ((l (sb-kernel:find-layout 'standard-generic-function)))
-    (assert (/= (sb-kernel:wrapper-bitmap l) sb-kernel:+layout-all-tagged+))))
 
 (with-test (:name :known-array-rank)
   (flet ((try (type)
@@ -870,12 +809,10 @@ sb-vm::(define-vop (cl-user::test)
   (check-arrayp-cmp-opcodes 1 'simple-base-string)
   #+sb-unicode
   (check-arrayp-cmp-opcodes 1 'sb-kernel::simple-character-string)
-  ;; FIXME: (AND STRING (NOT SIMPLE-STRING)) executs 4 tests
-  ;; but it denotes the same set of objects as (AND STRING (NOT SIMPLE-ARRAY)).
-  ;; The problem is with type algebra, not in the backend.
-
-  ;; FIXME: this should be 1 comparison: widetag >= start-of-complex-widetags
-  (check-arrayp-cmp-opcodes 2 '(and array (not simple-array)))
+  (check-arrayp-cmp-opcodes 1 '(and string (not simple-array)))
+  (check-arrayp-cmp-opcodes #+sb-unicode 1
+                            #-sb-unicode 2
+                            '(and array (not simple-array)))
 
   ;; some other interesting pairs
   ;; This was passing just by random coincidence.
@@ -903,7 +840,24 @@ sb-vm::(define-vop (cl-user::test)
   ;; and some range-based testing rather than just 2 EQ tests.
   (check-integerp-cmp-opcodes 2 '(integer 1 2)))
 
-(defun typep-asm-code-length (type)
+(defun show-pretty-lines (type lines)
+  (format t ";;;; Type: ~s~%" type)
+  (dolist (line lines)
+    (when (plusp (length line))
+      (let* ((label
+              (if (char= (char line 0) #\L)
+                  (subseq line 0 (1+ (position #\: line)))
+                  ""))
+             (opcode-bytes
+              (progn
+                (setq line (string-left-trim " " (subseq line (length label))))
+                (subseq line 0 (position #\Space line)))))
+        (setq line (string-left-trim " " (subseq line (length opcode-bytes))))
+        (format t "; ~4a~20a~a~%"
+                label opcode-bytes line))))
+  (terpri))
+
+(defun typep-asm-code-length (type &optional print)
   (let* ((lines
           (disassembly-lines
            (compile nil
@@ -914,6 +868,7 @@ sb-vm::(define-vop (cl-user::test)
           (some (lambda (x) (or (search "#<FUNCTION" x)
                                 (search "#<FDEFN" x)))
                 lines)))
+    (when print (show-pretty-lines type lines))
     (values (length lines) callp)))
 
 ;;; Counting instructions of assembly is sort of a very rough guess
@@ -939,7 +894,48 @@ sb-vm::(define-vop (cl-user::test)
 (write-golden-typep-data "../interesting-types.lisp-expr"
                          "typep-golden-data.txt")
 
-(defun compare-to-golden-typep-data (pathname)
+;;; FIXME: Some time after the MANY-INTERESTING-ARRAY-TYPES test
+;;; got disabled, the code size changed either due to a regression,
+;;; or more aggressive inlining of ">=" and "<="
+;;; which now causes these warnings. Figure out the new baseline.
+;;
+;; WARNING: (AND INTEGER (NOT (SIGNED-BYTE 31))) was 32 is 38
+;; WARNING: (AND INTEGER (NOT (SIGNED-BYTE 32))) was 32 is 38
+;; WARNING: (INTEGER (0) *) was 18 is 22
+;; WARNING: (INTEGER * -1) was 18 is 22
+;; WARNING: (INTEGER * -1000000) was 18 is 22
+;; WARNING: (INTEGER * -1073741825) was 18 is 23
+;; WARNING: (INTEGER * -12) was 18 is 22
+;; WARNING: (INTEGER * -14) was 18 is 22
+;; WARNING: (INTEGER * -17) was 18 is 22
+;; WARNING: (INTEGER * -2) was 18 is 22
+;; WARNING: (INTEGER * -2147483649) was 18 is 23
+;; WARNING: (INTEGER * -4611686018427387901) was 18 is 23
+;; WARNING: (INTEGER * -54043195528445951) was 18 is 23
+;; WARNING: (INTEGER * -541073411) was 18 is 22
+;; WARNING: (INTEGER * -6) was 18 is 22
+;; WARNING: (INTEGER * -9) was 18 is 22
+;; WARNING: (INTEGER * 0) was 24 is 22
+;; WARNING: (INTEGER * 20) was 18 is 22
+;; WARNING: (INTEGER * 2047) was 18 is 22
+;; WARNING: (INTEGER * 2147483647) was 18 is 23
+;; WARNING: (INTEGER * 4611686018427387900) was 18 is 23
+;; WARNING: (INTEGER * 576460752303423487) was 18 is 23
+;; WARNING: (INTEGER * 65535) was 18 is 22
+;; WARNING: (INTEGER -1) was 18 is 22
+;; WARNING: (INTEGER 1) was 18 is 22
+;; WARNING: (INTEGER 1073741824) was 18 is 23
+;; WARNING: (INTEGER 1152921504606846961) was 18 is 23
+;; WARNING: (INTEGER 1899) was 18 is 22
+;; WARNING: (INTEGER 2) was 18 is 22
+;; WARNING: (INTEGER 2147483648) was 18 is 23
+;; WARNING: (INTEGER 2305843009214) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387900) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387901) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387902) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387903) was 18 is 23
+;; WARNING: (INTEGER 63) was 18 is 22
+(defun compare-to-golden-typep-data (pathname &optional print)
   (with-open-file (input pathname)
     (let ((*package* (find-package "SB-KERNEL")))
       (loop (let ((line (read-line input nil input)))
@@ -947,13 +943,15 @@ sb-vm::(define-vop (cl-user::test)
               (with-input-from-string (stream line :start 2)
                 (let ((expect-n (read stream))
                       (type (read stream)))
-                  (multiple-value-bind (linecount callp) (typep-asm-code-length type)
+                  (multiple-value-bind (linecount callp)
+                      (typep-asm-code-length type print)
                     (declare (ignore callp))
                     (when (/= linecount expect-n)
                       (warn "~S was ~d is ~d" type expect-n linecount))))))))))
 
-(with-test (:name :many-interesting-array-types :skipped-on (or (:not :sb-unicode)
-                                                                (not :sb-devel)))
+(with-test (:name :many-interesting-array-types
+                  :skipped-on (:or (:not :sb-unicode)
+                                   (:not :immobile-space)))
   (compare-to-golden-typep-data "typep-golden-data.txt"))
 
 (with-test (:name :integerp->bignump-strength-reduction)
@@ -970,6 +968,7 @@ sb-vm::(define-vop (cl-user::test)
   ;; Previously there would have been one from BOUNDP and one from SYMBOL-VALUE.
   (let ((lines (disassembly-lines
                 '(lambda ()
+                  (declare (optimize safety))
                   (if (boundp 'sb-c::*compilation*) sb-c::*compilation*) '(hi)))))
     (dolist (line lines)
       (assert (not (search "ERROR" line))))
@@ -1170,3 +1169,158 @@ sb-vm::(define-vop (cl-user::test)
     (assert (search ", 2" (nth (+ start 1) lines)))
     (assert (search ", 4" (nth (+ start 2) lines)))
     (assert (search ", 6" (nth (+ start 3) lines)))))
+
+(defglobal *myglobalvar* 3)
+(with-test (:name :disassemble-symbol-global-value)
+  (assert (loop for line in (disassembly-lines '(lambda () *myglobalvar*))
+                thereis (search "*MYGLOBALVAR*" line))))
+
+(defun compiler-trace-output-lines (lexpr)
+  (let ((string-stream (make-string-output-stream)))
+    (let ((sb-c::*compiler-trace-output* string-stream)
+          (sb-c::*compile-trace-targets* '(:vop))
+          (*print-pretty* nil))
+      (compile nil lexpr))
+    (split-string (get-output-stream-string string-stream)
+                  #\newline)))
+
+;;; Return the list of vops (as strings) that emitted a GC barrier.
+(defun find-gc-barriers (lambda-expression)
+  (let ((lines
+         (compiler-trace-output-lines lambda-expression))
+        (current-vop)
+        (result))
+    ;; FIXME: can this miss vops on a label line, or do we always print labels
+    ;; on their own line?
+    (dolist (line lines (nreverse result))
+     (let ((line (pop lines)))
+       (cond ((and (>= (length line) 4) (string= line "VOP " :end1 4))
+              (let ((string (subseq line 4 (position #\space line :start 5))))
+                (setq current-vop string)))
+             ((search ":FLAVOR GC-BARRIER" line)
+              (push current-vop result)))))))
+
+(with-test (:name :closure-init-gc-barrier)
+  (let ((vops-with-barrier
+         (find-gc-barriers
+           '(lambda (address)
+              (let ((sap (sb-sys:int-sap (truly-the sb-vm:word address))))
+                ;; The compiler conses the SAP *after* making the closure, so the store
+                ;; of the sap into the closure needs a barrier, as it's an old->young store.
+                (lambda () sap))))))
+    (assert (equal vops-with-barrier '("CLOSURE-INIT")))))
+
+(defstruct (point (:constructor make-point (x))) x (y 0) (z 0))
+(with-test (:name :structure-init-gc-barrier)
+  (let ((vops-with-barrier
+          (find-gc-barriers
+           '(lambda (val)
+             (declare (double-float val) (inline make-point))
+             ;; Similarly to the closure-init test, DOUBLE-FLOAT reg is cast to
+             ;; DESCRIPTOR-REG only after making the object. This seems like a
+             ;; low-hanging-fruit optimization to flip the order.
+             (let ((neg (- val))) (make-point neg))))))
+    (assert (equal vops-with-barrier '("SET-SLOT")))))
+
+(with-test (:name :system-tlabs)
+  (when (find-symbol "SYS-ALLOC-TRAMP" "SB-VM")
+    (assert (loop for line in (disassembly-lines 'sb-impl:test-make-packed-info)
+                  thereis (search "SYS-ALLOC-TRAMP" line)))
+    (assert (loop for line in (disassembly-lines 'sb-impl:test-copy-packed-info)
+                  thereis (search "SYS-ALLOC-TRAMP" line)))
+    (let ((f (compile nil '(lambda (x)
+                            (declare (sb-c::tlab :system))
+                            (sb-pcl::%copy-cache x)))))
+      (assert (loop for line in (disassembly-lines f)
+                    thereis (search "SYS-ALLOC-TRAMP" line))))))
+
+(defun find-in-disassembly (string lambda-expression)
+  (let ((disassembly
+         (with-output-to-string (s)
+           (disassemble (compile nil lambda-expression) :stream s))))
+    (loop for line in (split-string disassembly #\Newline)
+          thereis (search string line))))
+
+#+immobile-space
+(with-test (:name :disassemble-alien-linkage-table-ref
+                  :fails-on (or (not :sb-thread) :win32))
+  (dolist (memspace '(:dynamic :immobile))
+    (let ((sb-c::*compile-to-memory-space* memspace))
+      (assert (find-in-disassembly
+               (if (eq sb-c::*compile-to-memory-space* :immobile) "lose" "&lose")
+               '(lambda ()
+                 (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+                 (alien-funcall (extern-alien "lose" (function void))))))
+      (assert (find-in-disassembly
+               "&verify_gens"
+               '(lambda ()
+                 (extern-alien "verify_gens" char)))))))
+
+;;; This tests that the x86-64 disasembler does not crash
+;;; on LEA with a rip-relative operand and no label.
+(with-test (:name (disassemble :no-labels))
+  (let* ((lines
+          (split-string
+           (with-output-to-string (stream)
+             ;; A smallish function whose code happens to contain
+             ;; the thing under test.
+             (disassemble 'sb-impl::inspector :stream stream))
+          #\Newline))
+         (line (find "; = L0" lines :test 'search)))
+    (assert (search "LEA " line)) ; verify our test precondition
+    ;; Now just disassemble without labels and see that we don't crash
+    (disassemble 'sb-impl::inspector
+                 :use-labels nil
+                 :stream (make-broadcast-stream))))
+
+#+immobile-space
+(with-test (:name (disassemble :static-call))
+  (dolist (sym '(sb-kernel:two-arg-* sb-kernel:two-arg-/
+                 sb-kernel:two-arg-+ sb-kernel:two-arg--))
+    (let ((f (let ((sb-c:*compile-to-memory-space* :dynamic))
+               (compile nil `(lambda (x y) (,sym x y))))))
+      (assert (loop for line in (disassembly-lines f)
+                    thereis (search (princ-to-string sym) line))))))
+
+(with-test (:name :closure-gc-barrier)
+  (let ((vops-with-barrier
+         (find-gc-barriers
+           '(lambda ()
+             (let ((c (cons 1 2)))
+               (lambda (x)
+                 (setf (car c) x)))))))
+    (assert (equal vops-with-barrier '("SET-SLOT")))))
+
+(defstruct (wordpair (:predicate nil) (:copier nil)) a b)
+(defun func (x) (wordpair-b x))
+(with-test (:name :non-stack-instance-set)
+  ;; This is a trivial test of the control case for :stack-instance-set
+  (let ((vops-with-barrier
+         (find-gc-barriers
+          '(lambda ()
+            (declare (inline make-wordpair))
+            (let ((pair (make-wordpair :a 'foo)))
+              (setf (wordpair-b pair) "hi")
+              (values (func pair)))))))
+    (assert (equal vops-with-barrier '("INSTANCE-INDEX-SET")))))
+
+(with-test (:name :stack-instance-set)
+  (let ((vops-with-barrier
+         (find-gc-barriers
+          '(lambda ()
+            (declare (inline make-wordpair))
+            (let ((pair (make-wordpair :a 'foo)))
+              (declare (dynamic-extent pair))
+              (setf (wordpair-b pair) "hi")
+              (values (func pair)))))))
+    (assert (not vops-with-barrier))))
+
+(declaim (freeze-type wordpair))
+(with-test (:name :stack-instance-copy)
+  (let ((vops-with-barrier
+         (find-gc-barriers
+          '(lambda (x)
+            (let ((copy (copy-structure (truly-the wordpair x))))
+              (declare (dynamic-extent copy))
+              (values (func copy)))))))
+    (assert (not vops-with-barrier))))

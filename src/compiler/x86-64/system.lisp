@@ -46,52 +46,6 @@
     (inst movzx '(:byte :dword) result object)
     DONE))
 
-(macrolet ((read-depthoid ()
-             `(ea (- (+ 4 (ash (+ instance-slots-offset
-                                  (get-dsd-index layout sb-kernel::flags))
-                               word-shift))
-                     instance-pointer-lowtag)
-                  layout)))
-  (define-vop ()
-    (:translate layout-depthoid)
-    (:policy :fast-safe)
-    (:args (layout :scs (descriptor-reg)))
-    (:results (res :scs (any-reg)))
-    (:result-types fixnum)
-    (:generator 1 (inst movsx '(:dword :qword) res (read-depthoid))))
-  (define-vop ()
-    (:translate sb-c::layout-depthoid-ge)
-    (:policy :fast-safe)
-    (:args (layout :scs (descriptor-reg)))
-    (:info k)
-    (:arg-types * (:constant (unsigned-byte 16)))
-    (:conditional :ge)
-    (:generator 1 (inst cmp :dword (read-depthoid) (fixnumize k)))))
-
-(define-vop ()
-  (:translate sb-c::%structure-is-a)
-  (:args (x :scs (descriptor-reg)))
-  (:arg-types * (:constant t))
-  (:info test)
-  (:policy :fast-safe)
-  (:conditional :e)
-  (:generator 1
-    (inst cmp :dword
-          (ea (+ (id-bits-offset)
-                 (ash (- (wrapper-depthoid test) 2) 2)
-                 (- instance-pointer-lowtag))
-              x)
-          ;; Small layout-ids can only occur for layouts made in genesis.
-          ;; Therefore if the compile-time value of the ID is small,
-          ;; it is permanently assigned to that type.
-          ;; Otherwise, we allow for the possibility that the compile-time ID
-          ;; is not the same as the load-time ID.
-          ;; I don't think layout-id 0 can get here, but be sure to exclude it.
-          (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
-                  (not (sb-c::producing-fasl-file)))
-              (layout-id test)
-              (make-fixup test :layout-id)))))
-
 #+compact-instance-header
 (progn
 ;; ~17 instructions vs. 35
@@ -127,8 +81,7 @@
       (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
       (inst mov :dword result
-            (ea (make-fixup '**primitive-object-layouts**
-                           :symbol-value
+            (ea (make-fixup '**primitive-object-layouts** :symbol-value
                            (- (ash vector-data-offset word-shift)
                               other-pointer-lowtag))
                 nil rax 8)) ; no base register
@@ -565,3 +518,35 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    ;; Can't convert index to a code-relative index until the boxed header length
    ;; has been determined.
    (inst store-coverage-mark index)))
+
+(define-vop ()
+  (:translate sb-lockless::get-next)
+  (:policy :fast-safe)
+  (:args (node :scs (descriptor-reg)))
+  (:results (next-tagged :scs (descriptor-reg))
+            (next-bits :scs (descriptor-reg)))
+  (:generator 10
+    ;; Read the first user-data slot and convert to a tagged pointer,
+    ;; also returning the raw value as a secondary result
+    (pseudo-atomic ()
+      (inst mov next-bits (ea (- (ash (+ instance-slots-offset instance-data-start)
+                                      word-shift)
+                                 instance-pointer-lowtag)
+                              node))
+      ;; This can'be be LEA because usually the NEXT-BITS are tagged.
+      ;; An untagged value appears only if in mid-deletion.
+      (inst mov next-tagged next-bits)
+      (inst or :byte next-tagged instance-pointer-lowtag))))
+
+(define-vop (switch-to-arena)
+  (:args (x :scs (descriptor-reg immediate)))
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
+  (:vop-var vop)
+  (:ignore rsi)
+  (:generator 1
+    (inst mov rdi (if (sc-is x immediate) (tn-value x) x))
+    ;; We could have the vop declare that all C volatile regs are clobbered,
+    ;; but since this needs pseudo-atomic decoration anyway, it saves code size
+    ;; to make an assembly routine that preserves all registers.
+    (invoke-asm-routine 'call 'switch-to-arena vop)))

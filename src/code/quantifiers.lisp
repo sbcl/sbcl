@@ -19,15 +19,13 @@
            (return-from expand (values nil t))) ; give up
          (binding* ((elements (make-gensym-list (length sequences)))
                     ((bind-fun call-it) (funarg-bind/call-forms pred elements))
-                    (blockname (sb-xc:gensym "BLOCK"))
-                    (wrapper (sb-xc:gensym "WRAPPER"))
-                    (value (sb-xc:gensym "VAL")))
+                    (blockname (gensym "BLOCK"))
+                    (wrapper (gensym "WRAPPER"))
+                    (value (gensym "VAL")))
              (let ((form
                     `(block ,blockname
                        ;; Does DX actually help? INLINE should win anyway.
                        (dx-flet ((,wrapper (,@elements)
-                                  (declare (optimize
-                                            (sb-c::check-tag-existence 0)))
                                   (let ((,value ,call-it))
                                     (,test ,value
                                       (return-from ,blockname

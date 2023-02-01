@@ -17,7 +17,7 @@
 ;;;; more information.
 
 ;; These tests don't work unless compiling
-#+interpreter (sb-ext:exit :code 104)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (defun f-with-macro (arg) (list arg))
 (defun f2-with-macro (a b) (list a b))

@@ -155,19 +155,12 @@
   (inst jmp :nz GENERIC)
   (move res x)
   (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
-  (inst jmp :no FIXNUM)
-  ;; "inline constants" are quite wonky in terms of how we express the desired
-  ;; alignment and how we compute a pointer to the value
-  ;; (each backend being different in the implementation thereof is no help).
-  ;; The easiest thing to do is make this bignum an :OWORD and OR in a lowtag.
-  ;; Unfortunately this constant is not a valid argument to MAKE-LISP-OBJ.
-  ;; I don't think asm routines are allowed to reference boxed constants
-  ;; in dynamic space, are they? We could put it in static space maybe.
-  (let ((bignum (register-inline-constant
-                 :oword (logior (ash (- most-negative-fixnum) 64)
-                                (bignum-header-for-length 1)))))
-    (inst lea res (rip-relative-ea (ea-disp bignum) other-pointer-lowtag)))
-  FIXNUM
+  ;; This constant isn't really a fixup, but it's easiest for me to think about it
+  ;; that way for now. It should really do whatever EMIT-EA does for a CONSTANT.
+  (inst cmov :o res (ea (make-fixup nil :code-object
+                                    (+ (ash code-constants-offset word-shift)
+                                       (- other-pointer-lowtag)))
+                        rip-tn))
   (inst clc) (inst ret)
   GENERIC
   (tail-call-static-fun '%negate 1))

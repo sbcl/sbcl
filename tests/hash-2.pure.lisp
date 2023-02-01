@@ -548,4 +548,16 @@
     (assert (eq (sb-impl::hash-table-hash-fun h) #'fixnum-hash-worse)))
   (assert-error (make-hash-table :test 'my= :hash-function nil))) ; no good
 
-;;; success
+
+(with-test (:name :psxhash-large-floats)
+  (flet ((test (integer)
+           (assert (= (sb-int:psxhash (float integer 1d0))
+                      (sb-int:psxhash (truncate (float integer 1d0)))))
+           (assert (= (sb-int:psxhash (float integer))
+                      (sb-int:psxhash (truncate (float integer)))))))
+    (loop for i from 80 to 100 by 4
+          do (test (expt 2 i))
+             (test (1+ (expt 2 i)))
+             (test (1- (expt 2 i)))
+             (test (- (expt 2 i) (random (expt 2 i))))
+             (test (+ (expt 2 i) (random (expt 2 i)))))))

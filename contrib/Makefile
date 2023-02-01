@@ -1,46 +1,37 @@
 vpath %.fasl ../obj/sbcl-home/contrib/
 
-all: asdf.fasl sb-posix.fasl sb-bsd-sockets.fasl sb-introspect.fasl sb-cltl2.fasl \
-     sb-aclrepl.fasl sb-sprof.fasl sb-capstone.fasl sb-md5.fasl sb-capstone.fasl \
-     sb-executable.fasl sb-gmp.fasl sb-mpfr.fasl sb-queue.fasl sb-rotate-byte.fasl \
-     sb-simple-streams.fasl sb-concurrency.fasl sb-cover.fasl sb-graph.fasl
-asdf.fasl:
-	sh ./build-contrib $(basename $(@F))
-sb-grovel.fasl: asdf.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-rt.fasl: asdf.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-posix.fasl: asdf.fasl sb-grovel.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-bsd-sockets.fasl: asdf.fasl sb-grovel.fasl sb-posix.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-cltl2.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-aclrepl.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-concurrency.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-sprof.fasl: asdf.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-introspect.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-capstone.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-md5.fasl: asdf.fasl sb-rotate-byte.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-cover.fasl: asdf.fasl sb-md5.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-executable.fasl: asdf.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-gmp.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-mpfr.fasl: asdf.fasl sb-gmp.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-queue.fasl: asdf.fasl sb-concurrency.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-rotate-byte.fasl: asdf.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-simple-streams.fasl: asdf.fasl sb-posix.fasl sb-bsd-sockets.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
-sb-graph.fasl: asdf.fasl sb-rt.fasl
-	sh ./build-contrib $(basename $(@F))
+contribs = sb-posix sb-bsd-sockets sb-introspect sb-cltl2 sb-aclrepl \
+     sb-sprof sb-capstone sb-md5 sb-capstone sb-executable sb-gmp sb-mpfr \
+     sb-queue sb-rotate-byte sb-rt sb-simple-streams sb-concurrency sb-cover \
+     sb-simd sb-grovel asdf
+
+active_contribs = $(filter-out $(SBCL_CONTRIB_BLOCKLIST),$(contribs))
+
+fasls = $(active_contribs:=.fasl)
+
+all: $(fasls)
+
+# Inter-module dependencies are declared here but not in the per-directory Makefile.
+# This way we don't have to state them twice.
+sb-md5.fasl: sb-rotate-byte.fasl
+sb-cover.fasl: sb-md5.fasl
+sb-mpfr.fasl: sb-gmp.fasl
+sb-queue.fasl: sb-concurrency.fasl
+sb-simple-streams.fasl: sb-posix.fasl sb-bsd-sockets.fasl
+sb-grovel.fasl: asdf.fasl # for building the module, not for our build
+
+# Notes:
+# 1. Invoking $(MAKE) for nested make eliminates a warning about jobserver mode.
+# 2. This could be made to 'tee' into output/{something} as it used to,
+#    but it would be more Lispy if not elegant to have 'make-contrib.lisp' bind
+#    *ERROR-OUTPUT* to a broadcast stream of SYS:*STDERR* and a file stream.
+# 3. The massively overapproximates the set of inputs needed to compile any given contrib
+#    which avoids using per-target lists of files, or any power-user tricks such
+#    as .SECONDEXPANSION and $(wildcard) in this makefile.
+#    I tried all kinds of variations on "%/*.lisp" and nothing worked easily.
+#    I suspect the right solution involves eliminating the other level of Makefile.
+#    Also: a motivated person might be able to figure out how to express a dependence
+#    on src/runtime/sbcl or src/runtime/sbcl.exe depending on the OS.
+#    I'm going to assume that the depending on the core is enough.
+%.fasl: */*.lisp */*/*.lisp ../output/sbcl.core
+	$(MAKE) MODULE_REQUIRES="$(filter %.fasl, $^)" -C $*

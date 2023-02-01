@@ -618,7 +618,10 @@
                      (if (template-conditional-p info) 0 (length rtypes))
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
-      (unless (= (length (vop-codegen-info vop))
+      (unless (= (+ (length (vop-codegen-info vop))
+                    (if (typep (template-result-types info) '(cons (eql :conditional)))
+                        -1
+                        0))
                  (template-info-arg-count info))
         (barf "wrong number of codegen info args in ~S" vop))))
   (values))
@@ -971,6 +974,7 @@
                    (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
 
 (defvar *debug-print-types* nil)
+(defvar *debug-print-vop-temps* nil)
 
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
@@ -1068,6 +1072,15 @@
            (write-string "enclose ")
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
+             (write-char #\space)
+             (let* ((entry-fun (functional-entry-fun leaf))
+                    (env (and entry-fun (lambda-environment entry-fun))))
+               (when env
+                 (write-string "{env:")
+                 (dolist (leaf (environment-closure env))
+                   (write-char #\space)
+                   (print-leaf leaf))
+                 (write-string "}")))
              (write-char #\space))))
         (when (and *debug-print-types*
                    (valued-node-p node))
@@ -1133,6 +1146,11 @@
     (princ #\space)
     (pprint-indent :current 0)
     (print-operands (vop-args vop))
+    (when *debug-print-vop-temps*
+      (pprint-newline :linear)
+      (write-string "{temp: ")
+      (print-operands (vop-temps vop))
+      (princ #\}))
     (pprint-newline :linear)
     (when (vop-codegen-info vop)
       (case (vop-name vop)

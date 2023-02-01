@@ -83,10 +83,10 @@
 
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
-;; Size of one linkage-table entry in bytes. See comment in
+;; Size of one alien-linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c
-(defconstant linkage-table-entry-size 16)
-(defconstant linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
 
 
 (defenum (:start 8)
@@ -116,11 +116,7 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(length
-    two-arg-+ two-arg-- two-arg-* two-arg-/ two-arg-< two-arg-> two-arg-=
-    two-arg-<= two-arg->= two-arg-/= eql %negate
-    two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-    two-arg-gcd two-arg-lcm)
+    `#(two-arg-<= two-arg->= two-arg-/= ,@common-static-fdefns)
   #'equalp)
 
 ;;;; Pseudo-atomic trap number

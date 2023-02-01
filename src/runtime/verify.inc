@@ -134,9 +134,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
                 "unallocated space");
     } else {
         // The object pointed to must not have been discarded as garbage.
-        FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)) ||
-                filler_obj_p(native_pointer(thing)),
-                "trashed object");
+        FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)), "trashed object");
     }
     // Must not point to a forwarding pointer
     FAIL_IF(*native_pointer(thing) == FORWARDING_HEADER, "forwarding ptr");
@@ -200,17 +198,15 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
             CHECK(layout, object);
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             if (widetag_of(object) == FUNCALLABLE_INSTANCE_WIDETAG) {
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                gc_assert(bitmap.bits[0] == (sword_t)-1 || bitmap.bits[0] == (sword_t)6);
-#else
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                 gc_assert(bitmap.bits[0] == (sword_t)-4);
 #endif
             }
             if (lockfree_list_node_layout_p(LAYOUT(layout))) {
-                struct instance* node = (struct instance*)object;
-                lispobj next = node->slots[INSTANCE_DATA_START];
+                struct list_node* node = (void*)object;
+                lispobj next = node->_node_next;
                 if (fixnump(next) && next)
-                  CHECK(next | INSTANCE_POINTER_LOWTAG, node->slots+INSTANCE_DATA_START);
+                  CHECK(next | INSTANCE_POINTER_LOWTAG, &node->_node_next);
             }
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) CHECK(object[1+i], object+1+i);
@@ -258,30 +254,34 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
         return 0;
     }
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
     if (widetag == SYMBOL_WIDETAG) {
         struct symbol* s = (void*)object;
-        CHECK(s->hash, &s->hash);
         CHECK(s->value, &s->value);
+        CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
         CHECK(decode_symbol_name(s->name), &s->name);
-        CHECK(s->fdefn, &s->fdefn);
-        // augmented symbol?
-        if (nwords > ALIGN_UP(SYMBOL_SIZE,2)) CHECK(1[&s->fdefn], 1+&s->fdefn);
         return 0;
     }
-#endif
     if (widetag == FDEFN_WIDETAG) {
         struct fdefn* f = (void*)object;
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
-        CHECK(fdefn_callee_lispobj(f), (lispobj*)&f->raw_addr);
+        CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
         return 0;
     }
     for (i=1; i<nwords; ++i) CHECK(object[i], object+i);
     return 0;
 }
 
+static __attribute__((unused)) boolean acceptable_filler_cons_p(lispobj* where)
+{
+    if (where[0] == 0 && where[1] == 0) return 1;
+    // These "conses" can result from bignum multiplication-
+    // trailing insigificant sign bits which get chopped.
+    if (where[0] == (uword_t)-1 && where[1] == (uword_t)-1) return 1;
+    if (where[0] == (uword_t)-1 && where[1] == 0) return 1;
+    return 0;
+}
 static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
 {
     lispobj* where = start;
@@ -292,7 +292,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     }
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {
-            if (*where != NO_TLS_VALUE_MARKER_WIDETAG) {
+            if (*where != NO_TLS_VALUE_MARKER) {
                 int result = verify_pointer(*where, where, state);
                 if (result) return result;
             }
@@ -302,42 +302,50 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     }
     while (where < end) {
         int widetag = is_header(*where) ? header_widetag(*where) : LIST_POINTER_LOWTAG;
-        long nwords = OBJECT_SIZE(*where,where);
+        /* Technically we should wait until after performing the widetag validity
+         * tests before calling the sizer.  Otherwise the lossage message would
+         * not be as good as it could be. I guess that failure doesn't happen much */
+        sword_t nwords = object_size(where);
         state->object_addr = where;
         state->object_header = is_cons_half(*where) ? 0 : *where;
         if (state->flags & VERIFYING_GENERATIONAL) {
             page_index_t pg = find_page_index(where);
             state->object_gen = pg >= 0 ? page_table[pg].gen :
               gc_gen_of((lispobj)where, ARTIFICIALLY_HIGH_GEN);
-            // FIXME: should not have code acting as filler
-            if (widetag != FILLER_WIDETAG && !filler_obj_p(where)) {
-                // Any page can have a filler on it
-                if (pg >= 0) {
+#ifdef LISP_FEATURE_PPC64
+            // Cons fillers (two words of all 1s) cause failure of
+            // the default verification logic, so brute-force skip them
+            // regardless of whether the page type is PAGE_TYPE_CONS.
+            if (*where == (uword_t)-1 && where[1] == (uword_t)-1) {
+                where +=2;
+                continue;
+            }
+#endif
+            if (widetag != FILLER_WIDETAG && pg >= 0) {
                     // Assert proper page type
                     if (state->object_header) // is not a cons
                         gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
                     else if (page_table[pg].type != PAGE_TYPE_CONS) {
-                        if (where[0] | where[1]) // "page-filler cons" is OK
-                            // KLUDGE: allow negative bignum, but is it good/bad
-                            // to check for a bignum widetag at where[-2] ?
-                            // this SHOULD be: lose("cons @ %p on non-cons page", where);
-                            gc_assert(where[0]==(uword_t)-1 && where[1]==0);
+                      if (is_cons_half(where[0]))
+                          gc_assert(acceptable_filler_cons_p(where));
                     }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {
                         if (!is_code(page_table[pg].type))
                             lose("object @ %p is code on non-code page", where);
+                    } else if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
+                        // where these reside depends on the architecture
                     } else {
                         if (is_code(page_table[pg].type))
                             lose("object @ %p is non-code on code page", where);
                     }
-                }
             }
         }
         if (!state->object_header) {
             if (verify_pointer(where[0], where+0, state) ||
                 verify_pointer(where[1], where+1, state)) break;
+        } else if (widetag == FILLER_WIDETAG) { // do nothing
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
             lose("Unhandled widetag %"OBJ_FMTX" @ %p", *where, where);
         } else if (leaf_obj_widetag_p(widetag)) {
@@ -372,12 +380,13 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
     return result;
 }
 
-extern void save_gc_crashdump(char *, uword_t);
+extern void save_gc_crashdump(char *, lispobj*);
 /* Return the number of verification errors found.
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
  * But if a particular verification fails, then do dump it */
-int verify_heap(int flags)
+int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
+                int flags)
 {
     int verbose = gencgc_verbose | ((flags & VERIFY_VERBOSE) != 0);
 
@@ -398,16 +407,16 @@ int verify_heap(int flags)
 #  ifdef __linux__
     // Try this verification if immobile-space was compiled with extra debugging.
     // But weak symbols don't work on macOS.
-    extern void __attribute__((weak)) check_varyobj_pages();
-    if (&check_varyobj_pages) check_varyobj_pages();
+    extern void __attribute__((weak)) check_text_pages();
+    if (&check_text_pages) check_text_pages();
 #  endif
     if (verbose)
         fprintf(stderr, " [immobile]");
     if (verify(FIXEDOBJ_SPACE_START,
                fixedobj_free_pointer, &state,
                flags | VERIFYING_GENERATIONAL)) goto out;
-    if (verify(VARYOBJ_SPACE_START,
-               varyobj_free_pointer, &state,
+    if (verify(TEXT_SPACE_START,
+               text_space_highwatermark, &state,
                flags | VERIFYING_GENERATIONAL)) goto out;
 #endif
     struct thread *th;
@@ -419,12 +428,10 @@ int verify_heap(int flags)
         if (verify((lispobj)th->binding_stack_start,
                    (lispobj*)get_binding_stack_pointer(th), &state,
                    VERIFYING_UNFORMATTED)) goto out;
-#ifdef LISP_FEATURE_SB_THREAD
         if (verify((lispobj)&th->lisp_thread,
                    (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th), &state,
                    VERIFYING_UNFORMATTED))
             goto out;
-#endif
     }
     if (verbose)
         fprintf(stderr, " [RO]");
@@ -465,11 +472,17 @@ void gc_show_pte(lispobj obj)
         return;
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    page = find_varyobj_page_index((void*)obj);
+    page = find_text_page_index((void*)obj);
     if (page>=0) {
-        printf("page %ld (v) ss=%p gens %x%s\n", page,
-               varyobj_scan_start(page),
-               varyobj_pages[page].generations,
+        lispobj* text_page_scan_start(low_page_index_t page);
+        int gens = text_page_genmask[page];
+        char genstring[9];
+        int i;
+        for (i=0;i<8;++i) genstring[i] = (gens & (1<<i)) ? '0'+i : '-';
+        genstring[8] = 0;
+        printf("page %ld (v) base %p gens %s ss=%p%s\n",
+               page, text_page_address(page), genstring,
+               text_page_scan_start(page),
                card_markedp((void*)obj)?"":" WP");
         return;
     }
@@ -487,14 +500,10 @@ void gc_show_pte(lispobj obj)
 
 #include <stdio.h>
 
-static int n_dumps;
-__attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
-{
-    while (where < end) {
-        fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
-        where += OBJECT_SIZE(*where, where);
-    }
-}
+static int hexdump_counter;
+
+extern void dump_immobile_fixedobjs(lispobj* where, lispobj* end, FILE*f);
+extern void dump_immobile_text(lispobj* where, lispobj* end, FILE*f);
 static int dump_completely_p(lispobj* obj, struct verify_state* state)
 {
     int i;
@@ -507,20 +516,49 @@ static int dump_completely_p(lispobj* obj, struct verify_state* state)
         if (state->err_objs[i] == (uword_t)obj) return 1;
     return 0;
 }
+static void hexdump_control_stacks(__attribute__((unused)) void* approximate_stackptr,
+                                   __attribute__((unused)) FILE *stream)
+{
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    struct thread* th;
+    for_each_thread(th) {
+        if (th->state_word.state == STATE_DEAD) continue;
+        lispobj* stackptr;
+        if (th == get_sb_vm_thread()) {
+            stackptr = approximate_stackptr;
+        } else {
+            int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1;
+            os_context_t *c = nth_interrupt_context(ici, th);
+            stackptr = (lispobj*) *os_context_register_addr(c,reg_SP);
+        }
+        gc_assert(((uword_t)stackptr & (LOWTAG_MASK>>1)) == 0); // lispword-aligned
+        lispobj* where = th->control_stack_end;
+        fprintf(stream, "\nThread @ %p\n", th);
+        for (--where; where >= stackptr; --where) {
+            lispobj word = *where;
+            if (!fixnump(word) && gc_managed_addr_p(word))
+                fprintf(stream, "  %p: %"OBJ_FMTX"\n", where, word);
+        }
+    }
+#endif
+}
+
+#define HEXDUMP_PATH_TEMPLATE "/var/tmp/heap-%d-%d.txt"
+
 /* Dump spaces as human-readable text (hexadecimal) */
 void hexdump_spaces(struct verify_state* state, char *reason)
 {
     char path[100];
 
-    ++n_dumps;
-    sprintf(path, "heap-%d-%d.txt", getpid(), n_dumps);
+    ++hexdump_counter;
+    sprintf(path, HEXDUMP_PATH_TEMPLATE, getpid(), hexdump_counter);
     FILE *f = fopen(path, "w");
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     fprintf(f, "Fixedobj space:\n");
-    dump_immobile((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, f);
-    fprintf(f, "Varyobj space:\n");
-    dump_immobile((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, f);
+    dump_immobile_fixedobjs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, f);
+    fprintf(f, "Text space (tlsf mem @ %p):\n", tlsf_mem_start);
+    dump_immobile_text((lispobj*)TEXT_SPACE_START, text_space_highwatermark, f);
 #endif
 
     fprintf(f, "Dynamic space:\n");
@@ -547,7 +585,7 @@ void hexdump_spaces(struct verify_state* state, char *reason)
         fprintf(f, ")\n");
         lispobj *where = base;
         while (where<limit){
-            int nwords = OBJECT_SIZE(*where,where);
+            sword_t nwords = object_size(where);
             /* If your'e having trouble with a subset of objects, and you can get
              * a reliable reproducer, this predicate can decide which objects to
              * output in full. Generally you don't need that much output */
@@ -555,7 +593,7 @@ void hexdump_spaces(struct verify_state* state, char *reason)
                 lispobj* end = where + (1+HeaderValue(*where));
                 fprintf(f, " %06x: fill to %p\n", (int)(uword_t)where & 0xffffff, end);
             } else if (dump_completely_p(where, state)) {
-                int i;
+                sword_t i;
                 for(i=0;i<nwords;++i) {
                     uword_t word = where[i];
                     if (i==0)
@@ -602,24 +640,25 @@ void hexdump_spaces(struct verify_state* state, char *reason)
         fprintf(f,"--\n");
         firstpage = 1+lastpage;
     }
+    hexdump_control_stacks(&reason, f);
     fclose(f);
     fprintf(stderr, "%s: wrote [%s]\n", reason, path);
 }
 
-int hexdump_and_verify_heap(int flags)
+int hexdump_enabled = 0;
+
+int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 {
-    if (gencgc_verbose>1) {
-        hexdump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
+    if (hexdump_enabled) hexdump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
 #if 0
-        if (n_gcs == snapshot_this_gc_cycle) {
-            char pathname[128];
-            sprintf(pathname, "gc-%d-%d-%d-%s.bin",
-                    getpid(), n_gcs, from_space,
-                    flags & VERIFY_POST_GC ? "post" : "pre");
-            save_gc_crashdump(pathname, (uword_t)__builtin_frame_address(0));
-            fprintf(stderr, "Wrote [%s]\n", pathname);
-        }
-#endif
+    if (hexdump_counter >= 9) {
+        char pathname[128];
+        sprintf(pathname, "gc-%d-%d-%d-%s.bin",
+                getpid(), n_gcs, from_space,
+                flags & VERIFY_POST_GC ? "post" : "pre");
+        save_gc_crashdump(pathname, cur_thread_approx_stackptr);
+        fprintf(stderr, "Wrote [%s]\n", pathname);
     }
-    return verify_heap(flags);
+#endif
+    return verify_heap(cur_thread_approx_stackptr, flags);
 }

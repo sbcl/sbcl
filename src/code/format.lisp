@@ -31,11 +31,11 @@
                `(combine-directives
                  (%tokenize-control-string string 0 (length string) nil)
                  t)))
-    (if (logtest (get-header-data string)
-                 ;; shareable = readonly
-                 (ash (logior sb-vm:+vector-shareable+
-                              sb-vm:+vector-shareable-nonstd+)
-                      sb-vm:array-flags-data-position))
+    (if (test-header-data-bit string
+                              ;; shareable = readonly
+                              (ash (logior sb-vm:+vector-shareable+
+                                           sb-vm:+vector-shareable-nonstd+)
+                                   sb-vm:array-flags-data-position))
         (memoize (compute-it))
         (compute-it))))
 
@@ -56,7 +56,7 @@
     (loop
       (let ((next-directive (or (position #\~ string :start index :end end) end)))
         (when (> next-directive index)
-          (push (possibly-base-stringize (subseq string index next-directive))
+          (push (possibly-base-stringize-to-heap (subseq string index next-directive))
                 result))
         (when (= next-directive end)
           (return))
@@ -327,9 +327,10 @@
   `#',(%formatter control-string))
 
 (defun %formatter (control-string &optional (arg-count 0) (need-retval t)
-                                  &aux (lambda-name
-                                        (possibly-base-stringize
-                                         (concatenate 'string "fmt$" control-string))))
+                   &aux (lambda-name
+                         (logically-readonlyize
+                          (possibly-base-stringize
+                           (concatenate 'string "fmt$" control-string)))))
   ;; ARG-COUNT is supplied only when the use of this formatter is in a literal
   ;; call to FORMAT, in which case we can possibly elide &optional parsing.
   ;; But we can't in general, because FORMATTER may be called by users
@@ -469,7 +470,7 @@
         (collect ((expander-bindings) (runtime-bindings))
           (dolist (spec specs)
             (destructuring-bind (var default) spec
-              (let ((symbol (sb-xc:gensym "FVAR")))
+              (let ((symbol (gensym "FVAR")))
                 (expander-bindings
                  `(,var ',symbol))
                 (runtime-bindings
@@ -504,8 +505,8 @@
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
-        (directive (sb-xc:gensym "DIRECTIVE"))
-        (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
+        (directive (gensym "DIRECTIVE"))
+        (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (,directive ,directives)
          ,@(if lambda-list
@@ -519,7 +520,7 @@
        (%set-format-directive-expander ,char #',defun-name))))
 
 (defmacro def-format-directive (char lambda-list &body body)
-  (let ((directives (sb-xc:gensym "DIRECTIVES"))
+  (let ((directives (gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
     (loop
@@ -592,7 +593,7 @@
 
 (def-format-directive #\C (colonp atsignp params string end)
   (expand-bind-defaults () params
-    (let ((n-arg (sb-xc:gensym "ARG")))
+    (let ((n-arg (gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (typep ,n-arg 'character)
            (format-error-at ,string ,(1- end)
@@ -646,7 +647,7 @@
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
-    (let ((n-arg (sb-xc:gensym "ARG")))
+    (let ((n-arg (gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (or ,base
                      (integerp ,n-arg))
@@ -841,6 +842,7 @@
     `(handler-bind
          ((format-error
            (lambda (condition)
+             (declare (optimize (sb-c:store-source-form 0)))
              (error 'format-error
                     :complaint
                     "~A~%while processing indirect format string:"
@@ -1039,6 +1041,7 @@
                    `((handler-bind
                          ((format-error
                            (lambda (condition)
+                             (declare (optimize (sb-c:store-source-form 0)))
                              (format-error-at*
                               ,string ,(1- end)
                               "~A~%while processing indirect format string:"
@@ -1336,7 +1339,7 @@
     (collect ((param-names) (bindings))
       (dolist (param-and-offset params)
         (let ((param (cdr param-and-offset)))
-          (let ((param-name (sb-xc:gensym "PARAM")))
+          (let ((param-name (gensym "PARAM")))
             (param-names param-name)
             (bindings `(,param-name
                         ,(case param

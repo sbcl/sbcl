@@ -114,7 +114,7 @@
   (defun source-location ()
     (make-definition-source-location)))
 
-#-sb-source-locations
+#+(and (not sb-source-locations) (not sb-xc-host)) ; defined in cross-misc in make-host-1
 (defun source-location () nil)
 
 (in-package "SB-IMPL")

@@ -43,13 +43,12 @@ stale value, use MUTEX-OWNER instead."
 (defmacro current-thread-sap-int () `(sap-int (current-thread-sap)))
 
 ;;; This is the same as thread-primitive-thread but using the "funny fixnum"
-;;; representation on 32-bit so that we never cons when reading the slot.
+;;; representation so that on 32-bit builds we never cons when reading the slot.
 ;;; I'm not sure where consing was happening, but it did, which caused
 ;;; failure of the (:no-consing :mutex) test.
 (defmacro current-vmthread-id ()
-  #-64-bit '(%make-lisp-obj (current-thread-sap-int))
-  #+64-bit '(current-thread-sap-int))
-(defmacro vmthread-id->addr (x) #-64-bit `(get-lisp-obj-address ,x) #+64-bit x)
+  '(sb-ext:truly-the fixnum (%make-lisp-obj (current-thread-sap-int))))
+(defmacro vmthread-id->addr (x) `(get-lisp-obj-address ,x))
 
 (declaim (inline holding-mutex-p))
 (defun holding-mutex-p (mutex)

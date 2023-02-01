@@ -33,13 +33,20 @@
 #define STATIC_CODE_SPACE_SIZE (STATIC_CODE_SPACE_END - STATIC_CODE_SPACE_START)
 #endif
 
-#define LINKAGE_TABLE_SPACE_SIZE \
-    (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
+#define ALIEN_LINKAGE_TABLE_SPACE_END \
+    (ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE)
 
 #if !defined(__ASSEMBLER__)
 #include "thread.h"
 
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+#if defined(LISP_FEATURE_WIN32)
+
+#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
+    ((os_vm_address_t)(th->control_stack_start))
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) + win32_page_size + win32_stack_guarantee)
+
+#elif defined(LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD)
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
     ((os_vm_address_t)(th->control_stack_start))
@@ -47,6 +54,7 @@
     (CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
+
 #else
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
@@ -58,7 +66,7 @@
 
 #endif
 
-#ifdef ALIEN_STACK_GROWS_DOWNWARD
+#ifndef ALIEN_STACK_GROWS_UPWARD
 
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)         \
     ((os_vm_address_t)(th->alien_stack_start))
@@ -67,7 +75,7 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
 
-#elif defined(ALIEN_STACK_GROWS_UPWARD)
+#else
 
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)                            \
     (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
@@ -77,8 +85,6 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-#else
-#error ALIEN_STACK_GROWS_DOWNWARD or ALIEN_STACK_GROWS_UPWARD has to be defined
 #endif
 
 #define BINDING_STACK_HARD_GUARD_PAGE(th)                              \

@@ -9,7 +9,7 @@
                                               (scratch-file-name "fasl")))))
         (assert (search expect err-string))))))
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (unlock-package "SB-INT")
 (unlock-package "SB-IMPL")

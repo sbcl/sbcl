@@ -13,20 +13,6 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-#+gencgc
-(define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) os-vm-size-t)
-(declaim (inline current-dynamic-space-start))
-(defun current-dynamic-space-start ()
-  #+gencgc sb-vm:dynamic-space-start
-  #-gencgc (extern-alien "current_dynamic_space" unsigned-long))
-
-#+gencgc
-(progn
-  (declaim (inline dynamic-space-free-pointer))
-  (defun dynamic-space-free-pointer ()
-    (sap+ (int-sap (current-dynamic-space-start))
-          (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
-
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
   #+gencgc
@@ -34,7 +20,7 @@
   #-gencgc
   (truly-the word
              (- (sap-int (sb-c::dynamic-space-free-pointer))
-                (current-dynamic-space-start))))
+                sb-vm:dynamic-space-start)))
 
 (defun static-space-usage ()
   (- (sap-int sb-vm:*static-space-free-pointer*) sb-vm:static-space-start))
@@ -65,11 +51,9 @@
   (setq *gc-inhibit* nil)
   ;; This GC looks utterly unnecessary, but when I tried removing it,
   ;; I got heap exhaustions sooner than when I left it in.
-  ;; So why is that? Well, it seems like there's some state that is getting
-  ;; saved into the core which needs resetting, such as these SETQs,
-  ;; but how is that affecting the C runtime's decision on when to
-  ;; perform the first auto-triggered GC? How is not doing an explicit
-  ;; GC delaying the decision? It seems wrong.
+  ;; I think the reason is that we never set the auto-trigger at all
+  ;; unless a GC happens. Maybe what we mean here is "set auto trigger"
+  ;; and we need a function in C to do that.
   (gc)
   (setf *n-bytes-freed-or-purified* 0
         *gc-run-time* 0))
@@ -90,6 +74,7 @@ and submit it as a patch."
   (cond ((not (sb-vm:is-lisp-pointer (get-lisp-obj-address object))) 0)
         ((eq object nil) (ash sb-vm::sizeof-nil-in-words sb-vm:word-shift))
         ((simple-fun-p object) (code-object-size (fun-code-header object)))
+        #-(or x86 x86-64 arm64 riscv) ((lra-p object) 1)
         (t
          (with-alien ((sizer (function unsigned unsigned) :extern "primitive_object_size"))
            (with-pinned-objects (object)
@@ -107,14 +92,8 @@ run in any thread.")
 
 (define-alien-routine collect-garbage int (last-gen int))
 
-#+(or sb-thread sb-safepoint)
-(progn
-  (define-alien-routine gc-stop-the-world void)
-  (define-alien-routine gc-start-the-world void))
-#-(or sb-thread sb-safepoint)
-(progn
-  (defun gc-stop-the-world ())
-  (defun gc-start-the-world ()))
+(define-alien-routine gc-stop-the-world void)
+(define-alien-routine gc-start-the-world void)
 
 (declaim (inline dynamic-space-size))
 (defun dynamic-space-size ()
@@ -290,8 +269,7 @@ run in any thread.")
     ;; interrupts, which is precisely the thing we need to NOT do if already
     ;; in post-GC code of any kind (be it finalizer or other).
   (when (and *allow-with-interrupts*
-               (or (and (sb-impl::hash-table-culled-values
-                         (sb-impl::finalizer-id-map sb-impl::**finalizer-store**))
+               (or (and sb-impl::*finalizers-triggered*
                         (not sb-impl::*in-a-finalizer*))
                    *after-gc-hooks*))
       (sb-thread::without-thread-waiting-for ()
@@ -345,8 +323,7 @@ guaranteed to be collected."
          ;; but there is no automatic cache rehashing after GC.
          (sb-format::tokenize-control-string-cache-clear))
         ((eql 1 gen)
-         (sb-format::tokenize-control-string-cache-clear)
-         (ctype-of-cache-clear))
+         (sb-format::tokenize-control-string-cache-clear))
         (t
          (drop-all-hash-caches)))
   #-gencgc
@@ -378,12 +355,6 @@ Note: currently changes to this value are lost when saving core."
 
 ;;;; GENCGC specifics
 ;;;;
-#+gencgc
-(progn
-
-(define-symbol-macro sb-vm:dynamic-space-end
-    (+ (dynamic-space-size) sb-vm:dynamic-space-start))
-
 (define-alien-variable ("gc_logfile" %gc-logfile) (* char))
 
 (defun (setf gc-logfile) (pathname)
@@ -423,6 +394,37 @@ statistics are appended to it."
 
 (define-alien-variable generations
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
+
+;;; Why is PAGE-INDEX-T in SB-KERNEL but PAGE and the page table are in SB-VM?
+(define-alien-type (struct sb-vm::page)
+    (struct sb-vm::page
+            ;; To cut down the size of the page table, the scan_start_offset
+            ;; - a/k/a "start" - is measured in 4-byte integers regardless
+            ;; of word size. This is fine for 32-bit address space,
+            ;; but if 64-bit then we have to scale the value. Additionally
+            ;; there is a fallback for when even the scaled value is too big.
+            (sb-vm::start #+64-bit (unsigned 32) #-64-bit signed)
+            ;; Caution: The low bit of WORDS-USED* is a flag bit
+            (sb-vm::words-used* (unsigned 16)) ; (* in the name is a memory aid)
+            (sb-vm::flags (unsigned 8)) ; this named 'type' in C
+            (sb-vm::gen (signed 8))))
+(define-alien-variable ("page_table" sb-vm:page-table) (* (struct sb-vm::page)))
+(declaim (inline sb-vm:find-page-index))
+(define-alien-routine ("ext_find_page_index" sb-vm:find-page-index) page-index-t (address unsigned))
+
+(defun generation-of (object)
+  (with-pinned-objects (object)
+    (let* ((addr (get-lisp-obj-address object))
+           (page (sb-vm:find-page-index addr)))
+      (cond ((>= page 0) (slot (deref sb-vm:page-table page) 'sb-vm::gen))
+            #+immobile-space
+            ((immobile-space-addr-p addr)
+             ;; SIMPLE-FUNs don't contain a generation byte
+             (when (simple-fun-p object)
+               (setq addr (get-lisp-obj-address (fun-code-header object))))
+             (let ((sap (int-sap (logandc2 addr sb-vm:lowtag-mask))))
+               (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
+                       #xF)))))))
 
 (export 'page-protected-p)
 (macrolet ((addr->mark (addr)
@@ -496,7 +498,7 @@ Experimental: interface subject to change.")
       "Number of times garbage collection has been done on GENERATION without
 promotion. Available on GENCGC platforms only.
 
-Experimental: interface subject to change."))
+Experimental: interface subject to change.")
   (defun generation-average-age (generation)
     "Average age of memory allocated to GENERATION: average number of times
 objects allocated to the generation have seen younger objects promoted to it.
@@ -506,11 +508,10 @@ Experimental: interface subject to change."
     (declare (generation-index generation))
     (alien-funcall (extern-alien "generation_average_age"
                                  (function double generation-index-t))
-                   generation))
-)
+                   generation)))
 
 (macrolet ((cases ()
-             `(cond ((< (current-dynamic-space-start) addr
+             `(cond ((< sb-vm:dynamic-space-start addr
                         (sap-int (dynamic-space-free-pointer)))
                      :dynamic)
                     ((immobile-space-addr-p addr) :immobile)
@@ -522,20 +523,27 @@ Experimental: interface subject to change."
                      :static))))
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)
-;;; This assumes a single contiguous dynamic space, which is of course a
-;;; bad assumption, but nonetheless one that has been true for, say, ~20 years.
-;;; Also note, we don't have to pin X - an object can not move between spaces,
-;;; so a non-nil answer is the definite answer. As to whether the object could
-;;; have moved, or worse, died - by say reusing the same register as held X for
-;;; the value that is (get-lisp-obj-address X), with no surrounding pin or even
-;;; reference to X - then that's your problem.
-;;; If you wanted the object not to die or move, you should have held on tighter!
+;;; There's a microscopic window of time in which next_free_page for dynamic space
+;;; could _decrease_ after calculating the address of X, so we'll pin X
+;;; to ensure that can't happen.
 (defun heap-allocated-p (x)
-  (let ((addr (get-lisp-obj-address x)))
-    (and (sb-vm:is-lisp-pointer addr)
-         (cases))))
+  (with-pinned-objects (x)
+    (let ((addr (get-lisp-obj-address x)))
+      (and (sb-vm:is-lisp-pointer addr)
+           (cases)))))
 
 ;;; Internal use only. FIXME: I think this duplicates code that exists
 ;;; somewhere else which I could not find.
 (defun lisp-space-p (sap &aux (addr (sap-int sap))) (cases))
 ) ; end MACROLET
+
+(define-condition memory-fault-error (system-condition error) ()
+  (:report
+   (lambda (condition stream)
+     (let* ((faultaddr (system-condition-address condition))
+            (string (if (<= sb-vm:read-only-space-start
+                            faultaddr
+                            (sap-int (sap+ sb-vm:*read-only-space-free-pointer* -1)))
+                        "Attempt to modify a read-only object at #x~X."
+                        "Unhandled memory fault at #x~X.")))
+       (format stream string faultaddr)))))

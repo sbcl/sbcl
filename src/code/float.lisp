@@ -546,38 +546,156 @@
 ;;; caller if needed.
 ;;;
 ;;; In the float case, we pick off small arguments so that compiler
-;;; can use special-case operations. We use an exclusive test, since
-;;; (due to round-off error), (float most-positive-fixnum) is likely
-;;; to be equal to (1+ most-positive-fixnum).  An exclusive test is
-;;; good enough, because most-positive-fixnum will be one less than a
-;;; power of two, and that power of two will be exactly representable
-;;; as a float (at least until we get 128-bit fixnums).
+;;; can use special-case operations.
 (defun %unary-truncate (number)
-  (number-dispatch ((number real))
-    ((integer) number)
-    ((ratio) (values (truncate (numerator number) (denominator number))))
-    (((foreach single-float double-float #+long-float long-float))
-     (if (and (<= (float most-negative-fixnum number) number)
-              (< number (float most-positive-fixnum number)))
-         (truly-the fixnum (%unary-truncate number))
-         (multiple-value-bind (bits exp) (integer-decode-float number)
-           (let ((res (ash bits exp)))
-             (if (minusp number)
-                 (- res)
-                 res)))))))
+  (declare (explicit-check number))
+  (macrolet ((fits-fixnum (type)
+               `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
+                    number
+                    ,(symbol-value (symbolicate 'most-positive-fixnum- type))))
+             (shift (type integer count)
+               `(,(case type
+                    #-64-bit
+                    (double-float 'ash)
+                    (t 'bignum-ashift-left-fixnum))
+                 ,integer ,count)))
+    (number-dispatch ((number real))
+      ((integer) number)
+      ((ratio) (values (truncate (numerator number) (denominator number))))
+      (((foreach single-float double-float #+long-float long-float))
+       (if (fits-fixnum (dispatch-type number))
+           (truly-the fixnum (%unary-truncate number))
+           (multiple-value-bind (bits exp sign) (integer-decode-float number)
+             (shift (dispatch-type number)
+                    (if (minusp sign)
+                        (- bits)
+                        bits)
+                    exp)))))))
+
+;;; Produce both values, unlike %unary-truncate
+(defun unary-truncate (number)
+  (declare (explicit-check number))
+  (macrolet ((fits-fixnum (type)
+               `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
+                    number
+                    ,(symbol-value (symbolicate 'most-positive-fixnum- type))))
+             (shift (type integer count)
+               `(,(case type
+                    #-64-bit
+                    (double-float 'ash)
+                    (t 'bignum-ashift-left-fixnum))
+                 ,integer ,count)))
+    (number-dispatch ((number real))
+      ((integer) (values number 0))
+      ((ratio)
+       (let ((truncated (truncate (numerator number) (denominator number))))
+         (values truncated
+                 (- number truncated))))
+      (((foreach single-float double-float #+long-float long-float))
+       (if (fits-fixnum (dispatch-type number))
+           (let* ((truncated (truly-the fixnum (%unary-truncate number))))
+             (values truncated
+                     (- number
+                        (coerce truncated '(dispatch-type number)))))
+           (multiple-value-bind (bits exp sign) (integer-decode-float number)
+             (let ((truncated (shift (dispatch-type number)
+                                     (if (minusp sign)
+                                         (- bits)
+                                         bits)
+                                     exp)))
+               (values
+                truncated
+                #+64-bit
+                (coerce 0 '(dispatch-type number))
+                #-64-bit
+                (if (eq '(dispatch-type number) 'single-float)
+                    (coerce 0 '(dispatch-type number))
+                    (- number (coerce truncated '(dispatch-type number))))))))))))
+
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
+                  (declare (inline ,decode))
+                  (multiple-value-bind (bits exp sign) (,decode number)
+                    (let ((truncated (,(case type
+                                         #-64-bit
+                                         (double-float 'ash)
+                                         (t 'bignum-ashift-left-fixnum))
+                                      (if (minusp sign)
+                                          (- bits)
+                                          bits)
+                                      exp)))
+                      (values
+                       truncated
+                       ,(case type
+                          ((single-float #+64-bit double-float)
+                           `(coerce 0 ',type))
+                          (t
+                           `(- number (coerce truncated ',type)))))))))))
+  (def double-float)
+  (def single-float))
+
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+              `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
+                 (declare (inline ,decode))
+                 (multiple-value-bind (bits exp sign) (,decode number)
+                   (,(case type
+                       #-64-bit
+                       (double-float 'ash)
+                       (t 'bignum-ashift-left-fixnum))
+                    (if (minusp sign) (- bits) bits)
+                    exp))))))
+  (def double-float)
+  (def single-float))
+
+;;; Needs to be synchronized with sxhash-bignum
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate 'sxhash-bignum- type) (number)
+                  (declare (inline ,decode))
+                  (let ((result 316495330)
+                        (digit-size sb-bignum::digit-size))
+                    (declare (type fixnum result))
+                    (multiple-value-bind (bits exp sign) (,decode number)
+                      (let ((bits (if (minusp sign)
+                                      (- bits)
+                                      bits)))
+                        (multiple-value-bind (digits remaining) (truncate exp digit-size)
+                          (dotimes (i digits)
+                            do (mixf result 0))
+                          ;; Taken from bignum-ashift-left-fixnum.
+                          (let* ((right-half (ldb (byte digit-size 0)
+                                                  (ash bits remaining)))
+                                 (sign-bit-p
+                                   (logbitp (1- digit-size) right-half))
+                                 (left-half (ash bits
+                                                 (- remaining digit-size)))
+                                 (left-half-p (if sign-bit-p
+                                                  (/= left-half -1)
+                                                  (/= left-half 0))))
+                            (mixf result
+                                  (logand most-positive-fixnum
+                                          (logxor right-half
+                                                  (ash right-half -7))))
+                            (when left-half-p
+                              (let ((left-half (ldb (byte digit-size 0) left-half)))
+                                (mixf result
+                                      (logand most-positive-fixnum
+                                              (logxor left-half
+                                                      (ash left-half -7))))))))))
+                    result)))))
+  (def double-float)
+  (def single-float))
 
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)
-                (if (and (<= ,(coerce most-negative-fixnum type) number)
-                         (< number ,(coerce most-positive-fixnum type)))
+                (if (<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
+                        number
+                        ,(symbol-value (symbolicate 'most-positive-fixnum- type)))
                     (truly-the fixnum (,name number))
-                    ;; General -- slow -- case.
-                    (multiple-value-bind (bits exp) (integer-decode-float number)
-                      (let ((res (ash bits exp)))
-                        (if (minusp number)
-                            (- res)
-                            res)))))))
+                    (error "bad float arg")))))
   (def single-float %unary-truncate/single-float)
   (def double-float %unary-truncate/double-float)
   #+long-float
@@ -585,32 +703,42 @@
 
 ;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
 ;;; can't use the round primitive, then we do our own round-to-nearest on the
-;;; result of i-d-f. [Note that this rounding will really only happen with
-;;; double floats, since the whole single-float fraction will fit in a fixnum,
-;;; so all single-floats larger than most-positive-fixnum can be precisely
-;;; represented by an integer.]
+;;; result of i-d-f. [Note that this rounding will really only happen
+;;; with double floats on 32-bit architectures, where there are
+;;; fractional floats past most-x-fixnum]
 (defun %unary-round (number)
-  (number-dispatch ((number real))
-    ((integer) number)
-    ((ratio) (values (round (numerator number) (denominator number))))
-    (((foreach single-float double-float #+long-float long-float))
-     (if (< (float most-negative-fixnum number)
-            number
-            (float most-positive-fixnum number))
-         (truly-the fixnum (%unary-round number))
-         (multiple-value-bind (bits exp) (integer-decode-float number)
-           (let* ((shifted (ash bits exp))
-                  (rounded (if (minusp exp)
-                               (let ((fractional-bits (logand bits (lognot (ash -1 (- exp)))))
-                                     (0.5bits (ash 1 (- -1 exp))))
-                                 (cond
-                                   ((> fractional-bits 0.5bits) (1+ shifted))
-                                   ((< fractional-bits 0.5bits) shifted)
-                                   (t (if (oddp shifted) (1+ shifted) shifted))))
-                               shifted)))
-             (if (minusp number)
-                 (- rounded)
-                 rounded)))))))
+  (declare (explicit-check))
+  (macrolet ((fits-fixnum (type)
+               `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
+                    number
+                    ,(symbol-value (symbolicate 'most-positive-fixnum- type)))))
+    (number-dispatch ((number real))
+      ((integer) number)
+      ((ratio) (values (round (numerator number) (denominator number))))
+      (((foreach single-float double-float #+long-float long-float))
+       (if (fits-fixnum (dispatch-type number))
+           (truly-the fixnum (%unary-round number))
+           #+64-bit
+           (multiple-value-bind (bits exp sign) (integer-decode-float number)
+             (bignum-ashift-left-fixnum
+              (if (minusp sign)
+                  (- bits)
+                  bits)
+              exp))
+           #-64-bit
+           (multiple-value-bind (bits exp) (integer-decode-float number)
+             (let* ((shifted (ash bits exp))
+                    (rounded (if (minusp exp)
+                                 (let ((fractional-bits (logand bits (lognot (ash -1 (- exp)))))
+                                       (0.5bits (ash 1 (- -1 exp))))
+                                   (cond
+                                     ((> fractional-bits 0.5bits) (1+ shifted))
+                                     ((< fractional-bits 0.5bits) shifted)
+                                     (t (if (oddp shifted) (1+ shifted) shifted))))
+                                 shifted)))
+               (if (minusp number)
+                   (- rounded)
+                   rounded))))))))
 
 #-round-float
 (defun %unary-ftruncate (number)
@@ -635,25 +763,25 @@
   (declare (explicit-check))
   (number-dispatch ((x real))
     (((foreach single-float double-float #+long-float long-float))
-     (multiple-value-bind (bits exp) (integer-decode-float x)
+     (multiple-value-bind (bits exp sign) (integer-decode-float x)
        (if (eql bits 0)
            0
-           (let ((int (if (minusp x) (- bits) bits)))
-             (if (minusp exp)
-                 ;; Instead of division (which also involves GCD)
-                 ;; find the first set bit of the numerator and shift accordingly,
-                 ;; as the denominator is a power of two.
-                 (let* ((pexp (- exp))
-                        (set (first-bit-set bits))
-                        (shifted (ash int (- set))))
-                   (if (> pexp set)
-                       (%make-ratio shifted
-                                    (let ((shift (- pexp set)))
-                                      (if (< shift sb-vm:n-fixnum-bits)
-                                          (ash 1 shift)
-                                          (bignum-ashift-left-fixnum 1 shift))))
-                       (ash int exp)))
-                 (ash int exp))))))
+           (let ((int (if (minusp sign) (- bits) bits)))
+             (cond ((minusp exp)
+                    ;; Instead of division (which also involves GCD)
+                    ;; find the first set bit of the numerator and shift accordingly,
+                    ;; as the denominator is a power of two.
+                    (let* ((pexp (- exp))
+                           (set (first-bit-set bits)))
+                      (if (> pexp set)
+                          (%make-ratio (ash int (- set))
+                                       (let ((shift (- pexp set)))
+                                         (if (< shift sb-vm:n-fixnum-bits)
+                                             (ash 1 shift)
+                                             (bignum-ashift-left-fixnum 1 shift))))
+                          (ash int exp))))
+                   (t
+                    (ash int exp)))))))
     ((rational) x)))
 
 #+64-bit
@@ -667,7 +795,7 @@
            nil
            (let ((int (if (minusp float) (- bits) bits)))
              (and (= (truly-the bignum-length (bignum-integer-length bignum))
-                     (+ (integer-length bits) exp))
+                     (+ (integer-length int) exp))
                   (sb-bignum::bignum-lower-bits-zero-p bignum exp)
                   (= int
                      (truly-the fixnum
@@ -682,9 +810,9 @@
        (if (or (eql bits 0)
                (minusp exp))
            (bignum-plus-p bignum)
-           (let ((int (if (minusp float) (- bits) bits))
-                 (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
-                                 (+ (integer-length bits) exp))))
+           (let* ((int (if (minusp float) (- bits) bits))
+                  (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
+                                  (+ (integer-length int) exp))))
              (cond
                ((plusp length-diff) (bignum-plus-p bignum))
                ((minusp length-diff) (minusp float))
@@ -706,9 +834,9 @@
        (if (or (eql bits 0)
                (minusp exp))
            (not (bignum-plus-p bignum))
-           (let ((int (if (minusp float) (- bits) bits))
-                 (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
-                                 (+ (integer-length bits) exp))))
+           (let* ((int (if (minusp float) (- bits) bits))
+                  (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
+                                  (+ (integer-length int) exp))))
              (cond
                ((plusp length-diff) (not (bignum-plus-p bignum)))
                ((minusp length-diff) (not (minusp float)))

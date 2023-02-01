@@ -7,8 +7,8 @@
 #include <stdio.h>
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
-            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
+os_alloc_gc_space(int __attribute__((unused)) space_id,
+                  int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
     attributes &= ~IS_GUARD_PAGE;
@@ -37,22 +37,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
     return actual;
 }
 
-void
-os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    if (munmap(addr,len) == -1) {
-        perror("munmap");
-    }
-}
-
-void
-os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
-{
-    if (mprotect(address, length, prot)) {
-        perror("mprotect");
-    }
-}
-
 char *os_get_runtime_executable_path()
 {
     int cookie = 0;
@@ -69,7 +53,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     /*fprintf(stderr, "SIGSEGV: pc=%p addr=%p\n",
            context->uc_mcontext.rip, info->si_addr);*/
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
-    if (gencgc_handle_wp_violation(addr)) return;
+    if (gencgc_handle_wp_violation(context, addr)) return;
 
     if (!handle_guard_page_triggered(context, addr))
             interrupt_handle_now(signal, info, context);

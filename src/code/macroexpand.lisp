@@ -16,7 +16,18 @@
 (defun special-operator-p (symbol)
   "If the symbol globally names a special form, return T, otherwise NIL."
   (declare (symbol symbol))
-  (eq (info :function :kind symbol) :special-form))
+  #+sb-xc-host (eq (info :function :kind symbol) :special-form)
+  ;; special operators will always have a function definition, and that definition
+  ;; will be a closure with a specific shape that we can recognize.
+  #-sb-xc-host
+  (let ((f (%symbol-function (the symbol symbol))))
+    (and (closurep f) ; it's ok to call CLOSUREP on NIL
+         ;; Underlying function must be the same as any chosen special operator.
+         ;; This will also be true of macros though.
+         (eq (load-time-value (%closure-fun (symbol-function 'if)) t)
+             (%closure-fun f))
+         ;; Closure's captured value is (:SPECIAL sym)
+         (typep (%closure-index-ref f 0) '(cons (eql :special))))))
 
 (defvar *macroexpand-hook* 'funcall
   "The value of this variable must be a designator for a function that can
@@ -159,6 +170,11 @@ return NIL. Can be set with SETF when ENV is NIL."
     ;; we don't do it.
     (values (info :function :compiler-macro-function name))))
 
+(defvar *setf-compiler-macro-function-hook* nil
+  "A list of functions that (SETF COMPILER-MACRO-FUNCTION) invokes before
+   storing the new value. The functions take the function name and the new
+   value.")
+
 ;;; FIXME: we don't generate redefinition warnings for these.
 (defun (setf compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
@@ -168,6 +184,9 @@ return NIL. Can be set with SETF when ENV is NIL."
     (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
   (when (eq (info :function :kind name) :special-form)
     (error "~S names a special form." name))
+  (when (boundp '*setf-compiler-macro-function-hook*) ; unbound during cold init
+    (dolist (f *setf-compiler-macro-function-hook*)
+      (funcall f name function)))
   (with-single-package-locked-error
       (:symbol name "setting the compiler-macro-function of ~A")
     (setf (info :function :compiler-macro-function name) function)

@@ -74,37 +74,6 @@
                         word-shift))
                 instance-pointer-lowtag))))))
 
-;;; This could be split into two vops to avoid wasting an allocation for 'temp'
-;;; when the immediate form is used.
-(define-vop ()
-  (:translate sb-c::%structure-is-a)
-  (:args (x :scs (descriptor-reg)))
-  (:arg-types * (:constant t))
-  (:policy :fast-safe)
-  (:conditional :eq)
-  (:info test-layout)
-  (:temporary (:sc unsigned-reg) this-id temp)
-  (:generator 4
-    (let ((test-id (layout-id test-layout))
-          (offset (+ (id-bits-offset)
-                     (ash (- (wrapper-depthoid test-layout) 2) 2)
-                     (- instance-pointer-lowtag))))
-      (declare (ignorable test-id))
-      (inst ldr (32-bit-reg this-id) (@ x offset))
-      ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
-      (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
-             (if (minusp test-id)
-                 (inst cmn (32-bit-reg this-id) (- test-id))
-                 (inst cmp (32-bit-reg this-id) test-id)))
-            (t
-             (destructuring-bind (size . label)
-                 ;; This uses the bogus definition of :dword, the one which
-                 ;; emits 4 bytes. _technically_ dword should be 8 bytes.
-                 (register-inline-constant :dword `(:layout-id ,test-layout))
-               (declare (ignore size))
-               (inst load-from-label (32-bit-reg temp) label))
-             (inst cmp (32-bit-reg this-id) (32-bit-reg temp)))))))
-
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
@@ -148,6 +117,22 @@
       (immediate
        (inst orr t1 t1 (logical-mask (ash (tn-value data) n-widetag-bits)))))
     (storew t1 x 0 other-pointer-lowtag)))
+
+(define-vop ()
+  (:translate test-header-data-bit)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:info mask)
+  (:arg-types t (:constant t))
+  (:conditional :ne)
+  (:generator 1
+    (let ((byte 1))
+      (when (> mask #xff)
+        (aver (zerop (ldb (byte 8 0) mask)))
+        (setf mask (ash mask -8)
+              byte 2))
+      (inst ldrb tmp-tn (@ array (- byte other-pointer-lowtag)))
+      (inst tst tmp-tn mask))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)
@@ -328,3 +313,17 @@
    ;; Can't compute code-tn-relative index until the boxed header length
    ;; is known. Some vops emit new boxed words via EMIT-CONSTANT.
    (inst store-coverage-mark index tmp vector)))
+
+(define-vop ()
+  (:translate sb-lockless::get-next)
+  (:policy :fast-safe)
+  (:args (node :scs (descriptor-reg)))
+  (:results (next-tagged :scs (descriptor-reg))
+            (next-bits :scs (descriptor-reg)))
+  (:generator 10
+    ;; Read the first user-data slot and convert to a tagged pointer,
+    ;; also returning the raw value as a secondary result
+    (pseudo-atomic (tmp-tn :sync nil)
+      (loadw next-bits node (+ instance-slots-offset instance-data-start)
+             instance-pointer-lowtag)
+      (inst orr next-tagged next-bits instance-pointer-lowtag))))

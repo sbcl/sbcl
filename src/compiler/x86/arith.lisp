@@ -924,6 +924,25 @@ constant shift greater than word length")))
     (inst sar result :cl)
     (inst and result (lognot fixnum-tag-mask))))
 
+(define-vop (fastrem-32)
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg) :target eax)
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset eax-offset
+               :from (:argument 0) :to (:result 0)) eax)
+  (:temporary (:sc unsigned-reg :offset edx-offset
+               :from (:argument 0) :to (:result 0)) edx)
+  (:generator 10
+    (move eax dividend)
+    (inst mul eax c) ; result to EDX:EAX (but we expressly drop all bits from EDX)
+    (inst mul eax divisor) ; new we want _only_ bits from rDX
+    (move remainder edx)))
+
 (in-package "SB-C")
 
 (defknown %lea (integer integer (member 1 2 4 8) (signed-byte 32))

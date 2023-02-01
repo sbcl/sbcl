@@ -22,6 +22,43 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
+
+(defun pcl-compile (expr safety)
+  (labels ((strictly-heap-p (x)
+             (or (atom x)
+                 (and (heap-allocated-p x) (strictly-heap-p (cdr x)))))
+           (maybe-copy-expr ()
+             ;; The lambda list goes into a code component as-is.
+             ;; To avoid creating a heap->arena pointer we might have to copy it.
+             #-system-tlabs expr
+             #+system-tlabs
+             (multiple-value-bind (name rest)
+                 (ecase (car expr)
+                   (named-lambda (values (cadr expr) (cddr expr)))
+                   (lambda (values nil (cdr expr))))
+               (destructuring-bind (args . body) rest
+                   (if (strictly-heap-p args)
+                       expr
+                       (let ((args-copy (copy-list args)))
+                         (if name
+                             `(named-lambda ,name ,args-copy . ,body)
+                             `(lambda ,args-copy . ,body))))))))
+    (sb-vm:without-arena "pcl-compile"
+     (let* ((base-policy sb-c::*policy*)
+            (lexenv
+             (sb-c::make-almost-null-lexenv
+              (ecase safety
+                (:safe base-policy)
+                (:unsafe (sb-c::process-optimize-decl
+                          '((space 1) (compilation-speed 1)
+                            (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
+                          base-policy)))
+              ;; I suspect that INHIBIT-WARNINGS precludes them from happening
+              (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
+                    (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
+              nil nil nil
+              '((:declare sb-c::tlab :system)))))
+       (sb-c:compile-in-lexenv (maybe-copy-expr) lexenv nil nil nil nil nil)))))
 
 ;;; GET-FUN is the main user interface to this code. It is like
 ;;; COMPILE, only more efficient. It achieves this efficiency by
@@ -113,7 +150,7 @@
     (let ((generator-lambda `(lambda ,gensyms
                                (declare (optimize (sb-c:store-source-form 0)))
                                (function ,code))))
-      (let ((generator (pcl-compile generator-lambda)))
+      (let ((generator (pcl-compile generator-lambda :safe)))
         (ensure-fgen test gensyms generator generator-lambda nil)
         generator))))
 

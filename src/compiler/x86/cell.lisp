@@ -75,7 +75,7 @@
         ;; Thread-local area, no LOCK needed.
         (with-tls-ea (EA :base tls :base-already-live-p t)
           (inst cmpxchg EA new :maybe-fs))
-        (inst cmp eax no-tls-value-marker-widetag)
+        (inst cmp eax no-tls-value-marker)
         (inst jmp :ne check)
         (move eax old))
       (inst cmpxchg (make-ea :dword :base symbol
@@ -93,11 +93,11 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
   (:policy :fast-safe)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -119,7 +119,7 @@
             (done (gen-label)))
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base tls :base-already-live-p t)
-          (inst cmp EA no-tls-value-marker-widetag :maybe-fs)
+          (inst cmp EA no-tls-value-marker :maybe-fs)
           (inst jmp :z global-val)
           (inst mov EA value :maybe-fs))
         (inst jmp done)
@@ -129,7 +129,7 @@
 
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
-    (:translate symeval)
+    (:translate symbol-value)
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
@@ -142,7 +142,7 @@
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base value :base-already-live-p t)
           (inst mov value EA :maybe-fs))
-        (inst cmp value no-tls-value-marker-widetag)
+        (inst cmp value no-tls-value-marker)
         (inst jmp :ne check-unbound-label)
         (loadw value object symbol-value-slot other-pointer-lowtag)
         (emit-label check-unbound-label)
@@ -157,13 +157,13 @@
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
     (:policy :fast)
-    (:translate symeval)
+    (:translate symbol-value)
     (:generator 8
       (let ((ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base value :base-already-live-p t)
           (inst mov value EA :maybe-fs))
-        (inst cmp value no-tls-value-marker-widetag)
+        (inst cmp value no-tls-value-marker)
         (inst jmp :ne ret-lab)
         (loadw value object symbol-value-slot other-pointer-lowtag)
         (emit-label ret-lab)))))
@@ -171,9 +171,9 @@
 #-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (fast-symbol-value fast-symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (set %set-symbol-global-value)))
 
 #+sb-thread
@@ -188,7 +188,7 @@
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (with-tls-ea (EA :base value :base-already-live-p t)
         (inst mov value EA :maybe-fs))
-      (inst cmp value no-tls-value-marker-widetag)
+      (inst cmp value no-tls-value-marker)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (emit-label check-unbound-label)
@@ -212,7 +212,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:args-var args)
+  (:arg-refs args)
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; car slot, so we have to strip off the two low bits to make sure
@@ -454,6 +454,11 @@
 (define-full-compare-and-swap %raw-instance-cas/word instance
   instance-slots-offset instance-pointer-lowtag
   (unsigned-reg) unsigned-num %raw-instance-cas/word)
+
+(define-full-compare-and-swap %raw-instance-cas/signed-word instance
+  instance-slots-offset instance-pointer-lowtag
+  (signed-reg) signed-num %raw-instance-cas/signed-word)
+
 
 ;;;; code object frobbing
 

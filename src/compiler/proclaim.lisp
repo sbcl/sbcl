@@ -134,7 +134,7 @@
              (assert-symbol-home-package-unlocked name "proclaiming ~S as a function")))
 
       (let ((kind (info :function :kind name)))
-        ;; scrubbing old data I: possible collision with a macro
+        ;; scrubbing old data: possible collision with a macro
         ;; There's a silly little problem with fun names that are not ANSI-legal names,
         ;; e.g. (CAS mumble). We can't ask the host whether that is FBOUNDP,
         ;; because it would rightly complain. So, just assume that it is not FBOUNDP.
@@ -152,17 +152,6 @@
           ;; could only be of kind :FUNCTION if anything.
           (unless (pcl-methodfn-name-p name)
             (setf (info :function :kind name) :function))))))
-
-  ;; scrubbing old data II: dangling forward references
-  ;;
-  ;; (This could happen if someone executes PROCLAIM FTYPE at
-  ;; macroexpansion time, which is bad style, or at compile time, e.g.
-  ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
-  ;; case it's reasonable style. Either way, NAME is no longer a free
-  ;; function.)
-  (when (boundp '*ir1-namespace*)       ; when compiling
-    (unless (block-compile *compilation*)
-      (remhash name (free-funs *ir1-namespace*))))
 
   (values))
 
@@ -313,22 +302,14 @@
   (when (and (eq kind 'always-bound) (eq info-value :always-bound)
              (not (boundp name))
              ;; Allow it to be unbound at compile-time.
-             (not *compile-time-eval*)
-             ;; Check if we are still bootstrapping.
-             (not (boundp '*queued-proclaims*)))
+             (not *compile-time-eval*))
     (error "Cannot proclaim an unbound symbol as ~A: ~S" kind name))
 
   (multiple-value-bind (allowed test)
       (ecase kind
         (special
-         ;; KLUDGE: There is probably a better place to do this.
-         (when (boundp '*ir1-namespace*)
-           (remhash name (free-vars *ir1-namespace*)))
          (values '(:special :unknown) #'eq))
         (global
-         ;; KLUDGE: Ditto.
-         (when (boundp '*ir1-namespace*)
-           (remhash name (free-vars *ir1-namespace*)))
          (values '(:global :unknown) #'eq))
         (always-bound (values '(:constant) #'neq)))
     (let ((old (info :variable :kind name)))
@@ -414,23 +395,6 @@
     (when (typep class 'classoid)
       (seal-class class))))
 
-(defun process-inline-declaration (name kind)
-  (declare (type (and inlinep (not null)) kind))
-  ;; since implicitly it is a function, also scrubs (FREE-FUNS *IR1-NAMESPACE*)
-  (proclaim-as-fun-name name)
-  (warn-if-inline-failed/proclaim name kind)
-  (setf (info :function :inlinep name) kind))
-
-(defun process-block-compile-declaration (entries kind)
-  (ecase kind
-    (start-block
-     (finish-block-compilation)
-     (let ((compilation *compilation*))
-       (setf (block-compile compilation) t)
-       (setf (entry-points compilation) entries)))
-    (end-block
-     (finish-block-compilation))))
-
 (defun check-deprecation-declaration (state since form)
   (unless (typep state 'deprecation-state)
     (error 'simple-type-error
@@ -505,6 +469,19 @@
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
+    ;; It seems strange to test whether we are currently in
+    ;; compile-time mode this way, but the reason we don't just call
+    ;; %COMPILER-PROCLAIM in a :COMPILE-TOPLEVEL-only situation in the
+    ;; macro-expansion of DECLAIM is that unlike the DEFmumble macros,
+    ;; DECLAIM and PROCLAIM both exist, and it is unclear whether the
+    ;; intent of the ANSI specification is that
+    ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL ...)
+    ;;     (LET ()
+    ;;       (PROCLAIM ...)))
+    ;; should have the exact same compile time effects as (DECLAIM ...).
+    ;; We make the assumption that yes, they should have the same semantics.
+    (when (boundp '*compilation*)
+      (%compiler-proclaim kind args))
     (labels ((store-location (name &key (key kind))
                (if location
                    (setf (getf (info :source-location :declaration name) key)
@@ -542,16 +519,9 @@
              #+sb-xc-host
              (error "Type system not yet initialized.")))
         (freeze-type
-         #-sb-fluid
          (map-args #'process-freeze-type-declaration))
-        ((start-block end-block)
-         #-(and sb-devel sb-xc-host)
-         (when (and *compile-time-eval* (boundp '*compilation*))
-           (if (eq *block-compile-argument* :specified)
-               (process-block-compile-declaration args kind)
-               (compiler-notify "ignoring ~S declaration since ~
-                                :BLOCK-COMPILE is not :SPECIFIED"
-                                kind))))
+        ;; This only has compile-time effects.
+        ((start-block end-block))
         (optimize
          (multiple-value-bind (new-policy specified-qualities)
              (process-optimize-decl form *policy*)
@@ -575,8 +545,11 @@
         ((disable-package-locks enable-package-locks)
          (setq *disabled-package-locks*
                (process-package-lock-decl form *disabled-package-locks*)))
-        ((#-sb-fluid inline notinline #-sb-fluid maybe-inline)
-         (map-args #'process-inline-declaration kind))
+        ((inline notinline maybe-inline)
+         (dolist (name args)
+           (warn-if-inline-failed/proclaim name kind)
+           (setf (info :function :inlinep name)
+                 (the (and inlinep (not null)) kind))))
         (deprecated
          (destructuring-bind (state since &rest things) args
            (multiple-value-bind (state software version)

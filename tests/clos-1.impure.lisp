@@ -316,3 +316,94 @@
                             (method-self-call a b :z j :j 10)))
       (and warning
            (not sb-kernel:redefinition-warning))))
+
+(define-method-combination qualifier-pattern-element-wild ()
+  ((qpew (:qpew *)))
+  `(1+ (call-method ,(first qpew))))
+
+(defgeneric qualifier-pattern-element-wild-fun (x)
+  (:method-combination qualifier-pattern-element-wild)
+  (:method :qpew * ((x integer)) x)
+  (:method :qpew t ((x ratio)) x)
+  (:method :qpew 1 2 ((x symbol)) 3))
+
+(with-test (:name :method-combination-qualfier-pattern-element-wild)
+  (assert (= (qualifier-pattern-element-wild-fun 1) 2))
+  (assert (= (qualifier-pattern-element-wild-fun 1/2) 3/2))
+  (assert-error (qualifier-pattern-element-wild-fun t)))
+
+(define-method-combination method-combination-arguments-whole ()
+  ((methods *))
+  (:arguments &whole args)
+  (:generic-function gf)
+  `(list* ,gf ,args))
+
+(defgeneric method-combination-arguments-whole-fun (a &key key-1)
+  (:method-combination method-combination-arguments-whole)
+  (:method (a &key key-1 key-2)
+    (declare (ignore a key-1 key-2))))
+
+(with-test (:name :method-combination-arguments-whole)
+  (assert (equal (method-combination-arguments-whole-fun 1 :key-1 2)
+                 (list #'method-combination-arguments-whole-fun 1 :key-1 2)))
+  (assert (equal (method-combination-arguments-whole-fun 1)
+                 (list #'method-combination-arguments-whole-fun 1))))
+
+(defconstant order-one 'order-two)
+(defconstant order-two :most-specific-last)
+
+(define-method-combination dont-overevaluate ()
+  ((group * :order order-one))
+  `(call-method ,(first group)))
+
+(with-test (:name :method-combination-dont-overevaluate)
+  (defgeneric dont-overevaluate-gf (x)
+    (:method-combination dont-overevaluate)
+    (:method ((x t)) x))
+  (assert-error (dont-overevaluate-gf 1)))
+
+;;; An example (non-normative) from the Standard, which we interpret
+;;; as failing the requirement not to have multiple methods with the
+;;; same specializers in the same method group.
+
+(defun positive-integer-qualifier-p (method-qualifiers)
+  (and (= (length method-qualifiers) 1)
+       (typep (first method-qualifiers) '(integer 0 *))))
+
+(define-method-combination example-method-combination ()
+  ((methods positive-integer-qualifier-p))
+  `(progn ,@(mapcar #'(lambda (method)
+                        `(call-method ,method))
+                    (stable-sort methods #'<
+                                 :key #'(lambda (method)
+                                          (first (method-qualifiers method)))))))
+
+(defgeneric example-method-combination-gf (x s)
+  (:method-combination example-method-combination)
+  (:method 1 (x (s stream)) (format s "~&1: ~A~%" x))
+  (:method 2 (x (s stream)) (format s "~&2: ~A~%" x)))
+
+(with-test (:name :clhs-example-method-combination-no-order)
+  (assert-error (example-method-combination-gf 1 (make-broadcast-stream))))
+
+;;; The same example as above, modified to declare (using a
+;;; non-standard extension) that the order it receives methods in the
+;;; group does not matter.
+
+(define-method-combination example-method-combination-order-nil ()
+  ((methods positive-integer-qualifier-p :order nil))
+  `(progn ,@(mapcar #'(lambda (method)
+                        `(call-method ,method))
+                    (stable-sort methods #'<
+                                 :key #'(lambda (method)
+                                          (first (method-qualifiers method)))))))
+
+(defgeneric example-method-combination-order-nil-gf (x s)
+  (:method-combination example-method-combination-order-nil)
+  (:method 1 (x (s stream)) (format s "1: ~A and " x))
+  (:method 2 (x (s stream)) (format s "2: ~A" x)))
+
+(with-test (:name :clhs-example-method-combination-order-nil)
+  (let ((string (with-output-to-string (s)
+                  (example-method-combination-order-nil-gf t s))))
+    (assert (string= string "1: T and 2: T"))))

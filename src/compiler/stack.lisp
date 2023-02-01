@@ -69,6 +69,12 @@
   (dolist (e late early)
     (pushnew e early)))
 
+;;; Return a list of all lvars pushed before LVAR in 2BLOCK.
+(defun ir2-block-pushed-before (lvar 2block)
+  (declare (lvar lvar))
+  (declare (ir2-block 2block))
+  (member lvar (reverse (ir2-block-pushed 2block))))
+
 ;; Blocks are numbered in reverse DFO order, so the "lowest common
 ;; dominator" of a set of blocks is the closest dominator of all of
 ;; the blocks.
@@ -113,7 +119,7 @@
                                            (set-difference
                                             (ir2-block-start-stack 2block)
                                             (ir2-block-popped 2block))
-                                           (member dx-lvar (reverse (ir2-block-pushed 2block))))))))
+                                           (ir2-block-pushed-before dx-lvar 2block))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (aver start-block)
@@ -122,7 +128,7 @@
                  (when (eq (block-flag succ) cycle)
                    (mark succ)))
                (when (eq (block-out block) nlx)
-                 (do-nested-cleanups (cleanup (block-end-lexenv block))
+                 (do-nested-cleanups (cleanup block)
                    (case (cleanup-kind cleanup)
                      ((:block :tagbody :catch :unwind-protect)
                       (dolist (nlx-info (cleanup-nlx-info cleanup))
@@ -201,7 +207,7 @@
                                          ;; they're handled specially.
                                          (remove-if #'lvar-dynamic-extent
                                                     (ir2-block-start-stack (block-info succ))))))
-    (do-nested-cleanups (cleanup (block-end-lexenv block))
+    (do-nested-cleanups (cleanup block)
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
          (dolist (nlx-info (cleanup-nlx-info cleanup))
@@ -233,47 +239,24 @@
                                (ir2-block-start-stack 2block)
                                (ir2-block-popped 2block))))
                (setq new-end (merge-uvl-live-sets
-                              ;; union in the lvars
-                              ;; pushed before LVAR in
-                              ;; this block.
-                              new-end (member lvar (reverse (ir2-block-pushed 2block)))))))))))
+                              new-end
+                              (ir2-block-pushed-before lvar 2block))))))
+         ;; We need to back-propagate the DX LVARs from the start of
+         ;; their environments to their allocation sites. The
+         ;; %CLEANUP-POINT funny function combination ensures the
+         ;; mess-up node's block will end with an enclosing
+         ;; cleanup. We need to be clever about this because some code
+         ;; paths may not allocate all of the DX LVARs.
+         (let ((mess-up (cleanup-mess-up cleanup)))
+           (when (and (eq (node-block mess-up) block)
+                      (entry-p mess-up))
+             (back-propagate-dx-lvars block (cleanup-nlx-info cleanup)))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
-
-    ;; If a block has a "entry DX" node (the start of a DX
-    ;; environment) then we need to back-propagate the DX LVARs to
-    ;; their allocation sites.  We need to be clever about this
-    ;; because some code paths may not allocate all of the DX LVARs.
-    (do-nodes (node nil block)
-      (when (typep node 'entry)
-        (let ((cleanup (entry-cleanup node)))
-          (when (eq (cleanup-kind cleanup) :dynamic-extent)
-            (back-propagate-dx-lvars block (cleanup-nlx-info cleanup))))))
 
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
-
-      ;; We cannot delete unused UVLs during NLX, so all UVLs live at
-      ;; ENTRY which are not popped will be actually live at NLE.
-      ;;
-      ;; BUT, UNWIND-PROTECTor is called in the environment, which has
-      ;; nothing in common with the environment of its entry. So we
-      ;; fictively compute its stack from the containing cleanups, but
-      ;; do not propagate additional LVARs from the entry, thus
-      ;; preveting bogus stack cleanings.
-      ;;
-      ;; TODO: Insert a check that no values are discarded in UWP. Or,
-      ;; maybe, we just don't need to create NLX-ENTRY for UWP?
-      (when (nle-block-p block)
-        (let* ((nlx-info (nle-block-nlx-info block))
-               (cleanup (nlx-info-cleanup nlx-info)))
-          (unless (eq (cleanup-kind cleanup) :unwind-protect)
-            (let* ((entry-block (node-block (cleanup-mess-up cleanup)))
-                   (entry-stack (set-difference
-                                 (ir2-block-start-stack (block-info entry-block))
-                                 (ir2-block-popped (block-info entry-block)))))
-              (setq start (merge-uvl-live-sets start entry-stack))))))
 
       (when *check-consistency*
         (aver (subsetp original-start start)))

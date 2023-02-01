@@ -171,8 +171,13 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  #-(or x86-64 arm64) ;; Needs to be supported by the call VOPs
+  #-(or arm64 x86-64) ;; Needs to be supported by the call VOPs
   (setf attributes (remove 'no-verify-arg-count attributes))
+  #-(or arm64 x86-64) ;; Needs to be supported by the call VOPs, sb-vm::fixed-call-arg-location
+  (setf attributes (remove 'fixed-args attributes))
+  (when (memq 'fixed-args attributes)
+    (pushnew 'no-verify-arg-count attributes))
+
   (multiple-value-bind (type annotation)
       (split-type-info arg-types result-type)
     `(%defknown ',(if (and (consp name)
@@ -274,10 +279,15 @@
 
 ;;;; generic type inference methods
 
-(defun symeval-derive-type (node &aux (args (basic-combination-args node))
+(defun maybe-find-free-var (name)
+  (let ((found (gethash name (free-vars *ir1-namespace*))))
+    (unless (eq found :deprecated)
+      found)))
+
+(defun symbol-value-derive-type (node &aux (args (basic-combination-args node))
                                       (lvar (pop args)))
   (unless (and lvar (endp args))
-    (return-from symeval-derive-type))
+    (return-from symbol-value-derive-type))
   (if (constant-lvar-p lvar)
       (let* ((sym (lvar-value lvar))
              (var (maybe-find-free-var sym))
@@ -305,15 +315,6 @@
     (let ((lvar (nth n (combination-args call))))
       (when lvar (lvar-type lvar)))))
 
-;;; Derive the result type according to the float contagion rules, but
-;;; always return a float. This is used for irrational functions that
-;;; preserve realness of their arguments.
-(defun result-type-float-contagion (call)
-  (declare (type combination call))
-  (reduce #'numeric-contagion (combination-args call)
-          :key #'lvar-type
-          :initial-value (specifier-type 'single-float)))
-
 (defun simplify-list-type (type &key preserve-dimensions)
   ;; Preserve all the list types without dragging
   ;; (cons (eql 10)) stuff in.
@@ -336,7 +337,7 @@
                                        preserve-vector-type)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when lvar
         (let ((type (lvar-type lvar)))
           (cond ((simplify-list-type type
@@ -358,7 +359,7 @@
 (defun result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (careful-specifier-type (lvar-value lvar))))))
 
@@ -376,7 +377,7 @@
 (defun creation-result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (let* ((specifier (lvar-value lvar))
                (lspecifier (if (atom specifier) (list specifier) specifier)))
@@ -467,16 +468,6 @@
             ;; logic restricts itself to simple arrays.
             (max-dim (lvar-type lvar))
             (values max min))))))
-
-(defun position-derive-type (call)
-  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
-    (when (integerp dim)
-      (specifier-type `(or (integer 0 (,dim)) null)))))
-
-(defun count-derive-type (call)
-  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
-    (when (integerp dim)
-      (specifier-type `(integer 0 ,dim)))))
 
 ;;; This used to be done in DEFOPTIMIZER DERIVE-TYPE, but
 ;;; ASSERT-CALL-TYPE already asserts the ARRAY type, so it gets an extra

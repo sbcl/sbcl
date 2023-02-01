@@ -135,28 +135,19 @@
 ;;;
 ;;; We make no attempt to be fully general; our table doesn't need to be
 ;;; able to express features which we don't happen to use.
-(export '(genesis
-          package-data
-          make-package-data
-          package-data-name
-          package-data-export
-          package-data-reexport
-          package-data-import-from
-          package-data-use))
+(export '(genesis))
 (defstruct package-data
   ;; a string designator for the package name
   (name (error "missing PACKAGE-DATA-NAME datum"))
   ;; a doc string
   (documentation (error "missing PACKAGE-DOCUMENATION datum"))
+  ;; a list of nicknames
+  nicknames
   ;; a list of string designators for shadowing symbols
   shadow
   ;; a list of string designators for exported symbols which'll be set
   ;; up at package creation time.
   export
-  ;; a list of string designators for exported symbols which don't necessarily
-  ;; originate in this package (so their EXPORT operations should be handled
-  ;; after USE operations have been done, so that duplicates aren't created)
-  reexport
   ;; a list of sublists describing imports. Each sublist has the format as an
   ;; IMPORT-FROM list in DEFPACKAGE: the first element is the name of the
   ;; package to import from, and the remaining elements are the names of
@@ -280,6 +271,7 @@
     "COMPILER-MACRO-FUNCTION"
     "CONSTANTP"
     "GET-SETF-EXPANSION"
+    "GENSYM"
     "*GENSYM-COUNTER*"
     "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
     "MACRO-FUNCTION"
@@ -292,10 +284,6 @@
     "UPGRADED-ARRAY-ELEMENT-TYPE"
     "UPGRADED-COMPLEX-PART-TYPE"
     "WITH-COMPILATION-UNIT"
-
-    ;; For debugging purposes, we want to be able to intercept inline
-    ;; and block compilation declamations in the host.
-    "DECLAIM"
     ))
 
 ;;; A symbol in the "dual personality" list refers to the symbol in CL unless
@@ -332,6 +320,7 @@
 ;;; see by default, so that using them by accident fails.
 (defparameter *undefineds*
   '("SYMBOL-PACKAGE"
+    "PACKAGE-NAME"
     ;; Float decoding: don't want to see these used either.
     "DECODE-FLOAT" "INTEGER-DECODE-FLOAT"
     "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"
@@ -347,11 +336,14 @@
 ;;
 (let ((package-name "SB-XC"))
   (dolist (name (append *undefineds* *dual-personality-math-symbols*))
+    ;; FIXME: this triggers some pathological behavior in our implementation
+    ;; of EXPORT. For each symbol, we're adding it to the internals, then
+    ;; removing that to add to the externals, each time shrinking the hashset
+    ;; of internals back to nothing. Is there way to not do that?
     (export (intern name package-name) package-name))
   (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
                   "ARRAY-ELEMENT-TYPE"
                   "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
-                  "GENSYM"
                   "MAKE-ARRAY"
                   "SIMPLE-VECTOR"
                   "TYPEP"
@@ -403,11 +395,12 @@
   ;; Build all packages that we need, and initialize them as far as we
   ;; can without referring to any other packages.
   (dolist (package-data package-data-list)
-    (let ((package (make-package (package-data-name package-data) :use nil)))
+    (let ((package (make-package (package-data-name package-data)
+                                 :use nil
+                                 :nicknames (package-data-nicknames package-data))))
       (dolist (string (package-data-shadow package-data))
         (shadow string package))
-      (dolist (string (package-data-export package-data))
-        (export (intern string package) package))))
+      (setf (documentation package t) (package-data-documentation package-data))))
   ;; Now that all packages exist, we can set up package-package
   ;; references.
   (dolist (package-data package-data-list)
@@ -415,62 +408,36 @@
                              (package-data-use package-data)
                              :test 'string=)
                  (package-data-name package-data))
+    ;; Note: Unlike plain-old DEFPACKAGE, this IMPORT-FROM does
+    ;; potentially intern NAME into the FROM-PACKAGE to make forward
+    ;; references work.
     (dolist (sublist (package-data-import-from package-data))
-      (let ((from-package (first sublist)))
+      (let* ((from-package (first sublist))
+             (from-package (if (string= from-package "CL")
+                               "XC-STRICT-CL"
+                               from-package)))
         (import (mapcar (lambda (name) (intern name from-package))
                         (rest sublist))
-                (package-data-name package-data)))))
+                (package-data-name package-data))))
+    (dolist (string (package-data-export package-data))
+      (export (intern string (package-data-name package-data))
+              (package-data-name package-data))))
 
-  (unhide-host-format-funs)
-
-  ;; Now that all package-package references exist, we can handle
-  ;; REEXPORT operations. (We have to wait until now because they
-  ;; interact with USE operations.)  This code handles dependencies
-  ;; properly, but is somewhat ugly.
-  (let (done)
-    (labels
-        ((reexport (package-data)
-           (let ((package (find-package (package-data-name package-data))))
-             (cond
-               ((member package done))
-               ((null (package-data-reexport package-data))
-                (push package done))
-               (t
-                (mapcar #'reexport
-                        (remove-if-not
-                         (lambda (x)
-                           (member x (package-data-use package-data)
-                                   :test #'string=))
-                         package-data-list
-                         :key #'package-data-name))
-                (dolist (symbol-name (package-data-reexport package-data))
-                  (multiple-value-bind (symbol status)
-                      (find-symbol symbol-name package)
-                    (unless status
-                      (error "No symbol named ~S is accessible in ~S."
-                             symbol-name package))
-                    (when (eq (symbol-package symbol) package)
-                      (error
-                       "~S is not inherited/imported, but native to ~S."
-                       symbol-name package))
-                    (export symbol package)))
-                (push package done))))))
-      (dolist (x package-data-list)
-        (reexport x))
-      (assert (= (length done) (length package-data-list))))))
+  (unhide-host-format-funs))
 
 (export '*undefined-fun-allowlist*)
 (defvar *undefined-fun-allowlist* (make-hash-table :test 'equal))
 
 (defparameter *package-data-list* '())
 
-;;; Like DEFPACKAGE, but can handle :REEXPORT.
+;;; Like DEFPACKAGE, but does some special stuff to make forward
+;;; references work.
 (defmacro defpackage* (name &rest options)
   (let ((flattened-options '()))
     (dolist (option options)
       (destructuring-bind (kind . args) option
-        (case kind
-          ((:use :export :reexport :shadow)
+        (ecase kind
+          ((:use :export :shadow :nicknames)
            (let ((existing-option (assoc kind flattened-options)))
              (if existing-option
                  (setf (second (second existing-option))
@@ -518,13 +485,6 @@
 ;; Each backend should have a different package for its instruction set
 ;; so that they can co-exist.
 (make-assembler-package (backend-asm-package-name))
-
-(defun package-list-for-genesis ()
-  (append *package-data-list*
-          (let ((asm-package (backend-asm-package-name)))
-            (list (make-package-data :name asm-package
-                                     :use (list* "CL" *asm-package-use-list*)
-                                     :documentation nil)))))
 
 ;;; Not all things shown by this are actually unused. Some get removed
 ;;; by the tree-shaker as intended.

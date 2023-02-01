@@ -83,18 +83,11 @@ Evaluation took:
   (dolist (type '(parent child child2))
     (let* ((equalp-impl
             (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout type)))
-           (constants
-            (ctu:find-code-constants equalp-impl)))
+           (callees
+            (ctu:find-named-callees equalp-impl)))
       (case type
         ((parent child)
-         (assert (and (sb-int:singleton-p constants)
-                      (eq (car constants)
-                          (sb-int:find-fdefn 'sb-int:bit-vector-=)))))
+         (assert (equal callees `(,#'sb-int:bit-vector-=))))
         (child2
-         ;; FIXME: why does CHILD2-EQUALP reference a boxed constant
-         ;; equal to MOST-POSITIVE-WORD as a bignum?
-         ;; Something strange about the bit-vector-= xform on simple-bit-vector.
-         (assert (or (not constants)
-                     (and (sb-int:singleton-p constants)
-                          (not (typep (car constants)
-                                      'sb-kernel:fdefn))))))))))
+         ;; EQUAL on SIMPLE-BIT-VECTOR gets open-coded
+         (assert (not callees)))))))

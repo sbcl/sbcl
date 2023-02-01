@@ -2,6 +2,7 @@
 
 logdir=${SBCL_PAREXEC_TMP:-$HOME}/sbcl-test-logs-$$
 echo ==== Writing logs to $logdir ====
+# FIXME: junkdir isn't getting removed
 junkdir=${SBCL_PAREXEC_TMP:-/tmp}/junk
 mkdir -p $junkdir $logdir
 
@@ -25,7 +26,30 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --no-userinit --no-sysinit --noprint --disable-debugger $* << EOF
 (pop *posix-argv*)
 (require :sb-posix)
-(require :sb-sprof)
+#-sparc (push :test-sprof *features*)
+#+test-sprof (require :sb-sprof)
+
+;; (push :tlsf-stress *features*)
+#+tlsf-stress
+(progn
+ (setq sb-c:*compile-to-memory-space* :immobile)
+ (with-alien ((tlsf-control system-area-pointer :extern)
+              (tlsf-mem-start system-area-pointer :extern))
+   (defun tlsf-checks ()
+     (alien-funcall (extern-alien "tlsf_check" (function void system-area-pointer))
+                    tlsf-control)
+     (alien-funcall (extern-alien "tlsf_check_pool" (function void system-area-pointer))
+                    tlsf-mem-start)
+    (let ((msg #.(format nil "TLSF checks passed~%")))
+       (sb-unix:unix-write 2 msg 0 (length msg))))
+   (defun tlsf-dump ()
+     (alien-funcall (extern-alien "tlsf_dump_pool"
+       (function void system-area-pointer system-area-pointer c-string))
+       tlsf-control tlsf-mem-start "/dev/stdout")))
+  (compile 'tlsf-checks)
+  (compile 'tlsf-dump)
+  (push #'tlsf-checks sb-ext:*after-gc-hooks*))
+
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread)
@@ -42,9 +66,10 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        "compiler.pure"
                        "timer.impure"
                        "bug-1180102.impure"
-                       "gethash-concurrency.impure"
+                       "gethash-concurrency.pure"
                        "arith-slow.pure"))
 (defvar *filter* nil)
+(defglobal *delete-logs* nil)
 (defun choose-order (tests)
   (when *filter*
     (let (strings)
@@ -154,12 +179,12 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (wait))
         (let ((pid (sb-posix:fork)))
           (when (zerop pid)
+          (let  ((mylog (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))))
             #+(and linux sb-thread 64-bit)
             (sb-alien:alien-funcall (sb-alien:extern-alien "reset_gc_stats"
                                     (function sb-alien:void)))
             ;; FILE is (filename . test-iteration)
-            (with-open-file (stream (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))
-                                    :direction :output :if-exists :supersede)
+            (with-open-file (stream mylog :direction :output :if-exists :supersede)
               (alien-funcall (extern-alien "dup2" (function int int int))
                              (sb-sys:fd-stream-fd stream) 1)
               (alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
@@ -181,7 +206,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    ;; if exec fails, just exit with a wrong (not 104) status
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
-                   (sb-sprof:start-profiling :sample-interval .001)
+                   #+test-sprof (sb-sprof:start-profiling :sample-interval .001)
                    (setq sb-c::*static-vop-usage-counts* (make-hash-table :synchronized t))
                    (let ((*features* (cons :parallel-test-runner *features*)))
                      (pure-runner (list (concatenate 'string file ".lisp"))
@@ -195,13 +220,16 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        (let ((*print-pretty* nil))
                          (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
                            (format output "~7d \"~s\"~%" count name)))))
-                   (sb-sprof:stop-profiling)
+                   #+test-sprof (sb-sprof:stop-profiling)
                    #+test-aprof (progn (sb-aprof::aprof-stop) (sb-aprof:aprof-show))
                    (when (member :allocator-metrics sb-impl:+internal-features+)
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
-                   (sb-sprof:report :type :flat)
-                   (exit :code (if (unexpected-failures) 1 104)))))
+                   #+test-sprof (sb-sprof:report :type :flat)
+                   #+tlsf-stress (cl-user::tlsf-dump)
+                   (gc :gen 7)
+                   (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
+                   (exit :code (if (unexpected-failures) 1 104))))))
           (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))
           (incf subprocess-count)
           (push (list pid file (get-internal-real-time)) subprocess-list)))
@@ -260,6 +288,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                          argv (cddr argv)))
                   (t
                    (return))))
+      (when (>= runs-per-test 10)
+	(format t "~&Note: will not keep logs of passing runs~%")
+	(setq *delete-logs* t))
       (setq argv
         (mapcar (lambda (file)
                   (probe-file file) ; for effect

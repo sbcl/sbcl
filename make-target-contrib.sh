@@ -47,74 +47,13 @@ export SBCL_HOME SBCL_TOP
 
 SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
-SBCL_BUILDING_CONTRIB=1
-export SBCL SBCL_BUILDING_CONTRIB
+export SBCL
 
-# deleting things here lets us not worry about interaction with stale
-# fasls.  This is not good, but is better than :FORCE on each asdf
-# operation, because that causes multiple builds of base systems such
-# as SB-RT and SB-GROVEL, but FIXME: there's probably a better
-# solution.  -- CSR, 2003-05-30
-if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
-  rm -fr obj/sbcl-home/contrib/
-  rm -fr obj/asdf-cache/
-fi
-
-find output -name 'building-contrib.*' -print | xargs rm -f
-
-# Ignore all source registries.
+set -e # exit with failure if any $GNUMAKE fails
 if [ -z "$*" ]; then
-    $GNUMAKE $SBCL_MAKE_JOBS -C contrib
+    $GNUMAKE $SBCL_MAKE_JOBS -k -C contrib
 else
     for x in "$@"; do
         $GNUMAKE -C contrib $x.fasl
     done
-fi
-
-# Otherwise report expected failures:
-HEADER_HAS_BEEN_PRINTED=false
-for dir in `cd ./obj/asdf-cache/ ; echo *`; do
-  f="obj/asdf-cache/$dir/test-passed.test-report"
-  if test -f "$f" && grep -i fail "$f" >/dev/null; then
-      if ! $HEADER_HAS_BEEN_PRINTED; then
-          cat <<EOF
-
-Note: Test suite failures which are expected for this combination of
-platform and features have been ignored:
-EOF
-          HEADER_HAS_BEEN_PRINTED=true
-      fi
-      echo "  contrib/$dir"
-      (unset IFS; while read line; do echo "    $line"; done <"$f")
-  fi
-done
-
-if [ -z "$*" ]; then
-    contribs_to_build="`cd ./contrib ; echo *`"
-else
-    contribs_to_build="$*"
-fi
-
-# Sometimes people used to see the "No tests failed." output from the last
-# DEFTEST in contrib self-tests and think that's all that is. So...
-HEADER_HAS_BEEN_PRINTED=false
-for dir in $contribs_to_build
-do
-  if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" -a ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
-      if $HEADER_HAS_BEEN_PRINTED; then
-          echo > /dev/null
-      else
-          cat <<EOF
-
-WARNING! Some of the contrib modules did not build successfully or pass
-their self-tests. Failed contribs:"
-EOF
-          HEADER_HAS_BEEN_PRINTED=true
-      fi
-      echo "  $dir"
-  fi
-done
-
-if [ $HEADER_HAS_BEEN_PRINTED = true ]; then
-  exit 1
 fi

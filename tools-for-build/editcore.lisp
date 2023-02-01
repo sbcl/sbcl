@@ -34,8 +34,8 @@
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement
                 #:near-cond-jump-displacement #:mov #:call #:jmp
                 #:get-gpr #:reg-name)
-  (:import-from "SB-IMPL" #:package-hashtable #:package-%name
-                #:package-hashtable-cells
+  (:import-from "SB-IMPL" #:symbol-hashset #:package-%name
+                #:symtbl-%cells
                 #:hash-table-pairs #:hash-table-%count))
 
 (in-package "SB-EDITCORE")
@@ -200,25 +200,18 @@
 (defun in-bounds-p (addr bounds)
   (and (>= addr (bounds-low bounds)) (< addr (bounds-high bounds))))
 
-(defun make-hashset (contents count)
-  (if (<= count 20)
-      (coerce contents 'vector)
-      (let ((ht (make-hash-table :test 'equal)))
-        (dolist (x contents ht)
-          (setf (gethash x ht) t)))))
+(defun make-string-hashset (contents count)
+  (let ((hs (sb-int:make-hashset count #'string= #'sxhash)))
+    (dolist (string contents hs)
+      (sb-int:hashset-insert hs string))))
 
-(defun hashset-find (item hashset)
-  (if (vectorp hashset)
-      (find item hashset :test 'string=)
-      (gethash item hashset)))
-
-(defun scan-package-hashtable (function table core)
-  (let ((spaces (core-spaces core))
-        (nil-object (core-nil-object core)))
-    (dovector (x (translate
-                  (package-hashtable-cells
-                   (truly-the package-hashtable (translate table spaces)))
-                  spaces))
+(defun scan-symbol-hashset (function table core)
+  (let* ((spaces (core-spaces core))
+         (nil-object (core-nil-object core))
+         (cells (translate (symtbl-%cells (truly-the symbol-hashset
+                                                     (translate table spaces)))
+                           spaces)))
+    (dovector (x (translate (cdr cells) spaces))
       (unless (fixnump x)
         (funcall function
                  (if (eq x nil-object) ; any random package can export NIL. wow.
@@ -246,7 +239,7 @@
          (let ((p (position #\/ x :from-end t)))
            (if p (subseq x (1+ p)) x)))
         ((symbolp x)
-         (let ((package-id (sb-impl::symbol-package-id x))
+         (let ((package-id (symbol-package-id x))
                (name (translate (symbol-name x) spaces)))
            (when (eq package-id 0) ; uninterned
              (return-from recurse (string-downcase name)))
@@ -271,18 +264,18 @@
              (let ((externals (gethash package-name packages))
                    (n 0))
                (unless externals
-                 (scan-package-hashtable
+                 (scan-symbol-hashset
                   (lambda (string symbol)
                     (declare (ignore symbol))
                     (incf n)
                     (push string externals))
                   (package-external-symbols package)
                   core)
-                 (setf externals (make-hashset externals n)
+                 (setf externals (make-string-hashset externals n)
                        (gethash package-name packages) externals))
                (make-core-sym package-name
                               name
-                              (hashset-find name externals))))))
+                              (sb-int:hashset-find externals name))))))
         (t "?"))))))
 
 (defun remove-name-junk (name)
@@ -414,7 +407,7 @@
              (size (primitive-object-size obj)))
         (when (and (symbolp obj)
                    (string= symbol-name (translate (symbol-name obj) spaces))
-                   (= (sb-impl::symbol-package-id obj) package-id))
+                   (= (symbol-package-id obj) package-id))
           (return-from find-target-symbol
             (%make-lisp-obj
                    (logior (ecase address-mode
@@ -449,17 +442,16 @@
 (defconstant inst-jmp (find-inst #b11101001 (get-inst-space)))
 (defconstant inst-jmpz (find-inst #x840f (get-inst-space)))
 (defconstant inst-pop (find-inst #x5d (get-inst-space)))
+(defconstant inst-mov (find-inst #x8B (get-inst-space)))
+(defconstant inst-lea (find-inst #x8D (get-inst-space)))
 
 (defun make-core (spaces code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
-          (make-bounds
-           (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-SPACE-START" spaces :physical))
-           (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-SPACE-END" spaces :physical))))
+          (let ((text (space-addr (get-space immobile-text-core-space-id spaces))))
+            (make-bounds (- text sb-vm:alien-linkage-table-space-size) text)))
          (linkage-entry-size
           (symbol-global-value
-           (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-ENTRY-SIZE"
+           (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
                                spaces :physical)))
          (linkage-symbols (compute-linkage-symbols spaces))
          (nil-object (compute-nil-object spaces))
@@ -479,20 +471,27 @@
            :enable-pie enable-pie)))
     (let ((package-table
            (symbol-global-value
-            (find-target-symbol (package-id "SB-KERNEL") "*PACKAGE-NAMES*" spaces :physical)))
+            (find-target-symbol (package-id "SB-IMPL") "*ALL-PACKAGES*" spaces :physical)))
           (package-alist)
           (symbols (make-hash-table :test 'equal)))
-      (dovector (x (translate (%instance-ref (translate package-table spaces) 0) spaces))
-        (when (%instancep x) ; package
-          (flet ((scan (table)
-                   (scan-package-hashtable
+      (labels ((scan-symtbl (table)
+                 (scan-symbol-hashset
                     (lambda (str sym)
                       (pushnew (get-lisp-obj-address sym) (gethash str symbols)))
-                    table core)))
-            (let ((package (truly-the package (translate x spaces))))
-              (push (cons (sb-impl::package-id package) package) package-alist)
-              (scan (package-external-symbols package))
-              (scan (package-internal-symbols package))))))
+                    table core))
+               (scan-package (x)
+                 (let ((package (truly-the package (translate x spaces))))
+                   ;; a package can appear in *ALL-PACKAGES* under each of its nicknames
+                   (unless (assoc (sb-impl::package-id package) package-alist)
+                     (push (cons (sb-impl::package-id package) package) package-alist)
+                     (scan-symtbl (package-external-symbols package))
+                     (scan-symtbl (package-internal-symbols package))))))
+        (dovector (x (translate package-table spaces))
+          (cond ((%instancep x) (scan-package x))
+                ((listp x) (loop (if (eq x nil-object) (return))
+                                 (setq x (translate x spaces))
+                                 (scan-package (car x))
+                                 (setq x (cdr x)))))))
       (let ((package-by-id (make-array (1+ (reduce #'max package-alist :key #'car))
                                        :initial-element nil)))
         (loop for (id . package) in package-alist
@@ -630,6 +629,23 @@
             (when (in-bounds-p target-addr (core-linkage-bounds core))
               (push (list* (dstate-cur-offs dstate) 6 "je" target-addr)
                     list))))
+         ((and (or (and (eq inst inst-mov)
+                        (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8B))
+                   (eq inst inst-lea))
+                (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
+                  (= (logand modrm #b11000111) #b00000101)) ; RIP-relative mode
+                (in-bounds-p (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                                (dstate-next-addr dstate))
+                             (core-linkage-bounds core)))
+          (let* ((abs-addr (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                              (dstate-next-addr dstate)))
+                 (reg (logior (ldb (byte 3 3) (sap-ref-8 sap (1+ (dstate-cur-offs dstate))))
+                              (if (logtest (sb-disassem::dstate-inst-properties dstate)
+                                           #b0100) ; REX.r
+                                  8 0)))
+                 (op (if (eq inst inst-lea) "lea" "mov-gotpcrel"))
+                 (args (list abs-addr (reg-name (get-gpr :qword reg)))))
+            (push (list* (1- (dstate-cur-offs dstate)) 7 op args) list)))
          ((and (eq inst inst-pop) (eq (logand dchunk #xFF) #x5D))
           (push (list* (dstate-cur-offs dstate) 1 "pop" "%rbp") list))))
      seg
@@ -739,6 +755,20 @@
                            (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
                                    opcode (stringp operand) operand
                                    (core-enable-pie core)))
+                          ((string= opcode "mov-gotpcrel")
+                           (let* ((entry-index
+                                   (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
+                                      (core-linkage-entry-size core)))
+                                  (c-symbol (car (aref (core-linkage-symbols core) entry-index))))
+                             (setf (bit (core-linkage-symbol-usedp core) entry-index) 1)
+                             (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))))
+                          ((string= opcode "lea") ; lea becomes "mov" with gotpcrel as src, which becomes lea
+                           (let* ((entry-index
+                                   (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
+                                      (core-linkage-entry-size core)))
+                                  (c-symbol (aref (core-linkage-symbols core) entry-index)))
+                             (setf (bit (core-linkage-symbol-usedp core) entry-index) 1)
+                             (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))))
                           ((string= opcode "pop")
                            (format stream " ~A ~A~%" opcode operand)
                            (cond ((string= operand "8(%rbp)")
@@ -948,11 +978,11 @@
           (member :darwin *features*)
           label-prefix label-prefix label-prefix label-prefix))
 
-;;; Convert immobile varyobj space to an assembly file in OUTPUT.
+;;; Convert immobile text space to an assembly file in OUTPUT.
 (defun write-assembler-text
     (spaces output
      &optional enable-pie (emit-cfi t)
-     &aux (code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+     &aux (code-bounds (space-bounds immobile-text-core-space-id spaces))
           (fixedobj-bounds (space-bounds immobile-fixedobj-core-space-id spaces))
           (core (make-core spaces code-bounds fixedobj-bounds enable-pie))
           (code-addr (bounds-low code-bounds))
@@ -960,9 +990,6 @@
           (pp-state (cons (make-hash-table :test 'equal) nil))
           (prev-namestring "")
           (n-linker-relocs 0)
-          (seen-fdefns nil)
-          (seen-trampolines nil)
-          (seen-gfs nil)
           (temp-output (make-string-output-stream :element-type 'base-char))
           end-loc)
   (labels ((dumpwords (sap count stream &optional (exceptions #()) logical-addr)
@@ -1068,13 +1095,6 @@
                 (objsize (code-object-size code)))
            (incf total-code-size objsize)
            (cond
-             ((< (code-header-words code) 3) ; filler object
-              (let ((sap (int-sap (- (get-lisp-obj-address code) other-pointer-lowtag))))
-                (format output " .quad 0x~x, 0x~x~% .fill 0x~x~%# ~x:~%"
-                        (sap-ref-word sap 0)
-                        (sap-ref-word sap n-word-bytes)
-                        (- objsize (* 2 n-word-bytes))
-                        (+ code-addr objsize))))
              ((%instancep (%code-debug-info code)) ; assume it's a COMPILED-DEBUG-INFO
               (aver (plusp (code-n-entries code)))
               (let* ((source
@@ -1122,68 +1142,17 @@
                   (dumpwords (int-sap code-physaddr)
                              (code-header-words code) output header-exceptions code-addr)
                   (write-string (get-output-stream-string temp-output) output))))
-             ((functionp (%code-debug-info code))
-              (unless seen-trampolines
-                (setq seen-trampolines t)
-                (format output "lisp_trampolines:~%"))
-              (let* ((sap (int-sap (translate-ptr code-addr spaces)))
-                     (tramp-fun (sap-ref-word sap (ash 2 word-shift))))
-                (aver (not (in-bounds-p tramp-fun code-bounds)))
-                (format output " .quad ~{0x~x~^,~}~%"
-                        (loop for i from 0 by n-word-bytes repeat 6
-                              collect (sap-ref-word sap i)))))
              (t
               (error "Strange code component: ~S" code)))
            (incf code-addr objsize)))
-        (#.fdefn-widetag
-         (unless seen-fdefns
-           (format output "~%# FDEFNs~%")
-           (setq seen-fdefns t))
-         (let* ((ptr (translate-ptr code-addr spaces))
-                (fdefn (%make-lisp-obj (logior ptr other-pointer-lowtag)))
-                (name (fun-name-from-core (fdefn-name fdefn) core))
-                (c-name (c-name name core pp-state "F")))
-           (format output "~a: # ~x~% .size ~0@*~a, 32~%"
-                     (c-symbol-quote c-name)
-                     (logior code-addr other-pointer-lowtag))
-           (flet ((relativize (slot &aux (x (sap-ref-word (int-sap ptr) (ash slot word-shift))))
-                    (if (in-bounds-p x code-bounds)
-                        (format nil "CS+0x~x" (- x (bounds-low code-bounds)))
-                        (format nil "0x~x" x))))
-             (format output " .quad 0x~x, 0x~x, ~a, ~a~%"
-                     (sap-ref-word (int-sap ptr) 0)
-                     (sap-ref-word (int-sap ptr) 8)
-                     (relativize fdefn-fun-slot)
-                     (relativize fdefn-raw-addr-slot)))
-           (incf code-addr (* 4 n-word-bytes))))
-        (#.funcallable-instance-widetag
-         (unless seen-gfs
-           (setq seen-gfs t)
-           (when seen-trampolines
-             (format output " .size lisp_trampolines, .-lisp_trampolines~%")))
-         (let* ((sap (int-sap (translate-ptr code-addr spaces)))
-                (fin-fun (sap-ref-word sap (ash 2 word-shift)))
-                (code-space-p (in-bounds-p fin-fun code-bounds))
-                (slots (translate (sap-ref-lispobj sap (ash 3 word-shift)) spaces))
-                (name (and (> (length (the simple-vector slots)) +gf-name-slot+)
-                           (svref slots +gf-name-slot+)))
-                (c-name
-                 (c-name
-                  (if (or (not name)
-                          (eql (get-lisp-obj-address name) unbound-marker-widetag))
-                      "unnamed"
-                      (fun-name-from-core name core))
-                  core pp-state "G")))
-           (format output "~a:~% .size ~0@*~a, 48~%" (c-symbol-quote c-name))
-           (format output " .quad 0x~x, .+24, ~:[~;CS+~]0x~x~{, 0x~x~}~%"
-                   (sap-ref-word sap 0)
-                   code-space-p
-                   (if code-space-p (- fin-fun (bounds-low code-bounds)) fin-fun)
-                   (loop for i from (ash 3 word-shift) by n-word-bytes repeat 3
-                         collect (sap-ref-word sap i))))
-         (incf code-addr (* 6 n-word-bytes))))))
+        (#.filler-widetag
+         (let* ((word (sap-ref-word (int-sap (translate-ptr code-addr spaces)) 0))
+                (nwords (ash word -32))
+                (nbytes (* nwords sb-vm:n-word-bytes)))
+           (format output " .quad 0x~x~% .fill ~d~%" word (- nbytes n-word-bytes))
+           (incf code-addr nbytes))))))
 
-  ;; coreparse uses the 'lisp_jit_code' symbol to set varyobj_free_pointer
+  ;; coreparse uses the 'lisp_jit_code' symbol to set text_space_highwatermark
   ;; The intent is that compilation to memory can use this reserved area
   ;; (if space remains) so that profilers can associate a C symbol with the
   ;; program counter range. It's better than nothing.
@@ -1367,7 +1336,7 @@
                   `("lisp.rel"        ,+sht-progbits+ 0 0 0 8 8)
                   `(".relalisp.core"  ,+sht-rela+     0 2 1 8 ,reloc-entry-size)))
                                       ; symbol table -- ^ ^ -- for which section
-             (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
+             (:note ".note.GNU-stack" ,+sht-progbits+ 0 0 0 1  0)))
          (string-table
           (string-table (append '("lisp_code_start") (map 'list #'second sections))))
          (strings (cdr string-table))
@@ -1463,7 +1432,7 @@
 ;;; that need to be applied on startup of a position-independent executable.
 ;;;
 (defun collect-relocations (spaces fixups pie &key (verbose nil) (print nil))
-  (let* ((code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+  (let* ((code-bounds (space-bounds immobile-text-core-space-id spaces))
          (code-start (bounds-low code-bounds))
          (n-abs 0)
          (n-rel 0)
@@ -1511,7 +1480,7 @@
                     (id (space-id space))
                     (npages (ceiling nwords (/ +backend-page-bytes+ n-word-bytes))))
                (when (and (<= page0 page (+ page0 (1- npages)))
-                          (/= id immobile-varyobj-core-space-id))
+                          (/= id immobile-text-core-space-id))
                  (return (+ (space-addr space)
                             (* (- page page0) +backend-page-bytes+)
                             (logand core-offs (1- +backend-page-bytes+))))))))
@@ -1538,7 +1507,7 @@
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
-              (let ((type (translate (%instance-layout obj) spaces)))
+              (let ((type (truly-the layout (translate (%instance-layout obj) spaces))))
                 (do-layout-bitmap (i taggedp type (%instance-length obj))
                   (when taggedp
                     (scanptr vaddr obj (1+ i)))))
@@ -1604,7 +1573,7 @@
               (return-from scan-obj)))
            (scanptrs vaddr obj 1 (1- nwords))))
       (dolist (space (cdr spaces))
-        (unless (= (space-id space) immobile-varyobj-core-space-id)
+        (unless (= (space-id space) immobile-text-core-space-id)
           (let* ((logical-addr (space-addr space))
                  (size (space-size space))
                  (physical-addr (space-physaddr space spaces))
@@ -1680,16 +1649,16 @@
                              (alien-funcall
                               (extern-alien "load_core_bytes"
                                             (function system-area-pointer
-                                                      int int unsigned unsigned))
+                                                      int int unsigned unsigned int))
                               (sb-sys:fd-stream-fd ,stream)
-                              ;; Skip the core header
-                              (+ ,start +backend-page-bytes+)
+                              (+ ,start +backend-page-bytes+) ; Skip the core header
                               0 ; place it anywhere
-                              (* ,npages +backend-page-bytes+)))
+                              (* ,npages +backend-page-bytes+) ; len
+                              0))
                        ,@body)
                   (when ,sap-var
                     (alien-funcall
-                     (extern-alien "os_invalidate"
+                     (extern-alien "os_deallocate"
                                    (function void system-area-pointer unsigned))
                      ,sap-var (* ,npages +backend-page-bytes+)))))))
 
@@ -1744,8 +1713,8 @@
                (when verbose
                  (format t "id=~d page=~5x + ~5x addr=~10x words=~8x~:[~; (drop)~]~%"
                          id data-page npages addr nwords
-                         (= id immobile-varyobj-core-space-id)))
-               (cond ((= id immobile-varyobj-core-space-id)
+                         (= id immobile-text-core-space-id)))
+               (cond ((= id immobile-text-core-space-id)
                       (setq code-start-fixup-ofs (+ index 3))
                       ;; Keep this entry but delete the page count. We need to know
                       ;; where the space was supposed to be mapped and at what size.
@@ -1821,7 +1790,7 @@
       ;; Map the original core file to memory
       (with-mapped-core (sap core-offset original-total-npages input)
         (let* ((data-spaces
-                (delete immobile-varyobj-core-space-id (reverse spaces)
+                (delete immobile-text-core-space-id (reverse spaces)
                         :key #'space-id))
                (map (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                (pte-nbytes (cdar copy-actions)))
@@ -1844,6 +1813,12 @@
                   (if enable-pie +code-space-nominal-address+ 0))
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
+            ;; os_link_runtime() doesn't need to process the "required" symbols now
+            (let* ((sym (find-target-symbol (package-id "SB-VM")
+                                            "+REQUIRED-FOREIGN-SYMBOLS+" map :physical))
+                   (vector (translate (symbol-global-value sym) map)))
+              (fill vector 0)
+              (setf (%array-fill-pointer vector) 0))
             ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
             ;; and SB-C::*COMPILE-TO-MEMORY-SPACE* to :AUTO
             ;; in case the resulting executable needs to compile anything.
@@ -1865,8 +1840,7 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-          (let ((core (write-assembler-text map asm-file enable-pie))
-                (emit-all-c-symbols t))
+          (let ((core (write-assembler-text map asm-file enable-pie)))
             (format asm-file " .section .rodata~% .p2align 4~%lisp_fixups:~%")
             ;; Sort the hash-table in emit order.
             (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
@@ -1876,13 +1850,11 @@
                                  "~% .section .rodata~%"))
             (format asm-file " .globl ~A~%~:*~A:
  .quad ~d # ct~%"
-                    (labelize "lisp_linkage_values")
+                    (labelize "alien_linkage_values")
                     (length (core-linkage-symbols core)))
             ;; -1 (not a plausible function address) signifies that word
             ;; following it is a data, not text, reference.
             (loop for s across (core-linkage-symbols core)
-                  for bit across (core-linkage-symbol-usedp core)
-                  when (or emit-all-c-symbols (eql bit 0))
                   do (format asm-file " .quad ~:[~;-1, ~]~a~%"
                              (consp s)
                              (if (consp s) (car s) s))))))
@@ -1922,7 +1894,7 @@
         (with-mapped-core (sap core-offset total-npages input)
           (let* ((spaces (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                  (core (make-core spaces
-                                  (space-bounds immobile-varyobj-core-space-id spaces)
+                                  (space-bounds immobile-text-core-space-id spaces)
                                   (space-bounds immobile-fixedobj-core-space-id spaces)))
                  (c-symbols (map 'list (lambda (x) (if (consp x) (car x) x))
                                  (core-linkage-symbols core)))
@@ -1930,7 +1902,7 @@
                               (:sym  ".symtab"         ,+sht-symtab+   0 1 1 8 ,sym-entry-size)
                               ;;             section with the strings -- ^ ^ -- 1+ highest local symbol
                               (:core "lisp.core"       ,+sht-progbits+ 0 0 0 ,core-align 0)
-                              (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
+                              (:note ".note.GNU-stack" ,+sht-progbits+ 0 0 0 1  0)))
                  (string-table (string-table (append (map 'list #'second sections)
                                                      c-symbols)))
                  (packed-strings (cdr string-table))

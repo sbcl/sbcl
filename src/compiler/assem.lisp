@@ -257,13 +257,13 @@
   ;; (second) instruction.
   ;;
   ;; instructions whose writes this instruction tries to read
-  (read-dependencies (make-sset) :type sset)
+  (read-dependencies (make-sset) :type sset :read-only t)
   ;; instructions whose writes or reads are overwritten by this instruction
-  (write-dependencies (make-sset) :type sset)
+  (write-dependencies (make-sset) :type sset :read-only t)
   ;; instructions which write what we read or write
-  (write-dependents (make-sset) :type sset)
+  (write-dependents (make-sset) :type sset :read-only t)
   ;; instructions which read what we write
-  (read-dependents (make-sset) :type sset))
+  (read-dependents (make-sset) :type sset :read-only t))
 (declaim (freeze-type instruction))
 #+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
 #+sb-show-assem (defvar *next-inst-id* 0)
@@ -319,7 +319,6 @@
 
 (defstruct asmstream
   (data-section (make-section) :read-only t)
-  (indirections-section (make-section) :read-only t)
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)
   (data-origin-label (gen-label "data start") :read-only t)
@@ -342,8 +341,8 @@
   ;; can print "in the {x} section" whenever it changes.
   (tracing-state (list nil nil) :read-only t)) ; segment and vop
 (declaim (freeze-type asmstream))
-;;; FIXME: suboptimal since *asmstream* was declaimed earlier because reasons.
-;;; (so we're missing uses of the known type even though the special var is known)
+
+(defvar *asmstream*)
 (declaim (type asmstream *asmstream*))
 
 (defun get-allocation-points (asmstream)
@@ -454,8 +453,6 @@
                      ,(case dest
                         (:code '(asmstream-code-section *asmstream*))
                         (:elsewhere '(asmstream-elsewhere-section *asmstream*))
-                        (:indirections
-                         '(asmstream-indirections-section *asmstream*))
                         (t dest)))))
               ,@(when vop `((*current-vop* ,vop)))
               ,@(mapcar (lambda (name)
@@ -1502,10 +1499,8 @@
          (end-text (gen-label))
          (combined
            (append-sections
-            (append-sections (asmstream-data-section asmstream)
-                             (append-sections
-                              (asmstream-code-section asmstream)
-                              (asmstream-indirections-section asmstream)))
+             (append-sections (asmstream-data-section asmstream)
+                              (asmstream-code-section asmstream))
              (let ((section (asmstream-elsewhere-section asmstream)))
                (emit section
                      end-text
@@ -1513,32 +1508,17 @@
                      `(.skip ,trailer-len)
                      `(.align ,sb-vm:n-lowtag-bits))
                section)))
-         (octets (segment-buffer (%assemble segment combined))))
-    (flet ((store-ub16 (index val)
-             (multiple-value-bind (b0 b1)
-                 #+little-endian
-                 (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                 #+big-endian
-                 (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
-               (setf (aref octets (+ index 0)) b0
-                     (aref octets (+ index 1)) b1)))
-           (store-ub32 (index val)
-             (multiple-value-bind (b0 b1 b2 b3)
-                 #+little-endian
-                 (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
-                         (ldb (byte 8 16) val) (ldb (byte 8 24) val))
-                 #+big-endian
-                 (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
-                         (ldb (byte 8  8) val) (ldb (byte 8  0) val))
-               (setf (aref octets (+ index 0)) b0
-                     (aref octets (+ index 1)) b1
-                     (aref octets (+ index 2)) b2
-                     (aref octets (+ index 3)) b3))))
-      (let ((index (length octets))
-            (fun-offsets))
-        ;; Total size of the code object must be multiple of 2 lispwords
-        (aver (not (logtest (+ (segment-header-skew segment) index)
-                            sb-vm:lowtag-mask)))
+         (fun-offsets)
+         (octets (segment-buffer (%assemble segment combined)))
+         (index (length octets)))
+    ;; N-ENTRIES is packed into a uint16 with 5 other bits
+    (declare (type (unsigned-byte 11) n-entries))
+
+    ;; Total size of the code object must be multiple of 2 lispwords
+    (aver (not (logtest (+ (segment-header-skew segment) index)
+                        sb-vm:lowtag-mask)))
+    (sb-sys:with-pinned-objects (octets)
+      (let ((sap (sb-sys:vector-sap octets)))
         ;; TODO: as the comment in GENERATE-CODE suggests, we would like to align
         ;; code objects to 16 bytes for 32-bit x86. That's simple - all we have to do
         ;; is ensure that each code blob is a multiple of 16 bytes in size.
@@ -1550,10 +1530,12 @@
                            (- index trailer-len (label-position end-text)))))
           (unless (and (typep trailer-len '(unsigned-byte 16))
                        (typep n-entries '(unsigned-byte 12))
+                       ;; Padding must be representable in 4 bits at assembly time,
+                       ;; but CODE-HEADER/TRAILER-ADJUST can increase the padding.
                        (typep padding '(unsigned-byte 4)))
             (bug "Oversized code component?"))
-          (store-ub16 (- index 2) trailer-len)
-          (store-ub16 (- index 4) (logior (ash n-entries 4) padding)))
+          (setf (sap-ref-16 sap (- index 2)) trailer-len)
+          (setf (sap-ref-16 sap (- index 4)) (logior (ash n-entries 5) padding)))
         (decf index trailer-len)
         ;; Iteration over label positions occurs from numerically highest
         ;; to lowest, which is right because the 0th indexed simple-fun
@@ -1565,13 +1547,13 @@
         (dolist (label simple-fun-labels)
           (let ((val (label-position label)))
             (push val fun-offsets)
-            (store-ub32 index val)
-            (incf index 4)))
-        (aver (= index (- (length octets) 4)))
-        (values segment
-                (label-position end-text)
-                (segment-fixup-notes segment)
-                fun-offsets)))))
+            (setf (sap-ref-32 sap index) val)
+            (incf index 4)))))
+    (aver (= index (- (length octets) 4)))
+    (values segment
+            (label-position end-text)
+            (segment-fixup-notes segment)
+            fun-offsets)))
 
 ;;; Most backends do not convert register TNs into a different type of
 ;;; internal object prior to handing the operands off to the emitter.
@@ -1668,18 +1650,10 @@
     (trace-inst s :align bits)
     (emit s `(.align ,bits ,pattern))))
 
-;; ECL bug workaround: it miscompiles LABEL-POSITION with this decl
-;; This might be unnecessary now that I'm proclaiming an OPTIMIZE policy
-;; that seems to fix everything. It certainly was needed without that.
-;; At least by keeping this we might be able to report some specific bugs
-;; against ECL in the hope it gets fixed. Of course we can't actually ever
-;; remove workarounds.
-#-host-quirks-ecl
-(declaim (ftype (sfunction (label &optional t index) (or null index))
-                label-position))
 (defun label-position (label &optional if-after delta)
   "Return the current position for LABEL. Chooser maybe-shrink functions
    should supply IF-AFTER and DELTA in order to ensure correct results."
+  (declare #-sb-xc-host (values (or null index)))
   (let ((posn (label-posn label)))
     (if (and if-after (> posn if-after))
         (- posn delta)
@@ -1741,12 +1715,12 @@
                                  total-bits assembly-unit-bits))
                         quo))
            (bytes (make-array num-bytes :initial-element nil))
-           (segment-arg (sb-xc:gensym "SEGMENT-")))
+           (segment-arg (gensym "SEGMENT-")))
       (dolist (byte-spec-expr byte-specs)
         (let* ((byte-spec (eval byte-spec-expr))
                (byte-size (byte-size byte-spec))
                (byte-posn (byte-position byte-spec))
-               (arg (sb-xc:gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
+               (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
           (when (ldb-test (byte byte-size byte-posn) overall-mask)
             (error "The byte spec ~S either overlaps another byte spec, or ~
                     extends past the end."
@@ -1976,13 +1950,12 @@
        (cond ((label-p val)
               ;; note a fixup prior to writing the backpatch so that the fixup's
               ;; position is the location counter at the patch point
-              ;; (i.e. prior to skipping 8 bytes)
+              ;; (i.e. prior to skipping N-WORD-BYTES bytes)
               ;; This fixup is *not* recorded in code->fixups. Instead, trans_code()
               ;; will fixup a counted initial subsequence of unboxed words.
               ;; Q: why are fixup notes a "compiler" abstractions?
               ;; They seem pretty assembler-related to me.
-              (sb-c:note-fixup segment (or #+64-bit :absolute64 :absolute)
-                               (sb-c:make-fixup nil :code-object 0))
+              (sb-c:note-fixup segment :absolute (sb-c:make-fixup nil :code-object 0))
               (emit-back-patch
                segment
                sb-vm:n-word-bytes

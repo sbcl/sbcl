@@ -119,6 +119,7 @@ lispobj debug_print(lispobj string)
 {
     print_string(VECTOR(string), stderr);
     putc('\n', stderr);
+    fflush(stderr);
     return 0;
 }
 
@@ -130,7 +131,7 @@ lispobj symbol_package(struct symbol* s)
     // End-users should never see this failure.
     if (!lisp_package_vector) {
         if (!warned) {
-          fprintf(stderr, "Warning: package vector has not been initialized yet\n");
+          fprintf(stderr, "Warning: lisp package array is not initialized for C\n");
           warned = 1;
         }
         return NIL;
@@ -516,11 +517,13 @@ describe_thread_state(void)
     if (string[0]) printf("Signal mask: %s\n", string);
 #endif
     printf("Specials:\n");
-    printf(" *GC-INHIBIT* = %s\n", (read_TLS(GC_INHIBIT, thread) == T) ? "T" : "NIL");
-    printf(" *GC-PENDING* = %s\n", (read_TLS(GC_PENDING, thread) == T) ? "T" : "NIL");
-    printf(" *INTERRUPTS-ENABLED* = %s\n", (read_TLS(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
+    printf(" *GC-INHIBIT* = %s\n", read_TLS(GC_INHIBIT, thread) == LISP_T ? "T" : "NIL");
+    printf(" *GC-PENDING* = %s\n", read_TLS(GC_PENDING, thread) == LISP_T ? "T" : "NIL");
+    printf(" *INTERRUPTS-ENABLED* = %s\n",
+           read_TLS(INTERRUPTS_ENABLED, thread) == LISP_T ? "T" : "NIL");
 #ifdef STOP_FOR_GC_PENDING
-    printf(" *STOP-FOR-GC-PENDING* = %s\n", (read_TLS(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
+    printf(" *STOP-FOR-GC-PENDING* = %s\n",
+           read_TLS(STOP_FOR_GC_PENDING, thread) == LISP_T ? "T" : "NIL");
 #endif
     printf("Pending handler = %p\n", data->pending_handler);
 }
@@ -655,7 +658,7 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
 {
     fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
 #ifdef LISP_FEATURE_SB_THREAD
-    // the TLS area is not used if #-sb-thread. And if so, it must be "main thred"
+    // the TLS area is not used if #-sb-thread. And if so, it must be "main thread"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->name != NIL) {
         fprintf(stderr, " (\"");
@@ -663,6 +666,10 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
         fprintf(stderr, "\")");
     }
     putc('\n', stderr);
+    // In case you get no backtrace whatsoever, maybe at least see where the
+    // signal was received, probably in a function without the standard
+    // frame pointer setup.
+    fprintf(stderr, " interrupted @ PC %p\n", (void*)OS_CONTEXT_PC(context));
     if (lispthread->waiting_for != NIL) {
         fprintf(stderr, "waiting for %p", (void*)lispthread->waiting_for);
         if (instancep(lispthread->waiting_for)) {
@@ -719,7 +726,7 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
     struct thread* this_thread = get_sb_vm_thread();
 #ifdef LISP_FEATURE_SB_THREAD
     if (backtrace_completion_pipe[1] >= 0) {
-        libunwind_backtrace(current_thread, context);
+        libunwind_backtrace(get_sb_vm_thread(), context);
         write(backtrace_completion_pipe[1], context /* any random byte */, 1);
         return;
     }
@@ -758,24 +765,41 @@ static void* watchdog_thread(void* arg) {
     struct timeval timeout;
     fd_set fds;
     FD_ZERO(&fds);
-    FD_SET(watchdog_pipe[0], &fds);
-    timeout.tv_sec = (long)arg;
-    timeout.tv_usec = 0;
-    int nfds = select(watchdog_pipe[0]+1, &fds, 0, 0, &timeout);
-    if (nfds == 0) {
-        // Ensure this message comes out in one piece even if nothing following it does.
-        char msg[] = "Watchdog timer expired\n"; write(2, msg, sizeof msg-1);
-        backtrace_lisp_threads(0, 0, 0);
-        _exit(1); // cause the test suite to exit with failure
+    for (;;) {
+        FD_SET(watchdog_pipe[0], &fds);
+        timeout.tv_sec = (long)arg;
+        timeout.tv_usec = 0;
+        int nfds = select(watchdog_pipe[0]+1, &fds, 0, 0, &timeout);
+        if (nfds < 1) {
+            // Ensure this message comes out in one piece even if nothing following it does.
+            char msg[] = "Watchdog timer expired\n"; write(2, msg, sizeof msg-1);
+            backtrace_lisp_threads(0, 0, 0);
+            _exit(1); // cause the test suite to exit with failure
+        }
+        if (!FD_ISSET(watchdog_pipe[0], &fds))
+            lose("Watchdog got strange file descriptor mask");
+        char byte;
+        int n = read(watchdog_pipe[0], &byte, 1);
+        if (n != 1) lose("watchdog could not read a byte?");
+        fprintf(stderr, "watchdog got byte %d\n", byte);
+        switch (byte) {
+        case 0: return 0;
+        case 1: break; // restart the timer
+        default: lose("watchdog: bad byte");
+        }
     }
     return 0;
 }
-void start_watchdog(int sec) {
+void start_sbcl_watchdog(int sec) {
     if (pipe(watchdog_pipe)) lose("Can't make watchdog pipe");
     pthread_create(&watchdog_tid, 0, watchdog_thread, (void*)(long)sec);
     char msg[] = "Started watchdog thread\n"; write(2, msg, sizeof msg-1);
 }
-void stop_watchdog() {
+void reset_sbcl_watchdog_timer() {
+    char c[1] = {1};
+    write(watchdog_pipe[1], c, 1);
+}
+void stop_sbcl_watchdog() {
     char c[1] = {0};
     write(watchdog_pipe[1], c, 1);
     close(watchdog_pipe[1]);

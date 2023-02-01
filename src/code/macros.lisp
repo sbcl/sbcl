@@ -132,7 +132,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                   ;; a full inline expansion depending on the lexical environment.
                   ((save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
-                   (cond ((sb-c:maybe-inline-syntactic-closure lambda env))
+                   (cond ((sb-c:inline-syntactic-closure-lambda lambda env))
                          (t
                           (#+sb-xc-host warn
                            #-sb-xc-host sb-c:maybe-compiler-notify
@@ -172,8 +172,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                 ',name))))))))
 
 ;;; This is one of the major places where the semantics of block
-;;; compilation is handled.  Substitution for global names is totally
-;;; inhibited if (block-compile *compilation*) is NIL.  And if
+;;; compilation is handled. Substitution for global names is totally
+;;; inhibited if (block-compile *compilation*) is NIL. And if
 ;;; (block-compile *compilation*) is true and entry points are
 ;;; specified, then we don't install global definitions for non-entry
 ;;; functions (effectively turning them into local lexical functions.)
@@ -233,7 +233,16 @@ tree structure resulting from the evaluation of EXPRESSION."
                 ;; Non-continuable error.
                 (about-to-modify-symbol-value name 'defconstant)
                 (let ((old (symbol-value name)))
-                  (unless (eql value old)
+                  (unless (or (eql value old)
+                              ;; SAPs behave like numbers but yet EQL doesn't work on them,
+                              ;; special case it.
+                              ;; Nobody will notices that the constant
+                              ;; is not EQ, since it can be copied at
+                              ;; any time anyway.
+                              #-sb-xc-host
+                              (and (system-area-pointer-p old)
+                                   (system-area-pointer-p value)
+                                   (sap= old value)))
                     (multiple-value-bind (ignore aborted)
                         (with-simple-restart (abort "Keep the old value.")
                           (cerror "Go ahead and change the value."
@@ -269,7 +278,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
   ;; which reference the constant.
   #+sb-xc-host
-  (eval `(defconstant ,name ',value))
+  (eval `(unless (boundp ',name) (defconstant ,name ',value)))
   (setf (info :variable :kind name) :constant)
   name)
 
@@ -430,7 +439,7 @@ evaluated as a PROGN."
     (prog-expansion-from-let varlist body-decls 'let*)))
 
 (sb-xc:defmacro prog1 (result &body body)
-  (let ((n-result (sb-xc:gensym)))
+  (let ((n-result (gensym)))
     `(let ((,n-result ,result))
        (progn
          ,@body
@@ -470,7 +479,7 @@ evaluated as a PROGN."
            ;; Preserve non-toplevelness of the form!
            (let ((car (car forms))) (if nested car `(the t ,car))))
           (t
-           (let ((n-result (sb-xc:gensym)))
+           (let ((n-result (gensym)))
              `(let ((,n-result ,(first forms)))
                 (if ,n-result
                     ,n-result
@@ -494,12 +503,13 @@ evaluated as a PROGN."
       ;; Certainly for the evaluator it's preferable.
       `(let ((,(car vars) ,value-form))
          ,@body)
-      (let ((ignore (sb-xc:gensym)))
-        `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
+      (flet ((maybe-list (x) (if (member x lambda-list-keywords) (list x) x)))
+        (let ((ignore '#:ignore))
+          `(multiple-value-call #'(lambda (&optional ,@(mapcar #'maybe-list vars)
                                          &rest ,ignore)
                                   (declare (ignore ,ignore))
                                   ,@body)
-                              ,value-form))))
+                              ,value-form)))))
 
 (sb-xc:defmacro multiple-value-setq (vars value-form)
   (validate-vars vars)
@@ -529,7 +539,7 @@ evaluated as a PROGN."
                                           1000
                                           10))) ; Arbitrary limit.
         (let ((dummy-list (make-gensym-list val))
-              (keeper (sb-xc:gensym "KEEPER")))
+              (keeper (gensym "KEEPER")))
           `(multiple-value-bind (,@dummy-list ,keeper) ,form
              (declare (ignore ,@dummy-list))
              ,keeper))
@@ -651,14 +661,18 @@ invoked. In that case it will store into PLACE and start over."
   ;; variable to work around Python's blind spot in type derivation.
   ;; For more complex places getting the type derived should not
   ;; matter so much anyhow.
-  (let ((expanded (%macroexpand place env)))
+  (let ((expanded (%macroexpand place env))
+        (type (let ((ctype (sb-c::careful-specifier-type type)))
+                (if ctype
+                    (type-specifier ctype)
+                    type))))
     (if (symbolp expanded)
         `(do ()
              ((typep ,place ',type))
            (setf ,place (check-type-error ',place ,place ',type
                                           ,@(and type-string
                                                  `(,type-string)))))
-        (let ((value (sb-xc:gensym)))
+        (let ((value (gensym)))
           `(do ((,value ,place ,place))
                ((typep ,value ',type))
              (setf ,place
@@ -1139,9 +1153,9 @@ symbol-case giving up: case=((V U) (F))
            (clause->bins (make-array (length clauses) :initial-element nil))
            (table-nbits (byte-size (if (vectorp byte) (elt byte 0) byte)))
            (bins (make-array (ash 1 table-nbits) :initial-element 0))
-           (symbol (sb-xc:gensym "S"))
-           (hash (sb-xc:gensym "H"))
-           (vector (sb-xc:gensym "V"))
+           (symbol (gensym "S"))
+           (hash (gensym "H"))
+           (vector (gensym "V"))
            (is-hashable
             ;; For x86-64, any non-immediate object is considered hashable,
             ;; so we only do a lowtag test on the object, though the correct hash
@@ -1343,7 +1357,7 @@ symbol-case giving up: case=((V U) (F))
 
         ;; Produce a COND only if the backend supports the multiway branch vop.
         #+(or x86 x86-64)
-        (let ((block (sb-xc:gensym "B"))
+        (let ((block (gensym "B"))
               (unused-bins))
           ;; Take note of the unused bins
           (dotimes (i (length bins))
@@ -1395,7 +1409,7 @@ symbol-case giving up: case=((V U) (F))
 (defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
   (unless (or cases (not needcasesp))
     (warn "no clauses in ~S" name))
-  (let ((keyform-value (sb-xc:gensym))
+  (let ((keyform-value (gensym))
         (clauses ())
         (keys ())
         (keys-seen (make-hash-table :test #'eql)))
@@ -1631,7 +1645,7 @@ symbol-case giving up: case=((V U) (F))
 ;;; only for strings, hence the name. Renaming it to something more
 ;;; generic might not be a bad idea.
 (sb-xc:defmacro string-dispatch ((&rest types) var &body body)
-  (let ((fun (sb-xc:gensym "STRING-DISPATCH-FUN")))
+  (let ((fun (gensym "STRING-DISPATCH-FUN")))
     `(flet ((,fun (,var)
               ,@body))
        (declare (inline ,fun))
@@ -1654,7 +1668,7 @@ symbol-case giving up: case=((V U) (F))
 (sb-xc:defmacro with-open-file ((stream filespec &rest options)
                                 &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let ((abortp (sb-xc:gensym)))
+    (let ((abortp (gensym)))
       `(let ((,stream (open ,filespec ,@options))
              (,abortp t))
          ,@decls
@@ -1698,7 +1712,7 @@ symbol-case giving up: case=((V U) (F))
                                          var name))))
                           varlist))))
            (multiple-value-bind (code decls) (parse-body decls-and-code nil)
-             (let ((label-1 (sb-xc:gensym)) (label-2 (sb-xc:gensym)))
+             (let ((label-1 (gensym)) (label-2 (gensym)))
                `(block ,block
                   (,bind ,inits
                     ,@decls
@@ -1714,7 +1728,7 @@ symbol-case giving up: case=((V U) (F))
 
   ;; This is like DO, except it has no implicit NIL block.
   (sb-xc:defmacro do-anonymous (varlist endlist &rest body)
-    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (sb-xc:gensym)))
+    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
   (sb-xc:defmacro do (varlist endlist &body body)
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
@@ -1741,7 +1755,7 @@ symbol-case giving up: case=((V U) (F))
 (sb-xc:defmacro dotimes ((var count &optional (result nil)) &body body)
   ;; A nice optimization would be that if VAR is never referenced,
   ;; it's slightly more efficient to count backwards, but that's tricky.
-  (let ((c (if (integerp count) count (sb-xc:gensym))))
+  (let ((c (if (integerp count) count (gensym))))
     `(do ((,var 0 (1+ ,var))
           ,@(if (symbolp c) `((,c (the integer ,count)))))
          ((>= ,var ,c) ,result)
@@ -1758,8 +1772,8 @@ symbol-case giving up: case=((V U) (F))
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (binding* (((forms decls) (parse-body body nil))
-             (n-list (sb-xc:gensym "LIST"))
-             (start (sb-xc:gensym "START"))
+             (n-list (gensym "LIST"))
+             (start (gensym "START"))
              ((clist members clist-ok)
               (with-current-source-form (list)
                 (cond
@@ -1850,7 +1864,7 @@ symbol-case giving up: case=((V U) (F))
                   (cons (eql quote) (cons symbol null))
                   (cons (eql lambda))))
       (values nil `(funcall ,funarg . ,arg-forms))
-    (let ((fn-sym (sb-xc:gensym))) ; for ONCE-ONLY-ish purposes
+    (let ((fn-sym (gensym))) ; for ONCE-ONLY-ish purposes
       (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
               `(sb-c::%funcall ,fn-sym . ,arg-forms)))))
 
@@ -1883,26 +1897,26 @@ symbol-case giving up: case=((V U) (F))
   ;; This is simpler than trying to arrange transforms that cause
   ;; MAKE-STRING-OUTPUT-STREAM to be DXable. While that might be awesome,
   ;; this macro exists for a reason.
-  (let ((initial-buffer '#:buf)
-        (dummy '#:stream)
-        (string-let (or #+c-stack-is-control-stack 'dx-let 'let))
-        (string-ctor
-          (if (and (sb-xc:constantp element-type)
-                   (let ((ctype (sb-c::careful-specifier-type
-                                 (constant-form-value element-type))))
-                     (and ctype
-                          (csubtypep ctype (specifier-type 'character))
-                          (neq ctype *empty-type*))))
-              ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
-              ;; "The default initial element #\Nul is not a STANDARD-CHAR."
-              'make-array ; hooray! it's known be a valid string type
-              ;; Force a runtime STRINGP check unless futher transforms
-              ;; deduce a known type. You'll get "could not stack allocate"
-              ;; perhaps, but that's acceptable.
-              'make-string)))
+  (let* ((initial-buffer '#:buf)
+         (dummy '#:stream)
+         (string-ctor
+           (if (and (sb-xc:constantp element-type)
+                    (let ((ctype (sb-c::careful-specifier-type
+                                  (constant-form-value element-type))))
+                      (and ctype
+                           (csubtypep ctype (specifier-type 'character))
+                           (neq ctype *empty-type*))))
+               ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
+               ;; "The default initial element #\Nul is not a STANDARD-CHAR."
+               'make-array ; hooray! it's known be a valid string type
+               ;; Force a runtime STRINGP check unless futher transforms
+               ;; deduce a known type.
+               'make-string)))
     ;; A full call to MAKE-STRING-OUTPUT-STREAM uses a larger initial buffer
     ;; if BASE-CHAR but I really don't care to think about that here.
-    `(,string-let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+    `(let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+       #+c-stack-is-control-stack
+       (declare (sb-c::dynamic-extent-no-note ,initial-buffer))
        (dx-let ((,dummy (%allocate-string-ostream)))
          (let ((,var (%init-string-output-stream ,dummy ,initial-buffer
                                                  ,wild-result-type)))
@@ -1929,8 +1943,8 @@ symbol-case giving up: case=((V U) (F))
              ((t) '%instance-cas)
              #+(or arm64 ppc ppc64 riscv x86 x86-64)
              ((word) '%raw-instance-cas/word)
-             #+riscv
-             ((signed-word) '%raw-instance-cas/signed-word))))
+             #+(or arm64 riscv x86 x86-64)
+             ((sb-vm:signed-word) '%raw-instance-cas/signed-word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
                 for a typed slot: ~S"

@@ -117,26 +117,15 @@ RETURN-FROM can be used to exit the form."
                                   :cleanup cleanup)))
       (ir1-convert-progn-body dummy next result forms))))
 
+;;; We make NEXT start a block just so that it will have a block
+;;; assigned. People assume that when they pass a ctran into
+;;; IR1-CONVERT as NEXT, it will have a block when it is done.
 (def-ir1-translator return-from ((name &optional value) start next result)
   "RETURN-FROM name value
 
 Evaluate the VALUE, returning its values from the lexically enclosing
 block NAME. This is constrained to be used only within the dynamic
 extent of the block."
-  ;; old comment:
-  ;;   We make NEXT start a block just so that it will have a block
-  ;;   assigned. People assume that when they pass a ctran into
-  ;;   IR1-CONVERT as NEXT, it will have a block when it is done.
-  ;; KLUDGE: Note that this block is basically fictitious. In the code
-  ;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
-  ;; it's the block which answers the question "which block is
-  ;; the (SETQ X 3) in?" when the right answer is that (SETQ X 3) is
-  ;; dead code and so doesn't really have a block at all. The existence
-  ;; of this block, and that way that it doesn't explicitly say
-  ;; "I'm actually nowhere at all" makes some logic (e.g.
-  ;; BLOCK-HOME-LAMBDA-OR-NULL) more obscure, and it might be better
-  ;; to get rid of it, perhaps using a special placeholder value
-  ;; to indicate the orphanedness of the code.
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find name blocks)
                     (compiler-error "return for unknown block: ~S" name)))
@@ -152,9 +141,6 @@ extent of the block."
     (ir1-convert start value-ctran value-lvar value)
     (push exit (entry-exits entry))
     (link-node-to-previous-ctran exit value-ctran)
-    (let ((home-lambda (ctran-home-lambda-or-null start)))
-      (when home-lambda
-        (sset-adjoin entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit exit-ctran (third found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
@@ -244,9 +230,6 @@ constrained to be used only within the dynamic extent of the TAGBODY."
          (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
     (link-node-to-previous-ctran exit start)
-    (let ((home-lambda (ctran-home-lambda-or-null start)))
-      (when home-lambda
-        (sset-adjoin entry (lambda-calls-or-closes home-lambda))))
     (use-ctran exit (second found))))
 
 ;;;; translators for compiler-magic special forms
@@ -468,6 +451,35 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
                                   (subseq args required min))
                                ,@(subseq args 0 required)
                                ,@(subseq args min)))))
+
+(defmacro inline-%primitive (template &rest args)
+  (let* ((required (length (template-arg-types template)))
+         (info (template-info-arg-count template))
+         (min (+ required info))
+         (nargs (length args)))
+    (if (template-more-args-type template)
+        (when (< nargs min)
+          (bug "Primitive was called with ~R argument~:P, ~
+                but wants at least ~R."
+               nargs
+               min))
+        (unless (= nargs min)
+          (bug "Primitive was called with ~R argument~:P, ~
+                but wants exactly ~R."
+               nargs
+               min)))
+
+    (when (template-conditional-p template)
+      (bug "%PRIMITIVE was used with a conditional template."))
+
+    (when (template-more-results-type template)
+      (bug "%PRIMITIVE was used with an unknown values template."))
+
+    `(%%primitive ',template
+                  ',(eval-info-args
+                     (subseq args required min))
+                  ,@(subseq args 0 required)
+                  ,@(subseq args min))))
 
 ;;;; QUOTE
 
@@ -543,6 +555,29 @@ Return VALUE without evaluating it."
       (list :in context))))
 
 ;;;; FUNCTION and NAMED-LAMBDA
+
+;;; `(NAMED-LAMBDA ,NAME ,@REST) is like `(FUNCTION (LAMBDA ,@REST)),
+;;; except that the value of NAME is passed to the compiler for use in
+;;; creation of debug information for the resulting function.
+;;;
+;;; NAME can be a legal function name or some arbitrary other thing.
+;;;
+;;; If NAME is a legal function name, then the caller should be
+;;; planning to set (FDEFINITION NAME) to the created function.
+;;; (Otherwise the debug names will be inconsistent and thus
+;;; unnecessarily confusing.)
+;;;
+;;; Arbitrary other things are appropriate for naming things which are
+;;; not the FDEFINITION of NAME. E.g.
+;;;   NAME = (:FLET FOO BAR)
+;;; for the FLET function in
+;;;   (DEFUN BAR (X)
+;;;     (FLET ((FOO (Y) (+ X Y)))
+;;;       FOO))
+;;; or
+;;;   NAME = (:METHOD PRINT-OBJECT :AROUND (STARSHIP T))
+;;; for the function used to implement
+;;;   (DEFMETHOD PRINT-OBJECT :AROUND ((SS STARSHIP) STREAM) ...).
 (defun name-lambdalike (thing)
   (case (car thing)
     ((named-lambda)
@@ -550,9 +585,6 @@ Return VALUE without evaluating it."
          `(lambda ,(strip-lambda-list (third thing) :name) ,(name-context))))
     ((lambda)
      `(lambda ,(strip-lambda-list (second thing) :name) ,@(name-context)))
-    ((lambda-with-lexenv)
-     ;; FIXME: Get the original DEFUN name here.
-     `(lambda ,(fifth thing)))
     (otherwise
      (compiler-error "Not a valid lambda expression:~%  ~S"
                      thing))))
@@ -569,7 +601,7 @@ Return VALUE without evaluating it."
 ;;; apparent function associated to it.
 (defun find-or-convert-fun-leaf (thing start)
   (cond
-    ((typep thing '(cons (member lambda named-lambda lambda-with-lexenv)))
+    ((typep thing '(cons (member lambda named-lambda)))
      (let ((ctran (make-ctran))
            (leaf (ir1-convert-lambdalike thing
                                          :debug-name (name-lambdalike thing))))
@@ -690,6 +722,12 @@ be a lambda expression."
 (def-ir1-translator %funcall-lvar ((function &rest args) start next result)
   (ir1-convert-combination-args function start next result args))
 
+(def-ir1-translator %funcall-no-nargs ((function &rest args) start next result)
+  (let ((ctran (make-ctran))
+        (fun-lvar (make-lvar)))
+    (ir1-convert start ctran fun-lvar `(the function ,function))
+    (ir1-convert-combination-args fun-lvar ctran next result args :pass-nargs nil)))
+
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
@@ -792,7 +830,8 @@ have been evaluated."
                                    :debug-name (debug-name 'let bindings))))
                          (reference-leaf start ctran fun-lvar fun))
                        (values next result))))
-           (ir1-convert-combination-args fun-lvar ctran next result values)))))
+           (ir1-convert-combination-args fun-lvar ctran next result values
+                                         :arg-source-forms bindings)))))
 
 (def-ir1-translator let* ((bindings &body body)
                           start next result)
@@ -803,7 +842,8 @@ form to reference any of the previous VARS."
   (multiple-value-bind (vars values forms decls) (parse-letish bindings body 'let*)
     (processing-decls (decls vars nil next result post-binding-lexenv)
       (ir1-convert-aux-bindings
-       start next result forms vars values post-binding-lexenv))))
+       start next result forms vars values post-binding-lexenv
+       :value-source-forms bindings))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
@@ -1174,14 +1214,12 @@ care."
       (let* ((name (first things))
              (value-form (second things))
              (leaf (or (lexenv-find name vars) (find-free-var name))))
+        (maybe-note-undefined-variable-reference leaf name)
         (etypecase leaf
           (leaf
            (when (constant-p leaf)
              (compiler-error "~S is a constant and thus can't be set." name))
            (when (lambda-var-p leaf)
-             (let ((home-lambda (ctran-home-lambda-or-null start)))
-               (when home-lambda
-                 (sset-adjoin leaf (lambda-calls-or-closes home-lambda))))
              (when (lambda-var-ignorep leaf)
                ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
                ;; requires that this be a STYLE-WARNING, not a full warning.

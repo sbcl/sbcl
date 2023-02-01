@@ -31,8 +31,8 @@
   (:generator 0
     (error "BRANCH-IF should not be needed on RISC-V.")))
 
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
+(defun convert-conditional-move-p (dst-tn)
+  (declare (ignore dst-tn))
   nil)
 
 

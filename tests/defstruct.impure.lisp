@@ -607,8 +607,6 @@
   (slot *bug210*))
 ;;; Because of bug 210, this assertion used to fail.
 (assert (typep (nth-value 1 (ignore-errors (bug210a))) 'unbound-variable))
-;;; Even with bug 210, these assertions succeeded.
-(assert (typep (nth-value 1 (ignore-errors *bug210*)) 'unbound-variable))
 (assert (typep (nth-value 1 (ignore-errors (make-bug210b))) 'unbound-variable))
 
 ;;; In sbcl-0.7.8.53, DEFSTRUCT blew up in non-toplevel contexts
@@ -1083,7 +1081,7 @@ redefinition."
     (assert-invalid instance)))
 
 ;; Some other subclass wrinkles have to do with splitting definitions
-;; accross files and compiling and loading things in a funny order.
+;; across files and compiling and loading things in a funny order.
 (with-defstruct-redefinition-test
     :defstruct/subclass-in-other-file-funny-operation-order-continue
     (((defstruct ignore pred1) :class-name redef-test-10 :slots (a))
@@ -1442,3 +1440,11 @@ redefinition."
     (assert (eq f #'sb-int:pathname=)))
   (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'hash-table))))
     (assert (eq f #'sb-int:hash-table-equalp))))
+
+(defstruct (badbuf (:constructor make-badbuf ()))
+  (str (make-string 128) :type (simple-array character (128))))
+
+;; STR slot gets a type-check in the constructor. It should not
+(test-util:with-test (:name :make-string-type-inference :fails-on :sbcl)
+  (let ((things (ctu:find-code-constants #'make-badbuf :type 'list)))
+    (assert (not things))))

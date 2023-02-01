@@ -38,7 +38,7 @@ __LDFLAGS__ =
 
 OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+  OS_LIBS += -lzstd
 endif
 ifdef LISP_FEATURE_SB_FUTEX
   OS_LIBS += -lSynchronization

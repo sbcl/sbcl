@@ -155,8 +155,8 @@ This is SETFable."
                                  (foreign-symbol-sap ,initial-value ,datap) 0 ,alien-type)))
                            ,@body)))
                       (:local
-                       (let* ((var (sb-xc:gensym "VAR"))
-                              (initval (if initial-value (sb-xc:gensym "INITVAL")))
+                       (let* ((var (gensym "VAR"))
+                              (initval (if initial-value (gensym "INITVAL")))
                               (info (make-local-alien-info :type alien-type))
                               (inner-body
                                 `((note-local-alien-type ',info ,var)
@@ -262,9 +262,12 @@ Examples:
                    (error
                     "cannot override the size of zero-dimensional arrays"))
                  (when (constantp size)
-                   (setf alien-type (copy-structure alien-type))
-                   (setf (alien-array-type-dimensions alien-type)
-                         (cons (constant-form-value size) (cdr dims)))))
+                   (setf alien-type
+                         (make-alien-array-type
+                          :dimensions (cons (constant-form-value size) (cdr dims))
+                          :element-type (alien-array-type-element-type alien-type)
+                          :bits (alien-type-bits alien-type)
+                          :alignment (alien-type-alignment alien-type)))))
                 (dims
                  (setf size (car dims)))
                 (t
@@ -715,7 +718,7 @@ type specifies the argument and result types."
        (let ((stub (alien-fun-type-stub type)))
          (unless stub
            (setf stub
-                 (let ((fun (sb-xc:gensym "FUN"))
+                 (let ((fun (gensym "FUN"))
                        (parms (make-gensym-list (length args))))
                    (compile nil
                             `(lambda (,fun ,@parms)

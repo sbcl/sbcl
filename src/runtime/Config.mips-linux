@@ -15,7 +15,7 @@ ASSEM_SRC = mips-assem.S
 ARCH_SRC = mips-arch.c
 
 OS_SRC = linux-os.c linux-mman.c mips-linux-os.c
-OS_LIBS = -ldl -Wl,-no-as-needed
+OS_LIBS = -lrt -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -25,7 +25,7 @@ ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+  OS_LIBS += -lzstd
 endif
 
 GC_SRC = gencgc.c fullcgc.c traceroot.c

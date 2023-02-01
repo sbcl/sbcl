@@ -105,9 +105,20 @@ distinct from the global value. Can also be SETF."
           (%set-symbol-hash symbol (compute-symbol-hash name (length name))))
       hash)))
 
+;;; Return the function binding of SYMBOL or NIL if not fboundp.
+;;; Don't strip encapsulations.
+(declaim (inline %symbol-function))
+(defun %symbol-function (symbol)
+  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+    (if (eql fdefn 0) nil (fdefn-fun (truly-the fdefn fdefn)))))
+(defun (setf %symbol-function) (newval symbol) ; OK to use only if fdefn exists
+  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+    (setf (fdefn-fun (truly-the fdefn fdefn)) newval)))
+
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."
-  (%coerce-name-to-fun symbol (symbol-fdefn symbol)))
+  (truly-the function (or (%symbol-function symbol) ; fast way
+                          (%coerce-name-to-fun symbol)))) ; fallback w/restart
 
 ;; I think there are two bugs here.
 ;; Per CLHS "SETF may be used with symbol-function to replace a global
@@ -124,6 +135,7 @@ distinct from the global value. Can also be SETF."
   ;; on SYMBOL-FUNCTION. It doesn't say that SETF behaves the same, but let's
   ;; assume it does, and that we can't assign our macro/special guard funs.
   (err-if-unacceptable-function new-value '(setf symbol-function))
+  (setq new-value (strip-encapsulation new-value))
   (with-single-package-locked-error
       (:symbol symbol "setting the symbol-function of ~A")
     ;; This code is a little "surprising" in that it is not just a limited
@@ -146,11 +158,11 @@ distinct from the global value. Can also be SETF."
 #-compare-and-swap-vops
 (progn
 (defun cas-symbol-%info (symbol old new)
-  (%primitive sb-vm::set-slot symbol new
+  (%primitive sb-c:set-slot symbol new
               '(setf symbol-%info) sb-vm:symbol-info-slot sb-vm:other-pointer-lowtag)
   old)
 (defun sb-vm::cas-symbol-fdefn (symbol old new)
-  (%primitive sb-vm::set-slot symbol new
+  (%primitive sb-c:set-slot symbol new
               '(setf symbol-fdefn) sb-vm:symbol-fdefn-slot sb-vm:other-pointer-lowtag)
   old))
 
@@ -204,9 +216,11 @@ distinct from the global value. Can also be SETF."
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
   (let ((list (symbol-%info symbol)))
+    ;; The compiler can't possibly know that the CAR of LIST
+    ;; is also a list (if LIST is a LIST), so force it with a TRULY-THE.
     ;; See the comments above UPDATE-SYMBOL-INFO for a
     ;; reminder as to why this logic is right.
-    (if (%instancep list) nil (car list))))
+    (if (%instancep list) nil (truly-the list (car list)))))
 
 (declaim (ftype (sfunction (symbol t) cons) %ensure-plist-holder)
          (inline %ensure-plist-holder))
@@ -296,6 +310,11 @@ distinct from the global value. Can also be SETF."
 
 (defun sb-xc:symbol-package (symbol)
   "Return SYMBOL's home package, or NIL if none."
+  (%symbol-package symbol))
+(defun %symbol-package (symbol)
+  ;; only called via transform
+  ;; don't need arg-count check, type check, or vector bounds check.
+  (declare (optimize (safety 0)))
   (let ((id (symbol-package-id symbol)))
     (truly-the (or null package)
                (if (= id +package-id-overflow+)
@@ -357,7 +376,11 @@ distinct from the global value. Can also be SETF."
 
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
-  (logior-array-flags name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
+  (declare (sb-c::tlab :system))
+  ;; Avoid writing to the string header if it's already flagged as readonly, or off-heap.
+  (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
+             (dynamic-space-obj-p name))
+    (logior-array-flags name sb-vm:+vector-shareable+)) ; Set "logically read-only" bit
   (let ((symbol
          (truly-the symbol
           #+immobile-symbols (sb-vm::make-immobile-symbol name)
@@ -489,20 +512,17 @@ distinct from the global value. Can also be SETF."
 
 (flet ((%symbol-nameify (prefix counter)
   (declare (string prefix))
-  (if (typep counter '(and fixnum unsigned-byte))
+  (if (and (typep prefix 'simple-base-string)
+           (typep counter '(and fixnum unsigned-byte)))
       (let ((s ""))
-        (declare (simple-string s))
+        (declare (simple-base-string s))
         (labels ((recurse (depth n)
                    (multiple-value-bind (q r) (truncate n 10)
                      (if (plusp q)
                          (recurse (1+ depth) q)
-                         (let ((et (if (or (base-string-p prefix)
-                                           #+sb-unicode ; no #'base-char-p
-                                           (every #'base-char-p prefix))
-                                       'base-char 'character)))
-                           (setq s (make-string (+ (length prefix) depth)
-                                                :element-type et))
-                           (replace s prefix)))
+                         (replace (setq s (make-string (+ (length prefix) depth)
+                                                       :element-type 'base-char))
+                                  (truly-the simple-base-string prefix)))
                      (setf (char s (- (length s) depth))
                            (code-char (+ (char-code #\0) r)))
                      s)))
@@ -595,3 +615,5 @@ distinct from the global value. Can also be SETF."
                        :datum new-value
                        :expected-type spec)))))))
     nil))
+
+#+sb-thread (defun symbol-tls-index (x) (symbol-tls-index x)) ; necessary stub

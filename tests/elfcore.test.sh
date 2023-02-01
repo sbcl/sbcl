@@ -13,7 +13,6 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl <<EOF
@@ -46,8 +45,17 @@ run_sbcl <<EOF
 EOF
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
+(sb-vm::make-immobile-symbol "junk") ; crashed 'cause I forgot to use rip-relative-EA
 ;; I think this tests immobile space exhaustion
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
+
+;; Test that the link step did not use --export-dynamic
+(assert (gethash '("TEXT_SPACE_START") (car sb-sys:*linkage-info*))) ; C symbol exists
+; but dlsym() can't see it
+(assert (not (sb-sys:find-dynamic-foreign-symbol-address "TEXT_SPACE_START")))
+; but we can read the value
+(assert (funcall (compile nil '(lambda () sb-vm:text-space-start))))
+
 ;; Test that CODE-SERIAL# is never 0 except for simple-fun-less objects
 (sb-vm:map-allocated-objects
  (lambda (obj type size)
@@ -58,7 +66,7 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-us
  :all)
 ;; This just needs any function that when ELFinated has its packed fixups rewritten.
 ;; If the packed value is a bignum, it goes into a C data section.
-(let* ((code (sb-kernel:fun-code-header #'sb-c::%compile-files))
+(let* ((code (sb-kernel:fun-code-header #'compile-file))
        (fixups (sb-vm::%code-fixups code)))
   (assert (typep fixups 'bignum))
   (assert (not (heap-allocated-p fixups))))
@@ -86,7 +94,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "${tmpcore}")
 EOF
 
-m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
+m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lzstd") #+x86 (princ " -m32"))' --quit`
 
 (cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \

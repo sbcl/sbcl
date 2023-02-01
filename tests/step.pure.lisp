@@ -12,7 +12,7 @@
 ;;;; more information.
 
 ;; No stepper support on some platforms.
-#+(or interpreter ppc64 riscv) (invoke-restart 'run-tests::skip-file)
+#+(or interpreter riscv) (invoke-restart 'run-tests::skip-file)
 
 ;; These tests should either with code in dynamic space
 ;; or immobile space, but they only accidentally worked
@@ -294,19 +294,19 @@
     (step (out))
     (assert (equal expected (reverse results)))))
 
-(with-test (:name :step-into)
+(with-test (:name :step-into :fails-on :arm)
   (test-step-into))
 
-(with-test (:name :step-next)
+(with-test (:name :step-next :fails-on :arm)
   (test-step-next))
 
-(with-test (:name :step-out)
+(with-test (:name :step-out :fails-on :arm)
   (test-step-out))
 
-(with-test (:name :step-start-from-break)
+(with-test (:name :step-start-from-break :fails-on :arm)
   (test-step-start-from-break))
 
-(with-test (:name :step-frame)
+(with-test (:name :step-frame :fails-on :arm)
   (test-step-frame))
 
 (with-test (:name :step-backtrace)
@@ -318,10 +318,16 @@
 (with-test (:name :step-out/2)
   (test-step-out/2))
 
+;;; This ironically-named test asserts that we do NOT step-instrument
+;;; a call to TWO-ARG-/ (because it doesn't work). I guess it used to crash on x86.
+;;; But I sure as heck don't understand whether it's actually testing that,
+;;; because it doesn't seem to offer to step into the division function on_any platform.
+;;; It shows that it steps into CHECKED-COMPILE which returns 6 values.
 (with-test (:name :static-fun-step)
   (handler-bind ((step-form-condition
                    (lambda (c)
                      c
+                     ; (format t "~&~A~%" c)
                      (invoke-restart 'step-into))))
     (assert (= (step (funcall (checked-compile
                                `(lambda (x) (declare (optimize debug)) (/ 1 x)))

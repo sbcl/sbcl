@@ -11,11 +11,10 @@
 
 (declaim (special *lexenv*))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
     #(:required &optional &rest &more &key &aux &environment &whole
       &allow-other-keys &body :post-env :post-rest :post-more)
-  #'equalp))
+  #'equalp)
 
 ;; Return a bitmask representing the LIST of lambda list keywords.
 (defmacro lambda-list-keyword-mask (list)
@@ -807,7 +806,7 @@
                                   (if sup-p-var `(values ,def nil) def))))
              (cond ((not sup-p-var) (bind-pat var vals))
                    ((not (symbolp var))
-                    (let ((var-temp (sb-xc:gensym))
+                    (let ((var-temp (gensym))
                           (sup-p-temp (copy-symbol suppliedp)))
                       (bind `((,var-temp ,sup-p-temp) ,vals))
                       (descend var var-temp)
@@ -830,7 +829,7 @@
              ;; in theory, (MULTIPLE-VALUE-BIND () (EXPR) ...)
              ;; but in practice it becomes a binding of an ignored gensym.
              (let* ((bindings-p (or whole required opt rest keys))
-                    (temp (and bindings-p (sb-xc:gensym))))
+                    (temp (and bindings-p (gensym))))
                (bind `(,temp
                        ,(cond ((or emit-pre-test (ll-kwds-keyp llks))
                                (emit-ds-bind-check parsed-lambda-list input
@@ -880,7 +879,7 @@
              (dolist (elt keys)
                (multiple-value-bind (keyword var def sup-p-var)
                    (parse-key-arg-spec elt default-default)
-                 (let ((temp (sb-xc:gensym)))
+                 (let ((temp (gensym)))
                    (bind `(,temp (ds-getf ,input ',keyword)))
                    (bind-if :not `(eql ,temp 0) `(car (truly-the cons ,temp))
                             var sup-p-var def))))
@@ -1230,7 +1229,12 @@
                      '(destructuring-bind))
                ,new-ll (,accessor ,ll-whole)
                #-sb-xc-host
-               (declare (constant-value ,@variables))
+               (declare (constant-value ,@variables)
+                        ;; Avoid warnings about emitted full calls
+                        ;; inside the body of a compiler macro itself.
+                        ,@(and (eq kind 'define-compiler-macro)
+                               `((no-compiler-macro ,name))))
+
                ,@decls
                ,@(if wrap-block
                      `((block ,(fun-name-block-name name) ,@forms))

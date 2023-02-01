@@ -1358,11 +1358,6 @@ bootstrapping.
                              `(list ,@required-args+rest-arg))
                         (method-call-call-method-args ,method-call)))
 
-(defstruct (fast-method-call (:copier nil))
-  (function #'identity :type function)
-  pv
-  next-method-call
-  arg-info)
 (defstruct (constant-fast-method-call
              (:copier nil) (:include fast-method-call))
   value)
@@ -1593,9 +1588,12 @@ bootstrapping.
     (fast-instance-boundp
      (if (or (null args) (cdr args))
          (%program-error "invalid number of arguments")
-         (let ((slots (get-slots (car args))))
-           (not (unbound-marker-p
-                 (clos-slots-ref slots (fast-instance-boundp-index emf)))))))
+         (let ((slots (get-slots (car args)))
+               (index (fast-instance-boundp-index emf)))
+           (if (minusp index)
+               (progn (setf (clos-slots-ref slots (lognot index)) +slot-unbound+)
+                      (car args))
+               (not (unbound-marker-p (clos-slots-ref slots index)))))))
     (function
      (apply emf args))))
 
@@ -1783,12 +1781,13 @@ bootstrapping.
                 (when (equal (cdr form) '(call-next-method))
                   (setq call-next-method-p t))
                 form)
-               ((slot-value set-slot-value slot-boundp)
+               ((slot-value set-slot-value slot-boundp slot-makunbound)
                 (if (constantp (third form) env)
                     (let ((fun (ecase (car form)
                                  (slot-value #'optimize-slot-value)
                                  (set-slot-value #'optimize-set-slot-value)
-                                 (slot-boundp #'optimize-slot-boundp))))
+                                 (slot-boundp #'optimize-slot-boundp)
+                                 (slot-makunbound #'optimize-slot-makunbound))))
                       (funcall fun form slots required-parameters env))
                     form))
                (t form))))
@@ -2034,7 +2033,7 @@ bootstrapping.
                   ;(k1 k2 ..) Each method must accept these &KEY arguments.
                   ;T          must have &KEY or &REST
 
-  gf-info-simple-accessor-type ; nil, reader, writer, boundp
+  gf-info-simple-accessor-type ; nil, reader, writer, boundp, makunbound
   (gf-precompute-dfun-and-emf-p nil) ; set by set-arg-info
 
   gf-info-static-c-a-m-emf
@@ -2175,10 +2174,10 @@ bootstrapping.
   (aver (= (symbol-value (intern (format nil "+SM-~A-INDEX+" s)))
            (!bootstrap-slot-index 'standard-reader-method s)
            (!bootstrap-slot-index 'standard-writer-method s)
-           (!bootstrap-slot-index 'standard-boundp-method s)
            (!bootstrap-slot-index 'global-reader-method s)
            (!bootstrap-slot-index 'global-writer-method s)
-           (!bootstrap-slot-index 'global-boundp-method s))))
+           (!bootstrap-slot-index 'global-boundp-method s)
+           (!bootstrap-slot-index 'global-makunbound-method s))))
 
 (defun safe-method-specializers (method)
   (if (member (class-of method) **standard-method-classes** :test #'eq)
@@ -2226,9 +2225,10 @@ bootstrapping.
                         ((or (eq class *the-class-standard-writer-method*)
                              (eq class *the-class-global-writer-method*))
                          'writer)
-                        ((or (eq class *the-class-standard-boundp-method*)
-                             (eq class *the-class-global-boundp-method*))
-                         'boundp)))))
+                        ((eq class *the-class-global-boundp-method*)
+                         'boundp)
+                        ((eq class *the-class-global-makunbound-method*)
+                         'makunbound)))))
           (setq metatypes (mapcar #'raise-metatype metatypes specializers))
           (setq type (cond ((null type) new-type)
                            ((eq type new-type) type)
@@ -2255,9 +2255,10 @@ bootstrapping.
                             *internal-pcl-generalized-fun-name-symbols*))
                nil)
               (t (let* ((symbol (fun-name-block-name name))
-                        (package (symbol-package symbol)))
-                   (and (or (eq package *pcl-package*)
-                            (memq package (package-use-list *pcl-package*)))
+                        (package (symbol-package symbol))
+                        (pcl-package #.(find-package "SB-PCL")))
+                   (and (or (eq package pcl-package)
+                            (memq package (package-use-list pcl-package)))
                         (not (eq package *cl-package*))
                         ;; FIXME: this test will eventually be
                         ;; superseded by the *internal-pcl...* test,
@@ -2649,8 +2650,7 @@ bootstrapping.
 (defun early-method-standard-accessor-p (early-method)
   (let ((class (first (fifth early-method))))
     (or (eq class 'standard-reader-method)
-        (eq class 'standard-writer-method)
-        (eq class 'standard-boundp-method))))
+        (eq class 'standard-writer-method))))
 
 (defun early-method-standard-accessor-slot-name (early-method)
   (eighth (fifth early-method)))
@@ -2824,10 +2824,11 @@ bootstrapping.
                             (function-header (sb-kernel:fun-code-header function-object))
                             (debug-info (sb-kernel:%code-debug-info function-header))
                             (debug-source (sb-c::debug-info-source debug-info))
-                            (debug-fun (debug-info-debug-function function debug-info)))
+                            (debug-fun (debug-info-debug-function function debug-info))
+                            (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
                        (sb-c::%make-definition-source-location
                         (sb-c::debug-source-namestring debug-source)
-                        (sb-c::compiled-debug-info-tlf-number debug-info)
+                        tlf
                         (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)
 

@@ -188,11 +188,13 @@
 ;;; We also maintain the increasing cost ordering.
 (defun adjoin-template (template list)
   (declare (type template template) (list list))
-  (sort (cons template
-              (remove (template-name template) list
-                      :key #'template-name))
-        #'<=
-        :key #'template-cost))
+  (stable-sort (sort (cons template
+                           (remove (template-name template) list
+                                   :key #'template-name))
+                     #'string<
+                     :key #'template-name)
+               #'<=
+               :key #'template-cost))
 
 ;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
@@ -222,13 +224,11 @@
            (results (if (template-conditional-p template)
                         '(boolean)
                         (convert result-restr
-                                 (cond ((template-more-results-type template))
-                                       ((/= (length result-restr) 1) '*)
-                                       (t nil))))))
+                                 (template-more-results-type template)))))
       `(function ,args
-                 ,(if (= (length results) 1)
-                      (first results)
-                      `(values ,@results))))))
+                 (values ,@results
+                         ,@(unless (template-more-results-type template)
+                             '(&optional)))))))
 
 (defun template-translates-arg-p (function argument type)
   (let ((primitive-type (primitive-type (specifier-type type))))

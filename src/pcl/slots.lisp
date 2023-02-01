@@ -333,9 +333,12 @@
   (let ((fun (slot-info-boundp (slot-definition-info slotd))))
     (funcall fun object)))
 
-(defmethod slot-makunbound-using-class ((class condition-class) object slot)
-  (error "attempt to unbind slot ~S in condition object ~S."
-         slot object))
+(defmethod slot-makunbound-using-class
+    ((class condition-class)
+     (object condition)
+     (slotd condition-effective-slot-definition))
+  (let ((fun (slot-info-makunbound (slot-definition-info slotd))))
+    (funcall fun object)))
 
 (defmethod slot-value-using-class
     ((class structure-class)
@@ -344,8 +347,6 @@
   (let* ((function (slot-definition-internal-reader-function slotd))
          (value (funcall function object)))
     (declare (type function function))
-    ;; FIXME: Is this really necessary? Structure slots should surely
-    ;; never be unbound!
     (if (unbound-marker-p value)
         (values (slot-unbound class object (slot-definition-name slotd)))
         value)))
@@ -359,16 +360,23 @@
     (funcall function new-value object)))
 
 (defmethod slot-boundp-using-class
-           ((class structure-class)
-            (object structure-object)
-            (slotd structure-effective-slot-definition))
-  t)
+    ((class structure-class)
+     (object structure-object)
+     (slotd structure-effective-slot-definition))
+  (let* ((function (slot-definition-internal-reader-function slotd))
+         (value (funcall function object)))
+    (declare (type function function))
+    (not (unbound-marker-p value))))
 
 (defmethod slot-makunbound-using-class
-           ((class structure-class)
-            (object structure-object)
-            (slotd structure-effective-slot-definition))
-  (error "Structure slots can't be unbound."))
+    ((class structure-class)
+     (object structure-object)
+     (slotd structure-effective-slot-definition))
+  (if (slot-definition-always-bound-p slotd)
+      (error "Structure slots can't be unbound.")
+      (let ((function (slot-definition-internal-writer-function slotd)))
+        (declare (type function function))
+        (funcall function sb-pcl:+slot-unbound+ object))))
 
 (defmethod slot-missing
            ((class t) instance slot-name operation &optional new-value)

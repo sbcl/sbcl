@@ -326,3 +326,11 @@
            10
            x)))
    (2 2)))
+
+(with-test (:name :dotted-comma-source-paths)
+  (assert-condition-source-paths
+   (lambda ()
+     `(progn
+        . ,(progn
+             (progn (setq x 1)))))
+   (1 1 1 1 2)))

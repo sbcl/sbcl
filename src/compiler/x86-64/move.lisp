@@ -60,15 +60,16 @@
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
             :load-if (not (location= x y))))
-  (:results (y :scs (any-reg descriptor-reg)
+  (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if
-               (not (or (location= x y)
-                        (and (sc-is x any-reg descriptor-reg immediate)
-                             (sc-is y control-stack))))))
-  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)) temp)
+               (not (location= x y))))
+  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)
+               :unused-if (or (not (sc-is x immediate))
+                              (typep (encode-value-if-immediate x)
+                                     '(or (signed-byte 32) #+immobile-space fixup))))
+              temp)
   (:generator 0
-    (if (and (sc-is x immediate)
-             (sc-is y any-reg descriptor-reg control-stack))
+    (if (sc-is x immediate)
         (move-immediate y (encode-value-if-immediate x) temp)
         (move y x))))
 
@@ -125,20 +126,24 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
-  (:temporary (:sc unsigned-reg) val-temp) ; for oversized immediate operand
+  (:temporary (:sc unsigned-reg
+               :unused-if (or (not (sc-is x immediate))
+                              (typep (encode-value-if-immediate x)
+                                     '(signed-byte 32))))
+              val-temp) ; for oversized immediate operand
   (:generator 0
     (let ((val (encode-value-if-immediate x)))
-    (sc-case y
-      ((any-reg descriptor-reg)
-       (if (sc-is x immediate)
-           (if (eql val 0) (zeroize y) (inst mov y val))
-           (move y x)))
-      ((control-stack)
-       (if (= (tn-offset fp) rsp-offset)
-           ;; C-call
-           (storew val fp (tn-offset y) 0 val-temp)
-           ;; Lisp stack
-           (storew val fp (frame-word-offset (tn-offset y)) 0 val-temp)))))))
+      (sc-case y
+        ((any-reg descriptor-reg)
+         (if (sc-is x immediate)
+             (if (eql val 0) (zeroize y) (inst mov y val))
+             (move y x)))
+        ((control-stack)
+         (if (= (tn-offset fp) rsp-offset)
+             ;; C-call
+             (storew val fp (tn-offset y) 0 val-temp)
+             ;; Lisp stack
+             (storew val fp (frame-word-offset (tn-offset y)) 0 val-temp)))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -207,7 +212,7 @@
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target y))
   (:results (y :scs (signed-reg unsigned-reg)))
-  (:results-var results)
+  (:result-refs results)
   (:note "integer to untagged word coercion")
   (:temporary (:sc unsigned-reg) backup)
   (:generator 4
@@ -297,7 +302,7 @@
 (define-vop (move-from-fixnum+1)
   (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:args-var arg-ref)
+  (:arg-refs arg-ref)
   (:vop-var vop)
   (:generator 4
     (let ((const (case (vop-name vop)

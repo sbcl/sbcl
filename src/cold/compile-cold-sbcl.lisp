@@ -85,8 +85,7 @@
         ;; optimizations. (ANSI says users aren't supposed to
         ;; redefine our functions anyway; and developers can
         ;; fend for themselves.)
-        (sb-ext:*derive-function-types*
-         (if (find :sb-fluid sb-xc:*features*) nil t))
+        (sb-ext:*derive-function-types* t)
         ;; Let the target know that we're the cross-compiler.
         (sb-xc:*features* (cons :sb-xc sb-xc:*features*))
         (*readtable* sb-cold:*xc-readtable*))
@@ -109,6 +108,13 @@
         (sb-impl::expand-quasiquote (second form) t)))
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
+
+;;; Need to get access these sb-sys symbols unqualified from sb-assem
+;;; during make-host-2. Make-host-1 would have already converted its
+;;; code via DEFSETF so it should be insensitive to this substitution.
+(unintern 'sb-assem::sap-ref-16 'sb-assem)
+(unintern 'sb-assem::sap-ref-32 'sb-assem)
+(import '(sb-sys:sap-ref-16 sb-sys:sap-ref-32) 'sb-assem)
 
 (read-undefined-fun-allowlist)
 (defun parallel-make-host-2 (max-jobs)
@@ -174,6 +180,21 @@
             (sb-cold::exit-process 1))))
       (values))))
 
+(sb-kernel::show-ctype-ctor-cache-metrics)
+
+(defun write-sxhash-xcheck-data (pathname)
+  (with-open-file (stream pathname :direction :output
+                                   :if-exists :supersede :if-does-not-exist :create)
+    (format stream ";;; SXHASH test data~%(~%")
+    (let ((seen (make-hash-table)))
+      (dolist (pair sb-impl::*sxhash-crosscheck*)
+        (let ((prev (gethash (car pair) seen)))
+          (if prev
+              (assert (= prev (cdr pair))) ; be self-consistent at least
+              (format stream "(~S #x~X)~%" (car pair) (cdr pair))))
+        (setf (gethash (car pair) seen) (cdr pair))))
+    (format stream ")~%")))
+
 ;;; See whether we're in individual file mode
 (cond
   ((boundp 'cl-user::*compile-files*)
@@ -211,12 +232,54 @@
                                     internal-time-units-per-second)))
                     (format t " (~f sec)~%" elapsed)
                     (incf total-time elapsed)))
+                ;(sb-kernel::show-ctype-ctor-cache-metrics)
+                (when sb-impl::*profile-hash-cache*
+                  ;;  avoid "make-host-2 stopped due to unexpected STYLE-WARNING raised from the host."
+                  (funcall (intern "SHOW-HASH-CACHE-STATISTICS" "SB-IMPL")))
                 ;; The specialized array registry has file-wide scope. Hacking that aspect
                 ;; into the xc build scaffold seemed slightly easier than hacking the
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)
                 (clear-specialized-array-registry)))
              (format t "~&~50t ~f~%" total-time))
            (sb-c::dump/restore-interesting-types 'write)))
+     (write-sxhash-xcheck-data
+      (sb-cold:find-bootstrap-file "output/sxhash-calls.lisp-expr" t))
      (sb-kernel::write-structure-definitions-as-text
-      (sb-cold:stem-object-path "defstructs.lisp-expr"
-                                '(:extra-artifact) :target-compile)))))
+      (sb-cold:find-bootstrap-file "output/defstructs.lisp-expr" t)))))
+(sb-kernel::show-ctype-ctor-cache-metrics)
+
+(defun dump-some-ctype-hashsets ()
+  (flet ((cells (hs) (sb-impl::hss-cells (sb-impl::hashset-storage hs))))
+    ;; It might warrant looking into that we print a lot of unknown types.
+    ;; Some of those might have resulted in suboptimal code.
+    (format t "~2&UNKNOWN~%=======")
+    (sb-int:dovector (x (cells sb-kernel::*unknown-type-hashset*) (terpri))
+      (when (sb-kernel:ctype-p x)
+        (print (sb-kernel::hairy-type-specifier x))))
+    (format t "~2&HAIRY~%=====")
+    (sb-int:dovector (x (cells sb-kernel::*hairy-type-hashset*) (terpri))
+      (when (sb-kernel:ctype-p x)
+        (print (sb-kernel::hairy-type-specifier x))))
+    ;; Out of curiosity, why are there 35 character-set-type instances?
+    ;; I suppose it's because the unicode processing logic contains all different
+    ;; manner of tests about the range of code points.
+    #+nil
+    (sb-int:dovector (x (cells sb-kernel::*character-set-type-hashset*) (terpri))
+      (when (sb-kernel:ctype-p x)
+        (print (sb-kernel::character-set-type-pairs x))))
+    #+nil ; we see > 350 distinct simd-pack types. wow!
+    (let (list)
+      (sb-int:dovector (x (cells sb-kernel::*simd-pack-type-hashset*))
+        (when (sb-kernel:ctype-p x)
+          (push (sb-kernel::simd-pack-type-element-type x) list)))
+      (flet ((int (x) (logand (host-sb-kernel:%vector-raw-bits (reverse x) 0) #b1111111111)))
+        (dolist (bv (sort list (lambda (a b) (< (int a) (int b)))) (terpri))
+          (print bv))))
+    ;; There are an astoundingly high number of MEMBER types.
+    ;; Most contain symbols. A few contain conses and proxy floating-point values.
+    ;; So we must operate on sets that contain unpaired signed zeros.
+    (format t "~2&MEMBER~%======")
+    (sb-int:dovector (x (cells sb-kernel::*member-type-hashset*) (terpri))
+      (when (sb-kernel:ctype-p x)
+        (unless (every #'symbolp (sb-kernel:member-type-members x))
+          (print (sb-kernel:member-type-members x)))))))

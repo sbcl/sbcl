@@ -32,9 +32,10 @@
 
 (defconstant-eqx +standard-method-class-names+
   '(standard-method standard-reader-method
-    standard-writer-method standard-boundp-method
+    standard-writer-method
     global-reader-method global-writer-method
-    global-boundp-method)
+    global-boundp-method
+    global-makunbound-method)
   #'equal)
 
 (define-load-time-global *sgf-wrapper*
@@ -65,24 +66,24 @@
 (defun allocate-standard-funcallable-instance (wrapper name)
   (declare (wrapper wrapper))
   (let* ((hash (if name
+                   ;; Named functions have a predictable hash
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
-                   (sb-impl::quasi-random-address-based-hash
+                   (sb-kernel::quasi-random-address-based-hash
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
                     most-positive-fixnum)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
-         (fin (cond #+(and immobile-code)
-                    ((not (sb-kernel::bitmap-all-taggedp (wrapper-friend wrapper)))
-                     (let ((f (truly-the funcallable-instance
-                                         (sb-vm::make-immobile-funinstance wrapper slots))))
-                       ;; set the upper 4 bytes of wordindex 5
-                       (sb-sys:with-pinned-objects (f)
-                         (setf (sb-impl::fsc-instance-trailer-hash f) (ldb (byte 32 0) hash)))
-                       f))
-                    (t
-                     (let ((f (truly-the funcallable-instance
-                                         (%make-standard-funcallable-instance slots hash))))
-                       (setf (%fun-wrapper f) wrapper)
-                       f)))))
+         (fin (truly-the funcallable-instance
+                         (%make-standard-funcallable-instance
+                          slots #-compact-instance-header hash))))
+    (setf (%fun-wrapper fin) wrapper)
+    #+compact-instance-header
+    (let ((32-bit-hash
+           ;; don't know how good our hash is, so use all N-FIXNUM-BITS of it
+           ;; as input to murmur-hash, which should definitely affect all bits,
+           ;; and then take 32 bits of that result.
+           (ldb (byte 32 0) (sb-impl::murmur3-fmix-word hash))))
+      (sb-sys:with-pinned-objects (fin)
+        (setf (sb-vm::compact-fsc-instance-hash fin) 32-bit-hash)))
     (setf (%funcallable-instance-fun fin)
           (lambda (&rest args)
             (declare (ignore args))
@@ -183,15 +184,11 @@
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
               (!early-collect-inheritance name)
             (let* ((class (find-class name))
-                   ;; With #+compact-instance-header there are two possible bitmaps
-                   ;; for funcallable instances - for self-contained trampoline
-                   ;; instructions and external trampoline instructions.
-                   ;; With #-compact-instance-header all funcallable layouts
-                   ;; need the same bitmap, which is that of standard-GF.
-                   ;; These requirements are checked in verify_range() of gencgc.
+                   ;; All funcallable objects get the bitmap of standard-GF.
+                   ;; This is checked in verify_range() of gencgc.
                    (bitmap (if (memq name '(standard-generic-function
-                                            #-compact-instance-header funcallable-standard-object
-                                            #-compact-instance-header generic-function))
+                                            funcallable-standard-object
+                                            generic-function))
                                sb-kernel::standard-gf-primitive-obj-layout-bitmap
                                +layout-all-tagged+))
                    (wrapper (cond ((eq class slot-class)
@@ -302,7 +299,7 @@
         (funcall set-slot 'source nil)
         (funcall set-slot 'type-name 'standard)
         (funcall set-slot 'options '())
-        (funcall set-slot '%generic-functions (make-gf-hash-table))
+        (funcall set-slot '%generic-functions (make-gf-hashset))
         (funcall set-slot '%documentation "The standard method combination.")
         (setq *standard-method-combination* method-combination))
       ;; Create an OR method combination object.
@@ -312,7 +309,7 @@
         (funcall set-slot 'type-name 'or)
         (funcall set-slot 'operator 'or)
         (funcall set-slot 'identity-with-one-argument t)
-        (funcall set-slot '%generic-functions (make-gf-hash-table))
+        (funcall set-slot '%generic-functions (make-gf-hashset))
         (funcall set-slot '%documentation nil)
         (funcall set-slot 'options '(:most-specific-first))
         (setq *or-method-combination* method-combination))))))
@@ -498,7 +495,9 @@
           :writer
           (make-optimized-std-writer-method-function nil nil slot-name index)
           :boundp
-          (make-optimized-std-boundp-method-function nil nil slot-name index))))
+          (make-optimized-std-boundp-method-function nil nil slot-name index)
+          :makunbound
+          (make-optimized-std-makunbound-method-function nil nil slot-name index))))
       (when (and (eq name 'standard-class)
                  (eq slot-name 'slots) effective-p)
         (setq *the-eslotd-standard-class-slots* slotd))
@@ -635,6 +634,31 @@
         (declare (ignore instance))
         (instance-structure-protocol-error slotd 'slot-boundp-using-class))))
    `(boundp ,slot-name)))
+
+(defun make-optimized-std-makunbound-method-function
+    (fsc-p slotd slot-name location)
+  (set-fun-name
+   (etypecase location
+     (fixnum (if fsc-p
+                 (lambda (instance)
+                   (check-obsolete-instance instance)
+                   (setf (clos-slots-ref (fsc-instance-slots instance) location)
+                         +slot-unbound+)
+                   instance)
+                 (lambda (instance)
+                   (check-obsolete-instance instance)
+                   (setf (clos-slots-ref (std-instance-slots instance) location)
+                         +slot-unbound+)
+                   instance)))
+     (cons (lambda (instance)
+             (check-obsolete-instance instance)
+             (setf (cdr location) +slot-unbound+)
+             instance))
+     (null
+      (lambda (instance)
+        (declare (ignore instance))
+        (instance-structure-protocol-error slotd 'slot-makunbound-using-class))))
+   `(makunbound ,slot-name)))
 
 ;;;; FINDING SLOT DEFINITIONS
 ;;;

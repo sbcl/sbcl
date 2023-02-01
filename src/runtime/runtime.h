@@ -38,6 +38,8 @@ static inline int cs_mutex_lock(void* l) { EnterCriticalSection(l); return 1; }
 static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; }
 #define mutex_acquire(l) cs_mutex_lock(l)
 #define mutex_release(l) cs_mutex_unlock(l)
+#define CONDITION_VAR_WAIT(x,y) SleepConditionVariableCS(x,y,INFINITE)
+#define CONDITION_VAR_WAKE_ALL(x) WakeAllConditionVariable(x)
 #else
 #define thread_self() pthread_self()
 #define thread_equal(a,b) pthread_equal(a,b)
@@ -45,6 +47,8 @@ static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; 
 #define mutex_acquire(l) !pthread_mutex_lock(l)
 #define mutex_release(l) !pthread_mutex_unlock(l)
 #define TryEnterCriticalSection(l) !pthread_mutex_trylock(l)
+#define CONDITION_VAR_WAIT(x,y) pthread_cond_wait(x,y)
+#define CONDITION_VAR_WAKE_ALL(x) pthread_cond_broadcast(x)
 #endif
 
 #else
@@ -88,67 +92,21 @@ void gc_state_unlock();
  * you are a developer and want to affect FSHOW behaviour.
  */
 
-/* Enable extra-verbose low-level debugging output for signals? (You
- * probably don't want this unless you're trying to debug very early
- * cold boot on a new machine, or one where you've just messed up
- * signal handling.)
- *
- * Note: It may be that doing this is fundamentally unsound, since it
- * causes output from signal handlers, and the i/o libraries aren't
- * necessarily reentrant. But it can still be very convenient for
- * figuring out what's going on when you have a signal handling
- * problem.
- *
- * Possible values are:
- *   0 -- Never show signal-related output.  There is absolutely no
- *        run-time overhead from FSHOW_SIGNAL in this case.
- *
- *   1 -- (recommended)
- *        Show signal-related output only if selected at run-time
- *        (otherwise almost no run-time overhead).
- *
- *   2 -- Unconditionally show signal-related output.
- *        Very significant overhead.
- *
- * For reasons of tradition, we default to 0 on POSIX and 1 on Windows
- * through :SB-QSHOW.
- *
- * With option 1, set up environment variable SBCL_DYNDEBUG to include
- * "fshow" or "fshow_signal" before starting SBCL to enable output.
- *
- * There is no particular advantage to option 2 except that you do not
- * need to set environment variables in this case.
- */
 #ifdef LISP_FEATURE_SB_QSHOW
-# define QSHOW_SIGNALS 1
+# define QSHOW 1
 #else
-# define QSHOW_SIGNALS 0
+# define QSHOW 0
 #endif
-
-/* Enable low-level debugging output, if not zero. Defaults to enabled
- * if QSHOW_SIGNALS, disabled otherwise. Change it to 1 or 2 if you want
- * low-level debugging output but not the whole signal mess. */
-#define QSHOW QSHOW_SIGNALS
 
 /*
  * Configuration options end here -- the following defines do not
  * generally need customization.
  */
 
-#define odxprint(topic, fmt, ...)                       \
-    do                                                  \
-        if (dyndebug_config.dyndebug_##topic)           \
-            odxprint_fun(fmt "\n", ##__VA_ARGS__);      \
-    while (0)
-
-void odxprint_fun(const char *fmt, ...);
-void fshow_fun(void *ignored, const char *fmt, ...);
-
 /* Flags defined in a structure to avoid code duplication between
  * declaration and definition. */
 extern struct dyndebug_config {
     int dyndebug_fshow;
-    int dyndebug_fshow_signal;
     int dyndebug_gencgc_verbose;
     int dyndebug_safepoints;
     int dyndebug_seh;
@@ -166,26 +124,13 @@ extern int gencgc_verbose;
 
 void dyndebug_init(void);
 
-/* The following macros duplicate the expansion of odxprint, because the
- * extra level of parentheses around `args' prevents us from
- * implementing FSHOW in terms of odxprint directly.  (They also differ
- * in a newline.)
- */
-
-#if QSHOW
-# define FSHOW(args) \
-    do if (dyndebug_config.dyndebug_fshow) fshow_fun args; while (0)
-# define SHOW(string) FSHOW((stderr, "/%s\n", string))
+#if 0
+/* To see output from FSHOW - which is almost certainly a bad idea because it's
+ * quite likely to hinder your progress by causing deadlock in stdio - then change
+ * the preceding line to "#if 1" */
+# define FSHOW(args) fprintf args
 #else
 # define FSHOW(args)
-# define SHOW(string)
-#endif
-
-#if QSHOW_SIGNALS
-# define FSHOW_SIGNAL(args)                                             \
-    do if (dyndebug_config.dyndebug_fshow_signal) fshow_fun args; while (0)
-#else
-# define FSHOW_SIGNAL(args)
 #endif
 
 #ifdef _WIN64

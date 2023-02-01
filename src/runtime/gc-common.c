@@ -44,6 +44,8 @@
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "genesis/list-node.h"
+#include "genesis/split-ordered-list.h"
 #define WANT_SCAV_TRANS_SIZE_TABLES
 #include "gc-internal.h"
 #include "gc-private.h"
@@ -62,7 +64,7 @@ os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*const scavtab[256])(lispobj *where, lispobj object);
-uword_t gc_copied_nwords;
+uword_t gc_copied_nwords, gc_in_situ_live_nwords;
 
 /* If sb_sprof_enabled was used and the data are not in the final form
  * (in the *SAMPLES* instance) then all code remains live.
@@ -105,10 +107,10 @@ static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
  *
  * For GENCGC only:
  * - With 32-bit words, is_lisp_pointer(object) returns true if addr
- *   contains a broken heart marker (0x01), so we need a sanity check
- *   as the last case.
+ *   contains FORWARDING_HEADER (0x01), so we need a guard condition
+ *   as the last case, to make error detection possible.
  * - With 64-bit words, is_lisp_pointer(object) is false when addr
- *   contains a broken heart marker (0x01), so this won't get called.
+ *   contains FORWARDING_HEADER, so this function won't get called.
  */
 static inline void scav1(lispobj* addr, lispobj object)
 {
@@ -120,25 +122,31 @@ static inline void scav1(lispobj* addr, lispobj object)
             scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
     }
 #else
-    page_index_t page;
     /* In theory we can test forwarding_pointer_p on anything, but it's probably
      * better to avoid reading more memory than needed. Hence the pre-check
      * for a from_space object. But, rather than call from_space_p() which always
      * checks for object pinning, it's a performance boost to treat from_space_p()
      * as a leaky abstraction - reading one word at *native_pointer(object) is easier
      * than looking in a hashset, and 9 times out of 10 times we need to read it anyway.
-     * And if the object was already forwarded, we never need pinned_p. */
-    if ((page = find_page_index((void*)object)) >= 0) {
-        if (page_table[page].gen == from_space) {
+     * And if the object was already forwarded, we never need pinned_p.
+     *
+     * Based on some instrumentation added to this function, I determined
+     * that it makes sense to read the 'gen' even if find_page_index() returns -1,
+     * because approximately 25% of all calls to scav1() *do* find that the object
+     * is in from_space. The guard condition on page_index is not needed
+     * because it is legal to access page_table at index -1.
+     * Therefore, when the object is in from_space, we incur one fewer branch */
+
+    page_index_t page = find_page_index((void*)object);
+    if (page_table[page].gen == from_space) {
             if (forwarding_pointer_p(native_pointer(object)))
                 *addr = forwarding_pointer_value(native_pointer(object));
             else if (!pinned_p(object, page))
                 scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
-        }
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Test immobile_space_p() only if object was definitely not in dynamic space
-    else if (immobile_space_p(object)) {
+    else if (page < 0 && immobile_space_p(object)) {
         lispobj *ptr = base_pointer(object);
         if (immobile_obj_gen_bits(ptr) == from_space)
             enliven_immobile_obj(ptr, 1);
@@ -234,7 +242,6 @@ sword_t scavenge(lispobj *start, sword_t n_words)
  *
  * In case of card-spanning objects, the 'start' and 'end' parameters might not
  * exactly delimit objects boundaries. */
-#ifdef LISP_FEATURE_GENCGC
 int descriptors_scavenge(lispobj *start, lispobj* end,
                          generation_index_t gen, int dirty)
 {
@@ -278,9 +285,10 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
             goto immobile_obj;
 #endif
         else {
-            // Advancing by the filler payload count causes 'where' to be exactly
-            // at the next object after the loop increments it as usual.
-            if (header_widetag(ptr) == FILLER_WIDETAG) where += ptr >> N_WIDETAG_BITS;
+            // Advancing by the filler payload count (= total - 1) causes 'where' to
+            // align exactly to the next object after the loop steps by 1 as usual.
+            if (header_widetag(ptr) == FILLER_WIDETAG)
+                where += filler_total_nwords(ptr)-1;
             continue;
         }
         // Dear lord, I hate the numbering scheme with SCRATCH_GENERATION higher than everything
@@ -288,7 +296,6 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
     }
     return dirty;
 }
-#endif
 
 /* If 'fun' is provided, then call it on each livened object,
  * otherwise use scav1() */
@@ -347,9 +354,7 @@ extern int pin_all_dynamic_space_code;
 static struct code *
 trans_code(struct code *code)
 {
-#ifdef LISP_FEATURE_GENCGC
     gc_dcheck(!pin_all_dynamic_space_code);
-#endif
     /* if object has already been transported, just return pointer */
     if (forwarding_pointer_p((lispobj *)code)) {
         return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));
@@ -358,15 +363,24 @@ trans_code(struct code *code)
     gc_dcheck(widetag_of(&code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
-    lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
-    lispobj l_new_code = copy_possibly_large_object(l_code,
-                                           code_total_nwords(code),
-                                           code_region, PAGE_TYPE_CODE);
-
-#ifdef LISP_FEATURE_GENCGC
-    if (l_new_code == l_code)
-        return code;
+    long nwords = code_total_nwords(code);
+#ifndef LISP_FEATURE_64_BIT
+    /* 32-bit can allocate large code to ordinary (small object) pages
+     * because it uses code regions larger than LARGE_OBJECT_SIZE.
+     * This makes large code accidentally fit into the region.
+     * We can correct that problem here by closing the code region.
+     * This is simpler than (or more abstract than) calling gc_alloc_large()
+     * because whatever post-copying actions gc_copy_object() performs,
+     * we still want, such as the NOTE_TRANSPORTING macro invocation */
+    long nbytes = nwords << WORD_SHIFT;
+    if (nbytes >= LARGE_OBJECT_SIZE && !page_single_obj_p(find_page_index(code)))
+        ensure_region_closed(code_region, PAGE_TYPE_CODE);
 #endif
+    lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
+    lispobj l_new_code
+        = copy_potential_large_object(l_code, nwords, code_region, PAGE_TYPE_CODE);
+
+    if (l_new_code == l_code) return code;
 
     set_forwarding_pointer((lispobj *)code, l_new_code);
 
@@ -395,11 +409,7 @@ trans_code(struct code *code)
         }
     })
     gencgc_apply_code_fixups(code, new_code);
-#ifdef LISP_FEATURE_GENCGC
-    /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
-       spaces once when all copying is done. */
     os_flush_icache(code_text_start(new_code), code_text_size(new_code));
-#endif
     return new_code;
 }
 
@@ -430,9 +440,13 @@ scav_fun_pointer(lispobj *where, lispobj object)
             /* funcallable-instance might have all descriptor slots
              * except for the trampoline, which points to an asm routine.
              * This is not true for self-contained trampoline GFs though. */
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            page_type = PAGE_TYPE_CODE, region = code_region;
+#else
             struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
             if (layout && (layout_flags(layout) & STRICTLY_BOXED_FLAG))
                 page_type = PAGE_TYPE_BOXED, region = boxed_region;
+#endif
         } else {
             /* Closures can always go on strictly boxed pages even though the
              * underlying function is (possibly) an untagged pointer.
@@ -446,6 +460,14 @@ scav_fun_pointer(lispobj *where, lispobj object)
         }
         copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
         gc_assert(copy != object);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
+            struct funcallable_instance* old = (void*)native_pointer(object);
+            struct funcallable_instance* new = (void*)native_pointer(copy);
+            if (old->trampoline == (lispobj)&old->instword1)
+                new->trampoline = (lispobj)&new->instword1;
+        }
+#endif
         set_forwarding_pointer(fun, copy);
     }
     if (copy != object) *where = copy;
@@ -532,7 +554,6 @@ static inline lispobj copy_instance(lispobj object)
     void* region = small_mixed_region;
     int page_type = PAGE_TYPE_SMALL_MIXED;
 
-#ifdef LISP_FEATURE_GENCGC
     struct layout* layout = (void*)native_pointer(instance_layout(INSTANCE(object)));
     struct bitmap bitmap;
     const int words_per_card = GENCGC_CARD_BYTES>>WORD_SHIFT;
@@ -553,7 +574,6 @@ static inline lispobj copy_instance(lispobj object)
                  (layout_flags(layout) & STRICTLY_BOXED_FLAG))
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
     }
-#endif
 
     lispobj copy;
     // KLUDGE: reading both flags at once doesn't really work
@@ -566,10 +586,10 @@ static inline lispobj copy_instance(lispobj object)
         /* If odd, add 1 (making even). Rounding that to odd and then
          * adding 1 for the header will effectively add 2 words.
          * Otherwise, don't add anything because a padding slot exists */
+        int old_nwords = 1 + (original_length|1);
         int new_length = original_length + (original_length & 1);
         copy = gc_copy_object_resizing(object, 1 + (new_length|1),
-                                       region, page_type,
-                                       1 + (original_length|1));
+                                       region, page_type, old_nwords);
         lispobj *base = native_pointer(copy);
         /* store the old address as the hash value */
 #ifdef LISP_FEATURE_64_BIT
@@ -589,11 +609,12 @@ static inline lispobj copy_instance(lispobj object)
                (void*)object, original_length, (void*)copy, new_length,
                instance_length(*base));
 #endif
+        set_forwarding_pointer_resized(native_pointer(object), copy, old_nwords);
     } else {
         int nwords = 1 + (original_length|1);
         copy = gc_copy_object(object, nwords, region, page_type);
+        set_forwarding_pointer(native_pointer(object), copy);
     }
-    set_forwarding_pointer(native_pointer(object), copy);
     return copy;
 }
 
@@ -613,11 +634,11 @@ scav_instance_pointer(lispobj *where, lispobj object)
             // Copy chain of lockfree list nodes to consecutive memory addresses,
             // just like trans_list does.  A logically deleted node will break the chain,
             // as its 'next' will not satisfy instancep(), but that's ok.
-            while (instancep(object = node->slots[INSTANCE_DATA_START]) // node.next
+            while (instancep(object = ((struct list_node*)node)->_node_next)
                    && from_space_p(object)
                    && !forwarding_pointer_p(native_pointer(object))) {
                 copy = copy_instance(object);
-                node->slots[INSTANCE_DATA_START] = copy;
+                ((struct list_node*)node)->_node_next = copy;
                 node = INSTANCE(copy);
                 // We don't have to stop upon seeing an instance with a different layout.
                 // The only other object in the 'next' chain could be *TAIL-ATOM* if we reach
@@ -710,7 +731,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.
-    // That decision is made in copy_possibly_large_object().
+    // That decision is made in copy_potential_large_object().
     if (copy != object) {
         set_forwarding_pointer(first_pointer, copy);
         *where = copy;
@@ -722,6 +743,11 @@ scav_other_pointer(lispobj *where, lispobj object)
 /*
  * immediate, boxed, and unboxed objects
  */
+
+static sword_t size_filler(lispobj *where) {  return filler_total_nwords(*where); }
+static sword_t scav_filler(__attribute__((unused)) lispobj *where, lispobj object) {
+    return filler_total_nwords(object);
+}
 
  /* The immediate object scavenger basically wants to be "scav_cons",
   * and so returns 2. To see why it's right, observe that scavenge() will
@@ -752,11 +778,21 @@ scav_immediate(lispobj *where, lispobj object)
     return 2;
 }
 
-static sword_t
-size_immediate(lispobj __attribute__((unused)) *where)
+#ifdef LISP_FEATURE_PPC64
+/* Dead conses are clobbered to contain all 1s. The first word of such a cons
+ * does NOT look like a valid cons half due to unusual lowtag arrangement */
+static sword_t scav_consfiller(lispobj *where, lispobj object)
 {
-    return 1;
+    gc_assert(object == (uword_t)-1);
+    gc_assert(where[1] == (uword_t)-1);
+    return 2;
 }
+static sword_t size_consfiller(lispobj *where)
+{
+    gc_assert(where[0] == (uword_t)-1 && where[1] == (uword_t)-1);
+    return 2;
+}
+#endif
 
 //// General boxed object scav/trans/size functions
 
@@ -769,38 +805,33 @@ size_immediate(lispobj __attribute__((unused)) *where)
 
 DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
-DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 static lispobj trans_boxed(lispobj object) {
     return gc_copy_object(object, 1 + BOXED_NWORDS(*native_pointer(object)),
                           boxed_region, PAGE_TYPE_BOXED);
 }
-static lispobj trans_tiny_mixed(lispobj object) {
-    return gc_copy_object(object, 1 + TINY_BOXED_NWORDS(*native_pointer(object)),
-                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
-}
 
-static sword_t scav_symbol(lispobj *where, lispobj header) {
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
+/* Symbol */
+static sword_t scav_symbol(lispobj *where,
+                           __attribute__((unused)) lispobj header) {
     struct symbol* s = (void*)where;
-    scavenge(&s->value, 2); // picks up the value and info slots
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+    scavenge(&s->value, 3); // value, fdefn, info
     lispobj name = decode_symbol_name(s->name);
     lispobj new = name;
     scavenge(&new, 1);
     if (new != name) set_symbol_name(s, new);
-    // The normal length indicated in the header would be (SYMBOL_SIZE-1) since
-    // SYMBOL_SIZE counts the header as 1 word. If the indicated size is SYMBOL_SIZE,
-    // then there's an extra slot.  (The extra slot provides quick access to
-    // the special-operator handler function in the fast evaluator.)
-    int indicated_nwords = (header>>N_WIDETAG_BITS) & 0xFF;
-    // We've already processed the {hash, value, info, name}, so subtract 4 words.
-    // In truth, the hash was ignored, though it might be a good place to store
-    // some pointer data. 64 bits of hash is way more than enough.
-    scavenge(&s->fdefn, indicated_nwords - 4);
-    return 1 + (indicated_nwords|1); // round to odd, then add 1 for the header
 #else
-    return scav_tiny_boxed(where, header);
+    scavenge(&s->value, 4); // value, fdefn, info, name
 #endif
+    return ALIGN_UP(SYMBOL_SIZE, 2);
+}
+static lispobj trans_symbol(lispobj object) {
+    return gc_copy_object(object, ALIGN_UP(SYMBOL_SIZE,2),
+                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
+}
+static sword_t size_symbol(lispobj __attribute__((unused)) *where) {
+    return ALIGN_UP(SYMBOL_SIZE,2);
 }
 
 static inline int array_header_nwords(lispobj header) {
@@ -863,14 +894,14 @@ scav_instance(lispobj *where, lispobj header)
     // GC doesn't care too much about the deletion algorithm, but does have to
     // ensure liveness of the pointee, which may move unless pinned.
     if (lockfree_list_node_layout_p(layout)) {
-        struct instance* node = (struct instance*)where;
-        lispobj next = node->slots[INSTANCE_DATA_START];
+        struct list_node* node = (struct list_node*)where;
+        lispobj next = node->_node_next;
         if (fixnump(next) && next) { // ignore initially 0 heap words
             lispobj descriptor = next | INSTANCE_POINTER_LOWTAG;
             scav1(&descriptor, descriptor);
             // Fix the pointer but of course leave it in mid-deletion (untagged) state.
             if (descriptor != (next | INSTANCE_POINTER_LOWTAG))
-                node->slots[INSTANCE_DATA_START] = descriptor & ~LOWTAG_MASK;
+                node->_node_next = descriptor & ~LOWTAG_MASK;
         }
     }
 
@@ -928,15 +959,14 @@ scav_funinstance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
 #endif
-    // Do a similar thing as scav_instance but without any special cases.
-    struct bitmap bitmap = get_layout_bitmap(LAYOUT(layoutptr));
-    gc_assert(bitmap.nwords == 1);
-    sword_t mask = bitmap.bits[0];
-    ++where;
-    lispobj* limit = where + nslots;
-    lispobj obj;
-    for ( ; where < limit ; mask >>= 1, ++where )
-        if ((mask & 1) && is_lisp_pointer(obj = *where)) scav1(where, obj);
+    struct funcallable_instance* fin = (void*)where;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // payload: entry addr, 2 raw words, implementation function
+    scavenge(&fin->function, nslots-3);
+#else
+    // payload: trampoline entry addr, layout, implementation function, ...
+    scavenge(&fin->function, nslots-2);
+#endif
     return 1 + (nslots | 1);
 }
 
@@ -970,12 +1000,12 @@ static sword_t scav_bignum(lispobj __attribute__((unused)) *where, lispobj heade
 static lispobj trans_bignum(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-    return copy_possibly_large_object(object, bignum_nwords(*native_pointer(object)),
+    return copy_potential_large_object(object, bignum_nwords(*native_pointer(object)),
                                       unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
 #ifndef LISP_FEATURE_X86_64
-lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
+lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
     lispobj raw_addr = (lispobj)fdefn->raw_addr;
     if (!raw_addr || points_to_asm_code_p(raw_addr))
         // technically this should return the address of the code object
@@ -990,7 +1020,7 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct fdefn *fdefn = (struct fdefn *)where;
     scavenge(where + 1, 2); // 'name' and 'fun'
-    lispobj obj = fdefn_callee_lispobj(fdefn);
+    lispobj obj = decode_fdefn_rawfun(fdefn);
     lispobj new = obj;
     scavenge(&new, 1);
     if (new != obj) fdefn->raw_addr += (sword_t)(new - obj);
@@ -1058,7 +1088,7 @@ trans_vector_t(lispobj object)
         page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
     else if (v->header & mask)
         page_type = PAGE_TYPE_SMALL_MIXED, region = small_mixed_region;
-    return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), region, page_type);
+    return copy_potential_large_object(object, ALIGN_UP(length + 2, 2), region, page_type);
 }
 
 static sword_t
@@ -1118,7 +1148,7 @@ static inline void check_shadow_bits(__attribute((unused)) lispobj* v) {
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = vector_len(VECTOR(object)); \
-    return copy_possibly_large_object(object, ALIGN_UP(nwords + 2, 2), \
+    return copy_potential_large_object(object, ALIGN_UP(nwords + 2, 2), \
                              SPECIALIZED_VECTOR_ARGS); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
@@ -1209,11 +1239,9 @@ void smash_weak_pointers(void)
          * it has been, the weak pointer is still good and needs to be
          * updated. Otherwise, the weak pointer needs to be broken. */
         TEST_WEAK_CELL(wp->value, val, UNBOUND_MARKER_WIDETAG)
-#ifdef LISP_FEATURE_GENCGC
         // Large objects are "moved" by touching the page table gen field.
         // Do nothing if the target of this weak pointer had that happen.
         else if (new_space_p(val)) { }
-#endif
         else
             lose("unbreakable pointer %p", wp);
     }
@@ -1416,43 +1444,29 @@ boolean test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
 
 int finalizer_thread_runflag = 1;
 #ifdef LISP_FEATURE_SB_THREAD
+
 #ifdef LISP_FEATURE_WIN32
 CRITICAL_SECTION finalizer_mutex;
 CONDITION_VARIABLE finalizer_condvar;
-void finalizer_thread_wait () {
-    EnterCriticalSection(&finalizer_mutex);
-    if (finalizer_thread_runflag)
-        SleepConditionVariableCS(&finalizer_condvar, &finalizer_mutex, INFINITE);
-    LeaveCriticalSection(&finalizer_mutex);
-}
-void finalizer_thread_wake () {
-    WakeAllConditionVariable(&finalizer_condvar);
-}
-void finalizer_thread_stop () {
-    EnterCriticalSection(&finalizer_mutex);
-    finalizer_thread_runflag = 0;
-    WakeAllConditionVariable(&finalizer_condvar);
-    LeaveCriticalSection(&finalizer_mutex);
-}
 #else
 pthread_mutex_t finalizer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t finalizer_condvar = PTHREAD_COND_INITIALIZER;
+#endif
 void finalizer_thread_wait () {
     ignore_value(mutex_acquire(&finalizer_mutex));
     if (finalizer_thread_runflag)
-        pthread_cond_wait(&finalizer_condvar, &finalizer_mutex);
+        CONDITION_VAR_WAIT(&finalizer_condvar, &finalizer_mutex);
     ignore_value(mutex_release(&finalizer_mutex));
 }
-void finalizer_thread_wake() {
-    pthread_cond_broadcast(&finalizer_condvar);
+void finalizer_thread_wake () {
+    CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
 }
-void finalizer_thread_stop() {
+void finalizer_thread_stop () {
     ignore_value(mutex_acquire(&finalizer_mutex));
     finalizer_thread_runflag = 0;
-    pthread_cond_broadcast(&finalizer_condvar);
+    CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
     ignore_value(mutex_release(&finalizer_mutex));
 }
-#endif
 #endif
 
 void gc_common_init()
@@ -1534,7 +1548,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
         struct hash_table* ht = (struct hash_table*)native_pointer(kv_supplement);
         eql_hashing = hashtable_kind(ht) == 1;
         kv_supplement = ht->hash_vector;
-    } else if (kv_supplement == T) { // EQL hashing on a non-weak table
+    } else if (kv_supplement == LISP_T) { // EQL hashing on a non-weak table
         eql_hashing = 1;
         kv_supplement = NIL;
     }
@@ -1705,7 +1719,6 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             uint32_t *next_vector, uint32_t *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
-                            boolean save_culled_values,
                             boolean rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
@@ -1724,22 +1737,6 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
         gc_assert(value != empty_symbol);
         if (!alivep_test(key, value)) {
             gc_assert(hash_table->_count > 0);
-            if (save_culled_values) {
-                lispobj val = kv_vector[2 * index + 1];
-                gc_assert(!is_lisp_pointer(val));
-                struct cons *cons = (struct cons*)
-                  gc_general_alloc(cons_region, sizeof(struct cons), PAGE_TYPE_CONS);
-                // Lisp code which manipulates the culled_values slot must use
-                // compare-and-swap, but C code need not, because GC runs in one
-                // thread and has stopped the Lisp world.
-                cons->cdr = hash_table->culled_values;
-                cons->car = val;
-                lispobj list = make_lispobj(cons, LIST_POINTER_LOWTAG);
-                notice_pointer_store(&hash_table->culled_values);
-                hash_table->culled_values = list;
-                // ensure this cons doesn't get smashed into (0 . 0) by full gc
-                if (!compacting_p()) gc_mark_obj(list);
-            }
             kv_vector[2 * index] = empty_symbol;
             kv_vector[2 * index + 1] = empty_symbol;
             ensure_non_ptr_word_writable(&hash_table->_count);
@@ -1766,7 +1763,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             cons->cdr = hash_table->smashed_cells;
             // Lisp code must atomically pop the list whereas this C code
             // always wins and does not need compare-and-swap.
-            notice_pointer_store(&hash_table->smashed_cells);
+            notice_pointer_store(hash_table, &hash_table->smashed_cells);
             hash_table->smashed_cells = make_lispobj(cons, LIST_POINTER_LOWTAG);
             // ensure this cons doesn't get smashed into (0 . 0) by full gc
             if (!compacting_p()) gc_mark_obj(hash_table->smashed_cells);
@@ -1802,7 +1799,6 @@ cull_weak_hash_table (struct hash_table *hash_table,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
 
     boolean rehash = 0;
-    boolean save_culled_values = (hash_table->flags & make_fixnum(4)) != 0;
     // I'm slightly confused as to why we can't (or don't) compute the
     // 'should rehash' flag while scavenging the weak k/v vector.
     // I believe the explanation is this: for weak-key-AND-value tables, the vector
@@ -1814,7 +1810,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
         if (cull_weak_hash_table_bucket(hash_table, i, index_vector[i],
                                         kv_vector, next_vector, hash_vector,
                                         alivep_test, fix_pointers,
-                                        save_culled_values, rehash))
+                                        rehash))
             rehash = 1;
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
@@ -1868,10 +1864,8 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
      * which is what an extra reset would do if it saw no inserts. */
     if (weak_objects.count)
         hopscotch_reset(&weak_objects);
-#ifdef LISP_FEATURE_GENCGC
-    // Close the region used when pushing items to the finalizer queue
+    // Close the region used when pushing into hash_table->smashed_cells
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
-#endif
 }
 
 
@@ -1907,6 +1901,12 @@ sword_t scav_code_blob(lispobj *object, lispobj header);
 lispobj *
 component_ptr_from_pc(char *pc)
 {
+    /* This will safely look in one or both codeblob trees and/or the
+     * sorted array of immobile text pages. Failing those, it'll perform
+     * the usual linear scan of generation 1 and up pages. In any case
+     * it should be perfectly threadsafe because the trees are made of immutable
+     * nodes, and linear scan only operates on pages that can't be
+     * concurrently manipulated */
     lispobj *object = search_all_gc_spaces(pc);
 
     if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
@@ -1950,31 +1950,32 @@ lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success, or NULL on failure. */
 lispobj *
-gc_search_space3(void *pointer, lispobj *start, void *limit)
+gc_search_space3(void *pointer, lispobj * const start, void *limit)
 {
     if (pointer < (void*)start || pointer >= limit) return NULL;
 
     size_t count;
+    lispobj* where = start;
+
 #if SEARCH_SPACE_FOLLOWS_FORWARDING_POINTERS
     /* CAUTION: this code is _significantly_ slower than the production version
-       due to the extra checks for forwarding.  Only use it if debugging */
-    for ( ; (void*)start < limit ; start += count) {
-        lispobj *forwarded_start;
-        if (forwarding_pointer_p(start))
-            forwarded_start = native_pointer(forwarding_pointer_value(start));
-        else
-            forwarded_start = start;
-        lispobj thing = *forwarded_start;
-        count = OBJECT_SIZE(thing, forwarded_start);
+       due to the extra checks for forwarding.
+       Also it is BROKEN. DO NOT ENABLE THE #define UNLESS/UNTIL FIXED. */
+    for ( ; (void*)where < limit ; where += count) {
+        lispobj *copy = where;
+        if (forwarding_pointer_p(where))
+            copy = native_pointer(forwarding_pointer_value(where));
+        // BUG: the size of a forwarded object may exceed the size of the original
+        // due to the addition of a stable hash slot.
+        count = object_size(copy);
         /* Check whether the pointer is within this object. */
-        if (pointer < (void*)(start+count)) return start;
+        if (pointer < (void*)(where+count)) return where;
     }
 #else
-    for ( ; (void*)start < limit ; start += count) {
-        lispobj thing = *start;
-        count = OBJECT_SIZE(thing, start);
+    for ( ; (void*)where < limit ; where += count) {
+        count = object_size(where);
         /* Check whether the pointer is within this object. */
-        if (pointer < (void*)(start+count)) return start;
+        if (pointer < (void*)(where+count)) return where;
     }
 #endif
     return NULL;
@@ -2060,15 +2061,6 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
     return 0; // no good
 }
 
-/* META: Note the ambiguous word "validate" in the comment below.
- * This means "Decide whether <x> is valid".
- * But when you see os_validate() elsewhere, that doesn't mean to ask
- * whether something is valid, it says to *make* it valid.
- * I think it would be nice if we could avoid using the word in the
- * sense in which os_validate() uses it, which would entail renaming
- * a bunch of stuff, which is harder than just explaining why
- * the comments can be deceptive */
-
 /* Used by the debugger to validate possibly bogus pointers before
  * calling MAKE-LISP-OBJ on them.
  *
@@ -2092,7 +2084,6 @@ valid_lisp_pointer_p(lispobj pointer)
      * cases when we could answer the question more simply.
      * So unfortunately this generic interface has to know something about
      * which GC is in use. */
-#ifdef LISP_FEATURE_GENCGC
     page_index_t page = find_page_index((void*)pointer);
     if (page >= 0 &&
         (page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_BOXED) {
@@ -2104,7 +2095,6 @@ valid_lisp_pointer_p(lispobj pointer)
                             LOWTAG_FOR_WIDETAG(*native_pointer(pointer) & WIDETAG_MASK))
                == pointer;
     }
-#endif
     lispobj *start = search_all_gc_spaces((void*)pointer);
     if (start != NULL)
         return properly_tagged_descriptor_p((void*)pointer, start);
@@ -2173,7 +2163,7 @@ maybe_gc(os_context_t *context)
      */
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
-    unblock_gc_signals();
+    unblock_gc_stop_signal();
 #endif
     FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
     /* FIXME: Nothing must go wrong during GC else we end up running
@@ -2184,11 +2174,7 @@ maybe_gc(os_context_t *context)
      * we may even be in a WITHOUT-INTERRUPTS. */
     gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
     FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
-           (gc_happened == NIL)
-           ? "NIL"
-           : ((gc_happened == T)
-              ? "T"
-              : "0")));
+           gc_happened == NIL ? "NIL" : gc_happened == LISP_T ? "T" : "0"));
     /* gc_happened can take three values: T, NIL, 0.
      *
      * T means that the thread managed to trigger a GC, and post-gc
@@ -2201,7 +2187,7 @@ maybe_gc(os_context_t *context)
      * triggered by this thread; success, but post-gc doesn't have
      * to be called.
      */
-    if ((gc_happened == T) &&
+    if ((gc_happened == LISP_T) &&
         /* See if interrupts are enabled or it's possible to enable
          * them. POST-GC has a similar check, but we don't want to
          * unlock deferrables in that case and get a pending interrupt
@@ -2350,35 +2336,25 @@ scavenge_control_stack(struct thread *th)
      * the compiler isn't allowed to store unboxed objects on the
      * control stack.  -- AB, 2011-Dec-02 */
 
-    /* FIXME: I believe that this loop could be replaced by scavenge(),
-     * as it can not "... blow past the end" on header words,
-     * the way that heap_scavenge() might */
     for (object_ptr = th->control_stack_start;
          object_ptr < access_control_stack_pointer(th);
          object_ptr++) {
-
-        lispobj object = *object_ptr;
-#ifdef LISP_FEATURE_GENCGC
-        if (forwarding_pointer_p(object_ptr))
+        lispobj word = *object_ptr;
+        if (word == FORWARDING_HEADER)
             lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p",
                  object_ptr, th->control_stack_start, access_control_stack_pointer(th));
+        else if (is_lisp_pointer(word)) { scav1(object_ptr, word); }
+#ifdef LISP_FEATURE_PPC64
+        /* For ppc64, ~0 does not satisfy is_lisp_pointer() or is_lisp_immediate(),
+         * but it can be ignored. It nominally satisfies is_lisp_pointer() on other
+         * architectures, and gets ignored because it does not point to the heap. */
+        else if (is_lisp_immediate(word) || word == ~(uword_t)0) { } // ignore
+#else
+        else if (is_lisp_immediate(word)) { } // ignore
 #endif
-        if (is_lisp_pointer(object) && from_space_p(object)) {
-            /* It currently points to old space. Check for a
-             * forwarding pointer. */
-            lispobj *ptr = native_pointer(object);
-            if (forwarding_pointer_p(ptr)) {
-                /* Yes, there's a forwarding pointer. */
-                *object_ptr = forwarding_pointer_value(ptr);
-            } else {
-                /* Scavenge that pointer. */
-                long n_words_scavenged =
-                    (scavtab[header_widetag(object)])(object_ptr, object);
-                gc_assert(n_words_scavenged == 1);
-            }
-        } else if (scavtab[header_widetag(object)] == scav_lose) {
+        else if (scavtab[header_widetag(word)] == scav_lose) {
             lose("unboxed object in scavenge_control_stack: %p->%"OBJ_FMTX", start=%p, end=%p",
-                 object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
+                 object_ptr, word, th->control_stack_start, access_control_stack_pointer(th));
         }
     }
 }
@@ -2388,7 +2364,7 @@ scavenge_control_stack(struct thread *th)
 
 static int boxed_registers[] = BOXED_REGISTERS;
 
-// Nothing usees os_context_pc_addr any more, except ACCESS_INTERIOR_POINTER_pc.
+// Nothing uses os_context_pc_addr any more, except ACCESS_INTERIOR_POINTER_pc.
 // I didn't see a good way to remove that one.
 extern os_context_register_t* os_context_pc_addr(os_context_t*);
 
@@ -2644,6 +2620,147 @@ scavenge_interrupt_contexts(struct thread *th)
 #endif /* !REG_CODE */
 #endif /* x86oid targets */
 
+/* Finalizer table based on Split-Ordered Lists */
+typedef struct {
+    struct list_node lfnode;
+    lispobj hash;
+    lispobj key;
+    lispobj data;
+    // padding word, only if #+compact-instance-header
+} so_node;
+
+static inline int dummy_node_p(so_node* node) {
+    return (node->hash & make_fixnum(1)) == 0;
+}
+
+static inline int lispobj_livep(lispobj obj_base) {
+    extern int fullcgc_lispobj_livep(lispobj);
+    lispobj obj = compute_lispobj((lispobj*)obj_base);
+    return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
+}
+
+static void push_in_lockfree_list(struct symbol* list_holder,
+                                  so_node* this, lispobj key, lispobj data)
+{
+    // Using the so_node type for the rehash list is slightly wasteful of space
+    // but I don't feel like inventing another type just to eliminate the 'hash' slot.
+    // It is, however, imperative that we create new objects, because
+    // the lockfree algorithm crashes if nodes are mutated.
+    so_node* node =
+      gc_general_alloc(mixed_region, ALIGN_UP(sizeof (so_node), 2*N_WORD_BYTES),
+                       PAGE_TYPE_MIXED);
+    const unsigned int header_low =
+        (((sizeof (so_node) / N_WORD_BYTES) - 1) << INSTANCE_LENGTH_SHIFT)
+        | INSTANCE_WIDETAG;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    node->lfnode.header = ((this->lfnode.header >> 32) << 32) | header_low;
+    *(&node->data + 1) = 0; // padding words
+#else
+    node->lfnode.header = header_low;
+    node->lfnode._layout = this->lfnode._layout;
+#endif
+    node->hash = 0;
+    node->key = key;
+    node->data = data;
+    lispobj old = list_holder->value;
+    node->lfnode._node_next = old != NIL ? old : LFLIST_TAIL_ATOM;
+    // This __sync_val_compare_and_swap can not fail.
+    // On the machines that have spurious failure, it is not exposed,
+    // unlike in C++ where you can choose compare_exchange_{weak|strong}
+    lispobj new = make_lispobj(node, INSTANCE_POINTER_LOWTAG);
+    lispobj __attribute__((unused)) actual =
+        __sync_val_compare_and_swap(&list_holder->value, old, new);
+    gc_assert(actual == old);
+    if (!compacting_p()) gc_mark_obj(new);
+}
+static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
+{
+    struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
+    cons->car = element;
+    lispobj old = list_holder->value;
+    cons->cdr = old;
+    lispobj new = make_lispobj(cons, LIST_POINTER_LOWTAG);
+    lispobj __attribute__((unused)) actual =
+        __sync_val_compare_and_swap(&list_holder->value, old, new);
+    gc_assert(actual == old);
+    if (!compacting_p()) gc_mark_obj(new);
+}
+
+/* Scan the finalizer table and take action on each node as follows:
+ * - dummy nodes are ignored
+ * - nodes marked for deletion (by CANCEL-FINALIZATION) are culled
+ * - transported keys are moved to the "rehash" list
+ * - dead keys are moved to the "triggered" list
+ * - all other live keys are left alone
+ */
+void scan_finalizers()
+{
+    // NOTE: we do NOT need to invoke notice_pointer_store() on the global values
+    // of REHASHLIST or TRIGGERED because those are static symbols.
+    lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
+    gc_assert(lowtag_of(finalizer_store) == INSTANCE_POINTER_LOWTAG);
+    struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
+    so_node* prev = (void*)native_pointer(solist->head);
+    // SO-HEAD can not possibly be marked for deletion, therefore %NODE-NEXT
+    // returns a valid node.
+    lispobj node = prev->lfnode._node_next;
+    while (node != LFLIST_TAIL_ATOM) {
+        // At each iteration, 'this' is the node whose disposition we're pondering,
+        // and 'prev' is its immediate predecessor, always a valid non-deleted node.
+        so_node* this = (so_node*)(node-INSTANCE_POINTER_LOWTAG);
+        // To determine if 'this' is pending deletion, read the bits of its 'next'
+        lispobj next = this->lfnode._node_next;
+        if (dummy_node_p(this)) {
+            // Case 1: split-order dummy node
+            gc_assert(!fixnump(next)); // 'this' can not be marked for impending deletion
+            prev = this, node = next;
+            continue;
+        } else if (fixnump(next)) {
+            // Case 2: logically deleted regular node- "help" the lisp code along
+            // by completing this deletion. Lisp will decrement SO-COUNT (I hope!)
+        } else if (forwarding_pointer_p((lispobj*)this->key)) {
+            // Case 3: live object moved
+            // Get the moved object and construct a weak pointer to it.
+            // If the new object were directly stored in node->key, that would create
+            // a strong reference which not delays finalization, but also transitively
+            // enlivens anything it reaches.
+            struct weak_pointer* weakptr =
+              gc_general_alloc(mixed_region,
+                               ALIGN_UP(sizeof (struct weak_pointer), 2*N_WORD_BYTES),
+                               PAGE_TYPE_MIXED);
+            weakptr->header = ((WEAK_POINTER_SIZE-1) << N_WIDETAG_BITS) | WEAK_POINTER_WIDETAG;
+            weakptr->value = forwarding_pointer_value((lispobj*)this->key);
+#ifndef LISP_FEATURE_64_BIT
+            // 64-bit weak-pointers are 2 words, but 32-bit are 4 words because there
+            // is a GC-use field. In 64-bit, that field fits in the header.
+            memset(&weakptr->next, 0, 2*N_WORD_BYTES); // Will crash without this
+#endif
+            if (!compacting_p()) gc_mark_obj(make_lispobj(weakptr, OTHER_POINTER_LOWTAG));
+            push_in_lockfree_list(SYMBOL(FINALIZER_REHASHLIST),
+                                  this, make_lispobj(weakptr, OTHER_POINTER_LOWTAG),
+                                  this->data);
+            this->key = 0; // clobber dangling reference
+            --solist->uw_count;
+        } else if (!lispobj_livep(this->key)) {
+            // Case 4: dead object
+            push_in_ordinary_list(SYMBOL(FINALIZERS_TRIGGERED), this->data);
+            this->key = 0; // clobber dangling reference
+            --solist->uw_count;
+        } else {
+            // Case 5: ordinary node, live unmoved object
+            prev = this, node = next;
+            continue;
+        }
+        // Cases 2 through 4 all delete 'this' from the list
+        node = next | INSTANCE_POINTER_LOWTAG; // restore lowtag on 'next' for case 2
+        notice_pointer_store(prev, &prev->lfnode._node_next);
+        prev->lfnode._node_next = node;
+    }
+    // Close the region
+    ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
+    ensure_region_closed(cons_region, PAGE_TYPE_CONS);
+}
+
 /* Our own implementation of heapsort, because some C libraries have a qsort()
  * that calls malloc() apparently, which we MUST NOT do. */
 
@@ -2689,5 +2806,5 @@ void gc_heapsort_uwords(heap array, int length)
 /// External function for calling from Lisp.
 uword_t primitive_object_size(lispobj ptr) {
     lispobj* addr = native_pointer(ptr);
-    return OBJECT_SIZE(*addr,addr) * N_WORD_BYTES;
+    return object_size(addr) * N_WORD_BYTES;
 }

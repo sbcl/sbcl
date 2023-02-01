@@ -18,9 +18,12 @@
 #include "search.h"
 #include "thread.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
+#include "brothertree.h"
+#include "forwarding-ptr.h"
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -105,9 +108,8 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
     }
 #endif
     while (where < limit) {
-        lispobj word = *where;
         struct vector *string;
-        if (header_widetag(word) == SYMBOL_WIDETAG &&
+        if (widetag_of(where) == SYMBOL_WIDETAG &&
             (string = symbol_name((struct symbol*)where)) != 0 &&
             string->length_ == namelen) {
             if (gc_managed_addr_p((lispobj)string) &&
@@ -121,7 +123,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
                  ))
                 return where;
         }
-        where += OBJECT_SIZE(word, where);
+        where += object_size(where);
     }
     return 0;
 }
@@ -144,7 +146,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
             if (widetag == SYMBOL_WIDETAG &&
                 tls_index_of(((struct symbol*)where)) == tls_index)
                 return (struct symbol*)where;
-            where += OBJECT_SIZE(header, where);
+            where += object_size2(where, header);
         }
         if (where >= (lispobj*)DYNAMIC_SPACE_START)
             break;
@@ -171,26 +173,28 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
     struct package* pkg = (struct package*)(package - INSTANCE_POINTER_LOWTAG);
     int table_selector = *hint & 1, iteration;
     for (iteration = 1; iteration <= 2; ++iteration) {
-        struct instance* symbols = (struct instance*)
+        struct instance* table = (struct instance*)
           native_pointer(table_selector ? pkg->external_symbols : pkg->internal_symbols);
-        gc_assert(widetag_of(&symbols->header) == INSTANCE_WIDETAG);
-        struct vector* cells = VECTOR(symbols->slots[INSTANCE_DATA_START]);
-        gc_assert(widetag_of(&cells->header) == SIMPLE_VECTOR_WIDETAG);
+        gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
+        gc_assert(listp(table->slots[INSTANCE_DATA_START])); // KLUDGE
+        struct cons* cells = (void*)native_pointer(table->slots[INSTANCE_DATA_START]);
+        gc_assert(simple_vector_p(cells->cdr));
+        struct vector* v = VECTOR(cells->cdr);
         lispobj namelen = strlen(symbol_name);
-        int cells_length = vector_len(cells);
+        int vector_length = vector_len(v);
         int index = *hint >> 1;
-        if (index >= cells_length)
+        if (index >= vector_length)
             index = 0; // safeguard against vector shrinkage
         int initial_index = index;
         do {
-            lispobj thing = cells->data[index];
+            lispobj thing = v->data[index];
             if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(thing)->header) == SYMBOL_WIDETAG
                 && sym_stringeq(thing, symbol_name, namelen)) {
                 *hint = (index << 1) | table_selector;
                 return (lispobj*)SYMBOL(thing);
             }
-            index = (index + 1) % cells_length;
+            index = (index + 1) % vector_length;
         } while (index != initial_index);
         table_selector = table_selector ^ 1;
     }
@@ -201,3 +205,120 @@ lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 {
     return package ? search_package_symbols(package, symbol_name, hint) : 0;
 }
+
+static inline boolean fringe_node_p(struct binary_node* node)
+{
+    int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
+    return len <= (int)(1+INSTANCE_DATA_START);
+}
+
+/* I anticipate using the brothertree search algorithms to find code
+ * while GC has already potentially moved some of the tree nodes,
+ * thus the use of follow_fp() before dereferencing a node pointer */
+uword_t brothertree_find_eql(uword_t key, lispobj tree)
+{
+    while (tree != NIL) {
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            // unless a fringe node, read the left and right pointers
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
+            if (key < node->key) tree = l; else tree = r;
+        }
+    }
+    return 0;
+}
+
+uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            // unless a fringe node, read the left and right pointers
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
+            if (key < node->key) tree = l; else { best = tree; tree = r; }
+        }
+    }
+    return best;
+}
+
+uword_t brothertree_find_greatereql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            // unless a fringe node, read the left and right pointers
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
+            if (key > node->key) tree = r; else { best = tree; tree = l; }
+        }
+    }
+    return best;
+}
+
+#define BSEARCH_ALGORITHM_IMPL \
+    int low = 0; \
+    int high = nelements - 1; \
+    while (low <= high) { \
+        /* Many authors point out that this is a bug if overflow occurs \
+         * and it can be avoided by using low+(high-low)/2 or similar. \
+         * But we will never have so many code blobs that overflow occurs. */ \
+        int mid = (low + high) / 2; \
+        uword_t probe = array[mid]; \
+        if (probe < item) low = mid + 1; \
+        else if (probe > item) high = mid - 1; \
+        else return mid; \
+    } \
+
+/* Binary search a sorted vector (of code base addresses).
+ * This might be useful for generations other than 0,
+ * because we only need to rebuild the vector in GC, which is
+ * easily done; and it's much denser than a tree */
+int bsearch_lesseql_uword(uword_t item, uword_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (high >= 0) return high;
+    return -1;
+}
+
+int bsearch_greatereql_uword(uword_t item, uword_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (low < nelements) return low;
+    return -1;
+}
+
+#ifdef LISP_FEATURE_64_BIT
+/// As above, but using space-relative pointers which halve the storage requirement
+int bsearch_lesseql_uint32(uint32_t item, uint32_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (high >= 0) return high;
+    return -1;
+}
+
+int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (low < nelements) return low;
+    return -1;
+}
+#endif

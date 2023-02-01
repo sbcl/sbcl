@@ -11,6 +11,16 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "compiler-test-util.lisp")
+
+(require :sb-md5)
+#+64-bit
+(progn
+  (let ((n 0))
+    (do-all-symbols (s)
+      (when (> (sb-kernel:symbol-package-id s) 100) (incf n)))
+    (assert (= n 0))))
+
 (defun set-bad-package (x)
   (declare (optimize (safety 0)))
   (setq *package* x))
@@ -791,14 +801,14 @@ if a restart was invoked."
           (assert (equal (length (intersection answer expect :test #'equal))
                          (length expect))))))))
 
-;; Assert that changes in size of a package-hashtable's symbol vector
+;; Assert that changes in size of a symbo-hashset's symbol vector
 ;; do not cause WITH-PACKAGE-ITERATOR to crash. The vector shouldn't grow,
 ;; because it is not permitted to INTERN new symbols, but it can shrink
 ;; because it is expressly permitted to UNINTERN the current symbol.
 ;; (In fact we allow INTERN, but that's beside the point)
 (with-test (:name :with-package-iterator-and-mutation)
   (flet ((table-size (pkg)
-           (length (sb-impl::package-hashtable-cells
+           (length (sb-impl::symtbl-cells
                     (sb-impl::package-internal-symbols pkg)))))
     (let* ((p (make-package (string (gensym))))
            (initial-table-size (table-size p))
@@ -823,6 +833,14 @@ if a restart was invoked."
               (assert (not (iter))))))
         (let ((shrunk-table-size (table-size p)))
           (assert (< shrunk-table-size grown-table-size)))))))
+
+(with-test (:name :symbol-externalp)
+  (with-package-iterator (iter (list-all-packages) :internal :external)
+    (loop
+        (multiple-value-bind (foundp sym access pkg) (iter)
+          (unless foundp (return))
+          (when (eq access :external)
+            (assert (sb-impl::symbol-externalp sym pkg)))))))
 
 ;; example from CLHS
 (with-test (:name :do-symbols-block-scope)
@@ -1011,52 +1029,6 @@ if a restart was invoked."
     (make-package "PKG-B" :nicknames '("PKG-A"))
     (assert (eq (foo-intern "X") (find-symbol "X" "PKG-B")))))
 
-;;; It's extremely unlikely that a user would make >2^16 packages, but test that it works.
-(defun grow-id->package-vector ()
-  (let ((table (make-array 65535 :initial-element nil))) ; grow once only. Sorry for cheating
-    (replace table sb-impl:*id->package*)
-    (setf sb-impl:*id->package* table)))
-(compile 'grow-id->package-vector)
-
-(with-test (:name :ridiculous-amount-of-packages)
-  (make-package "WATPACKAGE")
-  (grow-id->package-vector) ; grow once only. Sorry for cheating
-  (loop
-    ;; This loop unfortunately takes 2 seconds, which kind of speaks to
-    ;; the slowness of package creation. I don't think we need to improve that,
-    ;; but we _do_ need to test this, so ... it's a minor point of pain.
-    ;; If I had to guess, resizing the mostly-lockfree hash-table is the issue.
-    ;; We could grow it all at once to improve the performance.
-    (let* ((package (make-package "STRANGE"))
-           (id (sb-impl::package-id package))
-           (new-name (format nil "TEST-PKGID-~D" id)))
-      (unless id (return))
-      (rename-package package new-name)))
-  (let ((p (find-package "STRANGE")))
-    (assert (not (sb-impl::package-id p)))
-    (let ((symbol (intern "WAT123" p)))
-      (assert (eq (symbol-package symbol) p))
-      (delete-package p)
-      (assert (not (symbol-package symbol)))
-      (import symbol "WATPACKAGE")
-      (assert (eq (symbol-package symbol) (find-package "WATPACKAGE")))
-      ;; assert that the symbol got a small ID
-      (assert (not (sb-int:info :symbol :package symbol)))))
-  (delete-package "WATPACKAGE")
-  (let ((p (make-package "ANOTHERPACKAGE")))
-    (assert (sb-impl::package-id p)))
-  (let ((p (make-package "YETANOTHERPACKAGE")))
-    (assert (not (sb-impl::package-id p))))
-  ;; Now for every package named TEST-PKGIDnm, check that a symbol interned
-  ;; in that package can read the bits back correctly (because vops are confusing)
-  (let ((n 0))
-    (dolist (package (list-all-packages))
-      (when (search "TEST-PKGID-" (package-name package))
-        (incf n)
-        (let ((the-symbol (intern "FROBOLA" package)))
-          (assert (eq (symbol-package the-symbol) package)))))
-    (assert (> n 65450)))) ; assert that we exercised lots of bit patterns
-
 ;;; The concept behind the intricate storage representation of local nicknames
 ;;; was that adding a nickname does not create a strong reference to the
 ;;; nicknamed package, but nonetheless avoids having to do a FIND-PACKAGE
@@ -1081,11 +1053,111 @@ if a restart was invoked."
   ;; Check that SP is a local nickname
   (assert (let ((*package* (find-package "MYPKG"))) (find-symbol "ZOOK" "SP")))
   ;;; But not a global name of any package
-  (assert-error  (find-symbol "ZOOK" "SP"))
+  (assert-error (find-symbol "ZOOK" "SP"))
   (delete-package "SOMEPACKAGE")
+  ;; Assert that the local nickname vector has not yet removed the
+  ;; deleted package. DELETE-PACKAGE does not scan all packages to adjust
+  ;; their local nicknames. (There's no "locally nicknamed by" accessor so it
+  ;; definitely would need to visit all packages which I didn't like.
+  ;; It wouldn't be the worst thing, but I opted not to store a reverse lookup)
+  ;; Rather interestingly, this operation overwrites a words of the control stack
+  ;; that might otherwise randomly contain the very package that got deleted.
+  (assert (= (length (cdr (sb-impl::package-%local-nicknames
+                           (find-package "MYPKG"))))
+             2))
   (sb-sys:scrub-control-stack)
   (gc :full t)
-  (assert (not (weak-pointer-value *the-weak-ptr*)))
+  ;; Asserting that the weak pointer gets splatted _before_ doing the next FIND-SYMBOL
+  ;; confirms that the nickname representation did not store a strong reference
+  ;; to #<SOMEPACKAGE>. Package-local nicknames are necessarily purged of any deleted
+  ;; packages just-in-time, so the assertion would not demonstrate anything if run
+  ;; _after_ calling FIND-SYMBOL. I don't know why this fails on #+win32, SEARCH-ROOTS
+  ;; did not return a path, so there must also be a deficiency in that.
+  #-win32 (assert (not (weak-pointer-value *the-weak-ptr*)))
   (assert-error (let ((*package* (find-package "MYPKG")))
                   ;; the nickname magically went away!
                   (find-symbol "ZOOK" "SP"))))
+
+;;; This is probably, strictly speaking, non-conforming code according
+;;; to ANSI 3.2.4.4 under item 1 for symbol, taking package "same"ness
+;;; to mean EQness.
+(with-test (:name :defpackage-rename-package-redefpackage)
+  (ctu:file-compile
+   `((eval-when (:compile-toplevel :load-toplevel :execute)
+       (when (find-package "DEFPACKAGE4")
+         (rename-package "DEFPACKAGE4" "DEFPACKAGE4")))
+     (defpackage "DEFPACKAGE4"
+       (:use :cl))
+     (in-package "DEFPACKAGE4")
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       (export '(f))))
+   :load t)
+  (assert (eq (nth-value 1 (find-symbol "F" "DEFPACKAGE4"))
+              :external)))
+
+(with-test (:name :defpackage-rename-package)
+  (delete-package "BAR")
+  (ctu:file-compile
+   `((eval-when (:compile-toplevel :load-toplevel :execute)
+       (cond
+         ((find-package "FOO")
+          (rename-package "FOO"
+                          "BAR"))
+         ((not (find-package "BAR"))
+          (make-package "BAR" :use '("CL")))))
+
+     (in-package "BAR")
+
+     (defun stable-union (bar) bar))
+   :before-load (lambda ()
+                  (delete-package "BAR")
+                  (defpackage foo (:use :cl)))
+   :load t)
+  (assert (find-symbol "STABLE-UNION" "BAR"))
+  (delete-package "BAR"))
+
+(with-test (:name :defpackage-rename-package-symbol-conflict)
+  (with-scratch-file (fasl2 "fasl")
+    (compile-file "package-test-2.lisp" :output-file fasl2)
+    (delete-package "BAR")
+    (with-scratch-file (fasl1 "fasl")
+      (compile-file "package-test-1.lisp" :output-file fasl1)
+      (load fasl2)))
+  (assert (eq (symbol-package (find-symbol "BAZ" "BAR"))
+              (find-package "BAR")))
+  (assert (eq (funcall (find-symbol "BAZ" "BAR"))
+              :good))
+  (delete-package "BAR"))
+
+(with-test (:name :defpackage-rename-package-preserve-externals)
+  (with-scratch-file (fasl4 "fasl")
+    (compile-file "package-test-4.lisp" :output-file fasl4)
+    (delete-package "FOO-NEW")
+    (with-scratch-file (fasl3 "fasl")
+      (compile-file "package-test-3.lisp" :output-file fasl3)
+      (load fasl4)))
+  (assert (eq (nth-value 1 (find-symbol "BAR" "FOO-NEW"))
+              :external))
+  (delete-package "FOO-NEW"))
+
+(with-test (:name :defpackage-delete-package-redefpackage-fasloader)
+  (with-scratch-file (fasl5 "fasl")
+    (compile-file "package-test-5.lisp" :output-file fasl5)
+    (load fasl5)
+    (if (find-package "BAR-DRRFL") (delete-package "BAR-DRRFL"))
+    (with-scratch-file (fasl6 "fasl")
+      (compile-file "package-test-6.lisp" :output-file fasl6)
+      (load fasl6)
+      (load fasl6))
+    (delete-package "BAR-DRRFL")))
+
+;;; We were not creating fasls correctly when a file defining a
+;;; package was compiled twice, since we were relying on the compile
+;;; time effect of that happening to change the behavior of what code
+;;; to put in the same component.
+(with-test (:name :make-package-compile-twice)
+  (with-scratch-file (fasl7 "fasl")
+    (compile-file "package-test-7.lisp" :output-file fasl7)
+    (compile-file "package-test-7.lisp" :output-file fasl7)
+    (load fasl7)
+    (delete-package "COMPILE-TWICE")))

@@ -373,3 +373,27 @@ fractional bits."
                        4.2766818550391727d188
                        1.635888515419299d28))
           (test op val))))))
+
+(with-test (:name :truncate-bignum-type-derivation)
+  (checked-compile `(lambda (x)
+                      (declare ((or (integer 1208925819614629174706175)
+                                    (integer * -1208925819614629174706175))
+                                x))
+                      (truncate (float x 4d0))))
+  (checked-compile `(lambda (x)
+                      (declare ((or (integer 1208925819614629174706175)
+                                    (integer * -1208925819614629174706175))
+                                x))
+                      (truncate (float x 1d0) 4d0))))
+
+(with-test (:name :bignum-float-compare)
+  (flet ((test (integer)
+           (assert (= (float integer 1d0)
+                      (truncate (float integer 1d0))))
+           (assert (= (float integer)
+                      (truncate (float integer))))))
+    (loop for i from 80 to 100 by 4
+          do (test (expt 2 i))
+             (test (- (expt 2 i)))
+             (test (1+ (expt 2 i)))
+             (test (- (expt 2 i))))))

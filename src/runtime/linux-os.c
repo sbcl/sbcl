@@ -197,7 +197,6 @@ futex_init()
         futex_private_supported_p = 1;
     } else {
         futex_private_supported_p = 0;
-        SHOW("No futex private suppport\n");
     }
 }
 
@@ -360,27 +359,6 @@ int os_preinit(char *argv[], char *envp[])
 #endif
     return 0;
 }
-
-void
-os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
-{
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    // dynamic space should not have protections manipulated
-    if (find_page_index(address) >= 0)
-        lose("unexpected call to os_protect with software card marks");
-#endif
-    if (mprotect(address, length, prot)) {
-        if (errno == ENOMEM) {
-            lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
-                 "of separate memory mappings was exceeded. To fix the problem, either increase\n"
-                 "the maximum with e.g. 'echo 262144 > /proc/sys/vm/max_map_count' or recompile\n"
-                 "SBCL with a larger value for GENCGC-PAGE-BYTES in\n"
-                 "'src/compiler/"SBCL_TARGET_ARCHITECTURE_STRING"/parms.lisp'.");
-        } else {
-            perror("mprotect");
-        }
-    }
-}
 
 /*
  * any OS-dependent special low-level handling for signals
@@ -410,9 +388,13 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-    if (gencgc_handle_wp_violation(addr)) return;
+    if (gencgc_handle_wp_violation(context, addr)) return;
 #else
     if (cheneygc_handle_wp_violation(context, addr)) return;
+#endif
+    extern int diagnose_arena_fault(os_context_t*,char*);
+#ifdef LISP_FEATURE_SYSTEM_TLABS
+    if (diagnose_arena_fault(context, addr)) return;
 #endif
     if (!handle_guard_page_triggered(context, addr))
             sbcl_fallback_sigsegv_handler(signal, info, context);

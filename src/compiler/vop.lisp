@@ -59,36 +59,6 @@
 (defun sc-locations-member (location locations)
   (logbitp location locations))
 
-;;; This used to have two local functions in it, but when it did,
-;;; using ABCL as the build host crashed thusly with no backtrace:
-;;; (funcall (macro-function 'do-sc-locations)
-;;;           '(do-sc-locations (el (sc-locations sc) nil (sc-element-size sc))
-;;;             (feep))
-;;;            nil)
-;;;  => Debugger invoked on condition of type TYPE-ERROR
-;;;     The value NIL is not of type STRUCTURE-OBJECT.
-(defmacro do-sc-locations ((location locations
-                            &optional result increment (limit 'sb-vm:finite-sc-offset-limit))
-                           &body body)
-  (let ((mid (floor sb-vm:finite-sc-offset-limit 2)))
-    (once-only ((locations locations)
-                (increment `(the sb-vm:finite-sc-offset ,(or increment 1))))
-      (flet ((make-guarded-block (start end)
-                 (unless (and (integerp limit) (> start limit))
-                   (let ((mask (dpb -1 (byte mid start) 0)))
-                     `((when (logtest ,mask ,locations)
-                         (loop named #:noname
-                               for ,location
-                               from ,start below ,end by ,increment
-                               when (logbitp ,location ,locations)
-                                 do (locally (declare (type sb-vm:finite-sc-offset
-                                                            ,location))
-                                      ,@body))))))))
-        `(block nil
-           ,@(make-guarded-block 0   mid)
-           ,@(make-guarded-block mid limit)
-           ,result)))))
-
 ;;; the different policies we can use to determine the coding strategy
 (deftype ltn-policy ()
   '(member :safe :small :small-safe :fast :fast-safe))
@@ -244,7 +214,7 @@
   (%label :test %label))
 
 ;;; An IR2-LVAR structure is used to annotate LVARs that are used as a
-;;; function result LVARs or that receive MVs.
+;;; function result LVAR or that receive MVs.
 (defstruct (ir2-lvar
             (:constructor make-ir2-lvar (primitive-type))
             (:copier nil))
@@ -388,6 +358,8 @@
 ;;; this case the slots aren't actually initialized until entry
 ;;; analysis runs.
 (defstruct (entry-info (:copier nil))
+  ;; True if this function has a non-null closure environment.
+  (closure-p nil :type boolean)
   ;; TN, containing closure (if needed) for this function in the home
   ;; environment.
   (closure-tn nil :type (or null tn))
@@ -695,7 +667,7 @@
   ;;
   ;; :KNOWN-RETURN
   ;;     If needed, the old NFP is computed using COMPUTE-OLD-NFP.
-  (move-args nil :type (member nil :full-call :local-call :known-return))
+  (move-args nil :type (member nil :full-call :local-call :known-return :fixed))
   ;; a list of sc-vectors representing the loading costs of each fixed
   ;; argument and result
   (arg-costs nil :type list)
@@ -738,7 +710,7 @@
   ;; encodes the source ref (shifted 8, it is also encoded in
   ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1)))
-  (optimizer nil :type (or null function))
+  (optimizer nil :type (or null function (cons function symbol)))
   (optional-results nil :type list)
   move-vop-p
   (after-sc-selection nil :type (or null function) :read-only t))

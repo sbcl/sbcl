@@ -14,7 +14,7 @@
 
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (sb-ext:exit :code 104))
+  (invoke-restart 'run-tests::skip-file))
 
 (declaim (optimize debug))
 
@@ -36,7 +36,7 @@
           do (setf frame (sb-di::frame-down frame)))
     (assert frame)
     (assert (sb-debug::frame-has-debug-tag-p frame))
-    (let* ((call-list (sb-debug::frame-call-as-list frame))
+    (let* ((call-list (sb-debug::frame-call-as-list frame call-arguments-limit))
            (fun (fdefinition (car call-list))))
       (sb-debug::unwind-to-frame-and-call frame
                                           (lambda ()

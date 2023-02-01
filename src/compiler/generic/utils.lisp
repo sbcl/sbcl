@@ -49,18 +49,22 @@
            (- list-pointer-lowtag)))
       0))
 
+(symbol-macrolet ((alien-linkage-table-space-end
+                   (+ alien-linkage-table-space-start alien-linkage-table-space-size)))
 ;;; the address of the linkage table entry for table index I.
-(defun linkage-table-entry-address (i)
-  (ecase linkage-table-growth-direction
-    (:up   (+ (* i linkage-table-entry-size) linkage-table-space-start))
-    (:down (- linkage-table-space-end (* (1+ i) linkage-table-entry-size)))))
+(defun alien-linkage-table-entry-address (i)
+  (ecase alien-linkage-table-growth-direction
+    (:up   (+ (* i alien-linkage-table-entry-size) alien-linkage-table-space-start))
+    (:down (- alien-linkage-table-space-end (* (1+ i) alien-linkage-table-entry-size)))))
 
-(defun linkage-table-index-from-address (addr)
-  (ecase linkage-table-growth-direction
+#-sb-xc-host
+(defun alien-linkage-table-index-from-address (addr)
+  (ecase alien-linkage-table-growth-direction
     (:up
-     (floor (- addr linkage-table-space-start) linkage-table-entry-size))
+     (floor (- addr alien-linkage-table-space-start) alien-linkage-table-entry-size))
     (:down
-     (1- (floor (- linkage-table-space-end addr) linkage-table-space-end)))))
+     (1- (floor (- alien-linkage-table-space-end addr) alien-linkage-table-space-end)))))
+)
 
 (defconstant-eqx +all-static-fdefns+
     #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)
@@ -72,6 +76,7 @@
     (and static-fun-index
          (+ (* (length +static-symbols+) (pad-data-block symbol-size))
             (pad-data-block (1- symbol-size))
+            (* 4 n-word-bytes) ; sizeof SB-LOCKLESS:+TAIL+
             (- list-pointer-lowtag)
             (* static-fun-index (pad-data-block fdefn-size))
             other-pointer-lowtag))))
@@ -90,6 +95,29 @@
      (- other-pointer-lowtag)
      (* fdefn-raw-addr-slot n-word-bytes)))
 
+;;; Various error-code generating helpers
+(defvar *adjustable-vectors*)
+
+(defmacro with-adjustable-vector ((var) &rest body)
+  `(let ((,var (or (pop *adjustable-vectors*)
+                   (make-array 16
+                               :element-type '(unsigned-byte 8)
+                               :fill-pointer 0
+                               :adjustable t))))
+     ;; Don't declare the length - if it gets adjusted and pushed back
+     ;; onto the freelist, it's anyone's guess whether it was expanded.
+     ;; This code was wrong for >12 years, so nobody must have needed
+     ;; more than 16 elements. Maybe we should make it nonadjustable?
+     (declare (type (vector (unsigned-byte 8)) ,var))
+     (setf (fill-pointer ,var) 0)
+     ;; No UNWIND-PROTECT here - semantics are unaffected by nonlocal exit,
+     ;; and this macro is about speeding up the compiler, not slowing it down.
+     ;; GC will clean up any debris, and since the vector does not point
+     ;; to anything, even an accidental promotion to a higher generation
+     ;; will not cause transitive garbage retention.
+     (prog1 (progn ,@body)
+       (push ,var *adjustable-vectors*))))
+
 ;;;; interfaces to IR2 conversion
 
 ;;; Return a wired TN describing the N'th full call argument passing
@@ -118,6 +146,38 @@
       (make-sc+offset descriptor-reg-sc-number
                       (nth n *register-arg-offsets*))
       (make-sc+offset control-stack-sc-number n)))
+
+(defstruct fixed-call-args-state
+  (descriptors -1 :type fixnum)
+  #-c-stack-is-control-stack
+  (non-descriptors -1 :type fixnum)
+  (float -1 :type fixnum))
+
+(declaim (#+sb-xc-host special
+          #-sb-xc-host sb-ext:global
+          *float-regs* *descriptor-args*
+          #-c-stack-is-control-stack *non-descriptor-args*))
+
+(defun fixed-call-arg-location (type state)
+  (let* ((primtype (primitive-type type))
+         (sc (find descriptor-reg-sc-number (sb-c::primitive-type-scs primtype) :test-not #'eql)))
+    (case (primitive-type-name primtype)
+      ((double-float single-float)
+       (make-wired-tn primtype
+                      sc
+                      (elt *float-regs* (incf (fixed-call-args-state-float state)))))
+      ((unsigned-byte-64 signed-byte-64)
+       (make-wired-tn primtype
+                      sc
+                      (elt #-c-stack-is-control-stack *non-descriptor-args*
+                           #+c-stack-is-control-stack *descriptor-args*
+                           (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
+                                  #+c-stack-is-control-stack fixed-call-args-state-descriptors
+                                  state)))))
+      (t
+       (make-wired-tn primtype
+                      descriptor-reg-sc-number
+                      (elt *descriptor-args* (incf (fixed-call-args-state-descriptors state))))))))
 
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.
@@ -192,45 +252,66 @@
        (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                       (specifier-type 'list)))))
 
-;;; Does the TN definitely hold an OTHER pointer
-(defun other-pointer-tn-ref-p (tn-ref)
+;;; Does the TN definitely hold an OTHER pointer?
+;;; If the operation next to be performed on TN is a widetag test,
+;;; then NIL is ok as the input. Indicate this by specifying PERMIT-NIL.
+;;; With rare exception it should always be permitted, though not on ppc64
+;;; where it would never be. The safe default is NIL.
+(defun other-pointer-tn-ref-p (tn-ref &optional permit-nil)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
-             (specifier-type '(or fixnum
-                               #+64-bit single-float
-                               function
-                               list
-                               instance
-                               character))))))
+             (if permit-nil
+                 (specifier-type '(or fixnum
+                                   #+64-bit single-float
+                                   function
+                                   cons
+                                   instance
+                                   character))
+                 (specifier-type '(or fixnum
+                                   #+64-bit single-float
+                                   function
+                                   list
+                                   instance
+                                   character)))))))
 
-(defun fixnum-or-other-pointer-tn-ref-p (tn-ref)
+(defun fixnum-or-other-pointer-tn-ref-p (tn-ref &optional permit-nil)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
-             (specifier-type '(or #+64-bit single-float
-                               function
-                               list
-                               instance
-                               character))))))
+             (specifier-type (if permit-nil
+                                 '(or #+64-bit single-float
+                                   function
+                                   cons
+                                   instance
+                                   character)
+                                 '(or #+64-bit single-float
+                                   function
+                                   list
+                                   instance
+                                   character)))))))
 
 (defun not-nil-tn-ref-p (tn-ref)
   (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                  (specifier-type '(eql nil)))))
 
+(defun instance-tn-ref-p (tn-ref)
+  (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance)))
+
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
-    (when (or (not write) ; grrrr, the only write is from a LOAD tn
-                          ; and we don't know the corresponding normal TN?
-              (tn-ref-next write)) ; can't determine if > 1 write
+    (when (or (not write)    ; grrrr, the only write is from a LOAD tn
+                                        ; and we don't know the corresponding normal TN?
+              (tn-ref-next write))      ; can't determine if > 1 write
       (return-from stack-consed-p nil))
     (let ((vop (tn-ref-vop write)))
-      (when (not vop) ; wat?
+      (when (not vop)                   ; wat?
         (return-from stack-consed-p nil))
       (when (eq (vop-name vop) 'allocate-vector-on-stack)
         (return-from stack-consed-p t))
-      (when (and (eq (vop-name vop) 'fixed-alloc)
-                 (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+      (when (or (and (eq (vop-name vop) 'fixed-alloc) ; do we still need this case?
+                     (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+                (eq (vop-name vop) 'sb-c::fixed-alloc-to-stack))
         (return-from stack-consed-p t))
       ;; Should we try to detect a stack-consed LIST also?
       ;; I don't think that will work.
@@ -239,7 +320,7 @@
         (return-from stack-consed-p nil))
       (let* ((splat-input (vop-args vop))
              (splat-input-source
-              (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
+               (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
         ;; How in the heck can there NOT be a vop??? Well, sometimes there isn't.
         (when (and splat-input-source
                    (eq (vop-name splat-input-source)
@@ -313,9 +394,7 @@
   (logand (1- rank) array-rank-mask))
 
 (defun compute-object-header (nwords widetag-or-metadata)
-  (let* ((widetag (if (typep widetag-or-metadata '(or wrapper defstruct-description))
-                      instance-widetag
-                      widetag-or-metadata))
+  (let* ((widetag (if (fixnump widetag-or-metadata) widetag-or-metadata instance-widetag))
          (array-header-p
           (or (= widetag simple-array-widetag)
               (>= widetag complex-base-string-widetag))))
@@ -334,3 +413,54 @@
 (defmacro id-bits-offset ()
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
+
+;;; I'd like the division-by-constant-integer optimization to work
+;;; during cross-compilation, but the algorithm to compute the magic
+;;; parameters is expressed in C, not Lisp. I need to translate it.
+#-sb-xc-host
+(defun sb-c:compute-udiv32-magic (divisor)
+  (with-alien ((mag (struct magu
+                            (m unsigned-int)
+                            (a int)
+                            (s int)))
+               (compute-udiv-magic32 (function void int (* (struct magu)))
+                                     :extern))
+    (alien-funcall compute-udiv-magic32 divisor (addr mag))
+    (values (slot mag 'm) (slot mag 'a) (slot mag 's))))
+
+;;; "Algorithm 2: Algorithm to select the number of fractional bits and the scaled
+;;; approximate reciprocal in the case of unsigned integers."
+;;; from https://r-libre.teluq.ca/1633/1/Faster_Remainder_of_the_Division_by_a_Constant.pdf
+;;; See also https://github.com/bmkessler/fastdiv for that coded in Go.
+;;; D = divisor
+;;; N = number of bits of precision in numerator
+;;; FRACTION-BITS is what you want, or :VARIABLE for the smallest
+;;;
+;;; Note that for 32 fraction bits, the divisor can *not* use all 32 bits of precision.
+;;; It can only have about 27 or 28 significant bits. This function will figure it out.
+(defun compute-fastrem-coefficient (d n fraction-bits)
+  (multiple-value-bind (smallest-f c)
+      (flet ((is-pow2 (n)
+               (declare (unsigned-byte n))
+               (let ((l (integer-length n)))
+                 (= n (ash 1 (1- l))))))
+        (if (is-pow2 d)
+            (values (1- (integer-length d)) 1)
+            (loop for L from 0
+                  do (let* ((F (+ N L))
+                            (2^F (expt 2 F)))
+                       (when (<= d (+ (mod 2^F d) (expt 2 L)))
+                         (let ((c (ceiling (expt 2 F) d)))
+                           (return (values F c))))))))
+    (cond ((eq fraction-bits :variable) ; return the smallest F
+           (values c smallest-f))
+          (t
+           ;; Otherwise hardwire F to 32 so the algorithm can use :DWORD
+           ;; register moves to perform the shifting and masking.
+           ;; But make sure the smallest-f is not more than 32, or else
+           ;; this can't work.
+           (when (> smallest-f fraction-bits)
+             (error "Need ~D fraction bits for divisor ~D and ~D bit dividend"
+                    smallest-f d n))
+           (values (ceiling (expt 2 fraction-bits) d) fraction-bits)))))
+

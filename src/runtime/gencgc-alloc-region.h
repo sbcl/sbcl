@@ -21,6 +21,15 @@ struct alloc_region {
     void  *start_addr;
 };
 
+typedef struct {
+    struct alloc_region cons;
+    struct alloc_region mixed;
+    uword_t token;
+} arena_state;
+
+// Macro to statically initialize instead of using set_region_empty()
+#define ALLOC_REGION_INITIALIZER {(void*)0x1000, (void*)1000, 0}
+
 // One region for each of page type.
 // These indices have no correlation to PAGE_TYPE constants.
 // MIXED has to always be at array index 0 because lisp accesses
@@ -32,6 +41,13 @@ extern struct alloc_region  gc_alloc_region[6];
 #define code_region    (&gc_alloc_region[3])
 #define boxed_region   (&gc_alloc_region[4])
 #define cons_region    (&gc_alloc_region[5])
+#define ASSERT_REGIONS_CLOSED() \
+    gc_assert(!((uintptr_t)gc_alloc_region[0].start_addr \
+               |(uintptr_t)gc_alloc_region[1].start_addr \
+               |(uintptr_t)gc_alloc_region[2].start_addr \
+               |(uintptr_t)gc_alloc_region[3].start_addr \
+               |(uintptr_t)gc_alloc_region[4].start_addr \
+               |(uintptr_t)gc_alloc_region[5].start_addr))
 
 extern generation_index_t from_space, new_space;
 extern int gencgc_alloc_profiler;

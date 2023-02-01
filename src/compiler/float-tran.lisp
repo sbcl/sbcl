@@ -717,14 +717,6 @@
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'cl:single-float))
 
-;;; The basic interval type. It can handle open and closed intervals.
-;;; A bound is open if it is a list containing a number, just like
-;;; Lisp says. NIL means unbounded.
-(defstruct (interval (:constructor %make-interval (low high))
-                     (:copier nil))
-  low high)
-(declaim (freeze-type interval))
-
 ;;; Handle monotonic functions of a single variable whose domain is
 ;;; possibly part of the real line. ARG is the variable, FUN is the
 ;;; function, and DOMAIN is a specifier that gives the (real) domain
@@ -1553,22 +1545,106 @@
 
 
 ;;;; TRUNCATE, FLOOR, CEILING, and ROUND
+(deftransform truncate ((x &optional by)
+                        (t &optional (constant-arg (member 1))))
+  '(unary-truncate x))
 
-(macrolet ((define-frobs (fun ufun)
-             `(deftransform ,fun ((x &optional by)
-                                  (t &optional (constant-arg (member 1))))
-                  '(let ((res (,ufun x)))
-                    (values res (locally
-                                    (declare (flushable %single-float
-                                                        %double-float))
-                                  (- x res)))))))
-  (define-frobs truncate %unary-truncate)
-  (define-frobs round %unary-round))
+(deftransform round ((x &optional by)
+                     (t &optional (constant-arg (member 1))))
+  '(let ((res (%unary-round x)))
+    (values res (locally
+                    (declare (flushable %single-float
+                                        %double-float))
+                  (- x res)))))
 
 (deftransform %unary-truncate ((x) (single-float))
-  `(%unary-truncate/single-float x))
+  `(values (unary-truncate x)))
 (deftransform %unary-truncate ((x) (double-float))
-  `(%unary-truncate/double-float x))
+  `(values (unary-truncate x)))
+
+(defun value-within-numeric-type (type)
+  (labels ((try (x)
+             (when (ctypep x type)
+               (return-from value-within-numeric-type x)))
+           #-sb-xc-host
+           (next-float (float)
+             (multiple-value-bind (frac exp sign)
+                 (integer-decode-float float)
+               (* (scale-float (float (1+ frac) float) exp)
+                  sign)))
+           #-sb-xc-host
+           (prev-float (float)
+             (multiple-value-bind (frac exp sign)
+                 (integer-decode-float float)
+               (* (scale-float (float (1- frac) float) exp)
+                  sign)))
+           (next (x)
+             (typecase x
+               (integer
+                (1+ x))
+               #-sb-xc-host
+               (float
+                (next-float x))
+               (t
+                0)))
+           (prev (x)
+             (typecase x
+               (integer
+                (1- x))
+               #-sb-xc-host
+               (float
+                (prev-float x))
+               (t
+                0)))
+           (ratio-between (low high)
+             (+ low (/ (- high low) 2)))
+           (numeric (x)
+             (when (numeric-type-p x)
+               (let ((lo (numeric-type-low x))
+                     (hi (numeric-type-high x)))
+                 (when (numberp lo)
+                   (try lo))
+                 (when (numberp hi)
+                   (try hi))
+                 (when (consp lo)
+                   (try (next (car lo))))
+                 (when (consp hi)
+                   (try (prev (car hi))))
+                 (when (and (typep lo '(cons rational))
+                            (typep hi '(cons rational)))
+                   (try (ratio-between (car lo) (car hi))))
+                 (when (csubtypep x (specifier-type 'rational))
+                   (try 0))
+                 (when (csubtypep x (specifier-type 'double-float))
+                   (try $0d0))
+                 (when (csubtypep x (specifier-type 'single-float))
+                   (try $0f0))))))
+    (typecase type
+      (numeric-type (numeric type))
+      (union-type (mapc #'numeric (union-type-types type))))
+    (error "Couldn't come up with a value for ~s" type)))
+
+(deftransform unary-truncate ((x) * * :result result :node node)
+  (unless (lvar-single-value-p result)
+    (give-up-ir1-transform))
+  (let ((rem-type (second (values-type-required (node-derived-type node)))))
+    `(values (%unary-truncate x)
+             ,(value-within-numeric-type rem-type))))
+
+(macrolet ((def (type)
+             `(deftransform unary-truncate ((number) (,type))
+                '(if (typep number
+                      '(,type
+                        ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                        ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                  (let ((truncated (truly-the fixnum (,(symbolicate '%unary-truncate/ type) number))))
+                    (declare (flushable ,(symbolicate "%" type)))
+                    (values truncated
+                            (- number
+                               (coerce truncated ',type))))
+                  (,(symbolicate 'unary-truncate- type '-to-bignum) number)))))
+  (def single-float)
+  (def double-float))
 
 ;;; Convert (TRUNCATE x y) to the obvious implementation.
 ;;;
@@ -1582,8 +1658,16 @@
 ;;; depending on FLOAT-ACCURACY. Finally, leave out the secondary value when
 ;;; we know it is unused: COERCE is not flushable.
 (macrolet ((def (type other-float-arg-types)
-             (let ((unary (symbolicate "%UNARY-TRUNCATE/" type))
-                   (coerce (symbolicate "%" type)))
+             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
+                    (unary-to-bignum (symbolicate '%unary-truncate- type '-to-bignum))
+                    (coerce (symbolicate "%" type))
+                    (unary `(lambda (number)
+                              (if (typep number
+                                         '(,type
+                                           ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                                           ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                                  (truly-the fixnum (,unary number))
+                                  (,unary-to-bignum number)))))
                `(deftransform truncate ((x &optional y)
                                         (,type
                                          &optional (or ,type ,@other-float-arg-types integer))
@@ -1596,20 +1680,25 @@
                     (if (or (not y)
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
                         (if compute-all
-                            `(let ((res (,',unary x)))
-                               (values res (- x (locally
-                                                    ;; Can be flushed as it will produce no errors.
-                                                    (declare (flushable ,',coerce))
-                                                    (,',coerce res)))))
+                            `(unary-truncate x)
                             `(let ((res (,',unary x)))
                                ;; Dummy secondary value!
                                (values res x)))
                         (if compute-all
                             `(let* ((f (,',coerce y))
-                                    (res (,',unary (/ x f))))
-                               (values res (- x (* f (locally
-                                                         (declare (flushable ,',coerce))
-                                                       (,',coerce res))))))
+                                    (div (/ x f))
+                                    (res (,',unary div)))
+                               (values res
+                                       (- x (* f
+                                               #+round-float
+                                               (,',(ecase type
+                                                     (double-float 'round-double)
+                                                     (single-float 'round-single))
+                                                div :truncate)
+                                               #-round-float
+                                               (locally
+                                                   (declare (flushable ,',coerce))
+                                                 (,',coerce res))))))
                             `(let* ((f (,',coerce y))
                                     (res (,',unary (/ x f))))
                                ;; Dummy secondary value!
@@ -1719,3 +1808,23 @@
           (complex single-float-negative-infinity single-float-positive-infinity)
           (complex single-float-negative-infinity single-float-negative-infinity)
           (complex single-float-positive-infinity single-float-negative-infinity)))
+
+#+round-float
+(deftransform fround ((number &optional divisor) (double-float t))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-double number :round)))
+         (values res (- number res)))
+      `(let ((res (round-double (/ number (%double-float divisor)) :round)))
+         (values res (- number (* res divisor))))))
+
+#+round-float
+(deftransform fround ((number &optional divisor) (single-float (or null single-float rational)))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-single number :round)))
+         (values res (- number res)))
+      `(let ((res (round-single (/ number (%single-float divisor)) :round)))
+         (values res (- number (* res divisor))))))

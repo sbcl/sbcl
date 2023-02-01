@@ -164,7 +164,13 @@
               ;; FIXME: this seems to omit FUNCTIONAL
               (when (defined-fun-p fun)
                 (return-from fun-lexically-notinline-p
-                  (eq (defined-fun-inlinep fun) 'notinline))))))))
+                  (eq (defined-fun-inlinep fun) 'notinline)))
+              (loop for data in (lexenv-user-data env)
+                    when (and (eq (car data) 'no-compiler-macro)
+                              (eq (cdr data) name))
+                    do
+                    (return-from fun-lexically-notinline-p
+                      t)))))))
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
@@ -224,52 +230,6 @@
                          where
                          (maybe-defined-here name where)))))))
 
-;;; Have some DEFINED-FUN-FUNCTIONALS of a FREE-FUNS entry become invalid?
-;;; Drop 'em.
-;;;
-;;; This was added to fix bug 138 in SBCL. It is possible for a FREE-FUNS
-;;; entry to contain a DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object
-;;; contained IR1 stuff (NODEs, BLOCKs...) referring to an already compiled
-;;; (aka "dead") component. When this IR1 stuff was reused in a new component,
-;;; under further obscure circumstances it could be used by
-;;; WITH-IR1-ENVIRONMENT-FROM-NODE to generate a binding for
-;;; *CURRENT-COMPONENT*. At that point things got all confused, since IR1
-;;; conversion was sending code to a component which had already been compiled
-;;; and would never be compiled again.
-;;;
-;;; Note: as of 1.0.24.41 this seems to happen only in XC, and the original
-;;; BUGS entry also makes it seem like this might not be an issue at all on
-;;; target.
-(defun clear-invalid-functionals (free-fun)
-  ;; There might be other reasons that FREE-FUN entries could
-  ;; become invalid, but the only one we've been bitten by so far
-  ;; (sbcl-0.pre7.118) is this one:
-  (when (defined-fun-p free-fun)
-    (setf (defined-fun-functionals free-fun)
-          (delete-if (lambda (functional)
-                       (or (eq (functional-kind functional) :deleted)
-                           (when (lambda-p functional)
-                             (or
-                              ;; (The main reason for this first test is to bail
-                              ;; out early in cases where the LAMBDA-COMPONENT
-                              ;; call in the second test would fail because links
-                              ;; it needs are uninitialized or invalid.)
-                              ;;
-                              ;; If the BIND node for this LAMBDA is null, then
-                              ;; according to the slot comments, the LAMBDA has
-                              ;; been deleted or its call has been deleted. In
-                              ;; that case, it seems rather questionable to reuse
-                              ;; it, and certainly it shouldn't be necessary to
-                              ;; reuse it, so we cheerfully declare it invalid.
-                              (not (lambda-bind functional))
-                              ;; If this IR1 stuff belongs to a dead component,
-                              ;; then we can't reuse it without getting into
-                              ;; bizarre confusion.
-                              (eq (component-info (lambda-component functional))
-                                  :dead)))))
-                     (defined-fun-functionals free-fun)))
-    nil))
-
 ;;; If NAME already has a valid entry in (FREE-FUNS *IR1-NAMESPACE*), then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
 ;;; the global environment and enter it in FREE-FUNS. If NAME
@@ -278,20 +238,7 @@
 ;;; demanded a function.
 (declaim (ftype (sfunction (t string) global-var) find-free-fun))
 (defun find-free-fun (name context &aux (free-funs (free-funs *ir1-namespace*)))
-  (or (let ((old-free-fun (gethash name free-funs)))
-        (when old-free-fun
-          (clear-invalid-functionals old-free-fun)
-          (when (or (not (defined-fun-p old-free-fun))
-                    (not (block-compile *compilation*))
-                    ;; When block-compiling, it is the case that we
-                    ;; could proclaim an inline, define some things,
-                    ;; then proclaim a notinline, and in the case that
-                    ;; the function's :inlinep info changes, the
-                    ;; old-free-fun is stale and we should make a new
-                    ;; one.
-                    (eq (info :function :inlinep name)
-                        (defined-fun-inlinep old-free-fun)))
-            old-free-fun)))
+  (or (gethash name free-funs)
       (let ((kind (info :function :kind name)))
         (ecase kind
           ((:macro :special-form)
@@ -332,16 +279,11 @@
 
 (declaim (end-block))
 
-(defun maybe-find-free-var (name)
-  (let ((found (gethash name (free-vars *ir1-namespace*))))
-    (unless (eq found :deprecated)
-      found)))
-
 ;;; Return the LEAF node for a global variable reference to NAME. If
 ;;; NAME is already entered in (FREE-VARS *IR1-NAMESPACE*), then we just return the
 ;;; corresponding value. Otherwise, we make a new leaf using
 ;;; information from the global environment and enter it in
-;;; FREE-VARS. If the variable is unknown, then we emit a warning.
+;;; FREE-VARS.
 (declaim (ftype (sfunction (t) (or leaf cons heap-alien-info)) find-free-var))
 (defun find-free-var (name &aux (free-vars (free-vars *ir1-namespace*))
                                 (existing (gethash name free-vars)))
@@ -374,7 +316,13 @@
                        (type (type-specifier (info :variable :type name))))
                    `(macro . (the ,type ,expansion))))
                 (:constant
-                 (find-constant (symbol-value name) name))
+                 (let ((value (symbol-value name)))
+                   ;; Objects that are freely coalescible become
+                   ;; anonymous since we aren't interested in
+                   ;; accessing them through their name.
+                   (if (sb-xc:typep value '(or number character symbol))
+                       (find-constant value)
+                       (make-constant value (ctype-of value) name))))
                 (t
                  (make-global-var :kind kind
                                   :%source-name name
@@ -399,7 +347,8 @@
       (cl:typep obj 'package)
       ;; The cross-compiler wants to dump CTYPE instances as leaves,
       ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
-      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))))
+      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
+      (eq obj sb-lockless:+tail+)))
 
 ;;; Grovel over CONSTANT checking for any sub-parts that need to be
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
@@ -607,8 +556,12 @@
       (declare (fixnum pos))
       (macrolet ((frob ()
                    `(progn
-                      (when (atom subform) (return))
-                      (let ((fm (car subform)))
+                      (let ((fm (cond ((comma-p subform)
+                                       (comma-expr subform))
+                                      ((atom subform)
+                                       (return))
+                                      (t
+                                       (car subform)))))
                         (when (comma-p fm)
                           (setf fm (comma-expr fm)))
                         (cond ((consp fm)
@@ -626,6 +579,8 @@
                                ;; perfect, but better than nothing.
                                (note-source-path subform pos path)))
                         (incf pos))
+                      (when (comma-p subform)
+                        (return))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
         (loop
@@ -702,18 +657,15 @@
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
-;;; been converted, and is not NOTINLINE, then reference the
-;;; functional instead.
+;;; been converted in the same compilation block, and is not
+;;; NOTINLINE, then reference the functional instead.
 (defun reference-leaf (start next result leaf &optional (name '.anonymous.))
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
                         (neq (defined-fun-inlinep leaf) 'notinline)
-                        ;; Only reference defined functionals from named-lambda,
-                        ;; everything else should do this through recognize-known-call,
-                        ;; avoiding copying references to global functions
-                        (defined-fun-named-lambda-p leaf)
+                        (defined-fun-same-block-p leaf)
                         (let ((functional (defined-fun-functional leaf)))
                           (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
@@ -754,50 +706,33 @@
 (defun ir1-convert-var (start next result name)
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
-    (if (and (global-var-p var) (not (always-boundp name)))
-        ;; KLUDGE: If the variable may be unbound, convert using SYMEVAL
-        ;; which is not flushable, so that unbound dead variables signal an
-        ;; error (bug 412, lp#722734): checking for null RESULT is not enough,
-        ;; since variables can become dead due to later optimizations.
-        (ir1-convert start next result
-                     (case (global-var-kind var)
-                       (:global `(sym-global-val ',name))
-                       (:unknown
-                        (when (not (deprecated-thing-p 'variable name))
-                          (note-undefined-reference name :variable))
-                        `(symeval ',name))
-                       (t
-                        `(symeval ',name))))
-        (etypecase var
-          (leaf
-           (cond
-             ((lambda-var-p var)
-              (let ((home (ctran-home-lambda-or-null start)))
-                (when home
-                  (sset-adjoin var (lambda-calls-or-closes home))))
-              (when (lambda-var-ignorep var)
-                ;; (ANSI's specification for the IGNORE declaration requires
-                ;; that this be a STYLE-WARNING, not a full WARNING.)
-                #-sb-xc-host
-                (compiler-style-warn "reading an ignored variable: ~S" name)
-                ;; there's no need for us to accept ANSI's lameness when
-                ;; processing our own code, though.
-                #+sb-xc-host
-                (warn "reading an ignored variable: ~S" name))))
-           (reference-leaf start next result var name))
-          ((cons (eql macro)) ; symbol-macro
-           ;; FIXME: the following comment is probably wrong now.
-           ;; If we warn here on :early and :late deprecation
-           ;; then we get an extra warning somehow.
-           ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
-           ;; for symbol-macros. Includes variables, constants,
-           ;; etc. in :FINAL deprecation.
-           (when (eq (deprecated-thing-p 'variable name) :final)
-             (check-deprecated-thing 'variable name))
-           ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
-           (ir1-convert start next result (cdr var)))
-          (heap-alien-info
-           (ir1-convert start next result `(%heap-alien ',var))))))
+    (etypecase var
+      (leaf
+       (when (lambda-var-p var)
+         (when (lambda-var-ignorep var)
+           ;; (ANSI's specification for the IGNORE declaration requires
+           ;; that this be a STYLE-WARNING, not a full WARNING.)
+           #-sb-xc-host
+           (compiler-style-warn "reading an ignored variable: ~S" name)
+           ;; there's no need for us to accept ANSI's lameness when
+           ;; processing our own code, though.
+           #+sb-xc-host
+           (warn "reading an ignored variable: ~S" name)))
+       (maybe-note-undefined-variable-reference var name)
+       (reference-leaf start next result var name))
+      ((cons (eql macro))               ; symbol-macro
+       ;; FIXME: the following comment is probably wrong now.
+       ;; If we warn here on :early and :late deprecation
+       ;; then we get an extra warning somehow.
+       ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
+       ;; for symbol-macros. Includes variables, constants,
+       ;; etc. in :FINAL deprecation.
+       (when (eq (deprecated-thing-p 'variable name) :final)
+         (check-deprecated-thing 'variable name))
+       ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
+       (ir1-convert start next result (cdr var)))
+      (heap-alien-info
+       (ir1-convert start next result `(%heap-alien ',var)))))
   (values))
 
 ;;; Find a compiler-macro for a form, taking FUNCALL into account.
@@ -1005,19 +940,13 @@
 ;;; instrumentation for?
 (defun step-form-p (form)
   (flet ((step-symbol-p (symbol)
-           ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
-           ;; we insert calls to SYMEVAL for most non-lexical
-           ;; variable references in order to avoid them being elided
-           ;; if the value is unused.
-           (if (member symbol '(symeval sym-global-val))
-               (not (constantp (second form)))
-               (not (member (sb-xc:symbol-package symbol)
-                            (load-time-value
-                              ;; KLUDGE: packages we're not interested in
-                              ;; stepping.
-                              (mapcar #'find-package '(sb-c sb-int sb-impl
-                                                       sb-kernel sb-pcl))
-                             t))))))
+           (not (member (sb-xc:symbol-package symbol)
+                        (load-time-value
+                         ;; KLUDGE: packages we're not interested in
+                         ;; stepping.
+                         (mapcar #'find-package '(sb-c sb-int sb-impl
+                                                  sb-kernel sb-pcl))
+                         t)))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))
          (listp form)
@@ -1055,12 +984,16 @@
 ;;; node. FUN-LVAR yields the function to call. ARGS is the list of
 ;;; arguments for the call, which defaults to the cdr of source. We
 ;;; return the COMBINATION node.
-(defun ir1-convert-combination-args (fun-lvar start next result args)
+(defun ir1-convert-combination-args (fun-lvar start next result args
+                                     &key (pass-nargs t)
+                                          arg-source-forms)
   (declare (type ctran start next)
            (type lvar fun-lvar)
            (type (or lvar null) result)
            (type list args))
   (let ((node (make-combination fun-lvar)))
+    (unless pass-nargs
+      (setf (combination-pass-nargs node) nil))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start start)
@@ -1074,7 +1007,9 @@
                  (setf this-start
                        (maybe-instrument-progn-like this-start forms arg))
                  (let ((this-ctran (make-ctran))
-                       (this-lvar (make-lvar node)))
+                       (this-lvar (make-lvar node))
+                       (*current-path* (or (get-source-path (pop arg-source-forms))
+                                           *current-path*)))
                    (ir1-convert this-start this-ctran this-lvar arg)
                    (setq this-start this-ctran)
                    (arg-lvars this-lvar))))
@@ -1238,6 +1173,7 @@
                    (var (or bound-var
                             (lexenv-find var-name vars)
                             (find-free-var var-name))))
+              (maybe-note-undefined-variable-reference var var-name)
               (etypecase var
                 (leaf
                  (flet
@@ -1419,8 +1355,10 @@
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)
             (defined-fun-inline-expansion var))
-      (setf (defined-fun-functionals res)
-            (defined-fun-functionals var)))
+      (setf (defined-fun-functional res)
+            (defined-fun-functional var))
+      (setf (defined-fun-same-block-p res)
+            (defined-fun-same-block-p var)))
     ;; FIXME: Is this really right? Needs we not set the FUNCTIONAL
     ;; to the original global-var?
     res))
@@ -1529,10 +1467,17 @@
          (setf (lambda-var-ignorep var) t)))))
   (values))
 
+(defvar *stack-allocate-dynamic-extent* t
+  "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
+and stack allocates otherwise inaccessible parts of the object whenever
+possible. Potentially long (over one page in size) vectors are, however, not
+stack allocated except in zero SAFETY code, as such a vector could overflow
+the stack without triggering overflow protection.")
+
 (defun process-extent-decl (names vars fvars kind)
   (let ((extent
           (ecase kind
-            (dynamic-extent
+            ((dynamic-extent dynamic-extent-no-note)
              (when *stack-allocate-dynamic-extent*
                kind))
             ((indefinite-extent truly-dynamic-extent)
@@ -1544,22 +1489,21 @@
              (let* ((bound-var (find-in-bindings vars name))
                     (var (or bound-var
                              (lexenv-find name vars)
-                             (maybe-find-free-var name))))
+                             (find-free-var name))))
+               (maybe-note-undefined-variable-reference var name)
                (etypecase var
                  (leaf
-                  (if bound-var
-                      (if (and (leaf-extent var) (neq extent (leaf-extent var)))
-                          (warn "Multiple incompatible extent declarations for ~S?" name)
-                          (setf (leaf-extent var) extent))
-                      (compiler-notify
-                       "Ignoring free ~S declaration: ~S" kind name)))
+                  (cond
+                    ((and (typep var 'global-var) (eq (global-var-kind var) :unknown)))
+                    (bound-var
+                     (if (and (leaf-extent var) (neq extent (leaf-extent var)))
+                         (warn "Multiple incompatible extent declarations for ~S?" name)
+                         (setf (leaf-extent var) extent)))
+                    (t (compiler-notify "Ignoring free ~S declaration: ~S" kind name))))
                  (cons
                   (compiler-error "~S on symbol-macro: ~S" kind name))
                  (heap-alien-info
-                  (compiler-error "~S on alien-variable: ~S" kind name))
-                 (null
-                  (compiler-style-warn
-                   "Unbound variable declared ~S: ~S" kind name)))))
+                  (compiler-error "~S on alien-variable: ~S" kind name)))))
             ((and (consp name)
                   (eq (car name) 'function)
                   (null (cddr name))
@@ -1624,6 +1568,11 @@
         (process-ftype-decl (second spec) res (cddr spec) fvars context))
        ((inline notinline maybe-inline)
         (process-inline-decl spec res fvars))
+       (no-compiler-macro
+        (make-lexenv :default res
+                     :user-data (list*
+                                 (cons 'no-compiler-macro (second spec))
+                                 (lexenv-user-data res))))
        (optimize
         (multiple-value-bind (new-policy specified-qualities)
             (process-optimize-decl spec (lexenv-policy res))
@@ -1639,7 +1588,7 @@
          :default res
          :handled-conditions (process-unmuffle-conditions-decl
                               spec (lexenv-handled-conditions res))))
-       ((dynamic-extent truly-dynamic-extent indefinite-extent)
+       ((dynamic-extent truly-dynamic-extent indefinite-extent dynamic-extent-no-note)
         (process-extent-decl (cdr spec) vars fvars (first spec))
         res)
        ((disable-package-locks enable-package-locks)
@@ -1805,7 +1754,7 @@
                             &body forms)
   (declare (symbol ctran lvar))
   (let ((post-binding-lexenv-p (not (null post-binding-lexenv)))
-        (post-binding-lexenv (or post-binding-lexenv (sb-xc:gensym "LEXENV"))))
+        (post-binding-lexenv (or post-binding-lexenv (gensym "LEXENV"))))
     `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
                         ,post-binding-lexenv-p
                         (lambda (,ctran ,lvar ,post-binding-lexenv)
@@ -1834,3 +1783,140 @@
                           :where-from :declared))))
 
 (declaim (end-block))
+
+
+;;;; Proclamations:
+;;;
+;;; PROCLAIM changes the global environment, so we must handle its
+;;; compile time side effects if we are to keep the information in the
+;;; (FREE-xxx *IR1-NAMESPACE*) tables up to date. When there is a var
+;;; structure we disown it by replacing it with an updated copy. Uses
+;;; of the variable which were translated before the PROCLAIM will get
+;;; the old version, while subsequent references will get the updated
+;;; information.
+
+;;; If a special block compilation delimiter, then start or end the
+;;; block as appropriate. If :BLOCK-COMPILE is T or NIL, then we
+;;; ignore any start/end block declarations.
+(defun process-block-compile-proclamation (kind entry-points)
+  (if (eq *block-compile-argument* :specified)
+      (ecase kind
+        (start-block
+         (finish-block-compilation)
+         (let ((compilation *compilation*))
+           (setf (block-compile compilation) t)
+           (setf (entry-points compilation) entry-points)))
+        (end-block
+         (finish-block-compilation)))
+      (compiler-notify "ignoring ~S declaration since ~
+                        :BLOCK-COMPILE is not :SPECIFIED"
+                       kind)))
+
+;;; Update function type info cached in (FREE-FUNS *IR1-NAMESPACE*).
+;;; If:
+;;; -- there is a GLOBAL-VAR, then just update the type and remove the
+;;;    name from the list of undefined functions. Someday we should
+;;;    check for incompatible redeclaration.
+;;; -- there is a FUNCTIONAL, then apply the type assertion to that
+;;;    function.  This will only happen during block compilation.
+(defun process-1-ftype-proclamation (name type)
+  (proclaim-as-fun-name name)
+  (let* ((free-funs (free-funs *ir1-namespace*))
+         (var (gethash name free-funs)))
+    (etypecase var
+      (null)
+      (global-var
+       (setf (gethash name free-funs)
+             (let ((kind (global-var-kind var)))
+               (if (defined-fun-p var)
+                   (make-defined-fun
+                    :%source-name name :type type :where-from :declared :kind kind
+                    :inlinep (defined-fun-inlinep var)
+                    :inline-expansion (defined-fun-inline-expansion var)
+                    :same-block-p (defined-fun-same-block-p var)
+                    :functional (defined-fun-functional var))
+                   (make-global-var :%source-name name :type type
+                                    :where-from :declared :kind kind))))
+       (when (defined-fun-p var)
+         (let ((fun (defined-fun-functional var)))
+           (when fun
+             (assert-definition-type fun type
+                                     :unwinnage-fun #'compiler-notify
+                                     :where "this declaration"))))))))
+
+(defun process-ftype-proclamation (spec names)
+  (declare (list names))
+  (let ((type (specifier-type spec)))
+    (unless (csubtypep type (specifier-type 'function))
+      (error "Not a function type: ~/sb-impl:print-type/" spec))
+    (dolist (name names)
+      (process-1-ftype-proclamation name type))))
+
+;;; Replace each old var entry with one having the new type.
+(defun process-type-proclamation (spec names)
+  (declare (list names))
+  (let ((free-vars (free-vars *ir1-namespace*))
+        (type (specifier-type spec)))
+    (dolist (name names)
+      (let ((var (gethash name free-vars)))
+        (etypecase var
+          (null)
+          ;; Constants cannot be redefined, and we already give the
+          ;; constant object the tightest type possible. We will error
+          ;; if the type is incompatible.
+          (constant)
+          (global-var
+           (setf (gethash name free-vars)
+                 (make-global-var :%source-name name
+                                  :type type :where-from :declared
+                                  :kind (global-var-kind var)))))))))
+
+;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
+;;; global-var ensures that when we substitute a functional for a
+;;; global var (i.e. for DEFUN) that we won't clobber any uses
+;;; declared :NOTINLINE.
+(defun process-inline-proclamation (kind funs)
+  (declare (type (and inlinep (not null)) kind))
+  (dolist (name funs)
+    (proclaim-as-fun-name name)
+    (let* ((free-funs (free-funs *ir1-namespace*))
+           (var (gethash name free-funs)))
+      (etypecase var
+        (null)
+        (global-var
+         (setf (gethash name free-funs)
+               ;; Use the universal type as the local type restriction,
+               ;; since we are processing the proclamation at the top
+               ;; level and hence in a null lexical environment.
+               (make-new-inlinep var kind *universal-type*)))))))
+
+;;; Handle the compile-time side effects of PROCLAIM that don't happen
+;;; at load time. These mostly side-effect the global state of the
+;;; compiler, rather than the global environment.
+(defun %compiler-proclaim (kind args)
+  (case kind
+    ((special global)
+     (dolist (name args)
+       (let* ((free-vars (free-vars *ir1-namespace*))
+              (old (gethash name free-vars)))
+         (when old
+           (ecase (global-var-kind old)
+             ((:special :global))
+             (:unknown
+              (setf (gethash name free-vars)
+                    (make-global-var :%source-name name :type (leaf-type old)
+                                     :where-from (leaf-where-from old)
+                                     :kind (ecase kind
+                                             (special :special)
+                                             (global :global))))))))))
+    ((start-block end-block)
+     #-(and sb-devel sb-xc-host)
+     (process-block-compile-proclamation kind args))
+    (ftype
+     (destructuring-bind (spec &rest args) args
+       (process-ftype-proclamation spec args)))
+    (type
+     (destructuring-bind (spec &rest args) args
+       (process-type-proclamation spec args)))
+    ((inline notinline maybe-inline)
+     (process-inline-proclamation kind args))))

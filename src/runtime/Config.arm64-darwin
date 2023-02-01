@@ -11,10 +11,6 @@
 
 CFLAGS += -g -Wall -fdollars-in-identifiers
 
-# ifdef LISP_FEATURE_INODE64
-# CFLAGS += -D_DARWIN_USE_64_BIT_INODE
-# endif 
-
 OS_SRC = bsd-os.c arm64-bsd-os.c darwin-os.c arm64-darwin-os.c
 
 OS_LIBS = -lSystem -lc -ldl
@@ -22,7 +18,7 @@ ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+  OS_LIBS += -lzstd
 endif
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a

@@ -18,7 +18,6 @@
   (let ((args (copy-list args)))
     (remf args :weakness)
     (remf args :synchronized)
-    (remf args :finalizer)
     (let ((hash-fun (getf args :hash-function)))
       (when hash-fun
         (assert (eq (getf args :test) 'eq))
@@ -125,6 +124,8 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
+;;; We maintain a separate GENSYM counter since the host is allowed to
+;;; mutate its counter however it wishes.
 (defvar sb-xc:*gensym-counter* 0)
 
 (defun sb-xc:gensym (&optional (thing "G"))
@@ -199,11 +200,20 @@
   name)
 
 (declaim (declaration enable-package-locks disable-package-locks))
+(declaim (declaration sb-c::tlab))
+
+;;; The XC-STRICT-CL and SB-XC packages are called COMMON-LISP in the
+;;; target image.
+(defun sb-xc:package-name (package)
+  (if (or (eq package #.(find-package "SB-XC"))
+          (eq package #.(find-package "XC-STRICT-CL")))
+      "COMMON-LISP"
+      (cl:package-name package)))
 
 ;; Nonstandard accessor for when you know you have a valid package in hand.
 ;; This avoids double lookup in *PACKAGE-NAMES* in a few places.
 ;; But portably we have to just fallback to PACKAGE-NAME.
-(defun package-%name (x) (package-name x))
+(defun package-%name (x) (sb-xc:package-name x))
 
 ;;; This definition collapses SB-XC back into COMMON-LISP.
 ;;; Use CL:SYMBOL-PACKAGE if that's not the behavior you want.
@@ -222,6 +232,9 @@
                         (eq symbol (find-symbol name #.(find-package "COMMON-LISP")))))))
         *cl-package*
         p)))
+
+(defun possibly-base-stringize (s) (coerce (the string s) 'simple-base-string))
+(defun possibly-base-stringize-to-heap (s) (coerce (the string s) 'simple-base-string))
 
 ;;; printing structures
 
@@ -269,6 +282,42 @@
 (defun system-area-pointer-p (x) x nil) ; nothing is a SAP
 (defmacro sap-ref-word (sap offset)
   `(#+64-bit sap-ref-64 #-64-bit sap-ref-32 ,sap ,offset))
+
+;;; Needed for assembler.
+(defstruct (asm-sap-wrapper (:constructor vector-sap (vector)))
+  (vector (missing-arg) :type (simple-array (unsigned-byte 8) (*))))
+(defmacro with-pinned-objects (list &body body)
+  (declare (ignore list))
+  `(progn ,@body))
+;;; The assembler does not USE-PACKAGE sb-sys, which works to our advantage
+;;; in that we can define SAP-REF-16 and -32 as macros in the ASM package
+;;; which avoids conflict with genesis. Genesis has its own SAP emulations in SB-SYS
+;;; so all the definitions of FIXUP-CODE-OBJECT using the native accessors
+;;; can transparently operate on genesis's model of target code blobs.
+(defsetf sb-assem::sap-ref-16 sb-assem::asm-set-sap-ref-16)
+(defsetf sb-assem::sap-ref-32 sb-assem::asm-set-sap-ref-32)
+(defun sb-assem::asm-set-sap-ref-16 (sap index val)
+  (declare (type asm-sap-wrapper sap))
+  (multiple-value-bind (b0 b1)
+    #+little-endian (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+    #+big-endian    (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+    (let ((octets (asm-sap-wrapper-vector sap)))
+      (setf (aref octets (+ index 0)) b0
+            (aref octets (+ index 1)) b1)))
+  val)
+(defun sb-assem::asm-set-sap-ref-32 (sap index val)
+  (declare (type asm-sap-wrapper sap))
+  (multiple-value-bind (b0 b1 b2 b3)
+      #+little-endian (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
+                              (ldb (byte 8 16) val) (ldb (byte 8 24) val))
+      #+big-endian    (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
+                              (ldb (byte 8  8) val) (ldb (byte 8  0) val))
+    (let ((octets (asm-sap-wrapper-vector sap)))
+      (setf (aref octets (+ index 0)) b0
+            (aref octets (+ index 1)) b1
+            (aref octets (+ index 2)) b2
+            (aref octets (+ index 3)) b3)))
+  val)
 
 (defun logically-readonlyize (x) x)
 
@@ -339,3 +388,18 @@
   `(with-output-to-string (,var) ,@body))
 
 (defun source-location ())
+
+;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
+;;; is kept as a property on the host symbol.
+(declaim (inline symbol-%info))
+(defun symbol-%info (symbol) (get symbol :sb-xc-globaldb-info))
+(defun symbol-dbinfo (symbol) (symbol-%info symbol))
+
+(defun sys-copy-struct (x) (copy-structure x))
+(defun ensure-heap-list (x) (copy-list x))
+
+(defun range< (l x h) (< l x h))
+(defun range<= (l x h) (<= l x h))
+(defun range<<= (l x h) (and (< l x) (<= x h)))
+(defun range<=< (l x h) (and (<= l x) (< x h)))

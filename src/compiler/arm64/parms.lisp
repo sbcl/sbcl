@@ -64,22 +64,6 @@
 
 ;;;; Where to put the different spaces.
 
-;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#-gencgc
-(progn
-  (defconstant read-only-space-start #x04000000)
-  (defconstant read-only-space-end   #x07ff8000)
-  (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00)
-
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000)
-  #+(or linux openbsd)
-  (progn
-    (defparameter dynamic-0-space-start #x4f000000)
-    (defparameter dynamic-0-space-end   #x66fff000)))
-
-#+gencgc
 (!gencgc-space-setup #+(or linux openbsd freebsd) #xF0000000
                      #+darwin #x300000000
                      #+netbsd #x2F0000000
@@ -87,8 +71,8 @@
                      #-darwin #x1000000000
                      #+darwin #x7003000000)
 
-(defconstant linkage-table-growth-direction :up)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
 
 ;;;; other miscellaneous constants
 
@@ -122,15 +106,7 @@
      ,@+common-static-symbols+)
   #'equalp)
 
-(defconstant-eqx +static-fdefns+
-  #(two-arg-gcd two-arg-lcm
-    two-arg-+ two-arg-- two-arg-* two-arg-/
-    two-arg-< two-arg-> two-arg-=
-    two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-
-    eql
-    sb-kernel:%negate)
-  #'equalp)
+(defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
 
 
 ;;;; Assembler parameters:

@@ -693,3 +693,11 @@
                          (vector-push-extend 1 x))
                       :allow-warnings 'warning))))
 
+(with-test (:name :defmethod-malformed-let*)
+  (assert (nth-value 5
+                     (checked-compile
+                      `(lambda ()
+                         (cl:defmethod ,(gensym) ()
+                           (let* ((a 1 2))
+                             a)))
+                      :allow-failure t))))

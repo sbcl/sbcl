@@ -37,6 +37,11 @@
   "tests/block-compile-test-4.lisp"
   "tests/block-compile-test-5.lisp")
  ("debug.impure.lisp" "tests/bug-414.lisp")
+ ("block-compile.impure.lisp"
+  "tests/package-test-1.lisp"
+  "tests/package-test-2.lisp"
+  "tests/package-test-3.lisp"
+  "tests/package-test-4.lisp")
  ("defstruct.impure-cload.lisp" "tests/block-compile-defstruct-test.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
@@ -63,12 +68,60 @@
  ("octets.pure.lisp"
   "tests/data/compile-file-pos.lisp"
   "tests/data/compile-file-pos-utf16be.lisp")
- ("redblack.pure.lisp" "tests/bbtree-test-util.lisp")
+ ("packages.impure.lisp"
+  "contrib/sb-md5.fasl"
+  "contrib/sb-rotate-byte.fasl"
+  "tests/package-test-1.lisp"
+  "tests/package-test-2.lisp"
+  "tests/package-test-3.lisp"
+  "tests/package-test-4.lisp"
+  "tests/package-test-5.lisp"
+  "tests/package-test-6.lisp"
+  "tests/package-test-7.lisp")
+ ("redblack.pure.lisp" "tests/bbtree-test-util.lisp" "src/code/redblack.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
- ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")
+ ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"
+  "../contrib/sb-aclrepl/tests.lisp")
+ ("sb-bsd-sockets.impure.lisp" "contrib/sb-bsd-sockets.fasl" "contrib/sb-posix.fasl"
+  "../contrib/sb-bsd-sockets/tests.lisp")
+ ("sb-cltl2.impure.lisp" "contrib/sb-cltl2.fasl" "../contrib/sb-cltl2/tests.lisp")
+ ("sb-concurrency.impure.lisp" "contrib/sb-concurrency.fasl"
+  "../contrib/sb-concurrency/tests/package.lisp"
+  "../contrib/sb-concurrency/tests/test-utils.lisp"
+  "../contrib/sb-concurrency/tests/test-frlock.lisp"
+  "../contrib/sb-concurrency/tests/test-queue.lisp"
+  "../contrib/sb-concurrency/tests/test-mailbox.lisp"
+  "../contrib/sb-concurrency/tests/test-gate.lisp")
+ ("sb-cover.impure.lisp" "contrib/sb-cover.fasl")
+ ("sb-gmp.impure.lisp" "contrib/sb-gmp.fasl" "../contrib/sb-gmp/tests.lisp")
+ ("sb-introspect.impure.lisp" "contrib/sb-introspect.fasl"
+  "../contrib/sb-introspect/xref-test-data.lisp" "../contrib/sb-introspect/xref-test.lisp"
+  "../contrib/sb-introspect/test.lisp" "../contrib/sb-introspect/test-driver.lisp"
+  "../contrib/sb-introspect/load-test.lisp")
+ ("sb-md5.impure.lisp" "contrib/sb-md5.fasl" "contrib/sb-rotate-byte.fasl"
+  "../contrib/sb-md5/md5-tests.lisp")
+ ("sb-mpfr.impure.lisp" "contrib/sb-gmp.fasl" "contrib/sb-mpfr.fasl"
+  "../contrib/sb-mpfr/tests.lisp")
+ ("sb-posix.impure.lisp" "contrib/sb-posix.fasl"
+  "../contrib/sb-posix/posix-tests.lisp" "../contrib/sb-posix/libc-tests.lisp")
+ ("sb-simd.impure.lisp" "contrib/sb-simd.fasl"
+  "../contrib/sb-simd/test-suite/packages.lisp"
+  "../contrib/sb-simd/test-suite/numbers.lisp"
+  "../contrib/sb-simd/test-suite/utilities.lisp"
+  "../contrib/sb-simd/test-suite/test-suite.lisp"
+  "../contrib/sb-simd/test-suite/test-arefs.lisp"
+  "../contrib/sb-simd/test-suite/test-simple-simd-functions.lisp"
+  "../contrib/sb-simd/test-suite/test-horizontal-functions.lisp"
+  "../contrib/sb-simd/test-suite/test-hairy-simd-functions.lisp"
+  "../contrib/sb-simd/test-suite/test-packages.lisp")
+ ("sb-simple-streams.impure.lisp" "contrib/sb-simple-streams.fasl" "contrib/sb-bsd-sockets.fasl"
+  "../contrib/sb-simple-streams/simple-stream-tests.lisp")
+ ("sb-rotate-byte.impure.lisp" "contrib/sb-rotate-byte.fasl"
+  "../contrib/sb-rotate-byte/rotate-byte-tests.lisp")
+ ("sb-sprof.impure.lisp" "contrib/sb-sprof.fasl"
+  "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
  ("signals.impure.lisp" "contrib/sb-posix.fasl")
  ("stream.impure.lisp" "contrib/sb-posix.fasl")
- ("sprof.impure.lisp" "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
  ("threads.impure.lisp"
   "tests/alloca.so"
   "tests/threads-foreign.so")

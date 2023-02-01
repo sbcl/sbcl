@@ -85,7 +85,7 @@ maintained."
 ;;;
 ;;; FIXME: Shouldn't these be functions instead of macros?
 (defmacro in-stream-from-designator (stream)
-  (let ((svar (sb-xc:gensym)))
+  (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
@@ -110,7 +110,7 @@ maintained."
               (t (return x))))))
 |#
 (defmacro out-stream-from-designator (stream)
-  (let ((svar (sb-xc:gensym)))
+  (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
@@ -234,7 +234,7 @@ maintained."
                        &body body)
   ;; If the &REST arg never needs to be reified, this is slightly quicker
   ;; than using a DX list.
-  (let ((index (sb-xc:gensym "INDEX")))
+  (let ((index (gensym "INDEX")))
     `(let ((,index ,start))
        (loop
         (cond ((< (truly-the index ,index) (length ,rest-var))
@@ -247,6 +247,15 @@ maintained."
 
 (in-package "SB-THREAD")
 
+;;; SBCL-internal code should prefer this variant of a mutex acquire/release.
+;;; Also I'm exploring whether WITH-MUTEX could optionally using absl::Mutex
+;;; (https://abseil.io/about/design/mutex) under user control. SBCL mutexes are
+;;; very fast, as they avoid a foreign call, but absl::Mutex provides metrics
+;;; on lock contention. Using those universally though would require solving some
+;;; problems: (1) absl::Mutex is never recursive, (2) If finalization is needed
+;;; to free the C++ object, and the finalizer table has a mutex, how to insert
+;;; the finalizer on the finalizer table mutex into the table.
+;;; System mutexes will always be our own mutex-based-on-futex (if available).
 (defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
                                     &body body)
   `(dx-flet ((with-system-mutex-thunk () ,@body))

@@ -158,7 +158,7 @@
          (cmp :qword ?end :tlab-limit)
          (jmp :nbe ?_)
          (mov :qword :tlab-freeptr ?end)
-         (add ?end ?bias)
+         (:or (add ?end ?bias) (dec ?end))
          (mov ?_ (ea ?_ ?end) ?header))
 
         (var-array
@@ -232,6 +232,12 @@
                (mov ?_ (ea 0 ?result) ?header)
                (mov ?_ (ea ?_ ?result) ?vector-len)
                (or ?result ?lowtag))
+        ;; not really "large" but same as preceding
+        (funinstance (push ?nbytes)
+                     (call . ignore)
+                     (pop ?result)
+                     (mov ?_ (ea 0 ?result) ?header)
+                     (or ?result ?lowtag))
         (list (push ?nbytes)
               (call . ignore)
               (pop ?result)
@@ -266,9 +272,13 @@
                   ;; Figure out if we're looking at an allocation buffer
                   (let ((disp (ash (machine-ea-disp ea) (- sb-vm:word-shift))))
                     (awhen (case disp
-                            ((#.sb-vm::thread-mixed-tlab-slot
+                            ((#.sb-vm::thread-sys-mixed-tlab-slot
+                              #.sb-vm::thread-sys-cons-tlab-slot
+                              #.sb-vm::thread-mixed-tlab-slot
                               #.sb-vm::thread-cons-tlab-slot) :tlab-freeptr)
-                            ((#.(1+ sb-vm::thread-mixed-tlab-slot)
+                            ((#.(1+ sb-vm::thread-sys-mixed-tlab-slot)
+                              #.(1+ sb-vm::thread-sys-cons-tlab-slot)
+                              #.(1+ sb-vm::thread-mixed-tlab-slot)
                               #.(1+ sb-vm::thread-cons-tlab-slot)) :tlab-limit))
                       (setq ea it))))
                 (setf (car tail) ea)) ; change the EA
@@ -425,9 +435,7 @@
     ;; Expect an increment of the allocation point hit counter
     (let* ((inst (get-instruction iterator))
            (ea (third inst))) ; (INC :qword EA)
-      (when (and (eq (car inst) 'inc)
-                 (machine-ea-base ea)
-                 (null (machine-ea-index ea)))
+      (when (and (eq (car inst) 'inc) (machine-ea-base ea) (null (machine-ea-index ea)))
         (incf (car iterator))
         (let ((profiler-base (machine-ea-base ea))
               (profiler-index (machine-ea-disp ea)))

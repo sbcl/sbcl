@@ -70,39 +70,20 @@
 
 ;;;; Where to put the different spaces.
 
-;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#-gencgc
-(progn
-  (defconstant read-only-space-start #x04000000)
-  (defconstant read-only-space-end   #x07ff8000)
-  (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00)
-
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000))
-
-#+gencgc
 (progn
   #+(or linux netbsd)
   (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
   #+openbsd
   (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000))
 
-(defconstant linkage-table-growth-direction :down)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :down)
+(defconstant alien-linkage-table-entry-size 16)
 ;;; Link these as data entries so that we store only the address of the
 ;;; handwritten assembly code in the linkage able, and not a trampoline
 ;;; to the trampoline. The ALLOCATION macro just wants an address.
-#+gencgc
 (setq *linkage-space-predefined-entries* '(("alloc_tramp" t)
                                            ("list_alloc_tramp" t)))
 
-#+(or linux netbsd openbsd)
-(progn
-  #-gencgc
-  (progn
-    (defparameter dynamic-0-space-start #x4f000000)
-    (defparameter dynamic-0-space-end   #x66fff000)))
 
 ;;;; other miscellaneous constants
 
@@ -137,15 +118,7 @@
      *pseudo-atomic-interrupted*)
   #'equalp)
 
-(defconstant-eqx +static-fdefns+
-  #(two-arg-gcd two-arg-lcm
-    two-arg-+ two-arg-- two-arg-* two-arg-/
-    two-arg-< two-arg-> two-arg-=
-    two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-
-    eql
-    sb-kernel:%negate)
-  #'equalp)
+(defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
 
 
 ;;;; Assembler parameters:

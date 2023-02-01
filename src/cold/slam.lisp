@@ -46,7 +46,7 @@
 ;;; :trace-file as a flag.
 (setf *stems-and-flags*
       (let ((*readtable* *xc-readtable*))
-        (read-from-file "^build-order.lisp-expr" nil)))
+        (read-from-file "^build-order.lisp-expr" :enforce-single-expr nil)))
 
 ;;; Don't care about deftransforms that get redefined.
 ;;; The target condition is defined in 'condition' which is a :not-host file.

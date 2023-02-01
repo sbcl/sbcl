@@ -65,10 +65,12 @@
     (inst cmp temp lowtag)
     (inst b (if not-p :ne :eq) target)))
 
-(defun %test-headers (value temp target not-p function-p headers
+(defun %test-headers (value widetag target not-p function-p headers
                       &key (drop-through (gen-label))
-                           value-tn-ref)
-  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
+                           value-tn-ref
+                           (nil-in-other-pointers t))
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
+        (temp widetag))
     (flet ((%logical-mask (x)
              (cond ((encode-logical-immediate x)
                     x)
@@ -85,11 +87,15 @@
               (values drop-through target)
               (values target drop-through))
         (assemble ()
-          (unless (and value-tn-ref
-                       (eq lowtag other-pointer-lowtag)
-                       (other-pointer-tn-ref-p value-tn-ref))
-            (%test-lowtag value temp when-false t lowtag))
-          (load-type temp value (- lowtag))
+          (cond (widetag
+                 (unless (and value-tn-ref
+                              (eq lowtag other-pointer-lowtag)
+                              (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers))
+                   (%test-lowtag value widetag when-false t lowtag))
+                 (load-type widetag value (- lowtag)))
+                (t
+                 (setf widetag value
+                       temp tmp-tn)))
           (do ((remaining headers (cdr remaining)))
               ((null remaining))
             (let ((header (car remaining))
@@ -100,13 +106,13 @@
                    ((and (not last) (null (cddr remaining))
                          (atom (cadr remaining))
                          (= (logcount (logxor header (cadr remaining))) 1))
-                    (inst and temp temp (%logical-mask
+                    (inst and temp widetag (%logical-mask
                                          (ldb (byte 8 0) (logeqv header (cadr remaining)))))
                     (inst cmp temp (ldb (byte 8 0) (logand header (cadr remaining))))
                     (inst b (if not-p :ne :eq) target)
                     (return))
                    (t
-                    (inst cmp temp header)
+                    (inst cmp widetag header)
                     (if last
                         (inst b (if not-p :ne :eq) target)
                         (inst b :eq when-true)))))
@@ -117,7 +123,7 @@
                      ((and last (not (= start bignum-widetag))
                            (= (+ start 4) end)
                            (= (logcount (logxor start end)) 1))
-                      (inst and temp temp (%logical-mask
+                      (inst and temp widetag (%logical-mask
                                            (ldb (byte 8 0) (logeqv start end))))
                       (inst cmp temp (ldb (byte 8 0) (logand start end)))
                       (inst b (if not-p :ne :eq) target))
@@ -127,26 +133,26 @@
                            (= (+ (caadr remaining) 4) (cdadr remaining))
                            (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
                            (= (logcount (logxor (caadr remaining) start)) 1))
-                      (inst and temp temp (ldb (byte 8 0) (logeqv start (cdadr remaining))))
+                      (inst and temp widetag (ldb (byte 8 0) (logeqv start (cdadr remaining))))
                       (inst cmp temp (ldb (byte 8 0) (logand start (cdadr remaining))))
                       (inst b (if not-p :ne :eq) target)
                       (return))
                      ((and last
                            (/= start bignum-widetag)
                            (/= end complex-array-widetag))
-                      (inst sub temp temp start)
+                      (inst sub temp widetag start)
                       (inst cmp temp (- end start))
                       (inst b (if not-p :hi :ls) target))
                      (t
                       (unless (= start bignum-widetag)
-                        (inst cmp temp start)
+                        (inst cmp widetag start)
                         (if (= end complex-array-widetag)
                             (progn
                               (aver last)
                               (inst b (if not-p :lt :ge) target))
                             (inst b :lt when-false)))
                       (unless (= end complex-array-widetag)
-                        (inst cmp temp end)
+                        (inst cmp widetag end)
                         (if last
                             (inst b (if not-p :gt :le) target)
                             (inst b :le when-true))))))))))
@@ -167,7 +173,7 @@
         (assemble ()
           (when fixnum-p
             (inst tbz* value 0 yep))
-          (unless (fixnum-or-other-pointer-tn-ref-p args)
+          (unless (fixnum-or-other-pointer-tn-ref-p args t)
             (test-type value temp nope t (other-pointer-lowtag)))
           (loadw temp value 0 other-pointer-lowtag)
           (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -190,7 +196,7 @@
   (:translate unsigned-byte-64-p)
   (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
-          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args)))
+          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
@@ -263,15 +269,13 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:args-var args)
+  (:arg-refs integer-ref)
   (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :gt)
   (:generator 10
-    (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
-      (setf args (tn-ref-across args)))
-    (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
-           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args))
+    (let* ((integer-p (csubtypep (tn-ref-type integer-ref) (specifier-type 'integer)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p integer-ref t))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
@@ -288,7 +292,7 @@
               (values not-target target)
               (values target not-target))
         (assemble ()
-          (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+          (when (types-equal-or-intersect (tn-ref-type integer-ref) (specifier-type 'fixnum))
             (cond ((or other-pointer-p
                        (not (and (eql fixnum 0)
                                  (eq comparison :ge))))
@@ -347,6 +351,7 @@
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
   (:arg-types tagged-num (:or integer bignum))
+  (:arg-refs nil integer-ref)
   (:variant :lt))
 
 (define-vop (<-fixnum-integer >-fixnum-integer)
@@ -362,10 +367,10 @@
   (:variant :ge))
 (define-vop (<=-fixnum-integer >-fixnum-integer)
   (:translate)
-  (:variant :le))
+  (:variant :ge))
 (define-vop (>=-fixnum-integer <-fixnum-integer)
   (:translate)
-  (:variant :ge))
+  (:variant :le))
 
 
 ;;; MOD type checks
@@ -532,12 +537,21 @@
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
   (:generator 12
-    (let* ((drop-thru (gen-label))
-           (is-symbol-label (if not-p drop-thru target)))
+    (unless (other-pointer-tn-ref-p args t)
       (inst cmp value null-tn)
-      (inst b :eq is-symbol-label)
-      (test-type value temp target not-p (symbol-widetag))
-      (emit-label drop-thru))))
+      (inst b :eq (if not-p drop-thru target)))
+    (test-type value temp target not-p (symbol-widetag)
+               :value-tn-ref args)
+    drop-thru))
+
+(define-vop (non-null-symbol-p type-predicate)
+  (:translate non-null-symbol-p)
+  (:generator 7
+    (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'null))
+      (inst cmp value null-tn)
+      (inst b :eq (if not-p target drop-thru)))
+    (test-type value temp target not-p (symbol-widetag) :value-tn-ref args)
+    drop-thru))
 
 (define-vop (consp type-predicate)
   (:translate consp)
@@ -555,3 +569,178 @@
   (:translate single-float-p)
   (:generator 7
     (inst cmp (32-bit-reg value) single-float-widetag)))
+
+(define-vop (load-other-pointer-widetag)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:arg-refs args)
+  (:info not-other-pointer-label null-label)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (unless (other-pointer-tn-ref-p args)
+      (when null-label
+        (inst cmp value null-tn)
+        (inst b :eq null-label))
+      (inst and r value lowtag-mask)
+      (inst cmp r other-pointer-lowtag)
+      (inst b :ne not-other-pointer-label))
+    (load-type r value (- other-pointer-lowtag))))
+
+(define-vop (test-widetag)
+  (:args (value :scs (unsigned-reg)))
+  (:info target not-p type-codes)
+  (:generator 1
+    (%test-headers value nil target not-p nil
+      (if (every #'integerp type-codes)
+          (canonicalize-widetags type-codes)
+          type-codes))))
+
+(define-vop (load-instance-layout)
+  (:args (object :scs (any-reg descriptor-reg)))
+  (:arg-refs args)
+  (:info not-instance)
+  (:results (r :scs (descriptor-reg)))
+  (:generator 1
+    (unless (instance-tn-ref-p args)
+      (inst and tmp-tn object lowtag-mask)
+      (inst cmp tmp-tn instance-pointer-lowtag)
+      (inst b :ne not-instance))
+    (loadw r object instance-slots-offset instance-pointer-lowtag)))
+
+(defun structure-is-a (layout temp this-id test-layout &optional desc-temp target not-p done)
+  (cond ((integerp test-layout)
+         (inst ldrsw temp
+               (@ layout
+                  (- (ash (+ instance-slots-offset
+                             (get-dsd-index layout sb-kernel::flags))
+                          word-shift)
+                     instance-pointer-lowtag)))
+         (inst tst temp test-layout))
+        ((and desc-temp
+              (neq (tn-kind desc-temp) :unused))
+         (inst load-constant desc-temp
+               (tn-byte-offset (emit-constant test-layout)))
+         (inst cmp layout desc-temp))
+        (t
+         (let* ((test-id (layout-id test-layout))
+                (depthoid (wrapper-depthoid test-layout))
+                (offset (+ (id-bits-offset)
+                           (ash (- depthoid 2) 2)
+                           (- instance-pointer-lowtag))))
+           (when (and target
+                      (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
+             (inst ldrsw temp
+                   (@ layout
+                      (- (+ #+little-endian 4
+                            (ash (+ instance-slots-offset
+                                    (get-dsd-index layout sb-kernel::flags))
+                                 word-shift))
+                         instance-pointer-lowtag)))
+             (inst cmp temp (add-sub-immediate (fixnumize depthoid)))
+             (inst b :lt (if not-p target done)))
+           (inst ldr (32-bit-reg this-id) (@ layout offset))
+           ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
+           (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+                  (if (minusp test-id)
+                      (inst cmn (32-bit-reg this-id) (- test-id))
+                      (inst cmp (32-bit-reg this-id) test-id)))
+                 (t
+                  (destructuring-bind (size . label)
+                      ;; This uses the bogus definition of :dword, the one which
+                      ;; emits 4 bytes. _technically_ dword should be 8 bytes.
+                      (register-inline-constant :dword `(:layout-id ,test-layout))
+                    (declare (ignore size))
+                    (inst load-from-label (32-bit-reg temp) label))
+                  (inst cmp (32-bit-reg this-id) (32-bit-reg temp))))))))
+
+;;; This could be split into two vops to avoid wasting an allocation for 'temp'
+;;; when the immediate form is used.
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:info test-layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (structure-is-a x temp this-id test-layout)))
+
+(define-vop ()
+  (:translate sb-c::structure-typep)
+  (:args (object :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:arg-refs args)
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:temporary (:sc descriptor-reg) layout)
+  (:temporary (:sc unsigned-reg
+               :unused-if
+               (and (instance-tn-ref-p args)
+                    #1=(and (not (integerp test-layout))
+                            (let ((classoid (wrapper-classoid test-layout)))
+                              (and (eq (classoid-state classoid) :sealed)
+                                   (not (classoid-subclasses classoid)))))))
+              temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if (or (integerp test-layout)
+                              #1#))
+              this-id)
+  (:temporary (:sc descriptor-reg
+               :unused-if (not #1#))
+              desc-temp)
+  (:generator 4
+    (unless (instance-tn-ref-p args)
+      (inst and temp object lowtag-mask)
+      (inst cmp temp instance-pointer-lowtag)
+      (inst b :ne (if not-p target done)))
+    (loadw layout object instance-slots-offset instance-pointer-lowtag)
+    (structure-is-a layout temp this-id test-layout desc-temp target not-p done)
+    (inst b (if (if (integerp test-layout)
+                    (not not-p)
+                    not-p)
+                :ne :eq) target)
+    done))
+
+(define-vop (structure-typep*)
+  (:args (layout :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:temporary (:sc unsigned-reg
+               :unused-if
+               #1=(and (not (integerp test-layout))
+                       (let ((classoid (wrapper-classoid test-layout)))
+                         (and (eq (classoid-state classoid) :sealed)
+                              (not (classoid-subclasses classoid))))))
+              temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if (or (integerp test-layout)
+                              #1#))
+              this-id)
+  (:temporary (:sc descriptor-reg
+               :unused-if (not #1#))
+              desc-temp)
+  (:generator 4
+    (structure-is-a layout temp this-id test-layout desc-temp target not-p done)
+    (inst b (if (if (integerp test-layout)
+                    (not not-p)
+                    not-p)
+                :ne :eq) target)
+    done))
+
+(define-vop (keywordp type-predicate)
+  (:translate keywordp)
+  (:generator 3
+    #.(assert (= sb-impl::package-id-bits 16))
+    (unless (csubtypep (tn-ref-type args) (specifier-type 'symbol))
+      (test-type value temp (if not-p target not-target) t (symbol-widetag)
+                 :value-tn-ref args))
+    (inst ldrh temp (@ value (+ (ash symbol-name-slot word-shift)
+                               (- other-pointer-lowtag)
+                               6)))
+    (inst cmp temp sb-impl::+package-id-keyword+)
+    (inst b (if not-p :ne :eq) target)
+    not-target))

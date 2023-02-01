@@ -11,8 +11,6 @@
 
 (in-package "SB-ASSEM")
 
-(defvar *asmstream*)
-
 ;;; common supertype for all the different kinds of annotations
 (defstruct (annotation (:constructor nil)
                         (:copier nil))

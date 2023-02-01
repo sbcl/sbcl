@@ -8,15 +8,10 @@
 ;;;; files for more information.
 
 (defpackage :sb-introspect-test
-  (:use "SB-INTROSPECT" "CL" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "SB-INTROSPECT" "CL"))
 
 (in-package :sb-introspect-test)
-
-(defmacro deftest* ((name &key fails-on) form &rest results)
-  `(progn
-     (when (sb-impl::featurep ',fails-on)
-       (pushnew ',name sb-rt::*expected-failures*))
-     (deftest ,name ,form ,@results)))
 
 ;; When running the tests which query for a function type, sb-interpreter
 ;; can return an answer if there were type declarations for the arguments,
@@ -48,9 +43,13 @@
 
 (deftest macro-lambda-list.1
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x b)
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x b))
   t)
+
+(defmacro interpret (form)
+  `(let ((sb-ext:*evaluator-mode* :interpret))
+     (eval ',form)))
 
 #+sb-eval
 (deftest macro-lambda-list.2
@@ -61,26 +60,26 @@
 
 (deftest macro-lambda-list.3
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &optional (b "abc"))
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x &optional (b "abc")))
   t)
 
 (deftest macro-lambda-list.4
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &key (b "abc"))
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x &key (b "abc")))
   t)
 
-(deftest definition-source.1
-    (values (consp (find-definition-sources-by-name 'vectorp :vop))
-            (consp (find-definition-sources-by-name 'check-type :macro)))
-  t t)
+(test-util:with-test (:name definition-source.1 :skipped-on :no-source-locs)
+  (assert (consp (find-definition-sources-by-name 'vectorp :vop)))
+  (assert (consp (find-definition-sources-by-name 'check-type :macro))))
 
 (deftest definition-source-plist.1
     (let* ((source (find-definition-source #'cl-user::one))
            (plist (definition-source-plist source))
            (pathname (definition-source-pathname source)))
-      (values (equalp pathname #p"SYS:CONTRIB;SB-INTROSPECT;TEST.LISP.NEWEST")
+      ;; the full pathname isn't important
+      (values (equalp (pathname-name pathname) "TEST")
               (= (definition-source-file-write-date source)
                  (file-write-date pathname))
               (or (equal (getf plist :test-outer)
@@ -88,18 +87,13 @@
                   plist)))
   t t t)
 
-;; Not sure why this fails when interpreted, and don't really care too much.
-;; The behavior seems right to me anyway.
-#.(if (eq sb-ext:*evaluator-mode* :compile)
-'(deftest definition-source-plist.2
+;;; The behavior of :SOURCE-PLIST on nested WITH-COMPILATION-UNIT
+;;; is to append. This is documented in source/compiler/main
+(test-util:with-test (:name :definition-source-plist.2)
     (let ((plist (definition-source-plist
                      (find-definition-source #'cl-user::four))))
-      (values (or (equal (getf plist :test-outer) "OUT")
-                  plist)
-              (or (equal (getf plist :test-inner) "IN")
-                  plist)))
-  t t)
-(values))
+      (assert (equal (getf plist :test-outer) "OUT"))
+      (assert (equal (getf plist :test-inner) "IN"))))
 
 (defun matchp (object form-number)
   (let ((ds (sb-introspect:find-definition-source object)))
@@ -125,33 +119,26 @@
     (matchp #'cl-user::one 2)
   t)
 
-(deftest find-source-stuff.3
-    (matchp-name :generic-function 'cl-user::two 3)
-  t)
+(test-util:with-test (:name find-source-stuff.3 :skipped-on :no-source-locs)
+  (assert (matchp-name :generic-function 'cl-user::two 3)))
 
-(deftest find-source-stuff.4
-    (matchp (car (sb-mop:generic-function-methods #'cl-user::two)) 4)
-  t)
+(test-util:with-test (:name find-source-stuff.4 :skipped-on :no-source-locs)
+  (assert (matchp (car (sb-mop:generic-function-methods #'cl-user::two)) 4)))
 
-(deftest find-source-stuff.5
-    (matchp-name :variable 'cl-user::*a* 8)
-  t)
+(test-util:with-test (:name find-source-stuff.5 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::*a* 8)))
 
-(deftest find-source-stuff.6
-    (matchp-name :variable 'cl-user::*b* 9)
-  t)
+(test-util:with-test (:name find-source-stuff.6 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::*b* 9)))
 
-(deftest find-source-stuff.7
-    (matchp-name :class 'cl-user::a 10)
-  t)
+(test-util:with-test (:name find-source-stuff.7 :skipped-on :no-source-locs)
+  (assert (matchp-name :class 'cl-user::a 10)))
 
-(deftest find-source-stuff.8
-    (matchp-name :condition 'cl-user::b 11)
-  t)
+(test-util:with-test (:name find-source-stuff.8 :skipped-on :no-source-locs)
+  (assert (matchp-name :condition 'cl-user::b 11)))
 
-(deftest find-source-stuff.9
-    (matchp-name :structure 'cl-user::c 12)
-  t)
+(test-util:with-test (:name find-source-stuff.9 :skipped-on :no-source-locs)
+  (assert (matchp-name :structure 'cl-user::c 12)))
 
 (deftest find-source-stuff.10
     (matchp-name :function 'cl-user::make-c 12)
@@ -161,9 +148,8 @@
     (matchp-name :function 'cl-user::c-e 12)
   t)
 
-(deftest find-source-stuff.12
-    (matchp-name :structure 'cl-user::d 13)
-  t)
+(test-util:with-test (:name find-source-stuff.12 :skipped-on :no-source-locs)
+  (assert (matchp-name :structure 'cl-user::d 13)))
 
 (deftest find-source-stuff.13
     (matchp-name :function 'cl-user::make-d 13)
@@ -173,21 +159,17 @@
     (matchp-name :function 'cl-user::d-e 13)
   t)
 
-(deftest find-source-stuff.15
-    (matchp-name :package 'cl-user::e 14)
-  t)
+(test-util:with-test (:name find-source-stuff.15 :skipped-on :no-source-locs)
+  (assert (matchp-name :package 'cl-user::e 14)))
 
-(deftest find-source-stuff.16
-    (matchp-name :symbol-macro 'cl-user::f 15)
-  t)
+(test-util:with-test (:name find-source-stuff.16 :skipped-on :no-source-locs)
+  (assert (matchp-name :symbol-macro 'cl-user::f 15)))
 
-(deftest find-source-stuff.17
-    (matchp-name :type 'cl-user::g 16)
-  t)
+(test-util:with-test (:name find-source-stuff.17 :skipped-on :no-source-locs)
+  (assert (matchp-name :type 'cl-user::g 16)))
 
-(deftest find-source-stuff.18
-    (matchp-name :constant 'cl-user::+h+ 17)
-  t)
+(test-util:with-test (:name find-source-stuff.18 :skipped-on :no-source-locs)
+  (assert (matchp-name :constant 'cl-user::+h+ 17)))
 
 (deftest find-source-stuff.19
     (matchp-length :method 'cl-user::j 2)
@@ -206,21 +188,19 @@
   t)
 
 (deftest find-source-stuff.23
-    (matchp-name :function  '(setf cl-user::o) 23)
+    (matchp-name :function '(setf cl-user::o) 23)
   t)
 
-(deftest find-source-stuff.24
-    (matchp-name :method  '(setf cl-user::p) 24)
-  t)
+(test-util:with-test (:name find-source-stuff.24 :skipped-on :no-source-locs)
+  (assert (matchp-name :method '(setf cl-user::p) 24)))
 
 (deftest find-source-stuff.25
     (matchp-name :macro  'cl-user::q 25)
   t)
 
 
-(deftest find-source-stuff.26
-    (matchp-name :method-combination 'cl-user::r 26)
-  t)
+(test-util:with-test (:name find-source-stuff.26 :skipped-on :no-source-locs)
+  (assert (matchp-name :method-combination 'cl-user::r 26)))
 
 
 (deftest find-source-stuff.27
@@ -250,14 +230,13 @@
     (matchp-name :function 'cl-user::compile-time-too-fun 28)
   t)
 
-(load "load-test.lisp")
+(load "../contrib/sb-introspect/load-test.lisp")
 (deftest find-source-stuff.32
     (matchp-name :function 'cl-user::loaded-as-source-fun 3)
   t)
 
-(deftest find-source-stuff.33
-    (matchp-name :variable 'cl-user::**global** 29)
-  t)
+(test-util:with-test (:name find-source-stuff.33 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::**global** 29)))
 
 ;;; Check wrt. interplay of generic functions and their methods.
 
@@ -384,28 +363,13 @@
     (tai 42s0 :immediate nil)
   t)
 
-;;; -- It appears that this test can also fail due to systematic issues
-;;; (possibly with the C compiler used) which we cannot detect based on
-;;; *features*.  Until this issue has been fixed, I am marking this test
-;;; as failing on Windows to allow installation of the contrib on
-;;; affected builds, even if the underlying issue is (possibly?) not even
-;;; strictly related to windows.  C.f. lp1057631.  --DFL
-;;;
-(deftest* (allocation-information.4
+(test-util:with-test (:name :allocation-information.4
            ;; Ignored as per the comment above, even though it seems
            ;; unlikely that this is the right condition.
-           :fails-on (or :win32 :ppc64 (and :sparc :gencgc)))
-    #+gencgc
+           :fails-on (or :ppc64 (and :sparc :gencgc)))
     (tai (make-list 1) :heap
          `(:space :dynamic :boxed t :large nil)
-         :ignore (list :page :pinned :generation :write-protected))
-    #-gencgc
-    (tai :cons :heap
-         ;; FIXME: Figure out what's the right cheney-result. SPARC at least
-         ;; has exhibited both :READ-ONLY and :DYNAMIC, which seems wrong.
-         '()
-         :ignore '(:space))
-  t)
+         :ignore (list :page :pinned :generation :write-protected)))
 
 (setq sb-ext:*evaluator-mode* :compile)
 (sb-ext:defglobal *large-obj* nil)
@@ -440,30 +404,39 @@
          (= (getf props :page) page)
          (= (getf props :generation) gen)
          (eq (getf props :boxed :missing) boxedp))))
+
+(defun alloc-large-code ()
+  ;; large objets have to have to be at least 4 GC pages
+  (let ((bytes (* 4 sb-vm:gencgc-page-bytes)))
+    ;; For 32-bit in order to force allocation into a large-object page, the currently
+    ;; open code region has to be closed. Otherwise the allocation might fit in the region.
+    #-64-bit
+    (sb-alien:alien-funcall
+     (sb-alien:extern-alien "gc_close_region"
+                            (function sb-alien:void sb-alien:unsigned sb-alien:unsigned))
+     (+ (* 3 3 sb-vm:n-word-bytes) ; KLUDGE: a region is 3 words, and code_region
+                                        ; is the third in the array of regions
+        (sb-sys:find-dynamic-foreign-symbol-address "gc_alloc_region"))
+     7) ; KLUDGE: PAGE_TYPE_CODE
+    ;; A legal code object needs >= 4 boxed words. Let's use 8
+    (let ((object (sb-c:allocate-code-object nil 8 (- bytes (* 8 sb-vm:n-word-bytes)))))
+      (setq *large-obj* object)
+      ;; assert that it's large, otherwise the entire test is bogus
+      (let ((props (nth-value 1 (allocation-information object))))
+        (assert (getf props :large)))
+      object)))
+(compile 'alloc-large-code)
+
 #+gencgc
-(deftest* (allocation-information.6 :fails-on :sbcl)
+(deftest allocation-information.6
     ;; Remember, all tests run after all toplevel forms have executed,
     ;; so if this were (DEFGLOBAL *LARGE-CODE* ... ) or something,
     ;; the garbage collection explicitly requested for ALLOCATION-INFORMATION.5
     ;; would have already happened, and thus affected this test as well.
     ;; So we need to make the objects within each test,
     ;; while avoiding use of lexical vars that would cause conservative pinning.
-    (multiple-value-bind (page gen)
-        (page-and-gen
-         (setq *large-obj*
-               ;; To get a large-object page, a code object has to exceed
-               ;; LARGE_OBJECT_SIZE and not fit within an open region.
-               ;; (This is a minor bug, because one should be able to
-               ;; create regions as large as desired without affecting
-               ;; determination of whether an object is large.
-               ;; Practically it means is that a small object region
-               ;; is limited to at most 3 pages)
-               ;; 32-bit machines use 64K for code allocation regions,
-               ;; but the large object size can be as small as 16K.
-               ;; 16K might fit in the free space of an open region,
-               ;; and by accident would not go on a large object page.
-               (sb-c:allocate-code-object nil 0 0
-                (max (* 4 sb-vm:gencgc-page-bytes) #-64-bit 65536))))
+    (multiple-value-bind (page gen) (page-and-gen (alloc-large-code))
+      (declare (ignorable gen))
       (declare (notinline format))
       (format (make-string-output-stream) "~%")
       (loop for i from 1 to sb-vm:+highest-normal-generation+
@@ -479,7 +452,7 @@
 (deftest allocation-information.7
     (locally
       (declare (notinline format))
-      ;; Create a bignum using 4 GC cards
+      ;; Create a bignum using 4 GC pages
       (setq *b* (ash 1 (* sb-vm:gencgc-page-bytes sb-vm:n-byte-bits 4)))
       (setq *negb* (- *b*))
       (and (let ((props (get-small-bignum-allocation-information)))
@@ -551,10 +524,6 @@
   (or (equal typespec1 typespec2)   ; TYPE= punts on &keywords in FTYPEs.
       (sb-kernel:type= (sb-kernel:values-specifier-type typespec1)
                        (sb-kernel:values-specifier-type typespec2))))
-
-(defmacro interpret (form)
-  `(let ((sb-ext:*evaluator-mode* :interpret))
-     (eval ',form)))
 
 ;; Functions
 
@@ -735,7 +704,7 @@
         (predicate (find-definition-source #'cl-user::three-p)))
     (values (and (equalp copier accessor)
                  (equalp copier predicate))
-            (equal "TEST.LISP.NEWEST"
+            (equal "test.lisp"
                    (file-namestring (definition-source-pathname copier)))
             (equal '(5)
                    (definition-source-form-path copier))))
@@ -749,7 +718,7 @@
         (predicate (car (find-definition-sources-by-name 'cl-user::three-p :function))))
     (values (and (equalp copier accessor)
                  (equalp copier predicate))
-            (equal "TEST.LISP.NEWEST"
+            (equal "test.lisp"
                    (file-namestring (definition-source-pathname copier)))
             (equal '(5)
                    (definition-source-form-path copier))))
@@ -757,25 +726,20 @@
   t
   t)
 
-(deftest alien-type.1
-  (matchp-name :alien-type 'cl-user::test-alien-type 30)
-  t)
+(test-util:with-test (:name alien-type.1 :skipped-on :no-source-locs)
+  (assert (matchp-name :alien-type 'cl-user::test-alien-type 30)))
 
-(deftest alien-type.2
-  (matchp-name :alien-type 'cl-user::test-alien-struct 31)
-  t)
+(test-util:with-test (:name alien-type.2 :skipped-on :no-source-locs)
+  (assert (matchp-name :alien-type 'cl-user::test-alien-struct 31)))
 
-(deftest alien-variable
-  (matchp-name :variable 'cl-user::test-alien-var 32)
-  t)
+(test-util:with-test (:name alien-variable :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::test-alien-var 32)))
 
-(deftest condition-slot-reader
-  (matchp-name :method 'cl-user::condition-slot-reader 33)
-  t)
+(test-util:with-test (:name condition-slot-reader :skipped-on :no-source-locs)
+  (matchp-name :method 'cl-user::condition-slot-reader 33))
 
-(deftest condition-slot-writer
-  (matchp-name :method 'cl-user::condition-slot-writer 33)
-  t)
+(test-util:with-test (:name condition-slot-writer :skipped-on :no-source-locs)
+  (matchp-name :method 'cl-user::condition-slot-writer 33))
 
 (deftest function-with-a-local-function
     (sb-introspect:definition-source-form-number
@@ -802,9 +766,10 @@
 (deftest map-root-closure-unnamed
     (count-pointees (funcall (compile nil `(lambda (x) (lambda () x))) t) nil)
   2)
-;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value.
-;;; The closed-over value is AND, and the name of the closure is (:MACRO AND).
-(deftest map-root-closure-named (count-pointees (symbol-function 'and) nil) 3)
+;;; (SYMBOL-FUNCTION 'IF) is a named closure over 1 value.
+;;; The closed-over value is (:SPECIAL IF), and the name of the closure is
+;;; identical, but it also has a docstring.
+(deftest map-root-closure-named (count-pointees (symbol-function 'if) nil) 3)
 
 ;;; GFs point to their layout, implementation function, and slot vector.
 ;;; There's also a hash-code which is stored is one of two different ways.

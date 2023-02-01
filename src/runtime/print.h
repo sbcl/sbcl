@@ -23,4 +23,12 @@ extern void reset_printer(void);
 extern void safely_show_lstring(struct vector*, int, FILE*);
 extern void print_list_car_ptrs(lispobj, FILE*);
 
+#define odxprint(topic, fmt, ...)                       \
+    do                                                  \
+        if (dyndebug_config.dyndebug_##topic)           \
+            odxprint_fun(fmt "\n", ##__VA_ARGS__);      \
+    while (0)
+
+void odxprint_fun(const char *fmt, ...);
+
 #endif

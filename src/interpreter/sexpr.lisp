@@ -132,22 +132,12 @@
   (declare (ignore env sexpr) #.+handler-optimize+)
   x)
 
-;;; Return a handler that returns a constant.
-;;; The %SEXPR constructor elides a handler for constants,
-;;; but there are cases where NIL sneaks through and demands a callable handler.
-;;; We avoid generating N copies of such handler. Same goes for 0 and T.
-(defun return-constant (object)
-  (cond ((null object) (load-time-value (handler #'%const nil)))
-        ((eq object t) (load-time-value (handler #'%const t)))
-        ((eql object 0) (load-time-value (handler #'%const 0)))
-        (t (handler #'%const object))))
-
 (defun return-constant-values (values env sexpr)
   (declare (ignore env sexpr) #.+handler-optimize+)
   (values-list values))
 
 ;; Forward defs
-(declaim (ftype function digest-form %eval eval-setq))
+(declaim (ftype function digest-form %eval eval-setq reutrn-constant))
 
 ;;; Return a SEXPR object that will, when dispatched, evaluate FORM.
 ;;; Unlike optimizations on SEXPRS whereby they install the most-specific
@@ -916,7 +906,7 @@ Test case.
 (defun tracing-macroexpand-1 (form env &optional (predicate #'fluid-def-p)
                               &aux (original-hook (valid-macroexpand-hook))
                                    expanders)
-  (unless (allow-macro-redefinition env)
+  (unless (allow-macro-redef-p env)
     (return-from tracing-macroexpand-1
       (values (macroexpand-1 form env) nil)))
   (flet ((macroexpand-hook (function form env)
@@ -946,7 +936,7 @@ Test case.
 
 ;;; Return T if the evaluator should always consider that macros
 ;;; might be redefined. If NIL then cached expansions are permanent.
-(defun allow-macro-redefinition (env)
+(defun allow-macro-redef-p (env)
   (if (policy env (and (= speed 3) (= debug 0) (= safety 0)))
       nil
       t))
@@ -1050,56 +1040,60 @@ Test case.
                  (pop tail)))))))))
 
 ;;; Apply what is probably a function - it was when the form was digested.
-;;; This carefully mimics the compiler's behavior of referencing the
-;;; function only after evaluation of its args. In particular, supposing that
-;;; BAZ is not defined, this works in compiled code:
-;;;  (DEFUN FOO () (BAZ (SETF (SYMBOL-FUNCTION 'BAZ) (LAMBDA (X) `(HI ,X)))))
+;;; This _might_ or might not mimic the compiler's behavior of referencing the
+;;; function only after evaluation of its args. Consider an example:
+;;;  * (fmakunbound 'g)
+;;;  * (defun define-g () (setf (symbol-function 'g) #'print) *terminal-io*)
+;;;  * (defun f (x) (g (- x) (define-g)))
+;;;  * (f 3)
 ;;;
-;;; Interpreted code needs an explicit check for NIL in an fdefn-fun.
-;;; Compiled code doesn't because the 'raw-addr' slot is always
-;;; something valid to jump to.
-(defun apply-probably-fun (fdefinition args env &aux (n-args 0))
+;;; sb-eval couldn't eval F because #'G is undefined when attempting to eval the
+;;; head of the body form in F. But compiled code works fine, as the CAR of a
+;;; combination node is accessed last. (Portable code shouldn't rely on that)
+;;;
+;;; sb-fasteval similarly accepts it the backend has CALL-SYMBOL, but it works
+;;; accidentally rather than on purpose now. #'G is looked up to see whether
+;;; it is macro and then called normally if not. But if #'G is undefined, then G
+;;; is invoked by name so that backtrace shows it. However, if CALL-SYMBOL isn't
+;;; a thing, then F will fail at (%COERCE-CALLABLE-FOR-CALL 'G)
+;;; It was surprising to me that %COERCE-CALLABLE-FOR-CALL is performed eagerly
+;;; where CALL-SYMBOL doesn't exist. I would have figured it would be performed
+;;; as late as possible, as if by CALL-SYMBOL.
+(defun apply-probably-fun (name args env &aux (n-args 0))
+  (declare (symbol name))
   (multiple-value-setq (args n-args) (arglist-to-sexprs args))
   (macrolet
-      ((funcall-n (n)
-         (let* ((arg-names (subseq '(a b c d e) 0 n))
-                (bindings
-                  (loop for arg in arg-names for i from 1 repeat n
-                        collect `(,arg
-                                  (dispatch
-                                   ,(if (= n 1) '(cdr data) `(svref data ,i))
-                                   env)))))
-           `(hlambda (GLOBAL-CALL ,n) (data) (env sexpr)
-              (symbol-macrolet ((fdefn ,(case n
-                                          (0 'data)
-                                          (1 '(car data))
-                                          (t '(svref data 0)))))
-                (if (re-expand-p)
-                    (digest-form (sexpr-form sexpr) env sexpr)
-                    (let ,bindings
-                      (funcall (sb-c:safe-fdefn-fun fdefn) ,@arg-names)))))))
+      ((funcall-n (n &aux (s (case n (0 'data) (1 '(car data)) (t '(svref data 0)))))
+         `(hlambda (GLOBAL-CALL ,n) (data) (env sexpr)
+            (let* ((symbol (truly-the symbol ,s))
+                   (function (or (%symbol-function symbol) symbol)))
+              (if (re-expand-p)
+                  (digest-form (sexpr-form sexpr) env sexpr)
+                  (funcall function
+                           ,@(loop for i from 1 repeat n
+                                   collect `(dispatch ,(if (= n 1) '(cdr data) `(svref data ,i))
+                                                      env)))))))
        (generate-switch ()
          `(case n-args
-            (0 (let ((data fdefinition)) (funcall-n 0)))
-            (1 (let ((data (cons fdefinition (first args)))) (funcall-n 1)))
+            (0 (let ((data name)) (funcall-n 0)))
+            (1 (let ((data (cons name (first args)))) (funcall-n 1)))
             (t
-             (let ((data (coerce (cons fdefinition args) 'vector)))
+             (let ((data (coerce (cons name args) 'vector)))
                (cases n-args (2 5 funcall-n)
                 (t (hlambda GLOBAL-CALL (data) (env sexpr)
                     (declare (simple-vector data))
-                    (symbol-macrolet ((fdefn (svref data 0)))
+                    (let* ((symbol (truly-the symbol (svref data 0)))
+                           (function (or (%symbol-function symbol) symbol)))
                       (if (re-expand-p)
                           (digest-form (sexpr-form sexpr) env sexpr)
                           (let* ((arglist (make-list (1- (length data))))
                                  (tail arglist))
-                            (dotimes (i (1- (length data))
-                                        (apply (sb-c:safe-fdefn-fun fdefn) arglist))
+                            (dotimes (i (1- (length data)) (apply function arglist))
                               (rplaca tail (dispatch (svref data (1+ i)) env))
                               (pop tail)))))))))))))
-    (if (allow-macro-redefinition env)
+    (if (allow-macro-redef-p env)
         (macrolet ((re-expand-p ()
-                     '(let ((f (fdefn-fun fdefn)))
-                        (and f (sb-impl::macro/special-guard-fun-p f)))))
+                     '(and (functionp function) (sb-impl::macro/special-guard-fun-p function))))
           (generate-switch))
         (macrolet ((re-expand-p () nil)) (generate-switch)))))
 
@@ -1180,23 +1174,18 @@ Test case.
             (setf (debug-source-namestring source)
                   (sb-kernel::function-file-namestring f)
                   (debug-source-created source) nil) ; = unknown
-            ;; Clobber the TLF-NUM + OFFSET. We should do better that that,
-            ;; but interpreted functions do not track their file offset,
-            ;; so the conservative thing is to plug in NILs, not bogus values
-            ;; from whatever file (if any) is currently being loaded.
-            (setf (sb-c::compiled-debug-info-tlf-num+offset cdi) 0)
             ;; Skirt a package lock by avoiding (SETF SYMBOL-FUNCTION)
             ;; *technically* this should be a compare-and-swap to ensure that the
             ;; original lambda expression is as expected. To do that, we need
             ;; to get to the point where fdefns do not store "both" representations
             ;; of one function pointer, because we can't assume that multi-word CAS
             ;; is a thing.  Or use a mutex (horrible).
-            (setf (fdefn-fun (find-fdefn fname)) compiled-fun)))))
+            (setf (%symbol-function fname) compiled-fun)))))
 
     (when (fluid-def-p fname)
       ;; Return a handler that calls FNAME very carefully
       (return-from digest-global-call
-        (apply-probably-fun (find-or-create-fdefn fname) args env))))
+        (apply-probably-fun fname args env))))
 
   ;; Try to recognize (FUNCALL constant-fun ...)
   ;; This syntax is required when using SETF functions, and it should

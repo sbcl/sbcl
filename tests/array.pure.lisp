@@ -523,9 +523,7 @@
 
 (with-test (:name (make-array :transform :fill-pointer nil))
   (flet ((test (form)
-           (let ((fun (checked-compile `(lambda () ,form))))
-             (assert (not (ctu:find-named-callees
-                           fun :name 'sb-kernel:%make-array))))))
+           (assert (not (ctu:ir1-named-calls `(lambda () ,form))))))
     (test '(make-array 3      :fill-pointer nil))
     (test '(make-array 3      :fill-pointer nil))
     (test '(make-array 3      :fill-pointer t))
@@ -534,9 +532,9 @@
     (test '(make-array '(3 3) :fill-pointer nil))))
 
 (with-test (:name (make-array :transform :adjustable :fill-pointer))
-  (let ((fun (checked-compile '(lambda (fp)
-                                (make-array 3 :adjustable t :fill-pointer fp)))))
-    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))
+  (multiple-value-bind (calls fun)
+      (ctu:ir1-named-calls '(lambda (fp) (make-array 3 :adjustable t :fill-pointer fp)))
+    (assert (not (member 'sb-kernel:%make-array calls)))
     (assert (= (length (funcall fun t)) 3))
     (assert (array-has-fill-pointer-p (funcall fun t)))
     (assert (= (length (funcall fun 2)) 2))
@@ -548,18 +546,20 @@
 
 (with-test (:name (make-array :transform :non-constant-fill-pointer))
   ;; Known adjustable with any fill-pointer can be inlined
-  (let ((fun (checked-compile '(lambda (n fillp)
+  (multiple-value-bind (calls fun)
+      (ctu:ir1-named-calls '(lambda (n fillp)
                                  (make-array (the (mod 20) n)
-                                             :adjustable t :fill-pointer fillp)))))
-    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))
+                                             :adjustable t :fill-pointer fillp)))
+    (assert (not (member 'sb-kernel:%make-array calls)))
     (let ((a (funcall fun 10 3)))
       (assert (= (length a) 3))
       (assert (= (array-dimension a 0) 10))))
   ;; Non-adjustable w/ non-constant numeric fill-pointer can be inlined
-  (let ((fun (checked-compile '(lambda (n)
+  (multiple-value-bind (calls fun)
+      (ctu:ir1-named-calls '(lambda (n)
                                  (make-array (the (mod 20) n)
-                                             :fill-pointer (floor n 2))))))
-    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))
+                                             :fill-pointer (floor n 2))))
+    (assert (not (member 'sb-kernel:%make-array calls)))
     (let ((a (funcall fun 10)))
       (assert (= (length a) 5))
       (assert (= (array-dimension a 0) 10)))))
@@ -685,3 +685,40 @@
       `(lambda ()
          (typep "abcd" '(simple-array t 2)))
     (() nil)))
+
+(with-test (:name :vector-push-extend-specialized)
+  (let ((extend (checked-compile `(lambda (e a)
+                                    (vector-push-extend e a)
+                                    a))))
+    (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+          for type = (sb-vm:saetp-specifier saetp)
+          when type
+          do
+          (let* ((value (sb-vm:saetp-initial-element-default saetp))
+                 (value (if (characterp value)
+                            (code-char (1+ (char-code value)))
+                            (1+ value))))
+            (assert (eql (aref (funcall extend value (make-array 1 :element-type type
+                                                                   :adjustable t
+                                                                   :fill-pointer t))
+                               1)
+                         value))))))
+
+(with-test (:name :intersection-type-complexp)
+  (assert (equal (caddr (sb-kernel:%simple-fun-type
+                         (checked-compile `(lambda (x)
+                                             (declare ((and (simple-array * (10))
+                                                            (not simple-vector))
+                                                       x))
+                                             (length x)))))
+                 `(values (integer 10 10) &optional))))
+
+(with-test (:name :vector-length-intersection-types)
+  (assert (equal (caddr (sb-kernel:%simple-fun-type
+                         (checked-compile `(lambda (x)
+                                             (declare ((and (or (simple-array * (11))
+                                                                (simple-array * (12)))
+                                                            (not simple-vector))
+                                                       x))
+                                             (length x)))))
+                 `(values (integer 11 12) &optional))))

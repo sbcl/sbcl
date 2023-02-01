@@ -130,14 +130,18 @@
   (stack (make-fop-vector 100) :type simple-vector)
   (name-buffer (vector (make-string  1 :element-type 'character)
                        (make-string 31 :element-type 'base-char)))
-  (deprecated-stuff nil :type list)
-  ;; Sometimes we want to skip over any FOPs with side-effects (like
-  ;; function calls) while executing other FOPs. SKIP-UNTIL will
-  ;; either contain the position where the skipping will stop, or
-  ;; NIL if we're executing normally.
-  (skip-until nil :type (or null fixnum))
-  (print nil :type boolean))
+  (print nil :type boolean)
+  ;; We keep track of partial source info for the input in case
+  ;; loading gets interrupted.
+  (partial-source-info nil :type (or null sb-c::debug-source)))
 (declaim (freeze-type fasl-input))
+
+;;; Lisp assembler routines are named by Lisp symbols, not strings,
+;;; and so can be compared by EQ.
+(define-load-time-global *assembler-routines* nil)
+;;; word vector in static space of addresses of asm routines
+#+immobile-space (define-load-time-global *asm-routine-vector* nil)
+#-sb-xc-host (declaim (code-component *assembler-routines*))
 
 ;;; Output the current number of semicolons after a fresh-line.
 ;;; FIXME: non-mnemonic name
@@ -422,8 +426,7 @@
                `((macrolet
                    ((fasl-input () '(truly-the fasl-input .fasl-input.))
                     (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
-                    (operand-stack () '(%fasl-input-stack (fasl-input)))
-                    (skip-until () '(%fasl-input-skip-until (fasl-input))))
+                    (operand-stack () '(%fasl-input-stack (fasl-input))))
                   ,@(if (null stack-args)
                         forms
                         (with-unique-names (stack ptr)
@@ -443,7 +446,8 @@
     (when (functionp function)
       (let ((oname (nth-value 2 (function-lambda-expression function))))
         (when (and oname (not (eq oname name)))
-          (error "fop ~S with opcode ~D conflicts with fop ~S."
+          (cerror "Define it anyway"
+                  "fop ~S with opcode ~D conflicts with fop ~S."
                  name opcode oname))))
     (let ((existing-opcode (get name 'opcode)))
       (when (and existing-opcode (/= existing-opcode opcode))
@@ -676,6 +680,10 @@
                       nil
                       nil)))))))
 
+(defstruct fasl-group
+  (fun-names))
+
+(defvar *current-fasl-group*)
 ;;;
 ;;; a helper function for LOAD-AS-FASL
 ;;;
@@ -687,66 +695,43 @@
         (trace *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
-    (catch 'fasl-group-end
-      (setf (svref (%fasl-input-table fasl-input) 0) 0)
-      (loop
-       (binding* ((pos (when trace (file-position stream)))
-                  ((byte function pushp n-operands arg1 arg2 arg3)
-                   (decode-fop fasl-input))
-                  (result
-                   (if (functionp function)
-                       (case n-operands
-                         (0 (funcall function fasl-input))
-                         (1 (funcall function fasl-input arg1))
-                         (2 (funcall function fasl-input arg1 arg2))
-                         (3 (funcall function fasl-input arg1 arg2 arg3)))
-                       (error "corrupt fasl file: FOP code #x~x" byte))))
-         (when pushp
-           (push-fop-stack result fasl-input))
-         (when trace
-           ;; show file pos prior to decoding the fop,
-           ;; table and stack ptrs *after* executing it
-           (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
-                   pos
-                   (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                   (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
-                   byte
-                   n-operands arg1 arg2 arg3)
-           (when (functionp function)
-             (format *trace-output* " ~35t~(~a~)" (%fun-name function))))
-         (let ((stack (%fasl-input-stack fasl-input)))
-           (declare (ignorable stack)) ; not used in xc-host
-           (when (and (eq byte #.(get 'fop-funcall-for-effect 'opcode))
-                      (fop-stack-empty-p stack)) ; (presumed) end of TLF
-             (awhen (%fasl-input-deprecated-stuff fasl-input)
-               ;; Delaying this message rather than printing it
-               ;; in fop-fdefn makes it more informative (usually).
-               (setf (%fasl-input-deprecated-stuff fasl-input) nil)
-               (loader-deprecation-warn
-                it
-                (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2)))))))))))
-
-;; This is the moral equivalent of a warning from /usr/bin/ld that
-;; "gets() is dangerous." You're informed by both the compiler and linker.
-(defun loader-deprecation-warn (stuff whence)
-  ;; Stuff is a list: ((<state> name . category) ...)
-  ;; For now we only deal with category = :FUNCTION so we ignore it.
-  (let ((warning-class
-         ;; We're only going to warn once (per toplevel form),
-         ;; so pick the most stern warning applicable.
-         (if (every (lambda (x) (eq (car x) :early)) stuff)
-             'simple-style-warning 'simple-warning)))
-    (warn warning-class
-          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
-          :format-arguments
-          (list (length stuff) (mapcar #'second stuff) whence))))
+    (let ((*current-fasl-group* (make-fasl-group)))
+      (catch 'fasl-group-end
+        (setf (svref (%fasl-input-table fasl-input) 0) 0)
+        (loop
+         (binding* ((pos (when trace (file-position stream)))
+                    ((byte function pushp n-operands arg1 arg2 arg3)
+                     (decode-fop fasl-input))
+                    (result
+                     (if (functionp function)
+                         (case n-operands
+                           (0 (funcall function fasl-input))
+                           (1 (funcall function fasl-input arg1))
+                           (2 (funcall function fasl-input arg1 arg2))
+                           (3 (funcall function fasl-input arg1 arg2 arg3)))
+                         (error "corrupt fasl file: FOP code #x~x" byte))))
+           (when pushp
+             (push-fop-stack result fasl-input))
+           (when trace
+             ;; show file pos prior to decoding the fop,
+             ;; table and stack ptrs *after* executing it
+             (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
+                     pos
+                     (svref (%fasl-input-table fasl-input) 0) ; table pointer
+                     (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
+                     byte
+                     n-operands arg1 arg2 arg3)
+             (when (functionp function)
+               (format *trace-output* " ~35t~(~a~)" (%fun-name function))
+               (when (eql (%fun-name function) 'fop-push)
+                 (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
   (let ((fasl-input (make-fasl-input stream print)))
-    (with-deferred-package-names
+    (with-loader-package-names
       (unwind-protect
            (loop while (load-fasl-group fasl-input))
         ;; Nuke the table and stack to avoid keeping garbage on
@@ -789,7 +774,8 @@
         (n-data-words (- size sb-vm:instance-data-start)))
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
-      (let ((bitmap (wrapper-bitmap layout)))
+      ;; FIXME: this is basically DO-LAYOUT-BITMAP, but probably not as efficient.
+      (let ((bitmap (sb-kernel::%layout-bitmap layout)))
         ;; Values on the stack are in the same order as in the structure itself.
         (do ((i sb-vm:instance-data-start (1+ i)))
             ((>= i size))
@@ -829,15 +815,12 @@
             (setf (slot-value instance slot-name) value))))
     instance))
 
-(define-fop 64 (fop-end-group () nil)
-  (throw 'fasl-group-end t))
-
-(define-fop 62 (fop-verify-table-size ((:operands expected-index)) nil)
-  (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
-    (bug "fasl table of improper size")))
-(define-fop 63 (fop-verify-empty-stack () nil)
+(define-fop 64 (fop-end-group ((:operands table-size)) nil)
+  (unless (= (svref (%fasl-input-table (fasl-input)) 0) table-size)
+    (bug "fasl table of improper size"))
   (unless (fop-stack-empty-p (operand-stack))
-    (bug "fasl stack not empty when it should be")))
+    (bug "fasl stack not empty when it should be"))
+  (throw 'fasl-group-end t))
 
 ;;;; fops for loading symbols
 
@@ -865,10 +848,10 @@
                           'read-char-string-as-varints)
                       (%fasl-input-stream fasl-input) string namelen)
              (values string namelen elt-type)))
-         (aux-fop-intern (length+flag package fasl-input)
+         (aux-fop-intern (length+flag package inherited fasl-input)
            (multiple-value-bind (name length elt-type)
                (read-symbol-name length+flag fasl-input)
-             (push-fop-table (%intern name length package elt-type t)
+             (push-fop-table (%intern name length package elt-type t inherited)
                              fasl-input)))
          (ensure-hashed (symbol)
            ;; ENSURE-SYMBOL-HASH when vop-translated is flushable since it is
@@ -882,11 +865,13 @@
            symbol))
 
   (define-fop 77 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
-    (aux-fop-intern length+flag *cl-package* (fasl-input)))
+    (aux-fop-intern length+flag *cl-package* t (fasl-input)))
   (define-fop 78 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
-    (aux-fop-intern length+flag *keyword-package* (fasl-input)))
+    (aux-fop-intern length+flag *keyword-package* t (fasl-input)))
   (define-fop 79 :not-host (fop-symbol-in-package-save ((:operands length+flag pkg-index)))
-    (aux-fop-intern length+flag (ref-fop-table (fasl-input) pkg-index) (fasl-input)))
+    (aux-fop-intern length+flag (ref-fop-table (fasl-input) pkg-index) t (fasl-input)))
+  (define-fop 84 :not-host (fop-symbol-in-package-internal-save ((:operands length+flag pkg-index)))
+    (aux-fop-intern length+flag (ref-fop-table (fasl-input) pkg-index) nil (fasl-input)))
 
   (define-fop 80 :not-host (fop-uninterned-symbol-save ((:operands length+flag)))
     (multiple-value-bind (name len) (read-symbol-name length+flag (fasl-input))
@@ -904,12 +889,8 @@
 (define-fop 83 :not-host (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
     (read-char-string-as-varints (fasl-input-stream) package-name)
-    (push-fop-table
-     (handler-case (find-undeleted-package-or-lose package-name)
-       (simple-package-error (condition)
-         (declare (ignore condition))
-         (make-deferred-package package-name)))
-     (fasl-input))))
+    (push-fop-table (find-or-maybe-make-deferred-package package-name)
+                    (fasl-input))))
 
 ;;;; fops for loading numbers
 
@@ -1064,24 +1045,21 @@
     (read-n-bytes (fasl-input-stream) vector 0 bytes)
     vector))
 
-(defun fop-funcall* (argc stack skipping)
+(defun fop-funcall* (argc stack)
   (with-fop-stack ((stack) ptr (1+ argc))
-    (unless skipping
-      (do ((i (+ ptr argc))
-           (args))
-          ((= i ptr) (apply (fop-stack-ref i) args))
-        (declare (type index i))
-        (push (fop-stack-ref i) args)
-        (decf i)))))
+    (if (zerop argc)
+        (funcall (fop-stack-ref ptr))
+        (do ((i (+ ptr argc))
+             (args))
+            ((= i ptr) (apply (fop-stack-ref i) args))
+          (declare (type index i))
+          (push (fop-stack-ref i) args)
+          (decf i)))))
 
 (define-fop 55 (fop-funcall ((:operands n)))
-  (fop-funcall* n (operand-stack) (skip-until)))
+  (fop-funcall* n (operand-stack)))
 (define-fop 56 (fop-funcall-for-effect ((:operands n)) nil)
-  (fop-funcall* n (operand-stack) (skip-until)))
-
-;;; For LOAD-TIME-VALUE which is used for MAKE-LOAD-FORM
-(define-fop 57 (fop-funcall-no-skip ((:operands n)))
-  (fop-funcall* n (operand-stack) nil))
+  (fop-funcall* n (operand-stack)))
 
 ;;;; fops for fixing up circularities
 
@@ -1115,56 +1093,134 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
+;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS in copy-in/out mode
+;;; on any architecture where fixup application cares what the address of the code actually is.
+;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
+(defmacro with-writable-code-instructions ((code-var total-nwords debug-info-var
+                                            n-fdefns n-funs)
+                                           &key copy fixup)
+  (declare (ignorable n-fdefns))
+  ;; N-FDEFNS is important for PPC64, slightly important for X86-64, not important for
+  ;; any others, and doesn't even have a place to store it if lispwords are 32 bits.
+  ;; The :DEDUPLICATED-FDEFNS test in compiler-2.pure asserts that the value is valid
+  (let ((body
+         ;; The following operations need the code pinned:
+         ;; 1. copying into code-instructions (a SAP)
+         ;; 2. apply-core-fixups and sanctify-for-execution
+         ;; A very specific store order is necessary to allow using uninitialized memory
+         ;; pages for code. Storing of the debug-info slot must occur between steps 1 and 2.
+         ;; Note that this does not have to take care to ensure atomicity
+         ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
+         ;; interrupted in between the store of any individual byte, this code
+         ;; is GC-safe because we no longer need to know where simple-funs are embedded
+         ;; within the object to trace pointers. We *do* need to know where the funs
+         ;; are when transporting the object, but it's pinned within the body forms.
+         `(,copy
+           (sb-c::code-header/trailer-adjust ,code-var ,total-nwords ,n-fdefns)
+           ;; Check that the code trailer matches our expectation on number of embedded simple-funs
+           (aver (= (code-n-entries ,code-var) ,n-funs))
+           ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
+           ;; into this object, because the C code assumes that the fun table is in an
+           ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
+           ;; That is, C code can't deal with an interior code pointer until the fun-table
+           ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
+           ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
+           (setf (%code-debug-info ,code-var) ,debug-info-var)
+           ,fixup)))
+    #+darwin-jit
+    `(with-pinned-objects (,code-var ,debug-info-var)
+       ;; DEBUG-INFO is pinned so that after assigning it into the temporary
+       ;; block of memory, the off-heap word which is invisible to GC remains valid.
+       (let* ((temp-copy (alien-funcall (extern-alien "duplicate_codeblob_offheap"
+                                                      (function unsigned unsigned))
+                                        (get-lisp-obj-address ,code-var)))
+              (aligned (+ temp-copy (logand temp-copy sb-vm:n-word-bytes))))
+         ;; Rebind CODE-VAR to the replica, then execute BODY
+         (let ((,code-var (%make-lisp-obj (logior aligned sb-vm:other-pointer-lowtag)))) ,@body)
+         ;; Copy back, and fixup the simple-funs in the managed object
+         (alien-funcall (extern-alien "jit_copy_code_insts" (function void unsigned unsigned))
+                        (get-lisp-obj-address ,code-var)
+                        temp-copy)))
+    #-darwin-jit
+    `(with-pinned-objects (,code-var) ,@body)))
+
 (define-load-time-global *show-new-code* nil)
-(define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
+#+sb-xc-host
+(defun possibly-log-new-code (object reason)
+  (declare (ignore reason))
+  object)
+#-sb-xc-host
+(defun possibly-log-new-code (object reason &aux (show *show-new-code*))
+  (when show
+    (let ((size (code-object-size object))
+          (fmt "~&New code(~Db,~A): ~A~%")
+          (file "jit-code.txt")
+          (*print-pretty* nil))
+      ;; DISASSEMBLE is for limited debugging only.
+      ;; It may write garbled output if multiple threads
+      ;; I tried WITH-OPEN-STREAM during cold-init and got:
+      ;;   "vicious metacircle:  The computation of an effective method of
+      ;;    #<STREAM-FUNCTION COMMON-LISP:CLOSE (2)> for arguments of types
+      ;;    (#<STRUCTURE-CLASS SB-SYS:FD-STREAM>) uses the effective method
+      ;; being computed."
+      ;; so just leave the stream open. Or we could call the fd-stream misc routine.
+      (if (or (eq show 'disassemble) (streamp show))
+          (let ((f (if (streamp show)
+                       show
+                       (prog1
+                           (setq *show-new-code*
+                                 (open file :direction :output
+                                       :if-exists :append :if-does-not-exist :create))
+                         (format t "~&; Logging code allocation to ~S~%" file)))))
+            (format f fmt size reason object)
+            (disassemble object :stream f)
+            (terpri f)
+            (force-output f))
+          (format *trace-output* fmt (code-object-size object) reason object))))
+  object)
+
+(define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
+  ;; The stack looks like:
+  ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
+  ;;     | <--------- n-constants ---------> |            | <-- n-fixup-elts -> ||
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
-         (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
-         (n-constants (- n-boxed-words sb-vm:code-constants-offset)))
-    ;; stack has (at least) N-CONSTANTS words plus debug-info
-    (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
+         (n-constants (- n-boxed-words sb-vm:code-constants-offset))
+         (stack-elts-consumed (+ n-constants 1 n-fixup-elts)))
+    (with-fop-stack ((stack (operand-stack)) ptr stack-elts-consumed)
       ;; We've already ensured that all FDEFNs the code uses exist.
       ;; This happened by virtue of calling fop-fdefn for each.
-      (let ((stack-index (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))))
-        (dotimes (i n-named-calls)
-          (aver (typep (svref stack stack-index) 'fdefn))
-          (incf stack-index)))
-      (let ((code (sb-c:allocate-code-object
+      (loop for stack-index from (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))
+            repeat n-fdefns
+            do (aver (typep (svref stack stack-index) 'fdefn)))
+      (binding* (((code total-nwords)
+                  (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
-                   n-named-calls
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
-                   n-code-bytes)))
-        (with-pinned-objects (code)
-          ;; * DO * NOT * SEPARATE * THESE * STEPS *
-          ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
-          ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
-          #-darwin-jit
-          (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          #+darwin-jit
-          (let ((buf (make-array n-code-bytes :element-type '(unsigned-byte 8))))
-            (read-n-bytes (fasl-input-stream) buf 0 n-code-bytes)
-            (with-pinned-objects (buf)
-              (sb-vm::jit-memcpy (code-instructions code) (vector-sap buf) n-code-bytes)))
-          (aver (= (code-n-entries code) n-simple-funs))
-          ;; Serial# shares a word with the jump-table word count,
-          ;; so we can't assign serial# until after all raw bytes are copied in.
-          (sb-c::assign-code-serialno code)
-          (sb-thread:barrier (:write))
-          ;; Assign debug-info last. A code object that has no debug-info will never
-          ;; have its fun table accessed in conservative_root_p() or pin_object().
-          (setf (%code-debug-info code) (svref stack (+ ptr n-constants)))
-          ;; Boxed constants can be assigned only after figuring out where the range
-          ;; of implicitly tagged words is, which requires knowing how many functions
-          ;; are in the code component, which requires reading the code trailer.
-          (let* ((header-index sb-vm:code-constants-offset)
-                 (stack-index ptr))
+                   n-code-bytes))
+                 (real-code code)
+                 (debug-info (svref stack (+ ptr n-constants))))
+        (with-writable-code-instructions
+            (code total-nwords debug-info n-fdefns n-simple-funs)
+          :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
+          :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts real-code))
+        ;; Don't need the code pinned from here on
+        (setf (sb-c::debug-info-source (%code-debug-info code))
+              (%fasl-input-partial-source-info (fasl-input)))
+        ;; Boxed constants can be assigned only after figuring out where the range
+        ;; of implicitly tagged words is, which requires knowing how many functions
+        ;; are in the code component, which requires reading the code trailer.
+        #+darwin-jit (sb-c::assign-code-constants code (subseq stack ptr (+ ptr n-constants)))
+        #-darwin-jit
+        (let* ((header-index sb-vm:code-constants-offset)
+               (stack-index ptr))
             (declare (type index header-index stack-index))
-            (dotimes (n n-simple-funs)
-              (dotimes (i sb-vm:code-slots-per-simple-fun)
-                (setf (code-header-ref code header-index) (svref stack stack-index))
-                (incf header-index)
-                (incf stack-index)))
-            (dotimes (i n-named-calls)
+            (dotimes (n (* n-simple-funs sb-vm:code-slots-per-simple-fun))
+              (setf (code-header-ref code header-index) (svref stack stack-index))
+              (incf header-index)
+              (incf stack-index))
+            (dotimes (i n-fdefns)
               (sb-c::set-code-fdefn code header-index (svref stack stack-index))
               (incf header-index)
               (incf stack-index))
@@ -1172,28 +1228,28 @@
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
               (incf stack-index)))
-          ;; Now apply fixups. The fixups to perform are popped from the fasl stack.
-          (sb-c::apply-fasl-fixups stack code n-fixups))
-        (when *show-new-code*
-          (let ((*print-pretty* nil))
-            (format t "~&New code(~Db,load): ~A~%" (code-object-size code) code)))
-        #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
           (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
-        code))))
+        (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
 (define-fop 18 :not-host (fop-fdefn (name))
-  (awhen (deprecated-thing-p 'function name) ; returns the stage of deprecation
-    (pushnew (list* it name :function)
-             (%fasl-input-deprecated-stuff (fasl-input)) :test 'equal))
+  (when (deprecated-thing-p 'function name)
+    ;; This is the moral equivalent of a warning from /usr/bin/ld
+    ;; that "gets() is dangerous." You're informed by both the
+    ;; compiler and linker.
+    (check-deprecated-thing 'function name))
   (find-or-create-fdefn name))
 
 (define-fop 19 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
+
+#+arm64
+(define-fop 23 :not-host (fop-tls-index (name))
+  (ash (ensure-symbol-tls-index name) (- sb-vm:n-fixnum-tag-bits)))
 
 ;;; This FOP is only encountered in cross-compiled FASLs for cold load,
 ;;; and is a no-op except in cold load. A developer may want to load a
@@ -1245,42 +1301,13 @@
 (define-fop 22 (fop-assembler-code)
   (error "cannot load assembler code except at cold load"))
 
-;;; FOPs needed for implementing an IF operator in a FASL
+;;;; fops for debug info
 
-;;; Skip until a FOP-MAYBE-STOP-SKIPPING with the same POSITION is
-;;; executed. While skipping, we execute most FOPs normally, except
-;;; for ones that a) funcall/eval b) start skipping. This needs to
-;;; be done to ensure that the fop table gets populated correctly
-;;; regardless of the execution path.
-(define-fop 6 (fop-skip ((:operands position)) nil)
-  (unless (skip-until)
-    (setf (skip-until) position))
-  (values))
-
-;;; As before, but only start skipping if the top of the FOP stack is NIL.
-(define-fop 7 (fop-skip-if-false ((:operands position) condition) nil)
-  (unless (or condition (skip-until))
-    (setf (skip-until) position))
-  (values))
-
-;;; If skipping, pop the top of the stack and discard it. Needed for
-;;; ensuring that the stack stays balanced when skipping.
-(define-fop 8 (fop-drop-if-skipping () nil)
-  (when (skip-until)
-    (fop-stack-pop-n (operand-stack) 1))
-  (values))
-
-;;; If skipping, push a dummy value on the stack. Needed for
-;;; ensuring that the stack stays balanced when skipping.
-(define-fop 9 (fop-push-nil-if-skipping () nil)
-  (when (skip-until)
-    (push-fop-stack nil (fasl-input)))
-  (values))
-
-;;; Stop skipping if the top of the stack matches SKIP-UNTIL
-(define-fop 10 (fop-maybe-stop-skipping ((:operands label)) nil)
-  (when (eql (skip-until) label)
-    (setf (skip-until) nil))
+(define-fop 124 (fop-note-partial-source-info (namestring created plist) nil)
+  (setf (%fasl-input-partial-source-info (fasl-input))
+        (sb-c::make-debug-source :namestring namestring
+                                 :created created
+                                 :plist plist))
   (values))
 
 ;;;; fops for code coverage
@@ -1297,9 +1324,9 @@
                     ,@(mapcar (lambda (spec) `((,(cadr spec)) ,(car spec)))
                               specs)))
                 ,@(mapcar (lambda (spec)
-                            `(define-fop ,(car spec)
-                                          (,(symbolicate "FOP-LAYOUT-OF-"
-                                                         (cadr spec)))
+                            `(define-fop ,(car spec) :not-host
+                               (,(symbolicate "FOP-LAYOUT-OF-"
+                                              (cadr spec)))
                                ,(find-layout (cadr spec))))
                           specs))))
   (frob (#x68 t)
@@ -1357,4 +1384,3 @@
       (dolist (m times)
         (format t "~30S: ~6,2F~%" (car m) (/ (float (cdr m)) 60.0))))))
 |#
-

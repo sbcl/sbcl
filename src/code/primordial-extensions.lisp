@@ -16,14 +16,14 @@
 ;;; to CALL-WITH-FOO less ugly.
 (defmacro dx-flet (functions &body forms)
   `(flet ,functions
-     (declare (truly-dynamic-extent ,@(mapcar (lambda (func) `#',(car func))
-                                              functions)))
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
+               ,@(mapcar (lambda (func) `#',(car func)) functions)))
      ,@forms))
 
 ;;; Another similar one.
 (defmacro dx-let (bindings &body forms)
   `(let ,bindings
-     (declare (truly-dynamic-extent
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
                ,@(mapcar (lambda (bind) (if (listp bind) (car bind) bind))
                          bindings)))
      ,@forms))
@@ -61,7 +61,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (string (gensymify* symbol-name "-")))))
-                     `(,symbol (sb-xc:gensym ,stem))))
+                     `(,symbol (gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -69,7 +69,7 @@
 ;;; macros and other code-manipulating code.)
 (defun make-gensym-list (n &optional name)
   (let ((arg (if name (string name) "G")))
-    (loop repeat n collect (sb-xc:gensym arg))))
+    (loop repeat n collect (gensym arg))))
 
 ;;;; miscellany
 
@@ -92,8 +92,8 @@
 
 (defun gensymify (x)
   (if (symbolp x)
-      (sb-xc:gensym (symbol-name x))
-      (sb-xc:gensym)))
+      (gensym (symbol-name x))
+      (gensym)))
 
 (eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (labels ((symbol-concat (package &rest things)
@@ -302,12 +302,12 @@
 ;;;
 #+sb-xc-host
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  ;; CLISP needs the EVAL-WHEN here, or else the symbol defined is
-  ;; unavailable for later uses within the same file. For instance, in
-  ;; x86-64/vm, defining TEMP-REG-TN as R11-TN would get an error that
-  ;; R11-TN is unbound.  We don't want that junk in our expansion.
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
+     ;; We use DEFVAR rather than DEFCONSTANT as a host effect in
+     ;; order to avoid differences in host decisions about inlining
+     ;; the value of the constant, with knock-on effects on EQLity
+     ;; of references to internal parts of the constant.
+     (defvar ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
        ,@(when doc (list doc)))))
 
 #-sb-xc-host

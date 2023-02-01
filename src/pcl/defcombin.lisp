@@ -36,7 +36,16 @@
      ,(if (and (cddr form)
                (listp (caddr form)))
           (expand-long-defcombin form)
-          (expand-short-defcombin form))))
+          (let* ((type-name (cadr form))
+                 (doc (getf (cddr form) :documentation (make-unbound-marker)))
+                 (ioa (getf (cddr form) :identity-with-one-argument nil))
+                 (operator (getf (cddr form) :operator type-name)))
+            (unless (or (unbound-marker-p doc) (stringp doc))
+              (%program-error "~@<~S argument to the short form of ~S must be a string.~:@>"
+                              :documentation 'define-method-combination))
+            `(load-short-defcombin ',type-name ',operator ',ioa
+                                   ,(unless (unbound-marker-p doc) doc)
+                                   (sb-c:source-location))))))
 
 (defstruct method-combination-info
   (lambda-list nil :type list)
@@ -56,10 +65,14 @@
 ;;;; standard method combination
 (setf (gethash 'standard **method-combinations**)
       (make-method-combination-info
-       :constructor (lambda (options) (when options (method-combination-error "STANDARD method combination accepts no options.")) *standard-method-combination*)
+       :constructor (lambda (options)
+                      (when options
+                        (method-combination-error "STANDARD method combination accepts no options."))
+                      *standard-method-combination*)
        :cache (list (cons nil *standard-method-combination*))))
 
 (defun update-mcs (name new old frobmc)
+  (declare (function frobmc))
   (setf (gethash name **method-combinations**) new)
   ;; for correctness' sake we should probably lock
   ;; **METHOD-COMBINATIONS** while we're updating things, to defend
@@ -72,11 +85,10 @@
       (let* ((mc (cdr entry))
              (gfs (method-combination-%generic-functions mc)))
         (funcall frobmc mc)
-        (flet ((flush (gf ignore)
-                 (declare (ignore ignore))
+        (flet ((flush (gf)
                  (flush-effective-method-cache gf)
                  (reinitialize-instance gf)))
-          (maphash #'flush gfs))))))
+          (map-hashset #'flush gfs))))))
 
 ;;;; short method combinations
 ;;;;
@@ -84,23 +96,6 @@
 ;;;; effective method. So, we just implement that rule once. Each short
 ;;;; method combination object just reads the parameters out of the object
 ;;;; and runs the same rule.
-
-(defun expand-short-defcombin (whole)
-  (let* ((canary (cons nil nil))
-         (type-name (cadr whole))
-         (documentation (getf (cddr whole) :documentation canary))
-         (ioa (getf (cddr whole) :identity-with-one-argument nil))
-         (operator
-           (getf (cddr whole) :operator type-name)))
-    (unless (or (eq documentation canary)
-                (stringp documentation))
-      (%program-error "~@<~S argument to the short form of ~S must be a string.~:@>"
-                      :documentation 'define-method-combination))
-    `(load-short-defcombin
-      ',type-name ',operator ',ioa
-      ',(and (neq documentation canary)
-             documentation)
-      (sb-c:source-location))))
 
 (defun random-documentation (name type)
   (cdr (assoc type (info :random-documentation :stuff name))))
@@ -268,29 +263,24 @@
 ;;; multiple methods with the same specializers in the same method
 ;;; group are unclear by the spec: a portion of the standard implies
 ;;; that an error should be signalled, and another is more lenient.
-;;;
-;;; It is reasonable to allow a single method group of * to bypass all
-;;; rules, as this is explicitly stated in the standard.
-
-(defun group-cond-clause (name tests specializer-cache star-only)
+(defun group-cond-clause (name tests specializer-cache order-matters-test)
   (let ((maybe-error-clause
-         (if star-only
-             `(setq ,specializer-cache .specializers.)
-             `(if (and (equal ,specializer-cache .specializers.)
-                       (not (null .specializers.)))
-                  (return-from .long-method-combination-function.
-                    '(error 'long-method-combination-error
-                      :format-control "More than one method of type ~S ~
+          `(if (and ,order-matters-test
+                    (equal ,specializer-cache .specializers.)
+                    (not (null .specializers.)))
+               (return-from .long-method-combination-function.
+                 '(error 'long-method-combination-error
+                   :format-control "More than one method of type ~S ~
                                        with the same specializers."
-                      :format-arguments (list ',name)))
-                  (setq ,specializer-cache .specializers.)))))
+                   :format-arguments (list ',name)))
+               (setq ,specializer-cache .specializers.))))
     `((or ,@tests)
       ,maybe-error-clause
       (push .method. ,name))))
 
 (defun wrap-method-group-specifier-bindings
     (method-group-specifiers declarations real-body)
-  (let (names specializer-caches cond-clauses required-checks order-cleanups)
+  (let (names specializer-caches cond-clauses required-checks order-vars order-cleanups)
     (let ((nspecifiers (length method-group-specifiers)))
       (dolist (method-group-specifier method-group-specifiers
                (push `(t (return-from .long-method-combination-function.
@@ -301,13 +291,33 @@
         (multiple-value-bind (name tests description order required)
             (parse-method-group-specifier method-group-specifier)
           (declare (ignore description))
-          (let ((specializer-cache (gensym)))
+          (let* ((specializer-cache (gensym))
+                 (order-var (gensym "O"))
+                 (order-constantp (constantp order))
+                 (order-value (and order-constantp (constant-form-value order))))
             (push name names)
             (push specializer-cache specializer-caches)
-            (push (group-cond-clause name tests specializer-cache
-                                     (and (eq (cadr method-group-specifier) '*)
-                                          (= nspecifiers 1)))
-                  cond-clauses)
+            (unless order-constantp
+              (push `(,order-var ,order) order-vars))
+            (let ((order-matters-test
+                    (cond
+                      ;; It is reasonable to allow a single method
+                      ;; group of * to bypass all rules, as this is
+                      ;; explicitly stated in the standard.
+                      ((and (eq (cadr method-group-specifier) '*)
+                            (= nspecifiers 1))
+                       nil)
+                      ;; an :ORDER value known at compile-time to be
+                      ;; NIL (an SBCL extension) also bypasses the
+                      ;; ordering checks.  (Other :ORDER values do
+                      ;; not.)
+                      (order-constantp (not (eql order-value nil)))
+                      ;; otherwise, check the ORDER value at
+                      ;; method-combination time, bypassing ordering
+                      ;; checks if it is NIL.
+                      (t `(not (eql ,order-var nil))))))
+              (push (group-cond-clause name tests specializer-cache order-matters-test)
+                    cond-clauses))
             (when required
               (push `(when (null ,name)
                       (return-from .long-method-combination-function.
@@ -315,20 +325,16 @@
                           :format-control "No ~S methods."
                           :format-arguments (list ',name))))
                     required-checks))
-            (loop (unless (and (constantp order)
-                               (neq order (setq order
-                                                (constant-form-value order))))
-                    (return t)))
-            (push (cond ((eq order :most-specific-first)
-                         `(setq ,name (nreverse ,name)))
-                        ((eq order :most-specific-last) ())
-                        (t
-                         `(ecase ,order
-                           (:most-specific-first
-                            (setq ,name (nreverse ,name)))
-                           (:most-specific-last))))
-                  order-cleanups))))
-      `(let (,@(nreverse names) ,@specializer-caches)
+            (cond
+              ((and order-constantp (eq order-value :most-specific-first))
+               (push `(setq ,name (nreverse ,name)) order-cleanups))
+              ((and order-constantp
+                    (or (null order-value) (eq order-value :most-specific-last))))
+              (t (push `(ecase ,order-var
+                          (:most-specific-first (setq ,name (nreverse ,name)))
+                          ((nil :most-specific-last)))
+                       order-cleanups))))))
+      `(let (,@(nreverse names) ,@specializer-caches ,@order-vars)
         (declare (ignorable ,@specializer-caches))
         ,@declarations
         (dolist (.method. .applicable-methods.)
@@ -383,7 +389,9 @@
   (loop (cond ((and (null pattern) (null qualifiers))
                (return t))
               ((eq pattern '*) (return t))
-              ((and pattern qualifiers (eq (car pattern) (car qualifiers)))
+              ((and pattern qualifiers
+                    (or (eq (car pattern) '*)
+                        (eq (car pattern) (car qualifiers))))
                (pop pattern)
                (pop qualifiers))
               (t (return nil)))))
@@ -488,7 +496,7 @@
             ;; it result in the actual arguments of the generic-function
             ;; not the frobbed list.
             ,,(when whole
-                ``(setq ,',whole .gf-args.))
+                ``(setq ,',(car whole) .gf-args.))
             ,inner-result.)))))
 
 ;;; Partition VALUES into three sections: required, optional, and the
@@ -519,3 +527,25 @@
             (return (nconc (frob required nr nreq t)
                            (frob optional no nopt values)
                            values)))))
+
+;;; The built-in method combination types as taken from page 1-31 of
+;;; 88-002R. Note that the STANDARD method combination type is defined
+;;; by hand in the file combin.lisp.
+(define-method-combination +      :identity-with-one-argument t)
+(define-method-combination and    :identity-with-one-argument t)
+(define-method-combination append :identity-with-one-argument nil)
+(define-method-combination list   :identity-with-one-argument nil)
+(define-method-combination max    :identity-with-one-argument t)
+(define-method-combination min    :identity-with-one-argument t)
+(define-method-combination nconc  :identity-with-one-argument t)
+(define-method-combination progn  :identity-with-one-argument t)
+
+;;; we made OR (:MOST-SPECIFIC-FIRST) earlier in the build; hook it in
+(define-method-combination or     :identity-with-one-argument t)
+(let ((info (gethash 'or **method-combinations**)))
+  (aver info)
+  (aver (null (method-combination-info-cache info)))
+  (setf (method-combination-info-cache info)
+        (list (cons '(:most-specific-first) *or-method-combination*))))
+(add-to-weak-hashset #'make-specializer-form-using-class
+                     (method-combination-%generic-functions *or-method-combination*))

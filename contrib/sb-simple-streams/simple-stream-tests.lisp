@@ -1,7 +1,8 @@
 ;;;; -*- lisp -*-
 
 (defpackage sb-simple-streams-test
-  (:use #:common-lisp #:sb-simple-streams #:sb-rt))
+  (:import-from #:test-util #:deftest)
+  (:use #:common-lisp #:sb-simple-streams))
 
 
 (in-package #:sb-simple-streams-test)

@@ -876,7 +876,7 @@ instead of
     (multiple-value-bind (name init)
         (cond ((atom binding) (values binding 'no-init))
               ((not (cdr binding)) (values (car binding) 'no-init))
-              (t (values (car binding) (cadr binding))))
+              (t (values (car binding) (cdr binding))))
       (push (cons name (xset-member-p name seen)) names)
       (add-to-xset name seen)
       (push init inits))))
@@ -917,9 +917,11 @@ instead of
                                          (prog1 (car bindings)
                                            (note-var-binding (car name) new-env))
                                          (prog1
-                                             (relist (car bindings)
+                                             (recons (car bindings)
                                                      (caar bindings)
-                                                     (walk-form-internal init context new-env))
+                                                     (recons init
+                                                             (walk-form-internal (car init) context new-env)
+                                                             (cdr init)))
                                            (note-var-binding (car name) new-env)))
                                    (unless (cdr name)
                                      (setf decls (mapcar (lambda (d)

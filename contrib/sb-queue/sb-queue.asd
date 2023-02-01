@@ -9,11 +9,8 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-#-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-queue"
   :depends-on ("sb-concurrency")
-  :components ((:file "package"))
-  :perform (load-op :after (o c) (provide 'sb-queue))
-  :perform (test-op (o c) :pass))
+  :components ((:file "package")))

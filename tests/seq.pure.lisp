@@ -215,7 +215,7 @@
 ;;; a proper sequence".
 (with-test (:name (copy-seq type-error))
   (locally (declare (optimize safety))
-    (multiple-value-bind (seq err) (ignore-errors (copy-seq '(1 2 3 . 4)))
+    (multiple-value-bind (seq err) (ignore-errors (copy-seq (opaque-identity '(1 2 3 . 4))))
       (assert (not seq))
       (assert (typep err 'type-error)))))
 
@@ -299,7 +299,7 @@
          (declare (simple-vector x))
          (search x #(t t t) :key k))
     ((#() nil) 0))
-  (checked-compile-and-assert (:optimize :safe)
+  (checked-compile-and-assert (:optimize :safe :allow-warnings 'warning)
       `(lambda (x)
          (declare (simple-vector x))
          (search x #(t t t) :start2 1 :end2 0 :end1 0))
@@ -611,3 +611,187 @@
       `(lambda (v s)
          (replace (the simple-vector v) #() :start1 s))
     ((#(1) 0) #(1) :test #'equalp)))
+
+(with-test (:name :reduce-type-derive)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (equal (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x)
+                                        ,fun)))))
+                  ',expected))))
+    (check (reduce '+ x)
+           t)
+    (check (reduce '+ x :end 10)
+           number)
+    (check (reduce '+ x :initial-value 10)
+           number)
+    (check (reduce '+ (the (simple-array t (1)) x))
+           t)
+    (check (reduce '+ (the (simple-array t (2)) x))
+           number)
+    (check (reduce '+ (the (simple-array t (10)) x) :end 1)
+           t)
+    (check (reduce '+ (the (simple-array fixnum (*)) x))
+           integer)
+    (check (reduce '+ (the (simple-array (unsigned-byte 8) (*)) x))
+           unsigned-byte)
+    (check (reduce '+ (the (simple-array (unsigned-byte 8) (*)) x) :initial-value -1)
+           integer)
+    (check (reduce '+ (the (simple-array double-float (*)) x) :initial-value 1)
+           (or double-float (integer 1 1)))
+    (check (reduce '+ (the (simple-array double-float (*)) x) :initial-value 1d0)
+           double-float)
+    (check (reduce '+ (the (simple-array double-float (*)) x))
+           (or double-float (integer 0 0)))
+    (check (reduce '+ (the (simple-array double-float (10)) x))
+           double-float)
+    (check (reduce '+ (the (simple-array double-float (1)) x))
+           double-float)
+    (check (reduce '+ x :key #'length)
+           unsigned-byte)
+    (check (reduce '+ x :key #'length :initial-value -1)
+           integer)))
+
+(with-test (:name :find-type-derive)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (type-specifiers-equal
+            (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x y)
+                                        (declare (ignorable x y))
+                                        ,fun)))))
+                  ',expected))))
+    (check (find x y) t)
+    (check (find 1 y) (or (integer 1 1) null))
+    (check (find x y :key #'car) list)
+    (check (find x y :test #'=) (or number null))
+    (check (find x y :key #'car :test #'=) list)
+    (check (find x (the vector y) :key #'car) list)
+    (check (find-if #'evenp y) (or integer null))
+    (check (find-if #'evenp (the list y) :key #'car) list)
+    (check (find x (the (simple-array character (*)) y)) (or character null))
+    (check (find x (the string y)) (or character null))))
+
+(with-test (:name :position-type-derive)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (position x y) (or (integer 0 (#.(1- array-dimension-limit))) null))
+    (check (position x (the (simple-string 10) y)) (or (mod 10) null))
+    (check (position x y :end 10) (or (mod 10) null))
+    (check (position x (the cons y) :start 5 :end 10) (or (integer 5 9) null))
+    (check (position-if x y :end 10) (or (mod 10) null))))
+
+(with-test (:name :string-cmp)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (string/= (the simple-string x) (the simple-string y) :end2 0)
+           (or (integer 0 0) null))))
+
+(with-test (:name :reverse-specialized-arrays)
+  (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+        for type = (sb-kernel:type-specifier (sb-vm:saetp-ctype saetp))
+        when type
+        do
+        (let ((value-transformer (cond ((eq type #+sb-unicode 'base-char
+                                                 #-sb-unicode 'character)
+                                        (lambda (x)
+                                          (code-char
+                                           (if (>= x sb-int:base-char-code-limit)
+                                               (random sb-int:base-char-code-limit)
+                                               x))))
+                                       #+sb-unicode
+                                       ((eq type 'character)
+                                        (lambda (x)
+                                          (code-char x)))
+                                       ((eq type 'bit)
+                                        (lambda (x)
+                                          x
+                                          (random 2)))
+                                       ((subtypep type 'integer)
+                                        (if (eq type 'fixnum)
+                                            #'identity
+                                            (let* ((signed (eq (car type) 'signed-byte))
+                                                   (width (second type))
+                                                   (mod (expt 2 (- width
+                                                                   (if signed
+                                                                       1
+                                                                       0)))))
+                                              (if (< mod 1300)
+                                                  (lambda (x)
+                                                    (if (>= x mod)
+                                                        (random mod)
+                                                        x))
+                                                  (lambda (x)
+                                                    x)))))
+                                       (t
+                                        (lambda (x)
+                                          (coerce x type))))))
+          (loop for i to (floor 1300
+                                (ceiling (sb-vm:saetp-n-bits saetp) sb-vm:n-word-bytes))
+                for list = (loop for j from 1 to i
+                                 collect (funcall value-transformer j))
+                for reverse = (reverse list)
+                for vector = (make-array i :element-type type
+                                           :initial-contents list)
+                do
+                (let* ((offset (1+ (random 120)))
+                       (prefix (loop for j from 1 to offset
+                                     collect (funcall value-transformer j)))
+                       (suffix (loop for j from 1 to (- 128 offset)
+                                     collect (funcall value-transformer j)))
+                       (contents (concatenate 'list prefix list suffix))
+                       (source (make-array (+ i 128) :element-type type
+                                                     :initial-contents contents))
+                       (displaced (make-array i :element-type type
+                                                :displaced-to source
+                                                :displaced-index-offset offset
+                                                :fill-pointer i)))
+                  (assert (equal reverse (coerce (reverse displaced) 'list)))
+                  (assert (equal reverse (coerce (nreverse displaced) 'list)))
+                  (assert (equal prefix (coerce (subseq source 0 offset) 'list)))
+                  (assert (equal suffix (coerce (subseq source (+ offset i)) 'list))))
+                (assert (equal reverse (coerce (reverse vector) 'list)))
+                (assert (equal reverse (coerce (nreverse vector) 'list)))))))
+
+(with-test (:name :list-derived-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (sort (the (cons (eql 0)) x) y)
+           cons)))
+
+(with-test (:name :range-error-fill-transform)
+  (assert
+   (nth-value 2 (checked-compile `(lambda (x y)
+                                    (declare ((simple-base-string 10) x))
+                                    (fill x y :start 12))
+                                 :allow-warnings t))))

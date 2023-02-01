@@ -1,5 +1,6 @@
 (defpackage #:sb-md5-tests
-  (:use #:sb-md5 #:cl #:sb-rt))
+  (:import-from #:test-util #:deftest)
+  (:use #:sb-md5 #:cl))
 (in-package #:sb-md5-tests)
 
 (defun byte-array-to-hex-string (bytevec)
@@ -131,22 +132,13 @@
        ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" . "a0d1395c7fb36247bfe2d49376d9d133")
        ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" . "ab75504250558b788f99d1ebd219abf2"))))
 
-(deftest sb-md5.md5sum-file.0
-    (let ((file
-           (loop with ret
-                 for filename = (format nil "md5-test-~6,'0D" (random 100000))
-                 do (with-open-file (stream filename :direction :output
-                                            :if-exists nil
-                                            :if-does-not-exist :create)
-                      (when stream
-                        (setf ret stream)))
-                 when ret return ret)))
-      (unwind-protect
-          (string= (format nil "~(~{~2,'0X~}~)"
-                           (coerce (md5sum-file file) 'list))
-                   "d41d8cd98f00b204e9800998ecf8427e")
-        (delete-file file)))
-      t)
+;; This is barely a test. It's md5summing an empty file. Why?
+(test-util:with-test (:name :sb-md5.md5sum-file.0)
+  (test-util:with-scratch-file (name)
+    (with-open-file (stream name :direction :output :if-does-not-exist :create))
+    (let ((answer (md5sum-file name)))
+      (assert (string= (format nil "~(~{~2,'0X~}~)" (coerce answer 'list))
+                       "d41d8cd98f00b204e9800998ecf8427e")))))
 
 (deftest sb-md5.md5sum-sequence.error.0
     (handler-case (md5sum-sequence "foo")

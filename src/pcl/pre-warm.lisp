@@ -52,10 +52,6 @@
 ;;; function creation there is no danger of having the system get
 ;;; confused.
 
-;;; FIXME: these all go in dynamic space and then allocate a trampoline when
-;;; assigned into an FDEFN. Figure out how to put them in immobile space,
-;;; or can we allocate them _anywhere_ with embedded code now? I think so!
-;;; And why do we assign these info FDEFNs? What calls them via their names?
 #-sb-xc-host ; host doesn't need
 (progn
 (!defstruct-with-alternate-metaclass %method-function
@@ -65,12 +61,11 @@
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
-;;; Note: for x8-64 with #+immobile-code there are 2 additional raw slots which
-;;; hold machine instructions to load the funcallable-instance-fun and jump to
-;;; it, so that funcallable-instances can act like simple-funs, in as much as
-;;; there's an address you can jump to without loading a register.
+;; for x86-64 with compact-instance-header, generic functions are 6 words:
+;;  header, entrypoint, raw (x2), implementation function, slot vector
+;; and the hash goes in 4 unused bytes of the second raw slot.
 (sb-kernel:!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots hash-code)
+  :slot-names (clos-slots #-compact-instance-header hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid
@@ -102,10 +97,10 @@
     (standard-accessor-method standard-accessor-method-p)
     (standard-reader-method standard-reader-method-p)
     (standard-writer-method standard-writer-method-p)
-    (standard-boundp-method standard-boundp-method-p)
     (global-reader-method global-reader-method-p)
     (global-writer-method global-writer-method-p)
     (global-boundp-method global-boundp-method-p)
+    (global-makunbound-method global-makunbound-method-p)
     (generic-function generic-function-p)
     (standard-generic-function standard-generic-function-p)
     (method-combination method-combination-p)

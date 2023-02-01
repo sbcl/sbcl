@@ -111,6 +111,65 @@
 ;;; ID must be an fixnum for either value of n-word-bits.
 (def!type layout-id () '(signed-byte 30))
 
+(declaim (start-block))
+
+;;; The CLASSOID structure is a supertype of all classoid types.  A
+;;; CLASSOID is also a CTYPE structure as recognized by the type
+;;; system.  (FIXME: It's also a type specifier, though this might go
+;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
+;;; longer necessary)
+(defstruct (classoid
+             (:include ctype)
+             (:constructor nil)
+             (:copier nil)
+             (:print-object
+              (lambda (class stream)
+                (let ((name (classoid-name class)))
+                  (print-unreadable-object (class stream
+                                                  :type t
+                                                  :identity (not name))
+                    (format stream
+                            ;; FIXME: Make sure that this prints
+                            ;; reasonably for anonymous classes.
+                            "~:[anonymous~;~:*~S~]~@[ (~(~A~))~]"
+                            name
+                            (classoid-state class))))))
+             #-sb-xc-host (:pure nil))
+  ;; the value to be returned by CLASSOID-NAME.
+  (name nil :type symbol)
+  ;; the current WRAPPER for this class, or NIL if none assigned yet
+  (wrapper nil :type (or null wrapper))
+  ;; How sure are we that this class won't be redefined?
+  ;;   :READ-ONLY = We are committed to not changing the effective
+  ;;                slots or superclasses.
+  ;;   :SEALED    = We can't even add subclasses.
+  ;;   NIL        = Anything could happen.
+  (state nil :type (member nil :read-only :sealed))
+  ;; direct superclasses of this class. Always NIL for CLOS classes.
+  (direct-superclasses () :type list)
+  ;; Definition location
+  ;; Not used for standard-classoid, because pcl has its own mechanism.
+  (source-location nil)
+  ;; representation of all of the subclasses (direct or indirect) of
+  ;; this class. This is NIL if no subclasses or not initalized yet;
+  ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
+  ;; subclass layout that was in effect at the time the subclass was
+  ;; created.
+  ;; Initially an alist, and changed to a hash-table at some threshold.
+  (subclasses nil :type (or list hash-table))
+  (%lock nil) ; install it just-in-time, similar to hash-table-lock
+  ;; the PCL class (= CL:CLASS, but with a view to future flexibility
+  ;; we don't just call it the CLASS slot) object for this class, or
+  ;; NIL if none assigned yet
+  (pcl-class nil))
+;;; For low-level C code if it wants to display a classoid
+(defconstant classoid-name-wordindex
+  (+ 2 #-compact-instance-header 1))  ; <Header, Layout (if needed), %BITS, NAME>
+#-sb-xc-host
+(eval-when (:compile-toplevel)
+  (assert (= (+ sb-vm:instance-slots-offset (get-dsd-index classoid name))
+             classoid-name-wordindex)))
+
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
 ;;; type checking and garbage collection. Whenever a class is
@@ -258,6 +317,8 @@
   )
 (declaim (freeze-type wrapper sb-vm:layout)))
 
+(declaim (end-block))
+
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
 ;;;     GC wants it in the layout to avoid double indirection.
@@ -327,7 +388,9 @@
            ;; that has this bitmap we can use the layout of T.
            ((eq wrapper (find-layout t)) 0)
            (t
-            +layout-all-tagged+))))
+            +layout-all-tagged+)))
+  (defun %layout-bitmap (layout) (wrapper-bitmap layout))
+) ; end PROGN #+sb-xc-host
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))
@@ -371,7 +434,20 @@
 
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
-  #+compact-instance-header  6
+  ;; layout has no bitmap bit. The other slots all look tagged even though
+  ;; it's an accident that the raw instruction words resemble fixnums.
+  ;; I should probably find a more principled way to express this,
+  ;; but the old - technically correct - way based on a bitmap really made
+  ;; the logic look like crap. But now that the variable-length part of a
+  ;; funcallable-instance follows its embedded trampoline, it would be simple
+  ;; to alter the GC to skip a fixed number of slots.
+  ;; I think that is preferable to using a bitmap.
+  #+compact-instance-header -1
+  ;; the layout is considered untagged so that we don't doubly process it
+  ;; if walking tagged slots. The assumption is that layout is always
+  ;; handled separately, so therefore we don't want to process it again
+  ;; in a bitmap-based scan. And the entry point is considered untagged
+  ;; because it points to an assembler routine, thus ignorable.
   #-compact-instance-header -4)
 
 #-sb-xc-host
@@ -400,8 +476,27 @@
 #+64-bit
 (defun wrapper-depthoid (wrapper) (layout-depthoid (wrapper-friend wrapper)))
 
+;;; Extract the bitmap from 1 or more words of bits that have the same format
+;;; as a BIGNUM - least-significant word first, native bit order within each word,
+;;; all but the last are unsigned, and the last is signed.
+(defun %layout-bitmap (wrapper)
+  (declare (type wrapper wrapper))
+  (do ((accumulator 0)
+       (shift 0)
+       (index (bitmap-start wrapper) (1+ index))
+       (last (1- (%instance-length wrapper))))
+      ((> index last) accumulator)
+    (setf accumulator (logior accumulator
+                              (ash (if (= index last)
+                                       (%raw-instance-ref/signed-word wrapper index)
+                                       (%raw-instance-ref/word wrapper index))
+                                   shift)))
+    (incf shift sb-vm:n-word-bits)))
+
 (defun wrapper-bitmap (wrapper)
   (declare (type wrapper wrapper))
+  ;; Whenever we call WRAPPER-BITMAP on a structure-object subtype,
+  ;; it's supposed to have the INFO slot populated, linking it to a defstruct-description.
   (acond ((wrapper-info wrapper) (dd-bitmap it))
          ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
          ;; raw slots, except that funcallable-instances may have 2 raw slots -
@@ -409,70 +504,22 @@
          ;; on the platform, and the layout is tagged but a special case.
          ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
          ;; words preceding it.
-         (t (the fixnum
-                 (%raw-instance-ref/signed-word (wrapper-friend wrapper)
-                                                (type-dd-length sb-vm:layout))))))
+         (t
+          (aver (not (logtest +structure-layout-flag+ (wrapper-flags wrapper))))
+          (the fixnum
+               (%raw-instance-ref/signed-word (wrapper-friend wrapper)
+                                              (type-dd-length sb-vm:layout))))))
 #+64-bit
 (defmacro wrapper-length (wrapper) ; SETFable
   `(ldb (byte 16 16) (layout-flags (wrapper-friend ,wrapper))))
 
-) ; end PROGN
+) ; end PROGN #-sb-xc-host
 
 ;;; True of STANDARD-OBJECT, which include generic functions.
 (declaim (inline layout-for-pcl-obj-p))
 (defun layout-for-pcl-obj-p (wrapper)
   (declare (type wrapper wrapper))
   (logtest (wrapper-flags wrapper) +pcl-object-layout-flag+))
-
-;;; The CLASSOID structure is a supertype of all classoid types.  A
-;;; CLASSOID is also a CTYPE structure as recognized by the type
-;;; system.  (FIXME: It's also a type specifier, though this might go
-;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
-;;; longer necessary)
-(def!struct (classoid
-             (:include ctype)
-             (:constructor nil)
-             (:copier nil)
-             (:print-object
-              (lambda (class stream)
-                (let ((name (classoid-name class)))
-                  (print-unreadable-object (class stream
-                                                  :type t
-                                                  :identity (not name))
-                    (format stream
-                            ;; FIXME: Make sure that this prints
-                            ;; reasonably for anonymous classes.
-                            "~:[anonymous~;~:*~S~]~@[ (~(~A~))~]"
-                            name
-                            (classoid-state class))))))
-             #-sb-xc-host (:pure nil))
-  ;; the value to be returned by CLASSOID-NAME.
-  (name nil :type symbol)
-  ;; the current WRAPPER for this class, or NIL if none assigned yet
-  (wrapper nil :type (or null wrapper))
-  ;; How sure are we that this class won't be redefined?
-  ;;   :READ-ONLY = We are committed to not changing the effective
-  ;;                slots or superclasses.
-  ;;   :SEALED    = We can't even add subclasses.
-  ;;   NIL        = Anything could happen.
-  (state nil :type (member nil :read-only :sealed))
-  ;; direct superclasses of this class. Always NIL for CLOS classes.
-  (direct-superclasses () :type list)
-  ;; Definition location
-  ;; Not used for standard-classoid, because pcl has its own mechanism.
-  (source-location nil)
-  ;; representation of all of the subclasses (direct or indirect) of
-  ;; this class. This is NIL if no subclasses or not initalized yet;
-  ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
-  ;; subclass layout that was in effect at the time the subclass was
-  ;; created.
-  ;; Initially an alist, and changed to a hash-table at some threshold.
-  (subclasses nil :type (or list hash-table))
-  (%lock nil) ; install it just-in-time, similar to hash-table-lock
-  ;; the PCL class (= CL:CLASS, but with a view to future flexibility
-  ;; we don't just call it the CLASS slot) object for this class, or
-  ;; NIL if none assigned yet
-  (pcl-class nil))
 
 (defun wrapper-classoid-name (x)
   (classoid-name (wrapper-classoid x)))
@@ -481,11 +528,10 @@
 
 ;;; An UNDEFINED-CLASSOID is a cookie we make up to stick in forward
 ;;; referenced layouts. Users should never see them.
-(def!struct (undefined-classoid
+(defstruct (undefined-classoid
              (:include classoid)
-             (:copier nil)
-             (:constructor make-undefined-classoid
-                 (name &aux (%bits (pack-ctype-bits classoid name))))))
+             (:constructor !alloc-undefined-classoid (%bits name))
+             (:copier nil)))
 
 ;;; BUILT-IN-CLASS is used to represent the standard classes that
 ;;; aren't defined with DEFSTRUCT and other specially implemented
@@ -497,7 +543,7 @@
 ;;; This translation is done when type specifiers are parsed. Type
 ;;; system operations (union, subtypep, etc.) should never encounter
 ;;; translated classes, only their translation.
-(def!struct (built-in-classoid (:include classoid) (:copier nil)
+(defstruct (built-in-classoid (:include classoid) (:copier nil)
                                     (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
   ;; stands on its own. Only :INITIALIZING for a period during cold
@@ -505,10 +551,9 @@
   (translation nil :type (or null ctype (member :initializing)))
   (predicate (missing-arg) :type (sfunction (t) boolean) :read-only t))
 
-(def!struct (condition-classoid (:include classoid)
-                                (:copier nil)
-                                (:constructor make-condition-classoid
-                                    (&key name &aux (%bits (pack-ctype-bits classoid name)))))
+(defstruct (condition-classoid (:include classoid)
+                                (:constructor !alloc-condition-classoid (%bits name))
+                                (:copier nil))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -536,17 +581,16 @@
 ;;; STRUCTURE-CLASSOID represents what we need to know about structure
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
-(def!struct (structure-classoid
+(defstruct (structure-classoid
              (:include classoid)
-             (:copier nil)
-             (:constructor make-structure-classoid
-                           (&key name &aux (%bits (pack-ctype-bits classoid name))))))
+             (:constructor !alloc-structure-classoid (%bits name))
+             (:copier nil)))
 
 ;;;; classoid namespace
 
 ;;; We use an indirection to allow forward referencing of class
 ;;; definitions with load-time resolution.
-(def!struct (classoid-cell
+(defstruct (classoid-cell
              (:copier nil)
              (:constructor make-classoid-cell (name &optional classoid))
              (:print-object (lambda (s stream)
@@ -570,18 +614,32 @@
 ;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
 ;;; side does not need to distinguish between STANDARD-CLASS and
 ;;; FUNCALLABLE-STANDARD-CLASS.
-(def!struct (standard-classoid (:include classoid)
-                               (:copier nil)
-                               (:constructor make-standard-classoid
-                                   (&key name pcl-class
-                                    &aux (%bits (pack-ctype-bits classoid name)))))
+(defstruct (standard-classoid
+             (:include classoid)
+             (:constructor !alloc-standard-classoid (%bits name pcl-class))
+             (:copier nil))
   old-layouts)
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
-(def!struct (static-classoid (:include classoid)
-                             (:copier nil)
-                             (:constructor make-static-classoid
-                                 (&key name &aux (%bits (pack-ctype-bits classoid name))))))
+(defstruct (static-classoid (:include classoid)
+                             (:constructor !alloc-static-classoid (%bits name))
+                             (:copier nil)))
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
+
+;;; Return the name of the global hashset that OBJ (a CTYPE instance)
+;;; would be stored in, if it were stored in one.
+;;; This is only for bootstrap, and not 100% precise as it does not know
+;;; about the other MEMBER type containers.
+(defun ctype->hashset-sym (obj)
+  (macrolet ((generate  ()
+               (collect ((clauses))
+                 (dolist (type-class *type-class-list*
+                                     `(etypecase obj ,@(clauses)))
+                   (dolist (instance-type (cdr type-class))
+                     (clauses
+                      (list instance-type
+                            (unless (member instance-type '(classoid named-type))
+                              `',(symbolicate "*" instance-type "-HASHSET*")))))))))
+    (generate)))

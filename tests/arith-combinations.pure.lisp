@@ -16,6 +16,7 @@
            (sb-kernel:type-specifier (sb-kernel:specifier-type type))))
     (let ((types (mapcar #'normalize-type types))
           (result-types (mapcar #'normalize-type result-types))
+          (progress 0)
           (cache (make-hash-table :test #'equal)))
       (loop for op in ops
             do
@@ -49,6 +50,13 @@
                                                               (setf (gethash lambda cache)
                                                                     (checked-compile lambda :allow-warnings t)))
                                                 do
+                                                (when (and (zerop (mod (incf progress) (or #+(or arm x86) 100 10000)))
+                                                           (interactive-stream-p *standard-output*))
+                                                  (write-char #\Return)
+                                                  (write progress)
+                                                  (write-char #\Space)
+                                                  (write (hash-table-count cache))
+                                                  (force-output))
                                                 (handler-case
                                                     (apply fun args)
                                                   (error (c)
@@ -94,6 +102,33 @@
                   (floor most-negative-fixnum 2))))
 
 (with-test (:name :fixnum-integer-cmp)
+  (test-ops '(> <)
+            `(t fixnum
+                integer
+                bignum
+                (integer ,(- (expt 2 sb-vm:n-word-bits) 10)
+                         ,(- (expt 2 sb-vm:n-word-bits) 1))
+                (signed-byte ,sb-vm:n-word-bits)
+                (unsigned-byte ,sb-vm:n-word-bits)
+                (signed-byte 8)
+                (unsigned-byte 8))
+            (list 0 1 2 3 4 -1 -2 -3 -4
+                  (- (expt 2 sb-vm:n-word-bits) 1)
+                  (- (expt 2 sb-vm:n-word-bits) 5)
+                  (- (expt 2 (1- sb-vm:n-word-bits)) 1)
+                  (- (expt 2 (1- sb-vm:n-word-bits)) 5)
+                  (- (expt 2 (1- sb-vm:n-word-bits)))
+                  (- 10 (expt 2 (1- sb-vm:n-word-bits)))
+                  (expt 2 (1- sb-vm:n-word-bits))
+                  most-positive-fixnum
+                  most-negative-fixnum
+                  (1- most-positive-fixnum)
+                  (1+ most-negative-fixnum)
+                  (floor most-positive-fixnum 2)
+                  (floor most-negative-fixnum 2))
+            '(t)))
+
+(with-test (:name :integer-ratio-float-compare)
   (test-ops '(> <)
             `(t fixnum
                 integer

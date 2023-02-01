@@ -11,12 +11,16 @@
 
 (in-package "SB-IMPL")
 
-;;;; We often use a source-transform to do macro-like rewriting of an
-;;;; ordinary function call. Source-transforms seem to pre-date the ANSI
-;;;; specification and are redundant with compiler-macros.
-;;;; In the interest of not multiplying entities needlessly, it should
-;;;; be feasible to get rid of source-transforms.
-;;;; A problem is namespace clobbering: these must not affect the host Lisp.
+;;;; Source transforms are used by the compiler to make code more
+;;;; canonical so that the compiler can compile it futher; they are
+;;;; not optional. Compiler macros are an optional source rewriting
+;;;; mechanism mainly for compile-time syntax checking and
+;;;; optimizations that can be declined for any reason, but especially
+;;;; through the use of NOTINLINE. Perhaps the actual mechanism
+;;;; outside the decision to do rewriting could be reunified. We also
+;;;; must pay special attention when writing compiler macros for the
+;;;; purposes of cross-compiling. A problem is namespace clobbering:
+;;;; these must not affect the host Lisp.
 
 ;;; A sanity-checker for an extremely common programmer error.
 (define-compiler-macro format (&whole form destination control &rest args)
@@ -69,7 +73,7 @@
                           (:preserve-whitespace 2)
                           (otherwise (return-from read-from-string form))))
                  (var (if (logbitp index seen)
-                          (let ((x (sb-xc:gensym "IGNORE")))
+                          (let ((x (gensym "IGNORE")))
                             (push x ignore)
                             x)
                           (setf seen (logior (ash 1 index) seen)

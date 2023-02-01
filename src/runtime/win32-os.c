@@ -66,6 +66,7 @@
 #include <wincrypt.h>
 #include <stdarg.h>
 #include <string.h>
+#include "print.h"
 
 /* missing definitions for modern mingws */
 #ifndef EH_UNWINDING
@@ -85,126 +86,6 @@ typedef WCHAR console_char;
 #else
 typedef CHAR console_char;
 #endif
-
-/* wrappers for winapi calls that must be successful (like SBCL's
- * (aver ...) form). */
-
-/* win_aver function: basic building block for miscellaneous
- * ..AVER.. macrology (below) */
-
-/* To do: These routines used to be "customizable" with dyndebug_init()
- * and variables like dyndebug_survive_aver, dyndebug_skip_averlax based
- * on environment variables.  Those features got lost on the way, but
- * ought to be reintroduced. */
-
-static inline
-intptr_t win_aver(intptr_t value, char* comment, char* file, int line,
-                  int justwarn)
-{
-    if (!value) {
-        LPSTR errorMessage = "<FormatMessage failed>";
-        DWORD errorCode = GetLastError(), allocated=0;
-        int posixerrno = errno;
-        const char* posixstrerror = strerror(errno);
-        char* report_template =
-            "Expression unexpectedly false: %s:%d\n"
-            " ... %s\n"
-            "     ===> returned #X%p, \n"
-            "     (in thread %p)"
-            " ... Win32 thinks:\n"
-            "     ===> code %u, message => %s\n"
-            " ... CRT thinks:\n"
-            "     ===> code %u, message => %s\n";
-
-        allocated =
-            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER|
-                           FORMAT_MESSAGE_FROM_SYSTEM,
-                           NULL,
-                           errorCode,
-                           MAKELANGID(LANG_ENGLISH,SUBLANG_ENGLISH_US),
-                           (LPSTR)&errorMessage,
-                           1024u,
-                           NULL);
-
-        if (justwarn) {
-            fprintf(stderr, report_template,
-                    file, line,
-                    comment, value,
-                    get_sb_vm_thread(),
-                    (unsigned)errorCode, errorMessage,
-                    posixerrno, posixstrerror);
-        } else {
-            lose(report_template,
-                    file, line,
-                    comment, value,
-                    get_sb_vm_thread(),
-                    (unsigned)errorCode, errorMessage,
-                    posixerrno, posixstrerror);
-        }
-        if (allocated)
-            LocalFree(errorMessage);
-    }
-    return value;
-}
-
-/* sys_aver function: really tiny adaptor of win_aver for
- * "POSIX-parody" CRT results ("lowio" and similar stuff):
- * negative number means something... negative. */
-static inline
-intptr_t sys_aver(long value, char* comment, char* file, int line,
-              int justwarn)
-{
-    win_aver((intptr_t)(value>=0),comment,file,line,justwarn);
-    return value;
-}
-
-/* Check for (call) result being boolean true. (call) may be arbitrary
- * expression now; massive attack of gccisms ensures transparent type
- * conversion back and forth, so the type of AVER(expression) is the
- * type of expression. Value is the same _if_ it can be losslessly
- * converted to (void*) and back.
- *
- * Failed AVER() is normally fatal. Well, unless dyndebug_survive_aver
- * flag is set. */
-
-#define AVER(call)                                                      \
-    ({ __typeof__(call) __attribute__((unused)) me =                    \
-            (__typeof__(call))                                          \
-            win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 0);      \
-        me;})
-
-/* AVERLAX(call): do the same check as AVER did, but be mild on
- * failure: print an annoying unrequested message to stderr, and
- * continue. With dyndebug_skip_averlax flag, AVERLAX stop even to
- * check and complain. */
-
-#define AVERLAX(call)                                                   \
-    ({ __typeof__(call) __attribute__((unused)) me =                    \
-            (__typeof__(call))                                          \
-            win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 1);      \
-        me;})
-
-/* Now, when failed AVER... prints both errno and GetLastError(), two
- * variants of "POSIX/lowio" style checks below are almost useless
- * (they build on sys_aver like the two above do on win_aver). */
-
-#define CRT_AVER_NONNEGATIVE(call)                              \
-    ({ __typeof__(call) __attribute__((unused)) me =            \
-            (__typeof__(call))                                  \
-            sys_aver((call), #call, __FILE__, __LINE__, 0);     \
-        me;})
-
-#define CRT_AVERLAX_NONNEGATIVE(call)                           \
-    ({ __typeof__(call) __attribute__((unused)) me =            \
-            (__typeof__(call))                                  \
-            sys_aver((call), #call, __FILE__, __LINE__, 1);     \
-        me;})
-
-/* to be removed */
-#define CRT_AVER(booly)                                         \
-    ({ __typeof__(booly) __attribute__((unused)) me = (booly);  \
-        sys_aver((booly)?0:-1, #booly, __FILE__, __LINE__, 0);  \
-        me;})
 
 /* The exception handling function looks like this: */
 EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
@@ -234,12 +115,10 @@ static void set_seh_frame(void *frame)
 }
 #endif
 
-#if defined(LISP_FEATURE_SB_THREAD)
-
 void alloc_gc_page()
 {
-    AVER(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
-                      MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE));
+    gc_assert(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
+                           MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE));
 }
 
 /* Permit loads from GC_SAFEPOINT_PAGE_ADDR (NB page state change is
@@ -266,18 +145,16 @@ void alloc_gc_page()
 void map_gc_page()
 {
     DWORD oldProt;
-    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
-                        PAGE_READWRITE, &oldProt));
+    gc_assert(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
+                             PAGE_READWRITE, &oldProt));
 }
 
 void unmap_gc_page()
 {
     DWORD oldProt;
-    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
-                        PAGE_NOACCESS, &oldProt));
+    gc_assert(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
+                             PAGE_NOACCESS, &oldProt));
 }
-
-#endif
 
 /* This feature has already saved me more development time than it
  * took to implement.  In its current state, ``dynamic RT<->core
@@ -327,7 +204,7 @@ void unmap_gc_page()
  * bundle'' that rolls up your patch, redumps and -- presto -- 100MiB
  * program is fixed by sending and loading a 50KiB thingie.
  *
- * However, until LISP_FEATURE_LINKAGE_TABLE, if your bug were fixed
+ * However, until LISP_FEATURE_ALIEN_LINKAGE_TABLE, if your bug were fixed
  * by modifying two lines of _C_ sources, a customer described above
  * had to be ready to receive and reinstall a new 100MiB
  * executable. With the aid of code below, deploying such a fix
@@ -356,15 +233,6 @@ void unmap_gc_page()
  * many other environments, is nonexistent in SBCL: we already have a
  * ``global quiesce point'' that is generally required for this kind
  * of worldwide revolution -- around collect_garbage.
- *
- * What's almost unnoticeable from the C side (where you are now, dear
- * reader): using the same style for all linking is beautiful. I tried
- * to leave old-style linking code in place for the sake of
- * _non-linkage-table_ platforms (they probably don't have -ldl or its
- * equivalent, like LL/GPA, at all) -- but i did it usually by moving
- * the entire `old style' code under #-linkage-table and
- * refactoring the `new style' branch, instead of cutting the tail
- * piecemeal and increasing #+-ifdeffery amount & the world enthropy.
  *
  * If we look at the majority of the ``new style'' code units, it's a
  * common thing to observe how #+-ifdeffery _vanishes_ instead of
@@ -573,7 +441,6 @@ void* os_dlsym_default(char* name)
     return result;
 }
 
-#if defined(LISP_FEATURE_SB_THREAD)
 /* We want to get a slot in TIB that (1) is available at constant
    offset, (2) is our private property, so libraries wouldn't legally
    override it, (3) contains something predefined for threads created
@@ -680,7 +547,6 @@ int os_preinit(char *argv[], char *envp[])
 #endif
     return 0;
 }
-#endif  /* LISP_FEATURE_SB_THREAD */
 
 int os_number_of_processors = 1;
 
@@ -786,8 +652,8 @@ set_up_win64_seh_thunk(size_t page_size)
     if (page_size < sizeof(struct win64_seh_data))
         lose("Not enough space to allocate struct win64_seh_data");
 
-    AVER(VirtualAlloc(WIN64_SEH_DATA_ADDR, page_size,
-                      MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    gc_assert(VirtualAlloc(WIN64_SEH_DATA_ADDR, page_size,
+                           MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 
     struct win64_seh_data *seh_data = (void *) WIN64_SEH_DATA_ADDR;
     DWORD64 base = (DWORD64) seh_data;
@@ -816,7 +682,7 @@ set_up_win64_seh_thunk(size_t page_size)
     volatile uint8_t *tramp = seh_data->handler_trampoline;
     tramp[0] = 0xFF; // jmp qword ptr [rip+2]
     tramp[1] = 0x25;
-    UNALIGNED_STORE32((tramp+2), 2);
+    UNALIGNED_STORE32((void*volatile)(tramp+2), 2);
     tramp[6] = 0x66; // 2-byte nop
     tramp[7] = 0x90;
     *(void **)(tramp+8) = handle_exception;
@@ -836,12 +702,71 @@ set_up_win64_seh_thunk(size_t page_size)
     rt->EndAddress = 16;
     rt->UnwindData = (DWORD64) ui - base;
 
-    AVER(RtlAddFunctionTable(rt, 1, base));
+    gc_assert(RtlAddFunctionTable(rt, 1, base));
 }
 #endif
 
 static LARGE_INTEGER lisp_init_time;
 static double qpcMultiplier;
+DWORD win32_page_size = 0;
+ULONG win32_stack_guarantee = 0;
+
+void
+win32_set_stack_guarantee()
+{
+    /* 64 KB appears to be enough to run the SWANK debugger + (FACT 1000). 32 KB
+     * is surprisingly not enough for the debugger. */
+    ULONG request = 64*1024;
+    if (!SetThreadStackGuarantee(&request)) {
+        fprintf(stderr, "ERROR: SetThreadStackGuarantee failed: 0x%lx.\n",
+                GetLastError());
+        fflush(stderr);
+    }
+
+    /* Store stack guarantee size the first time around so that
+     * win32_reset_stack_overflow_guard_page() may restore the stack guard. */
+    if (!win32_stack_guarantee)
+        SetThreadStackGuarantee(&win32_stack_guarantee);
+}
+
+/*
+ * The usual way to do this would be to invoke _resetstkoflw(). However, it
+ * refuses to re-establish the stack overflow guard page when the stack
+ * pointer is still within the stack area reserved by SetThreadStackGuarantee().
+ *
+ * This is invoked when SB-KERNEL:HANDLE-WIN32-EXCEPTION is unwound after
+ * handling a STACK_OVERFLOW_EXCEPTION.
+ */
+void
+win32_reset_stack_overflow_guard_page() {
+    struct thread *self = get_sb_vm_thread();
+
+    /* this is similar to CONTROL_STACK_RETURN_GUARD_PAGE on other platforms,
+     * but Windows handles the page faults on its own.
+     *
+     * From experimentation, it seems that as long as set up a guard region
+     * somewhere below the stack guarantee, Windows will manage to raise a
+     * STACK_OVERFLOW_EXCEPTION appropriately next time we exhaust the stack.
+     * Furthermore, if we reprotect sufficiently far away from the stack
+     * guarantee, user code can get away with modifying the stack while
+     * unwinding from a stack overflow condition without retriggering the guard
+     * page. See test (:EXHAUST :WRITE-TO-STACK-ON-UNWIND). */
+#define WIN32_STACK_GUARD_SLACK (2*win32_stack_guarantee + win32_page_size)
+    void *stack_guard_start = CONTROL_STACK_GUARD_PAGE(self);
+    fprintf(stderr, "INFO: Reprotecting control stack guard (0x%p+0x%x)\n",
+            stack_guard_start, WIN32_STACK_GUARD_SLACK);
+    fflush(stderr);
+
+    DWORD oldprot;
+    VirtualProtect(stack_guard_start + WIN32_STACK_GUARD_SLACK,
+                   /* a single page would probably be enough, but let's cargo
+                    * cult Windows and use guarantee size + 1 page. */
+                   win32_stack_guarantee + win32_page_size,
+                   PAGE_READWRITE | PAGE_GUARD,
+                   &oldprot);
+
+    self->state_word.control_stack_guard_page_protected = 1;
+}
 
 void os_init()
 {
@@ -860,11 +785,9 @@ void os_init()
 
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
+    win32_page_size = system_info.dwPageSize;
     os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
         system_info.dwPageSize : BACKEND_PAGE_BYTES;
-#if defined(LISP_FEATURE_X86)
-    fast_bzero_pointer = fast_bzero_detect;
-#endif
     os_number_of_processors = system_info.dwNumberOfProcessors;
 
 #ifdef LISP_FEATURE_X86_64
@@ -886,16 +809,19 @@ uword_t get_monotonic_time()
 #endif
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
-            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
+os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
-        return
-            AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
+        os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection);
+        gc_assert(actual);
+        return actual;
     }
 
-    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    // Reserving the dynamic space doesn't commit it.
+    DWORD commit =
+      (space_id == DYNAMIC_CORE_SPACE_ID && (attributes & MOVABLE)) ? 0 : MEM_COMMIT;
+    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|commit, PAGE_EXECUTE_READWRITE);
 
     if (!actual) {
         if (!(attributes & MOVABLE)) {
@@ -906,47 +832,21 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
             return 0;
         }
 
-        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+        actual = VirtualAlloc(NULL, len, MEM_RESERVE|commit, PAGE_EXECUTE_READWRITE);
+        gc_assert(actual);
     }
 
     return actual;
 }
 
-/* Used to allocate the dynamic space, as it may be very large. Dynamically comitted by os_commit_memory in handle_access_violation */
-os_vm_address_t
-os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
+void os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
 {
-    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
-    if (!actual) {
-        if (!(attributes & MOVABLE)) {
-            fprintf(stderr,
-                    "VirtualAlloc: wanted %lu bytes at %p, actually mapped at %p\n",
-                    (unsigned long) len, addr, actual);
-            fflush(stderr);
-            return 0;
-        }
-        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-    }
-
-    return actual;
+    if (len) gc_assert(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
-void* os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
-{
-    return
-        AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
-}
-
-
-void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
-    AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
-}
-
-void
-os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
+void os_decommit_mem(os_vm_address_t addr,  os_vm_size_t len) {
+    gc_assert(gc_active_p);
+    gc_assert(VirtualFree(addr, len, MEM_DECOMMIT));
 }
 
 /*
@@ -958,26 +858,33 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
  * a lazy read (demand page) setup, but that would mean keeping an
  * open file pointer for the core indefinately (and be one more
  * thing to maintain).
+ * FIXME: I would bet that we can use PAGE_EXECUTE_WRITECOPY for this,
+ * but I'll leave it to someone who actually cares.
  */
 
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
-                      int __attribute__((unused)) execute)
+                      int is_readonly_space)
 {
     os_commit_memory(addr, len);
 #ifdef LISP_FEATURE_64_BIT
-    CRT_AVER_NONNEGATIVE(_lseeki64(fd, offset, SEEK_SET));
+    os_vm_offset_t res = _lseeki64(fd, offset, SEEK_SET);
 #else
-    CRT_AVER_NONNEGATIVE(lseek(fd, offset, SEEK_SET));
+    os_vm_offset_t res = lseek(fd, offset, SEEK_SET);
 #endif
+    gc_assert(res == offset);
     size_t count;
 
+    os_vm_address_t original_addr = addr;
+    os_vm_size_t original_len = len;
     while (len) {
         unsigned to_read = len > INT_MAX ? INT_MAX : len;
         count = read(fd, addr, to_read);
         addr += count;
         len -= count;
-        CRT_AVER(count == to_read);
+        gc_assert(count == to_read);
     }
+    DWORD old;
+    if (is_readonly_space) VirtualProtect(original_addr, original_len, PAGE_READONLY, &old);
     return (void*)0;
 }
 static DWORD os_protect_modes[8] = {
@@ -997,9 +904,9 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     DWORD old_prot;
 
     DWORD new_prot = os_protect_modes[prot];
-    AVER(VirtualProtect(address, length, new_prot, &old_prot)||
-         (VirtualAlloc(address, length, MEM_COMMIT, new_prot) &&
-          VirtualProtect(address, length, new_prot, &old_prot)));
+    gc_assert(VirtualProtect(address, length, new_prot, &old_prot)||
+              (VirtualAlloc(address, length, MEM_COMMIT, new_prot) &&
+               VirtualProtect(address, length, new_prot, &old_prot)));
     odxprint(misc,"Protecting %p + %p vmaccess %d "
              "newprot %08x oldprot %08x",
              address,length,prot,new_prot,old_prot);
@@ -1054,7 +961,6 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
      * 'kind' value (eg trap_Cerror). */
     unsigned trap = *(unsigned char *)OS_CONTEXT_PC(ctx);
 
-#ifdef LISP_FEATURE_SB_THREAD
     /* Before any other trap handler: gc_safepoint ensures that
        inner alloc_sap for passing the context won't trap on
        pseudo-atomic. */
@@ -1066,7 +972,6 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
         thread_interrupted(ctx);
         return 0;
     }
-#endif
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
@@ -1074,13 +979,23 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
         (lispobj *)*os_context_sp_addr(ctx);
 
     WITH_GC_AT_SAFEPOINTS_ONLY() {
-#if defined(LISP_FEATURE_SB_THREAD)
         block_blockable_signals(&ctx->sigmask);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        if (trap == trap_UndefinedFunction) {
+            lispobj* fdefn = (lispobj*)(OS_CONTEXT_PC(ctx) & ~LOWTAG_MASK);
+            if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
+                // Return to undefined-tramp
+                OS_CONTEXT_PC(ctx) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
+                // with RAX containing the FDEFN
+                *os_context_register_addr(ctx,reg_RAX) =
+                    make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
+            }
+        } else
 #endif
-        handle_trap(ctx, trap);
-#if defined(LISP_FEATURE_SB_THREAD)
+        {
+            handle_trap(ctx, trap);
+        }
         thread_sigmask(SIG_SETMASK,&ctx->sigmask,NULL);
-#endif
     }
 
     /* Done, we're good to go! */
@@ -1120,7 +1035,6 @@ handle_access_violation(os_context_t *ctx,
 #endif
 
     /* Safepoint pages */
-#ifdef LISP_FEATURE_SB_THREAD
     if (fault_address == (void *) GC_SAFEPOINT_TRAP_ADDR) {
         thread_in_lisp_raised(ctx);
         return 0;
@@ -1130,22 +1044,21 @@ handle_access_violation(os_context_t *ctx,
         thread_in_safety_transition(ctx);
         return 0;
     }
-#endif
 
     /* dynamic space */
     page_index_t page = find_page_index(fault_address);
-    if (page != -1
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-        && !PAGE_WRITEPROTECTED_P(page)
-#endif
-        ) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    if (page >= 0) lose("should not get access violation in dynamic space");
+#else
+    if (page != -1 && !PAGE_WRITEPROTECTED_P(page)) {
         os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
                          os_vm_page_size);
         return 0;
     }
-    if (gencgc_handle_wp_violation(fault_address)) {
+    if (gencgc_handle_wp_violation(ctx, fault_address)) {
         return 0;
     }
+#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern int immobile_space_handle_wp_violation(void*);
@@ -1180,18 +1093,13 @@ signal_internal_error_or_lose(os_context_t *ctx,
          * aren't supposed to happen during cold init or reinit
          * anyway. */
 
-#if defined(LISP_FEATURE_SB_THREAD)
         block_blockable_signals(&ctx->sigmask);
-#endif
         fake_foreign_function_call(ctx);
 
         WITH_GC_AT_SAFEPOINTS_ONLY() {
             DX_ALLOC_SAP(context_sap, ctx);
             DX_ALLOC_SAP(exception_record_sap, exception_record);
-
-#if defined(LISP_FEATURE_SB_THREAD)
             thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
-#endif
 
             /* The exception system doesn't automatically clear pending
              * exceptions, so we lose as soon as we execute any FP
@@ -1203,9 +1111,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
         }
         /* If Lisp doesn't nlx, we need to put things back. */
         undo_fake_foreign_function_call(ctx);
-#if defined(LISP_FEATURE_SB_THREAD)
         thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
-#endif
         /* FIXME: HANDLE-WIN32-EXCEPTION should be allowed to decline */
         return;
     }
@@ -1214,7 +1120,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
             (void*)(intptr_t)exception_record->ExceptionCode);
     fprintf(stderr, "Faulting IP: %p.\n",
             (void*)(intptr_t)exception_record->ExceptionAddress);
-    if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+    if ((long int)exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         MEMORY_BASIC_INFORMATION mem_info;
 
         if (VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
@@ -1298,6 +1204,15 @@ handle_exception_ex(EXCEPTION_RECORD *exception_record,
     int rc;
     EXCEPTION_DISPOSITION disp = ExceptionContinueExecution;
     switch (code) {
+    case EXCEPTION_STACK_OVERFLOW:
+        void *sp = voidreg(win32_context, sp);
+        fprintf(stderr, "INFO: Caught stack overflow exception (sp=0x%p); "
+                        "proceed with caution.\n", sp);
+        fflush(stderr);
+        self->state_word.control_stack_guard_page_protected = 0;
+        rc = -1;
+        break;
+
     case EXCEPTION_ACCESS_VIOLATION:
         rc = handle_access_violation(ctx, exception_record, fault_address, self);
         if (rc && continue_search_on_unhandled_access_violation) {
@@ -1385,12 +1300,12 @@ veh(EXCEPTION_POINTERS *ep)
     }
 
     DWORD64 rip = ep->ContextRecord->Rip;
-    DWORD code = ep->ExceptionRecord->ExceptionCode;
+    long int code = ep->ExceptionRecord->ExceptionCode;
     BOOL from_lisp =
-        (rip >= READ_ONLY_SPACE_START &&
-         rip <= READ_ONLY_SPACE_END) ||
-        (rip >= DYNAMIC_SPACE_START &&
-         rip <= DYNAMIC_SPACE_START+dynamic_space_size);
+        (rip >= DYNAMIC_SPACE_START && rip < DYNAMIC_SPACE_START+dynamic_space_size) ||
+        (rip >= READ_ONLY_SPACE_START && rip < READ_ONLY_SPACE_END) ||
+        immobile_space_p(rip) ||
+        (rip >= STATIC_SPACE_START && rip < (uword_t)static_space_free_pointer);
 
     if (code == EXCEPTION_ACCESS_VIOLATION ||
         code == STATUS_HEAP_CORRUPTION ||
@@ -1438,30 +1353,6 @@ wos_install_interrupt_handlers
 #endif
 }
 
-/*
- * The stubs below are replacements for the windows versions,
- * which can -fail- when used in our memory spaces because they
- * validate the memory spaces they are passed in a way that
- * denies our exception handler a chance to run.
- */
-
-void *memmove(void *dest, const void *src, size_t n)
-{
-    if (dest < src) {
-        size_t i;
-        for (i = 0; i < n; i++) *(((char *)dest)+i) = *(((char *)src)+i);
-    } else {
-        while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
-    }
-    return dest;
-}
-
-void *memcpy(void *dest, const void *src, size_t n)
-{
-    while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
-    return dest;
-}
-
 char *dirname(char *path)
 {
     static char buf[PATH_MAX + 1];
@@ -1495,8 +1386,8 @@ socket_input_available(HANDLE socket, long time, long utime)
 
     FD_ZERO(&readfds);
     FD_ZERO(&errfds);
-    FD_SET(socket, &readfds);
-    FD_SET(socket, &errfds);
+    FD_SET((uword_t)socket, &readfds);
+    FD_SET((uword_t)socket, &errfds);
 
     count = select(0, &readfds, NULL, &errfds, &timeout);
     SetLastError(wsaErrno);
@@ -1516,7 +1407,6 @@ socket_input_available(HANDLE socket, long time, long utime)
         return 0;
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
 /* Atomically mark current thread as (probably) doing synchronous I/O
  * on handle, if no cancellation is requested yet (and return TRUE),
  * otherwise clear thread's I/O cancellation flag and return false.
@@ -1558,9 +1448,6 @@ io_end_interruptible(HANDLE handle)
       return -1;                           \
     }                                      \
     RUN_BODY_ONCE(xx, io_end_interruptible(handle))
-#else
-#define WITH_INTERRUPTIBLE_IO(handle)
-#endif
 
 int console_handle_p(HANDLE handle)
 {
@@ -1568,7 +1455,7 @@ int console_handle_p(HANDLE handle)
     return GetFileType(handle) == FILE_TYPE_CHAR &&
         GetConsoleMode(handle, &mode);
 }
-#ifdef LISP_FEATURE_SB_THREAD
+
 /*
  * (AK writes:)
  *
@@ -1819,7 +1706,6 @@ win32_maybe_interrupt_io(void* thread)
     }
     return done;
 }
-#endif
 
 static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
 
@@ -2065,31 +1951,21 @@ char *os_get_runtime_executable_path()
 DWORD
 win32_wait_object_or_signal(HANDLE waitFor)
 {
-#ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = get_sb_vm_thread();
     HANDLE handles[] = {waitFor, thread_private_events(self,1)};
     return
         WaitForMultipleObjects(2,handles, FALSE, INFINITE);
-#else
-    return WaitForSingleObject(waitFor, INFINITE);
-#endif
 }
 
 DWORD
 win32_wait_for_multiple_objects_or_signal(HANDLE *handles, DWORD count)
 {
-#ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = get_sb_vm_thread();
     handles[count] = thread_private_events(self,1);
     return
         WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE);
-#else
-    return
-        WaitForMultipleObjects(count, handles, FALSE, INFINITE);
-#endif
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
 /*
  * Portability glue for win32 waitable timers.
  *
@@ -2132,7 +2008,6 @@ os_cancel_wtimer(HANDLE handle)
 {
     CancelWaitableTimer(handle);
 }
-#endif
 
 #ifdef LISP_FEATURE_SB_FUTEX
 int
@@ -2188,30 +2063,7 @@ int sb_pthr_kill(struct thread* thread, int signum)
     return 0;
 }
 
-int sigpending(sigset_t *set)
-{
-    struct extra_thread_data* data = thread_extra_data(get_sb_vm_thread());
-    *set = InterlockedCompareExchange((volatile LONG*)&data->pending_signal_set,
-                                      0, 0);
-    return 0;
-}
-
 /* Signals */
-struct sigaction signal_handlers[NSIG];
-
-/* Never called for now */
-int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
-{
-  struct sigaction newact = *act;
-  if (oldact)
-    *oldact = signal_handlers[signum];
-  if (!(newact.sa_flags & SA_SIGINFO)) {
-      newact.sa_sigaction = (typeof(newact.sa_sigaction))newact.sa_handler;
-  }
-  signal_handlers[signum] = newact;
-  return 0;
-}
-
 int sched_yield()
 {
   /* http://stackoverflow.com/questions/1383943/switchtothread-vs-sleep1

@@ -56,16 +56,13 @@ static inline unsigned int* code_fun_table(struct code* code) {
     return (unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 4);
 }
 static inline unsigned short code_trailer_len(struct code* code) {
-    // Do not attempt to read the trailer len from a code page filler object.
-    // Fillers are recognizable by boxed_size == 0.
-    return code->boxed_size ?
-      *(unsigned short*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 2) : 0;
+    return *(unsigned short*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 2);
 }
 static inline unsigned short code_n_funs(struct code* code) {
     // Do not attempt to read the fun table size from a code object with no trailer.
     // If there is a nonzero trailer length, assume it is at least enough to store
     // the length of the fun table.
-    return !code_trailer_len(code) ? 0 : *(unsigned short*)code_fun_table(code) >> 4;
+    return !code_trailer_len(code) ? 0 : *(unsigned short*)code_fun_table(code) >> 5;
 }
 
 static inline char* code_text_start(struct code* code) {

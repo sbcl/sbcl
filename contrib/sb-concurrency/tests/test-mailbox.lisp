@@ -219,6 +219,7 @@
                                 repeat 99
                                 do (kill-thread victim)
                                    (sleep (random 0.0001)))))
+      (declare (ignore errors))
       (values
        ;; We may have killed a receiver before it got to incrementing
        ;; the counter.

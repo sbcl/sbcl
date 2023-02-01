@@ -11,20 +11,18 @@
 
 ;;;; C string support.
 
-(define-alien-type-class (c-string :include pointer :include-args (to))
-  (external-format :default :type keyword)
-  (element-type 'character :type (member character base-char))
-  (not-null nil :type boolean))
-
-(define-alien-type-translator c-string
-    (&key (external-format :default)
-          (element-type 'character)
-          (not-null nil))
+(defun load-alien-c-string-type (element-type external-format not-null)
   (make-alien-c-string-type
    :to (parse-alien-type 'char (sb-kernel:make-null-lexenv))
    :element-type element-type
    :external-format external-format
    :not-null not-null))
+
+(define-alien-type-translator c-string
+    (&key (external-format :default)
+          (element-type 'character)
+          (not-null nil))
+  (load-alien-c-string-type element-type external-format not-null))
 
 (defun c-string-external-format (type)
   (let ((external-format (alien-c-string-type-external-format type)))
@@ -33,7 +31,7 @@
         #-sb-xc-host (default-c-string-external-format)
         external-format)))
 
-(define-alien-type-method (c-string :unparse) (type)
+(define-alien-type-method (c-string :unparse) (type state)
   (let* ((external-format (alien-c-string-type-external-format type))
          (element-type (alien-c-string-type-element-type type))
          (not-null (alien-c-string-type-not-null type))

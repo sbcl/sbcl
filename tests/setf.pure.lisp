@@ -412,12 +412,12 @@
 
 (with-test (:name :setf-ldb-recognize-local-macros)
   ;; This lambda should call neither %LDB nor %DPB
-  (assert (not (ctu:find-named-callees
-                (compile nil
-                         '(lambda (x)
+  (let ((f (compile nil '(lambda (x)
                            (declare (type (cons) x))
                            (symbol-macrolet ((b (byte 4 3)))
-                             (incf (ldb b (truly-the fixnum (car x)))))))))))
+                             (incf (ldb b (truly-the fixnum (car x)))))))))
+    (assert (not (ctu:asm-search "%LDB" f)))
+    (assert (not (ctu:asm-search "%DPB" f)))))
 
 ;; There's aren't a lot of reasonable uses of the setf "getter" for LOGBITP.
 ;; It might come in handy for SHIFTF or ROTATEF, or this:

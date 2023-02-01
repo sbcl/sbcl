@@ -1,0 +1,230 @@
+@node sb-simd
+@section sb-simd
+@cindex SIMD
+
+The @code{sb-simd} module provides a convenient interface for SIMD
+programming in SBCL.  It provides one package per SIMD instruction set,
+plus functions and macros for querying whether an instruction set is
+available and what functions and data types it exports.
+
+@subsection Data Types
+
+The central data type in @code{sb-simd} is the SIMD pack.  A SIMD pack
+is very similar to a specialized vector, except that its length must be
+a particular power of two that depends on its element type and the
+underlying hardware.  The set of element types that are supported for
+SIMD packs is similar to that of SBCL's specialized array element types,
+except that there is currently no support for SIMD packs of complex
+numbers or characters.
+
+The supported scalar types are @code{f32}, @code{f64}, @code{sN}, and
+@code{uN}, where @code{N} is either 8, 16, 32, or 64.  These scalar
+types are abbreviations for the Common Lisp types @code{single-float},
+@code{double-float}, @code{signed-byte}, and @code{unsigned-byte},
+respectively.  For each scalar data type @code{X}, there exists one or
+more SIMD data type @code{X.Y} with @code{Y} elements.  For example, in
+AVX there are two supported SIMD data types with element type
+@code{f64}, namely @code{f64.2} (128 bit) and @code{f64.4} (256 bit).
+
+SIMD packs are regular Common Lisp objects that have a type, a class,
+and can be passed as function arguments.  The price for this is that
+SIMD packs have both a boxed and an unboxed representation.  The unboxed
+representation of a SIMD pack has zero overhead and fits into a CPU
+register, but can only be used within a function and when the compiler
+can statically determine the SIMD pack's type.  Otherwise, the SIMD pack
+is boxed, i.e., spilled to the heap together with its type information.
+In practice, boxing of SIMD packs can usually be avoided via inlining,
+or by loading and storing them to specialized arrays instead of passing
+them around as function arguments.
+
+@subsection Casts
+
+For each scalar data type @code{X}, there is a function named @code{X}
+that is equivalent to @code{(lambda (v) (coerce v 'X))}.  For each SIMD
+data type @code{X.Y}, there is a function named @code{X.Y} that ensures
+that its argument is of type @code{X.Y}, or, if the argument is a number,
+calls the cast function of @code{X} and broadcasts the result.
+
+All functions provided by @code{sb-simd} (apart from the casts
+themselves) implicitly cast each argument to its expected type.  So to
+add the number five to each single float in a SIMD pack @code{x} of type
+@code{f32.8}, it is sufficient to write @code{(f32.8+ x 5)}.  We don't
+mention this implicit conversion explicitly in the following sections,
+so if any function description states that an argument must be of type
+@code{X.Y}, the argument can actually be of any type that is a suitable
+argument of the cast function named @code{X.Y}.
+
+@subsection Constructors
+
+For each SIMD data type @code{X.Y}, there is a constructor named
+@code{make-X.Y} that takes @code{Y} arguments of type @code{X} and
+returns a SIMD pack whose elements are the supplied values.
+
+@subsection Unpackers
+
+For each SIMD data type @code{X.Y}, there is a function named
+@code{X.Y-values} that returns, as @code{Y} multiple values, the
+elements of the supplied SIMD pack of type @code{X.Y}.
+
+@subsection Reinterpret Casts
+
+For each SIMD data type @code{X.Y}, there is a function named
+@code{X.Y!} that takes any SIMD pack or scalar datum and interprets its
+bits as a SIMD pack of type @code{X.Y}.  If the supplied datum has more
+bits than the resulting value, the excess bits are discarded.  If the
+supplied datum has less bits than the resulting value, the missing bits are
+assumed to be zero.
+
+@subsection Associatives
+
+For each associative binary function, e.g., @code{two-arg-X.Y-OP}, there
+is a function @code{X.Y-OP} that takes any number of arguments and
+combines them with this binary function in a tree-like fashion.  If the
+binary function has an identity element, it is possible to call the
+function with zero arguments, in which case the identity element is
+returned.  If there is no identity element, the function must receive at
+least one argument.
+
+Examples of associative functions are @code{f32.8+}, for summing any
+number of 256 bit packs of single floats, and @code{u8.32-max}, for
+computing the element-wise maximum of one or more 256 bit packs of 8 bit
+integers.
+
+@subsection Reducers
+
+For binary functions @code{two-arg-X.Y-OP} that are not associative, but
+that have a neutral element, there are functions @code{X.Y-OP} that take
+any positive number of arguments and return the reduction of all
+arguments with the binary function.  In the special case of a single
+supplied argument, the binary function is invoked on the neutral element
+and that argument.  Reducers have been introduced to generate Lisp-style
+subtraction and division functions.
+
+Examples of reducers are @code{f32.8/}, for successively dividing a pack
+of 32 bit single floats by all further supplied packs of 32 bit single
+floats, or @code{u32.8-} for subtracting any number of supplied packs of
+32 bit unsigned integers from the first supplied one, except in the case
+of a single argument, where @code{u32.8-} simply negates all values in
+the pack.
+
+@subsection Rounding
+
+For each floating-point SIMD data type @code{X.Y} there are several
+functions that round the values of a supplied SIMD pack to nearby
+floating-point values whose fractional digits are all zero.  Those
+functions are @code{X.Y-round}, @code{X.Y-floor}, @code{X.Y-ceiling},
+and @code{X.Y-truncate}, and they have the same semantics as the one
+argument versions of @code{cl:round}, @code{cl:floor},
+@code{cl:ceiling}, and @code{cl:truncate}, respectively.
+
+@subsection Comparisons
+
+For each SIMD data type @code{X.Y}, there exist conversion functions
+@code{X.Y<}, @code{X.Y<=}, @code{X.Y>}, @code{X.Y>=}, and
+@code{X.Y=} that check whether the supplied arguments are strictly
+monotonically increasing, monotonically increasing, strictly monotonically
+decreasing, monotonically decreasing, equal, or nowhere equal,
+respectively.  In contrast to the Common Lisp functions @code{<},
+@code{<=}, @code{>}, @code{>=}, @code{=}, and @code{/=} the SIMD
+comparison functions don't return a generalized boolean, but a SIMD pack of
+unsigned integers with @code{Y} elements.  The bits of each unsigned
+integer are either all one, if the values of the arguments at that position
+satisfy the test, or all zero, if they don't.  We call a SIMD packs of such
+unsigned integers a mask.
+
+@subsection Conditionals
+
+The SIMD paradigm is inherently incompatible with fine-grained control
+flow.  A piece of code containing an @code{if} special form cannot be
+vectorized in a straightforward way, because doing so would require as
+many instruction pointers and processor states as there are values in
+the desired SIMD data type.  Instead, most SIMD instruction sets provide
+an operator for selecting values from one of two supplied SIMD packs
+based on a mask.  The mask is a SIMD pack with as many elements as the
+other two arguments, but whose elements are unsigned integers whose bits
+must be either all zeros or all ones.  This selection mechanism can be
+used to emulate the effect of an @code{if} special form, at the price
+that both operands have to be computed each time.
+
+In @code{sb-simd}, all conditional operations and comparisons emit
+suitable mask fields, and there is a @code{X.Y-if} function for each
+SIMD data type with element type @code{X} and number of elements
+@code{Y} whose first arguments must be a suitable mask, whose second and
+third argument must be objects that can be converted to the SIMD data
+type @code{X.Y}, and that returns a value of type @code{X.Y} where each
+element is from the second operand if the corresponding mask bits are
+set, and from the third operand if the corresponding mask bits are not
+set.
+
+@subsection Loads and Stores
+
+In practice, a SIMD pack @code{X.Y} is usually not constructed by
+calling its constructor, but by loading @code{Y} consecutive elements
+from a specialized array with element type @code{X}.  The functions for
+doing so are called @code{X.Y-aref} and @code{X.Y-row-major-aref}, and
+have similar semantics as Common Lisp's @code{aref} and
+@code{row-major-aref}.  In addition to that, some instruction sets
+provide the functions @code{X.Y-non-temporal-aref} and
+@code{X.Y-non-temporal-row-major-aref}, for accessing a memory location
+without loading the referenced values into the CPU's cache.
+
+For each function @code{X.Y-foo} for loading SIMD packs from an array,
+there also exists a corresponding function @code{(setf X.Y-foo)} for
+storing a SIMD pack in the specified memory location.  An exception to
+this rule is that some instruction sets (e.g., SSE) only provide
+functions for non-temporal stores, but not for the corresponding
+non-temporal loads.
+
+One difficulty when treating the data of a Common Lisp array as a SIMD
+pack is that some hardware instructions require a particular alignment
+of the address being referenced.  Luckily, most architectures provide
+instructions for unaligned loads and stores that are, at least on modern
+CPUs, not slower than their aligned equivalents.  So by default we
+translate all array references as unaligned loads and stores.  An
+exception are the instructions for non-temporal loads and stores, that
+always require a certain alignment.  We do not handle this case
+specially, so without special handling by the user, non-temporal loads
+and stores will only work on certain array indices that depend on the
+actual placement of that array in memory.
+
+@subsection Specialized Scalar Operations
+
+Finally, for each SIMD function @code{X.Y-OP} that applies a certain
+operation @code{OP} element-wise to the @code{Y} elements of type
+@code{X}, there exists also a functions @code{X-OP} for applying that
+operation only to a single element.  For example, the SIMD function
+@code{f64.4+} has a corresponding function @code{f64+} that differs from
+@code{cl:+} in that it only accepts arguments of type double float, and
+that it adds its supplied arguments in a fixed order that is the same as
+the one used by @code{f64.4}.
+
+There are good reasons for exporting scalar functions from a SIMD
+library, too.  The most obvious one is that they obey the same naming
+convention and hence make it easier to locate the correct functions.
+Another benefit is that the semantics of each scalar operation is
+precisely the same as that of the corresponding SIMD function, so they
+can be used to write reference implementations for testing.  A final
+reason is that these scalar functions can be used to simplify the life
+of tools for automatic vectorization.
+
+@subsection Instruction Set Dispatch
+
+One challenge that is unique to image-based programming systems such as
+Lisp is that a program can run on one machine, be dumped as an image,
+and then resumed on another machine.  While nobody expects this feature
+to work across machines with different architectures, it is quite likely
+that the machine where the image is dumped and the one where execution
+is resumed provide different instruction set extensions.
+
+As a practical example, consider a game developer that develops software
+on an x86-64 machine with all SIMD extensions up to AVX2, but then dumps
+it as an image and ships it to a customer whose machine only supports
+SIMD extensions up to SSE2.  Ideally, the image should contain multiple
+optimized versions of all crucial functions, and dynamically select the
+most appropriate version based on the instruction set extensions that
+are actually available.
+
+This kind of run time instruction set dispatch is explicitly supported
+by means of the @code{instruction-set-case} macro.  The code resulting
+from an invocation of this macro compiles to an efficient jump table
+whose index is recomputed on each startup of the Lisp image.

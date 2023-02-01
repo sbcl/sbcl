@@ -360,7 +360,7 @@ not supported."
                  ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
                  ;; Do that now so that the forked process has only the main thread
                  ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
-                 (sb-thread::join-pthread-joinables #'identity)
+                 (sb-thread::%dispose-thread-structs)
                  ;; Threads are added to ALL-THREADS before they have an OS thread,
                  ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
                  ;; So we need to go lower-level to sense whether any exist.
@@ -547,8 +547,8 @@ not supported."
    (passwd :initarg :passwd :accessor group-passwd)
    (gid :initarg :gid :accessor group-gid)))
 
-(defmacro define-obj-call (name arg type conv)
-  #-(or win32 android)
+#-(or win32 android)
+(macrolet ((define-obj-call (name arg type conv)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
     `(progn
@@ -558,7 +558,7 @@ not supported."
         (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
           (if (null-alien r)
               nil
-              (,conv r)))))))
+              (,conv r))))))))
 
 (define-obj-call "getpwnam" login-name (function (* alien-passwd) (c-string :not-null t))
                  alien-to-passwd)
@@ -568,7 +568,7 @@ not supported."
                  alien-to-group)
 (define-obj-call "getgrgid" gid (function (* alien-group) gid-t)
                  alien-to-group)
-
+) ; end MACROLET
 
 #-win32
 (define-protocol-class timeval alien-timeval ()

@@ -95,7 +95,6 @@ int arch_os_thread_init(struct thread *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
   int sel = install_segment((unsigned long) thread, dynamic_values_bytes);
 
-  FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", sel));
   __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
 
   thread->tls_cookie = sel;
@@ -121,8 +120,6 @@ int arch_os_thread_cleanup(struct thread *thread) {
     /* Set the %%fs register back to 0 and free the ldt by setting it
      * to NULL.
      */
-    FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
-
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
 
     ignore_value(mutex_acquire(&modify_ldt_lock));

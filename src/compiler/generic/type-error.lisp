@@ -128,7 +128,7 @@
   (encode-internal-error-args values))
 
 (defun encode-internal-error-args (values)
-  (sb-c::with-adjustable-vector (vector)
+  (with-adjustable-vector (vector)
     (dolist (where values)
       (write-var-integer
        ;; WHERE can be either a TN or a packed SC number + offset

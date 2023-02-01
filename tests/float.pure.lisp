@@ -98,7 +98,7 @@
   (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum)))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on (or :arm64))
+            :fails-on :no-float-traps)
   (flet ((test (form)
            (assert-error (funcall (checked-compile `(lambda () ,form)
                                                    :allow-style-warnings t))
@@ -133,9 +133,10 @@
     (mapc #'test '(sin cos tan))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on (or :arm64
-                        (and :ppc :openbsd)
-                        (and :x86 :netbsd)))
+            :fails-on (or (and :arm64 (not :darwin))
+                          :arm
+                          (and :ppc :openbsd)
+                          (and :x86 :netbsd)))
   (assert-error
    (sb-sys:without-interrupts
      (sb-int:set-floating-point-modes :current-exceptions nil
@@ -153,9 +154,10 @@
 ;; the preceeding "pure" test files aren't as free of side effects as
 ;; we might like.
 (with-test (:name (:addition-overflow :bug-372 :take-2)
-            :fails-on (or :arm64
-                        (and :ppc :openbsd)
-                        (and :x86 :netbsd)))
+            :fails-on (or (and :arm64 (not :darwin))
+                          :arm
+                          (and :ppc :openbsd)
+                          (and :x86 :netbsd)))
   (assert-error
    (sb-sys:without-interrupts
      (sb-int:set-floating-point-modes :current-exceptions nil
@@ -233,6 +235,18 @@
       (test (not (> -1.0 nan)))
       (test (not (> nan 1.0))))))
 
+(with-test (:name (:nan :comparison :non-float)
+            :fails-on (or :sparc))
+  (sb-int:with-float-traps-masked (:invalid)
+    (let ((nan (/ 0.0 0.0))
+          (reals (list 0 1 -1 1/2 -1/2 (expt 2 300) (- (expt 2 300))))
+          (funs '(> < <= >= =)))
+      (loop for fun in funs
+            do
+            (loop for real in reals
+                  do (assert (not (funcall fun nan real)))
+                     (assert (not (funcall fun real nan))))))))
+
 (with-test (:name :log-int/double-accuracy)
   ;; we used to use single precision for intermediate results
   (assert (eql 2567.6046442221327d0
@@ -275,11 +289,11 @@
 
 ;; Leakage from the host could result in wrong values for truncation.
 (with-test (:name :truncate)
-  (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 33))))
-  (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 33))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2f0 33))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2d0 33))))
   ;; That'd be one strange host, but just in case
-  (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 65))))
-  (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 65)))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2f0 65))))
+  (assert (plusp (sb-kernel:%unary-truncate (expt 2d0 65)))))
 
 ;; On x86-64, we sometimes forgot to clear the higher order bits of the
 ;; destination register before using it with an instruction that doesn't
@@ -526,12 +540,12 @@
 
 (with-test (:name :conservative-floor-bounds)
   (assert
-   (equal (sb-kernel:%simple-fun-type
-           (checked-compile
-            `(lambda (x)
-               (declare (unsigned-byte x))
-               (values (truncate 1.0 x)))))
-          '(function (unsigned-byte) (values unsigned-byte &optional)))))
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                          (checked-compile
+                           `(lambda (x)
+                              (declare (unsigned-byte x))
+                              (values (truncate 1.0 x)))))))
+             'unsigned-byte)))
 
 (with-test (:name :single-float-sign-stubs)
   (checked-compile-and-assert
@@ -544,10 +558,13 @@
    ((-96088.234) -1.0)))
 
 (with-test (:name :inline-signum)
-  (assert (ctu:find-named-callees ; should be a full call
-           (compile nil '(lambda (x)
+  (assert (equal '(signum)
+                 (ctu:ir1-named-calls ; should be a full call
+                        '(lambda (x)
                            (signum (truly-the number x))))))
-  ;; should not be a full call
+  ;; FIXME: This test passed by accident on backends that didn't fully inline
+  ;; the call, because PLUSP (from the IR transform) is an asm routine.
+  #+x86-64
   (dolist (type '(integer
                   (or (integer 1 10) (integer 50 90))
                   rational
@@ -555,9 +572,9 @@
                   (or (single-float -10f0 0f0) (single-float 1f0 20f0))
                   double-float
                   (or (double-float -10d0 0d0) (double-float 1d0 20d0))))
-    (assert (null (ctu:find-named-callees
-                   (compile nil `(lambda (x)
-                                   (signum (truly-the ,type x))))))))
+    (assert (null (ctu:ir1-named-calls
+                                `(lambda (x)
+                                   (signum (truly-the ,type x)))))))
   ;; check signed zero
   (let ((f (compile nil '(lambda (x) (signum (the single-float x))))))
     (assert (eql (funcall f -0f0) -0f0))
@@ -582,6 +599,7 @@
     ((1d0 0d0) t)))
 
 (with-test (:name :ftruncate-inline
+            :fails-on :ppc64
             :skipped-on (not :64-bit))
   (checked-compile
    `(lambda (v d)
@@ -734,11 +752,24 @@
   (checked-compile-and-assert
       ()
       `(lambda (x y)
-         (declare ((OR (INTEGER 0 0) (DOUBLE-FLOAT 0.0d0 0.0d0)) x)
-                  ((OR (RATIONAL -10 0) (DOUBLE-FLOAT -10.0d0 -0.0d0)) y))
+         (declare ((or (integer 0 0) (double-float 0.0d0 0.0d0)) x)
+                  ((or (rational -10 0) (double-float -10.0d0 -0.0d0)) y))
          (= x y))
   ((0 0) t)
   ((0 0d0) t)
   ((0 -0d0) t)
   ((0d0 -0d0) t)
   ((0 -1d0) nil)))
+
+(with-test (:name :unary-truncate-float-derive-type)
+  (assert
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                             (checked-compile
+                              `(lambda (f)
+                                 (declare ((double-float 10d0 30d0) f))
+                                 (values (truncate f)))))))
+             '(integer 10 30))))
+
+(with-test (:name :rational-not-bignum)
+  (assert (equal (type-of (eval '(rational -4.3973217e12)))
+                 (type-of -4397321682944))))

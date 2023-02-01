@@ -467,7 +467,7 @@
   (locally (declare (muffle-conditions style-warning))
     (handler-bind (((satisfies some-silly-fun) #'print))
       (let ((test (caaar sb-kernel:*handler-clusters*)))
-        (assert (eq test (sb-int:find-fdefn 'some-silly-fun))))))
+        (assert (eq test 'some-silly-fun)))))
   (handler-bind (((or warning error) #'print))
     (let ((test (caaar sb-kernel:*handler-clusters*)))
       (assert (functionp test))))
@@ -484,7 +484,7 @@
   (handler-bind ((warning 'some-silly-handler))
     (let ((fn (cdaar sb-kernel:*handler-clusters*)))
       ;; the function is stored as an fdefn
-      (assert (typep fn 'sb-kernel::fdefn))))
+      (assert (eq fn 'some-silly-handler))))
 
   (handler-bind ((warning 'muffle-warning))
     (let ((fn (cdaar sb-kernel:*handler-clusters*)))
@@ -497,6 +497,7 @@
 ;; the real handler function.
 (defun this-should-fail ()
   (declare (muffle-conditions style-warning))
+  (declare (optimize safety))
   (handler-bind ((condition #'some-nonexistent-handler))
     (random 100)))
 

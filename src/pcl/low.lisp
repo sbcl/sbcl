@@ -37,10 +37,6 @@
 
 (in-package "SB-PCL")
 
-;;; The PCL package is internal and is used by code in potential
-;;; bottlenecks. And since it's internal, no one should be
-;;; doing things like deleting and recreating it in a running target Lisp.
-(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
 
 (declaim (inline defstruct-classoid-p))
 (defun defstruct-classoid-p (classoid)
@@ -64,11 +60,22 @@
               (defstruct-classoid-p classoid)))))
 
 ;;; Symbol contruction utilities
-(defun format-symbol (package format-string &rest format-arguments)
+(defun pkg-format-symbol (package format-string &rest format-arguments)
   (without-package-locks
    (intern (possibly-base-stringize
             (apply #'format nil format-string format-arguments))
            package)))
+;; Like the preceding, but always use PCL package, and override the package lock
+;; in a more elegant way than using WITHOUT-PACKAGE-LOCKS.
+(defun pcl-format-symbol (format-string &rest format-arguments)
+  (let ((string (possibly-base-stringize
+                 (let ((*package* *keyword-package*))
+                   (apply #'format nil format-string format-arguments)))))
+    ;; Is there any way this can actually NOT be of type base-char?
+    (sb-impl::%intern string (length string) #.(find-package "SB-PCL")
+                      (if (simple-base-string-p string) 'base-char 'character)
+                      t ; ignore lock
+                      nil))) ; no inheritance. Does it matter?
 
 (defun condition-type-p (type)
   (and (symbolp type)
@@ -220,19 +227,10 @@
   ;; (once in the test of PCL-INSTANCE-P and once in GET-SLOTS).
   (cond ((std-instance-p instance) (std-instance-slots instance))
         ((fsc-instance-p instance) (fsc-instance-slots instance))))
-
-(defun pcl-compile (expr &optional unsafe-policy)
-  (let* ((base-policy sb-c::*policy*)
-         (lexenv
-          (sb-c::make-almost-null-lexenv
-           (if unsafe-policy
-               (sb-c::process-optimize-decl
-                '((space 1) (compilation-speed 1)
-                  (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
-                base-policy)
-               base-policy)
-           ;; I suspect that INHIBIT-WARNINGS precludes them from happening
-           (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
-                 (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
-           nil nil nil)))
-    (sb-c:compile-in-lexenv expr lexenv nil nil nil nil nil)))
+
+;;; This is here, moved from src/pcl/boot so that it gets a 1-byte layout ID
+(defstruct (fast-method-call (:copier nil))
+  (function #'identity :type function)
+  pv
+  next-method-call
+  arg-info)

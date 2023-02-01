@@ -53,18 +53,14 @@
     (labels ((retry-value (value)
                (or (typecase value
                      (fdefn (fdefn-fun value))
-                     (symbol
-                      (let ((fdefn (symbol-fdefn value)))
-                        (and fdefn
-                             (fdefn-fun fdefn))))
+                     (symbol (sb-impl::%symbol-function value))
                      (function value)
-                     (t
-                      (if (valid-function-name-p value)
-                          (let ((fdefn (find-fdefn value)))
-                            (and fdefn
-                                 (fdefn-fun fdefn)))
+                     ((satisfies legal-fun-name-p)
+                      (let ((fdefn (find-fdefn value)))
+                        (and fdefn (fdefn-fun fdefn))))
+                      (t
                           (still-bad "Bad value when restarting ~s: ~s"
-                                     name value))))
+                                     name value)))
                    (still-bad (if (fdefn-p value)
                                   "~S is still undefined"
                                   "Can't replace ~s with ~s because it is undefined")
@@ -513,7 +509,7 @@
              (if (and (>= error-number (length **internal-error-handlers**))
                       (< error-number (length sb-c:+backend-internal-errors+)))
                  (let ((context (sb-di:error-context)))
-                   (if (typep context '(cons (eql :struct-read)))
+                   (if (typep context '(cons (eql struct-read-context)))
                        ;; This was shoehorned into being a "type error"
                        ;; which isn't the best way to explain it to the user.
                        ;; However, from an API stance, it makes some sense to signal

@@ -19,10 +19,11 @@
   ;; that needs to know what the unknown type is, and tries to re-parse.
   ;; Also, there are some unknowns in there already. How on earth did that happen???
   (do-all-symbols (s)
-    (let ((info (sb-int:info :function :type s)))
-      (when (consp info)
-        (let ((parsed (specifier-type info)))
-          (setf (sb-int:info :function :type s) parsed)))))
+    (unless (macro-function s)
+      (let ((info (sb-int:info :function :type s)))
+        (when (consp info)
+          (let ((parsed (specifier-type info)))
+            (setf (sb-int:info :function :type s) parsed))))))
   ;; One good kludge deserves another.
   ;; This is OK only because it's the very first file compiled in warm build.
   (let ((disallowed-undefineds

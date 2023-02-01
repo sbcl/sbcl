@@ -19,7 +19,7 @@
     ;; Note:
     ;; This is not FLUSHABLE because it's defined to signal errors.
     (movable)
-  ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
+  ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 1 ? Nope... (COERCE 1 'COMPLEX)
   ;; returns REAL/INTEGER, not COMPLEX.
   )
 ;; These each check their input sequence for type-correctness,
@@ -103,6 +103,7 @@
 #+64-bit (defknown layout-depthoid (sb-vm:layout) layout-depthoid (flushable always-translatable))
 #+(or x86 x86-64) (defknown (layout-depthoid-ge) (sb-vm:layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
+(defknown structure-typep (t t) boolean (foldable flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
   :derive-type #'result-type-first-arg)
@@ -111,8 +112,8 @@
 
 ;;; This is not FLUSHABLE, since it's required to signal an error if
 ;;; unbound.
-(defknown (symbol-value symeval) (symbol) t ()
-  :derive-type #'symeval-derive-type)
+(defknown symbol-value (symbol) t ()
+  :derive-type #'symbol-value-derive-type)
 (defknown about-to-modify-symbol-value (symbol t &optional t t) null
   ())
 ;;; From CLHS, "If the symbol is globally defined as a macro or a
@@ -121,7 +122,7 @@
 ;;; either a macro or a special operator, and if the symbol is fbound,
 ;;; a function object is returned".  Our objects of
 ;;; implementation-dependent nature happen to be functions.
-(defknown (symbol-function) (symbol) function ())
+(defknown (symbol-function) (symbol) function (unsafely-flushable))
 
 (defknown boundp (symbol) boolean (flushable))
 (defknown fboundp ((or symbol cons)) (or null function) (unsafely-flushable))
@@ -131,8 +132,8 @@
 (defknown set (symbol t) t ()
   :derive-type #'result-type-last-arg)
 (defknown fdefinition ((or symbol cons)) function ())
-(defknown %set-fdefinition ((or symbol cons) function) function ()
-  :derive-type #'result-type-last-arg)
+(defknown ((setf fdefinition)) (function (or symbol cons)) function ()
+  :derive-type #'result-type-first-arg)
 (defknown makunbound (symbol) symbol ()
   :derive-type #'result-type-first-arg)
 (defknown fmakunbound ((or symbol cons)) (or symbol cons)
@@ -192,6 +193,7 @@
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or package null) (flushable))
+(defknown %symbol-package (t) (or package null) (flushable)) ;; doesn't check the type.
 (defknown keywordp (t) boolean (flushable)) ; semi-foldable, see src/compiler/typetran
 
 ;;;; from the "Packages" chapter:
@@ -272,9 +274,13 @@
   (integer integer) rational
   (no-verify-arg-count unsafely-flushable))
 
-(defknown (two-arg-< two-arg-= two-arg->)
+(defknown (two-arg-< two-arg-= two-arg-> two-arg-<= two-arg->=)
     (number number) boolean
     (no-verify-arg-count))
+
+(defknown (range< range<= range<<= range<=<)
+    (fixnum real fixnum) boolean
+    (foldable flushable movable no-verify-arg-count))
 
 (defknown (two-arg-gcd two-arg-lcm two-arg-and two-arg-ior two-arg-xor two-arg-eqv)
   (integer integer) integer
@@ -333,7 +339,10 @@
 (defknown (rationalize) (real) rational
   (movable foldable flushable recursive))
 
-(defknown (numerator denominator) (rational) integer
+(defknown numerator (rational) integer
+  (movable foldable flushable))
+
+(defknown denominator (rational) (integer 1)
   (movable foldable flushable))
 
 (defknown (floor ceiling round)
@@ -343,6 +352,40 @@
 (defknown truncate
   (real &optional real) (values integer real)
   (movable foldable flushable recursive))
+
+(defknown unary-truncate (real) (values integer real)
+  (movable foldable flushable no-verify-arg-count))
+
+;;; KLUDGE: Don't fold these, the compiler may call it on floats that
+;;; do not truncate into a bignum, and the functions do not check
+;;; their input values and produce corrupted memory.
+(defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
+    (#+(or) foldable movable flushable fixed-args))
+(defknown unary-truncate-double-float-to-bignum (double-float)
+    (values #+64-bit bignum #-64-bit integer
+            (and
+             #+(and 64-bit
+                    (not (or riscv ppc64))) ;; they can't survive cold-init
+             (eql $0d0)
+             double-float))
+   (#+(or) foldable movable flushable fixed-args))
+
+(defknown %unary-truncate-single-float-to-bignum (single-float) bignum
+   (#+(or) foldable movable flushable fixed-args))
+(defknown %unary-truncate-double-float-to-bignum (double-float) bignum
+   (#+(or) foldable movable flushable fixed-args))
+
+(defknown (subtract-bignum add-bignums) (bignum bignum) integer
+    (movable flushable no-verify-arg-count))
+(defknown (add-bignum-fixnum subtract-bignum-fixnum) (bignum fixnum) integer
+    (movable flushable no-verify-arg-count))
+(defknown subtract-fixnum-bignum (fixnum bignum) integer
+    (movable flushable no-verify-arg-count))
+
+(defknown sxhash-bignum-double-float (double-float) hash-code
+  (foldable movable flushable fixed-args))
+(defknown sxhash-bignum-single-float (single-float) hash-code
+  (foldable movable flushable fixed-args))
 
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
@@ -517,15 +560,15 @@
   (flushable))
 
 (defknown copy-seq (proper-sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown length (proper-sequence) index (foldable flushable dx-safe))
 
 (defknown reverse (proper-sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t))
 
 (defknown make-sequence (type-specifier index
@@ -533,10 +576,10 @@
                                         (:initial-element t))
   consed-sequence
   (movable)
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest proper-sequence) consed-sequence ()
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown %concatenate-to-string (&rest sequence) simple-string
   (flushable no-verify-arg-count))
@@ -570,7 +613,8 @@
                     &rest proper-sequence)
   sequence
   (call)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t))
 
 (defknown #.(loop for info across sb-vm:*specialized-array-element-type-properties*
                   collect
@@ -601,7 +645,8 @@
 (defknown fill ((modifying sequence) t &rest t &key
                 (:start index) (:end sequence-end)) sequence
     ()
-  :derive-type #'result-type-first-arg
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t)
   :result-arg 0)
 ;;; Like FILL but with no keyword argument parsing
 (defknown quickfill ((modifying (simple-array * 1)) t) (simple-array * 1) ()
@@ -620,7 +665,8 @@
 (defknown replace ((modifying sequence) proper-sequence &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
-  :derive-type #'result-type-first-arg
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t)
   :result-arg 0)
 
 (defknown remove
@@ -633,7 +679,7 @@
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown substitute
   (t t proper-sequence &rest t &key (:from-end t)
@@ -645,7 +691,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown (remove-if remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) proper-sequence
@@ -656,7 +702,7 @@
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown (substitute-if substitute-if-not)
   (t (function-designator ((nth-arg 2 :sequence t :key :key))) proper-sequence
@@ -667,7 +713,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown delete
   (t (modifying sequence) &rest t &key (:from-end t)
@@ -678,7 +724,7 @@
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown nsubstitute
   (t t (modifying sequence) &rest t &key (:from-end t)
@@ -689,7 +735,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
   (call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown (delete-if delete-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) (modifying sequence)
@@ -698,7 +744,7 @@
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
   (t (function-designator ((nth-arg 2 :sequence t :key :key))) (modifying sequence)
@@ -707,7 +753,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
   (call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown remove-duplicates
   (proper-sequence &rest t &key
@@ -721,7 +767,7 @@
             (:key (function-designator ((nth-arg 0 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 0))
 
 (defknown delete-duplicates
   ((modifying sequence)
@@ -735,7 +781,7 @@
    (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 0))
 
 (defknown find
   (t proper-sequence &rest t &key
@@ -833,7 +879,8 @@
    &key (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
   (call)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t))
 (defknown sb-impl::stable-sort-list (list function function) list
   (call important-result no-verify-arg-count))
 (defknown sb-impl::sort-vector (vector index index function (or function null))
@@ -857,7 +904,7 @@
                                                      (nth-arg 2 :sequence t))))))
   sequence
   (call important-result)
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown read-sequence ((modifying sequence) stream
                          &key
@@ -882,7 +929,7 @@
 
 ;; Correct argument type restrictions for these functions are
 ;; complicated, so we just declare them to accept LISTs and suppress
-;; flushing is safe code.
+;; flushing in safe code.
 (defknown (caar cadr cdar cddr
                 caaar caadr cadar caddr cdaar cdadr cddar cdddr
                 caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
@@ -1260,7 +1307,8 @@
   (string-designator &key
    (:start (inhibit-flushing index 0))
    (:end (inhibit-flushing sequence-end nil)))
-  simple-string (flushable))
+  simple-string (flushable)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   ((modifying string) &key (:start index) (:end sequence-end))
@@ -1335,7 +1383,7 @@
   (movable foldable flushable))
 (defknown open-stream-p (stream) boolean (flushable))
 (defknown close (stream &key (:abort t)) (eql t) ())
-(defknown file-string-length (ansi-stream (or string character))
+(defknown file-string-length (stream (or string character))
   (or unsigned-byte null)
   (flushable))
 
@@ -1715,17 +1763,6 @@
    (:entry-points list)
    (:emit-cfasl t))
   (values (or pathname null) boolean boolean))
-(defknown sb-c::compile-files
-    (cons &key (:output-file pathname-designator)
-               (:verbose t)
-               (:print t)
-               (:external-format external-format-designator)
-               (:progress t)
-               (:trace-file t)
-               (:block-compile t)
-               (:entry-points list)
-               (:emit-cfasl t))
-  (values (or pathname null) boolean boolean))
 
 (defknown (compile-file-pathname)
   (pathname-designator &key (:output-file (or pathname-designator
@@ -1802,8 +1839,8 @@
 
 ;;;; miscellaneous extensions
 
-(defknown (symbol-global-value sym-global-val) (symbol) t ()
-  :derive-type #'symeval-derive-type)
+(defknown symbol-global-value (symbol) t ()
+  :derive-type #'symbol-value-derive-type)
 (defknown set-symbol-global-value (symbol t) t ()
   :derive-type #'result-type-last-arg)
 
@@ -1899,13 +1936,13 @@
   (always-translatable))
 ;;; The lowest-level vector SET operators should not return a value.
 ;;; Functions built upon them may return the input value.
-(defknown data-vector-set (array index t) (values) (always-translatable))
+(defknown data-vector-set (array index t) (values) (dx-safe always-translatable))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
-  (always-translatable))
-(defknown hairy-data-vector-ref (array index) t (foldable))
-(defknown hairy-data-vector-set (array index t) t ())
-(defknown hairy-data-vector-ref/check-bounds (array index) t (foldable))
-(defknown hairy-data-vector-set/check-bounds (array index t) t ())
+  (dx-safe always-translatable))
+(defknown hairy-data-vector-ref (array index) t (foldable flushable no-verify-arg-count))
+(defknown hairy-data-vector-set (array index t) t (no-verify-arg-count))
+(defknown hairy-data-vector-ref/check-bounds (array index) t (foldable no-verify-arg-count))
+(defknown hairy-data-vector-set/check-bounds (array index t) t (no-verify-arg-count))
 (defknown %caller-frame () t (flushable))
 (defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
@@ -2033,10 +2070,11 @@
 (defknown %alien-funcall ((or string system-area-pointer) alien-type &rest t) *)
 
 ;; Used by WITH-PINNED-OBJECTS
-#+(or x86 x86-64)
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
+(defknown sb-vm::touch-object-identity (t) t
+  (always-translatable))
 (defknown foreign-symbol-dataref-sap (simple-string)
   system-area-pointer
   (movable flushable))
@@ -2154,7 +2192,7 @@
   (movable foldable flushable))
 
 ;; FIXME: should T be be (OR INSTANCE FUNCALLABLE-INSTANCE) etc?
-(defknown slot-value (t symbol) t (any))
+(defknown (slot-value slot-makunbound) (t symbol) t (any))
 (defknown (slot-boundp slot-exists-p) (t symbol) boolean)
 (defknown sb-pcl::set-slot-value (t symbol t) t (any))
 

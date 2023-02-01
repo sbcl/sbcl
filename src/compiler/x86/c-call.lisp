@@ -379,17 +379,6 @@
               delta)))
     (load-symbol-value result *alien-stack-pointer*)))
 
-;;; not strictly part of the c-call convention, but needed for the
-;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so
-;;; that GC won't move them while foreign functions go to work.
-(define-vop (touch-object)
-  (:translate touch-object)
-  (:args (object))
-  (:ignore object)
-  (:policy :fast-safe)
-  (:arg-types t)
-  (:generator 0))
-
 #-sb-xc-host
 (defun alien-callback-accessor-form (type sp offset)
   `(deref (sap-alien (sap+ ,sp ,offset) (* ,type))))

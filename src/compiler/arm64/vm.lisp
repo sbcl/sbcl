@@ -18,20 +18,19 @@
 
 ;;;; register specs
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *register-names* (make-array 32 :initial-element nil)))
+(defvar *register-names* (make-array 32 :initial-element nil))
 
 (macrolet ((defreg (name offset)
              (let ((offset-sym (symbolicate name "-OFFSET")))
-               `(eval-when (:compile-toplevel :load-toplevel :execute)
-                  (defconstant ,offset-sym ,offset)
+               `(progn
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    (defconstant ,offset-sym ,offset))
                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
 
            (defregset (name &rest regs)
-             `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (defparameter ,name
+             `(defglobal ,name
                   (list ,@(mapcar #'(lambda (name)
-                                      (symbolicate name "-OFFSET")) regs))))))
+                                      (symbolicate name "-OFFSET")) regs)))))
 
   (defreg nl0 0)
   (defreg nl1 1)
@@ -93,7 +92,10 @@
   (defconstant register-arg-count 4)
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2 r3)
-  (defparameter *register-arg-names* '(r0 r1 r2 r3)))
+  (defparameter *register-arg-names* '(r0 r1 r2 r3))
+  (defregset *descriptor-args* r0 r1 r2 r3 r4 r5 r6 r7 r8 r9)
+  (defregset *non-descriptor-args* nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9)
+  (defglobal *float-regs* (loop for i below 32 collect i)))
 
 
 ;;;; SB and SC definition:
@@ -113,7 +115,6 @@
 
   ;; Anything else that can be an immediate.
   (immediate immediate-constant)
-
 
   ;; **** The stacks.
 
@@ -188,17 +189,17 @@
 
   ;; **** Things that can go in the floating point registers.
 
-  ;; Non-Descriptor single-floats.
+  (single-immediate immediate-constant)
+  (double-immediate immediate-constant)
+
   (single-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs ()
+              :constant-scs (single-immediate)
               :save-p t
               :alternate-scs (single-stack))
-
-  ;; Non-Descriptor double-floats.
   (double-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs ()
+              :constant-scs (double-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
@@ -255,9 +256,13 @@
      (if (static-symbol-p value)
          immediate-sc-number
          nil))
-    ((eql $0.0)
-     ;; Can be encoded in a single instruction
-     immediate-sc-number)))
+    (double-float
+     double-immediate-sc-number)
+    (single-float
+     single-immediate-sc-number)
+    (structure-object
+     (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
@@ -358,6 +363,11 @@
              (values :transform '(lambda (newbyte size posn integer)
                                   (%%dpb newbyte size posn integer)))
              (values :default nil))))
+      (signum
+       (if (or (valid-funtype '(signed-word) '*)
+               (valid-funtype '(word) '*))
+           (values :direct nil)
+           (values :default nil)))
       (t (values :default nil)))))
 
 (defun primitive-type-indirect-cell-type (ptype)

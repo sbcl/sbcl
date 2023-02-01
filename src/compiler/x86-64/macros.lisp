@@ -66,7 +66,8 @@
                 (not (typep value '(signed-byte 32))))
            (cond (temp
                   (inst mov temp value)
-                  (inst mov ea temp))
+                  (inst mov ea temp)
+                  temp)
                  (t
                   (bug "need temp reg for STOREW of oversized immediate operand"))))
           (t
@@ -291,7 +292,7 @@
                (%instance-cas
                 ;; store barrier affects only the object's base address
                 '((emit-gc-store-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
-               (%raw-instance-cas/word))
+               ((%raw-instance-cas/word %raw-instance-cas/signed-word)))
            (move rax old-value)
            (inst cmpxchg :lock ea new-value)
            (move value rax))))))
@@ -358,7 +359,7 @@
            (when (memq name '(data-vector-ref-with-offset/simple-vector
                               data-vector-ref-with-offset/simple-vector-c))
              `((when (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-trapping 0))
-                 (inst cmp :byte ea no-tls-value-marker-widetag)
+                 (inst cmp :byte ea unwritten-vector-element-marker)
                  (inst jmp :e (generate-error-code
                                vop 'uninitialized-element-error object
                                ,index-to-encode)))))))

@@ -90,7 +90,7 @@
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
 ;;; The structure constructor is never called
-(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
+(sb-xc:defstruct (packed-info (:copier %copy-packed-info) (:predicate nil) (:constructor nil))
   cells)
 (declaim (freeze-type packed-info))
 #-sb-xc-host
@@ -99,7 +99,11 @@
     (setf (dd-flags dd) (logior (dd-flags dd) +dd-varylen+))))
 (eval-when (#-sb-xc-host :compile-toplevel)
   (sb-xc:defmacro make-packed-info (n)
-    `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
+    `(locally (declare (sb-c::tlab :system)) ; will be ignored if #-system-tlabs
+       (%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
+  (sb-xc:defmacro copy-packed-info (x)
+    `(locally (declare (sb-c::tlab :system))
+       (%copy-packed-info ,x))))
 
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
@@ -118,28 +122,21 @@
       (setf (%info-ref v 0) 0)
       v))
 
-;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
-;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
-;;; is kept as a property on the host symbol.
-;;; The compatible "primitive" accessor must be a SETFable place.
-#+sb-xc-host
-(progn
-  (declaim (inline symbol-%info))
-  (defun symbol-%info (symbol)
-    (get symbol :sb-xc-globaldb-info))
-  (defun symbol-dbinfo (symbol) (symbol-%info symbol))
-  ;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
-  (defun update-symbol-info (symbol update-fn)
-    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-    ;; a vector describing 0 infos and 0 auxiliary keys.
-    (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
-      (when newval
-        (setf (get symbol :sb-xc-globaldb-info) newval))
-      (values))))
+#+sb-xc-host ; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+(defun update-symbol-info (symbol update-fn)
+  ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+  ;; a vector describing 0 infos and 0 auxiliary keys.
+  (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
+    (when newval
+      (setf (get symbol :sb-xc-globaldb-info) newval))
+    (values)))
 
-;; FDEFINITIONs have an info-number that admits slightly clever logic
-;; for PACKED-INFO-FDEFN. Do not change this constant without
-;; careful examination of that function.
+;;; :DEFINITION has an info-number that admits slightly clever logic.
+;;; * SB-INTERPRETER:SPECIAL-FORM-HANDLER only needs to decode the first
+;;;   info-number in a packed-info to test if :DEFINITION is present.
+;;; * FIND-FDEFN only needs to extract one info-number after finding
+;;;   the proper auxiliary key {SETF, CAS, etc} in the data portion.
+;;; Do not change this without careful examination of those functions.
 (defconstant +fdefn-info-num+ info-num-mask)
 
 ;; Extract a field from a packed info descriptor.
@@ -254,7 +251,7 @@
 ;; Iterate over PACKED-INFO, binding DATA-INDEX to the index of each aux-key in turn.
 ;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
 ;;
-(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (sb-xc:gensym)))
+(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (gensym)))
                                   step-form &optional result-form)
   (with-unique-names (descriptor-idx field-idx info)
      `(let* ((,info ,packed-info)
@@ -284,7 +281,7 @@
 ;; Equivalently, it's the number of packed fields times 2 minus 1.
 ;;
 (defun compute-unpackified-info-size (packed-info)
-  (declare (packed-info packed-info))
+  (declare (type packed-info packed-info))
   (do-packed-info-aux-key (packed-info) ()
     ;; off-by-one: the first info group's auxiliary key is imaginary
     (1- (truly-the fixnum (ash total-n-fields 1)))))
@@ -383,7 +380,7 @@
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
-(defun %packed-info-insert (input aux-key info-number value)
+(defun packed-info-insert (input aux-key info-number value)
   (declare (type packed-info input) (type info-number info-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
@@ -400,8 +397,7 @@
     (flet ((insert-at (point v0 v1)
              (unless (eql point old-size) ; slide right
                (replace new new :start1 (+ point n-extra-elts) :start2 point))
-             (setf (svref new point) v0
-                   (svref new (+ point 1)) v1)))
+             (setf (svref new point) v0 (svref new (1+ point)) v1)))
       (cond ((= n-extra-elts 4)
              ;; creating a new aux key. SETF immediately follows the data
              ;; for the primary Name. All other aux-keys go to the end.
@@ -410,83 +406,31 @@
                (setf (svref new (+ point 2)) info-number
                      (svref new (+ point 3)) value)))
             (t
-             (let ((data-start (info-find-aux-key/unpacked
-                                aux-key new old-size)))
-               ;; it had better be found - it was in the packed vector
-               (aver data-start)
-               ;; fdefn must be the first piece of info for any name.
-               ;; This facilitates implementing SYMBOL-FUNCTION without
-               ;; without completely decoding the vector.
-               (insert-at (+ data-start (if (eql info-number +fdefn-info-num+)
-                                            1 (svref new data-start)))
-                          info-number value)
+             (let* ((data-start (info-find-aux-key/unpacked aux-key new old-size))
+                    (data-length (svref new data-start))
+                    ;; Scan for the insertion point that preserves ascending order
+                    ;; by info number, except that fdefn-info-num is always first.
+                    (insertion-point
+                     (cond ((eql info-number +fdefn-info-num+) (1+ data-start))
+                           ((and (eq aux-key +no-auxiliary-key+)
+                                 (loop for index from (1+ data-start) by 2
+                                       repeat (ash data-length -1)
+                                       when (and (/= (aref new index) +fdefn-info-num+)
+                                                 (< info-number (aref new index)))
+                                       return index)))
+                           (t (+ data-start data-length)))))
+               (insert-at insertion-point info-number value)
                ;; add 2 cells, and verify that re-packing won't
                ;; overflow the 'count' for this info group.
                (aver (typep (ash (incf (svref new data-start) 2) -1)
                             'info-number))))))
     (packify-infos new)))
 
-;; Return T if INFO-VECTOR admits quicker insertion logic - it must have
-;; exactly one descriptor for the root name, space for >= 1 more field,
-;; and no aux-keys.
-(declaim (inline info-quickly-insertable-p))
-(defun info-quickly-insertable-p (packed-info)
-  (let ((n-infos (packed-info-field packed-info 0 0)))
-    ;; We can easily determine if the no-aux-keys constraint is satisfied,
-    ;; because a secondary name's info occupies at least two cells,
-    ;; one for its aux-key and >= 1 for info values.
-    (and (< n-infos (1- +infos-per-word+))
-         (eql n-infos (1- (packed-info-len packed-info))))))
-
-;; Take a packed-info INPUT and return a new one with INFO-NUMBER/VALUE
-;; added for the root name. The vector must satisfy INFO-QUICKLY-INSERTABLE-P.
-;; This code is separate from PACKED-INFO-INSERT to facilitate writing
-;; a unit test of this logic against the complete logic.
-;;
-(defun quick-packed-info-insert (input info-number value)
-  ;; Because INPUT contains 1 descriptor and its corresponding values,
-  ;; the current length is exactly NEW-N, the new number of fields.
-  (let* ((descriptor (%info-ref input 0))
-         (new-n (truly-the info-number (packed-info-len input)))
-         (output (make-packed-info (1+ new-n))))
-    ;; Two cases: we're either inserting info for the fdefn, or not.
-    (cond ((eq info-number +fdefn-info-num+)
-           ;; fdefn, if present, must remain the first packed field.
-           ;; Replace the lowest field (the count) with +fdefn-info-num+,
-           ;; shift everything left 6 bits, then OR in the new count.
-           (setf (%info-ref output 0)
-                 (logior (make-info-descriptor
-                          (dpb +fdefn-info-num+ (byte info-number-bits 0)
-                               descriptor) info-number-bits) new-n)
-                 ;; Packed vectors are indexed "backwards". The first
-                 ;; field's info is in the highest numbered cell.
-                 (%info-ref output new-n) value)
-           (loop for i from 1 below new-n
-                 do (setf (%info-ref output i) (%info-ref input i))))
-          (t
-           ;; Add a field on the high end and increment the count.
-           (setf (%info-ref output 0)
-                 (logior (make-info-descriptor
-                          info-number (* info-number-bits new-n))
-                         (1+ descriptor))
-                 (%info-ref output 1) value)
-           ;; Slide the old data up 1 cell.
-           (loop for i from 2 to new-n
-                 do (setf (%info-ref output i) (%info-ref input (1- i))))))
-    output))
-
-(declaim (maybe-inline packed-info-insert))
-(defun packed-info-insert (packed-info aux-key info-number newval)
-  (if (and (eql aux-key +no-auxiliary-key+)
-           (info-quickly-insertable-p packed-info))
-      (quick-packed-info-insert packed-info info-number newval)
-      (%packed-info-insert packed-info aux-key info-number newval)))
-
 ;; Search packed VECTOR for AUX-KEY and INFO-NUMBER, returning
 ;; the index of the data if found, or NIL if not found.
 ;;
 (defun packed-info-value-index (packed-info aux-key type-num)
-  ;;(declare (optimize (safetya 0))) ; bounds are AVERed
+  (declare (optimize (safety 0))) ; bounds are AVERed
   (let ((data-idx (packed-info-len packed-info)) (descriptor-idx 0) (field-idx 0))
     (declare (type index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))
@@ -580,11 +524,12 @@
 (defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
 (defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
 (defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
+(defconstant-eqx !+pcl-makunbound-name+ (make-symbol "MAKUNBOUND") (constantly t))
 
 ;; PCL names are physically 4-lists (see "pcl/slot-name")
 ;; that get treated as 2-component names for globaldb's purposes.
 ;; Return the kind of PCL slot accessor name that NAME is, if it is one.
-;; i.e. it matches (SLOT-ACCESSOR :GLOBAL <sym> READER|WRITER|BOUNDP)
+;; i.e. it matches (SLOT-ACCESSOR :GLOBAL <sym> READER|WRITER|BOUNDP|MAKUNBOUND)
 ;; When called, NAME is already known to start with 'SLOT-ACCESSOR.
 ;; This has to be defined before building PCL.
 (defun pcl-global-accessor-name-p (name)
@@ -596,12 +541,14 @@
              (listp (setq last (cdr tail)))
              (not (cdr last))
              ;; Return symbols that can't conflict, in case somebody
-             ;; legitimates (BOUNDP <f>) via DEFINE-FUNCTION-NAME-SYNTAX.
-             ;; Especially important since BOUNDP is an external of CL.
+             ;; legitimates (BOUNDP <f>) via
+             ;; DEFINE-FUNCTION-NAME-SYNTAX.  Especially important
+             ;; since BOUNDP and MAKUNBOUND are externals of CL.
              (setq kind (case (car last)
                           (sb-pcl::reader !+pcl-reader-name+)
                           (sb-pcl::writer !+pcl-writer-name+)
-                          (sb-pcl::boundp !+pcl-boundp-name+))))
+                          (sb-pcl::boundp !+pcl-boundp-name+)
+                          (sb-pcl::makunbound !+pcl-makunbound-name+))))
         ;; The first return value is what matters to WITH-GLOBALDB-NAME
         ;; for deciding whether the name is "simple".
         ;; Return the KIND first, just in case somehow we end up with
@@ -618,6 +565,7 @@
   (cond ((eq aux-symbol !+pcl-reader-name+) (sb-pcl::slot-reader-name stem))
         ((eq aux-symbol !+pcl-writer-name+) (sb-pcl::slot-writer-name stem))
         ((eq aux-symbol !+pcl-boundp-name+) (sb-pcl::slot-boundp-name stem))
+        ((eq aux-symbol !+pcl-makunbound-name+) (sb-pcl::slot-makunbound-name stem))
         (t (list aux-symbol stem)))) ; something like (SETF frob)
 
 ;; Call FUNCTION with each piece of info in packed VECT using ROOT-SYMBOL
@@ -692,7 +640,7 @@ This is interpreted as
 ;; Given a NAME naming a globaldb object, decide whether the NAME has
 ;; an efficient or "simple" form, versus a general or "hairy" form.
 ;; The efficient form is either a symbol, a (CONS SYMBOL (CONS SYMBOL NULL)),
-;; or a PCL global slot {reader, writer, boundp} function name.
+;; or a PCL global slot {reader, writer, boundp, makunbound} function name.
 ;;
 ;; If NAME is "simple", bind KEY2 and KEY1 to the elements
 ;; in that order, and execute the SIMPLE code, otherwise execute the HAIRY code.
@@ -891,3 +839,8 @@ This is interpreted as
                         old-info)))
           (info-puthash *info-environment* name #'hairy-name))))
     result))
+
+;;; Disassembling these proves that SYS-ALLOC-TRAMP gets called
+(export '(test-make-packed-info test-copy-packed-info))
+(defun test-make-packed-info (x) (make-packed-info (the (mod 100) x)))
+(defun test-copy-packed-info (x) (copy-packed-info x))

@@ -40,6 +40,9 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 
 #include "align.h"
 
+// Distinguish penultimate GC (iteration 1) from ultimate GC (iteration 2) in save-lisp
+extern int save_lisp_gc_iteration;
+
 // Offset from an fdefn raw address to the underlying simple-fun,
 // if and only if it points to a simple-fun.
 // For those of us who are too memory-impaired to know how to use the value:
@@ -105,8 +108,27 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
   v->header ^= WEAK_VECTOR_VISITED_BIT
 
 extern sword_t (*sizetab[256])(lispobj *where);
-#define OBJECT_SIZE(header,where) \
-  (is_header(header)?sizetab[header_widetag(header)](where):CONS_SIZE)
+typedef sword_t (*sizerfn)(lispobj*);
+static inline sword_t object_size(lispobj* where) {
+    sizerfn f = sizetab[widetag_of(where)];
+    return f ? f(where) : CONS_SIZE;
+}
+// These three variants are potentially more efficient -
+//  (1) if the widetag was loaded, avoids one memory read
+//  (2) if you know the object isn't a cons, use headerobj_size
+//  (3) both of the above pertain.
+// Cases 1 and 3 exist only because C doesn't have optional args.
+// These might be premature optimizations, I really don't know.
+static inline sword_t object_size2(lispobj* where, unsigned int header) {
+    sizerfn f = sizetab[header & WIDETAG_MASK];
+    return f ? f(where) : CONS_SIZE;
+}
+static inline sword_t headerobj_size(lispobj* where) {
+    return sizetab[widetag_of(where)](where);
+}
+static inline sword_t headerobj_size2(lispobj* where, unsigned int header) {
+    return sizetab[header & WIDETAG_MASK](where);
+}
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
@@ -139,7 +161,7 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
 
 extern int simple_fun_index(struct code*, struct simple_fun*);
 
-extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
-extern void gc_close_thread_regions(struct thread*);
-extern void gc_close_collector_regions();
+extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);
+extern void gc_close_thread_regions(struct thread*, int);
+extern void gc_close_collector_regions(int);
 #endif /* _GC_INTERNAL_H_ */

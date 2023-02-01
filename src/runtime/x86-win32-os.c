@@ -70,23 +70,12 @@ int arch_os_thread_init(struct thread *thread)
          */
         thread->control_stack_start = cur_stack_start;
         thread->control_stack_end = top_exception_frame;
-
-#ifndef LISP_FEATURE_SB_THREAD
-        /*
-         * Theoretically, threaded SBCL binds directly against
-         * the thread structure for these values. We don't do
-         * threads yet, but we'll probably do the same. We do
-         * need to reset these, though, because they were
-         * initialized based on the wrong stack space.
-         */
-        SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
-        SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
-#endif
     }
 
-#ifdef LISP_FEATURE_SB_THREAD
     TlsSetValue(OUR_TLS_INDEX,thread);
-#endif
+
+    win32_set_stack_guarantee();
+
     return 1;
 }
 
@@ -98,12 +87,10 @@ int arch_os_thread_cleanup(struct thread *thread) {
     return 0;
 }
 
-#if defined(LISP_FEATURE_SB_THREAD)
 sigset_t *os_context_sigmask_addr(os_context_t *context)
 {
   return &context->sigmask;
 }
-#endif
 
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
@@ -156,4 +143,28 @@ os_context_float_register_addr(os_context_t *context, int offset)
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
+}
+
+/*
+ * The stubs below are replacements for the windows versions,
+ * which can -fail- when used in our memory spaces because they
+ * validate the memory spaces they are passed in a way that
+ * denies our exception handler a chance to run.
+ */
+
+void *memmove(void *dest, const void *src, size_t n)
+{
+    if (dest < src) {
+        size_t i;
+        for (i = 0; i < n; i++) *(((char *)dest)+i) = *(((char *)src)+i);
+    } else {
+        while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
+    }
+    return dest;
+}
+
+void *memcpy(void *dest, const void *src, size_t n)
+{
+    while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
+    return dest;
 }

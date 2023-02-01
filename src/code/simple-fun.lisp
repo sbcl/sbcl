@@ -51,13 +51,15 @@
 (macrolet ((new-closure (nvalues)
              ;; argument is the number of INFO words
              #-(or x86 x86-64 arm64)
-             `(sb-vm::%alloc-closure ,nvalues (%closure-fun closure))
+             `(sb-c::maybe-with-system-tlab (closure)
+               (sb-vm::%alloc-closure ,nvalues (%closure-fun closure)))
              #+(or x86 x86-64 arm64)
              `(with-pinned-objects ((%closure-fun closure))
                 ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                 ;; valid across GC due to %CLOSURE-FUN being pinned
                 ;; until after the new closure is made.
-                (sb-vm::%alloc-closure ,nvalues (sb-vm::%closure-callee closure))))
+                (sb-c::maybe-with-system-tlab (closure)
+                 (sb-vm::%alloc-closure ,nvalues (sb-vm::%closure-callee closure)))))
            (copy-slots (has-extra-data)
              `(do ((j 0 (1+ j)))
                   ((>= j nvalues)
@@ -311,11 +313,17 @@
     (interpreted-function (sb-interpreter:%fun-ftype function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(defun ftype-from-fdefn (name)
-  (declare (ignorable name))
-  (let ((function (awhen (find-fdefn name) (fdefn-fun it))))
-    (if (not function)
-        (specifier-type 'function)
+(defun sb-c::ftype-from-definition (name)
+  (let ((function (fboundp name)))
+    (cond
+      ((not function)
+       (specifier-type 'function))
+      ((and (symbolp name) (macro-function name))
+       ;; this seems to be called often on macros
+       ;; what's the right answer ???
+       ;; (warn "ftype-from-fdefn called on macro ~s" name)
+       (specifier-type '(function (t t) t)))
+      (t
         ;; Never signal the PARSE-UNKNOWN-TYPE condition.
         ;; This affects 2 regression tests, both very contrived:
         ;;  - in defstruct.impure ASSERT-ERROR (BUG127--FOO (MAKE-BUG127-E :FOO 3))
@@ -325,7 +333,7 @@
                 (sb-kernel::make-type-context
                  ftype nil sb-kernel::+type-parse-signal-inhibit+)))
           (declare (truly-dynamic-extent context))
-          (values (sb-kernel::basic-parse-typespec ftype context))))))
+          (values (sb-kernel::basic-parse-typespec ftype context)))))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
@@ -391,12 +399,6 @@
   (code-header-set code sb-vm::code-fixups-slot newval)
   newval)
 
-(declaim (inline code-obj-is-filler-p))
-(defun code-obj-is-filler-p (code-obj)
-  ;; See also HOLE-P in the allocator (same thing but using SAPs)
-  ;; and filler_obj_p() in the C code
-  (eql (sb-vm::%code-boxed-size code-obj) 0))
-
 #+(or sparc ppc64)
 (defun code-trailer-ref (code offset)
   (with-pinned-objects (code)
@@ -404,20 +406,18 @@
                 (+ (code-object-size code) offset (- sb-vm:other-pointer-lowtag)))))
 
 ;;; The last 'uint16' in the object holds the trailer length (see 'src/runtime/code.h')
-;;; but do not attempt to read it if the object is a filler.
 (declaim (inline code-trailer-len))
 (defun code-trailer-len (code-obj)
-  (if (code-obj-is-filler-p code-obj)
-      0
-      (let ((word (code-trailer-ref code-obj -4)))
-        ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
-        #+little-endian (ldb (byte 16 16) word)
-        #+big-endian    (ldb (byte 16  0) word))))
+  (let ((word (code-trailer-ref code-obj -4)))
+    ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+    #+little-endian (ldb (byte 16 16) word)
+    #+big-endian    (ldb (byte 16  0) word)))
 
 ;;; The fun-table-count is a uint16_t immediately preceding the trailer length
 ;;; containing two subfields:
-;;;  12 bits for the number of simple-funs in the code component
-;;;   4 bits for the number of pad bytes added to align the fun-offset-table
+;;;  11 bits for the number of simple-funs in the code component
+;;;   5 bits for the number of pad bytes added to align the fun-offset-table
+;;; See also code_n_funs() in code.h
 (declaim (inline code-fun-table-count))
 (defun code-fun-table-count (code-obj)
   (if (eql (code-trailer-len code-obj) 0)
@@ -431,26 +431,31 @@
 ;;; Keep in sync with C function code_n_funs()
 (defun code-n-entries (code-obj)
   (declare (type code-component code-obj))
-  (ash (code-fun-table-count code-obj) -4))
+  (ash (code-fun-table-count code-obj) -5))
 
-;;; Index to start of named-call fdefns
-;;; FIXME: Naming symmetry between this and code-n-named-calls might be nice.
-(defun code-fdefns-start-index (code-obj)
-  (+ sb-vm:code-constants-offset
-     (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun)))
-
-;;; Number of "called" fdefns, which does not count fdefns in the boxed
-;;; constants that are used in #'FUN syntax without a funcall necessarily
-;;; occuring, though it may.
-(defun code-n-named-calls (code-obj)
-  (ash (sb-vm::%code-boxed-size code-obj)
-       (+ -32 sb-vm:n-fixnum-tag-bits)))
+;;; Start and count of fdefns used in #'F synax or normal named call
+;;; (i.e. at the head of an expression)
+(defun code-header-fdefn-range (code-obj)
+  #-64-bit ; inefficient
+  (let ((start (+ sb-vm:code-constants-offset
+                  (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun)))
+        (count 0))
+    (do ((i start (1+ i))
+         (limit (code-header-words code-obj)))
+        ((= i limit))
+      (if (fdefn-p (code-header-ref code-obj i)) (incf count) (return)))
+    (values start count))
+  #+64-bit
+  (values (+ sb-vm:code-constants-offset
+             (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun))
+          (ash (sb-vm::%code-boxed-size code-obj)
+               (+ -32 sb-vm:n-fixnum-tag-bits))))
 
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
 (declaim (inline %code-fun-offset))
 (defun %code-fun-offset (code-obj fun-index)
-  (declare ((unsigned-byte 12) fun-index))
+  (declare ((unsigned-byte 11) fun-index))
   (code-trailer-ref code-obj (* -4 (+ fun-index 2))))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
@@ -468,8 +473,8 @@
 (defun %code-text-size (code-obj)
   (- (%code-code-size code-obj)
      (code-trailer-len code-obj)
-     ;; Subtract between 0 and 15 bytes of padding
-     (logand (code-fun-table-count code-obj) #xf)))
+     ;; Subtract between 0 and 31 bytes of padding
+     (logand (code-fun-table-count code-obj) #x1f)))
 
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
@@ -577,13 +582,15 @@
          (set-closure-name
           (lambda (&rest args)
            (declare (ignore args))
+           ;; don't capture the SYMBOL argument of INSTALL-GUARD-FUNCTION.
+           ;; It's redundant with FUN-NAME, which provides more information.
+           ;; No need to use SPECIAL-OPERATOR-P to see what it is.
+           (let ((kind (first fun-name)))
            ;; ANSI specification of FUNCALL says that this should be
            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
            ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
-           (error (if (special-operator-p symbol)
-                      'special-form-function
-                      'undefined-function)
-                  :name symbol))
+             (error (if (eq kind :special) 'special-form-function 'undefined-function)
+                    :name  (second fun-name))))
           t
           fun-name))
         (fdefn (find-or-create-fdefn symbol)))
@@ -631,33 +638,3 @@
   (do-closure-values (value closure)
     (when (funcall test value)
       (return value))))
-
-(in-package "SB-C")
-
-;;; Decode the packed TLF-NUM+OFFSET slot, which might have ancillary
-;;; data for the debugger pushed in.  So if it's a cons, take the CDR.
-;;; This is target-only code, so doesn't belong in 'debug-info.lisp'
-(defun unpack-tlf-num+offset (tlf-num+offset
-                              &aux (integer (if (consp tlf-num+offset)
-                                                (car tlf-num+offset)
-                                                tlf-num+offset))
-                                   (bytepos 0))
-  (flet ((unpack-1 ()
-           (let ((shift 0) (acc 0))
-             (declare (notinline sb-kernel:%ldb)) ; lp#1573398
-             (loop
-              (let ((byte (ldb (byte 8 bytepos) integer)))
-                (incf bytepos 8)
-                (setf acc (logior acc (ash (logand byte #x7f) shift)))
-                (if (logtest byte #x80)
-                    (incf shift 7)
-                    (return acc)))))))
-    (let ((v1 (unpack-1))
-          (v2 (unpack-1)))
-      (values (if (eql v1 0) nil (1- v1))
-              (if (eql v2 0) nil (1- v2))))))
-
-(defun compiled-debug-info-tlf-number (cdi)
-    (nth-value 0 (unpack-tlf-num+offset (compiled-debug-info-tlf-num+offset cdi))))
-  (defun compiled-debug-info-char-offset (cdi)
-    (nth-value 1 (unpack-tlf-num+offset (compiled-debug-info-tlf-num+offset cdi))))

@@ -37,6 +37,13 @@ bad_option() {
 WITH_FEATURES=""
 WITHOUT_FEATURES=""
 FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
+CONTRIBS=""
+for dir in `cd contrib ; echo *`; do
+    if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" ]; then
+        CONTRIBS="$CONTRIBS ${dir}"
+    fi
+done
+SBCL_CONTRIB_BLOCKLIST=${SBCL_CONTRIB_BLOCKLIST:-""}
 
 perform_host_lisp_check=no
 fancy=false
@@ -88,6 +95,10 @@ do
         ;;
       --without)
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
+        case $CONTRIBS
+        in *"$optarg"*)
+               SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST $optarg"
+        ;; esac
 	;;
       --fancy)
         WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
@@ -387,6 +398,7 @@ if [ "$sbcl_os" = "sunos" ] && [ `isainfo -k` = "amd64" ]; then
 fi
 
 # Under Darwin, uname -m returns "i386" even if CPU is x86_64.
+# (I suspect this is not true any more - it reports "x86_64 for me)
 if [ "$sbcl_os" = "darwin" ] && [ "`/usr/sbin/sysctl -n hw.optional.x86_64`" = "1" ]; then
     guessed_sbcl_arch=x86-64
 fi
@@ -479,6 +491,11 @@ echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
 echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WITH_FEATURES " >> $ltf
 
+# Automatically block sb-simd on non-x86 platforms, at least for now.
+case "$sbcl_arch" in
+    x86-64) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
+esac
+
 echo //setting up OS-dependent information
 
 original_dir=`pwd`
@@ -554,11 +571,7 @@ case "$sbcl_os" in
         ;;
     darwin)
         printf ' :unix :bsd :darwin :mach-o' >> $ltf
-        if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler' >> $ltf
-        fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :mach-exception-handler' >> $ltf
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
 
@@ -625,6 +638,10 @@ cd "$original_dir"
 
 case "$sbcl_arch" in
   x86)
+    if [ "$sbcl_os" = "darwin" ]; then
+        echo "Unsupported configuration"
+        exit 1
+    fi
     if [ "$sbcl_os" = "win32" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
@@ -637,9 +654,15 @@ case "$sbcl_arch" in
     ;;
   x86-64)
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
+
+    $GNUMAKE -C tools-for-build avx2
+    if tools-for-build/avx2; then
+       SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
+    fi
+
     case "$sbcl_os" in
-    linux | darwin | *bsd)
-        printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
+    linux | darwin | *bsd | win32)
+        printf ' :immobile-space' >> $ltf
     esac
     ;;
   ppc)
@@ -687,6 +710,8 @@ sh tools-for-build/grovel-features.sh >> $ltf
 echo //finishing $ltf
 printf " %s" "`cat crossbuild-runner/backends/${sbcl_arch}/features`" >> $ltf
 echo ")) (list$WITHOUT_FEATURES)))" >> $ltf
+
+echo "SBCL_CONTRIB_BLOCKLIST=\"$SBCL_CONTRIB_BLOCKLIST\"; export SBCL_CONTRIB_BLOCKLIST" >> output/build-config
 
 # FIXME: The version system should probably be redone along these lines:
 #

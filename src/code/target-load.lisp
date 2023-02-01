@@ -246,7 +246,7 @@
                    (sb-c::*policy* sb-c::*policy*)
                    (sb-c::*handled-conditions* sb-c::*handled-conditions*))
                (if faslp
-                   (load-as-fasl stream verbose print)
+                   (load-as-fasl stream verbose (if print t nil))
                    ;; FIXME: if *EVALUATOR-MODE* is :INTERPRET,
                    ;; then this should have nothing whatsoever to do with
                    ;; compiler-error-resignaling. That's an artifact
@@ -351,11 +351,6 @@
 
 ;;;; linkage fixups
 
-;;; Lisp assembler routines are named by Lisp symbols, not strings,
-;;; and so can be compared by EQ.
-(define-load-time-global *assembler-routines* nil)
-(declaim (code-component *assembler-routines*))
-
 (defun calc-asm-routine-bounds ()
   (loop for v being each hash-value of (%code-debug-info *assembler-routines*)
         minimize (car v) into min
@@ -368,13 +363,27 @@
 (defvar *!initial-assembler-routines*)
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
+  ;; Each architecture can define an "indirect" value in its own peculiar way.
+  ;; Only some of our architectures use that option.
   (awhen (the list (gethash (the symbol name) (%code-debug-info code)))
-    (sap-int (sap+ (code-instructions code)
-                   (if indirect
-                       ;; Return the address containing the routine address
-                       (ash (cddr it) sb-vm:word-shift)
-                       ;; Return the routine address itself
-                       (car it))))))
+    (destructuring-bind (start end . index) it
+      (declare (ignore end) (ignorable index))
+      (let* ((insts (code-instructions code))
+             (addr (sap-int (sap+ insts start))))
+        (unless indirect
+          (return-from get-asm-routine addr))
+        #-(or ppc ppc64 x86 x86-64) (bug "Indirect asm-routine lookup")
+        #+(or ppc ppc64) (- addr sb-vm:nil-value)
+        #+(or x86 x86-64) ; return the address of a word containing 'addr'
+        (let ((offset (ash index sb-vm:word-shift)))
+          ;; the address is in the "external" static-space jump table
+          #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
+                              (ash sb-vm:vector-data-offset sb-vm:word-shift)
+                          ;; offset is biased by 1 word, accounting for the jump-table-count
+                          ;; at the first word in code-instructions. So unbias it.
+                              (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
+          #-immobile-space ; the address is in the "internal" jump table
+          (sap-int (sap+ insts offset)))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
@@ -383,9 +392,11 @@
          (count (length vector))
          (ht (make-hash-table))) ; keys are symbols
     (rplaca (%code-debug-info code) ht)
+    (setf *asm-routine-index-to-name* (make-array (1+ (length vector))))
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
+          (setf (aref *asm-routine-index-to-name* (1+ i)) name)
           ;; Must be in ascending order, but one address can have more than one name.
           (aver (>= next-offset offset))
           ;; store inclusive bounds on PC offset range and the function index
@@ -398,9 +409,3 @@
     (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1))))
-
-;;; Remember where cold artifacts went, and put the warm ones there too
-;;; because it looks nicer not to scatter them throughout the source tree.
-;;; *t-o-prefix* isn't known to the compiler, and we need it to be
-;;; initialized from a constant, so use read-time eval.
-(defvar *!target-obj-prefix* #.sb-cold::*target-obj-prefix*)

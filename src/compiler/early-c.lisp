@@ -43,22 +43,26 @@
 
 (defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
   ;; FREE-VARS translates from the names of variables referenced
-  ;; globally to the LEAF structures for them.
+  ;; globally to the LEAF structures for them. FREE-FUNS is like
+  ;; FREE-VARS, only it deals with function names.
+  ;;
+  ;; We must preserve the property that a proclamation for a global
+  ;; thing only affects the code after it. This takes some work, since
+  ;; a proclamation may appear in the middle of a block being
+  ;; compiled. If there are references before the proclaim, then we
+  ;; copy the current entry before modifying it. Code converted before
+  ;; the proclaim sees the old Leaf, while code after it sees the new
+  ;; LEAF.
   (free-vars (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; FREE-FUNS is like FREE-VARS, only it deals with function names.
-  (free-funs (make-hash-table :test 'equal) :read-only t :type hash-table)
-  ;; These hashtables translate from constants to the LEAFs that
-  ;; represent them.
-  ;; Table 1: one entry per named constant
-  (named-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; Table 2: one entry for each unnamed constant as compared by EQL
+  (free-funs (make-hash-table :test #'equal) :read-only t :type hash-table)
+  ;; We use the same CONSTANT structure to represent all EQL anonymous
+  ;; constants. This hashtable translates from constants to the LEAFs
+  ;; that represent them.
   (eql-constants (make-hash-table :test 'eql) :read-only t :type hash-table)
-  ;; Table 3: one key per EQUAL constant,
-  ;; with the caveat that lookups must discriminate amongst constants that
-  ;; are EQUAL but not similar.  The value in the hash-table is a list of candidates
-  ;; (#<constant1> #<constant2> ... #<constantN>) such that CONSTANT-VALUE
-  ;; of each is EQUAL to the key for the hash-table entry, but dissimilar
-  ;; from each other. Notably, strings of different element types can't be similar.
+  ;; During file compilation we are allowed to coalesce similar
+  ;; constants. This coalescing is distinct from the coalescing done
+  ;; in the dumper, since the effect here is to reduce the number of
+  ;; boxed constants appearing in a code component.
   (similar-constants (sb-fasl::make-similarity-table) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
@@ -72,50 +76,22 @@
 (defvar *allow-instrumenting*)
 
 ;;; miscellaneous forward declarations
-#+sb-dyncount (defvar *collect-dynamic-statistics*)
 (defvar *component-being-compiled*)
 (defvar *compiler-error-context*)
-(defvar *compiler-error-count*)
-(defvar *compiler-warning-count*)
-(defvar *compiler-style-warning-count*)
-(defvar *compiler-note-count*)
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
 ;;; These are the default, but the list can also include
-;;; :pre-ir2-optimize, :symbolic-asm, and :sb-graph.
+;;; :pre-ir2-optimize, :symbolic-asm.
 (defvar *compile-trace-targets* '(:ir1 :ir2 :vop :symbolic-asm :disassemble))
-(defvar *constraint-universe*)
 (defvar *current-path*)
 (defvar *current-component*)
-#+sb-dyncount
-(defvar *dynamic-counts-tn*)
 (defvar *elsewhere-label*)
-(defvar *event-note-threshold*)
-(defvar *failure-p*)
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)
-(defvar *undefined-warnings*)
-(defvar *warnings-p*)
-(defvar *lambda-conversions*)
-(defvar *compile-object* nil)
-(defvar *location-context* nil)
 
 (defvar *handled-conditions* nil)
 (defvar *disabled-package-locks* nil)
-
-(defvar *stack-allocate-dynamic-extent* t
-  "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
-and stack allocates otherwise inaccessible parts of the object whenever
-possible. Potentially long (over one page in size) vectors are, however, not
-stack allocated except in zero SAFETY code, as such a vector could overflow
-the stack without triggering overflow protection.")
-
-;;; *BLOCK-COMPILE-ARGUMENT* holds the original value of the :BLOCK-COMPILE
-;;; argument, which overrides any internal declarations.
-(defvar *block-compile-argument*)
-(declaim (type (member nil t :specified)
-               *block-compile-default* *block-compile-argument*))
 
 
 ;;;; miscellaneous utilities
@@ -180,30 +156,15 @@ the stack without triggering overflow protection.")
 (declaim (always-bound *compile-time-eval*))
 
 #-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
-
-;;; Various error-code generating helpers
-(defvar *adjustable-vectors*)
-
-(defmacro with-adjustable-vector ((var) &rest body)
-  `(let ((,var (or (pop *adjustable-vectors*)
-                   (make-array 16
-                               :element-type '(unsigned-byte 8)
-                               :fill-pointer 0
-                               :adjustable t))))
-     ;; Don't declare the length - if it gets adjusted and pushed back
-     ;; onto the freelist, it's anyone's guess whether it was expanded.
-     ;; This code was wrong for >12 years, so nobody must have needed
-     ;; more than 16 elements. Maybe we should make it nonadjustable?
-     (declare (type (vector (unsigned-byte 8)) ,var))
-     (setf (fill-pointer ,var) 0)
-     ;; No UNWIND-PROTECT here - semantics are unaffected by nonlocal exit,
-     ;; and this macro is about speeding up the compiler, not slowing it down.
-     ;; GC will clean up any debris, and since the vector does not point
-     ;; to anything, even an accidental promotion to a higher generation
-     ;; will not cause transitive garbage retention.
-     (prog1 (progn ,@body)
-       (push ,var *adjustable-vectors*))))
-
+#-sb-xc-host ; not needed for make-hlst-1
+(defmacro maybe-with-system-tlab ((source-object) allocator)
+  (declare (ignorable source-object))
+  #+system-tlabs `(if (sb-vm::force-to-heap-p ,source-object)
+                      (locally (declare (sb-c::tlab :system)) ,allocator)
+                      ,allocator)
+  #-system-tlabs allocator)
+;;; TLAB selection is an aspect of a POLICY but this sets the global choice
+(defvar *force-system-tlab* nil)
 
 ;;; The allocation quantum for boxed code header words.
 ;;; 2 implies an even length boxed header; 1 implies no restriction.
@@ -264,7 +225,14 @@ the stack without triggering overflow protection.")
   ;; level lambdas resulting from compiling subforms. (In reverse
   ;; order.)
   (toplevel-lambdas nil :type list)
-
+  ;; We build a list of top-level lambdas, and then periodically smash them
+  ;; together into a single component and compile it.
+  (pending-toplevel-lambdas nil :type list)
+  ;; We record whether the package environment has changed during the
+  ;; compilation of some sequence top level forms. This allows the
+  ;; compiler to dump symbols in such a way that the loader can
+  ;; reconstruct them in the correct package.
+  (package-environment-changed nil :type boolean)
   ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding
   ;; small integer or string identifier. One direction could be done by adding
   ;; the ID as slot to each object, but we want both directions.

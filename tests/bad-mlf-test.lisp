@@ -1,5 +1,5 @@
 (defun zook ()
-  (declare (optimize sb-c::store-source-form))
+  (declare (optimize sb-c:store-source-form))
   (macrolet ((foo (x)
                (declare (ignore x))
                ''hi))
