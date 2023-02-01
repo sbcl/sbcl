@@ -34,6 +34,15 @@
 
 (cl:in-package "SB-RBTREE")
 
+(defmacro get-layout (string)
+  (sb-kernel:find-layout (intern string)))
+(defmacro childless (node)
+  `(= (sb-kernel:%instance-length ,node) ,(1+ sb-vm:instance-data-start)))
+
+;;; This gets a 4.5% consing reduction in the bbtrees benchmark,
+;;; but redblack trees are still not as good as brothertrees.
+(defconstant +fringe-node-storage-optimization+ t)
+
 (defmacro define-tree-class (&key key-type value-type (lessp '<)
                              &aux (data-type (if value-type 'cons key-type))
                                   (name (intern "RBNODE"))
@@ -57,26 +66,49 @@
             (blacken (x) `(,(intern "BLACKEN") ,x)))
 
 ;;; This structure is exactly 4 words with #+compact-instance-header
-;;; I really wanted one variant of thie structure to have a raw slot (SB-VM:WORD)
+;;; I really wanted one variant of this structure to have a raw slot (SB-VM:WORD)
 ;;; for DATA, and one not to, but that wasn't working, only because of unintended
 ;;; consing and not for any real reason.
 ;;; But that doesn't mean I want to merge these definitions back together -
 ;;; I still want to figure out why there was excess consing.
 (defstruct (,name (:conc-name "") (:constructor nil)
                   (:copier nil) (:predicate nil))
-  (left  nil :read-only t :type (or ,name null))
-  (right nil :read-only t :type (or ,name null))
-  (data  nil :read-only t :type ,data-type))
+  (data  nil :read-only t :type ,data-type)
+  (%left nil :read-only t :type (or ,name null))
+  (%right nil :read-only t :type (or ,name null)))
+
+(declaim (inline ,(intern "LEFT") ,(intern "RIGHT")))
+(defun ,(intern "LEFT") (x) (if (childless x) nil (,(intern "%LEFT") x)))
+(defun ,(intern "RIGHT") (x) (if (childless x) nil (,(intern  "%RIGHT") x)))
 
 (defstruct (,(intern "RED-NODE") (:include ,name) (:copier nil)
             (:predicate ,(intern "REDP"))
-            (:constructor ,(intern "RED-NODE") (left data right))
+            (:constructor ,(intern "%RED-NODE") (%left data %right))
             (:conc-name "")))
 
 (defstruct (,(intern "BLACK-NODE") (:include ,name) (:copier nil)
             (:predicate ,(intern "BLACKP"))
-            (:constructor ,(intern "BLACK-NODE") (left data right))
+            (:constructor ,(intern "%BLACK-NODE") (%left data %right))
             (:conc-name "")))
+
+(declaim (inline ,(intern "RED-NODE") ,(intern "BLACK-NODE")))
+(defun ,(intern "RED-NODE") (left data right)
+  (if (or (not +fringe-node-storage-optimization+) left right)
+      (,(intern "%RED-NODE") left data right)
+      (let ((node (sb-kernel:%make-instance/mixed (1+ sb-vm:instance-data-start))))
+        (sb-kernel:%set-instance-layout node (get-layout "RED-NODE"))
+        ;; Nodes are immutable, hence no setf'er exists.
+        (sb-kernel:%instance-set node sb-vm:instance-data-start data)
+        (truly-the ,(intern "RED-NODE") node))))
+
+(defun ,(intern "BLACK-NODE") (left data right)
+  (if (or (not +fringe-node-storage-optimization+) left right)
+      (,(intern "%BLACK-NODE") left data right)
+      (let ((node (sb-kernel:%make-instance/mixed (1+ sb-vm:instance-data-start))))
+        (sb-kernel:%set-instance-layout node (get-layout "BLACK-NODE"))
+        ;; Nodes are immutable, hence no setf'er exists.
+        (sb-kernel:%instance-set node sb-vm:instance-data-start data)
+        (truly-the ,(intern "BLACK-NODE") node))))
 
 (defmethod print-object ((self ,name) stream)
   (declare (optimize (speed 1) (safety 1)))
