@@ -10,10 +10,10 @@
 
      (:res result (unsigned-reg) nl0-offset))
   ;; *free-tls-index* is [lock][tls-index]
-  (inst mov free-tls-index (+ nil-value (static-symbol-offset '*free-tls-index*)
-                              (- (* symbol-value-slot n-word-bytes)
-                                 other-pointer-lowtag)
-                              #+little-endian 4))
+  (inst add free-tls-index null-tn (+ (static-symbol-offset '*free-tls-index*)
+                                      (- (* symbol-value-slot n-word-bytes)
+                                         other-pointer-lowtag)
+                                      #+little-endian 4))
   (pseudo-atomic (free-tls-index)
     (assemble ()
       RETRY
