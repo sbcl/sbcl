@@ -8,16 +8,8 @@
 ;;; the addition of nicknames. (It assumes that every name increases the table load)
 (mapc 'delete-package (mapcar 'make-package '("AA" "BB" "CC" "DD")))
 (defvar *tp* (make-package "SOMETESTPACKAGE"))
-(defconstant cell-offset 3)
 (defun compute-name-bucket (str)
-  (let ((hash (sxhash str))
-        (divisor (- (length *all-packages*) cell-offset)))
-    (+ cell-offset
-       (if (find-symbol "FASTREM-32" "SB-VM")
-           ;; mask required by fastrem vop to constrain the bits of precision
-           (rem (logand hash (aref *all-packages* 1)) divisor)
-           ;; if no fastrem vop then we just take the remainder
-           (rem hash divisor)))))
+  (mod (sxhash str) (1- (length *all-packages*))))
 (defvar *tp-bucket* (compute-name-bucket "SOMETESTPACKAGE"))
 
 ;;; Generate a random nicknames for SOMETESTPACKAGE that hashes to

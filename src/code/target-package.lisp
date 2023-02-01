@@ -214,29 +214,19 @@
 (define-load-time-global *package-names-cookie* most-negative-fixnum)
 (declaim (fixnum *package-names-cookie*))
 
-;;; *ALL-PACKAGES* is a prime-number-sized vector (physically with extra cells)
+;;; *ALL-PACKAGES* is a power-of-2-sized table (physically with 1 extra cell of metadata)
 ;;; as the backing storage of a closed-addressing hash-set with a peculiar aspect
 ;;; of allowing one key to appear in multiple buckets. This aspect allows each global name
 ;;; ("nickname" and "name" being synonymous in this usage) to appear in its respective
 ;;; hash bucket. By pure coincidence, names for one package could hash to the same bucket,
 ;;; so removal has to account for that - removal occurs only when the package does not
 ;;; belong in a bucket via any of its names.
-(defconstant pkgtable-fixed-cells 3)
-(defmacro pkgtable-magic (table) `(truly-the (unsigned-byte 32) (svref ,table 0)))
-(defmacro pkgtable-mask (table) `(truly-the (unsigned-byte 32) (svref ,table 1)))
-(defmacro pkgtable-count (table) `(truly-the fixnum (svref ,table 2)))
+(defconstant pkgtable-fixed-cells 1)
+(defmacro pkgtable-count (table)
+  `(truly-the fixnum (svref ,table (1- (length ,table)))))
 
 (defmacro pkgtable-bucket-index (vector hash)
-  `(let ((h ,hash)
-         (divisor (- (length ,vector) pkgtable-fixed-cells)))
-     (+ pkgtable-fixed-cells
-        ,(sb-c::if-vop-existsp (:translate sb-vm::fastrem-32)
-           `(let ((c (pkgtable-magic ,vector)))
-              (if (/= c 0)
-                  (sb-vm::fastrem-32 (logand h (pkgtable-mask ,vector)) c
-                                     (truly-the (unsigned-byte 32) divisor))
-                  (rem h divisor))) ; don't have a fastrem coeffficient
-           `(rem h divisor)))))
+  `(logand ,hash (- (length ,vector) ,(1+ pkgtable-fixed-cells))))
 
 (defmacro do-pkg-table (((package-var &optional (keys-var '#:keys)) table-var)
                         &body body
@@ -245,7 +235,7 @@
          (cell (list nil)))
      (declare (truly-dynamic-extent cell))
      (loop for ,index-var of-type index
-           from pkgtable-fixed-cells below (length .tbl.)
+           from 0 below (1- (length .tbl.))
            do (let ((data (svref .tbl. ,index-var)))
                 (setf (car cell) data) ; in case DATA is a non-null atom
                 (dolist (,package-var (if (%instancep data) cell data))
@@ -268,19 +258,14 @@
                                                   (t (list package data))))
                  (incf (pkgtable-count vector)))))) ; count once for each insertion
          (new-table (size)
-           (let* ((n (loop for n of-type fixnum
-                           from (logior (ceiling size 87/100) 1) by 2 ; target LF=87%
-                           when (positive-primep n) return n))
+           (let* ((n (power-of-two-ceiling size))
                   (vector (make-array (+ n pkgtable-fixed-cells) :initial-element nil)))
-             (multiple-value-bind (mask c) (optimized-symtbl-remainder-params n)
-               (setf (pkgtable-mask vector) mask
-                     (pkgtable-magic vector) c
-                     (pkgtable-count vector) 0))
+             (setf (pkgtable-count vector) 0)
              vector)))
     ;; First maybe rehash, assuming all names need to be added to the table.
     ;; The rehash threshold is 1 item or more per bucket
     (let ((new-count (+ (pkgtable-count vector) (floor (length keys) 2))))
-      (when (>= new-count (- (length vector) pkgtable-fixed-cells))
+      (when (> new-count (- (length vector) pkgtable-fixed-cells))
         (let ((new-table (new-table new-count)))
           (do-pkg-table ((package keys) vector)
             (insert new-table package keys))
@@ -1943,7 +1928,7 @@ PACKAGE."
   ;; (setq *sym-lookups* 0 *sym-hit-1st-try* 0)
   (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
   (setf *package-table-lock* (sb-thread:make-mutex :name "Package Table Lock"))
-  (setf *all-packages* #(0 0 0))
+  (setf *all-packages* #(0))
   (setf *package-nickname-ids* (cons (make-info-hashtable :comparator #'pkg-name=
                                                           :hash-function #'sxhash)
                                      1))
