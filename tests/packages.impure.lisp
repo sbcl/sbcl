@@ -1159,5 +1159,6 @@ if a restart was invoked."
   (with-scratch-file (fasl7 "fasl")
     (compile-file "package-test-7.lisp" :output-file fasl7)
     (compile-file "package-test-7.lisp" :output-file fasl7)
+    (delete-package "COMPILE-TWICE")
     (load fasl7)
     (delete-package "COMPILE-TWICE")))
