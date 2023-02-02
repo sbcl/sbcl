@@ -1614,17 +1614,11 @@ core and return a descriptor to it."
                            (remove (find-package "SB-COREFILE")
                                    (package-use-list package))
                            (package-use-list package))))))
-    (let* ((names (cons name nicknames))
-           (name-descriptors (mapcar #'string-literal-to-core names))
-           (keys (loop for descriptor in name-descriptors
-                       for string in names
-                       nconc (list descriptor
-                              (make-fixnum-descriptor
-                               (%sxhash-simple-string string))))))
+    (let ((strings (mapcar #'string-literal-to-core (cons name nicknames))))
       (write-slots cold-package
                    :id (make-fixnum-descriptor id)
-                   :keys (vector-in-core keys)
-                   :%name (car name-descriptors)
+                   :keys (vector-in-core (list (list-to-core strings)))
+                   :%name *nil-descriptor*
                    :%bits (make-fixnum-descriptor
                            (if (system-package-p name)
                                sb-impl::+initial-package-bits+

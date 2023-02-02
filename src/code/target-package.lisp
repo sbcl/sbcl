@@ -1936,12 +1936,11 @@ PACKAGE."
         "package nicknames")
   (dolist (spec specs)
     (destructuring-bind (pkg external-v internal-v) spec
-      (let ((names (cons (package-%name pkg) (package-%nicknames pkg))))
-        ;; Genesis uses %NAME and KEYS to convey strings to package-cold-init
-        ;; but technically these slots would not be set in a new package.
-        (setf (package-keys pkg) #()
-              (package-%name pkg) nil)
-        (with-package-names () (package-registry-update pkg names)))
+      ;; Genesis conveys the name strings via KEYS in an exceptional but type-correct
+      ;; way. The slot has to be cleared to look like a newly made package.
+      (with-package-names ()
+        (package-registry-update
+         pkg (elt (shiftf (package-keys pkg) #()) 0)))
       ;; the symbol MAKE-TABLE wouldn't magically disappear,
       ;; though its only use be to name an FLET in a function
       ;; hanging on an otherwise uninternable symbol. strange but true :-(
