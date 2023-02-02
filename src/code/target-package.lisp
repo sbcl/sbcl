@@ -817,12 +817,13 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (defun package-%use-list (package)
   (map 'list #'symtbl-package (package-tables package)))
 
-;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
-;;; most other operations, are unspecified for deleted packages. We
-;;; just do the easy thing and signal errors in that case.
 (macrolet ((def (ext real)
              `(defun ,ext (package-designator)
-                (,real (find-undeleted-package-or-lose package-designator)))))
+                (,real (%find-package-or-lose package-designator)))))
+  (def package-name package-%name)
+  ;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
+  ;; most other operations, are unspecified for deleted packages.
+  ;; There's no harm in returning NIL from the slot accessors.
   (def package-nicknames package-%nicknames)
   (def package-use-list package-%use-list)
   (def package-used-by-list package-%used-by-list)
@@ -1047,13 +1048,6 @@ Experimental: interface subject to change."
   (if (listp thing)
       (mapcar #'find-undeleted-package-or-lose thing)
       (list (find-undeleted-package-or-lose thing))))
-
-;;; ANSI specifies (in the definition of DELETE-PACKAGE) that PACKAGE-NAME
-;;; returns NIL (not an error) for a deleted package, so this is a special
-;;; case where we want to use bare %FIND-PACKAGE-OR-LOSE instead of
-;;; FIND-UNDELETED-PACKAGE-OR-LOSE.
-(defun package-name (package-designator)
-  (package-%name (%find-package-or-lose package-designator)))
 
 ;;;; operations on symbol hashsets
 
