@@ -4118,6 +4118,12 @@
   (def > i f (integer * #.most-positive-fixnum) fixnum)
   (def < f i fixnum (integer * #.most-positive-fixnum)))
 
+(deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))))
+  `(not (> x most-positive-fixnum)))
+
+(deftransform > ((x y) (integer (eql #.(1- most-negative-fixnum))))
+  `(not (< x most-negative-fixnum)))
+
 (deftransform = ((x y) (rational (constant-arg float)))
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))
