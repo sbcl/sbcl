@@ -1094,7 +1094,25 @@ Experimental: interface subject to change."
 (defun package-registry-update (package namelist)
   (declare (type (or list (eql t)) namelist))
   (aver (sb-thread:holding-mutex-p *package-table-lock*))
-  (let* ((n (if (listp namelist) (length namelist) 0))
+  (when (and namelist (not (package-id package)))
+    ;; Registration ensures a non-null id if it can (even for a "deferred" package)
+    (let* ((vector *id->package*)
+           ;; 30 is an arbitrary constant exceeding the number of wired IDs
+           (new-id (position nil vector :start 30)))
+      (when (and (null new-id) (< (length vector) +package-id-overflow+))
+        (let* ((current-length (length vector))
+               (new-length (min (+ current-length 10) +package-id-overflow+))
+               (new-vector (make-array new-length :initial-element nil)))
+          (replace new-vector vector)
+          (setf *id->package* new-vector)
+          (setf new-id current-length
+                vector new-vector)))
+      (when new-id
+        (setf (package-id package) new-id
+              (aref vector new-id) package))))
+  (when (eq namelist 't)
+    (return-from package-registry-update))
+  (let* ((n (length namelist))
          (new-hashes (mapcar #'sxhash namelist))
          (new-keys (make-array (* 2 n)))
          (old-hashes (let ((old-keys (package-keys package)))
@@ -1106,24 +1124,6 @@ Experimental: interface subject to change."
           do (setf (aref new-keys i) name)
              (setf (aref new-keys (1+ i)) hash))
     (when namelist
-      ;; Registration ensures a non-null id if it can (even for a "deferred" package)
-      (unless (package-id package)
-        (let* ((vector *id->package*)
-               ;; 30 is an arbitrary constant exceeding the number of wired IDs
-               (new-id (position nil vector :start 30)))
-          (when (and (null new-id) (< (length vector) +package-id-overflow+))
-            (let* ((current-length (length vector))
-                   (new-length (min (+ current-length 10) +package-id-overflow+))
-                   (new-vector (make-array new-length :initial-element nil)))
-              (replace new-vector vector)
-              (setf *id->package* new-vector)
-              (setf new-id current-length
-                    vector new-vector)))
-          (when new-id
-            (setf (package-id package) new-id
-                  (aref vector new-id) package))))
-      (when (eq namelist 't)
-        (return-from package-registry-update))
       (let* ((old-table *all-packages*)
              (new-table (pkgtable-insert old-table package new-keys)))
         (unless (eq old-table new-table)
@@ -2187,6 +2187,7 @@ PACKAGE."
                                           (make-symbol-hashset 0))))
               (setf (symtbl-package (package-external-symbols package)) package)
               (with-package-names ()
+                (setf (package-%name package) name)
                 ;; T is an indicator for doing nothing except assigning an ID
                 (package-registry-update package t))
               (setf (gethash name table) package))))))
