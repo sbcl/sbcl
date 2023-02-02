@@ -230,7 +230,15 @@
   sb-format::format-directive
   package
   form-tracking-stream
-  ansi-stream))
+  ansi-stream
+  ((unsigned-byte 16) object-not-unsigned-byte-16)
+  ((signed-byte 8) object-not-signed-byte-8)
+  ((signed-byte 16) object-not-signed-byte-16)
+  ((or index list) object-not-index-or-list)
+  condition
+  sb-pcl::fast-method-call
+  ((or symbol string) object-not-or-symbol-string)
+  ((and unsigned-byte fixnum) object-not-unsigned-fixnum)))
 
 (defun error-number-or-lose (name)
   (or (position name sb-c:+backend-internal-errors+
