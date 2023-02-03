@@ -116,12 +116,6 @@
        (2 (weaken-values-type type))
        (3 type)))))
 
-(defun type-contains-fun-type-p (type)
-  (sb-kernel::map-type (lambda (type)
-                         (when (fun-type-p type)
-                           (return-from type-contains-fun-type-p t)))
-                       type))
-
 ;;; LVAR is an lvar we are doing a type check on and TYPES is a list
 ;;; of types that we are checking its values against. If we have
 ;;; proven that LVAR generates a fixed number of values, then for each
