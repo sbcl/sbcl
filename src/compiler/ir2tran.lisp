@@ -209,43 +209,30 @@
 ;;; for the called function, since local call analysis converts all
 ;;; closure references. If a :TOPLEVEL-XEP, we know it is not a
 ;;; closure.
-;;;
-;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
-;;; don't initialize that slot. This can happen with closures over
-;;; top level variables, where optimization of the closure deleted the
-;;; variable. Since we committed to the closure format when we
-;;; pre-analyzed the top level code, we just leave an empty slot.
 (defun ir2-convert-closure (ref ir2-block functional res)
   (declare (type ref ref)
            (type ir2-block ir2-block)
            (type functional functional)
            (type tn res))
-  (flet ((prepare ()
-           (aver (not (eql (functional-kind functional) :deleted)))
-           (unless (leaf-info functional)
-             (setf (leaf-info functional)
-                   (make-entry-info :name
-                                    (functional-debug-name functional))))))
-    (let ((closure (etypecase functional
-                     (clambda
-                      (assertions-on-ir2-converted-clambda functional)
-                      (environment-closure (get-lambda-environment functional)))
-                     (functional
-                      (aver (eq (functional-kind functional) :toplevel-xep))
-                      nil))))
-      (cond (closure
-             (prepare)
-             (let* ((this-env (node-environment ref))
-                    (tn (find-in-environment functional this-env)))
-               (emit-move ref ir2-block tn res)))
-            (t
-             ;; if we're here, we should have either a toplevel-xep (some
-             ;; global scope function in a different component) or an external
-             ;; reference to the "closure"'s body.
-             (prepare)
-             (aver (memq (functional-kind functional) '(:external :toplevel-xep)))
-             (let ((entry (make-load-time-constant-tn :entry functional)))
-               (emit-move ref ir2-block entry res))))))
+  (aver (not (eql (functional-kind functional) :deleted)))
+  (unless (leaf-info functional)
+    (setf (leaf-info functional)
+          (make-entry-info :name
+                           (functional-debug-name functional))))
+  (let ((closure (etypecase functional
+                   (clambda
+                    (assertions-on-ir2-converted-clambda functional)
+                    (environment-closure (get-lambda-environment functional)))
+                   (functional
+                    (aver (eq (functional-kind functional) :toplevel-xep))
+                    nil))))
+    (cond (closure
+           (let* ((this-env (node-environment ref))
+                  (tn (find-in-environment functional this-env)))
+             (emit-move ref ir2-block tn res)))
+          (t
+           (let ((entry (make-load-time-constant-tn :entry functional)))
+             (emit-move ref ir2-block entry res)))))
   (values))
 
 (defun closure-initial-value (what this-env current-fp)
@@ -272,6 +259,13 @@
 ;;; the initialization of the closures until after they have all been
 ;;; created, though this may require more registers. TODO: it may be
 ;;; possible to improve on this somehow.
+;;;
+;;; If a closed-over LAMBDA-VAR has no refs (is deleted), or a
+;;; closed-over LAMBDA has been deleted, then we don't initialize that
+;;; slot. This can happen with closures over top level variables,
+;;; where optimization of the closure deleted the variable. Since we
+;;; committed to the closure format when we pre-analyzed the top level
+;;; code, we just leave an empty slot.
 (defun ir2-convert-enclose (node ir2-block)
   (declare (type enclose node)
            (type ir2-block ir2-block))
@@ -308,22 +302,17 @@
                           (length closure)
                           leaf-dx-p tn)))
                   (loop for what in closure and n from 0 do
-                    (unless (and (lambda-var-p what)
-                                 (null (leaf-refs what)))
-                      (if (lambda-p what)
-                          ;; If we have a deleted functional, punt,
-                          ;; since the component it refers to has
-                          ;; already been compiled.
-                          (let ((init (if (eq (functional-kind what) :deleted)
-                                          (make-constant-tn (find-constant nil))
-                                          (find-in-environment what env))))
-                            (delayed (list tn init n)))
+                    (if (lambda-p what)
+                        (unless (eq (functional-kind what) :deleted)
+                          (delayed (list tn (find-in-environment what env) n)))
+                        (unless (and (lambda-var-p what)
+                                     (null (leaf-refs what)))
                           (let ((initial-value (closure-initial-value what env nil)))
                             (if initial-value
                                 (vop closure-init node ir2-block tn initial-value n)
-                                ;; An initial-value of NIL means to stash
-                                ;; the frame pointer... which requires a
-                                ;; different VOP.
+                                ;; An initial-value of NIL means to
+                                ;; stash the frame pointer... which
+                                ;; requires a different VOP.
                                 (vop closure-init-from-fp node ir2-block tn n))))))))))))
       (loop for (tn what n) in (delayed)
             do (vop closure-init node ir2-block tn what n))))
