@@ -416,7 +416,8 @@ STRING (or the subsequence bounded by START and END)."
   ;; All synonyms of that name will also references the loaded format.
   (let* ((entry (apply #'%make-external-format :names names args))
          (table *external-formats*)
-         (free-index (position nil table)))
+         (free-index (or (get (car names) :external-format)
+                         (position nil table))))
     (dolist (name names)
       (setf (get name :external-format) free-index))
     (setf (aref table free-index) entry)))
