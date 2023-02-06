@@ -493,8 +493,8 @@
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
                                  (component-info *component-being-compiled*))))
-               (lexenv-contains-lambda fun
-                                       (lambda-lexenv (lambda-var-home var)))
+               (or (eq (lambda-var-home var) fun)
+                   (member var (environment-closure (lambda-environment fun))))
                (not (optional-leaf-p var))) ;; not always initialized
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
