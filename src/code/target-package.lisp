@@ -817,6 +817,57 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (defun package-%use-list (package)
   (map 'list #'symtbl-package (package-tables package)))
 
+(defmacro do-packages ((package) &body body)
+  ;; Even if iterating over the name -> package mapping were threadsafe
+  ;; (which is isn't), there could nonetheless exist a race between iterators
+  ;; and RENAME-PACKAGE. This is true whether first deleting the old name
+  ;; and then inserting the new, or the other way around.
+  ;; The examples below (only 2 out of many schedulings and choices of insert/delete
+  ;; ordering) show that iteration can produce a package twice, or skip it entirely.
+  ;;
+  ;; Consider the table bins could have oldname in an earlier bin:
+  ;;   bin 1 -> oldname, bin 2 -> newname
+  ;; and suppose we first delete old, the insert new.
+  ;;
+  ;;  Thread1                Thread2
+  ;;  ------------           -------------
+  ;;  read bin 1 = oldname
+  ;;                         delete oldname
+  ;;                         insert newname
+  ;;  read bin 2 = newname
+  ;;
+  ;; So it is produced twice even though it was not really in the table twice.
+  ;; Or we can see it not at all. Suppose bin1 -> newname, bin 2 -> oldname
+  ;;
+  ;;  Thread1                Thread2
+  ;;  ------------           -------------
+  ;;  read bin 1 (initially empty)
+  ;;                         delete oldname
+  ;;                         insert newname
+  ;;  read bin 2 (empty)
+  ;;
+  ;; The situation is further confounded by the fact that the primary name could
+  ;; become a nickname or vice-versa (among all the myriad other things that
+  ;; renaming can do) in which case there is ambiguity about the table cell
+  ;; that is considered the representative one for the package.
+  `(with-package-names ()
+     (do-pkg-table ((,package) *all-packages*) ,@body)))
+
+(defun package-%used-by-list (package &aux (wp (package-%used-by package)))
+  (or (and wp (weak-pointer-value wp))
+      ;; Ensure that the "uses" relation is fixed by acquiring the graph lock.
+      ;; Additionally, DO-PACKAGES will acquire the name table lock.
+      (with-package-graph ()
+        (let ((me (package-external-symbols package))
+              (list))
+          (do-packages (user)
+            (when (find me (package-tables user))
+              (push user list)))
+          ;; A minor deficiency: if the actual result is NIL, it will appear to
+          ;; always need recomputation. Honestly it's not worth caring about.
+          (setf (package-%used-by package) (if list (make-weak-pointer list)))
+          list))))
+
 (macrolet ((def (ext real)
              `(defun ,ext (package-designator)
                 (,real (%find-package-or-lose package-designator)))))
@@ -863,42 +914,6 @@ Experimental: interface subject to change."
           :package package
           :format-control format-control
           :format-arguments format-args))
-
-(defmacro do-packages ((package) &body body)
-  ;; Even if iterating over the name -> package mapping were threadsafe
-  ;; (which is isn't), there could nonetheless exist a race between iterators
-  ;; and RENAME-PACKAGE. This is true whether first deleting the old name
-  ;; and then inserting the new, or the other way around.
-  ;; The examples below (only 2 out of many schedulings and choices of insert/delete
-  ;; ordering) show that iteration can produce a package twice, or skip it entirely.
-  ;;
-  ;; Consider the table bins could have oldname in an earlier bin:
-  ;;   bin 1 -> oldname, bin 2 -> newname
-  ;; and suppose we first delete old, the insert new.
-  ;;
-  ;;  Thread1                Thread2
-  ;;  ------------           -------------
-  ;;  read bin 1 = oldname
-  ;;                         delete oldname
-  ;;                         insert newname
-  ;;  read bin 2 = newname
-  ;;
-  ;; So it is produced twice even though it was not really in the table twice.
-  ;; Or we can see it not at all. Suppose bin1 -> newname, bin 2 -> oldname
-  ;;
-  ;;  Thread1                Thread2
-  ;;  ------------           -------------
-  ;;  read bin 1 (initially empty)
-  ;;                         delete oldname
-  ;;                         insert newname
-  ;;  read bin 2 (empty)
-  ;;
-  ;; The situation is further confounded by the fact that the primary name could
-  ;; become a nickname or vice-versa (among all the myriad other things that
-  ;; renaming can do) in which case there is ambiguity about the table cell
-  ;; that is considered the representative one for the package.
-  `(with-package-names ()
-     (do-pkg-table ((,package) *all-packages*) ,@body)))
 
 (defun package-locally-nicknamed-by-list (package-designator)
   "Returns a list of packages which have a local nickname for the designated
@@ -1873,7 +1888,7 @@ PACKAGE."
                     (replace (make-array (1+ (length tbls))
                               :initial-element (package-external-symbols pkg))
                              tbls)))
-            (push package (package-%used-by-list pkg)))))))
+            (setf (package-%used-by pkg) nil)))))) ; recomputed on demand
   t)
 
 (defun unuse-package (packages-to-unuse &optional (package (sane-package)))
@@ -1888,8 +1903,7 @@ PACKAGE."
                                      (length packages) packages))
           (setf (package-tables package)
                 (delete (package-external-symbols p) (package-tables package)))
-          (setf (package-%used-by-list p)
-                (remove package (the list (package-%used-by-list p))))))
+          (setf (package-%used-by p) nil))) ; recomputed on demand
       t)))
 
 ;;;; final initialization
@@ -1952,13 +1966,10 @@ PACKAGE."
             (package-%implementation-packages pkg) nil)))
 
   ;; pass 2 - set the 'tables' slots only after all tables have been made
-  (dolist (item *!initial-package-graph*)
-    (let ((this (find-package (car item)))
-          (use-list (mapcar #'find-package (cdr item))))
-      (dolist (other use-list)
-        (push this (package-%used-by-list other)))
-      (setf (package-tables this)
-            (map 'vector #'package-external-symbols use-list))))
+  (loop for (this . use) in *!initial-package-graph*
+        do (setf (package-tables (find-package this))
+                 (map 'vector (lambda (x) (package-external-symbols (find-package x)))
+                              use)))
 
   (rebuild-package-vector)
   ;; Having made all packages, verify that symbol hashes are good.

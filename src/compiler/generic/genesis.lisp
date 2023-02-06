@@ -1638,7 +1638,7 @@ core and return a descriptor to it."
   (or (gethash package-name *cold-package-symbols*)
       (let* ((cold-package (allocate-struct-of-type 'package))
              (info (cons (cons nil nil) cold-package)))
-        (write-slots cold-package :%used-by-list *nil-descriptor*)
+        (write-slots cold-package :%used-by *nil-descriptor*)
         (setf (gethash package-name *cold-package-symbols*) info)
         (initialize-cold-package cold-package package-name)
         info)))

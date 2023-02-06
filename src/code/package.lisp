@@ -99,7 +99,7 @@
   ;; is tested first.
   (mru-table-index 0 :type index)
   ;; packages that use this package
-  (%used-by-list () :type list)
+  (%used-by nil :type (or null weak-pointer))
   ;; SYMBOL-HASHSETs of internal & external symbols
   (internal-symbols nil :type symbol-hashset)
   (external-symbols nil :type symbol-hashset)
@@ -114,6 +114,14 @@
   ;; Mapping of local nickname to actual package.
   ;; One vector stores the mapping sorted by string, the other stores it by
   ;; integer nickname ID so that we can binary search in either.
+  ;; This looks liks a more complicated representation than it has to be.
+  ;; Strictly speaking, that's true. But it helps optimize (find-symbol x "constant")
+  ;; where *PACKAGE* may specify a package-local nickname involving "constant".
+  ;; By translating that string to a small integer at load-time, we can seek the integer
+  ;; in a nickname mapping more quickly than looking for a string. However, there is
+  ;; redundancy now that each package gets an integer ID (to compresss the backlinks
+  ;; from symbols to packages). Nickname IDs were invented first, and it is certainly
+  ;; confusing that there are 2 distinct spaces of small integer IDs.
   (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
