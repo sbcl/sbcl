@@ -470,3 +470,14 @@
            (declare ((or (vector t 2) (member #\@ ,s)) x))
            (typep x '(string 1)))
       ((s) t))))
+
+(with-test (:name :constant-refs)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (let ((m 2301453501242805283))
+           (if (< m a)
+               (< m a)
+               (error ""))))
+    (((expt 2 80)) t)
+    (:return-type (values (member t) &optional))))
