@@ -168,7 +168,7 @@
                    (clambda
                     (aver (xep-p thing))
                     (node-home-lambda (xep-enclose thing)))))))
-          (close-over thing (lambda-environment call-home) thing-env))))
+          (close-over thing (get-lambda-environment call-home) thing-env))))
     (sset-adjoin fun (lambda-calls call-home)))
   (recognize-potentially-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
