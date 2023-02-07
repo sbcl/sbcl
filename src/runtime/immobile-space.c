@@ -65,7 +65,7 @@
 #include "var-io.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include "tlsf-bsd/tlsf/tlsf.h"
+#include "../../tlsf-bsd/tlsf/tlsf.h"
 
 #define WORDS_PER_PAGE ((int)IMMOBILE_CARD_BYTES/N_WORD_BYTES)
 #define DOUBLEWORDS_PER_PAGE (WORDS_PER_PAGE/2)

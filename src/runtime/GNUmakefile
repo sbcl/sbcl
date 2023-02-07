@@ -35,7 +35,7 @@ include ../../output/prefix.def
 
 CFLAGS += -g -Wall -Wundef -Wsign-compare -Wpointer-arith -O3
 ASFLAGS += $(CFLAGS)
-CPPFLAGS += -I. -I../../
+CPPFLAGS += -I.
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features

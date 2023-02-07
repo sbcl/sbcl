@@ -38,7 +38,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
 #include "gc-internal.h"
-#include "tlsf-bsd/tlsf/tlsf.h"
+#include "../../tlsf-bsd/tlsf/tlsf.h"
 extern void* tlsf_control;
 
 /* When we need to do command input, we use this stream, which is not

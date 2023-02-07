@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tlsf-bsd/tlsf/tlsf.h"
+#include "tlsf.h"
 
-#include "tlsf-bsd/tlsf/tlsf_utils.h"
+#include "tlsf_utils.h"
 
 #if __GNUC__ || __INTEL_COMPILER
 #define likely(x) __builtin_expect(!!(x), 1)
