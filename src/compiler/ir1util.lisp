@@ -823,8 +823,6 @@
             (every #'trivial-lambda-var-ref-p
                    (lambda-var-refs (lvar-lambda-var lvar))))))))
 
-(defvar *dx-lexenv*)
-
 (defun trivial-lambda-var-ref-p (use)
   (and (ref-p use)
        (let ((var (ref-leaf use)))
@@ -836,7 +834,6 @@
              ;; bound by a non-XEP lambda, no other REFS that aren't
              ;; DX-SAFE, or are result-args when the result is discarded.
              (when (and (neq :external (lambda-kind home))
-                        (lexenv-contains-lambda home *dx-lexenv*)
                         (dolist (ref refs t)
                           (unless (or (eq use ref)
                                       (ref-good-for-dx-p ref))
