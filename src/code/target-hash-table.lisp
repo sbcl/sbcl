@@ -871,14 +871,12 @@ multiple threads accessing the same hash-table without locking."
        result))))
 ) ; end MACROLET
 
-(defun recompute-ht-vector-sizes (table)
+(defun recompute-ht-vector-sizes (table old-size)
   ;; Compute new vector lengths for the table, extending the table based on the
   ;; rehash-size.
-  (let* ((old-next-vector (hash-table-next-vector table))
-         ;; The NEXT vector's length is 1 greater than "size" - the number
-         ;; of k/v pairs at full capacity.
-         (old-size (1- (length old-next-vector)))
-         (rehash-size (hash-table-rehash-size table))
+  ;; If I did the math right, the upper bound is a fixnum on 32-bit (and 64-bit of course)
+  (declare (type (integer 1 (#.(ash 1 29))) old-size))
+  (let* ((rehash-size (hash-table-rehash-size table))
          (new-size (typecase rehash-size
                      ;; Ensure that if the user specifies a float that is so close
                      ;; to 1.0 as to disappear in the TRUNCATE that we actually grow.
@@ -963,7 +961,12 @@ multiple threads accessing the same hash-table without locking."
               (hash-table-next-vector table) next-vector
               (hash-table-hash-vector table) hash-vector)
         (return-from grow-hash-table 1)))
-    (binding* (((new-size new-n-buckets) (recompute-ht-vector-sizes table))
+    (binding* (((new-size new-n-buckets)
+                (recompute-ht-vector-sizes
+                 table
+                 ;; Pass the old size. The NEXT vector's length is 1 greater than "size"
+                 ;; which is the number of k/v pairs stored at its full capacity.
+                 (1- (length (hash-table-next-vector table)))))
                (old-kv-vector (hash-table-pairs table))
                ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
                 (realloc new-size new-n-buckets))
