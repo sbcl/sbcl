@@ -176,10 +176,11 @@
              (or (sb-xc:subtypep typename 'ctype)
                  (eq typename 'sb-thread::avlnode))))
       (and node
-           (named-let search-env ((env (sb-c::node-lexenv node)))
-             (dolist (data (sb-c::lexenv-user-data env)
-                           (and (sb-c::lexenv-parent env)
-                                (search-env (sb-c::lexenv-parent env))))
+           (named-let search-env ((lexenv (sb-c::node-lexenv node)))
+             (dolist (data (sb-c::lexenv-user-data lexenv)
+                           (let ((call-lexenv (sb-c::lambda-call-lexenv
+                                               (sb-c::lexenv-lambda lexenv))))
+                             (and call-lexenv (search-env call-lexenv))))
                (when (and (eq (first data) :declare)
                           (eq (second data) 'sb-c::tlab))
                  (return (eq (third data) :system))))))))
