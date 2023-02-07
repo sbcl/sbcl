@@ -377,17 +377,6 @@
         (setf (lvar-dynamic-extent new) cleanup)
         (setf (cleanup-nlx-info cleanup) (subst new old (cleanup-nlx-info cleanup)))))))
 
-(defun lexenv-contains-lambda (lambda parent-lexenv)
-  (loop for lexenv = (lambda-lexenv lambda)
-        then (let ((lambda (lexenv-lambda lexenv)))
-               (and lambda
-                    (lambda-call-lexenv lambda)))
-        while lexenv
-        thereis
-        (loop for parent = lexenv then (lexenv-parent parent)
-              while parent
-              thereis (eq parent parent-lexenv))))
-
 ;;; Handle
 ;;; (dx-let ((x (let ((m (make-array)))
 ;;;               (fill m)
@@ -398,8 +387,9 @@
     (when (and dx
                (lambda-var-p new-lambda-var)
                ;; Make sure the let is inside the dx let
-               (lexenv-contains-lambda (lambda-var-home new-lambda-var)
-                                       (node-lexenv (cleanup-mess-up dx))))
+               (not (find new-lambda-var
+                          (lexenv-vars (node-lexenv (cleanup-mess-up dx)))
+                          :key #'cdr :test #'eq)))
       (let ((new-lvar (lambda-var-ref-lvar new-ref)))
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar)
