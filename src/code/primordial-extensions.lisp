@@ -314,3 +314,15 @@
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
   `(defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
+
+;;; These are shorthand.
+;;; If in some policy we decide to open-code MEMBER, there should be
+;;; no discernable difference between MEMQ and (MEMBER ... :test 'EQ).
+(declaim (inline memq assq))
+(defun memq (item list)
+  "Return tail of LIST beginning with first element EQ to ITEM."
+  (member item list :test #'eq))
+
+(defun assq (item alist)
+  "Return the first pair of alist where item is EQ to the key of pair."
+  (assoc item alist :test #'eq))

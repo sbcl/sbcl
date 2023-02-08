@@ -237,16 +237,6 @@
 
 ;;; Functions for compatibility sake:
 
-(defun memq (item list)
-  "Return tail of LIST beginning with first element EQ to ITEM."
-  (declare (inline member))
-  (member item list :test #'eq))
-
-(defun assq (item alist)
-  "Return the first pair of alist where item is EQ to the key of pair."
-  (declare (inline assoc))
-  (assoc item alist :test #'eq))
-
 ;;; Delete just one item
 (defun delq1 (item list)
   (do ((prev nil x)
