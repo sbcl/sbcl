@@ -1,5 +1,6 @@
 (setq *evaluator-mode* :compile)
 (load "src/code/redblack.lisp")
+(with-compilation-unit () (load "tests/test-util.lisp"))
 
 (in-package "SB-RBTREE.WORD")
 (defun height (tree)
@@ -30,6 +31,7 @@
 (in-package "CL-USER")
 (defvar *brothertree* nil)
 (defvar *rbtree* nil)
+(defvar *solist* nil)
 
 (defvar *lotta-strings*
   (mapcar (lambda (x)
@@ -53,13 +55,48 @@
       (setq tree (sb-rbtree.word:insert tree str)))
     (setq *rbtree* tree)))
 
+(defun insert-all-solist ()
+  (let ((set (let ((sb-lockless::*desired-elts-per-bin* 1))
+               (sb-lockless:make-so-set/addr))))
+    (dolist (str *lotta-strings*)
+      (sb-lockless:so-insert set str))
+    (setq *solist* set)))
+
 (gc)
 (time (insert-all-redblack))
 (gc)
 (time (insert-all-brothertree))
-(format t "~&Tree heights: redblack=~D brother=~D~%"
+(gc)
+(time (insert-all-solist))
+(let ((n (length *lotta-strings*)))
+  (format t "~&Memory:~:{~%  ~8a=~8D ~3,1f~}~%"
+          (loop for (name . val) in `(("brother" . ,*brothertree*)
+                                      ("redblack" . ,*rbtree*)
+                                      ("solist" . ,*solist*))
+                collect
+                (let ((mem (test-util:deep-size val)))
+                  (list name mem (/ mem n))))))
+
+(format t "~&Tree heights: redblack=~D brother=~D~2%"
         (sb-rbtree.word::height *rbtree*)
         (sb-brothertree::height *brothertree*))
+
+(defun find-all-in-brothertree (&aux (tree *brothertree*))
+  (loop for str in *lotta-strings*
+        count (sb-brothertree:find= str tree)))
+(defun find-all-in-redblack-tree (&aux (tree *rbtree*))
+  (loop for str in *lotta-strings*
+        count (sb-rbtree.word:find= str tree)))
+(defun find-all-in-solist (&aux (set *solist*))
+  (loop for str in *lotta-strings*
+        count (sb-lockless:so-find set str)))
+
+(find-all-in-brothertree)
+(find-all-in-redblack-tree)
+(find-all-in-solist)
+(time (find-all-in-brothertree))
+(time (find-all-in-redblack-tree))
+(time (find-all-in-solist))
 
 #|
 * (load"benchmarks/bbtrees")

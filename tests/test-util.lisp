@@ -12,6 +12,7 @@
            #:type-specifiers-equal
            #:assert-tri-eq
            #:random-type
+           #:deep-size
 
            ;; thread tools
            #:*n-cpus*
@@ -1006,3 +1007,34 @@
 (defmacro deftest (name form &rest results) ; use SB-RT syntax
   `(test-util:with-test (:name ,(sb-int:keywordicate name))
      (assert (equalp (multiple-value-list ,form) ',results))))
+
+;;; Compute size of OBJ including descendants.
+;;; LEAFP specifies what object types to treat as not reaching
+;;; any other object. You pretty much have to treat symbols
+;;; as leaves, otherwise you reach a package and then the result
+;;; just explodes to beyond the point of being useful.
+;;; (It works, but might reach the entire heap)
+;;; To turn this into an actual thing, we'd want to reduce the consing.
+(defun deep-size (obj &optional (leafp (lambda (x)
+                                         (typep x '(or package symbol sb-kernel:fdefn
+                                                       function sb-kernel:code-component
+                                                       sb-kernel:wrapper sb-kernel:classoid)))))
+  (let ((worklist (list obj))
+        (seen (make-hash-table :test 'eq))
+        (tot-bytes 0))
+    (setf (gethash obj seen) t)
+    (flet ((visit (thing)
+             (when (sb-vm:is-lisp-pointer (sb-kernel:get-lisp-obj-address thing))
+               (unless (or (funcall leafp thing)
+                           (gethash thing seen))
+                 (push thing worklist)
+                 (setf (gethash thing seen) t)))))
+      (loop
+        (unless worklist (return))
+        (let ((x (pop worklist)))
+          (incf tot-bytes (primitive-object-size x))
+          (sb-vm:do-referenced-object (x visit)))))
+    ;; Secondary values is number of visited objects not incl. original one.
+    (values tot-bytes
+            (1- (hash-table-count seen))
+            seen)))

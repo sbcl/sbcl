@@ -3591,7 +3591,7 @@ package is deprecated in favour of SB-MOP.")
   (:use "CL" "SB-EXT" "SB-INT")
   (:documentation "internal: 1-2-Brother tree")
   (:shadow "DELETE")
-  (:export "INSERT" "DELETE"))
+  (:export "INSERT" "DELETE" "FIND<=" "FIND>=" "FIND="))
 
 (defpackage* "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")

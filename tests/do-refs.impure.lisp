@@ -144,40 +144,9 @@
                                (typep fin-fun 'closure)
                                (typep d '(and integer (not (eql 0))))))))))
 
-;;; Compute size of OBJ including descendants.
-;;; LEAFP specifies what object types to treat as not reaching
-;;; any other object. You pretty much have to treat symbols
-;;; as leaves, otherwise you reach a package and then the result
-;;; just explodes to beyond the point of being useful.
-;;; (It works, but might reach the entire heap)
-;;; To turn this into an actual thing, we'd want to reduce the consing.
-(defun deep-size (obj &optional (leafp (lambda (x)
-                                         (typep x '(or package symbol fdefn
-                                                       function code-component
-                                                       wrapper classoid)))))
-  (let ((worklist (list obj))
-        (seen (make-hash-table :test 'eq))
-        (tot-bytes 0))
-    (setf (gethash obj seen) t)
-    (flet ((visit (thing)
-             (when (is-lisp-pointer (get-lisp-obj-address thing))
-               (unless (or (funcall leafp thing)
-                           (gethash thing seen))
-                 (push thing worklist)
-                 (setf (gethash thing seen) t)))))
-      (loop
-        (unless worklist (return))
-        (let ((x (pop worklist)))
-          (incf tot-bytes (primitive-object-size x))
-          (do-referenced-object (x visit)))))
-    ;; Secondary values is number of visited objects not incl. original one.
-    (values tot-bytes
-            (1- (hash-table-count seen))
-            seen)))
-
 (test-util:with-test (:name :deep-sizer)
   (multiple-value-bind (tot-bytes n-kids)
-      (deep-size #(a b c d (e f) #*0101))
+      (test-util:deep-size #(a b c d (e f) #*0101))
     ;; 8 words for the vector
     ;; 4 words for 2 conses
     ;; 4 words for a bit-vector: header/length/bits/padding
