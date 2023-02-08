@@ -407,17 +407,17 @@
               ,@(case designator
                   (:input
                    `(((eq ,streamvar t)
-                      (setf ,streamvar *standard-input*)
+                       (setf ,streamvar *terminal-io*)
                       (go again))
                      ((null ,streamvar)
-                      (setf ,streamvar *terminal-io*)
+                      (setf ,streamvar *standard-input*)
                       (go again))))
                    (:output
                     `(((eq ,streamvar t)
-                       (setf ,streamvar *standard-output*)
+                       (setf ,streamvar *terminal-io*)
                        (go again))
                       ((null ,streamvar)
-                       (setf ,streamvar *terminal-io*)
+                       (setf ,streamvar *standard-output*)
                        (go again)))))
               (t
                (sb-c::%type-check-error/c ,streamvar 'sb-kernel::object-not-stream-error nil))))))
