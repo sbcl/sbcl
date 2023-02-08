@@ -428,7 +428,7 @@
 (defun fd-stream-read-n-characters/utf-8 (stream buffer start requested eof-error-p &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
-           (type (simple-array character (512)) buffer))
+           (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
   (when (fd-stream-eof-forced-p stream)
     (setf (fd-stream-eof-forced-p stream) nil)
     (return-from fd-stream-read-n-characters/utf-8 0))

@@ -2609,7 +2609,7 @@
 ;;; FIXME: misleading name, screwy interface
 (defun file-name (stream &optional new-name)
   (stream-api-dispatch (stream)
-    :gray (declare (ignore stream))
+    :gray nil
     :native
     (when (typep stream 'fd-stream)
       (cond (new-name

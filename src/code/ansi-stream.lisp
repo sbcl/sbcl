@@ -383,22 +383,41 @@
 ;;; deciding whether the argument is actually a stream or merely a designator
 ;;; for a stream (T or NIL), and then figuring out which family of stream
 ;;; it belongs to: ANSI, Gray, or simple.
-(defmacro stream-api-dispatch ((streamvar &optional initform) &key native simple gray)
+(defmacro stream-api-dispatch ((streamvar &optional designator) &key native simple gray)
   ;; Most CL: stream APIs use explicit-check, so we should assert that the thing
   ;; is actually a stream.
   ;; If the CL interface bypasses STREAM-API-DISPATCH then it is up to generic layer
   ;; to signal an error, the class of which seems unfortunately subject to debate.
   (aver (and native (or simple gray)))
-  `(let ,(if initform `((,streamvar ,initform)))
-     ;; Dispatch native first, then if sb-simple-streams have been loaded,
-     ;; those, and finally punt to a generic function.
-     (block stream
-       ;; Assume that simple-stream can not inherit funcallable-standard-object.
-       (when (%instancep ,streamvar)
-         (let ((layout (%instance-layout ,streamvar)))
-           (cond ((sb-c::%structure-is-a layout ,(find-layout 'ansi-stream))
-                  (let ((,streamvar (truly-the ansi-stream ,streamvar)))
-                    (return-from stream ,native)))
-                 ((logtest (layout-flags layout) +simple-stream-layout-flag+)
-                  (return-from stream ,simple)))))
-       (let ((,streamvar (the stream ,streamvar))) ,gray))))
+  ;; Dispatch native first, then if sb-simple-streams have been loaded,
+  ;; those, and finally punt to a generic function.
+  `(block stream
+     (tagbody
+      again
+        ;; Assume that simple-stream can not inherit funcallable-standard-object.
+        (when (%instancep ,streamvar)
+          (let ((layout (%instance-layout ,streamvar)))
+            (cond ((sb-c::%structure-is-a layout ,(find-layout 'ansi-stream))
+                   (let ((,streamvar (truly-the ansi-stream ,streamvar)))
+                     (return-from stream ,native)))
+                  ((logtest (layout-flags layout) +simple-stream-layout-flag+)
+                   (return-from stream ,simple)))))
+        (cond ((streamp ,streamvar)
+               (return-from stream ,gray))
+              ,@(case designator
+                  (:input
+                   `(((eq ,streamvar t)
+                      (setf ,streamvar *standard-input*)
+                      (go again))
+                     ((null ,streamvar)
+                      (setf ,streamvar *terminal-io*)
+                      (go again))))
+                   (:output
+                    `(((eq ,streamvar t)
+                       (setf ,streamvar *standard-output*)
+                       (go again))
+                      ((null ,streamvar)
+                       (setf ,streamvar *terminal-io*)
+                       (go again)))))
+              (t
+               (sb-c::%type-check-error/c ,streamvar 'sb-kernel::object-not-stream-error nil))))))

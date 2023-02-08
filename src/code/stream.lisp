@@ -284,7 +284,7 @@
 
 (defun file-string-length (stream object)
   (stream-api-dispatch (stream)
-    :gray (declare (ignore stream))
+    :gray nil
     :simple (s-%file-string-length stream object)
     :native (call-ansi-stream-misc stream :file-string-length object)))
 
@@ -383,7 +383,7 @@
                             recursive-p)
   (declare (explicit-check))
   (declare (ignore recursive-p))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :simple (s-%read-line stream eof-error-p eof-value)
     :native (ansi-stream-read-line stream eof-error-p eof-value)
     :gray
@@ -410,7 +410,7 @@
                             eof-value
                             recursive-p)
   (declare (explicit-check))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :native (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
     ;; The final T is BLOCKING-P. I removed the ignored recursive-p arg.
     :simple (let ((char (s-%read-char stream eof-error-p eof-value t)))
@@ -441,7 +441,7 @@
 
 (defun unread-char (character &optional (stream *standard-input*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :simple (s-%unread-char stream character)
     :native (ansi-stream-unread-char character stream)
     :gray (stream-unread-char stream character))
@@ -462,7 +462,7 @@
 
 (defun listen (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-listen stream)
     :gray (stream-listen stream)))
@@ -479,7 +479,7 @@
                                     eof-value
                                     recursive-p)
   (declare (explicit-check))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :native
         (ansi-stream-read-char-no-hang stream eof-error-p eof-value
                                        recursive-p)
@@ -499,7 +499,7 @@
 
 (defun clear-input (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (in-stream-from-designator stream))
+  (stream-api-dispatch (stream :input)
     :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-clear-input stream)
     :gray (stream-clear-input stream))
@@ -673,7 +673,7 @@
 
 (defun write-char (character &optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (funcall (ansi-stream-out stream) stream character)
     :simple (s-%write-char stream character)
     :gray (stream-write-char stream character))
@@ -681,7 +681,7 @@
 
 (defun terpri (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (funcall (ansi-stream-out stream) stream #\Newline)
     :simple (s-%terpri stream)
     :gray (stream-terpri stream))
@@ -689,7 +689,7 @@
 
 (defun fresh-line (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (unless (eql (charpos stream) 0)
               (funcall (ansi-stream-out stream) stream #\newline)
               t)
@@ -700,7 +700,7 @@
     ((define (name)
        `(defun ,name (string stream start end)
           (with-array-data ((data string) (start start) (end end) :check-fill-pointer t)
-            (stream-api-dispatch (stream)
+            (stream-api-dispatch (stream :output)
               :native (progn (funcall (ansi-stream-sout stream) stream data start end)
                              ,@(when (eq name '%write-line)
                                  '((funcall (ansi-stream-out stream) stream #\newline))))
@@ -715,28 +715,28 @@
 (defun write-string (string &optional (stream *standard-output*)
                             &key (start 0) end)
   (declare (explicit-check))
-  (%write-string string (out-stream-from-designator stream) start end))
+  (%write-string string stream start end))
 
 (defun write-line (string &optional (stream *standard-output*)
                    &key (start 0) end)
   (declare (explicit-check))
-  (%write-line string (out-stream-from-designator stream) start end))
+  (%write-line string stream start end))
 
 (defun charpos (&optional (stream *standard-output*))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (call-ansi-stream-misc stream :charpos)
     :simple (s-%charpos stream)
     :gray (stream-line-column stream)))
 
 (defun line-length (&optional (stream *standard-output*))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (call-ansi-stream-misc stream :line-length)
     :simple (s-%line-length stream)
     :gray (stream-line-length stream)))
 
 (defun finish-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (call-ansi-stream-misc stream :finish-output)
     :simple (s-%finish-output stream)
     :gray (stream-finish-output stream))
@@ -744,7 +744,7 @@
 
 (defun force-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (call-ansi-stream-misc stream :force-output)
     :simple (s-%force-output stream)
     :gray (stream-force-output stream))
@@ -752,7 +752,7 @@
 
 (defun clear-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (stream-api-dispatch (stream (out-stream-from-designator stream))
+  (stream-api-dispatch (stream :output)
     :native (call-ansi-stream-misc stream :clear-output)
     :simple (s-%clear-output stream)
     :gray (stream-clear-output stream))
