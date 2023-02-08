@@ -752,7 +752,7 @@
              (search "src/code/arena" stem)
              (search "src/code/avltree" stem)
              (search "src/code/brothertree" stem)
-             (search "src/code/debug" stem)
+             (search "src/code/debug" stem) ; also matches debug-{info,int,var-io}
              (search "src/code/early-defmethod" stem)
              (search "src/code/final" stem)
              (search "src/code/format" stem)

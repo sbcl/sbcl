@@ -419,8 +419,8 @@
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)
-  ;; The CDR is an alist which maps SB-C::COMPILED-DEBUG-FUN to
-  ;; SB-DI::COMPILED-DEBUG-FUN instances. Null when unassigned.
+  ;; An alist mapping SB-C::COMPILED-DEBUG-FUN
+  ;; to SB-DI::COMPILED-DEBUG-FUN instances.
   (memo-cell nil :type list))
 
 ;;;; file reading

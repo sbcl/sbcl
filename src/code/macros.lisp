@@ -2051,6 +2051,9 @@ EXPERIMENTAL: Interface subject to change."
 
 
 ;;; This is what it all comes down to.
+;;; Possible todo: implement CAS-WEAK like in C and C++ standards
+;;; so that we don't loop-in-a-loop where failure has to re-test
+;;; whether some item is in a list, and retry the CAS anyway.
 (sb-xc:defmacro cas (place old new &environment env)
   "Synonym for COMPARE-AND-SWAP.
 

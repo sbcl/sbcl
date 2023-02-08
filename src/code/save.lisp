@@ -360,7 +360,6 @@ sufficiently motivated to do lengthy fixes."
 
 sb-c::
 (defun coalesce-debug-info ()
-  #+cheneygc (clrhash sb-di::*compiled-debug-funs*)
   (flet ((debug-source= (a b)
            (and (equal (debug-source-plist a) (debug-source-plist b))
                 (eql (debug-source-created a) (debug-source-created b)))))

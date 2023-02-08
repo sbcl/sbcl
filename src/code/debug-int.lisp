@@ -222,8 +222,7 @@
 ;;;; DEBUG-FUNs
 
 ;;; These exist for caching data stored in packed binary form in
-;;; compiler DEBUG-FUNs. *COMPILED-DEBUG-FUNS* maps a SB-C::DEBUG-FUN
-;;; to a DEBUG-FUN. There should only be one DEBUG-FUN in existence
+;;; compiler DEBUG-FUNs.  There should only be one DEBUG-FUN in existence
 ;;; for any function; that is, all CODE-LOCATIONs and other objects
 ;;; that reference DEBUG-FUNs point to unique objects. This is
 ;;; due to the overhead in cached information.
@@ -350,13 +349,6 @@
             (compiled-frame-escaped obj))))
 
 
-;;; This maps SB-C::COMPILED-DEBUG-FUNs to
-;;; COMPILED-DEBUG-FUNs, so we can get at cached stuff and not
-;;; duplicate COMPILED-DEBUG-FUN structures.
-#+cheneygc ; can't write to debug-info in a purified code object
-(define-load-time-global *compiled-debug-funs*
-    (make-hash-table :test 'eq :weakness :key))
-
 ;;;; breakpoints
 
 ;;; This is an internal structure that manages information about a
@@ -463,31 +455,23 @@
 ;;; of the slot in the SB-DI:: version of the structure.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
   (declare (code-component component))
-  #+gencgc ; TODO: can we make this hang off the code via a weak-pointer?
-  (let ((memo-cell
-         (let* ((info (sb-vm::%%code-debug-info component))
-                (val (sb-c::compiled-debug-info-memo-cell info)))
-           (if (null val)
-               (let* ((list (cons val nil))
-                      (old (cas (sb-c::compiled-debug-info-memo-cell info) val list)))
-                 (if (eq old val) list old))
-               val))))
-    ;; The CDR of MEMO-CELL slot is an alist from compiler -> debugger structure.
-    (let ((new-df nil) (new-pair nil) (new-alist nil) (alist (cdr memo-cell)))
-      (loop
-        ;; This list generally contains 5 items or less. At least, in our tests it does
-        ;; which I assume is typical.
-        (awhen (assoc compiler-debug-fun alist :test #'eq) (return (cdr it)))
-        (if new-alist
-            (rplacd new-alist alist)
-            (setq new-df (%make-compiled-debug-fun compiler-debug-fun component)
-                  new-pair (cons compiler-debug-fun new-df)
-                  new-alist (cons new-pair alist)))
-        (let ((old (cas (cdr memo-cell) alist new-alist)))
-          (if (eq old alist) (return new-df) (setq alist old))))))
-  #+cheneygc
-  (ensure-gethash compiler-debug-fun *compiled-debug-funs*
-                  (%make-compiled-debug-fun compiler-debug-fun component)))
+  (let ((dinfo (%code-debug-info component))
+        (new-df nil))
+    ;; The MEMO-CELL slot holds an alist from compiler -> debugger structure.
+    ;; This list generally contains 5 items or less. At least, in our tests it does
+    ;; which I assume is typical.
+    ;; It would do no good to make this a weak list because most code is
+    ;; pseudo-static and so would always enliven its memo-cell.
+    (named-let retry ((list (sb-c::compiled-debug-info-memo-cell dinfo)))
+      (let ((found (assq compiler-debug-fun list)))
+        (if found
+            (cdr found)
+            (let* ((new (acons compiler-debug-fun
+                               (or new-df (setq new-df (%make-compiled-debug-fun
+                                                        compiler-debug-fun component)))
+                               list))
+                   (old (cas (sb-c::compiled-debug-info-memo-cell dinfo) list new)))
+              (if (eq old list) new-df (retry old))))))))
 
 ;;;; CODE-LOCATIONs
 
