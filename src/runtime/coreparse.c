@@ -539,24 +539,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                 FIXUP(where[1] += delta, where+1);
             }
             continue;
-        case BIGNUM_WIDETAG:
-#ifndef LISP_FEATURE_64_BIT
-        case SINGLE_FLOAT_WIDETAG:
-#endif
-        case DOUBLE_FLOAT_WIDETAG:
-        case COMPLEX_SINGLE_FLOAT_WIDETAG:
-        case COMPLEX_DOUBLE_FLOAT_WIDETAG:
-#ifdef SIMD_PACK_WIDETAG
-        case SIMD_PACK_WIDETAG:
-#endif
-#ifdef SIMD_PACK_256_WIDETAG
-        case SIMD_PACK_256_WIDETAG:
-#endif
-        case FILLER_WIDETAG: // non-card-spanning object pages container fillers
-            continue;
         default:
-          if (other_immediate_lowtag_p(widetag)
-              && specialized_vector_widetag_p(widetag))
+          if ((other_immediate_lowtag_p(widetag) && leaf_obj_widetag_p(widetag))
+              || widetag==FILLER_WIDETAG)
               continue;
           else
               lose("Unrecognized heap object: @%p: %"OBJ_FMTX, where, *where);
