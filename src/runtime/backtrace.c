@@ -589,10 +589,10 @@ void backtrace_from_fp(void *fp, int nframes, int start) {
     log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
 }
 
-void backtrace_from_context(os_context_t *context, int nframes) {
+void print_backtrace_from_context(os_context_t *context, int nframes, FILE* file) {
     void *fp = (void *)os_context_frame_pointer(context);
-    print_backtrace_frame((void *)os_context_pc(context), fp, 0, stdout);
-    backtrace_from_fp(fp, nframes - 1, 1);
+    print_backtrace_frame((void *)os_context_pc(context), fp, 0, file);
+    log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes - 1, 1, file);
 }
 
 void
@@ -603,7 +603,7 @@ lisp_backtrace(int nframes)
 
     if (free_ici) {
         os_context_t *context = nth_interrupt_context(free_ici - 1, thread);
-        backtrace_from_context(context, nframes);
+        print_backtrace_from_context(context, nframes, stdout);
     } else {
         void *fp;
 
