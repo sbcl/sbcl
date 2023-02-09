@@ -171,7 +171,9 @@
 ;;;; comment from CMU CL: "the ultimate collection macro..."
 
 ;;; helper function for COLLECT, which becomes the expander of the
-;;; MACROLET definitions created by COLLECT if collecting a list.
+;;; MACROLET definitions created by COLLECT if collecting a list
+;;; and an INITIAL-VALUE was specified, so we don't know at each step
+;;; whether the tail is NIL or not.
 ;;; N-TAIL is the pointer to the current tail of the list,  or NIL
 ;;; if the list is empty.
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -198,37 +200,64 @@
 ;;; the collection macro with no arguments.
 ;;;
 ;;; INITIAL-VALUE is the value that the collection starts out with,
-;;; which defaults to NIL. FUNCTION is the function which does the
+;;; which defaults to NIL. COLLECTOR is the function which does the
 ;;; collection. It is a function which will accept two arguments: the
 ;;; value to be collected and the current collection. The result of
 ;;; the function is made the new value for the collection. As a
-;;; totally magical special-case, FUNCTION may be COLLECT, which tells
-;;; us to build a list in forward order; this is the default. If an
-;;; INITIAL-VALUE is supplied for COLLECT, the stuff will be RPLACD'd
-;;; onto the end. Note that FUNCTION may be anything that can appear
-;;; in the functional position, including macros and lambdas.
+;;; special-case, omitting COLLECTOR causes a list to be built in forward
+;;; order. If INITIAL-VALUE is supplied for the default usage, new items
+;;; will be RPLACD'd onto the end.
+;;; Note that COLLECTOR may be anything that can appear in the functional
+;;; position, including macros and lambdas.
+;;; Also note that invocation of the collector macro for effect, i.e. other
+;;; than with 0 arguments, is not prescribed to have any particular value.
 (defmacro collect (collections &body body)
   (let ((macros ())
         (binds ())
+        (dx ())
         (ignores ()))
     (dolist (spec collections)
-      (destructuring-bind (name &optional default collector
-                                &aux (n-value (copy-symbol name))) spec
-        (push `(,n-value ,default) binds)
+      (destructuring-bind (name &optional initial-value (collector nil collectorp)
+                                &aux (n-value (copy-symbol name)))
+          spec
+        (push `(,n-value ,(if (or initial-value collectorp) initial-value `(list nil)))
+              binds)
         (let ((macro-body
-               (if (or (null collector) (eq collector 'collect))
-                   (let ((n-tail (gensymify* name "-TAIL")))
-                     (push n-tail ignores)
-                     (push `(,n-tail ,(if default `(last ,n-value))) binds)
-                     `(collect-list-expander ',n-value ',n-tail args))
+               (cond
+                 (collectorp
                    ``(progn
                        ,@(mapcar (lambda (x)
                                    `(setq ,',n-value (,',collector ,x ,',n-value)))
                                  args)
-                       ,',n-value))))
+                       ,',n-value))
+                 ((not initial-value)
+                  ;; Use a dummy cons to skip the test for TAIL being NIL with each
+                  ;; inserted item.
+                  (push n-value dx)
+                  (let ((n-tail (gensymify* name "-TAIL")))
+                    (push n-tail ignores)
+                    (push `(,n-tail ,n-value) binds)
+                    `(if args
+                         `(progn
+                            ,@(mapcar (lambda (x)
+                                        `(setf ,',n-tail (setf (cdr ,',n-tail)
+                                                               (list ,x))))
+                                      args))
+                         `(cdr ,',n-value))))
+                 ;; collecting a list given a list to start with.
+                 ;; It's possible to use the "fancy" strategy to avoid testing for NIL
+                 ;; at each step but I choose not to.  The initializer would have to be
+                 ;; (cons nil initial-value). It's unimportant.
+                 (initial-value
+                  (let ((n-tail (gensymify* name "-TAIL")))
+                    (push n-tail ignores)
+                    (push `(,n-tail (last ,n-value)) binds)
+                    `(collect-list-expander ',n-value ',n-tail args))))))
           (push `(,name (&rest args) ,macro-body) macros))))
     `(macrolet ,macros
        (let* ,(nreverse binds)
+         ,@(if dx `((declare (#+sb-xc-host dynamic-extent ; maybe host can do
+                              #-sb-xc-host truly-dynamic-extent ,@dx))))
          ;; Even if the user reads each collection result,
          ;; reader conditionals might statically eliminate all writes.
          ;; Since we don't know, all the -n-tail variable are ignorable.
