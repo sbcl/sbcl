@@ -477,7 +477,7 @@
          (external-table (truly-the (simple-array word (*))
                                     sb-fasl::*asm-routine-vector*))
          (insts (code-instructions code))
-         (n (sb-impl::hash-table-%count (car (%%code-debug-info code)))))
+         (n (sb-impl::hash-table-%count (sb-fasl::%asm-routine-table code))))
     (declare (optimize (insert-array-bounds-checks 0)))
     (dotimes (i n)
       (unless (= (aref external-table i) 0)

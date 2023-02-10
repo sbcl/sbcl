@@ -351,8 +351,11 @@
 
 ;;;; linkage fixups
 
+(defun %asm-routine-table (code-obj)
+   (#+darwin-jit car #-darwin-jit identity (%code-debug-info code-obj)))
+
 (defun calc-asm-routine-bounds ()
-  (loop for v being each hash-value of (%code-debug-info *assembler-routines*)
+  (loop for v being each hash-value of (%asm-routine-table *assembler-routines*)
         minimize (car v) into min
         maximize (cadr v) into max
         ;; min/max are inclusive byte ranges, but return the answer
@@ -365,7 +368,7 @@
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
   ;; Each architecture can define an "indirect" value in its own peculiar way.
   ;; Only some of our architectures use that option.
-  (awhen (the list (gethash (the symbol name) (%code-debug-info code)))
+  (awhen (the list (gethash (the symbol name) (%asm-routine-table code)))
     (destructuring-bind (start end . index) it
       (declare (ignore end) (ignorable index))
       (let* ((insts (code-instructions code))
@@ -391,7 +394,7 @@
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
          (ht (make-hash-table))) ; keys are symbols
-    (rplaca (%code-debug-info code) ht)
+    (#+darwin-jit rplaca #-darwin-jit setf (%code-debug-info code) ht)
     (setf *asm-routine-index-to-name* (make-array (1+ (length vector))))
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)

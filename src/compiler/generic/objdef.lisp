@@ -200,7 +200,7 @@ during backtrace.
   ;; on the slot index; and there's a special variant if #+darwin-jit.
   (debug-info :type t
               :ref-known (flushable)
-              :ref-trans %%code-debug-info)
+              :ref-trans %code-debug-info)
   ;; Not all architectures use fixups. The slot is always present for consistency.
   ;; The corresponding SETF function is defined using code-header-set
   ;; on the slot index.

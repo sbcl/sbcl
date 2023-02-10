@@ -1528,9 +1528,7 @@
 
 ;;; Show the compiled debug function chain
 (defun show-cdf-chain (code)
-  (let* ((cdf
-          (sb-c::compiled-debug-info-fun-map
-           (sb-kernel:%code-debug-info (sb-kernel:fun-code-header #'open))))
+  (let* ((cdf (code-fun-map (fun-code-header code)))
          (ct 0))
     (format t "begin      end   startPC  elsewhere~%")
     (loop
@@ -2094,7 +2092,7 @@
          (segments
           (if (eq code-component sb-fasl:*assembler-routines*)
               (collect ((segs))
-                (dohash ((name locs) (%code-debug-info code-component))
+                (dohash ((name locs) (sb-fasl::%asm-routine-table code-component))
                   (destructuring-bind (start end . index) locs
                     (declare (ignore index))
                     (let ((seg (make-code-segment
@@ -2217,7 +2215,7 @@
                         (setf (gethash (funcall addr-xform address) addr->name) name))
                       name->addr)))
       (let ((code sb-fasl:*assembler-routines*))
-        (invert (%code-debug-info code)
+        (invert (sb-fasl::%asm-routine-table code)
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x)))))))
     (dovector (name sb-vm::+all-static-fdefns+)
       ;; ENTER-ALIEN-CALLBACK is not fboundp until src/code/alien-callback
@@ -2238,7 +2236,7 @@
            (values found 0))
           (t
            (let* ((code sb-fasl:*assembler-routines*)
-                  (hashtable (%code-debug-info code))
+                  (hashtable (sb-fasl::%asm-routine-table code))
                   (start (sap-int (code-instructions code)))
                   (end (+ start (1- (%code-text-size code)))))
              (when (<= start address end) ; it has to be an asm routine

@@ -1092,7 +1092,7 @@
                 (when (member flavor '(:assembly-routine :assembly-routine*))
                   (setq named nil)
                   (the (integer 1 *) ; data can't be 0
-                       (cddr (gethash name (%code-debug-info *assembler-routines*)))))
+                       (cddr (gethash name (%asm-routine-table *assembler-routines*)))))
                 0))
            (info
             (!pack-fixup-info (fixup-note-position note) (fixup-note-kind note)

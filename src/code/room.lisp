@@ -734,7 +734,7 @@ We could try a few things to mitigate this:
                    (#.code-header-widetag
                     (let ((dinfo (%code-debug-info obj)))
                       (format stream "~&Code object: ~S~%"
-                              (if dinfo
+                              (if dinfo ; BUG: what if this is in the asm code ?
                                   (sb-c::compiled-debug-info-name dinfo)
                                   "No debug info."))))
                    (#.symbol-widetag

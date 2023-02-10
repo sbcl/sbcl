@@ -4015,15 +4015,13 @@ III. initially undefined function references (alphabetically):
       (makunbound '*deferred-undefined-tramp-refs*)
 
       (when *cold-assembler-obj*
-        (write-wordindexed
-         *cold-assembler-obj* sb-vm:code-debug-info-slot
-         ;; code-debug-info stores the name->addr hashtable.
-         ;; Make sure readonly space doesn't point to dynamic space here.
-         (let ((z (make-fixnum-descriptor 0)))
-           (cold-cons z z (ecase (gspace-name
-                                  (descriptor-gspace *cold-assembler-obj*))
-                            ((:read-only :static) *static*)
-                            (:immobile-text *dynamic*)))))
+        ;; code-debug-info stores the name->addr hashtable.
+        ;; It's wrapped in a cons so that read-only space points to static-space
+        ;; and not to dynamic space. #-darwin-jit doesn't need this hack.
+        #+darwin-jit
+        (write-wordindexed *cold-assembler-obj* sb-vm:code-debug-info-slot
+                           (let ((z (make-fixnum-descriptor 0)))
+                             (cold-cons z z *static*)))
         (init-runtime-routines))
 
       ;; Initialize the *COLD-SYMBOLS* system with the information

@@ -377,7 +377,7 @@ sb-c::
          (declare (ignore size))
          (case widetag
           (#.sb-vm:code-header-widetag
-           (let ((di (sb-vm::%%code-debug-info obj)))
+           (let ((di (%code-debug-info obj)))
              ;; Discard memoized debugger's debug info
              (when (typep di 'sb-c::compiled-debug-info)
                (setf (sb-c::compiled-debug-info-memo-cell di) nil)))

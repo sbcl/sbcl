@@ -386,15 +386,6 @@
   (setf (code-header-ref code sb-vm:code-debug-info-slot) newval)
   newval)
 
-(defun %code-debug-info (code-obj)
-  ;; Extract the unadulterated debug-info emitted by the compiler. The slot
-  ;; value might be a cons of that and info stuffed in by the debugger.
-  (let ((info (sb-vm::%%code-debug-info code-obj)))
-    (if (and (listp info) (%instancep (car info)))
-        (car info)
-        ;; return it unchanged in all other cases
-        info)))
-
 (defun (setf sb-vm::%code-fixups) (newval code)
   (code-header-set code sb-vm::code-fixups-slot newval)
   newval)

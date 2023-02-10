@@ -1046,12 +1046,7 @@
                                           (start (car val))
                                           (end (car (translate (cdr val) spaces))))
                         (list* (translate (symbol-name name) spaces) start end))
-                      (target-hash-table-alist
-                       ;; Can't use %CODE-DEBUG-INFO on a foreign core because
-                       ;; it would dereference the cons not at its current physically mapped
-                       ;; address, but at its logical address. %%CODE-DEBUG-INFO is ok though.
-                       (car (translate (sb-vm::%%code-debug-info code-component) spaces))
-                       spaces))
+                      (target-hash-table-alist (%code-debug-info code-component) spaces))
               #'< :key #'cadr)))
         ;; Possibly unboxed words and/or padding
         (let ((here (ash jump-table-count sb-vm:word-shift))

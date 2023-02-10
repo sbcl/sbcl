@@ -1031,7 +1031,11 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 char* get_asm_routine_by_name(const char* name, int *index)
 {
     struct code* code = (struct code*)asm_routines_start;
+#ifdef LISP_FEATURE_DARWIN_JIT
     lispobj ht = CONS(code->debug_info)->car;
+#else
+    lispobj ht = code->debug_info;
+#endif
     if (ht) {
         struct vector* table =
             VECTOR(((struct hash_table*)native_pointer(ht))->pairs);

@@ -1260,8 +1260,8 @@ register."
     (etypecase info
       (sb-c::compiled-debug-info
        (make-compiled-debug-fun (compiled-debug-fun-from-pc info pc escaped) component))
-      (hash-table ; interrupted in an assembler routine
-       (let ((routine (dohash ((name pc-range) info)
+      ((or hash-table (cons hash-table)) ; interrupted in an assembler routine
+       (let ((routine (dohash ((name pc-range) (if (listp info) (car info) info))
                         (when (<= (car pc-range) pc (cadr pc-range))
                           (return name)))))
          (make-bogus-debug-fun (cond ((not routine)
@@ -3504,10 +3504,6 @@ register."
 
 ;;; This maps components to a mapping of offsets to BREAKPOINT-DATAs.
 ;;; FIXME: these data should hang off of the component itself.
-;;; We already have a thin wrapper on %CODE-DEBUG-INFO which allows it to
-;;; hold both the compiler-generated metadata and the debugger's data.
-;;; It might be preferable not to write to code if #+darwin-jit
-;;; but I don't think so - the hash-table entails far more overhead.
 (define-load-time-global *component-breakpoint-offsets*
     (make-hash-table :test 'eq :synchronized t))
 
