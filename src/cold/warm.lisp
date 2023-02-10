@@ -150,6 +150,12 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                  (read f) ; skip over the make-host-{1,2} input files
                  (read f)))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
+ ;; The CONCATENATE transform involves REPLACE which involves UBn-BASH-COPY which involves
+ ;; SHIFT-TOWARDS-{START|END} which is called with a constant arg. But the interpreter stubs
+ ;; aren't compiled yet. So in attempting to constant-fold the call, CAREFUL-CALL gets an
+ ;; undefined-fun error, which is handled fine unless you've broken the handler for undefined-fun
+ ;; and are trying to debug it in early warm load.
+ (declare (notinline concatenate))
  (proclaim '(sb-ext:muffle-conditions compiler-note))
  (flet ((do-srcs (list)
          (dolist (stem list)
