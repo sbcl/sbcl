@@ -387,11 +387,5 @@ true to stop searching)." *console-control-spec*)
              (do ()
                  ((= 0
                      (wait-object-or-signal handle))))))
-      (multiple-value-bind (ok code) (get-exit-code-process handle)
-        (when (and (plusp ok) (/= code still-active))
-          (setf (sb-impl::process-handle process) nil)
-          (close-handle handle)
-
-          (setf (sb-impl::process-%status process) :exited
-                (sb-impl::process-%exit-code process) code)))))
+      (sb-impl::get-processes-status-changes)))
   process)

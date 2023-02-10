@@ -1100,6 +1100,4 @@
                           "--eval" "(setq *default-external-format* :utf16le)"
                           "--load" script)
                     :error t)))
-        #+win32
-        (process-close process)
         (assert (zerop (process-exit-code process))))))
