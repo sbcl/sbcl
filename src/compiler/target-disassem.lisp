@@ -2110,8 +2110,9 @@
     (disassemble-segments segments stream dstate)
     (let ((n (code-jump-table-words code-component)))
       (when (> n 1)
-        (format stream "; Jump table (~d entries)~%" (1- n))
         (let ((sap (code-instructions code-component)))
+          (format stream "; Jump table (~d entries) @ ~X~%" (1- n)
+                  (sap-int (sap+ sap sb-vm:n-word-bytes)))
           (dotimes (i (1- n))
             (let ((a (sap-ref-word sap (ash (1+ i) sb-vm:word-shift))))
               (format stream "; ~vt~v,'02x = ~a~%"
