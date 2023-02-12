@@ -1084,19 +1084,19 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-           (inst test rcx-tn rcx-tn)
+           (inst test :dword rcx-tn rcx-tn)
            (inst jmp :z JUST-ALLOC-FRAME))
           ((and (eql min-verified fixed)
                 (> fixed 1))
            ;; verify-arg-count will do a CMP
            (inst jmp :e JUST-ALLOC-FRAME))
           (t
-           (inst cmp rcx-tn (fixnumize fixed))
+           (inst cmp :dword rcx-tn (fixnumize fixed))
            (inst jmp :be JUST-ALLOC-FRAME)))
 
     ;; Create a negated copy of the number of arguments to allow us to
     ;; use EA calculations in order to do scaled subtraction.
-    (inst mov temp rcx-tn)
+    (inst mov :dword temp rcx-tn)
     (inst neg temp)
 
     ;; Allocate the space on the stack.
@@ -1387,21 +1387,21 @@
             (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((not min)
              (if (zerop max)
-                 (inst test nargs nargs)
-                 (inst cmp nargs (fixnumize max)))
+                 (inst test :dword nargs nargs)
+                 (inst cmp :dword nargs (fixnumize max)))
              (inst jmp :ne err-lab))
             (max
              (if (zerop min)
                  (setf temp nargs)
-                 (inst lea temp (ea (fixnumize (- min)) nargs)))
-             (inst cmp temp (fixnumize (- max min)))
+                 (inst lea :dword temp (ea (fixnumize (- min)) nargs)))
+             (inst cmp :dword temp (fixnumize (- max min)))
              (inst jmp :a err-lab))
             (t
              (cond ((= min 1)
-                    (inst test nargs nargs)
+                    (inst test :dword nargs nargs)
                     (inst jmp :e err-lab))
                    ((plusp min)
-                    (inst cmp nargs (fixnumize min))
+                    (inst cmp :dword nargs (fixnumize min))
                     (inst jmp :b err-lab))))))))
 
 ;; Signal an error about an untagged number.
