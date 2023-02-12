@@ -1412,8 +1412,8 @@
                           pointer 0))
                   (setf (aref (truly-the (simple-array ,elt-type (*)) buffer) pointer)
                         char
-                        (string-output-stream-pointer stream) (1+ pointer))
-                  (setf (string-output-stream-index stream) (1+ index))))
+                        (string-output-stream-pointer stream) (truly-the index (1+ pointer)))
+                  (setf (string-output-stream-index stream) (truly-the index (1+ index)))))
              (sout (elt-type)
                ;; Only one case cares whether the string contains non-base chars.
                ;;  base-string source and buffer : OK
@@ -1549,12 +1549,20 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         (string-output-stream-prev stream))
   (setf (string-output-stream-buffer stream)
         (or (pop (string-output-stream-next stream))
-            ;; FIXME: This would be the correct place to detect that
-            ;; more than FIXNUM characters are being written to the
-            ;; stream, and do something about it.
-            (if (member (string-output-stream-element-type stream) '(base-char nil))
-                (make-array size :element-type 'base-char)
-                (make-array size :element-type 'character)))))
+            ;; There may be a fencepost bug lurking here but I don't think so, and in any case
+            ;; this errs on the side of caution.  Given the already dubious state of things
+            ;; with regard to meaning of the INDEX type - see comment in src/code/early-extensions
+            ;; above its DEF!TYPE - it seems like this can't be making things any worse to
+            ;; constrain the chars in a string-output-stream to be even _smaller_ than INDEX.
+            (let ((maximum-string-length (1- array-dimension-limit))
+                  (current-index (string-output-stream-index stream)))
+              (when (> (+ current-index size) maximum-string-length)
+                (setq size (- maximum-string-length current-index)))
+              (when (<= size 0)
+                (error "string-output-stream maximum length exceeded"))
+              (if (member (string-output-stream-element-type stream) '(base-char nil))
+                  (make-array size :element-type 'base-char)
+                  (make-array size :element-type 'character))))))
 
 ;;; Moves to the end of the next segment or the current one if there are
 ;;; no more segments. Returns true as long as there are next segments.
@@ -1597,6 +1605,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defun string-sout (stream string start end)
   (declare (explicit-check string)
            (type index start end))
+  ;; FIXME: this contains about 7 OBJECT-NOT-INDEX error traps.
+  ;; We should be able to check once up front that the string-stream will not
+  ;; exceed the max number of allowed characters, and then not do any further tests.
+  ;; Also, the SOUT-AUX method contains 4 calls to SB-INT:SEQUENCE-BOUNDING-INDICES-BAD-ERROR
+  ;; which may be redundant.
   (let* ((full-length (- end start))
          (length full-length)
          (buffer (string-output-stream-buffer stream))
