@@ -27,11 +27,11 @@
   #-x86-64 most-positive-fixnum
   "The exclusive upper bound on the number of arguments which may be passed
   to a function, including &REST args.")
-(defconstant lambda-parameters-limit most-positive-fixnum
+(defconstant lambda-parameters-limit call-arguments-limit
   "The exclusive upper bound on the number of parameters which may be specified
   in a given lambda list. This is actually the limit on required and &OPTIONAL
   parameters. With &KEY and &AUX you can get more.")
-(defconstant multiple-values-limit most-positive-fixnum
+(defconstant multiple-values-limit call-arguments-limit
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 
