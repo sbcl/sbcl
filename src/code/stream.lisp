@@ -674,7 +674,7 @@
 (defun write-char (character &optional (stream *standard-output*))
   (declare (explicit-check))
   (stream-api-dispatch (stream :output)
-    :native (funcall (ansi-stream-cout stream) stream character)
+    :native (return-from write-char (funcall (ansi-stream-cout stream) stream character))
     :simple (s-%write-char stream character)
     :gray (stream-write-char stream character))
   character)
@@ -767,7 +767,7 @@
   (declare (explicit-check))
   ;; The STREAM argument is not allowed to be a designator.
   (stream-api-dispatch (stream)
-    :native (funcall (ansi-stream-bout stream) stream integer)
+    :native (return-from write-byte (funcall (ansi-stream-bout stream) stream integer))
     :simple (s-%write-byte stream integer)
     :gray (stream-write-byte stream integer))
   integer)
@@ -856,8 +856,9 @@
   (let ((stream (%make-broadcast-stream streams)))
     (unless streams
       (flet ((out (stream arg)
-               (declare (ignore stream arg)
-                        (optimize speed (safety 0))))
+               (declare (ignore stream)
+                        (optimize speed (safety 0)))
+               arg)
              (sout (stream string start end)
                (declare (ignore stream string start end)
                         (optimize speed (safety 0)))))
@@ -866,13 +867,13 @@
               (broadcast-stream-sout stream) #'sout)))
     stream))
 
-(macrolet ((out-fun (name fun &rest args)
+(macrolet ((out-fun (name fun args return)
              `(defun ,name (stream ,@args)
-                (dolist (stream (broadcast-stream-streams stream))
+                (dolist (stream (broadcast-stream-streams stream) ,return)
                   (,fun ,(car args) stream ,@(cdr args))))))
-  (out-fun broadcast-cout write-char char)
-  (out-fun broadcast-bout write-byte byte)
-  (out-fun broadcast-sout %write-string string start end))
+  (out-fun broadcast-cout write-char (char) char)
+  (out-fun broadcast-bout write-byte (byte) byte)
+  (out-fun broadcast-sout %write-string (string start end) nil))
 
 (defun broadcast-misc (stream operation arg1)
   (let ((streams (broadcast-stream-streams stream)))
@@ -1415,10 +1416,11 @@
                     ;; characters as were already emplaced.
                     (setf buffer (string-output-stream-new-buffer stream index)
                           pointer 0))
+                  (setf (string-output-stream-pointer stream) (truly-the index (1+ pointer)))
+                  (setf (string-output-stream-index stream) (truly-the index (1+ index)))
+                  ;; return the character
                   (setf (aref (truly-the (simple-array ,elt-type (*)) buffer) pointer)
-                        char
-                        (string-output-stream-pointer stream) (truly-the index (1+ pointer)))
-                  (setf (string-output-stream-index stream) (truly-the index (1+ index)))))
+                        char)))
              (sout (elt-type)
                ;; Only one case cares whether the string contains non-base chars.
                ;;  base-string source and buffer : OK
@@ -1829,9 +1831,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (cond ((= pointer (length buffer))
            (bug "Should not happen"))
           (t
-           (setf (char buffer pointer) (truly-the base-char character)
-                 (finite-base-string-output-stream-pointer stream)
-                 (truly-the index (1+ pointer)))))))
+           (setf (finite-base-string-output-stream-pointer stream)
+                 (truly-the index (1+ pointer))
+                 ;; return the character
+                 (char buffer pointer) (truly-the base-char character))))))
 
 (defun finite-base-string-sout (stream string start end)
   (declare (optimize (sb-c:insert-array-bounds-checks 0)))
@@ -1940,8 +1943,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                 (set-array-header buffer workspace new-length
                                   current+1 0 new-length nil nil))
               (setf (fill-pointer buffer) current+1))
-          (setf (char workspace offset-current) character))))
-    current+1))
+          (setf (char workspace offset-current) character)))))
+  character)
 
 (defun fill-pointer-sout (stream string start end)
   (declare (fixnum start end))
@@ -2076,10 +2079,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type case-frob-stream stream)
            (type character char))
   (let ((target (case-frob-stream-target stream))
-        (char (char-upcase char)))
+        (c (char-upcase char)))
     (if (ansi-stream-p target)
-        (funcall (ansi-stream-cout target) target char)
-        (stream-write-char target char))))
+        ;; ansi stream method for character out has to return the original char
+        (progn (funcall (ansi-stream-cout target) target c) char)
+        (stream-write-char target c))))
 
 (defun case-frob-upcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
@@ -2101,10 +2105,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type case-frob-stream stream)
            (type character char))
   (let ((target (case-frob-stream-target stream))
-        (char (char-downcase char)))
+        (c (char-downcase char)))
     (if (ansi-stream-p target)
-        (funcall (ansi-stream-cout target) target char)
-        (stream-write-char target char))))
+        (progn (funcall (ansi-stream-cout target) target c) char)
+        (stream-write-char target c))))
 
 (defun case-frob-downcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
@@ -2137,7 +2141,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (t
            (if (ansi-stream-p target)
                (funcall (ansi-stream-cout target) target char)
-               (stream-write-char target char))))))
+               (stream-write-char target char)))))
+  char)
 
 (defun case-frob-capitalize-sout (stream str start end)
   (declare (type case-frob-stream stream)
@@ -2178,7 +2183,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (funcall (ansi-stream-cout target) target char)
                (stream-write-char target char))
            (setf (case-frob-stream-cout stream) #'case-frob-capitalize-out)
-           (setf (case-frob-stream-sout stream) #'case-frob-capitalize-sout)))))
+           (setf (case-frob-stream-sout stream) #'case-frob-capitalize-sout))))
+  char)
 
 (defun case-frob-capitalize-aux-sout (stream str start end)
   (declare (type case-frob-stream stream)
@@ -2219,7 +2225,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (t
            (if (ansi-stream-p target)
                (funcall (ansi-stream-cout target) target char)
-               (stream-write-char target char))))))
+               (stream-write-char target char)))))
+  char)
 
 (defun case-frob-capitalize-first-sout (stream str start end)
   (declare (type case-frob-stream stream)

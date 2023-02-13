@@ -67,7 +67,8 @@
          (let ((fill-pointer (pretty-stream-buffer-fill-pointer stream)))
            (setf (schar (pretty-stream-buffer stream) fill-pointer) char)
            (setf (pretty-stream-buffer-fill-pointer stream)
-                 (1+ fill-pointer))))))
+                 (1+ fill-pointer)))))
+  char)
 
 (defun pretty-sout (stream string start end)
   (declare (type pretty-stream stream)

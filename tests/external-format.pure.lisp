@@ -49,6 +49,15 @@
     (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
       (assert (eq (read-char s nil s) s)))))
 
+
+;; Output routines must return the written element
+(with-test (:name :output-routine-retval :skipped-on :win32)
+  (dolist (x sb-impl::*output-routines*)
+    (with-open-file (f "/dev/null" :direction :output :if-exists :overwrite)
+      (let ((arg (if (eq (car x) 'character) #\z 99))
+            (fun (symbol-function (third x))))
+        (assert (eql arg (funcall fun f arg)))))))
+
 ;;; Test standard character read-write equivalency over all external formats.
 (macrolet
     ((frob ()
