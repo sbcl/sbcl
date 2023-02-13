@@ -117,7 +117,7 @@
 ;; for users to get a hold of the stream and stash it somewhere.
 ;; Anyway, just a thought... Maybe keep a small handful in a recyclable list?
 (defstruct (pretty-stream (:include ansi-stream
-                                    (out #'pretty-out)
+                                    (cout #'pretty-out)
                                     (sout #'pretty-sout)
                                     (misc #'pretty-misc))
                           (:constructor make-pretty-stream (target))

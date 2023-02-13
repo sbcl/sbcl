@@ -2143,7 +2143,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "ANSI-STREAM-IN-BUFFER" "ANSI-STREAM-IN-INDEX"
            "ANSI-STREAM-MISC"
            "ANSI-STREAM-N-BIN"
-           "ANSI-STREAM-OUT" "ANSI-STREAM-SOUT"
+           "ANSI-STREAM-COUT" "ANSI-STREAM-SOUT"
            "COMPLEX-VECTOR"
            "LIST-TO-VECTOR*"
            "LOGICAL-HOST" "LOGICAL-HOST-DESIGNATOR"

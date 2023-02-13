@@ -1875,7 +1875,7 @@
               (fd-stream-char-size fd-stream) char-size))
       (when character-stream-p
         (setf (fd-stream-output-bytes fd-stream) output-bytes))
-      (setf (fd-stream-out fd-stream) cout-routine
+      (setf (fd-stream-cout fd-stream) cout-routine
             (fd-stream-bout fd-stream) bout-routine
             (fd-stream-sout fd-stream) (if (eql cout-size 1)
                                            #'fd-sout #'ill-out))

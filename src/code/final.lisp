@@ -253,7 +253,7 @@ Examples:
                        (ansi-stream-in object)
                        (ansi-stream-bin object)
                        (ansi-stream-n-bin object)
-                       (ansi-stream-out object)
+                       (ansi-stream-cout object)
                        (ansi-stream-bout object)
                        (ansi-stream-sout object)
                        (ansi-stream-misc object))

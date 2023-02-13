@@ -23,7 +23,7 @@
 ;;; In:                 Stream, Eof-Errorp, Eof-Value
 ;;; Bin:                Stream, Eof-Errorp, Eof-Value
 ;;; N-Bin:              Stream, Buffer, Start, Numbytes, Eof-Errorp
-;;; Out:                Stream, Character
+;;; Cout:               Stream, Character
 ;;; Bout:               Stream, Integer
 ;;; Sout:               Stream, String, Start, End
 ;;; Misc:               Stream, Operation, &Optional Arg1, Arg2
@@ -142,7 +142,7 @@
    (sfunction (stream (simple-unboxed-array (*)) index index t) index))
 
   ;; output functions
-  (out #'ill-out :type function)                ; WRITE-CHAR function
+  (cout #'ill-out :type function)               ; WRITE-CHAR function
   (bout #'ill-bout :type function)              ; byte output function
   (sout #'ill-out :type function)               ; string output function
 
@@ -162,7 +162,7 @@
                                      (in #'synonym-in)
                                      (bin #'synonym-bin)
                                      (n-bin #'synonym-n-bin)
-                                     (out #'synonym-out)
+                                     (cout #'synonym-out)
                                      (bout #'synonym-bout)
                                      (sout #'synonym-sout)
                                      (misc #'synonym-misc))
@@ -173,7 +173,7 @@
 (declaim (freeze-type synonym-stream))
 
 (defstruct (broadcast-stream (:include ansi-stream
-                                       (out #'broadcast-out)
+                                       (cout #'broadcast-cout)
                                        (bout #'broadcast-bout)
                                        (sout #'broadcast-sout)
                                        (misc #'broadcast-misc))

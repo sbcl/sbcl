@@ -163,7 +163,7 @@
          (flet ((outfn (c)
                   (unless unread-p
                     (if (ansi-stream-p out)
-                        (funcall (ansi-stream-out out) out c)
+                        (funcall (ansi-stream-cout out) out c)
                         ;; gray-stream
                         (stream-write-char out c))))
                 (infn ()

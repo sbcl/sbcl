@@ -152,11 +152,12 @@
     ;; Writing to a string-output-stream adds negligible overhead
     ;; versus the method dispatch for each input character.
     (values (with-output-to-string (s)
-              (loop (let ((ch (stream-read-char stream)))
-                      (case ch
-                        (#\newline (return))
-                        (:eof (return (setq eof t)))
-                        (t (funcall (ansi-stream-out s) s ch))))))
+              (let ((ouch (ansi-stream-cout s)))
+                (loop (let ((ch (stream-read-char stream)))
+                        (case ch
+                          (#\newline (return))
+                          (:eof (return (setq eof t)))
+                          (t (funcall ouch s ch)))))))
             eof)))
 
 (defgeneric stream-clear-input (stream)
