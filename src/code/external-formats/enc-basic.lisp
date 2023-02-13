@@ -504,7 +504,7 @@
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
-  (let ((bits (char-code byte)))
+  (let ((bits (char-code |ch|)))
     (cond ((< bits #x80) 1)
           ((< bits #x800) 2)
           ((< bits #x10000) 3)

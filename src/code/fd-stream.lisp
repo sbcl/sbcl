@@ -612,18 +612,18 @@
 
 (defmacro output-wrapper/variable-width ((stream size buffering restart)
                                          &body body)
-  (let ((stream-var (gensym "STREAM")))
+  (let ((stream-var '#:stream))
     `(let* ((,stream-var ,stream)
             (obuf (fd-stream-obuf ,stream-var))
             (tail (buffer-tail obuf))
             (size ,size))
-      ,(unless (eq (car buffering) :none)
-         `(when (< (buffer-length obuf) (+ tail size))
+      ,@(unless (eq (car buffering) :none)
+         `((when (< (buffer-length obuf) (+ tail size))
             (setf obuf (flush-output-buffer ,stream-var)
-                  tail (buffer-tail obuf))))
-      ,(unless (eq (car buffering) :none)
+                  tail (buffer-tail obuf)))))
+      ,@(unless (eq (car buffering) :none)
          ;; FIXME: Why this here? Doesn't seem necessary.
-         `(synchronize-stream-output ,stream-var))
+         `((synchronize-stream-output ,stream-var)))
       ,(if restart
            `(block output-nothing
               ,@body
@@ -631,27 +631,24 @@
            `(progn
              ,@body
              (setf (buffer-tail obuf) (+ tail size))))
-      ,(ecase (car buffering)
-         (:none
-          `(flush-output-buffer ,stream-var))
-         (:line
-          `(when (eql byte #\Newline)
-             (flush-output-buffer ,stream-var)))
-         (:full))
-    (values))))
+      ,@(ecase (car buffering)
+         (:none `((flush-output-buffer ,stream-var)))
+         (:line `((when (eql |ch| #\Newline)
+                    (flush-output-buffer ,stream-var))))
+         (:full)))))
 
 (defmacro output-wrapper ((stream size buffering restart) &body body)
-  (let ((stream-var (gensym "STREAM")))
+  (let ((stream-var '#:stream))
     `(let* ((,stream-var ,stream)
             (obuf (fd-stream-obuf ,stream-var))
             (tail (buffer-tail obuf)))
-       ,(unless (eq (car buffering) :none)
-          `(when (< (buffer-length obuf) (+ tail ,size))
+       ,@(unless (eq (car buffering) :none)
+          `((when (< (buffer-length obuf) (+ tail ,size))
              (setf obuf (flush-output-buffer ,stream-var)
-                   tail (buffer-tail obuf))))
+                   tail (buffer-tail obuf)))))
        ;; FIXME: Why this here? Doesn't seem necessary.
-       ,(unless (eq (car buffering) :none)
-          `(synchronize-stream-output ,stream-var))
+       ,@(unless (eq (car buffering) :none)
+          `((synchronize-stream-output ,stream-var)))
        ,(if restart
             `(block output-nothing
                ,@body
@@ -659,30 +656,29 @@
             `(progn
                ,@body
                (setf (buffer-tail obuf) (+ tail ,size))))
-       ,(ecase (car buffering)
-          (:none
-           `(flush-output-buffer ,stream-var))
-          (:line
-           `(when (eql byte #\Newline)
-              (flush-output-buffer ,stream-var)))
-          (:full))
-       (values))))
+       ,@(ecase (car buffering)
+          (:none `((flush-output-buffer ,stream-var)))
+          (:line `((when (eql |ch| #\Newline)
+                     (flush-output-buffer ,stream-var))))
+          (:full)))))
 
 (defmacro def-output-routines/variable-width
     ((name-fmt size restart external-format &rest bufferings)
      &body body)
-  (declare (optimize (speed 1)))
   (cons 'progn
-        (mapcar
-            (lambda (buffering)
-              (let ((function
-                     (intern (format nil name-fmt (string (car buffering))))))
-                `(progn
-                   (defun ,function (stream byte)
-                     (declare (ignorable byte))
+        (mapcan
+         (lambda (buffering)
+           (let ((function
+                  (intern (format nil name-fmt (string (car buffering))))))
+             (list
+                  `(defun ,function (stream |ch|)
                      (output-wrapper/variable-width (stream ,size ,buffering ,restart)
-                       ,@body))
-                   (setf *output-routines*
+                       ,@body)
+                     ;; return char so WRITE-CHAR can tail-call the stream's output method
+                     |ch|)
+                  ;; FIXME: technically illegal use of quoted constant, as we keep NCONCing
+                  ;; onto the tail of a literal
+                  `(setf *output-routines*
                          (nconc *output-routines*
                                 ',(mapcar
                                    (lambda (type)
@@ -692,23 +688,24 @@
                                            1
                                            external-format))
                                    (cdr buffering)))))))
-            bufferings)))
+         bufferings)))
 
 ;;; Define output routines that output numbers SIZE bytes long for the
 ;;; given bufferings. Use BODY to do the actual output.
 (defmacro def-output-routines ((name-fmt size restart &rest bufferings)
                                &body body)
-  (declare (optimize (speed 1)))
   (cons 'progn
-        (mapcar
-            (lambda (buffering)
-              (let ((function
+        (mapcan
+         (lambda (buffering)
+           (let ((function
                      (intern (format nil name-fmt (string (car buffering))))))
-                `(progn
-                   (defun ,function (stream byte)
+             (list
+                 `(defun ,function (stream byte)
                      (output-wrapper (stream ,size ,buffering ,restart)
-                       ,@body))
-                   (setf *output-routines*
+                       ,@body)
+                     ;; return byte so WRITE-BYTE can tail-call the stream's output method
+                     byte)
+                 `(setf *output-routines*
                          (nconc *output-routines*
                                 ',(mapcar
                                    (lambda (type)
@@ -718,7 +715,7 @@
                                            size
                                            nil))
                                    (cdr buffering)))))))
-            bufferings)))
+         bufferings)))
 
 (def-output-routines ("OUTPUT-UNSIGNED-BYTE-~A-BUFFERED"
                       1
@@ -874,24 +871,6 @@
       (declare (optimize (speed 3) (safety 0)))
     (let ((external-format (get-external-format-or-lose external-format)))
       (funcall (ef-read-c-string-fun external-format) sap element-type))))
-
-(defun wrap-external-format-functions (external-format fun)
-  (let ((result (%copy-external-format external-format)))
-    (macrolet ((frob (accessor)
-                 `(setf (,accessor result) (funcall fun (,accessor result)))))
-      (frob ef-read-n-chars-fun)
-      (frob ef-read-char-fun)
-      (frob ef-write-n-bytes-fun)
-      (frob ef-write-char-none-buffered-fun)
-      (frob ef-write-char-line-buffered-fun)
-      (frob ef-write-char-full-buffered-fun)
-      (frob ef-resync-fun)
-      (frob ef-bytes-for-char-fun)
-      (frob ef-read-c-string-fun)
-      (frob ef-write-c-string-fun)
-      (frob ef-octets-to-string-fun)
-      (frob ef-string-to-octets-fun))
-    result))
 
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
@@ -1472,8 +1451,8 @@
          (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name))
          (n-buffer (gensym "BUFFER")))
     `(progn
-       (defun ,size-function (byte)
-         (declare (ignorable byte))
+       (defun ,size-function (|ch|)
+         (declare (ignorable |ch|))
          ,out-size-expr)
        (defun ,out-function (stream string flush-p start end)
          (let ((start (or start 0))
@@ -1501,10 +1480,10 @@
                           `(progn))
                     (do* ()
                          ((or (= start end) (< (- len tail) 4)))
-                      (let* ((byte (aref string start))
-                             (bits (char-code byte))
+                      (let* ((|ch| (aref string start))
+                             (bits (char-code |ch|))
                              (size ,out-size-expr))
-                        (declare (ignorable byte bits))
+                        (declare (ignorable |ch| bits))
                         ,out-expr
                         (incf tail size)
                         (setf (buffer-tail obuf) tail)
@@ -1524,11 +1503,11 @@
                                             (:none character)
                                             (:line character)
                                             (:full character))
-         (if (eql byte #\Newline)
+         (if (eql |ch| #\Newline)
              (setf (fd-stream-output-column stream) 0)
              (setf (fd-stream-output-column stream)
                    (+ (truly-the unsigned-byte (fd-stream-output-column stream)) 1)))
-         (let ((bits (char-code byte))
+         (let ((bits (char-code |ch|))
                (sap (buffer-sap obuf))
                (tail (buffer-tail obuf)))
            ,out-expr))
@@ -1642,7 +1621,7 @@
          (locally
              (declare (optimize (speed 3) (safety 0)))
            (let* ((stream ,name)
-                  (size 0) (head 0) (byte 0) (char nil)
+                  (size 0) (head 0) (byte 0) (|ch| nil)
                   (decode-break-reason nil)
                   (length (dotimes (count (1- array-dimension-limit) count)
                             (setf decode-break-reason
@@ -1651,13 +1630,13 @@
                                           size ,(if (consp in-size-expr)
                                                     (cadr in-size-expr)
                                                     in-size-expr)
-                                          char ,in-expr)
+                                          |ch| ,in-expr)
                                     (incf head size)
                                     nil))
                             (when decode-break-reason
                               (c-string-decoding-error
                                ,name sap head decode-break-reason))
-                            (when (zerop (char-code char))
+                            (when (zerop (char-code |ch|))
                               (return count))))
                   (string (case element-type
                             (base-char
@@ -1669,7 +1648,7 @@
              (declare (ignorable stream byte)
                       (type index head length) ;; size
                       (type (unsigned-byte 8) byte)
-                      (type (or null character) char)
+                      (type (or null character) |ch|)
                       (type string string))
              (setf head 0)
              (dotimes (index length string)
@@ -1679,13 +1658,13 @@
                              size ,(if (consp in-size-expr)
                                        (cadr in-size-expr)
                                        in-size-expr)
-                             char ,in-expr)
+                             |ch| ,in-expr)
                        (incf head size)
                        nil))
                (when decode-break-reason
                  (c-string-decoding-error
                   ,name sap head decode-break-reason))
-               (setf (aref string index) char)))))
+               (setf (aref string index) |ch|)))))
 
        (defun ,output-c-string-function (string)
          (declare (type simple-string string))
@@ -1697,14 +1676,15 @@
                     (declare (optimize (speed 3) (safety 0)))
                   (block output-nothing
                     (let* ((length (length string))
-                           (null-size (let* ((byte (code-char 0))
-                                             (bits (char-code byte)))
-                                        (declare (ignorable byte bits))
+                           ;; wtf? why not just "LET ((bits 0))" ?
+                           (null-size (let* ((|ch| (code-char 0))
+                                             (bits (char-code |ch|)))
+                                        (declare (ignorable |ch| bits))
                                         (the index ,out-size-expr)))
                            (buffer-length
                              (+ (loop for i of-type index below length
-                                      for byte of-type character = (aref string i)
-                                      for bits = (char-code byte)
+                                      for |ch| of-type character = (aref string i)
+                                      for bits = (char-code |ch|)
                                       sum (the index ,out-size-expr) of-type index)
                                 null-size))
                            (tail 0)
@@ -1718,16 +1698,16 @@
                         (let ((sap (vector-sap ,n-buffer)))
                           (declare (system-area-pointer sap))
                           (loop for i of-type index below length
-                                for byte of-type character = (aref string i)
-                                for bits = (char-code byte)
+                                for |ch| of-type character = (aref string i)
+                                for bits = (char-code |ch|)
                                 for size of-type index = ,out-size-expr
                                 do (prog1
                                        ,out-expr
                                      (incf tail size)))
                           (let* ((bits 0)
-                                 (byte (code-char bits))
+                                 (|ch| (code-char bits)) ; more wtf
                                  (size null-size))
-                            (declare (ignorable bits byte size))
+                            (declare (ignorable bits |ch| size))
                             ,out-expr)))
                       ,n-buffer))))))
 

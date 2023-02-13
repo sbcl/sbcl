@@ -55,7 +55,7 @@
 (defun char->utf-16be (char dest string pos)
   (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
-    (let ((code (char-code char)))
+  (let ((code (char-code char)))
     (if (utf-noncharacter-code-p code)
         (let ((replacement (encoding-error :utf-16be string pos)))
           (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
@@ -257,7 +257,7 @@
 
 (define-external-format/variable-width (:utf-16le :utf16le) t
   (code-char #xfffd)
-  (let ((bits (char-code byte)))
+  (let ((bits (char-code |ch|)))
     (if (< bits #x10000) 2 4))
   (cond
     ((< bits #x10000)
@@ -292,7 +292,7 @@
 
 (define-external-format/variable-width (:utf-16be :utf16be) t
   (code-char #xfffd)
-  (let ((bits (char-code byte)))
+  (let ((bits (char-code |ch|)))
     (if (< bits #x10000) 2 4))
   (cond
     ((< bits #x10000)

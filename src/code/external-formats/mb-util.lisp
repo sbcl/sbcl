@@ -260,11 +260,11 @@
          ;; replacement here.
          #\?
          (block size
-           (mb-char-len (or (,ucs-to-mb (char-code byte))
+           (mb-char-len (or (,ucs-to-mb (char-code |ch|))
                             (return-from size 0))))
          (let ((mb (,ucs-to-mb bits)))
            (if (null mb)
-               (external-format-encoding-error stream byte)
+               (external-format-encoding-error stream |ch|)
                (ecase size
                  (1 (setf (sap-ref-8 sap tail) mb))
                  (2 (setf (sap-ref-8 sap tail) (ldb (byte 8 8) mb)
