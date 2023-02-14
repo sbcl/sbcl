@@ -4136,6 +4136,22 @@
         nil
         `(= x ,y))))
 
+(deftransform = ((x y) (t (constant-arg integer)))
+  (let ((y (lvar-value y)))
+    (if (and (if (cast-p (lvar-uses x))
+                 ;; Only when X is already a number.
+                 (csubtypep (lvar-type (cast-value (lvar-uses x)))
+                            (specifier-type 'number))
+                 t)
+             (handler-case (not (sb-xc:= y (coerce y 'double-float)))
+               (floating-point-overflow ()
+                 t))
+             (handler-case (not (sb-xc:= y (coerce y 'single-float)))
+               (floating-point-overflow ()
+                 t)))
+        `(eql x y)
+        (give-up-ir1-transform))))
+
 (deftransform = ((x y) (integer (constant-arg ratio)))
   "constant-fold INTEGER to RATIO comparison"
   nil)
