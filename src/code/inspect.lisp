@@ -124,10 +124,13 @@ evaluated expressions.
               (if named-p
                   (values (cdr element) (car element))
                   element)
-            (format stream "~W. ~@[~A: ~]~W~%"
-                    index name (if (eq value sb-pcl:+slot-unbound+)
-                                   "unbound"
-                                   value))))))
+            (format stream "~W. ~@[~A: ~]" index name)
+            (if (eq value sb-pcl:+slot-unbound+)
+                (print-unreadable-object
+                    (value stream :type nil :identity nil)
+                  (write-string "unbound slot" stream))
+                (write value :stream stream))
+            (terpri stream)))))
 
 ;;;; INSPECTED-PARTS
 
