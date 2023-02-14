@@ -540,8 +540,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             }
             continue;
         default:
-          if ((other_immediate_lowtag_p(widetag) && leaf_obj_widetag_p(widetag))
-              || widetag==FILLER_WIDETAG)
+          if (other_immediate_lowtag_p(widetag) && leaf_obj_widetag_p(widetag))
               continue;
           else
               lose("Unrecognized heap object: @%p: %"OBJ_FMTX, where, *where);

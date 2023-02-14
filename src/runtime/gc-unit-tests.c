@@ -182,6 +182,7 @@ void run_gencgc_tests()
     gc_assert(!is_lisp_pointer(CHARACTER_WIDETAG));
     gc_assert(!is_lisp_pointer(SIMPLE_VECTOR_WIDETAG));
     // Check leafness
+    gc_assert(other_immediate_lowtag_p(FILLER_WIDETAG));
     gc_assert(leaf_obj_widetag_p(FILLER_WIDETAG));
     gc_assert(leaf_obj_widetag_p(SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG));
     gc_assert(leaf_obj_widetag_p(SAP_WIDETAG));
