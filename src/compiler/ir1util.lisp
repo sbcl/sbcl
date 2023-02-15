@@ -94,28 +94,29 @@
     (plu lvar)))
 
 (defun principal-lvar-ref-use (lvar)
-  (let (seen)
-    (labels ((recurse (lvar)
-               (when lvar
-                 (let ((use (lvar-uses lvar)))
-                   (cond ((ref-p use)
-                          (push lvar seen)
-                          (let ((lvar (lambda-var-ref-lvar use)))
-                            (if (memq lvar seen)
-                                use
-                                (recurse lvar))))
-                         (t
-                          use))))))
-      (recurse lvar))))
+  (labels ((recurse (lvar)
+             (let ((use (lvar-uses lvar)))
+               (if (ref-p use)
+                   (let ((var (ref-leaf use)))
+                     (if (and (lambda-var-p var)
+                              (null (lambda-var-sets var))
+                              (eq (functional-kind (lambda-var-home var)) :let))
+                         (recurse (let-var-initial-value var))
+                         use))
+                   use))))
+    (recurse lvar)))
 
 (defun principal-lvar-ref (lvar)
   (labels ((recurse (lvar ref)
-             (if lvar
-                 (let ((use (lvar-uses lvar)))
-                   (if (ref-p use)
-                       (recurse (lambda-var-ref-lvar use) use)
-                       ref))
-                 ref)))
+             (let ((use (lvar-uses lvar)))
+               (if (ref-p use)
+                   (let ((var (ref-leaf use)))
+                     (if (and (lambda-var-p var)
+                              (null (lambda-var-sets var))
+                              (eq (functional-kind (lambda-var-home var)) :let))
+                         (recurse (let-var-initial-value var) use)
+                         use))
+                   ref))))
     (recurse lvar nil)))
 
 (defun principal-lvar-dest (lvar)
@@ -315,7 +316,11 @@
 (defun update-lvar-dependencies (new old)
   (typecase old
     (ref
-     (update-lvar-dependencies new (lambda-var-ref-lvar old)))
+     (let ((var (ref-leaf old)))
+       (when (and (lambda-var-p var)
+                  (null (lambda-var-sets var))
+                  (eq (functional-kind (lambda-var-home var)) :let))
+         (update-lvar-dependencies new (let-var-initial-value var)))))
     (lvar
      (do-uses (node old)
        (when (exit-p node)
@@ -386,14 +391,13 @@
         (new-lambda-var (ref-leaf new-ref)))
     (when (and dx
                (lambda-var-p new-lambda-var)
+               (eq (functional-kind (lambda-var-home new-lambda-var)) :let)
                ;; Make sure the let is inside the dx let
                (not (find new-lambda-var
                           (lexenv-vars (node-lexenv (cleanup-mess-up dx)))
                           :key #'cdr :test #'eq)))
-      (let ((new-lvar (lambda-var-ref-lvar new-ref)))
-        (when new-lvar
-          (propagate-lvar-dx new-lvar old-lvar)
-          t)))))
+      (propagate-lvar-dx (let-var-initial-value new-lambda-var) old-lvar)
+      t)))
 
 (defun node-dominates-p (node1 node2)
   (let ((block1 (node-block node1))
@@ -806,8 +810,8 @@
     (unless (use-good-for-dx-p use dx)
       (return nil))))
 
-;; Check that REF is DX safe or delivers a value to a combination
-;; whose result is that value and ends up being discarded.
+;;; Check that REF is DX safe or delivers a value to a combination
+;;; whose result is that value and ends up being discarded.
 (defun ref-good-for-dx-p (ref)
   (let* ((lvar (ref-lvar ref))
          (dest (when lvar (lvar-dest lvar))))
@@ -823,25 +827,6 @@
             (dolist (ref (lambda-var-refs (lvar-lambda-var lvar)) t)
               (when (not (ref-good-for-dx-p ref))
                 (return nil))))))))
-
-(defun lambda-var-ref-lvar (ref)
-  (let ((var (ref-leaf ref)))
-    (when (and (lambda-var-p var)
-               (not (lambda-var-sets var)))
-      (let* ((fun (lambda-var-home var))
-             (vars (lambda-vars fun))
-             (refs (lambda-refs fun))
-             (lvar (and refs
-                        (null (cdr refs))
-                        (ref-lvar (car refs))))
-             (combination (and lvar
-                               (lvar-dest lvar))))
-        (when (and (combination-p combination)
-                   (eq (combination-fun combination) lvar))
-          (loop for v in vars
-                for arg in (combination-args combination)
-                when (eq v var)
-                  return arg))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
@@ -2824,9 +2809,12 @@ is :ANY, the function name is not checked."
            (lvar (or (and (ref-p uses)
                           (let ((ref (principal-lvar-ref lvar)))
                             (and ref
-                                 (or
-                                  (lambda-var-ref-lvar ref)
-                                  (node-lvar ref)))))
+                                 (let ((var (ref-leaf ref)))
+                                   (if (and (lambda-var-p var)
+                                            (null (lambda-var-sets var))
+                                            (eq (functional-kind (lambda-var-home var)) :let))
+                                       (let-var-initial-value var)
+                                       (node-lvar ref))))))
                      lvar)))
       (cond ((constant-lvar-p lvar)
              (values :values (list (lvar-value lvar))))
