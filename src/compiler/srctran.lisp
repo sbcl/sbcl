@@ -2749,14 +2749,28 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
-(macrolet ((def (name fun type &optional (types `(,type ,type)))
+(macrolet ((def (name fun type &optional (types `(,type ,type)) swap)
              `(when-vop-existsp (:translate ,name)
-                (defun ,name (x y type)
-                  (declare (type ,type x y))
-                  (let ((r (,fun x y)))
-                    (unless (typep r type)
-                      (error 'type-error :expected-type type :datum r))
-                    r))
+                ,@(unless swap
+                    `((defun ,name (x y type)
+                        (declare (type ,type x y))
+                        (let ((r (,fun x y)))
+                          (unless (typep r type)
+                            (error 'type-error :expected-type type :datum r))
+                          r))
+                      (deftransform ,name ((x y type-to-check) * * :node node)
+                        (let (type
+                              (type-to-check (lvar-value type-to-check))
+                              (sword (specifier-type ',type)))
+                          (cond ((or (csubtypep (setf type (two-arg-derive-type x y
+                                                                                #',(symbolicate fun '-derive-type-aux)
+                                                                                #',fun))
+                                                sword)
+                                     (not (types-equal-or-intersect sword type)))
+                                 `(the ,type-to-check (,',fun x y)))
+                                (t
+                                 (give-up-ir1-transform)))))))
+
 
                 (deftransform ,fun ((x y) ,types * :node node :important nil)
                   (delay-ir1-transform node :optimize)
@@ -2771,24 +2785,15 @@
                              (not (csubtypep type (specifier-type 'word)))
                              (not (csubtypep type (specifier-type 'sb-vm:signed-word)))
                              (csubtypep (setf type-to-check (single-value-type (cast-type-to-check dest))) target-type))
-                        `(,',name x y ',(type-specifier type-to-check))
-                        (give-up-ir1-transform))))
-
-                (deftransform ,name ((x y type-to-check) * * :node node)
-                  (let (type
-                        (type-to-check (lvar-value type-to-check))
-                        (sword (specifier-type ',type)))
-                    (cond ((or (csubtypep (setf type (two-arg-derive-type x y
-                                                                          #',(symbolicate fun '-derive-type-aux)
-                                                                          #',fun))
-                                          sword)
-                               (not (types-equal-or-intersect sword type)))
-                           `(the ,type-to-check (,',fun x y)))
-                          (t
-                           (give-up-ir1-transform))))))))
+                        `(,',name ,@',(if swap
+                                          `(y x)
+                                          `(x y))
+                                  ',(type-specifier type-to-check))
+                        (give-up-ir1-transform)))))))
 
 
   (def unsigned+signed + word (word sb-vm:signed-word))
+  (def unsigned+signed + word (sb-vm:signed-word word) t)
   (def unsigned-signed - word (word sb-vm:signed-word))
 
   (def signed* * sb-vm:signed-word)
