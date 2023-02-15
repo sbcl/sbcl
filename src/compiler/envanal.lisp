@@ -439,7 +439,7 @@
                                            (lvar-good-for-dx-p arg dx))
                                   (mark-dx arg))))
                              (ref
-                              (mark-dx (trivial-lambda-var-ref-lvar use)))))))
+                              (mark-dx (let-var-initial-value (ref-leaf use))))))))
                 ;; Check that the LVAR hasn't been flushed somehow.
                 (when (lvar-uses lvar)
                   (cond ((lvar-good-for-dx-p lvar dx)

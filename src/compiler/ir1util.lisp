@@ -798,7 +798,7 @@
                            (when (not (ref-good-for-dx-p ref))
                              (return nil)))))
               (lvar-good-for-dx-p
-               (trivial-lambda-var-ref-lvar use) dx)))))))
+               (let-var-initial-value var) dx)))))))
 
 (defun lvar-good-for-dx-p (lvar dx)
   (aver (lvar-uses lvar))
@@ -823,18 +823,6 @@
             (dolist (ref (lambda-var-refs (lvar-lambda-var lvar)) t)
               (when (not (ref-good-for-dx-p ref))
                 (return nil))))))))
-
-(defun trivial-lambda-var-ref-lvar (use)
-  (let* ((this (ref-leaf use))
-         (fun (lambda-var-home this))
-         (vars (lambda-vars fun))
-         (combination (lvar-dest (ref-lvar (car (lambda-refs fun)))))
-         (args (combination-args combination)))
-    (aver (= (length vars) (length args)))
-    (loop for var in vars
-          for arg in args
-          when (eq var this)
-          return arg)))
 
 (defun lambda-var-ref-lvar (ref)
   (let ((var (ref-leaf ref)))
