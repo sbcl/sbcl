@@ -786,11 +786,19 @@
           (and (not (cast-type-check use))
                (lvar-good-for-dx-p (cast-value use) dx)))
          (ref
-          (and (trivial-lambda-var-ref-p use)
-               (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
-                 (or (eq use uses)
-                     (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use)
-                                         dx))))))))
+          (let ((var (ref-leaf use)))
+            ;; LET lambda var, no SETS, not explicitly indefinite-extent.
+            (when (and (lambda-var-p var)
+                       (eq (functional-kind (lambda-var-home var)) :let)
+                       (not (lambda-var-sets var))
+                       (neq (lambda-var-extent var) 'indefinite-extent)
+                       ;; Check the other refs are GOOD-FOR-DX-P.
+                       (dolist (ref (lambda-var-refs var) t)
+                         (unless (eq use ref)
+                           (when (not (ref-good-for-dx-p ref))
+                             (return nil)))))
+              (lvar-good-for-dx-p
+               (trivial-lambda-var-ref-lvar use) dx)))))))
 
 (defun lvar-good-for-dx-p (lvar dx)
   (aver (lvar-uses lvar))
@@ -798,6 +806,8 @@
     (unless (use-good-for-dx-p use dx)
       (return nil))))
 
+;; Check that REF is DX safe or delivers a value to a combination
+;; whose result is that value and ends up being discarded.
 (defun ref-good-for-dx-p (ref)
   (let* ((lvar (ref-lvar ref))
          (dest (when lvar (lvar-dest lvar))))
@@ -810,35 +820,9 @@
                        (awhen (fun-info-result-arg it)
                          (eql lvar (nth it (combination-args dest))))))))
            (:local
-            (every #'trivial-lambda-var-ref-p
-                   (lambda-var-refs (lvar-lambda-var lvar))))))))
-
-(defun trivial-lambda-var-ref-p (use)
-  (and (ref-p use)
-       (let ((var (ref-leaf use)))
-         ;; lambda-var, no SETS, not explicitly indefinite-extent.
-         (when (and (lambda-var-p var) (not (lambda-var-sets var))
-                    (neq (lambda-var-extent var) 'indefinite-extent))
-           (let ((home (lambda-var-home var))
-                 (refs (lambda-var-refs var)))
-             ;; bound by a non-XEP lambda, no other REFS that aren't
-             ;; DX-SAFE, or are result-args when the result is discarded.
-             (when (and (neq :external (lambda-kind home))
-                        (dolist (ref refs t)
-                          (unless (or (eq use ref)
-                                      (ref-good-for-dx-p ref))
-                            (return nil))))
-               ;; the LAMBDA this var is bound by has only a single REF, going
-               ;; to a combination
-               (let* ((lambda-refs (lambda-refs home))
-                      (primary (car lambda-refs)))
-                 (and (ref-p primary)
-                      (not (cdr lambda-refs))
-                      (let* ((lvar (ref-lvar primary))
-                             (dest (and lvar
-                                        (lvar-dest lvar))))
-                        (and (combination-p dest)
-                             (eq (combination-fun dest) lvar)))))))))))
+            (dolist (ref (lambda-var-refs (lvar-lambda-var lvar)) t)
+              (when (not (ref-good-for-dx-p ref))
+                (return nil))))))))
 
 (defun trivial-lambda-var-ref-lvar (use)
   (let* ((this (ref-leaf use))

@@ -439,9 +439,7 @@
                                            (lvar-good-for-dx-p arg dx))
                                   (mark-dx arg))))
                              (ref
-                              (let ((other (trivial-lambda-var-ref-lvar use)))
-                                (unless (eq other lvar)
-                                  (mark-dx other))))))))
+                              (mark-dx (trivial-lambda-var-ref-lvar use)))))))
                 ;; Check that the LVAR hasn't been flushed somehow.
                 (when (lvar-uses lvar)
                   (cond ((lvar-good-for-dx-p lvar dx)
