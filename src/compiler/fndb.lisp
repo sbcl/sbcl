@@ -2247,5 +2247,5 @@
 
 (defknown (unsigned+signed unsigned-signed)
   (word sb-vm:signed-word t)
-  word
+  integer
   (movable foldable commutative always-translatable))

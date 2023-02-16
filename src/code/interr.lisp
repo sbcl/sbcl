@@ -477,6 +477,14 @@
     (deferr sub-overflow-error (x)
       (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
         (err x of (not cf))))))
+
+(deferr signed-unsigned-add-overflow-error (x)
+  (let ((type (or (sb-di:error-context)
+                  'fixnum)))
+    (object-not-type-error (if (logbitp (1- sb-vm:n-word-bits) x)
+                               (ldb (byte sb-vm:n-word-bits 0) x)
+                               (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                           type nil)))
 
 ;;;; INTERNAL-ERROR signal handler
 

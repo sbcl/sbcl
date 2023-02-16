@@ -125,7 +125,8 @@
    ("Multiplication overflow" mul-overflow 2)
    ("Addition overflow" add-sub-overflow 1)
    #+x86-64
-   ("Subtraction overflow" sub-overflow 1))
+   ("Subtraction overflow" sub-overflow 1)
+   ("Addition overflow" signed-unsigned-add-overflow 1))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function
