@@ -2788,7 +2788,8 @@
 
   (def unsigned+signed + (word #+arm64 sb-vm:signed-word) (word sb-vm:signed-word))
   (def unsigned+signed + (word #+arm64 sb-vm:signed-word) (sb-vm:signed-word word) t)
-  (def unsigned-signed - word (word sb-vm:signed-word))
+  (def unsigned-signed - (word #+arm64 sb-vm:signed-word) (word sb-vm:signed-word))
+  (def signed-unsigned - (word #+arm64 sb-vm:signed-word) (sb-vm:signed-word word))
 
   (def signed* * sb-vm:signed-word)
   (def signed+ + sb-vm:signed-word)
@@ -2806,6 +2807,12 @@
                         'word
                         'sb-vm:signed-word)))
   (defoptimizer (unsigned-signed derive-type) ((x y type-to-check))
+    (specifier-type (if (subtypep (lvar-value type-to-check) 'word)
+                        'word
+                        'sb-vm:signed-word))))
+
+(when-vop-existsp (:translate signed-unsigned)
+  (defoptimizer (signed-unsigned derive-type) ((x y type-to-check))
     (specifier-type (if (subtypep (lvar-value type-to-check) 'word)
                         'word
                         'sb-vm:signed-word))))

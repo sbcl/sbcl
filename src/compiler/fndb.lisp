@@ -2249,3 +2249,8 @@
   (word sb-vm:signed-word t)
   integer
   (movable foldable commutative always-translatable))
+
+(defknown (signed-unsigned)
+  (sb-vm:signed-word word t)
+  integer
+  (movable foldable commutative always-translatable))
