@@ -19,25 +19,13 @@
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
 
-(deftransform constantly ((value) * * :node node)
-  (if (constant-lvar-p value)
-      `#'(lambda (&rest rest)
-           (declare (ignore rest))
-           ',(lvar-value value))
-      (let ((lvar (node-lvar node)))
-        ;; Is it destined to a funcall? Then don't create a closure
-        (map-all-lvar-dests
-         lvar
-         (lambda (lvar node)
-           (unless (lvar-called-by-node-p lvar node)
-             (give-up-ir1-transform))))
-        `#'(lambda (&rest rest)
-             (declare (ignore rest))
-             value))))
-
-(defoptimizer (constantly derive-type) ((value))
-  (specifier-type
-   `(function (&rest t) (values ,(type-specifier (lvar-type value)) &optional))))
+;;; Bind the value and make a closure that returns it.
+(define-source-transform constantly (value)
+  (with-unique-names (rest n-value)
+    `(let ((,n-value ,value))
+       (lambda (&rest ,rest)
+         (declare (ignore ,rest))
+         ,n-value))))
 
 (defoptimizer (complement derive-type) ((fun))
   (let ((type (lvar-fun-type fun)))
