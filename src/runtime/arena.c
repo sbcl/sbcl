@@ -57,7 +57,8 @@ lispobj sbcl_new_arena(size_t size)
     //   Memblk
     struct arena* arena = ARENA_GET_OS_MEMORY(size);
     memset(arena, 0, sizeof *arena);
-    arena->header = (sizeof (struct arena) / N_WORD_BYTES) << INSTANCE_LENGTH_SHIFT;
+    arena->header = ((sizeof (struct arena) / N_WORD_BYTES) << INSTANCE_LENGTH_SHIFT)
+      | INSTANCE_WIDETAG;
     struct arena_memblk* block =
       (void*)((char*)arena + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
     // arenas require threads, but the header for the mutex definition
