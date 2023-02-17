@@ -1104,7 +1104,7 @@
                (labels ((reoptimize (node)
                           (when (valued-node-p node)
                             (let ((lvar (node-lvar node))
-                                  (principal-lvar (nth-value 1 (principal-lvar-dest-and-lvar (node-lvar ref)))))
+                                  (principal-lvar (nth-value 1 (principal-lvar-end (node-lvar ref)))))
                               (reoptimize-lvar lvar)
                               (unless (eq lvar principal-lvar)
                                 (reoptimize-lvar principal-lvar)))))

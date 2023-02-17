@@ -119,24 +119,6 @@
                    ref))))
     (recurse lvar nil)))
 
-(defun principal-lvar-dest (lvar)
-  (labels ((pld (lvar)
-             (and lvar
-                  (let ((dest (lvar-dest lvar)))
-                    (if (cast-p dest)
-                        (pld (cast-lvar dest))
-                        dest)))))
-    (pld lvar)))
-
-(defun principal-lvar-dest-and-lvar (lvar)
-  (labels ((pld (lvar)
-             (and lvar
-                  (let ((dest (lvar-dest lvar)))
-                    (if (cast-p dest)
-                        (pld (cast-lvar dest))
-                        (values dest lvar))))))
-    (pld lvar)))
-
 (defun map-lvar-dest-casts (fun lvar)
   (labels ((pld (lvar)
              (and lvar
@@ -2615,7 +2597,7 @@ is :ANY, the function name is not checked."
 ;;; In (a (b lvar)) (lvar-matches-calls lvar '(b a)) would return T
 (defun lvar-matches-calls (lvar dest-fun-names)
   (loop for fun in dest-fun-names
-        for dest = (principal-lvar-dest lvar)
+        for dest = (principal-lvar-end lvar)
         when (or (not (combination-p dest))
                  (neq fun (combination-fun-source-name dest nil)))
         return nil

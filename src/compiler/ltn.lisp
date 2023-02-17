@@ -165,7 +165,7 @@
 (defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node)
   (multiple-value-bind (dest dest-lvar)
       (and (node-lvar node)
-           (principal-lvar-dest-and-lvar (node-lvar node)))
+           (principal-lvar-end (node-lvar node)))
     (cond ((and (basic-combination-p dest)
                 (eq (basic-combination-kind dest) :full)
                 (eq (basic-combination-fun dest) dest-lvar)
