@@ -810,8 +810,8 @@
     (unless (use-good-for-dx-p use dx)
       (return nil))))
 
-;;; Check that REF is DX safe or delivers a value to a combination
-;;; whose result is that value and ends up being discarded.
+;;; Check that REF delivers a value to a combination which is DX safe
+;;; or whose result is that value and ends up being discarded.
 (defun ref-good-for-dx-p (ref)
   (let* ((lvar (ref-lvar ref))
          (dest (when lvar (lvar-dest lvar))))
@@ -824,9 +824,14 @@
                        (awhen (fun-info-result-arg it)
                          (eql lvar (nth it (combination-args dest))))))))
            (:local
-            (dolist (ref (lambda-var-refs (lvar-lambda-var lvar)) t)
-              (when (not (ref-good-for-dx-p ref))
-                (return nil))))))))
+            (loop for arg in (combination-args dest)
+                  for var in (lambda-vars (combination-lambda dest))
+                  do (when (eq arg lvar)
+                       (return
+                         (dolist (ref (lambda-var-refs var) t)
+                           (unless (ref-good-for-dx-p ref)
+                             (return nil)))))
+                  finally (bug "unreachable")))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
@@ -2683,35 +2688,6 @@ is :ANY, the function name is not checked."
                                   (funcall function singleton-arg
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
-
-(defun lvar-lambda-var (lvar)
-  (let* ((let (lvar-dest lvar))
-         (fun (combination-lambda let)))
-    (loop for arg in (combination-args let)
-          for var in (lambda-vars fun)
-          when (eq arg lvar)
-          return var)))
-
-;;; If the dest is a LET variable use the variable refs.
-(defun map-all-lvar-dests (lvar fun)
-  (multiple-value-bind (dest lvar) (principal-lvar-dest-and-lvar lvar)
-    (if (and (combination-p dest)
-             (eq (combination-kind dest) :local))
-        (let ((var (lvar-lambda-var lvar)))
-          ;; Will PROPAGATE-LET-ARGS substitute the references?
-          (if (preserve-single-use-debug-var-p dest var)
-              (funcall fun lvar dest)
-              (loop for ref in (lambda-var-refs var)
-                    do (multiple-value-bind (dest lvar)
-                           (principal-lvar-dest-and-lvar (node-lvar ref))
-                         (funcall fun lvar dest)))))
-        (funcall fun lvar dest))))
-
-(defun lvar-called-by-node-p (lvar node)
-  (and (basic-combination-p node)
-       (let ((fun (basic-combination-fun node)))
-         (or (eq fun lvar)
-             (lvar-fun-is fun '(%coerce-callable-for-call))))))
 
 
 (defun proper-or-circular-list-p (x)

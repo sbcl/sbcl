@@ -46,13 +46,11 @@
      ((and min (eql min max))
       (let ((dums (make-gensym-list min)))
         `#'(lambda ,dums (not (funcall fun ,@dums)))))
-     ((block nil
-        (map-all-lvar-dests
-         (node-lvar node)
-         (lambda (lvar node)
-           (unless (lvar-called-by-node-p lvar node)
-             (return))))
-        t)
+     ((let ((lvar (node-lvar node)))
+        (when lvar
+          (let ((dest (lvar-dest lvar)))
+            (and (combination-p dest)
+                 (eq (combination-fun dest) lvar)))))
       '#'(lambda (&rest args)
            (not (apply fun args))))
      (t

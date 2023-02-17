@@ -6301,3 +6301,15 @@
                                 a))))))))
         (%f2 (loop for i below 1 sum (%f2 1)))))
    :allow-warnings t))
+
+(with-test (:name :single-use-complement-inlines)
+  (let ((fun (checked-compile
+              `(lambda (z)
+                 (funcall (complement z))))))
+    (assert (not (ctu:find-named-callees #'complement)))))
+
+(with-test (:name :single-use-constantly-inlines)
+  (let ((fun (checked-compile
+              `(lambda (z)
+                 (funcall (constantly z))))))
+    (assert (not (ctu:find-named-callees #'constantly)))))
