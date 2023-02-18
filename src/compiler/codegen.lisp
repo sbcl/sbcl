@@ -255,6 +255,7 @@
                       (unless (and (constant-p (tn-leaf x))
                                    (eql (tn-value x) 0)
                                    (register-p y))
+                        (push-in tn-ref-next args (tn-reads constant))
                         (setf (tn-ref-tn args) constant)
                         (setf (tn-ref-load-tn args) nil)))
                      ((register-p y)

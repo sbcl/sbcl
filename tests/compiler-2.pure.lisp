@@ -3991,3 +3991,10 @@
      (assert (eql (funcall *x*) 1))
      (assert (eql (funcall *x*) 2)))
    :load t))
+
+(with-test (:name :load-store-two-words-reused-load-tn)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (funcall x 1 2 3 4 'a t t))
+   (('list) '(1 2 3 4 a t t) :test #'equal)))

@@ -263,10 +263,13 @@
              (load-arg (x load-tn)
                (sc-case x
                  ((constant immediate control-stack)
-                  (let ((load-tn (if (and used-load-tn
-                                          (location= used-load-tn load-tn))
-                                     tmp-tn
-                                     load-tn)))
+                  (let ((load-tn (cond ((not (and used-load-tn
+                                                  (location= used-load-tn load-tn)))
+                                        load-tn)
+                                       ((sb-c::tn-reads load-tn)
+                                        (return-from load-arg))
+                                       (t
+                                        tmp-tn))))
                     (setf used-load-tn load-tn)
                     (sc-case x
                       (constant
