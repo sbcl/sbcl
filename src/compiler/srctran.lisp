@@ -2738,34 +2738,8 @@
 (macrolet ((def (name fun type &optional (types `(,type ,type)) swap)
                (setf type (sb-int:ensure-list type))
                `(when-vop-existsp (:translate ,name)
-                  ,@(unless swap
-                      `((defun ,name (x y type)
-                          (declare (type ,(first types) x)
-                                   (type ,(second types) x))
-                          (let ((r (,fun x y)))
-                            (unless (typep r type)
-                              (error 'type-error :expected-type type :datum r))
-                            r))
-                        (deftransform ,name ((x y type-to-check) * * :node node)
-                          (let* ((type-to-check (lvar-value type-to-check))
-                                 (unsigned (subtypep type-to-check 'word)))
-                            (flet ((no-overflow-p (type)
-                                     (let ((derived (two-arg-derive-type x y
-                                                                         #',(symbolicate fun '-derive-type-aux)
-                                                                         #',fun)))
-                                       (or (csubtypep derived type)
-                                           (not (types-equal-or-intersect derived type))))))
-                              (cond ((or ,@(loop for type in type
-                                                 for unsigned in '(t nil)
-                                                 collect `(and (eql unsigned  ,unsigned)
-                                                               (no-overflow-p (specifier-type ',type)))))
-                                     `(the ,type-to-check (,',fun x y)))
-                                    (t
-                                     (give-up-ir1-transform))))))))
-
-
                   (deftransform ,fun ((x y) ,types * :node node :important nil)
-                    (delay-ir1-transform node :optimize)
+                    (delay-ir1-transform node :ir1-phases)
                     (let ((dest (node-dest node))
                           (type (single-value-type (node-derived-type node)))
                           type-to-check)

@@ -2233,24 +2233,24 @@
 (defknown fixnum*
   (fixnum fixnum t)
   fixnum
-  (movable foldable always-translatable))
+  (movable always-translatable))
 
 (defknown (signed* signed+ signed-)
   (sb-vm:signed-word sb-vm:signed-word t)
   sb-vm:signed-word
-  (movable foldable commutative always-translatable))
+  (movable always-translatable))
 
 (defknown (unsigned* unsigned+ unsigned-)
   (word word t)
   word
-  (movable foldable commutative always-translatable))
+  (movable always-translatable))
 
 (defknown (unsigned+signed unsigned-signed)
   (word sb-vm:signed-word t)
   integer
-  (movable foldable commutative always-translatable))
+  (movable always-translatable))
 
 (defknown (signed-unsigned)
   (sb-vm:signed-word word t)
   integer
-  (movable foldable commutative always-translatable))
+  (movable always-translatable))
