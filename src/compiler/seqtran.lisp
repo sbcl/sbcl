@@ -2540,7 +2540,6 @@
   (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
   (when (or test key)
-    (delay-ir1-transform node :optimize)
     (give-up-ir1-transform "non-trivial :KEY or :TEST"))
   (block not-a-bit
     `(with-array-data ((bits sequence :offset-var offset)

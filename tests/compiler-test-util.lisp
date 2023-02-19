@@ -34,7 +34,7 @@
 (unless (fboundp 'compiler-derived-type)
   (defknown compiler-derived-type (t) (values t t) (flushable))
   (deftransform compiler-derived-type ((x) * * :node node)
-    (sb-c::delay-ir1-transform node :optimize)
+    (sb-c::delay-ir1-transform node :ir1-phases)
     `(values ',(type-specifier (sb-c::lvar-type x)) t))
   (defun compiler-derived-type (x)
     (declare (ignore x))

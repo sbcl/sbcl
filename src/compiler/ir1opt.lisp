@@ -1646,17 +1646,11 @@
 ;;;
 ;;; DELAY-IR1-TRANSFORM is used to throw out of an IR1 transform, and
 ;;; delay the transform on the node until later. REASONS specifies
-;;; when the transform will be later retried. The :OPTIMIZE reason
-;;; causes the transform to be delayed until after the current IR1
-;;; optimization pass. The :CONSTRAINT reason causes the transform to
-;;; be delayed until after constraint propagation.
-;;;
-;;; FIXME: Now (0.6.11.44) that there are 4 variants of this (GIVE-UP,
-;;; ABORT, DELAY/:OPTIMIZE, DELAY/:CONSTRAINT) and we're starting to
-;;; do CASE operations on the various REASON values, it might be a
-;;; good idea to go OO, representing the reasons by objects, using
-;;; CLOS methods on the objects instead of CASE, and (possibly) using
-;;; SIGNAL instead of THROW.
+;;; when the transform will be later retried. The :IR1-PHASES reason
+;;; causes the transform to be delayed until after the current
+;;; IR1-OPTIMIZE-PHASE-1 optimization pass. The :CONSTRAINT reason
+;;; causes the transform to be delayed until after constraint
+;;; propagation.
 (defun give-up-ir1-transform (&rest args)
   (throw 'give-up-ir1-transform (values :failure args)))
 (defun abort-ir1-transform (&rest args)

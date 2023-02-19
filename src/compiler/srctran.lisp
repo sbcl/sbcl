@@ -2707,7 +2707,7 @@
 (deftransform * ((x y) (integer (constant-arg unsigned-byte)) * :node node)
   "convert x*2^k to shift"
   ;; Delay to make sure the surrounding casts are apparent.
-  (delay-ir1-transform node :optimize)
+  (delay-ir1-transform node :ir1-phases)
   (let* ((type (single-value-type (node-asserted-type node)))
          (y (lvar-value y))
          (len (1- (integer-length y))))
@@ -2726,7 +2726,7 @@
                    :important nil
                    :node node)
   ;; Give modular arithmetic optimizers a chance
-  (delay-ir1-transform node :optimize)
+  (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-asserted-type node)))
         (shift (lvar-value amount)))
     (when (or (csubtypep type (specifier-type 'word))

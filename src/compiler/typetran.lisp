@@ -98,15 +98,15 @@
           (unless (type= difference (specifier-type 'fixnum))
             (return-from  ir1-transform-type-predicate `(not (null object))))))
       (cond ((typep type 'alien-type-type)
-                    ;; We don't transform alien type tests until here, because
-                    ;; once we do that the rest of the type system can no longer
-                    ;; reason about them properly -- so we'd miss out on type
-                    ;; derivation, etc.
-                    (delay-ir1-transform node :optimize)
-                    (let ((alien-type (alien-type-type-alien-type type)))
-                      ;; If it's a lisp-rep-type, the CTYPE should be one already.
-                      (aver (not (compute-lisp-rep-type alien-type)))
-                      `(sb-alien::alien-value-typep object ',alien-type)))
+             ;; We don't transform alien type tests until here, because
+             ;; once we do that the rest of the type system can no longer
+             ;; reason about them properly -- so we'd miss out on type
+             ;; derivation, etc.
+             (delay-ir1-transform node :ir1-phases)
+             (let ((alien-type (alien-type-type-alien-type type)))
+               ;; If it's a lisp-rep-type, the CTYPE should be one already.
+               (aver (not (compute-lisp-rep-type alien-type)))
+               `(sb-alien::alien-value-typep object ',alien-type)))
             ((let ((intersect (type-intersection otype type))
                    (fixnum (specifier-type 'fixnum)))
                (when (and (csubtypep intersect fixnum)
