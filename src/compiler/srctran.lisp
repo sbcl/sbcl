@@ -2760,10 +2760,10 @@
                                      ',(type-specifier type-to-check))
                            (give-up-ir1-transform))))))))
 
-  (def unsigned+signed + (word #+arm64 sb-vm:signed-word) (word sb-vm:signed-word))
-  (def unsigned+signed + (word #+arm64 sb-vm:signed-word) (sb-vm:signed-word word) t)
-  (def unsigned-signed - (word #+arm64 sb-vm:signed-word) (word sb-vm:signed-word))
-  (def signed-unsigned - (word #+arm64 sb-vm:signed-word) (sb-vm:signed-word word))
+  (def unsigned+signed + (word sb-vm:signed-word) (word sb-vm:signed-word))
+  (def unsigned+signed + (word sb-vm:signed-word) (sb-vm:signed-word word) t)
+  (def unsigned-signed - (word sb-vm:signed-word) (word sb-vm:signed-word))
+  (def signed-unsigned - (word sb-vm:signed-word) (sb-vm:signed-word word))
 
   (def signed* * sb-vm:signed-word)
   (def signed+ + sb-vm:signed-word)

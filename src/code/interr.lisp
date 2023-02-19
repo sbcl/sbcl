@@ -479,11 +479,20 @@
         (err x of (not cf))))))
 
 (deferr signed-unsigned-add-overflow-error (x)
-  (let ((type (or (sb-di:error-context)
-                  'fixnum)))
-    (object-not-type-error (if (logbitp (1- sb-vm:n-word-bits) x)
-                               (ldb (byte sb-vm:n-word-bits 0) x)
-                               (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+  (let* ((type (or (sb-di:error-context)
+                  'fixnum))
+        (raw-x (car *current-internal-error-args*))
+        (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
+    (object-not-type-error (if signed
+                               (if (logbitp (1- sb-vm:n-word-bits) x)
+                                   (ldb (byte sb-vm:n-word-bits 0) x)
+                                   (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                               (multiple-value-bind (of cf)
+                                   (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
+                                 (declare (ignore of))
+                                 (if cf
+                                     (sb-c::mask-signed-field sb-vm:n-word-bits x)
+                                     (dpb 1 (byte 1 sb-vm:n-word-bits) x))))
                            type nil)))
 
 (deferr sub-overflow2-error (x y)
