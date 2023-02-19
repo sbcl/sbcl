@@ -494,15 +494,14 @@
                 (sap-ref-word (int-sap (get-lisp-obj-address fun))
                               (- (ash simple-fun-self-slot word-shift) fun-pointer-lowtag))))))))
 
-(sb-c::when-vop-existsp (:translate sb-c::unsigned+)
-  (defconstant cf-bit 0)
-  (defconstant sf-bit 7)
-  (defconstant of-bit 11)
+(defconstant cf-bit 0)
+(defconstant sf-bit 7)
+(defconstant of-bit 11)
 
-  (defun context-overflow-carry-flags (context)
-    (let ((flags (context-flags context)))
-      (values (logbitp of-bit flags)
-              (logbitp cf-bit flags)))))
+(defun context-overflow-carry-flags (context)
+  (let ((flags (context-flags context)))
+    (values (logbitp of-bit flags)
+            (logbitp cf-bit flags))))
 
 (def-cpu-feature :avx2
     (plusp (sb-alien:extern-alien "avx2_supported" int)))
