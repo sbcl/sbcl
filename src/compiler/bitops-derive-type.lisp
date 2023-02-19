@@ -23,8 +23,10 @@
             (max (numeric-type-high type)))
         (values (and min max (max (integer-length min) (integer-length max)))
                 (or (null max) (not (minusp max)))
-                (or (null min) (minusp min))))
-      (values nil t t)))
+                (or (null min) (minusp min))
+                min
+                max))
+      (values nil t t nil nil)))
 
 ;;;; Generators for simple bit masks
 
@@ -186,9 +188,9 @@
                       (specifier-type 'integer))))))))
 
 (defun logior-derive-unsigned-bounds (x y)
-  (let* ((a (numeric-type-low x))
+  (let* ((a (max (or (numeric-type-low x) 0) 0))
          (b (numeric-type-high x))
-         (c (numeric-type-low y))
+         (c (max (or (numeric-type-low y) 0) 0))
          (d (numeric-type-high y))
          (length-xor-x (integer-length (logxor a b)))
          (length-xor-y (integer-length (logxor c d))))
@@ -211,8 +213,8 @@
 (defun logior-derive-type-aux (x y &optional same-leaf)
   (when same-leaf
     (return-from logior-derive-type-aux x))
-  (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
-    (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
+  (multiple-value-bind (x-len x-pos x-neg x-low x-high) (integer-type-length x)
+    (multiple-value-bind (y-len y-pos y-neg y-low y-high) (integer-type-length y)
       (cond
        ((and (not x-neg) (not y-neg))
         ;; Both are positive.
@@ -234,21 +236,22 @@
             ;; X is negative, but we don't know about Y. The result
             ;; will be negative, but no more negative than X.
             (specifier-type
-             `(integer ,(or (numeric-type-low x) '*)
+             `(integer ,(or x-low '*)
                        -1))))
        (t
         ;; X might be either positive or negative.
         (if (not y-pos)
             ;; But Y is negative. The result will be negative.
             (specifier-type
-             `(integer ,(or (numeric-type-low y) '*)
+             `(integer ,(or y-low '*)
                        -1))
-            ;; We don't know squat about either. It won't get any bigger.
-            (if (and x-len y-len)
-                ;; Bounded.
-                (specifier-type `(signed-byte ,(1+ (max x-len y-len))))
-                ;; Unbounded.
-                (specifier-type 'integer))))))))
+            (cond ((and x-len y-len)
+                   (specifier-type `(integer ,(min x-low y-low)
+                                             ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
+                  ((and x-high y-high)
+                   (specifier-type `(integer * ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
+                  (t
+                   (specifier-type 'integer)))))))))
 
 (defun logxor-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))
