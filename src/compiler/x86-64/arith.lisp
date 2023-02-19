@@ -438,12 +438,18 @@
   (def + fast-+/unsigned=>unsigned fast-+-c/unsigned=>unsigned
        (unsigned-reg unsigned-stack) unsigned-num (unsigned-byte 64) 3)
 
+  (def + fast-+/signed-unsigned fast-+-c/signed-unsigned
+      (signed-reg signed-stack unsigned-reg unsigned-stack) (:or signed-num unsigned-num) (signed-byte 64) 5)
+
   (def - fast--/fixnum=>fixnum fast---c/fixnum=>fixnum
        (any-reg control-stack) tagged-num fixnum 1 fixnumize)
   (def - fast--/signed=>signed fast---c/signed=>signed
        (signed-reg signed-stack) signed-num (signed-byte 64) 3)
   (def - fast--/unsigned=>unsigned fast---c/unsigned=>unsigned
        (unsigned-reg unsigned-stack) unsigned-num (unsigned-byte 64) 3)
+
+  (def - fast--/signed-unsigned fast---c/signed-unsigned
+      (signed-reg signed-stack unsigned-reg unsigned-stack) (:or signed-num unsigned-num) (signed-byte 64) 5)
 
   (def * fast-*/fixnum=>fixnum fast-*-c/fixnum=>fixnum
        (any-reg control-stack) tagged-num fixnum 1 identity t)
