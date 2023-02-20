@@ -56,7 +56,7 @@
               ;; I suspect that INHIBIT-WARNINGS precludes them from happening
               (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
                     (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
-              nil nil
+              nil nil nil
               '((:declare sb-c::tlab :system)))))
        (sb-c:compile-in-lexenv (maybe-copy-expr) lexenv nil nil nil nil nil)))))
 

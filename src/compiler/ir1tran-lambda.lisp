@@ -1140,12 +1140,14 @@
                   :handled-conditions (lexenv-handled-conditions *lexenv*)
                   :policy (lexenv-policy *lexenv*)
                   :flushable (lexenv-flushable *lexenv*)
-                  :lambda (lexenv-lambda *lexenv*))
+                  :lambda (lexenv-lambda *lexenv*)
+                  :parent *lexenv*)
                  (make-almost-null-lexenv
                   (lexenv-policy *lexenv*)
                   (lexenv-handled-conditions *lexenv*)
                   (lexenv-flushable *lexenv*)
-                  (lexenv-lambda *lexenv*))))
+                  (lexenv-lambda *lexenv*)
+                  *lexenv*)))
            (*inlining* (1+ *inlining*))
            (clambda (ir1-convert-lambda `(lambda ,@body)
                                         :source-name source-name

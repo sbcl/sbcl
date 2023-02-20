@@ -364,6 +364,17 @@
         (setf (lvar-dynamic-extent new) cleanup)
         (setf (cleanup-nlx-info cleanup) (subst new old (cleanup-nlx-info cleanup)))))))
 
+(defun lexenv-contains-lambda (lambda parent-lexenv)
+  (loop for lexenv = (lambda-lexenv lambda)
+        then (let ((lambda (lexenv-lambda lexenv)))
+               (and lambda
+                    (lambda-call-lexenv lambda)))
+        while lexenv
+        thereis
+        (loop for parent = lexenv then (lexenv-parent parent)
+              while parent
+              thereis (eq parent parent-lexenv))))
+
 ;;; Handle
 ;;; (dx-let ((x (let ((m (make-array)))
 ;;;               (fill m)
@@ -375,9 +386,8 @@
                (lambda-var-p new-lambda-var)
                (eq (functional-kind (lambda-var-home new-lambda-var)) :let)
                ;; Make sure the let is inside the dx let
-               (not (find new-lambda-var
-                          (lexenv-vars (node-lexenv (cleanup-mess-up dx)))
-                          :key #'cdr :test #'eq)))
+               (lexenv-contains-lambda (lambda-var-home new-lambda-var)
+                                       (node-lexenv (cleanup-mess-up dx))))
       (propagate-lvar-dx (let-var-initial-value new-lambda-var) old-lvar)
       t)))
 
@@ -934,7 +944,8 @@
                           (lexenv-disabled-package-locks default))
                          (policy (lexenv-policy default))
                          (user-data (lexenv-user-data default))
-                         flushable)
+                         flushable
+                         (parent default))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
                   (if ,var
@@ -950,7 +961,8 @@
      lambda
      cleanup handled-conditions disabled-package-locks
      policy
-     user-data)))
+     user-data
+     parent)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
@@ -986,7 +998,8 @@
      (lexenv-handled-conditions lexenv)
      (lexenv-disabled-package-locks lexenv)
      (lexenv-policy lexenv)
-     (lexenv-user-data lexenv))))
+     (lexenv-user-data lexenv)
+     lexenv)))
 
 ;;;; flow/DFO/component hackery
 

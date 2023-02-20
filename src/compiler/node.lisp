@@ -28,7 +28,7 @@
              (:copier nil)
              (:constructor make-null-lexenv ())
              (:constructor make-almost-null-lexenv
-                           (%policy handled-conditions flushable lambda
+                           (%policy handled-conditions flushable lambda parent
                             &optional user-data))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
@@ -38,7 +38,8 @@
                             type-restrictions
                             flushable
                             lambda cleanup handled-conditions
-                            disabled-package-locks %policy user-data)))
+                            disabled-package-locks %policy user-data
+                            parent)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -86,6 +87,7 @@
   ;; can't be attached to a function, as compiler macros can be
   ;; defined on macros).
   (user-data nil :type list)
+  (parent nil)
   ;; Cache of all visible variables, including the ones coming from
   ;; (call-lexenv lambda)
   ;; Used for LEAF-VISIBLE-TO-DEBUGGER-P
