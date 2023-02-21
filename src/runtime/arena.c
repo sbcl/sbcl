@@ -179,6 +179,7 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
         if (th->mixed_tlab.start_addr) gc_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
         if (th->cons_tlab.start_addr) gc_close_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
+#if 0 // this causes a data race, the very thing it's trying to avoid
         int arena_index = fixnum_value(arena->index);
         /* If this thread has potentially used this arena previously, see if
          * the TLAB pointers can be restored based on token validity */
@@ -191,6 +192,7 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
             }
             memset(state, 0, sizeof (arena_state));
         }
+#endif
     } else { // finished with the arena
         gc_assert(th->arena); // must have been an arena in use
         struct arena* old_arena = (void*)native_pointer(th->arena);
@@ -502,7 +504,7 @@ static int count_arena_objects(lispobj arena, int *pnchunks)
         ++nchunks;
         lispobj* where = (void*)ALIGN_UP(((uword_t)blk + sizeof (struct arena_memblk)),
                                          CHUNK_ALIGN);
-        lispobj* limit = (void*)blk->limit;
+        lispobj* limit = (void*)blk->freeptr;
         while (where < limit) {
             if (*where == (uword_t)-1) { // filler
                 where += 2;
@@ -547,7 +549,7 @@ lispobj arena_find_containing_object(lispobj arena, char* ptr)
     do {
         lispobj* where = (void*)ALIGN_UP(((uword_t)blk + sizeof (struct arena_memblk)),
                                          CHUNK_ALIGN);
-        lispobj* limit = (void*)blk->limit;
+        lispobj* limit = (void*)blk->freeptr;
         while (where < limit) {
             if (*where == (uword_t)-1) { // filler
                 where += 2;
@@ -566,6 +568,7 @@ lispobj arena_find_containing_object(lispobj arena, char* ptr)
 int diagnose_arena_fault(os_context_t* context, char *addr)
 {
 #ifndef LISP_FEATURE_WIN32
+    if (!arena_chain) return;
     lispobj arena = find_containing_arena((lispobj)addr);
     struct thread* th = get_sb_vm_thread();
     struct thread_instance* instance = (void*)native_pointer(th->lisp_thread);
