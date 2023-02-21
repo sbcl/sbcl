@@ -33,3 +33,39 @@
           (loop for x from min upto max do
             (assert (eql (logior x k) (funcall f x))))))))))
     (test-guts)))
+
+(defun type-derivation (op u-l u-h s-l s-h)
+  (let ((interval (sb-c::numeric-type->interval
+                   (sb-kernel:specifier-type (cadr (caddr (sb-kernel:%simple-fun-type
+                                                           (compile nil `(lambda (u s)
+                                                                           (declare ((integer ,u-l ,u-h) u)
+                                                                                    ((integer ,s-l ,s-h) s))
+                                                                           (,op u s))))))))))
+    (values (loop for u from u-l to u-h
+                  minimize (loop for s from s-l to s-h
+                                 minimize (funcall op u s)))
+            (loop for u from u-l to u-h
+                  maximize (loop for s from s-l to s-h
+                                 maximize (funcall op u s)))
+            (sb-c::interval-low interval)
+            (sb-c::interval-high interval))))
+
+(with-test (:name :logical-type-derivation)
+  (loop
+    for low1 from -4 to 4
+    do
+    (loop
+      for high1 from low1 to 4
+      do
+      (loop
+        for low2 from -4 to 4
+        do
+        (loop
+          for high2 from low2 to 4
+          do
+          (loop for op in '(logand logior logxor)
+                do
+                (multiple-value-bind (low high r-low r-high)
+                    (type-derivation op low1 high1 low2 high2)
+                  (assert (>= low r-low))
+                  (assert (<= high r-high)))))))))
