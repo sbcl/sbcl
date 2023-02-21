@@ -568,7 +568,7 @@ lispobj arena_find_containing_object(lispobj arena, char* ptr)
 int diagnose_arena_fault(os_context_t* context, char *addr)
 {
 #ifndef LISP_FEATURE_WIN32
-    if (!arena_chain) return;
+    if (!arena_chain) return 0; // not handled
     lispobj arena = find_containing_arena((lispobj)addr);
     struct thread* th = get_sb_vm_thread();
     struct thread_instance* instance = (void*)native_pointer(th->lisp_thread);

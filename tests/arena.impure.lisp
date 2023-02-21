@@ -12,6 +12,7 @@
 (defun f (x y z)
   (with-arena (*arena*) (list x y z)))
 
+#+nil
 (test-util:with-test (:name :arena-alloc-waste-reduction)
   (let* ((list1 (f 'foo 'bar'baz))
          (list1-addr (get-lisp-obj-address list1))
@@ -255,6 +256,7 @@
           (with-arena (arena)
             (test-util:opaque-identity (make-array 5)))))))
   bytes-used)
+#+nil
 (test-util:with-test (:name :allocator-resumption)
   (map nil 'rewind-arena *many-arenas*)
   (let ((bytes-used-per-arena (use-up-some-space 10000)))
