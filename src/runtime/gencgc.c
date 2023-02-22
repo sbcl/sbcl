@@ -2637,7 +2637,7 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
  * prior to storing. If GC occurs in between setting the mark and storing,
  * then resetting the mark would be wrong if the subsequent store
  * creates an old->young pointer.
- * Mark stickiness is checked only once per invocation of collect_garbge(),
+ * Mark stickiness is checked only once per invocation of collect_garbage(),
  * so it when scanning interrupt contexts for generation 0 but not higher gens.
  * Also note the two scenarios:
  * (1) tagged pointer to a large simple-vector, but we scan card-by-card
