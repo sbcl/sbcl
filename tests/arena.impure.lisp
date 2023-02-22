@@ -429,6 +429,7 @@
             (try `(or ,spec1 ,spec2))
             (try `(and ,spec1 (not ,spec2)))
             (try `(or ,spec1 (not ,spec2))))))))
+  (sb-sys:scrub-control-stack)
   (assert (null (sb-vm:c-find-heap->arena arena)))
   result)
 (test-util:with-test (:name :ctype-cache
