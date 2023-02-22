@@ -436,13 +436,13 @@
                              (combination
                               (dolist (arg (combination-args use))
                                 (when (and arg
-                                           (lvar-good-for-dx-p arg dx))
+                                           (lvar-good-for-dx-p arg cleanup dx))
                                   (mark-dx arg))))
                              (ref
                               (mark-dx (let-var-initial-value (ref-leaf use))))))))
                 ;; Check that the LVAR hasn't been flushed somehow.
                 (when (lvar-uses lvar)
-                  (cond ((lvar-good-for-dx-p lvar dx)
+                  (cond ((lvar-good-for-dx-p lvar cleanup dx)
                          (mark-dx lvar))
                         (t
                          (note-no-stack-allocation lvar)

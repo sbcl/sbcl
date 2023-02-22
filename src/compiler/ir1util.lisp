@@ -767,7 +767,7 @@
               (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
                                (find-original-source (node-source-path use)))))))))
 
-(defun use-good-for-dx-p (use dx)
+(defun use-good-for-dx-p (use cleanup dx)
   (and (not (node-to-be-deleted-p use))
        (typecase use
          (combination
@@ -777,10 +777,10 @@
                        (funcall it use dx))
                      (awhen (fun-info-result-arg info)
                        (lvar-good-for-dx-p (nth it (combination-args use))
-                                           dx))))))
+                                           cleanup dx))))))
          (cast
           (and (not (cast-type-check use))
-               (lvar-good-for-dx-p (cast-value use) dx)))
+               (lvar-good-for-dx-p (cast-value use) cleanup dx)))
          (ref
           (let ((var (ref-leaf use)))
             ;; LET lambda var, no SETS, not explicitly indefinite-extent.
@@ -788,18 +788,21 @@
                        (eq (functional-kind (lambda-var-home var)) :let)
                        (not (lambda-var-sets var))
                        (neq (lambda-var-extent var) 'indefinite-extent)
+                       (lexenv-contains-lambda (lambda-var-home var)
+                                               (node-lexenv (cleanup-mess-up cleanup)))
                        ;; Check the other refs are GOOD-FOR-DX-P.
-                       (dolist (ref (lambda-var-refs var) t)
-                         (unless (eq use ref)
-                           (when (not (ref-good-for-dx-p ref))
-                             (return nil)))))
+                       (print
+                        (dolist (ref (lambda-var-refs var) t)
+                          (unless (eq use ref)
+                            (when (not (ref-good-for-dx-p ref))
+                              (return nil))))))
               (lvar-good-for-dx-p
-               (let-var-initial-value var) dx)))))))
+               (let-var-initial-value var) cleanup dx)))))))
 
-(defun lvar-good-for-dx-p (lvar dx)
+(defun lvar-good-for-dx-p (lvar cleanup dx)
   (aver (lvar-uses lvar))
   (do-uses (use lvar t)
-    (unless (use-good-for-dx-p use dx)
+    (unless (use-good-for-dx-p use cleanup dx)
       (return nil))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe

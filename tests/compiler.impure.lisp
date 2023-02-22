@@ -3147,3 +3147,34 @@
    :block-compile t ; so the self call is recognized
    :load t)
   (assert (= (funcall 'delete-optional-dispatch-xep 3) 10)))
+
+
+(with-test (:name :dx-dont-propagate)
+  (ctu:file-compile
+   `((defmacro generalized-delete (item list test)
+       `(let ((the-list ,list))
+          (flet ((fun (y) (funcall ,test ,item y)))
+            (let ((input the-list))
+              (%%delete-impl #'fun input)))))
+
+     (defmacro %%delete-impl (predicate list)
+       `(let ((dummy (cons nil ,list)))
+          (declare (dynamic-extent dummy))
+          (do* ((prev dummy)
+                (cur (cdr prev) (cdr prev)))
+               ((null cur) (cdr dummy))
+            (if (funcall ,predicate (car cur))
+                (rplacd prev (cdr cur))
+                (pop prev)))))
+
+     (defun foo-assert (test expect actual)
+       (unless (funcall test expect actual)
+         (format t "stack-allocated-p=~S~%" (sb-ext:stack-allocated-p actual))
+         (error "assertion failed")))
+
+     ;; The dummy cons made by the DELETE-IMPL algorithm (using
+     ;; essentially the same technique as many list traversal macros in
+     ;; SBCL such as COLLECT). But The list made by (LIST 1) in this assertion
+     ;; does not want to be dynamic-extent.
+     (foo-assert #'equal (list 1) (generalized-delete 0 (list 1) #'=)))
+   :load t))

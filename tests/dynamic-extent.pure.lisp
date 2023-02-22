@@ -1753,3 +1753,18 @@
           (m :v4 m)
           (sb-ext:heap-allocated-p m))))
    (() :dynamic)))
+
+(with-test (:name :dx-do-propagate-let-var)
+  (checked-compile-and-assert
+   ()
+   '(lambda (z)
+     (let ((x (cons nil (let ((y (list z z z)))
+                          (declare (optimize debug))
+                          y))))
+       (declare (dynamic-extent x))
+       (print x)
+       (print x)
+       (assert (sb-ext:stack-allocated-p x))
+       (assert (sb-ext:stack-allocated-p (cdr x))))
+     nil)
+   ((3) NIL)))
