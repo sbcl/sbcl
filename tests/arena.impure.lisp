@@ -281,6 +281,70 @@
               (unuse-arena)))))
       (sb-thread:join-thread thread))))
 
+;;;; Type specifier parsing and operations
+
+(defparameter *bunch-of-objects*
+  `((foo)
+    "astring"
+    #*1010
+    ,(find-package "CL")
+    ,(pathname "/tmp/blub")
+    ,#'open
+    #2a((1 2) (3 4))
+    ,(ash 1 64)
+    ))
+
+;; These type-specs are themselves consed so that we can
+;; ascertain whether there are arena pointers in internalized types.
+(defun get-bunch-of-type-specs ()
+  `((integer ,(random 47) *)
+    (and bignum (not (eql ,(random 1000))))
+    (and bignum (not (eql ,(logior #x8000000000000001
+                                   (ash (1+ (random #xF00)) 10)))))
+    (member ,(complex (coerce (random 10) 'single-float)
+                      (coerce (- (random 10)) 'single-float))
+            (goo)
+            #+sb-unicode
+            #\thumbs_up_sign
+            #-sb-unicode
+            #\a)
+    (or stream (member :hello
+                       #+sb-unicode #\thumbs_down_sign
+                       #-sb-unicode #\B))
+    (array t (,(+ 10 (random 10))))))
+
+(defun show-cache-counts ()
+  (dolist (s sb-impl::*cache-vector-symbols*)
+    (let ((v (symbol-value s)))
+      (when (vectorp v)
+        (format t "~5d  ~a~%"
+                (count-if (lambda (x) (not (eql x 0))) v)
+                s)))))
+
+(defun ctype-operator-tests (arena &aux (result 0))
+  (sb-int:drop-all-hash-caches)
+  (flet ((try (spec)
+           (dolist (x *bunch-of-objects*)
+             (when (typep x spec)
+               (incf result)))))
+    (sb-vm:with-arena (arena)
+      (let ((specs (get-bunch-of-type-specs)))
+        (dolist (spec1 specs)
+          (dolist (spec2 specs)
+            (try `(and ,spec1 ,spec2))
+            (try `(or ,spec1 ,spec2))
+            (try `(and ,spec1 (not ,spec2)))
+            (try `(or ,spec1 (not ,spec2))))))))
+  (assert (not (sb-vm:c-find-heap->arena arena)))
+  result)
+(test-util:with-test (:name :ctype-cache
+                      ;; don't have time to figure out the 'c-find-heap->arena' crashes
+                      :skipped-on :win32)
+  (let ((arena (sb-vm:new-arena 1048576)))
+    (ctype-operator-tests arena)))
+
+;;;;
+
 (defvar *newpkg* (make-package "PACKAGE-GROWTH-TEST"))
 (defun addalottasymbols ()
   (with-arena (*arena*)
@@ -311,6 +375,22 @@
                   (output))
                (output (get-lisp-obj-address a))))))))
 
+;;; CAUTION: tests of C-FIND-HEAP->ARENA that execute after destroy-arena and a following
+;;; NEW-ARENA might spuriously fail depending on how eagerly malloc() reuses addresses.
+;;; The failure goes something like this:
+;;;
+;;; stack -> some-cons C1 ; conservative reference
+;;; heap: C1 = (#<instance-in-arena> . mumble)
+;;;
+;;; now rewind the arena. "instance-in-arena" is not a valid object.
+;;; But: allocate more stuff in the arena, and suppose the address where instance-in-arena
+;;; formerly was now holds a different primitive object, like a cons cell.
+;;; The C-FIND-HEAP->ARENA function won't die, but you *will* die when trying to examine
+;;; what it found.  The heap cons is conservatively live, its contents are assumed good,
+;;; yet its CAR has instance-pointer-lowtag pointing to something that does not have
+;;; INSTANCE-WIDETAG. The Lisp printer suffers a horrible fate and causes recursive errors.
+;;; Had malloc() not reused an address, this would not happen, because the destroyed arena
+;;; can not be seen, and the cons pointing to nothing will not be returned by the finder.
 (test-util:with-test (:name destroy-arena)
   (macrolet ((exit-if-no-arenas ()
                '(progn (incf n-deleted)
@@ -374,69 +454,6 @@
   (unhide-arena *another-arena*)
   (rewind-arena *another-arena*)
   (dotimes (i 10) (f *another-arena* 1000)))
-
-;;;; Type specifier parsing and operations
-
-(defparameter *bunch-of-objects*
-  `((foo)
-    "astring"
-    #*1010
-    ,(find-package "CL")
-    ,(pathname "/tmp/blub")
-    ,#'open
-    #2a((1 2) (3 4))
-    ,(ash 1 64)
-    ))
-
-;; These type-specs are themselves consed so that we can
-;; ascertain whether there are arena pointers in internalized types.
-(defun get-bunch-of-type-specs ()
-  `((integer ,(random 47) *)
-    (and bignum (not (eql ,(random 1000))))
-    (and bignum (not (eql ,(logior #x8000000000000001
-                                   (ash (1+ (random #xF00)) 10)))))
-    (member ,(complex (coerce (random 10) 'single-float)
-                      (coerce (- (random 10)) 'single-float))
-            (goo)
-            #+sb-unicode
-            #\thumbs_up_sign
-            #-sb-unicode
-            #\a)
-    (or stream (member :hello
-                       #+sb-unicode #\thumbs_down_sign
-                       #-sb-unicode #\B))
-    (array t (,(+ 10 (random 10))))))
-
-(defun show-cache-counts ()
-  (dolist (s sb-impl::*cache-vector-symbols*)
-    (let ((v (symbol-value s)))
-      (when (vectorp v)
-        (format t "~5d  ~a~%"
-                (count-if (lambda (x) (not (eql x 0))) v)
-                s)))))
-
-(defun ctype-operator-tests (arena &aux (result 0))
-  (sb-int:drop-all-hash-caches)
-  (flet ((try (spec)
-           (dolist (x *bunch-of-objects*)
-             (when (typep x spec)
-               (incf result)))))
-    (sb-vm:with-arena (arena)
-      (let ((specs (get-bunch-of-type-specs)))
-        (dolist (spec1 specs)
-          (dolist (spec2 specs)
-            (try `(and ,spec1 ,spec2))
-            (try `(or ,spec1 ,spec2))
-            (try `(and ,spec1 (not ,spec2)))
-            (try `(or ,spec1 (not ,spec2))))))))
-  (sb-sys:scrub-control-stack)
-  (assert (null (sb-vm:c-find-heap->arena arena)))
-  result)
-(test-util:with-test (:name :ctype-cache
-                      ;; don't have time to figure out the 'c-find-heap->arena' crashes
-                      :skipped-on :win32)
-  (let ((arena (sb-vm:new-arena 1048576)))
-    (ctype-operator-tests arena)))
 
 ;; #+sb-devel preserves some symbols that the test doesn't care about
 ;; as the associated function will never be called.
