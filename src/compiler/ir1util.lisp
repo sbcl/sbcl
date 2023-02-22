@@ -791,11 +791,10 @@
                        (lexenv-contains-lambda (lambda-var-home var)
                                                (node-lexenv (cleanup-mess-up cleanup)))
                        ;; Check the other refs are GOOD-FOR-DX-P.
-                       (print
-                        (dolist (ref (lambda-var-refs var) t)
-                          (unless (eq use ref)
-                            (when (not (ref-good-for-dx-p ref))
-                              (return nil))))))
+                       (dolist (ref (lambda-var-refs var) t)
+                         (unless (eq use ref)
+                           (when (not (ref-good-for-dx-p ref))
+                             (return nil)))))
               (lvar-good-for-dx-p
                (let-var-initial-value var) cleanup dx)))))))
 
