@@ -459,7 +459,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 (defun ir1-optimize-phase-1 (component)
   (let ((loop-count 0)
-        (*constraint-propagate* *constraint-propagate*))
+        (constraint-propagate *constraint-propagate*))
     (tagbody
      again
        (loop
@@ -477,7 +477,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                (return)))
         (eliminate-dead-code component)
         (dfo-as-needed component)
-        (when *constraint-propagate*
+        (when constraint-propagate
           (maybe-mumble "Constraint ")
           (constraint-propagate component)
           (when (retry-delayed-ir1-transforms :constraint)
@@ -500,7 +500,7 @@ necessary, since type inference may take arbitrarily long to converge.")
        ;; part, so avoid it.
        (when (retry-delayed-ir1-transforms :ir1-phases)
          (setf loop-count 0
-               *constraint-propagate* nil)
+               constraint-propagate nil)
          (go again)))))
 
 ;;; Do all the IR1 phases for a non-top-level component.
