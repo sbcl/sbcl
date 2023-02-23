@@ -807,35 +807,34 @@
                                (find-original-source (node-source-path use)))))))))
 
 (defun use-good-for-dx-p (use cleanup dx)
-  (and (not (node-to-be-deleted-p use))
-       (typecase use
-         (combination
-          (and (eq (combination-kind use) :known)
-               (let ((info (combination-fun-info use)))
-                 (or (awhen (fun-info-stack-allocate-result info)
-                       (funcall it use dx))
-                     (awhen (fun-info-result-arg info)
-                       (lvar-good-for-dx-p (nth it (combination-args use))
-                                           cleanup dx))))))
-         (cast
-          (and (not (cast-type-check use))
-               (lvar-good-for-dx-p (cast-value use) cleanup dx)))
-         (ref
-          (let ((var (ref-leaf use)))
-            ;; LET lambda var, no SETS, not explicitly indefinite-extent.
-            (when (and (lambda-var-p var)
-                       (eq (functional-kind (lambda-var-home var)) :let)
-                       (not (lambda-var-sets var))
-                       (neq (lambda-var-extent var) 'indefinite-extent)
-                       (lexenv-contains-lambda (lambda-var-home var)
-                                               (node-lexenv (cleanup-mess-up cleanup)))
-                       ;; Check the other refs are GOOD-FOR-DX-P.
-                       (dolist (ref (lambda-var-refs var) t)
-                         (unless (eq use ref)
-                           (when (not (ref-good-for-dx-p ref))
-                             (return nil)))))
-              (lvar-good-for-dx-p
-               (let-var-initial-value var) cleanup dx)))))))
+  (typecase use
+    (combination
+     (and (eq (combination-kind use) :known)
+          (let ((info (combination-fun-info use)))
+            (or (awhen (fun-info-stack-allocate-result info)
+                  (funcall it use dx))
+                (awhen (fun-info-result-arg info)
+                  (lvar-good-for-dx-p (nth it (combination-args use))
+                                      cleanup dx))))))
+    (cast
+     (and (not (cast-type-check use))
+          (lvar-good-for-dx-p (cast-value use) cleanup dx)))
+    (ref
+     (let ((var (ref-leaf use)))
+       ;; LET lambda var, no SETS, not explicitly indefinite-extent.
+       (when (and (lambda-var-p var)
+                  (eq (functional-kind (lambda-var-home var)) :let)
+                  (not (lambda-var-sets var))
+                  (neq (lambda-var-extent var) 'indefinite-extent)
+                  (lexenv-contains-lambda (lambda-var-home var)
+                                          (node-lexenv (cleanup-mess-up cleanup)))
+                  ;; Check the other refs are GOOD-FOR-DX-P.
+                  (dolist (ref (lambda-var-refs var) t)
+                    (unless (eq use ref)
+                      (when (not (ref-good-for-dx-p ref))
+                        (return nil)))))
+         (lvar-good-for-dx-p
+          (let-var-initial-value var) cleanup dx))))))
 
 (defun lvar-good-for-dx-p (lvar cleanup dx)
   (aver (lvar-uses lvar))

@@ -71,42 +71,39 @@
 ;;; dynamic-extent allocate.
 (defun recognize-potentially-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
-  ;; The block may end up being deleted due to cast optimization
-  ;; caused by USE-GOOD-FOR-DX-P
-  (unless (node-to-be-deleted-p call)
-    (let* (no-notes
-           (dx-lvars
-             (loop for arg in (basic-combination-args call)
-                   for var in (lambda-vars fun)
-                   for dx = (leaf-dynamic-extent var)
-                   when (and dx arg (not (lvar-dynamic-extent arg)))
+  (let* (no-notes
+         (dx-lvars
+           (loop for arg in (basic-combination-args call)
+                 for var in (lambda-vars fun)
+                 for dx = (leaf-dynamic-extent var)
+                 when (and dx arg (not (lvar-dynamic-extent arg)))
                    collect (cons dx arg)
-                   do
-                   (when (eq dx 'dynamic-extent-no-note)
-                     (setf no-notes dx)))))
-      (when dx-lvars
-        (let* ((entry (with-ir1-environment-from-node call
-                        (make-entry)))
-               (cleanup (make-cleanup :kind :dynamic-extent
-                                      :mess-up entry
-                                      :nlx-info dx-lvars
-                                      :dx-kind no-notes)))
-          (setf (entry-cleanup entry) cleanup)
-          (insert-node-before call entry)
-          (setf (node-lexenv call)
-                (make-lexenv :default (node-lexenv call)
-                             :cleanup cleanup))
-          (setf (ctran-next (node-prev call)) nil)
-          (let ((ctran (make-ctran)))
-            (with-ir1-environment-from-node call
-              (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
-              (link-node-to-previous-ctran call ctran)))
-          ;; Make CALL end its block, so that we have a place to
-          ;; insert cleanup code.
-          (node-ends-block call)
-          (push entry (lambda-entries (node-home-lambda entry)))
-          (dolist (cell dx-lvars)
-            (setf (lvar-dynamic-extent (cdr cell)) cleanup))))))
+                 do
+                    (when (eq dx 'dynamic-extent-no-note)
+                      (setf no-notes dx)))))
+    (when dx-lvars
+      (let* ((entry (with-ir1-environment-from-node call
+                      (make-entry)))
+             (cleanup (make-cleanup :kind :dynamic-extent
+                                    :mess-up entry
+                                    :nlx-info dx-lvars
+                                    :dx-kind no-notes)))
+        (setf (entry-cleanup entry) cleanup)
+        (insert-node-before call entry)
+        (setf (node-lexenv call)
+              (make-lexenv :default (node-lexenv call)
+                           :cleanup cleanup))
+        (setf (ctran-next (node-prev call)) nil)
+        (let ((ctran (make-ctran)))
+          (with-ir1-environment-from-node call
+            (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
+            (link-node-to-previous-ctran call ctran)))
+        ;; Make CALL end its block, so that we have a place to
+        ;; insert cleanup code.
+        (node-ends-block call)
+        (push entry (lambda-entries (node-home-lambda entry)))
+        (dolist (cell dx-lvars)
+          (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially

@@ -481,6 +481,11 @@
 ;;; unknown-values lvars used across block boundaries and no DX LVARs.
 (defun stack-analyze (component)
   (declare (type component component))
+  ;; Used for DX LVAR back propagation (see
+  ;; BACK-PROPAGATE-ONE-DX-LVAR).
+  (when (component-dx-lvars component)
+    (clear-dominators component)
+    (find-dominators component))
   (let* ((2comp (component-info component))
          (receivers (ir2-component-values-receivers 2comp))
          (generators (find-pushing-blocks receivers
