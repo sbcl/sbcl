@@ -38,9 +38,8 @@
   (let ((interval (sb-c::numeric-type->interval
                    (sb-kernel:specifier-type (cadr (caddr (sb-kernel:%simple-fun-type
                                                            (compile nil `(lambda (u s)
-                                                                           (declare ((integer ,u-l ,u-h) u)
-                                                                                    ((integer ,s-l ,s-h) s))
-                                                                           (,op u s))))))))))
+                                                                           (,op (truly-the (integer ,u-l ,u-h) u)
+                                                                                (truly-the (integer ,s-l ,s-h) s)))))))))))
     (values (loop for u from u-l to u-h
                   minimize (loop for s from s-l to s-h
                                  minimize (funcall op u s)))
@@ -52,16 +51,16 @@
 
 (with-test (:name :logical-type-derivation)
   (loop
-    for low1 from -4 to 4
+    for low1 from -4 to 5
     do
     (loop
-      for high1 from low1 to 4
+      for high1 from low1 to 5
       do
       (loop
-        for low2 from -4 to 4
+        for low2 from -4 to 5
         do
         (loop
-          for high2 from low2 to 4
+          for high2 from low2 to 5
           do
           (loop for op in '(logand logior logxor)
                 do
