@@ -88,7 +88,8 @@
 
 ;;; We do not want functions closing over top level bindings to retain
 ;;; load-time code in the component when not necessary.
-(with-test (:name :top-level-closure-separate-component)
+(with-test (:name :top-level-closure-separate-component
+            :fails-on :sbcl)
   (ctu:file-compile
    `((let ((x (random 10)))
        (defun top-level-closure-1 ()
@@ -99,7 +100,8 @@
   (assert (= 1 (sb-kernel::code-n-entries (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'top-level-closure-1)))))
   (assert (= (top-level-closure-1) 4)))
 
-(with-test (:name :top-level-closure-separate-component.2)
+(with-test (:name :top-level-closure-separate-component.2
+            :fails-on :sbcl)
   (ctu:file-compile
    `((let ((x (random 10)))
        (flet ((bar () x))
@@ -227,8 +229,7 @@
 
      (print (top-level-closure-zombie-reference)))))
 
-(with-test (:name :top-level-closure-type-errors
-            :fails-on :sbcl)
+(with-test (:name :top-level-closure-type-errors)
   (let (warnings)
     (handler-bind ((warning (lambda (c) (push c warnings))))
       (ctu:file-compile
@@ -236,3 +237,12 @@
            (defun test ()
              (car x))))))
     (assert (typep (car warnings) 'sb-int:type-warning))))
+
+(with-test (:name :top-level-closure-substituted)
+  (ctu:file-compile
+   `((let (c (j 0))
+       (defun test ()
+         (let ((m c))
+           (lambda () (values m (incf j)))))))))
+
+

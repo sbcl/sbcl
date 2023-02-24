@@ -836,7 +836,7 @@ functions when called with no arguments."
               #+(or x86-64 arm64)
               (with-pinned-objects ((%closure-fun traced-fun))
                 (sb-vm::%alloc-closure 0 (sb-vm::%closure-callee traced-fun)))
-              #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun 0 nil))
+              #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun nil 0 nil))
              (closure
               ;; Same as above, but simpler - the original closure will redirect
               ;; to the tracing wraper, which will invoke a new closure that is

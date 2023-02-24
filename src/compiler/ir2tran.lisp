@@ -53,10 +53,7 @@
          (ir2-nlx-info-home (nlx-info-info thing)))
         (clambda
          (aver (xep-p thing))
-         (let ((entry-info (lambda-info thing)))
-           (or (entry-info-closure-tn entry-info)
-               (setf (entry-info-closure-tn entry-info)
-                     (make-normal-tn *backend-t-primitive-type*))))))
+         (entry-info-closure-tn (lambda-info thing))))
       (bug "~@<~2I~_~S ~_not found in ~_~S~:>" thing env)))
 
 ;;; Return a TN that represents the value of LEAF, or NIL if LEAF
@@ -279,28 +276,18 @@
           ;; If there is no XEP then no closure needs to be created.
           (when (and xep (not (eq (functional-kind xep) :deleted)))
             (aver (xep-p xep))
-            (unless (leaf-info xep)
-              (setf (leaf-info xep)
-                    (make-entry-info :name
-                                     (functional-debug-name fun))))
             (let ((closure (environment-closure (get-lambda-environment xep))))
               (when closure
-                (let* ((env (node-environment node))
-                       (tn (find-in-environment xep env))
+                (let* ((entry-info (lambda-info xep))
+                       (tn (entry-info-closure-tn entry-info))
+                       #-(or x86-64 arm64)
+                       (entry (make-load-time-constant-tn :entry xep))
+                       (env (node-environment node))
                        (leaf-dx-p (and lvar (leaf-dynamic-extent fun))))
-                  (cond
-                    #+(or x86-64 arm64)
-                    ((eq (node-component node)
-                         (lambda-component xep))
-                     (vop make-closure-from-label node ir2-block
-                          (entry-info-offset (lambda-info xep))
-                          (length closure)
-                          leaf-dx-p tn))
-                    (t
-                     (vop make-closure node ir2-block
-                          (make-load-time-constant-tn :entry xep)
-                          (length closure)
-                          leaf-dx-p tn)))
+                  (aver (entry-info-offset entry-info))
+                  (vop make-closure node ir2-block #-(or x86-64 arm64) entry
+                                    (entry-info-offset entry-info) (length closure)
+                                    leaf-dx-p tn)
                   (loop for what in closure and n from 0 do
                     (if (lambda-p what)
                         (unless (eq (functional-kind what) :deleted)

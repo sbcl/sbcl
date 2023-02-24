@@ -709,6 +709,9 @@
     (etypecase var
       (leaf
        (when (lambda-var-p var)
+         (let ((home (ctran-home-lambda-or-null start)))
+           (when (and home (neq (lambda-var-home var) home))
+             (sset-adjoin var (lambda-calls-or-closes home))))
          (when (lambda-var-ignorep var)
            ;; (ANSI's specification for the IGNORE declaration requires
            ;; that this be a STYLE-WARNING, not a full WARNING.)

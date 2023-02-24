@@ -358,8 +358,6 @@
 ;;; this case the slots aren't actually initialized until entry
 ;;; analysis runs.
 (defstruct (entry-info (:copier nil))
-  ;; True if this function has a non-null closure environment.
-  (closure-p nil :type boolean)
   ;; TN, containing closure (if needed) for this function in the home
   ;; environment.
   (closure-tn nil :type (or null tn))

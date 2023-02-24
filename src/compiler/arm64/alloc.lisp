@@ -92,34 +92,22 @@
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
-(macrolet
-    ((frob (name labelp)
-       `(define-vop (,name)
-          ,@(unless labelp
-              '((:args (function :to :save :scs (descriptor-reg)))))
-          (:info ,@(when labelp '(label)) length stack-allocate-p)
-          (:temporary (:scs (non-descriptor-reg)) temp)
-          (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-          (:results (result :scs (descriptor-reg)))
-          (:generator 10
-            (let* ((size (+ length closure-info-offset))
-                   (alloc-size (pad-data-block size)))
-              (pseudo-atomic (lr :elide-if stack-allocate-p)
-                (allocation nil alloc-size fun-pointer-lowtag result
-                            :flag-tn lr
-                            :stack-allocate-p stack-allocate-p)
-                (load-immediate-word temp
-                                     (logior (ash (1- size) n-widetag-bits) closure-widetag))
-                ,(cond (labelp
-                        `(progn
-                           (inst adr lr label (ash simple-fun-insts-offset word-shift))
-                           (storew-pair temp 0 lr closure-fun-slot tmp-tn)))
-                       (t
-                        `(progn
-                           (inst add lr function (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-                           (storew-pair temp 0 lr closure-fun-slot tmp-tn))))))))))
-  (frob make-closure nil)
-  (frob make-closure-from-label t))
+(define-vop (make-closure)
+  (:info label length stack-allocate-p)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 10
+    (let* ((size (+ length closure-info-offset))
+           (alloc-size (pad-data-block size)))
+      (pseudo-atomic (lr :elide-if stack-allocate-p)
+        (allocation nil alloc-size fun-pointer-lowtag result
+                    :flag-tn lr
+                    :stack-allocate-p stack-allocate-p)
+        (load-immediate-word temp
+                             (logior (ash (1- size) n-widetag-bits) closure-widetag))
+        (inst adr lr label (ash simple-fun-insts-offset word-shift))
+        (storew-pair temp 0 lr closure-fun-slot tmp-tn)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;

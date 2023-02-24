@@ -3998,3 +3998,15 @@
    `(lambda (x)
       (funcall x 1 2 3 4 'a t t))
    (('list) '(1 2 3 4 a t t) :test #'equal)))
+
+(with-test (:name :closures-unreachable-components)
+  (checked-compile-and-assert
+      ()
+      `(lambda (f)
+         (catch 'c
+           (block nil
+             (labels ((f11 () f)
+                      (b (&key)
+                        (catch 'd
+                          (lambda () #'f11))
+                        (return #'f11)))))))))
