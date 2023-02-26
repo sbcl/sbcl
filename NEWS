@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.1:
+changes in sbcl-2.3.2 relative to sbcl-2.3.1:
   * incompatible change: the :ORDER long-form-option in
     DEFINE-METHOD-COMBINATION accepts NIL as well as :MOST-SPECIFIC-FIRST and
     :MOST-SPECIFIC-LAST.  A value of NIL implies no particular ordering of the
