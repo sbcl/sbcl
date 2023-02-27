@@ -204,7 +204,8 @@ a simple-string (not necessarily unique) or NIL.")
       (format stream
               ;; if not finished, show the STATE as a list.
               ;; if finished, show the VALUES.
-              "~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
+              "~@[tid=~D ~]~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
+              (or #+linux (thread-os-tid thread))
               (thread-name thread)
               (eq :finished state)
               state
