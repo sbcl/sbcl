@@ -204,14 +204,17 @@
 ;;; allocated off the heap
 #-x86-64 (defun copy-number-to-heap (n) n)
 
-(defun hexdump (thing &optional (n-words nil wordsp)
+(defun hexdump (thing &optional (n-words 2 wordsp)
                             ;; pass NIL explicitly if T crashes on you
                         (decode t))
   (declare (notinline %code-fun-offset))
   (multiple-value-bind (obj addr count)
-      (if (typep thing 'word) ; ambiguous in the edge case, but assume it's
-          ;; an address (though you might be trying to dump a bignum's data)
-          (values nil thing (if wordsp n-words 1))
+      (typecase thing
+        ;; if you pass a SAP, use it as the address to dump
+        (system-area-pointer (values nil (sap-int thing) n-words))
+        ;; If you pass a bignum, assume you're trying to display its data.
+        ((and word fixnum) (values nil thing n-words))
+        (t
           (values
            thing
            (logandc2 (get-lisp-obj-address thing) lowtag-mask)
@@ -223,7 +226,7 @@
                       (ash (%code-fun-offset thing 0) (- word-shift))
                       simple-fun-insts-offset)
                    ;; at most 16 words
-                   (min 16 (ash (primitive-object-size thing) (- word-shift)))))))
+                   (min 16 (ash (primitive-object-size thing) (- word-shift))))))))
     (with-pinned-objects (obj)
       (dotimes (i count)
         (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))

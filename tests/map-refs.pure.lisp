@@ -12,3 +12,6 @@
     (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
                                     :immobile v)
     (assert (member 'satisfies referers))))
+
+(with-test (:name :hexdump) ; Don't crash, that's all
+  (sb-vm:hexdump (1+ most-positive-fixnum)))
