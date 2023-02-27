@@ -328,31 +328,34 @@
                     (storew* header result-tn 0 other-pointer-lowtag t))))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
-(macrolet ((store-slot (tn list &optional (slot cons-car-slot)
-                                          (lowtag list-pointer-lowtag))
+(macrolet ((pop-arg (ref)
+             `(prog1 (tn-ref-tn ,ref) (setf ,ref (tn-ref-across ,ref))))
+           (store-slot (arg list &optional (slot cons-car-slot)
+                                           (lowtag list-pointer-lowtag))
              ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
              ;; but other other GC strategies might.
              `(let* (immediate-value
+                     (tn ,arg)
                      (reg
-                       (sc-case ,tn
+                       (sc-case tn
                          (constant
-                          (unless (and (constant-tn-p ,tn)
-                                       (eql prev-constant (tn-value ,tn)))
-                            (setf prev-constant (if (constant-tn-p ,tn)
-                                                    (tn-value ,tn)
+                          (unless (and (constant-tn-p tn)
+                                       (eql prev-constant (tn-value tn)))
+                            (setf prev-constant (if (constant-tn-p tn)
+                                                    (tn-value tn)
                                                     temp))
-                            (move temp ,tn))
+                            (move temp tn))
                           temp)
                          (immediate
-                          (if (eql prev-constant (setf immediate-value (tn-value ,tn)))
+                          (if (eql prev-constant (setf immediate-value (tn-value tn)))
                               temp
-                              (encode-value-if-immediate ,tn)))
+                              (encode-value-if-immediate tn)))
                          (control-stack
                           (setf prev-constant temp) ;; a non-eq initial value
-                          (move temp ,tn)
+                          (move temp tn)
                           temp)
                          (t
-                          ,tn))))
+                          tn))))
                 (when (eq (storew reg ,list ,slot ,lowtag temp)
                           temp)
                   (setf prev-constant immediate-value)))))
@@ -462,18 +465,15 @@
             (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
         (move ptr res)
         (dotimes (i (1- cons-cells))
-          (store-slot (tn-ref-tn things) ptr)
-          (setf things (tn-ref-across things))
+          (store-slot (pop-arg things) ptr)
           (inst add ptr (pad-data-block cons-size))
           (storew ptr ptr (- cons-cdr-slot cons-size) list-pointer-lowtag))
-        (store-slot (tn-ref-tn things) ptr cons-car-slot list-pointer-lowtag)
-        (cond (star
-               (setf things (tn-ref-across things))
-               (store-slot (tn-ref-tn things) ptr cons-cdr-slot list-pointer-lowtag))
-              (t
-               (storew nil-value ptr cons-cdr-slot list-pointer-lowtag)))
-        (aver (null (tn-ref-across things)))
-        (move result res)))))
+        (store-slot (pop-arg things) ptr cons-car-slot list-pointer-lowtag)
+        (if star
+            (store-slot (pop-arg things) ptr cons-cdr-slot list-pointer-lowtag)
+            (storew nil-value ptr cons-cdr-slot list-pointer-lowtag))))
+    (aver (null things))
+    (move result res)))
 )
 
 ;;;; special-purpose inline allocators
