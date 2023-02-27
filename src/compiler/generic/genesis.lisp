@@ -1937,7 +1937,7 @@ core and return a descriptor to it."
                         *static*))
   ;; static-call entrypoint vector must be immediately adjacent to *asm-routine-vector*
   (word-vector (make-list (length sb-vm:+static-fdefns+) :initial-element 0) *static*)
-  (setf *asm-routine-vector* (word-vector (make-list 70 :initial-element 0)
+  (setf *asm-routine-vector* (word-vector (make-list 256 :initial-element 0)
                                           *static*)))
 
   #-immobile-code
@@ -2942,6 +2942,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (unless (member (car item) ; these can't be called from compiled Lisp
                           '(sb-vm::fpr-save sb-vm::save-xmm sb-vm::save-ymm
                             sb-vm::fpr-restore sb-vm::restore-xmm sb-vm::restore-ymm))
+            (aver (< index (cold-vector-len *asm-routine-vector*)))
             (write-wordindexed/raw *asm-routine-vector*
                                    (+ sb-vm:vector-data-offset index) entrypoint)))
         (incf index)))))
