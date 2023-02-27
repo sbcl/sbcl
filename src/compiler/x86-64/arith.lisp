@@ -862,7 +862,7 @@
   (:arg-types unsigned-num signed-num (:constant (satisfies unsigned-type-specifier-p)))
   (:info type)
   (:temporary (:sc unsigned-reg :from (:argument 2)) x y)
-  (:results (r :scs (unsigned-reg)))
+  (:results (r :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
@@ -870,7 +870,6 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::signed-unsigned-add-overflow-error r)))
-
       (inst mov r -9223372036854775808)
       (move y in-y)
       (if (location= x in-x)
