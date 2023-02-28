@@ -289,3 +289,75 @@ specification."
   form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
   `(handler-case (progn ,@forms)
      (error (condition) (values nil condition))))
+
+;;; Condition slot access - needs DYNAMIC-SPACE-OBJ-P which needs misc-aliens
+;;; which isn't available in target-error.
+#-sb-xc-host
+(labels
+    ((atomic-acons (condition key val alist)
+       ;; Force new conses to the heap if instance is arena-allocated
+       (cas (condition-assigned-slots condition)
+            alist
+            (if (dynamic-space-obj-p condition)
+                (locally (declare (sb-c::tlab :system)) (acons key val alist))
+                (acons key val alist))))
+     (initval (instance slot classoid operation)
+       (let ((instance-length (%instance-length instance)))
+         (do ((i (+ sb-vm:instance-data-start 1) (+ i 2)))
+             ((>= i instance-length)
+              (find-slot-default instance classoid slot
+                                 (eq operation 'slot-boundp)))
+           (when (memq (%instance-ref instance i) (condition-slot-initargs slot))
+             (return (%instance-ref instance (1+ i)))))))
+     (%get (condition name operation)
+       ;; Shared code for CONDITION-SLOT-VALUE and CONDITION-SLOT-BOUNDP.
+       ;; First look for a slot with :CLASS allocation
+       (let ((classoid (wrapper-classoid (%instance-wrapper condition))))
+         (dolist (cslot (condition-classoid-class-slots classoid))
+           (when (eq (condition-slot-name cslot) name)
+             (return-from %get (car (condition-slot-cell cslot)))))
+         (let* ((alist (condition-assigned-slots condition))
+                (cell (assq name alist)))
+           (when cell (return-from %get (cdr cell)))
+           ;; find the slot definition or else signal an error
+           (let* ((slot (or (find-condition-class-slot classoid name)
+                            (return-from %get
+                              (values (slot-missing (classoid-pcl-class classoid)
+                                                    condition name 'slot-value)))))
+                  (val (initval condition slot classoid operation)))
+             (loop
+               (let ((old (atomic-acons condition name val alist)))
+                 (when (eq old alist) (return val))
+                 (setq alist old cell (assq name alist))
+                 (when cell (return (cdr cell))))))))))
+
+  ;; This is a stupid argument order. Shouldn't NEW-VALUE be first ?
+  (defun set-condition-slot-value (condition new-value name)
+    (dolist (cslot (condition-classoid-class-slots
+                    (wrapper-classoid (%instance-wrapper condition))))
+      (when (eq (condition-slot-name cslot) name)
+        (return-from set-condition-slot-value
+          (setf (car (condition-slot-cell cslot)) new-value))))
+    ;; Apparently this does not care that there might not exist a slot named NAME
+    ;; in the class, at least in this function. It seems to be handled
+    ;; at a higher level of the slot access protocol.
+    (let ((alist (condition-assigned-slots condition)))
+      (loop
+       (let ((cell (assq name alist)))
+         (when cell
+           (return (setf (cdr cell) new-value))))
+        (let ((old (atomic-acons condition name new-value alist)))
+          (if (eq old alist) (return new-value) (setq alist old))))))
+
+  (defun condition-slot-value (condition name)
+    (let ((value (%get condition name 'slot-value)))
+      (if (unbound-marker-p value)
+          (let ((class (classoid-pcl-class (wrapper-classoid (%instance-wrapper condition)))))
+            (values (slot-unbound class condition name)))
+          value)))
+
+  (defun condition-slot-boundp (condition name)
+    (not (unbound-marker-p (%get condition name 'slot-boundp))))
+
+  (defun condition-slot-makunbound (condition name)
+    (set-condition-slot-value condition sb-pcl:+slot-unbound+ name)))

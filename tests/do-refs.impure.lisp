@@ -105,7 +105,7 @@
                             :fails-on :interpreter)
   (let ((instance (make-condition 'cfoo :a 'ay :b 'bee :format-arguments "wat")))
     (walk-slots-test instance
-                     `(,(find-layout 'cfoo) (c c format-control nil)
+                     `(,(find-layout 'cfoo) ((c . c) (format-control . nil))
                        :a  ay :b bee :format-arguments "wat"))))
 
 (defun make-random-funinstance (&rest values)

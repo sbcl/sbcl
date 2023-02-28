@@ -375,6 +375,20 @@
                   (output))
                (output (get-lisp-obj-address a))))))))
 
+(define-condition foo (simple-warning)
+  ((a :initarg :a)
+   (b :initarg :b)))
+(defvar *condition* (make-condition 'foo
+                                    :format-control "hi there"
+                                    :a '(x y) :b #P"foofile"
+                                    :format-arguments '("Yes" "no")))
+(test-util:with-test (:name :arena-condition-slot-access)
+  (assert (null (sb-kernel::condition-assigned-slots *condition*)))
+  (let ((val (with-arena (*arena*)
+               (slot-value *condition* 'b))))
+    (assert (pathnamep val))
+    (assert (not (sb-vm:points-to-arena *condition*)))))
+
 ;;; CAUTION: tests of C-FIND-HEAP->ARENA that execute after destroy-arena and a following
 ;;; NEW-ARENA might spuriously fail depending on how eagerly malloc() reuses addresses.
 ;;; The failure goes something like this:

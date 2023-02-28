@@ -1162,7 +1162,16 @@ redefinition."
         (error "fail"))
     (type-error (e)
       (assert (eq 'string (type-error-expected-type e)))
-      (assert (sb-int:unbound-marker-p (type-error-datum e))))))
+      ;; This next ASSERT made no sense whatsoever. If the slot named DATUM
+      ;; in the ERROR instance that's reporting the unbound slot in the BUG-3B
+      ;; instance is itself unbound, then how can you expect that reading the
+      ;; DATUM slot in E is supposed to work?
+      ;; It worked only by accident, because the first access to the slot would
+      ;; return it from the initargs without checking for unbound-marker,
+      ;; but a subsequent access would trap on the memoized value.
+      ;; That dubious distinction is gone.
+      ;; (assert (sb-int:unbound-marker-p (type-error-datum e)))
+      (assert (not (slot-boundp e 'sb-kernel::datum))))))
 
 (with-test (:name :defstruct-copier-typechecks-argument)
   (copy-person (make-astronaut :name "Neil"))
