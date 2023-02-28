@@ -104,6 +104,7 @@
 #+(or x86 x86-64) (defknown (layout-depthoid-ge) (sb-vm:layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
 (defknown structure-typep (t t) boolean (foldable flushable))
+(defknown classoid-cell-typep (t t) boolean (foldable flushable no-verify-arg-count))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
   :derive-type #'result-type-first-arg)
