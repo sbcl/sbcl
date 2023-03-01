@@ -100,7 +100,8 @@ include the pathname of the file and the position of the definition."
 (declaim (ftype (sfunction (t debug-info) debug-function) debug-info-debug-function))
 (defun debug-info-debug-function (function debug-info)
   (sb-di::compiled-debug-fun-from-pc debug-info
-                                     (sb-di::function-start-pc-offset function)))
+                                     (sb-di::function-start-pc-offset function)
+                                     t))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a valid function name, ie. one that can be passed to
