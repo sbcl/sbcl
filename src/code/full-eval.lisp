@@ -573,6 +573,8 @@
         (cond
           ((and (symbolp name) (macro-function name))
            (values (macro-function name) :macro))
+          ((typep name '(cons (eql sb-pcl::slot-accessor)))
+           (sb-pcl::ensure-accessor name))
           (t (values (%coerce-name-to-fun name) :function))))))
 
 ;;; Return true if EXP is a lambda form.
