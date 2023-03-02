@@ -1768,3 +1768,15 @@
        (assert (sb-ext:stack-allocated-p (cdr x))))
      nil)
    ((3) NIL)))
+
+(with-test (:name :dx-anonymous-closure)
+  (checked-compile-and-assert
+   ()
+   '(lambda (z)
+     (let ((x (lambda () (print z))))
+       (declare (dynamic-extent x))
+       (funcall x)
+       (funcall x)
+       (assert (sb-ext:stack-allocated-p x))
+       (funcall x)))
+   ((3) 3)))

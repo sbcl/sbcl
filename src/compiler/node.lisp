@@ -194,8 +194,8 @@
   ;; the optimizer for this node type doesn't care, it can elect not
   ;; to clear this flag.
   (reoptimize t :type boolean)
-  ;; if the LVAR value is DYNAMIC-EXTENT, CLEANUP protecting it.
-  (dynamic-extent nil :type (or null cleanup))
+  ;; if the LVAR value is DYNAMIC-EXTENT, some information.
+  (dynamic-extent nil :type (or null dx-info))
   ;; something or other that the back end annotates this lvar with
   (info nil)
   ;; Nodes to reoptimize together with the lvar
@@ -203,6 +203,21 @@
   (annotations nil)
   (dependent-annotations nil))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
+
+;;; A DX-INFO structure is used to accumulate information about a
+;;; dynamic extent declaration.
+(defstruct (dx-info (:copier nil))
+  ;; The kind of dynamic extent this is.
+  (kind (missing-arg) :type (member enclose dynamic-extent truly-dynamic-extent
+                                    dynamic-extent-no-note))
+  ;; The value recognized to be declared dynamic extent.
+  (value (missing-arg) :type lvar)
+  ;; The stack-allocatable values in the transitive closure of the
+  ;; relation determined by the "otherwise inaccessible part"
+  ;; criterion. This is filled in by environment analysis.
+  (subparts nil :type list)
+  ;; The CLEANUP associated with this dynamic extent.
+  (cleanup (missing-arg) :type cleanup))
 
 ;;; These are used for annotating a LVAR with information that can't
 ;;; be expressed using types or if the CAST semantics are undesirable
@@ -695,13 +710,9 @@
   ;; structures whose NLX-INFO-CLEANUP is this cleanup. This is filled
   ;; in by environment analysis.
   ;;
-  ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
-  ;; cleanup. This is filled when the cleanup is created (now by
-  ;; locall call analysis) and is rechecked by environment
-  ;; analysis. (For closures this is a list of the LVAR of the enclose
-  ;; after environment analysis.)
-  (nlx-info nil :type list)
-  (dx-kind nil))
+  ;; For :DYNAMIC-EXTENT: a list of all DX-INFOs, preserved by this
+  ;; cleanup.
+  (nlx-info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
@@ -1720,8 +1731,11 @@
 ;;; would be emitted, if necessary.
 (defstruct (enclose (:include valued-node) ; this node uses a dummy lvar for dx analysis
                     (:copier nil))
-  ;; the list of functionals that this ENCLOSE node allocates.
-  (funs nil :type list))
+  ;; The list of functionals that this ENCLOSE node allocates.
+  (funs nil :type list)
+  ;; The cleanup for this enclose if any of its functionals are
+  ;; declared dynamic extent.
+  (cleanup nil :type (or null cleanup)))
 (defprinter (enclose :identity t)
   funs)
 

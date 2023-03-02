@@ -930,9 +930,11 @@ also processed as top level forms."
     (enclose start enclose-ctran funs)
     (cond ((some #'leaf-dynamic-extent funs)
            (ctran-starts-block next)
-           (let ((cleanup (make-cleanup :kind :dynamic-extent
-                                        :mess-up (ctran-use enclose-ctran)))
-                 (cleanup-ctran (make-ctran)))
+           (let* ((enclose (ctran-use enclose-ctran))
+                  (cleanup (make-cleanup :kind :dynamic-extent
+                                         :mess-up enclose))
+                  (cleanup-ctran (make-ctran)))
+             (setf (enclose-cleanup enclose) cleanup)
              (let ((*lexenv* (make-lexenv :cleanup cleanup)))
                (ir1-convert enclose-ctran cleanup-ctran nil '(%cleanup-point))
                (ir1-convert-progn-body cleanup-ctran next result body))))

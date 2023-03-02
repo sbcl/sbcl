@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.3.2:
+  * enhancement: LET-bound anonymous closures declared dynamic extent can be
+    stack allocated, just like closures bound with FLET or LABELS.
+
 changes in sbcl-2.3.2 relative to sbcl-2.3.1:
   * incompatible change: the :ORDER long-form-option in
     DEFINE-METHOD-COMBINATION accepts NIL as well as :MOST-SPECIFIC-FIRST and

@@ -357,12 +357,12 @@
   (values))
 
 (defun propagate-lvar-dx (new old)
-  (let ((cleanup (lvar-dynamic-extent old)))
-    (when cleanup
+  (let ((dx-info (lvar-dynamic-extent old)))
+    (when dx-info
       (setf (lvar-dynamic-extent old) nil)
       (unless (lvar-dynamic-extent new)
-        (setf (lvar-dynamic-extent new) cleanup)
-        (setf (cleanup-nlx-info cleanup) (subst new old (cleanup-nlx-info cleanup)))))))
+        (setf (lvar-dynamic-extent new) dx-info)
+        (setf (dx-info-value dx-info) new)))))
 
 (defun lexenv-contains-lambda (lambda parent-lexenv)
   (loop for lexenv = (lambda-lexenv lambda)
@@ -380,15 +380,21 @@
 ;;;               (fill m)
 ;;;               m))))
 (defun propagate-ref-dx (new-ref old-lvar)
-  (let ((dx (lvar-dynamic-extent old-lvar))
-        (new-lambda-var (ref-leaf new-ref)))
-    (when (and dx
-               (lambda-var-p new-lambda-var)
-               (eq (functional-kind (lambda-var-home new-lambda-var)) :let)
-               ;; Make sure the let is inside the dx let
-               (lexenv-contains-lambda (lambda-var-home new-lambda-var)
-                                       (node-lexenv (cleanup-mess-up dx))))
-      (propagate-lvar-dx (let-var-initial-value new-lambda-var) old-lvar)
+  (let ((dx-info (lvar-dynamic-extent old-lvar))
+        (leaf (ref-leaf new-ref)))
+    (when dx-info
+      (let ((cleanup (dx-info-cleanup dx-info)))
+        (typecase leaf
+          (lambda-var
+           (when (and (eq (functional-kind (lambda-var-home leaf)) :let)
+                      ;; Make sure the let is inside the dx let
+                      (lexenv-contains-lambda (lambda-var-home leaf)
+                                              (node-lexenv (cleanup-mess-up cleanup))))
+             (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
+          (clambda
+           (let ((fun (functional-entry-fun leaf)))
+             (setf (enclose-cleanup (functional-enclose fun)) cleanup)
+             (setf (leaf-extent fun) (dx-info-kind dx-info))))))
       t)))
 
 (defun node-dominates-p (node1 node2)
@@ -758,7 +764,7 @@
                                   (principal-lvar-use (cast-value use))
                                   use)))
       (unless (or
-               (eq (cleanup-dx-kind  (lvar-dynamic-extent lvar))
+               (eq (dx-info-kind (lvar-dynamic-extent lvar))
                    'dynamic-extent-no-note)
                ;; If we're flushing, don't complain if we can flush the combination.
                (and flush

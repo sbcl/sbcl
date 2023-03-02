@@ -181,17 +181,17 @@
                     marked)))))
       (back-propagate-pathwise block))))
 
-(defun back-propagate-dx-lvars (block dx-lvars)
-  (declare (type cblock block)
-           (type list dx-lvars))
-  (dolist (dx-lvar dx-lvars)
-    (back-propagate-one-dx-lvar block dx-lvar)))
+(defun back-propagate-dx-lvars (block dx-infos)
+  (declare (type cblock block))
+  (dolist (dx-info dx-infos)
+    (dolist (dx-lvar (dx-info-subparts dx-info))
+      (back-propagate-one-dx-lvar block dx-lvar))))
 
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
 ;;;
-;;; An LVAR is live at the end iff it is live at some of blocks, which
+;;; An LVAR is live at the end iff it is live at any of blocks which
 ;;; BLOCK can transfer control to. There are two kind of control
 ;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
 (defun update-uvl-live-sets (block)
@@ -221,26 +221,27 @@
              (setq new-end (merge-uvl-live-sets
                             new-end next-stack)))))
         (:dynamic-extent
-         (dolist (lvar (cleanup-nlx-info cleanup))
-           (do-uses (generator lvar)
-             (let* ((block (node-block generator))
-                    (2block (block-info block)))
-               ;; DX objects, living in the LVAR, are alive in
-               ;; the environment, protected by the CLEANUP. We
-               ;; also cannot move them (because, in general, we
-               ;; cannot track all references to them).
-               ;; Therefore, everything, allocated deeper than a
-               ;; DX object -- that is, before the DX object --
-               ;; should be kept alive until the object is
-               ;; deallocated.
-               (setq new-end (merge-uvl-live-sets
-                              new-end
-                              (set-difference
-                               (ir2-block-start-stack 2block)
-                               (ir2-block-popped 2block))))
-               (setq new-end (merge-uvl-live-sets
-                              new-end
-                              (ir2-block-pushed-before lvar 2block))))))
+         (dolist (dx-info (cleanup-nlx-info cleanup))
+           (dolist (lvar (dx-info-subparts dx-info))
+             (do-uses (generator lvar)
+               (let* ((block (node-block generator))
+                      (2block (block-info block)))
+                 ;; DX objects, living in the LVAR, are alive in
+                 ;; the environment, protected by the CLEANUP. We
+                 ;; also cannot move them (because, in general, we
+                 ;; cannot track all references to them).
+                 ;; Therefore, everything, allocated deeper than a
+                 ;; DX object -- that is, before the DX object --
+                 ;; should be kept alive until the object is
+                 ;; deallocated.
+                 (setq new-end (merge-uvl-live-sets
+                                new-end
+                                (set-difference
+                                 (ir2-block-start-stack 2block)
+                                 (ir2-block-popped 2block))))
+                 (setq new-end (merge-uvl-live-sets
+                                new-end
+                                (ir2-block-pushed-before lvar 2block)))))))
          ;; We need to back-propagate the DX LVARs from the start of
          ;; their environments to their allocation sites. The
          ;; %CLEANUP-POINT funny function combination ensures the
