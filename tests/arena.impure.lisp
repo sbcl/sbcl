@@ -353,7 +353,9 @@
         (assert (not (heap-allocated-p str)))
         (let ((sym (intern str *newpkg*)))
           (assert (heap-allocated-p sym))
-          (assert (heap-allocated-p (symbol-name sym))))))))
+          (assert (heap-allocated-p (symbol-name sym)))))))
+  (assert (not (sb-vm:c-find-heap->arena *arena*))))
+
 (test-util:with-test (:name :intern-a-bunch)
   (let ((old-n-cells
          (length (sb-impl::symtbl-cells
@@ -388,6 +390,10 @@
                (slot-value *condition* 'b))))
     (assert (pathnamep val))
     (assert (not (sb-vm:points-to-arena *condition*)))))
+
+(test-util:with-test (:name :gc-epoch-not-in-arena)
+  (with-arena (*arena*) (gc))
+  (assert (not (sb-vm:c-find-heap->arena *arena*))))
 
 ;;; CAUTION: tests of C-FIND-HEAP->ARENA that execute after destroy-arena and a following
 ;;; NEW-ARENA might spuriously fail depending on how eagerly malloc() reuses addresses.

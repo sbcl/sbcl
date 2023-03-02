@@ -437,6 +437,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; using a division by the table size minus two.
 (defun make-symbol-hashset (size &optional (load-factor 3/4))
   (declare (sb-c::tlab :system)
+           (inline make-symtbl-magic) ; to allow system-TLAB allocation
            (inline %make-symbol-hashset))
   (flet ((choose-good-size (size)
            (loop for n of-type fixnum
@@ -453,10 +454,9 @@ of :INHERITED :EXTERNAL :INTERNAL."
                (size (truncate (* n load-factor)))
                (reciprocals
                 (if (= n 3) ; minimal table
-                    (make-symtbl-magic 0 0 0 0)
+                    (make-symtbl-magic 0 0 0 0) ; <-- should be LTV but can't be.
+                                                ; (package-cold-init called before LTV fixups)
                     (make-symtbl-magic h1-mask h1-c h2-mask 0))))
-      ;; Store optimized remainder parameters unles either reciprocal
-      ;; (for H1 or H2) can't work using the fast REM algorithm in 32 bits.
       (%make-symbol-hashset (cons reciprocals (make-array n :initial-element 0))
                             size))))
 

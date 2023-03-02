@@ -131,6 +131,7 @@ run in any thread.")
          nil)
         (t
          (flet ((perform-gc ()
+                  (declare (sb-c::tlab :system)) ; for *gc-epoch*
                   ;; Called from WITHOUT-GCING and WITHOUT-INTERRUPTS
                   ;; after the world has been stopped, but it's an
                   ;; awkwardly long piece of code to nest so deeply.
