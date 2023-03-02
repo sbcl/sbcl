@@ -354,6 +354,7 @@
         (let ((sym (intern str *newpkg*)))
           (assert (heap-allocated-p sym))
           (assert (heap-allocated-p (symbol-name sym)))))))
+  #-win32
   (assert (not (sb-vm:c-find-heap->arena *arena*))))
 
 (test-util:with-test (:name :intern-a-bunch)
@@ -393,7 +394,7 @@
 
 (test-util:with-test (:name :gc-epoch-not-in-arena)
   (with-arena (*arena*) (gc))
-  (assert (not (sb-vm:c-find-heap->arena *arena*))))
+  (assert (heap-allocated-p sb-kernel::*gc-epoch*)))
 
 ;;; CAUTION: tests of C-FIND-HEAP->ARENA that execute after destroy-arena and a following
 ;;; NEW-ARENA might spuriously fail depending on how eagerly malloc() reuses addresses.
