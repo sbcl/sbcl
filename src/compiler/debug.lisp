@@ -1037,17 +1037,8 @@
            (let ((cleanup (entry-cleanup node)))
              (case (cleanup-kind cleanup)
                ((:dynamic-extent)
-                (format t "entry DX~{ v~D~}"
-                        (mapcar (lambda (lvar-or-cell)
-                                  (typecase lvar-or-cell
-                                    (cons
-                                     (cons (car lvar-or-cell)
-                                           (cont-num (cdr lvar-or-cell))))
-                                    (enclose
-                                     lvar-or-cell)
-                                    (t
-                                     (cont-num lvar-or-cell))))
-                                (cleanup-nlx-info cleanup))))
+                (format t "entry DX~{ ~D~}"
+                        (cleanup-nlx-info cleanup)))
                (t
                 (format t "entry ~S" (entry-exits node))))))
           (exit
