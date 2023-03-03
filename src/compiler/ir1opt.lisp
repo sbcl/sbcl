@@ -2373,12 +2373,17 @@
           ;; incompatible argument types, so don't allow reuse of this
           ;; functional during future inline expansion to prevent
           ;; spurious type conflicts.
-          (dolist (type union)
-            (unless (or (eq type *universal-type*) (not type))
-              (let ((defined-fun (functional-inline-expanded fun)))
-                (when (defined-fun-p defined-fun)
-                  (setf (defined-fun-functional defined-fun) nil)))
-              (return))))))
+          (let ((defined-fun (functional-inline-expanded fun)))
+            (when (defined-fun-p defined-fun)
+              (do ((args (basic-combination-args call) (cdr args))
+                   (vars vars (cdr vars)))
+                  ((null args))
+                (let ((arg (car args))
+                      (var (car vars)))
+                  (unless (and arg
+                               (eq (leaf-type var) *universal-type*))
+                    (setf (defined-fun-functional defined-fun) nil)
+                    (return)))))))))
 
   (values))
 

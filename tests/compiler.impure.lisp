@@ -3214,18 +3214,34 @@
 
      (defun new-inline-functional-type-conflict.2 (m)
        (declare (optimize space))
-       (inline-fun m)
-       (inline-fun m)
+       (print (list (inline-fun m)
+                    (inline-fun m)))
        (funcall (if t #'inline-fun) 'a)))
    :load t)
-  (assert (null (ctu:find-named-callees (symbol-function 'new-inline-functional-type-conflict.2))))
+  (assert (equal (ctu:find-named-callees (symbol-function 'new-inline-functional-type-conflict.2))
+                 (list #'print)))
   ;; We want to share the functional on space > speed, so we should
   ;; have 3 code segments: one for
   ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2's XEP, one for
   ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2, and one for INLINE-FUN.
   (assert (= 3 (length (sb-disassem::get-code-segments (sb-kernel::fun-code-header #'new-inline-functional-type-conflict.2)))))
-  ;; We should have no type information from the arguments., because
+  ;; We should have no type information from the arguments, because
   ;; the functional is shared.
   (let ((type (sb-kernel:%simple-fun-type
                (symbol-function 'new-inline-functional-type-conflict.2))))
     (assert (ctype= type '(function (t) (values t &optional))))))
+
+(with-test (:name :new-inline-functional-type-conflict.3)
+  (ctu:file-compile
+   `((declaim (inline inline-fun))
+     (defun inline-fun (x)
+       x)
+
+     (defun new-inline-functional-type-conflict.3 (m)
+       (declare (optimize space))
+       (when (integerp m)
+         (inline-fun m)
+         (inline-fun m)
+         (funcall (if (integerp m) #'inline-fun) 1)))
+     (assert (= (new-inline-functional-type-conflict.3 1) 1)))
+   :load t))
