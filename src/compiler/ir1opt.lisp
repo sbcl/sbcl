@@ -2318,8 +2318,8 @@
 ;;; variable, we compute the union of the types across all calls and
 ;;; propagate this type information to the var's refs.
 ;;;
-;;; If the function has an entry-fun, then we don't do anything: since
-;;; it has a XEP we would not discover anything.
+;;; If the function has an XEP, then we don't do anything, since we
+;;; won't discover anything.
 ;;;
 ;;; If the function is an optional-entry-point, we will just make sure
 ;;; &REST lists are known to be lists. Doing the regular rigamarole
@@ -2367,7 +2367,18 @@
 
           (loop for var in vars
                 and type in union
-                when type do (propagate-to-refs var type)))))
+                when type do (propagate-to-refs var type))
+
+          ;; It's possible to discover new inline calls which may have
+          ;; incompatible argument types, so don't allow reuse of this
+          ;; functional during future inline expansion to prevent
+          ;; spurious type conflicts.
+          (dolist (type union)
+            (unless (or (eq type *universal-type*) (not type))
+              (let ((defined-fun (functional-inline-expanded fun)))
+                (when (defined-fun-p defined-fun)
+                  (setf (defined-fun-functional defined-fun) nil)))
+              (return))))))
 
   (values))
 

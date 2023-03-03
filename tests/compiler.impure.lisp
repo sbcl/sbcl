@@ -3178,3 +3178,54 @@
      ;; does not want to be dynamic-extent.
      (foo-assert #'equal (list 1) (generalized-delete 0 (list 1) #'=)))
    :load t))
+
+(with-test (:name :new-inline-functional-type-conflict)
+  (ctu:compile-file
+   `((declaim (inline inline-fun))
+     (defun inline-fun (x)
+       x)
+
+     (defun new-inline-functional-type-conflict (m)
+       (declare (optimize space)
+                (integer m))
+       (inline-fun m)
+       (inline-fun m)
+       (funcall (if t #'inline-fun) 'a)))
+   :load t)
+  (assert (= 0 (ctu:count-full-calls 'inline-fun (symbol-function 'new-inline-functional-type-conflict))))
+  ;; We want to share the functional on space > speed, so we should
+  ;; have 3 code segments: one for
+  ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT's XEP, one for
+  ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT, and one for INLINE-FUN.
+  (assert (= 3 (length (sb-disassem::get-code-segments (sb-kernel::fun-code-header #'new-inline-functional-type-conflict)))))
+  (let ((type (caddr (sb-kernel:%simple-fun-type
+                      (symbol-function 'new-inline-functional-type-conflict)))))
+    ;; Either of these types should be OK.
+    (assert (or (ctype= type
+                        '(function (integer) (values (member a) &optional)))
+                (ctype= type
+                        '(function (integer) (values (or integer (member a)) &optional)))))))
+
+(with-test (:name :new-inline-functional-type-conflict.2)
+  (ctu:compile-file
+   `((declaim (inline inline-fun))
+     (defun inline-fun (x)
+       x)
+
+     (defun new-inline-functional-type-conflict.2 (m)
+       (declare (optimize space))
+       (inline-fun m)
+       (inline-fun m)
+       (funcall (if t #'inline-fun) 'a)))
+   :load t)
+  (assert (= 0 (ctu:count-full-calls 'inline-fun (symbol-function 'new-inline-functional-type-conflict.2))))
+  ;; We want to share the functional on space > speed, so we should
+  ;; have 3 code segments: one for
+  ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2's XEP, one for
+  ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2, and one for INLINE-FUN.
+  (assert (= 3 (length (sb-disassem::get-code-segments (sb-kernel::fun-code-header #'new-inline-functional-type-conflict.2)))))
+  ;; We should have no type information from the arguments., because
+  ;; the functional is shared.
+  (let ((type (caddr (sb-kernel:%simple-fun-type
+                      (symbol-function 'new-inline-functional-type-conflict.2)))))
+    (assert (ctype= type '(function (integer) (values t &optional))))))

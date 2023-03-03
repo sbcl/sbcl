@@ -41,19 +41,22 @@
 ;;; lvars.
 (defun propagate-to-args (call fun)
   (declare (type combination call) (type clambda fun))
-  (loop with policy = (lexenv-policy (node-lexenv call))
-        for args on (basic-combination-args call)
-        for var in (lambda-vars fun)
-        for name = (or (and (lambda-var-arg-info var )
-                            (arg-info-key (lambda-var-arg-info var )))
-                       (lambda-var-%source-name var))
-        do (assert-lvar-type (car args) (leaf-type var) policy
-                             (if (eq (functional-kind fun) :optional)
-                                 (make-local-call-context fun name)
-                                 name))
-           (unless (leaf-refs var)
-             (flush-dest (car args))
-             (setf (car args) nil)))
+  (do ((args (basic-combination-args call) (cdr args))
+       (vars (lambda-vars fun) (cdr vars))
+       (policy (lexenv-policy (node-lexenv call))))
+      ((null args))
+    (let* ((var (car vars))
+           (name (or (and (lambda-var-arg-info var)
+                          (arg-info-key (lambda-var-arg-info var)))
+                     (lambda-var-%source-name var))))
+      (assert-lvar-type (car args) (leaf-type var) policy
+                        (if (eq (functional-kind fun) :optional)
+                            (make-local-call-context fun name)
+                            name))
+      (unless (leaf-refs var)
+        (flush-dest (car args))
+        (setf (car args) nil))))
+
   (values))
 
 ;;; Given a local call CALL to FUN, find the associated argument LVARs
