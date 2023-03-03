@@ -219,6 +219,11 @@
   ;; The CLEANUP associated with this dynamic extent.
   (cleanup (missing-arg) :type cleanup))
 
+(defprinter (dx-info :identity t)
+  kind
+  value
+  subparts)
+
 ;;; These are used for annotating a LVAR with information that can't
 ;;; be expressed using types or if the CAST semantics are undesirable
 ;;; (type derivation, runtime errors).
