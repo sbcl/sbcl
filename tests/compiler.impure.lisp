@@ -3245,3 +3245,20 @@
          (funcall (if (integerp m) #'inline-fun) 1)))
      (assert (= (new-inline-functional-type-conflict.3 1) 1)))
    :load t))
+
+
+(with-test (:name :new-inline-functional-type-conflict.4)
+  (ctu:file-compile
+   `((declaim (inline inline-fun))
+     (defun inline-fun (x)
+       (eval x)
+       t)
+
+     (defun test (m j)
+       (declare (optimize space))
+       (when (integerp m)
+         (inline-fun j)
+         (inline-fun j)
+         (funcall (if (integerp m) #'inline-fun) 2)))
+     (assert (eq (test 1 2) t)))
+   :load t))

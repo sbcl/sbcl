@@ -704,11 +704,12 @@
                          (unless (flushable-combination-p node)
                            (return t))))))
           (let ((ctran (make-ctran))
-                (new-lvar (make-lvar node)))
+                (new-lvar (make-lvar node))
+                (defined-fun (functional-inline-expanded lambda)))
             (setf (ctran-next (node-prev node)) nil)
             (flush-dest lvar)
             (with-ir1-environment-from-node node
-              (ir1-convert (node-prev node) ctran new-lvar  '(values)))
+              (ir1-convert (node-prev node) ctran new-lvar '(values)))
             (setf (return-result node) new-lvar)
 
             (link-node-to-previous-ctran node ctran)
@@ -718,6 +719,8 @@
                 (setf (node-derived-type combination) *wild-type*)))
             (setf (return-result-type node) *wild-type*
                   (tail-set-type (lambda-tail-set lambda)) *wild-type*)
+            (when (defined-fun-p defined-fun)
+              (setf (defined-fun-functional defined-fun) nil))
             (return-from ir1-optimize-return)))))
     (tagbody
      :restart
