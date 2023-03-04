@@ -394,7 +394,7 @@
           (clambda
            (let ((fun (functional-entry-fun leaf)))
              (setf (enclose-cleanup (functional-enclose fun)) cleanup)
-             (setf (leaf-extent fun) (dx-info-kind dx-info))))))
+             (setf (leaf-dynamic-extent fun) (dx-info-kind dx-info))))))
       t)))
 
 (defun node-dominates-p (node1 node2)
@@ -827,11 +827,10 @@
           (lvar-good-for-dx-p (cast-value use) cleanup dx)))
     (ref
      (let ((var (ref-leaf use)))
-       ;; LET lambda var, no SETS, not explicitly indefinite-extent.
+       ;; LET lambda var with no SETS.
        (when (and (lambda-var-p var)
                   (eq (functional-kind (lambda-var-home var)) :let)
                   (not (lambda-var-sets var))
-                  (neq (lambda-var-extent var) 'indefinite-extent)
                   (lexenv-contains-lambda (lambda-var-home var)
                                           (node-lexenv (cleanup-mess-up cleanup)))
                   ;; Check the other refs are GOOD-FOR-DX-P.

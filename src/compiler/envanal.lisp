@@ -365,10 +365,14 @@
                            (etypecase use
                              (cast (mark-dx (cast-value use)))
                              (combination
-                              (dolist (arg (combination-args use))
-                                (when (and arg
-                                           (lvar-good-for-dx-p arg cleanup dx))
-                                  (mark-dx arg))))
+                              ;; Don't propagate through &REST, for
+                              ;; sanity.
+                              (unless (eq (combination-fun-source-name use nil)
+                                          '%listify-rest-args)
+                                (dolist (arg (combination-args use))
+                                  (when (and arg
+                                             (lvar-good-for-dx-p arg cleanup dx))
+                                    (mark-dx arg)))))
                              (ref
                               (mark-dx (let-var-initial-value (ref-leaf use))))))))
                 (let ((lvar (dx-info-value dx-info)))

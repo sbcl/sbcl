@@ -872,16 +872,11 @@
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent
-                            dynamic-extent-no-note))
+  (dynamic-extent nil :type (member nil truly-dynamic-extent dynamic-extent
+                                    dynamic-extent-no-note))
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)
-
-(defun leaf-dynamic-extent (leaf)
-  (let ((extent (leaf-extent leaf)))
-    (unless (member extent '(nil indefinite-extent))
-      extent)))
 
 ;;; LEAF name operations
 (defun leaf-has-source-name-p (leaf)

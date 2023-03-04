@@ -1119,7 +1119,7 @@
                  (use (principal-lvar-use arg)))
             (when (and (ref-p use)
                        (lambda-p (ref-leaf use))
-                       (neq (leaf-extent (lambda-parent (ref-leaf use)))
+                       (neq (leaf-dynamic-extent (lambda-parent (ref-leaf use)))
                             'truly-dynamic-extent))
               (unless received-args
                 (setq received-args

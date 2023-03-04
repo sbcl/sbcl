@@ -1483,7 +1483,7 @@ the stack without triggering overflow protection.")
             ((dynamic-extent dynamic-extent-no-note)
              (when *stack-allocate-dynamic-extent*
                kind))
-            ((indefinite-extent truly-dynamic-extent)
+            ((truly-dynamic-extent)
              kind))))
     (if extent
         (dolist (name names)
@@ -1499,9 +1499,10 @@ the stack without triggering overflow protection.")
                   (cond
                     ((and (typep var 'global-var) (eq (global-var-kind var) :unknown)))
                     (bound-var
-                     (if (and (leaf-extent var) (neq extent (leaf-extent var)))
+                     (if (and (leaf-dynamic-extent var)
+                              (neq extent (leaf-dynamic-extent var)))
                          (warn "Multiple incompatible extent declarations for ~S?" name)
-                         (setf (leaf-extent var) extent)))
+                         (setf (leaf-dynamic-extent var) extent)))
                     (t (compiler-notify "Ignoring free ~S declaration: ~S" kind name))))
                  (cons
                   (compiler-error "~S on symbol-macro: ~S" kind name))
@@ -1510,8 +1511,7 @@ the stack without triggering overflow protection.")
             ((and (consp name)
                   (eq (car name) 'function)
                   (null (cddr name))
-                  (valid-function-name-p (cadr name))
-                  (neq extent 'indefinite-extent))
+                  (valid-function-name-p (cadr name)))
              (let* ((fname (cadr name))
                     (bound-fun (find fname fvars
                                      :key (lambda (x)
@@ -1522,7 +1522,7 @@ the stack without triggering overflow protection.")
                (etypecase fun
                  (leaf
                   (if bound-fun
-                      (setf (leaf-extent bound-fun) extent)
+                      (setf (leaf-dynamic-extent bound-fun) extent)
                       (compiler-notify
                        "Ignoring free DYNAMIC-EXTENT declaration: ~S" name)))
                  (cons
@@ -1591,7 +1591,7 @@ the stack without triggering overflow protection.")
          :default res
          :handled-conditions (process-unmuffle-conditions-decl
                               spec (lexenv-handled-conditions res))))
-       ((dynamic-extent truly-dynamic-extent indefinite-extent dynamic-extent-no-note)
+       ((dynamic-extent truly-dynamic-extent dynamic-extent-no-note)
         (process-extent-decl (cdr spec) vars fvars (first spec))
         res)
        ((disable-package-locks enable-package-locks)

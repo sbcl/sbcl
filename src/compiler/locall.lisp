@@ -701,15 +701,14 @@
 ;;; function that rearranges the arguments and calls the entry point.
 ;;; We analyze the new function and the entry point immediately so
 ;;; that everything gets converted during the single pass.
-(defun convert-hairy-fun-entry (ref call entry vars ignores args indef)
+(defun convert-hairy-fun-entry (ref call entry vars ignores args)
   (declare (list vars ignores args) (type ref ref) (type combination call)
            (type clambda entry))
   (let ((new-fun
          (with-ir1-environment-from-node call
            (ir1-convert-lambda
             `(lambda ,vars
-               (declare (ignorable ,@ignores)
-                        (indefinite-extent ,@indef))
+               (declare (ignorable ,@ignores))
                (%funcall ,entry ,@args))
             :debug-name (debug-name 'hairy-function-entry
                                     (lvar-fun-debug-name
@@ -872,9 +871,7 @@
 
         (convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
                                  (append temps more-temps)
-                                 (ignores) (call-args)
-                                 (when (optional-rest-p fun)
-                                   more-temps)))))
+                                 (ignores) (call-args)))))
 
   (values))
 
