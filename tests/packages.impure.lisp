@@ -150,6 +150,10 @@ if a restart was invoked."
 
 ;;;; Tests
 ;;; USE-PACKAGE
+(with-test (:name :use-keyword-nope)
+  (assert-error (use-package "KEYWORD"))
+  (assert-error (use-package "CL-USER" "KEYWORD")))
+
 (with-test (:name :use-package.1)
   (with-packages (("FOO" (:export "SYM"))
                   ("BAR" (:export "SYM"))
