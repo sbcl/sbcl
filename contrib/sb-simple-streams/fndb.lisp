@@ -73,11 +73,12 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
                                                   :rename-and-delete :overwrite
                                                   :append :supersede nil))
                        (:if-does-not-exist (member :error :create nil))
-                       (:external-format keyword)
+                       (:external-format sb-kernel:external-format-designator)
                        (:class (or symbol class))
                        (:mapped (member t nil))
                        (:input-handle (or null fixnum stream))
                        (:output-handle (or null fixnum stream))
+                       #+win32 (:overlapped t)
                        &allow-other-keys)
     (or stream null)
     ()

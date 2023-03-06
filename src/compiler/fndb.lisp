@@ -907,6 +907,8 @@
   (call important-result)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
+;; N.B., sb-simple-streams clobbers this; if this changes, make sure
+;; sb-simple-streams follows along, where necessary.
 (defknown read-sequence ((modifying sequence) stream
                          &key
                          (:start index)
@@ -1478,8 +1480,12 @@
   ()
   :derive-type (read-elt-type-deriver t 'character nil))
 
+;; N.B., sb-simple-streams clobbers this; if this changes, make sure
+;; sb-simple-streams follows along, where necessary.
 (defknown listen (&optional stream-designator) boolean (flushable))
 
+;; N.B., sb-simple-streams clobbers this; if this changes, make sure
+;; sb-simple-streams follows along, where necessary.
 (defknown clear-input (&optional stream-designator) null ())
 
 (defknown read-from-string
@@ -1672,6 +1678,8 @@
 
 (defknown user-homedir-pathname (&optional t) pathname (flushable))
 
+;; N.B., sb-simple-streams clobbers this; if this changes, make sure
+;; sb-simple-streams follows along, where necessary.
 (defknown open
   (pathname-designator &key
                        (:class symbol)
