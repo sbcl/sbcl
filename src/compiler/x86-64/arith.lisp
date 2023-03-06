@@ -710,15 +710,20 @@
     (unsigned-wordpair-to-bignum r multidigit rax rdx node)
     DONE))
 
+(defun one-word-bignum (node result low)
+  (inst push low)
+  (invoke-reg-specific-asm-routine node "ONE-WORD-BIGNUM-TO-" result))
+
+(defun two-word-bignum (node result low)
+  (inst push low)
+  (invoke-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" result))
+
 (define-vop (+/unsigned=>integer)
   (:translate +)
   (:args (x :scs (unsigned-reg) :target low)
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg :from (:argument 0)) low)
-  (:temporary (:sc unsigned-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -726,17 +731,15 @@
   (:generator 8
     (move low x)
     (inst add low y)
-    (inst set :c high)
-    (inst mov :byte twodigit 1)
-    (inst jmp :c allocate)
-    (inst jmp :s allocate)
+    (inst jmp :c TWO)
+    (inst jmp :s TWO)
     (move r low)
     (inst shl r 1)
     (inst jmp :no DONE)
-    (zeroize twodigit)
-    allocate
-    (inst movzx '(:byte :dword) high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (one-word-bignum node r low)
+    (inst jmp DONE)
+    TWO
+    (two-word-bignum node r low)
     DONE))
 
 (define-vop (-/unsigned=>integer)
