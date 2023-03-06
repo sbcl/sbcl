@@ -30,6 +30,17 @@
              (make-fixup routine :assembly-routine)
              (ea (make-fixup routine :assembly-routine*)))))
 
+(defmacro invoke-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
+  `(invoke-asm-routine
+    'call
+    (aref ,(map 'vector
+                (lambda (x)
+                  (unless (member x '(rsp rbp) :test 'string=)
+                    (symbolicate prefix x suffix)))
+                +qword-register-names+)
+          (tn-offset ,tn))
+    ,node))
+
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options))
   (ecase style

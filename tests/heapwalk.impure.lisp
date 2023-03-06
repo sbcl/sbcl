@@ -30,7 +30,12 @@
 ;;; As a precondition to asserting that heap walking did not
 ;;; visit an alleged cons that is a filler object,
 ;;; assert that there is the telltale pattern (if applicable).
-#+(or arm64 x86-64)
+;;; x86-64 no longer leaves a stray 0xFF..FFF word in the heap.
+;;; That bit pattern came from signed integer multiplication where the final result
+;;; was a bignum having 1 payload word, but the intermediate result was a bignum
+;;; whose trailing word was all 1s. Being a redundant copy of the sign bit from the
+;;; prior word, the bignum gets shortened. Only arm64 overallocates the bignum now.
+#+arm64
 (let ((product (manymul 1)))
   (sb-sys:with-pinned-objects (product)
     (let ((word (sb-sys:sap-ref-word

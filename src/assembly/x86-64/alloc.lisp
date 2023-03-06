@@ -61,6 +61,79 @@
                  ONE-WORD-BIGNUM
                  (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
                  (popw number bignum-digits-offset other-pointer-lowtag))))))
+     (from-digits (reg)
+       ;; stack args:
+       ;; +24   is-two-digit [passed in 1 byte]
+       ;; +16   high-digit
+       ;;  +8   low-digit
+       ;; rsp : return-pc
+       ;;       saved-RAX if needed
+       (let* ((result (symbolicate reg "-TN"))
+              ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
+              ;; use R12 as the temp due to longer encoding and self-modifying code.
+              (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
+              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
+         `(define-assembly-routine (,(symbolicate "BIGNUM-TO-" reg)
+                                     (:return-style :none))
+              ()
+            (inst cmp :byte (ea 24 rsp-tn) 0)
+            ,@(if rax-temp '((inst push rax-tn)))
+            (inst jmp :e one-word-bignum)
+            (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
+            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
+            (inst movdqu float0-tn (ea 8 rsp-tn))
+            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
+            (inst ret 24) ; pop args
+            ONE-WORD-BIGNUM
+            (alloc-other bignum-widetag (+ bignum-digits-offset 1) ,alloc nil nil nil)
+            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
+            (inst movq float0-tn (ea 8 rsp-tn))
+            (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
+            (inst ret 24))))
+     ;; "from unsigned" might need to allocate 3 digits, but it receives only high:low
+     ;; because the highest digit if needed must be all 0.
+     (from-digits-unsigned (reg)
+       ;; stack args:
+       ;; +24   is-two-or-three-digit [passed in 1 byte]
+       ;; +16   high-digit
+       ;;  +8   low-digit
+       ;; rsp : return-pc
+       ;;       saved-RAX if needed
+       (let* ((result (symbolicate reg "-TN"))
+              ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
+              ;; use R12 as the temp due to longer encoding and self-modifying code.
+              (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
+              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
+         `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg)
+                                     (:return-style :none))
+              ()
+            (inst cmp :byte (ea 24 rsp-tn) 0)
+            (inst jmp :e one-word-bignum)
+            (inst test :byte (ea (+ 16 7) rsp-tn) #x80) ; sign bit
+            (inst jmp :z two-word-bignum)
+            ;; THREE-WORD-BIGNUM
+            ,@(if rax-temp '((inst push rax-tn)))
+            (alloc-other bignum-widetag (+ bignum-digits-offset 3) ,alloc nil nil nil)
+            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
+            (inst movdqu float0-tn (ea 8 rsp-tn))
+            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
+            ;; don't assume prezeroed unboxed pages
+            (inst mov :qword (ea (- (ash 3 word-shift) other-pointer-lowtag) ,result) 0)
+            (inst ret 24) ; pop args
+            TWO-WORD-BIGNUM
+            ,@(if rax-temp '((inst push rax-tn)))
+            (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
+            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
+            (inst movdqu float0-tn (ea 8 rsp-tn))
+            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
+            (inst ret 24)
+            ONE-WORD-BIGNUM
+            ,@(if rax-temp '((inst push rax-tn)))
+            (alloc-other bignum-widetag (+ bignum-digits-offset 1) ,alloc nil nil nil)
+            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
+            (inst movq float0-tn (ea 8 rsp-tn))
+            (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
+            (inst ret 24))))
      (define (op)
        ;; R13 is usually the thread register, but might not be
        `(progn
@@ -69,6 +142,8 @@
                                #+gs-seg r13
                                r14 r15)
                   collect `(,op ,reg)))))
+  (define from-digits)
+  (define from-digits-unsigned)
   (define signed)
   (define unsigned))
 
