@@ -257,19 +257,6 @@
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
-(eval-when (:compile-toplevel :execute)
-  ;; This is like a macro, but not a macro, because define-vop is weird.
-  (defun bignum-from-reg (tn signedp)
-    (flet ((make-vector ()
-             (map 'vector
-                  (lambda (x)
-                    ;; At present R11 can not occur here,
-                    ;; but let's be future-proof and allow for it.
-                    (unless (member x '(rsp rbp) :test 'string=)
-                      (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
-                  +qword-register-names+)))
-      `(aref ,(make-vector) (tn-offset ,tn)))))
-
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
 ;;; routine.
@@ -294,7 +281,7 @@
             (inst imul y x #.(ash 1 n-fixnum-tag-bits))
             (inst jmp :no DONE)
             (inst mov y x)))
-     (invoke-asm-routine 'call #.(bignum-from-reg 'y "SIGNED") vop)
+     (signed=>bignum-in-reg vop y)
      DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -348,7 +335,7 @@
     ;; support- speculatively restore the fixnum value, test previous flags and jump,
     ;; which would eliminate the 'jmp done' that jumps over the following SHR.
     (inst jmp :z fixnum)
-    (invoke-asm-routine 'call #.(bignum-from-reg 'res "UNSIGNED") vop)
+    (unsigned=>bignum-in-reg vop res)
     (inst jmp done)
     FIXNUM
     (inst shr res 1)

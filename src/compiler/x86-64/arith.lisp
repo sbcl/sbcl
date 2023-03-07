@@ -586,12 +586,12 @@
   (inst push flag)
   (inst push high)
   (inst push low)
-  (invoke-reg-specific-asm-routine node "BIGNUM-TO-" result))
+  (call-reg-specific-asm-routine node "BIGNUM-TO-" result))
 (defun unsigned-wordpair-to-bignum (result flag low high node)
   (inst push flag)
   (inst push high)
   (inst push low)
-  (invoke-reg-specific-asm-routine node "+BIGNUM-TO-" result))
+  (call-reg-specific-asm-routine node "+BIGNUM-TO-" result))
 
 (define-vop (*/signed=>integer)
   (:translate *)
@@ -710,20 +710,23 @@
     (unsigned-wordpair-to-bignum r multidigit rax rdx node)
     DONE))
 
-(defun one-word-bignum (node result low)
-  (inst push low)
-  (invoke-reg-specific-asm-routine node "ONE-WORD-BIGNUM-TO-" result))
+(defun signed=>bignum-in-reg (node reg) ; arg/result in same reg
+  (call-reg-specific-asm-routine node "ALLOC-SIGNED-BIGNUM-IN-" reg))
+
+(defun unsigned=>bignum-in-reg (node reg)
+  ;; one or two-word output from 1 word input. Same reg for arg/result
+  (call-reg-specific-asm-routine node "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
 
 (defun two-word-bignum (node result low)
-  (inst push low)
-  (invoke-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" result))
+  (inst push low) ; arg on stack + carry flag, result to reg
+  (call-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" result))
 
 (define-vop (+/unsigned=>integer)
   (:translate +)
   (:args (x :scs (unsigned-reg) :target low)
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) low)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0)) low)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -736,7 +739,14 @@
     (move r low)
     (inst shl r 1)
     (inst jmp :no DONE)
-    (one-word-bignum node r low)
+    ;; This is a little like MOVE-FROM-SIGNED or MOVE-FROM-UNSIGNED
+    ;; but not quite the same as either.
+    ;; Restore the bits of R, but we don't need the carry - it has to be 0
+    ;; because if it weren't 0 then OF would have been set.
+    (if (location= r low) (inst shr r 1) (move r low))
+    ;; "signed" meaning that bit index 63 which happens to be 0 is
+    ;; in fact a sign bit and not the 64th bit of the significand.
+    (signed=>bignum-in-reg node r)
     (inst jmp DONE)
     TWO
     (two-word-bignum node r low)

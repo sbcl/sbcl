@@ -30,7 +30,7 @@
              (make-fixup routine :assembly-routine)
              (ea (make-fixup routine :assembly-routine*)))))
 
-(defmacro invoke-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
+(defmacro call-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
   `(invoke-asm-routine
     'call
     (aref ,(map 'vector
