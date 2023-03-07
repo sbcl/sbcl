@@ -107,28 +107,26 @@
          `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg)
                                      (:return-style :none))
               ()
-            (inst cmp :byte (ea 24 rsp-tn) 0)
-            (inst jmp :e one-word-bignum)
-            (inst test :byte (ea (+ 16 7) rsp-tn) #x80) ; sign bit
-            (inst jmp :z two-word-bignum)
-            ;; THREE-WORD-BIGNUM
+            (inst cmp :byte (ea 24 rsp-tn) 0) ; test for 2-or-3-digit
             ,@(if rax-temp '((inst push rax-tn)))
+            (inst jmp :e one-word-bignum)
+            ;; Since 2 digits and 3 digits consume the same number of bytes
+            ;; due to padding, they can share the allocation request.
             (alloc-other bignum-widetag (+ bignum-digits-offset 3) ,alloc nil nil nil)
             ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
             (inst movdqu float0-tn (ea 8 rsp-tn))
             (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            ;; don't assume prezeroed unboxed pages
+            ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
             (inst mov :qword (ea (- (ash 3 word-shift) other-pointer-lowtag) ,result) 0)
+            ;; Test sign bit of digit index 1
+            (inst test :byte (ea (+ 7 (ash (+ bignum-digits-offset 1) word-shift)
+                                    (- other-pointer-lowtag)) ,result) #xff)
+            (inst jmp :s SKIP) ; if signed, then keep all 3 digits
+            ;; else, no sign bit, so change it to 2-digit bignum
+            (inst mov :byte (ea (- 1 other-pointer-lowtag) ,result) 2)
+            SKIP
             (inst ret 24) ; pop args
-            TWO-WORD-BIGNUM
-            ,@(if rax-temp '((inst push rax-tn)))
-            (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst movdqu float0-tn (ea 8 rsp-tn))
-            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            (inst ret 24)
             ONE-WORD-BIGNUM
-            ,@(if rax-temp '((inst push rax-tn)))
             (alloc-other bignum-widetag (+ bignum-digits-offset 1) ,alloc nil nil nil)
             ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
             (inst movq float0-tn (ea 8 rsp-tn))
