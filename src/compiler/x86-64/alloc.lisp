@@ -78,7 +78,6 @@
                                      (unless (location= reg r12-tn) (return reg)))
                                    scratch-registers)))
   (declare (ignorable type thread-temp))
-  (aver (not (location= temp r12-tn)))
   ;; Each allocation sequence has to call INSTRUMENT-ALLOC,
   ;; so we may as well take advantage of this fact to load the temp reg
   ;; here, if provided, rather than spewing more #+gs-seg tests around.
@@ -129,6 +128,7 @@
              (inst inc :qword
                    (thread-slot-ea (+ thread-obj-size-histo-slot bucket)))))))
   (when (policy node (> sb-c::instrument-consing 1))
+    (aver (not (location= temp r12-tn)))
     (when (tn-p size)
       (aver (not (location= size temp))))
     (let ((data temp)
@@ -306,7 +306,9 @@
   (let ((header (compute-object-header nwords widetag)))
     #+bignum-assertions
     (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
-    (cond ((and (not alloc-temp) (location= result-tn r12-tn))
+    (cond ((and (not alloc-temp)
+                (location= result-tn r12-tn)
+                (policy node (> sb-c::instrument-consing 1)))
            ;; this is the problematic case for INSTRUMENT-ALLOC.
            ;; Therefore, allocate into RAX but save it in RESULT-TN
            ;; and then switch them back.
