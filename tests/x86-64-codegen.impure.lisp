@@ -1331,10 +1331,13 @@
   (loop for i from 0 by (ash 1 56) repeat 256 collect i))
 
 (defparameter signed-word-test-inputs
-  (loop for word in unsigned-word-test-inputs
-        collect (let ((b (sb-bignum:%allocate-bignum 1)))
-                  (setf (sb-bignum:%bignum-ref b 0) word)
-                  (sb-bignum::%normalize-bignum b 1))))
+  (funcall 
+   (compile nil ;; no interpreter stubs
+            `(lambda ()
+               (loop for word in unsigned-word-test-inputs
+                     collect (let ((b (sb-bignum:%allocate-bignum 1)))
+                               (setf (sb-bignum:%bignum-ref b 0) word)
+                               (sb-bignum::%normalize-bignum b 1)))))))
 
 (defun check-result (fun x y actual)
   (let ((expect (funcall fun x y)))
