@@ -1143,3 +1143,10 @@
            (< f b)))
    ((1 t) nil)
    ((1 10) t)))
+
+(with-test (:name :cast-externally-checkable-p-satisfies)
+  (checked-compile-and-assert
+   ()
+   `(lambda (u s)
+      (the (unsigned-byte 64) (+ (the (or null (unsigned-byte 64)) u) (the fixnum s))))
+   ((1 2) 3)))
