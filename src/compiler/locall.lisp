@@ -68,7 +68,7 @@
 ;;; responsible for actually deciding if the lvars can be
 ;;; dynamic-extent allocated, dealing with transitively marking the
 ;;; otherwise-inaccessible parts of these values as dynamic extent as
-;;; well. This is because environment analysis happens after qll major
+;;; well. This is because environment analysis happens after all major
 ;;; changes to the dataflow in IR1 have been done and it is clear
 ;;; whether an LVAR is actually used by a combination which can
 ;;; dynamic-extent allocate.

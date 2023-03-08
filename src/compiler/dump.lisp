@@ -38,9 +38,7 @@
   ;; used for everything else. We use a separate EQ table to avoid
   ;; performance pathologies with objects for which SIMILAR
   ;; degenerates to EQL. Everything entered in the SIMILAR table is
-  ;; also entered in the EQ table. The NAMED-CONSTANT is used for
-  ;; named constants whose references are dumped as load time values
-  ;; of SYMBOL-GLOBAL-VALUE.
+  ;; also entered in the EQ table.
   (similar-table (make-similarity-table) :type hash-table :read-only t)
   (eq-table (make-hash-table :test 'eq) :type hash-table :read-only t)
   ;; the INSTANCE table maps dumpable instances to unique IDs for calculating
