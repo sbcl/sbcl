@@ -20,9 +20,8 @@
 ;;;;      unsigned-reg arg is OK too, provided that the top bit is 0.
 ;;;; ALLOC-UNSIGNED-BIGNUM-IN-Rxx : make a 1 or 2 digit bignum from unsigned-reg
 ;;;;      after undoing the bit rotation performed in MOVE-FROM-UNSIGNED.
-;;;; TWO-WORD-BIGNUM-To-Rxx : make a 2-digit bignum from unsigned arg
-;;;;      on the stack, also storing the carry flag into the high digit.
-;;;;      (TODO: should take a register, not a stack arg)
+;;;; TWO-WORD-BIGNUM-IN-Rxx : make a 2-digit bignum from unsigned reg
+;;;;      also storing the carry flag into the high digit.
 ;;;; BIGNUM-TO-Rxx : choose a 1 or 2 digit bignum given [high:low] on the stack
 ;;;; +BIGNUM-TO-Rxx : choose a 1, 2, or 3-digit bignum given [high:low] on stack,
 ;;;;      ensuring that if the sign bit of the high word is on, the third digit
@@ -150,22 +149,20 @@
               ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
               ;; use R12 as the temp due to longer encoding and self-modifying code.
               (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
-              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN")))
-              (temp (if (eq reg 'rcx) 'rax-tn 'rcx-tn)))
+              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
          `(define-assembly-routine (,(symbolicate "TWO-WORD-BIGNUM-TO-" reg)
                                     (:return-style :none))
               ()
-            (inst push ,temp)
-            (inst set :c ,temp)
-            (inst movzx '(:byte :dword) ,temp ,temp)
+            (inst push ,result) ; actually the argument
+            (inst set :c ,result)
+            (inst movzx '(:byte :dword) ,result ,result)
+            (inst push ,result)
             ,@(if rax-temp '((inst push rax-tn)))
             (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
             ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst mov (ea (- (ash 2 word-shift) other-pointer-lowtag) ,result) ,temp)
-            (inst mov ,temp (ea 16 rsp-tn))
-            (inst mov (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) ,temp)
-            (inst pop ,temp)
-            (inst ret 8))))
+            (inst pop (ea (- (ash 2 word-shift) other-pointer-lowtag) ,result))
+            (inst pop (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result))
+            (inst ret))))
      (define (op)
        ;; R13 is usually the thread register, but might not be
        `(progn

@@ -717,9 +717,8 @@
   ;; one or two-word output from 1 word input. Same reg for arg/result
   (call-reg-specific-asm-routine node "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
 
-(defun two-word-bignum (node result low)
-  (inst push low) ; arg on stack + carry flag, result to reg
-  (call-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" result))
+(defun two-word-bignum (node reg)
+  (call-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" reg))
 
 (define-vop (+/unsigned=>integer)
   (:translate +)
@@ -734,9 +733,9 @@
   (:generator 8
     (move low x)
     (inst add low y)
+    (move r low)
     (inst jmp :c TWO)
     (inst jmp :s TWO)
-    (move r low)
     (inst shl r 1)
     (inst jmp :no DONE)
     ;; This is a little like MOVE-FROM-SIGNED or MOVE-FROM-UNSIGNED
@@ -749,7 +748,7 @@
     (signed=>bignum-in-reg node r)
     (inst jmp DONE)
     TWO
-    (two-word-bignum node r low)
+    (two-word-bignum node r)
     DONE))
 
 (define-vop (-/unsigned=>integer)
