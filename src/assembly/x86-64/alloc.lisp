@@ -31,76 +31,42 @@
     ((signed (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
-          ,@(cond
-              ((eq reg 'r12) ; problematic case for INSTRUMENT-ALLOC
-               '((inst push rax-tn)
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
-                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
-                 (inst mov number rax-tn)
-                 (inst pop rax-tn)))
-              (t
-               '((inst push number)
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
-                 (popw number bignum-digits-offset other-pointer-lowtag))))))
+          (inst push number)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+          (popw number bignum-digits-offset other-pointer-lowtag)))
      (unsigned (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst ror number (1+ n-fixnum-tag-bits)) ; restore unrotated value
           (inst test number number)     ; rotates do not update SF
-          ,@(cond
-              ((eq reg 'r12) ; problematic case for INSTRUMENT-ALLOC
-               '((inst push rax-tn)
-                 (inst jmp :ns one-word-bignum)
-                 ;; Two word bignum
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) rax-tn nil nil nil)
-                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
-                 (inst mov number rax-tn)
-                 (inst pop rax-tn)
-                 (inst ret)
-                 ONE-WORD-BIGNUM
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
-                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
-                 (inst mov number rax-tn)
-                 (inst pop rax-tn)))
-              (t
-               '((inst push number)
-                 (inst jmp :ns one-word-bignum)
-                 ;; Two word bignum
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
-                 (popw number bignum-digits-offset other-pointer-lowtag)
-                 (inst ret)
-                 ONE-WORD-BIGNUM
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
-                 (popw number bignum-digits-offset other-pointer-lowtag))))))
+          (inst push number)
+          (inst jmp :ns one-word-bignum)
+          ;; Two word bignum
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
+          (popw number bignum-digits-offset other-pointer-lowtag)
+          (inst ret)
+          ONE-WORD-BIGNUM
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+          (popw number bignum-digits-offset other-pointer-lowtag)))
      (from-digits (reg)
        ;; stack args:
        ;; +24   is-two-digit [passed in 1 byte]
        ;; +16   high-digit
        ;;  +8   low-digit
        ;; rsp : return-pc
-       ;;       saved-RAX if needed
-       (let* ((result (symbolicate reg "-TN"))
-              ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
-              ;; use R12 as the temp due to longer encoding and self-modifying code.
-              (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
-              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
-         `(define-assembly-routine (,(symbolicate "BIGNUM-TO-" reg)
-                                     (:return-style :none))
-              ()
-            (inst cmp :byte (ea 24 rsp-tn) 0)
-            ,@(if rax-temp '((inst push rax-tn)))
-            (inst jmp :e one-word-bignum)
-            (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst movdqu float0-tn (ea 8 rsp-tn))
-            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            (inst ret 24) ; pop args
-            ONE-WORD-BIGNUM
-            (alloc-other bignum-widetag (+ bignum-digits-offset 1) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst movq float0-tn (ea 8 rsp-tn))
-            (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            (inst ret 24))))
+       `(define-assembly-routine (,(symbolicate "BIGNUM-TO-" reg) (:return-style :none))
+            ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
+          (inst cmp :byte (ea 24 rsp-tn) 0)
+          (inst jmp :e one-word-bignum)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) result nil nil nil)
+          (inst movdqu float0-tn (ea 8 rsp-tn))
+          (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst ret 24) ; pop args
+          ONE-WORD-BIGNUM
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
+          (inst movq float0-tn (ea 8 rsp-tn))
+          (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst ret 24)))
      ;; "from unsigned" might need to allocate 3 digits, but it receives only high:low
      ;; because the highest digit if needed must be all 0.
      (from-digits-unsigned (reg)
@@ -109,65 +75,49 @@
        ;; +16   high-digit
        ;;  +8   low-digit
        ;; rsp : return-pc
-       ;;       saved-RAX if needed
-       (let* ((result (symbolicate reg "-TN"))
-              ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
-              ;; use R12 as the temp due to longer encoding and self-modifying code.
-              (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
-              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
-         `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg)
-                                     (:return-style :none))
-              ()
-            (inst cmp :byte (ea 24 rsp-tn) 0) ; test for 2-or-3-digit
-            ,@(if rax-temp '((inst push rax-tn)))
-            (inst jmp :e one-word-bignum)
-            ;; Since 2 digits and 3 digits consume the same number of bytes
-            ;; due to padding, they can share the allocation request.
-            (alloc-other bignum-widetag (+ bignum-digits-offset 3) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst movdqu float0-tn (ea 8 rsp-tn))
-            (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
-            (inst mov :qword (ea (- (ash 3 word-shift) other-pointer-lowtag) ,result) 0)
-            ;; Test sign bit of digit index 1
-            (inst test :byte (ea (+ 7 (ash (+ bignum-digits-offset 1) word-shift)
-                                    (- other-pointer-lowtag)) ,result) #xff)
-            (inst jmp :s SKIP) ; if signed, then keep all 3 digits
-            ;; else, no sign bit, so change it to 2-digit bignum
-            (inst mov :byte (ea (- 1 other-pointer-lowtag) ,result) 2)
-            SKIP
-            (inst ret 24) ; pop args
-            ONE-WORD-BIGNUM
-            (alloc-other bignum-widetag (+ bignum-digits-offset 1) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst movq float0-tn (ea 8 rsp-tn))
-            (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result) float0-tn)
-            (inst ret 24))))
+       `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg) (:return-style :none))
+            ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
+          (inst cmp :byte (ea 24 rsp-tn) 0) ; test for 2-or-3-digit
+          (inst jmp :e one-word-bignum)
+          ;; Since 2 digits and 3 digits consume the same number of bytes
+          ;; due to padding, they can share the allocation request.
+          (alloc-other bignum-widetag (+ bignum-digits-offset 3) result nil nil nil)
+          (inst movdqu float0-tn (ea 8 rsp-tn))
+          (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
+          (inst mov :qword (ea (- (ash 3 word-shift) other-pointer-lowtag) result) 0)
+          ;; Test sign bit of digit index 1
+          (inst test :byte (ea (+ 7 (ash (+ bignum-digits-offset 1) word-shift)
+                                  (- other-pointer-lowtag)) result) #xff)
+          (inst jmp :s SKIP) ; if signed, then keep all 3 digits
+          ;; else, no sign bit, so change it to 2-digit bignum
+          (inst mov :byte (ea (- 1 other-pointer-lowtag) result) 2)
+          SKIP
+          (inst ret 24) ; pop args
+          ONE-WORD-BIGNUM
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
+          (inst movq float0-tn (ea 8 rsp-tn))
+          (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst ret 24)))
      ;; The high bit is in the carry flag.
      (two-word-bignum (reg)
-       (let* ((result (symbolicate reg "-TN"))
-              ;; If result is R12, then allocate to RAX since INSTRUMENT-ALLOC can not
-              ;; use R12 as the temp due to longer encoding and self-modifying code.
-              (rax-temp (and (eq reg 'r12) (policy nil (> sb-c::instrument-consing 1))))
-              (alloc (if rax-temp 'rax-tn (symbolicate reg "-TN"))))
-         `(define-assembly-routine (,(symbolicate "TWO-WORD-BIGNUM-TO-" reg)
-                                    (:return-style :none))
-              ()
-            (inst push ,result) ; actually the argument
-            (inst set :c ,result)
-            (inst movzx '(:byte :dword) ,result ,result)
-            (inst push ,result)
-            ,@(if rax-temp '((inst push rax-tn)))
-            (alloc-other bignum-widetag (+ bignum-digits-offset 2) ,alloc nil nil nil)
-            ,@(when rax-temp '((inst mov r12-tn rax-tn) (inst pop rax-tn)))
-            (inst pop (ea (- (ash 2 word-shift) other-pointer-lowtag) ,result))
-            (inst pop (ea (- (ash 1 word-shift) other-pointer-lowtag) ,result))
-            (inst ret))))
+       `(define-assembly-routine (,(symbolicate "TWO-WORD-BIGNUM-TO-" reg) (:return-style :none))
+            ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
+          (inst push number)
+          (inst set :c number)
+          (inst movzx '(:byte :dword) number number)
+          (inst push number)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
+          (inst pop (ea (- (ash 2 word-shift) other-pointer-lowtag) number))
+          (inst pop (ea (- (ash 1 word-shift) other-pointer-lowtag) number))
+          (inst ret)))
      (define (op)
+       ;; R12 is not usable for the time being.
        ;; R13 is usually the thread register, but might not be
        `(progn
           ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
-                               r8 r9 r10 r11 r12
+                               r8 r9 r10 r11
+                               ;; the register allocator will never select r12
                                #+gs-seg r13
                                r14 r15)
                   collect `(,op ,reg)))))

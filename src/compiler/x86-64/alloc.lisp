@@ -69,6 +69,9 @@
 ;;; The TN that we pick can't be R12 because encoding it into an instruction
 ;;; always requires a SIB byte, which doesn't fit in the reserved bytes
 ;;; of the instruction stream where hot patching occurs.
+;;; Compare:
+;;;        F048FF4018       LOCK INC QWORD PTR [RAX+24]
+;;;        F049FF442418     LOCK INC QWORD PTR [R12+24]
 (defun instrument-alloc (type size node scratch-registers
                          &optional thread-temp
                          &aux (temp

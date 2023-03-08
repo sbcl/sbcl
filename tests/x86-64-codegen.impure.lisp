@@ -1331,7 +1331,7 @@
   (loop for i from 0 by (ash 1 56) repeat 256 collect i))
 
 (defparameter signed-word-test-inputs
-  (funcall 
+  (funcall
    (compile nil ;; no interpreter stubs
             `(lambda ()
                (loop for word in unsigned-word-test-inputs
