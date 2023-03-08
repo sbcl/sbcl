@@ -32,6 +32,7 @@
 (defvar *brothertree* nil)
 (defvar *rbtree* nil)
 (defvar *solist* nil)
+(defvar *hash-table* nil)
 
 (defvar *lotta-strings*
   (mapcar (lambda (x)
@@ -62,17 +63,26 @@
       (sb-lockless:so-insert set str))
     (setq *solist* set)))
 
+(defun insert-all-hash-table ()
+  (let ((set (make-hash-table :test 'eq)))
+    (dolist (str *lotta-strings*)
+      (setf (gethash str set) t))
+    (setq *hash-table* set)))
+
 (gc)
 (time (insert-all-redblack))
 (gc)
 (time (insert-all-brothertree))
 (gc)
 (time (insert-all-solist))
+(gc)
+(time (insert-all-hash-table))
 (let ((n (length *lotta-strings*)))
   (format t "~&Memory:~:{~%  ~8a=~8D ~3,1f~}~%"
           (loop for (name . val) in `(("brother" . ,*brothertree*)
                                       ("redblack" . ,*rbtree*)
-                                      ("solist" . ,*solist*))
+                                      ("solist" . ,*solist*)
+                                      ("hashtbl " . ,*hash-table*))
                 collect
                 (let ((mem (test-util:deep-size val)))
                   (list name mem (/ mem n))))))
@@ -90,13 +100,18 @@
 (defun find-all-in-solist (&aux (set *solist*))
   (loop for str in *lotta-strings*
         count (sb-lockless:so-find set str)))
+(defun find-all-in-hash-table (&aux (set *hash-table*))
+  (loop for str in *lotta-strings*
+        count (gethash str set)))
 
 (find-all-in-brothertree)
 (find-all-in-redblack-tree)
 (find-all-in-solist)
+(find-all-in-hash-table)
 (time (find-all-in-brothertree))
 (time (find-all-in-redblack-tree))
 (time (find-all-in-solist))
+(time (find-all-in-hash-table))
 
 #|
 * (load"benchmarks/bbtrees")
