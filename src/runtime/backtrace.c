@@ -529,7 +529,13 @@ describe_thread_state(void)
 }
 
 static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
+#ifdef BACKTRACE_SHOW_FRAME_SIZE
+    // This display is a little confusing.  It's the size of the frame that this
+    // frame will return to.
+    fprintf(f, "%4d: fp=%p [%5x] pc=%p ", i, fp, (int)(*(char**)fp-(char*)fp), pc);
+#else
     fprintf(f, "%4d: fp=%p pc=%p ", i, fp, pc);
+#endif
     struct code *code = (void*)component_ptr_from_pc(pc);
     if (code) {
         struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
