@@ -409,7 +409,8 @@
              `(progn
                 (define-vop (,name fast-safe-arith-op)
                   (:translate ,fun-name)
-                  (:args (x :scs (,@scs immediate) :target r :load-if nil)
+                  (:args (x :scs (,@scs immediate) :load-if nil ,@(if (eq op 'sub)
+                                                                      '(:target r)))
                          (y :scs (,@scs immediate) :load-if nil))
                   (:arg-types ,primtype ,primtype)
                   (:results (r :scs ,scs :load-if nil))
@@ -421,7 +422,7 @@
                    (,emit ',op x y r temp vop ',val-xform ,@extra)))
                 (define-vop (,name/c fast-safe-arith-op)
                   (:translate ,fun-name)
-                  (:args (x :scs ,scs :target r :load-if nil))
+                  (:args (x :scs ,scs :load-if nil))
                   (:info y)
                   (:arg-types ,primtype (:constant ,type))
                   (:results (r :scs ,scs :load-if nil))
@@ -722,18 +723,20 @@
 
 (define-vop (+/unsigned=>integer)
   (:translate +)
-  (:args (x :scs (unsigned-reg) :target low)
+  (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0)) low)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
   (:node-var node)
   (:generator 8
-    (move low x)
-    (inst add low y)
-    (move r low)
+    (cond ((location= r x))
+          ((location= r y)
+           (setf y x))
+          (t
+           (move r x)))
+    (inst add r y)
     (inst jmp :c TWO)
     (inst jmp :s TWO)
     (inst shl r 1)
@@ -742,7 +745,7 @@
     ;; but not quite the same as either.
     ;; Restore the bits of R, but we don't need the carry - it has to be 0
     ;; because if it weren't 0 then OF would have been set.
-    (if (location= r low) (inst shr r 1) (move r low))
+    (inst shr r 1)
     ;; "signed" meaning that bit index 63 which happens to be 0 is
     ;; in fact a sign bit and not the 64th bit of the significand.
     (signed=>bignum-in-reg node r)
