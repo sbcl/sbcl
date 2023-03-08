@@ -131,15 +131,20 @@
              (inst inc :qword
                    (thread-slot-ea (+ thread-obj-size-histo-slot bucket)))))))
   (when (policy node (> sb-c::instrument-consing 1))
-    (aver (not (location= temp r12-tn)))
     (when (tn-p size)
       (aver (not (location= size temp))))
-    (let ((data temp)
-          (patch-loc (gen-label))
-          (skip-instrumentation (gen-label)))
+    ;; CAUTION: the logic for RAX-SAVE is entirely untested
+    ;; as it never gets exercised, and can not be, until R12 ceases
+    ;; to have its wired use as the GC card table base register.
+    (binding* (((data rax-save) (if (location= temp r12-tn)
+                                    (values rax-tn t)
+                                    (values temp nil)))
+               (patch-loc (gen-label))
+               (skip-instrumentation (gen-label)))
       ;; Don't count allocations to the arena
       (inst cmp :qword (thread-slot-ea thread-arena-slot) 0)
       (inst jmp :nz skip-instrumentation)
+      (when rax-save (inst push rax-tn))
       (inst mov data (thread-slot-ea thread-profile-data-slot thread-temp))
       (inst test data data)
       ;; This instruction is modified to "JMP :z" when profiling is
@@ -168,6 +173,7 @@
             (t
              (inst byte (logior (tn-offset data) (ash (tn-offset size) 4)))
              (inst .skip 8 :long-nop)))
+      (when rax-save (inst pop rax-tn))
       (emit-label skip-instrumentation))))
 
 (defun system-tlab-p (type node)
@@ -303,34 +309,22 @@
 ;;; Allocate an other-pointer object of fixed NWORDS with a single-word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.  NWORDS counts the header word.
-(defun alloc-other (widetag nwords result-tn node alloc-temp thread-temp
+(defun alloc-other (widetag nwords result-tn node alloc-temps thread-temp
                     &aux (bytes (pad-data-block nwords)))
   (declare (ignorable thread-temp))
-  (let ((header (compute-object-header nwords widetag)))
-    #+bignum-assertions
-    (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
-    (cond ((and (not alloc-temp)
-                (location= result-tn r12-tn)
-                (policy node (> sb-c::instrument-consing 1)))
-           ;; this is the problematic case for INSTRUMENT-ALLOC.
-           ;; Therefore, allocate into RAX but save it in RESULT-TN
-           ;; and then switch them back.
-           (inst mov result-tn rax-tn)
-           (instrument-alloc widetag bytes node rax-tn thread-temp)
-           (pseudo-atomic (:thread-tn thread-temp)
-             (allocation nil bytes other-pointer-lowtag rax-tn node nil thread-temp)
-             (storew* header rax-tn 0 other-pointer-lowtag t))
-           (inst xchg rax-tn result-tn))
-          (t
-           (instrument-alloc widetag bytes node result-tn thread-temp)
-           (pseudo-atomic ()
-             (cond (alloc-temp
-                    (allocation nil bytes 0 result-tn node alloc-temp thread-temp)
-                    (storew* header result-tn 0 0 t)
-                    (inst or :byte result-tn other-pointer-lowtag))
-                   (t
-                    (allocation nil bytes other-pointer-lowtag result-tn node nil thread-temp)
-                    (storew* header result-tn 0 other-pointer-lowtag t))))))))
+  #+bignum-assertions
+  (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
+  (instrument-alloc widetag bytes node (cons result-tn (ensure-list alloc-temps)) thread-temp)
+  (let ((header (compute-object-header nwords widetag))
+        (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
+    (pseudo-atomic ()
+      (cond (alloc-temp
+             (allocation nil bytes 0 result-tn node alloc-temp thread-temp)
+             (storew* header result-tn 0 0 t)
+             (inst or :byte result-tn other-pointer-lowtag))
+            (t
+             (allocation nil bytes other-pointer-lowtag result-tn node nil thread-temp)
+             (storew* header result-tn 0 other-pointer-lowtag t))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
 (macrolet ((pop-arg (ref)
