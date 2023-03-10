@@ -96,16 +96,18 @@
 
 (defun %so-search/addr (head hash key)
   ;; KEY is any object, which either has to be immobile, or else GC has to repair the table.
-  (declare (list-node head) (fixnum hash))
-  (macrolet ((cast-to-word (x) `(get-lisp-obj-address ,x))
-             (compare (x y)
-               (declare (ignore x y))
-               `(let ((x (node-hash (|the| so-node this))))
-                  (cond ((< x hash) t)
-                        ((= x hash)
-                         (< (cast-to-word (so-key (|the| so-key-node this)))
-                            (cast-to-word key)))))))
-    (lfl-search-macro compare t)))
+  (let ((head (truly-the list-node head))
+        (hash (truly-the fixnum hash)))
+    (macrolet ((cast-to-word (x)
+                 `(get-lisp-obj-address ,x))
+               (compare (x y)
+                 (declare (ignore x y))
+                 `(let ((x (node-hash (|the| so-node this))))
+                    (cond ((< x hash) t)
+                          ((= x hash)
+                           (< (cast-to-word (so-key (|the| so-key-node this)))
+                              (cast-to-word key)))))))
+      (lfl-search-macro compare t))))
 
 (defun %so-search/string (head hash key)
   (declare (list-node head) (fixnum hash) (string key))
@@ -188,8 +190,9 @@
  )
 
 (declaim (inline masked-hash))
-(defun masked-hash (hash) (mask-field (byte (1- +hash-nbits+) 1) hash))
-
+;;(defun masked-hash (hash) (mask-field (byte (1- +hash-nbits+) 1) hash))
+;; HASH *must* be non-negative. We don't mask out the sign bit any more.
+(defun masked-hash (hash) (logior hash 1))
 (defmacro with-bin ((table-var ; input
                      hash-var node-var &rest rest) ; output
                     hash-expr &body body)
@@ -296,6 +299,24 @@
         (atomic-decf (so-count table)))
       deleted)))
 
+(defmacro multiplicative-hash (x)
+  ;; Use Knuth's hash multiplier of 2^32 * (-1 + sqrt(5)) / 2.
+  ;; This constant works quite well for our variant of the solist algorithm
+  ;; which consumes hash bits from most-significant to least-significant.
+  ;; Note that most descriptions of this require a right-shift, but here it's
+  ;; exactly the correct answer by itself because the solist algorithm consumes
+  ;; bits from left-to-right (most-to-least-significant).
+  #-64-bit
+  `(ash (logand (* ,x 2654435769) sb-ext:most-positive-word)
+        ,(- (1+ sb-vm:n-fixnum-tag-bits))) ; Ensure a positive fixnum result
+  ;; Same thing but with 64 bits of precision. I used MPFR to compute this
+  ;; (also https://asecuritysite.com/hash/smh_fib gives the same number).
+  ;; The number 11400714819323198486 is slightly more correct, but an odd multiplier
+  ;; is better than even, otherwise the rightmost result bit would be always 0.
+  #+64-bit
+  `(ash (logand (* ,x 11400714819323198485) sb-ext:most-positive-word)
+        ,(- (1+ sb-vm:n-fixnum-tag-bits))))
+
 (macrolet ((guts (key-hash searcher equality-fn)
              `(with-bin (table hash start-node) ,key-hash
                 (let ((node (,searcher start-node (logior hash 1) key)))
@@ -309,7 +330,8 @@
     (guts (murmur-hash-word/fixnum key) %so-search/fixnum =))
   (defun so-find/addr (table key)
     (declare (split-ordered-list table))
-    (guts (funcall (so-hashfun table) key) %so-search/addr eq))
+    (let ((h (multiplicative-hash (get-lisp-obj-address key))))
+      (guts h %so-search/addr eq)))
   (defun so-find/string (table key)
     (declare (split-ordered-list table))
     (declare (string key))
@@ -345,7 +367,7 @@
            (setq node next))))))
 
 (flet ((make (valuesp)
-         (%make-so-list #'murmur-hash-word/fixnum
+         (%make-so-list #'murmur-hash-word/+fixnum
                         #'%so-insert/fixnum
                         #'%so-delete/fixnum
                         #'so-find/fixnum
@@ -363,7 +385,7 @@
   (defun make-so-map/string () (make t)))
 
 (flet ((make (valuesp)
-         (%make-so-list (lambda (x) (murmur-hash-word/+fixnum (get-lisp-obj-address x)))
+         (%make-so-list (lambda (x) (multiplicative-hash (get-lisp-obj-address x)))
                         #'%so-insert/addr #'%so-delete/addr #'so-find/addr
                         #'nofun #'nofun valuesp)))
   (defun make-so-set/addr () (make nil))
