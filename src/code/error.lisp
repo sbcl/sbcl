@@ -91,12 +91,14 @@
                       ;; The CLHS writeup of HANDLER-BIND says "Exceptional Situations: None."
                       ;; which might suggest that it's not an error if #'HANDLER is un-fboundp
                       ;; on entering the body, but we should check in safe code.
-                      (when (and (eq (car handler) 'function) (sb-c:policy env (= safety 3)))
+                      (when (eq (car handler) 'function)
                         ;; Referencing #'F is enough to get a compile-time warning about unknown
                         ;; functions, but the use itself is flushable, so employ SAFE-FDEFN-FUN.
-                        (dummy-forms `(sb-c:safe-fdefn-fun
-                                       (load-time-value
-                                        (find-or-create-fdefn ',name) t))))
+                        (dummy-forms `#',name)
+                        (when (sb-c:policy env (= safety 3))
+                          (dummy-forms `(sb-c:safe-fdefn-fun
+                                         (load-time-value
+                                          (find-or-create-fdefn ',name) t)))))
                       `(load-time-value
                         (cons ,test (the (function-designator (condition)) ',name))
                         t)))))

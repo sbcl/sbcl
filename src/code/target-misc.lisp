@@ -160,7 +160,7 @@ the file system."
   (when (and (fboundp name)
              *type-system-initialized*)
     (handler-bind (((satisfies sb-c::handle-condition-p)
-                     #'sb-c::handle-condition-handler))
+                     'sb-c::handle-condition-handler))
       (warn 'redefinition-with-defun :name name :new-function def)))
   (sb-c:%compiler-defun name nil inline-lambda extra-info)
   (setf (fdefinition name) def)

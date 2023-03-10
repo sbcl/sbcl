@@ -161,7 +161,7 @@
                   ;; using the outer compiler error context.
                   (*compiler-error-context* nil)
                   (oops nil))
-             (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+             (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
                (unless source-paths
                  (find-source-paths form tlf))
                (let ((*compiler-error-bailout*

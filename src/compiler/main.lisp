@@ -1704,7 +1704,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (sb-impl::*eval-tlf-index* nil)
         (sb-impl::*eval-source-context* nil))
     (handler-case
-        (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+        (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
               (fasl-dump-partial-source-info info *compile-object*)
