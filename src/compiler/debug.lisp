@@ -1068,9 +1068,11 @@
                     (env (and entry-fun (lambda-environment entry-fun))))
                (when env
                  (write-string "{env:")
-                 (dolist (leaf (environment-closure env))
+                 (dolist (thing (environment-closure env))
                    (write-char #\space)
-                   (print-leaf leaf))
+                   (etypecase thing
+                     (leaf (print-leaf leaf))
+                     (nlx-info (princ thing))))
                  (write-string "}")))
              (write-char #\space))))
         (when (and *debug-print-types*
