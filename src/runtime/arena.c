@@ -602,6 +602,6 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
     fprintf(stderr, "access of object @ %p\n", (void*)obj);
     fflush(stderr);
     lisp_memory_fault_error(context, addr);
-    return 1;
 #endif
+    return 1;
 }
