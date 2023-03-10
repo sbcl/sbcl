@@ -218,8 +218,8 @@
   (with-bin (table hash start-node bins+shift bins shift) (funcall (so-hashfun table) key)
     (multiple-value-bind (node foundp)
         (if (so-valuesp table)
-            (funcall (so-inserter table) start-node (logior hash 1) key value)
-            (funcall (so-inserter table) start-node (logior hash 1) key))
+            (funcall (so-inserter table) start-node hash key value)
+            (funcall (so-inserter table) start-node hash key))
       (cond (foundp ; must not find a dummy node
              ;; Note that in this case we do not update SO-DATA. The client of the table
              ;; can use the secondary value to notice that the node existed,
@@ -294,7 +294,7 @@
 
 (defun so-delete (table key)
   (with-bin (table hash start-node) (funcall (so-hashfun table) key)
-    (let ((deleted (funcall (so-deleter table) start-node (logior hash 1) key)))
+    (let ((deleted (funcall (so-deleter table) start-node hash key)))
       (when deleted
         (atomic-decf (so-count table)))
       deleted)))
@@ -319,7 +319,7 @@
 
 (macrolet ((guts (key-hash searcher equality-fn)
              `(with-bin (table hash start-node) ,key-hash
-                (let ((node (,searcher start-node (logior hash 1) key)))
+                (let ((node (,searcher start-node hash key)))
                   (when (and (not (endp node))
                              (not (dummy-node-p node))
                              (,equality-fn (so-key node) key))

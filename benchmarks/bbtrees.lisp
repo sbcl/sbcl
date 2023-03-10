@@ -39,7 +39,7 @@
 
 (defvar *lotta-strings*
   (coerce
-   ;; Collect al pseudostatic symbols and all readonly strings
+   ;; Collect all pseudostatic symbols and all readonly strings
    (mapcar (lambda (x)
              (sb-kernel:%make-lisp-obj
               (logandc2 (sb-kernel:get-lisp-obj-address x)
