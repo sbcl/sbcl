@@ -17,9 +17,11 @@ typedef register_t os_context_register_t;
 #include "arch-os-generic.inc"
 
 #if __DARWIN_UNIX03
+#define CONTEXT_SLOT(c,stem) c->uc_mcontext->__ss.__##stem
 #define CONTEXT_ADDR_FROM_STEM(stem) (os_context_register_t*)&context->uc_mcontext->__ss.__##stem
 #define OS_CONTEXT_PC(context) context->uc_mcontext->__ss.__rip
 #else
+#define CONTEXT_SLOT(c,stem) c->uc_mcontext->ss.stem
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
 #define OS_CONTEXT_PC(context) context->uc_mcontext->__ss.rip
 #endif /* __DARWIN_UNIX03 */

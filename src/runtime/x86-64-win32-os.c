@@ -81,6 +81,26 @@ sigset_t *os_context_sigmask_addr(os_context_t *context)
   return &context->sigmask;
 }
 
+void visit_context_registers(void (*proc)(os_context_register_t,int), os_context_t *context)
+{
+    proc(context->win32_context->Rip, 1);
+    proc(context->win32_context->Rax, 1);
+    proc(context->win32_context->Rcx, 1);
+    proc(context->win32_context->Rdx, 1);
+    proc(context->win32_context->Rbx, 1);
+    // don't bother with rsp or rbp
+    proc(context->win32_context->Rsi, 1);
+    proc(context->win32_context->Rdi, 1);
+    proc(context->win32_context->R8,  1);
+    proc(context->win32_context->R9,  1);
+    proc(context->win32_context->R10, 1);
+    proc(context->win32_context->R11, 1);
+    proc(context->win32_context->R12, 1);
+    proc(context->win32_context->R13, 1);
+    proc(context->win32_context->R14, 1);
+    proc(context->win32_context->R15, 1);
+}
+
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {

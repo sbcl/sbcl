@@ -76,6 +76,19 @@ int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 
+void visit_context_registers(void (*p)(os_context_register_t,int), os_context_t *context)
+{
+    mcontext_t* m = &context->uc_mcontext;
+    p(m->gregs[REG_RIP], 1);
+    // This is the order the registers appear in gregset_t (which makes no difference of course).
+    // Not sure why the order is so kooky.
+    p(m->gregs[REG_R8 ], 1); p(m->gregs[REG_R9 ], 1); p(m->gregs[REG_R10], 1); p(m->gregs[REG_R11], 1);
+    p(m->gregs[REG_R12], 1); p(m->gregs[REG_R13], 1); p(m->gregs[REG_R14], 1); p(m->gregs[REG_R15], 1);
+    p(m->gregs[REG_RDI], 1); p(m->gregs[REG_RSI], 1); p(m->gregs[REG_RBP], 1); p(m->gregs[REG_RBX], 1);
+    p(m->gregs[REG_RDX], 1); p(m->gregs[REG_RAX], 1); p(m->gregs[REG_RCX], 1); p(m->gregs[REG_RSP], 1);
+    // We could implicitly pin objects pointed to by parts of an XMM or YMM register here
+}
+
 // This array is indexed by the encoding of the register in an instruction.
 static unsigned char regmap[16] = {
     REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI,

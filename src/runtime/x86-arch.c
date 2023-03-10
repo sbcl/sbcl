@@ -53,6 +53,17 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
  * want to get to, and on OS, which determines how we get to it.)
  */
 
+void visit_context_registers(void (*proc)(os_context_register_t,int), os_context_t *context)
+{
+    proc(os_context_pc(context), 1);
+    proc(*os_context_register_addr(context,reg_EAX), 1);
+    proc(*os_context_register_addr(context,reg_ECX), 1);
+    proc(*os_context_register_addr(context,reg_EDX), 1);
+    proc(*os_context_register_addr(context,reg_EBX), 1);
+    proc(*os_context_register_addr(context,reg_ESI), 1);
+    proc(*os_context_register_addr(context,reg_EDI), 1);
+}
+
 int *
 os_context_flags_addr(os_context_t *context)
 {

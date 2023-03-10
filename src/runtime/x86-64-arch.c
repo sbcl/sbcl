@@ -159,6 +159,29 @@ arch_get_bad_addr(int __attribute__((unused)) sig,
  * want to get to, and on OS, which determines how we get to it.)
  */
 
+// I don't have an easy way to test changes for these OSes, so just use this
+// context visitor based on the old slightly-less-efficient way of doing it.
+#if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
+void visit_context_registers(void (*proc)(os_context_register_t, int), os_context_t *context)
+{
+    proc(os_context_pc(context), 1);
+    proc(*os_context_register_addr(context, reg_RAX), 1);
+    proc(*os_context_register_addr(context, reg_RCX), 1);
+    proc(*os_context_register_addr(context, reg_RDX), 1);
+    proc(*os_context_register_addr(context, reg_RBX), 1);
+    proc(*os_context_register_addr(context, reg_RSI), 1);
+    proc(*os_context_register_addr(context, reg_RDI), 1);
+    proc(*os_context_register_addr(context, reg_R8 ), 1);
+    proc(*os_context_register_addr(context, reg_R9 ), 1);
+    proc(*os_context_register_addr(context, reg_R10), 1);
+    proc(*os_context_register_addr(context, reg_R11), 1);
+    proc(*os_context_register_addr(context, reg_R12), 1);
+    proc(*os_context_register_addr(context, reg_R13), 1);
+    proc(*os_context_register_addr(context, reg_R14), 1);
+    proc(*os_context_register_addr(context, reg_R15), 1);
+}
+#endif
+
 os_context_register_t *
 os_context_flags_addr(os_context_t *context)
 {
