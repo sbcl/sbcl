@@ -2583,8 +2583,7 @@ static void pin_object(lispobj object)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word,
-                                                   __attribute__((unused)) int contextp)
+static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
 {
 #ifdef LISP_FEATURE_METASPACE
     extern lispobj valid_metaspace_ptr_p(void* addr);
@@ -2610,6 +2609,16 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word,
 #endif
         return 0;
     }
+
+    // Special case for untagged instance pointers in registers. This might belong in
+    // conservative_root_p() but the pointer has to be adjusted here or else the wrong
+    // value will be inserted into 'pinned_objects' (which demands tagged pointers)
+    if (contextp && lowtag_of(word) == 0 &&
+        (page_table[page].type == PAGE_TYPE_MIXED ||
+         page_table[page].type == PAGE_TYPE_SMALL_MIXED) &&
+        widetag_of((lispobj*)word) == INSTANCE_WIDETAG)
+        word |= INSTANCE_POINTER_LOWTAG;
+
     lispobj object = conservative_root_p(word, page);
     if (!object) return 0;
     if (object != AMBIGUOUS_POINTER) {

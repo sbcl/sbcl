@@ -526,17 +526,15 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:results (next-tagged :scs (descriptor-reg))
             (next-bits :scs (descriptor-reg)))
   (:generator 10
-    ;; Read the first user-data slot and convert to a tagged pointer,
-    ;; also returning the raw value as a secondary result
-    (pseudo-atomic ()
-      (inst mov next-bits (ea (- (ash (+ instance-slots-offset instance-data-start)
-                                      word-shift)
-                                 instance-pointer-lowtag)
-                              node))
-      ;; This can'be be LEA because usually the NEXT-BITS are tagged.
-      ;; An untagged value appears only if in mid-deletion.
-      (inst mov next-tagged next-bits)
-      (inst or :byte next-tagged instance-pointer-lowtag))))
+    ;; Read the first user-data slot, which might be an untagged pointer
+    ;; to the next node. Conservative GC implicitly pins objects pointed to by untagged
+    ;; instance pointers now.
+    (loadw next-bits node (+ instance-slots-offset instance-data-start) instance-pointer-lowtag)
+    ;; Also returning the unadjusted bits as a secondary result.
+    ;; This can'be use the LEA instruction because _usually_ NEXT-BITS
+    ;; already hold a tagged pointer.
+    (inst mov next-tagged next-bits)
+    (inst or :byte next-tagged instance-pointer-lowtag)))
 
 (define-vop (switch-to-arena)
   (:args (x :scs (descriptor-reg immediate)))

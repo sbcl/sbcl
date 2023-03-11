@@ -51,6 +51,42 @@
   (logical-delete (lfl-nth n list))
   list)
 
+(defun count-list-nodes (list &aux (n 0))
+  (do ((node (get-next (list-head list)) (get-next node)))
+      ((endp node) n)
+    (incf n)))
+
+(defun lockfree-list-with-many-deleted-nodes (n)
+  (let ((list (make-ordered-list :key-type 'fixnum)))
+    ;; insert items in descending order because otherwise this would take N^2 time
+    (loop for i from n downto 1 do (lfl-insert list i (- i)))
+    ;; logically delete half the nodes
+    (do ((i 0 (1+ i))
+         (node (list-head list) (get-next node)))
+        ((endp node))
+      (when (oddp i) (logical-delete node)))
+    list))
+
+(test-util:with-test (:name :lockfree-list-node-implicit-pin-untagged-pointer
+                            :skipped-on (not :sb-thread))
+  (let* ((keepon t)
+         (n-nodes 15000)
+         (list (lockfree-list-with-many-deleted-nodes n-nodes))
+         (thread ; Start a thread to invoke GC
+          (sb-thread:make-thread
+           (lambda ()
+             (loop
+               (sb-thread:barrier (:read))
+               (when (not keepon) (return))
+               (gc)
+               (sleep .001))))))
+    (loop repeat 1000 for i from 0
+          do (let ((counted (count-list-nodes list)))
+               (assert (= counted n-nodes))))
+    (setq keepon nil)
+    (sb-thread:barrier (:write))
+    (sb-thread:join-thread thread)))
+
 (logical-delete-nth 0 *lll2*)
 
 (defvar *lfl*)
