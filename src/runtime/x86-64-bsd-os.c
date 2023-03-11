@@ -35,8 +35,8 @@ void visit_context_registers(void (*proc)(os_context_register_t,int), os_context
     proc(CONTEXT_SLOT(context, rcx), 1); proc(CONTEXT_SLOT(context, r9),  1);
     proc(CONTEXT_SLOT(context, rdx), 1); proc(CONTEXT_SLOT(context, r10), 1);
     proc(CONTEXT_SLOT(context, rbx), 1); proc(CONTEXT_SLOT(context, r11), 1);
-    proc(CONTEXT_SLOT(context, rsp), 1); proc(CONTEXT_SLOT(context, r12), 1);
-    proc(CONTEXT_SLOT(context, rbp), 1); proc(CONTEXT_SLOT(context, r13), 1);
+    /* ignore rsp */                     proc(CONTEXT_SLOT(context, r12), 1);
+    /* ignore rbp */                     proc(CONTEXT_SLOT(context, r13), 1);
     proc(CONTEXT_SLOT(context, rsi), 1); proc(CONTEXT_SLOT(context, r14), 1);
     proc(CONTEXT_SLOT(context, rdi), 1); proc(CONTEXT_SLOT(context, r15), 1);
 }
@@ -103,8 +103,8 @@ void visit_context_registers(void (*proc)(os_context_register_t,int), os_context
     proc(CONTEXT_SLOT(context, RCX), 1); proc(CONTEXT_SLOT(context, R9),  1);
     proc(CONTEXT_SLOT(context, RDX), 1); proc(CONTEXT_SLOT(context, R10), 1);
     proc(CONTEXT_SLOT(context, RBX), 1); proc(CONTEXT_SLOT(context, R11), 1);
-    proc(CONTEXT_SLOT(context, RSP), 1); proc(CONTEXT_SLOT(context, R12), 1);
-    proc(CONTEXT_SLOT(context, RBP), 1); proc(CONTEXT_SLOT(context, R13), 1);
+    /* ignore RSP */                     proc(CONTEXT_SLOT(context, R12), 1);
+    /* ignore RBP */                     proc(CONTEXT_SLOT(context, R13), 1);
     proc(CONTEXT_SLOT(context, RSI), 1); proc(CONTEXT_SLOT(context, R14), 1);
     proc(CONTEXT_SLOT(context, RDI), 1); proc(CONTEXT_SLOT(context, R15), 1);
 }

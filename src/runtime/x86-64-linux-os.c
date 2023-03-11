@@ -84,8 +84,8 @@ void visit_context_registers(void (*p)(os_context_register_t,int), os_context_t 
     // Not sure why the order is so kooky.
     p(m->gregs[REG_R8 ], 1); p(m->gregs[REG_R9 ], 1); p(m->gregs[REG_R10], 1); p(m->gregs[REG_R11], 1);
     p(m->gregs[REG_R12], 1); p(m->gregs[REG_R13], 1); p(m->gregs[REG_R14], 1); p(m->gregs[REG_R15], 1);
-    p(m->gregs[REG_RDI], 1); p(m->gregs[REG_RSI], 1); p(m->gregs[REG_RBP], 1); p(m->gregs[REG_RBX], 1);
-    p(m->gregs[REG_RDX], 1); p(m->gregs[REG_RAX], 1); p(m->gregs[REG_RCX], 1); p(m->gregs[REG_RSP], 1);
+    p(m->gregs[REG_RDI], 1); p(m->gregs[REG_RSI], 1); p(m->gregs[REG_RBX], 1);
+    p(m->gregs[REG_RDX], 1); p(m->gregs[REG_RAX], 1); p(m->gregs[REG_RCX], 1);
     // We could implicitly pin objects pointed to by parts of an XMM or YMM register here
 }
 
