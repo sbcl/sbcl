@@ -1,11 +1,11 @@
 CC=gcc
-CFLAGS = -m64 -g -Wall -std=gnu89 -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+CFLAGS += -m64 -g -Wall -std=gnu89 -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 LINKFLAGS = -m64 -g
 ASFLAGS = -m64 -Wall
 GREP = ggrep
 
 #CC=/opt/SunStudioExpress/bin/cc
-#CFLAGS = -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+#CFLAGS += -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 #ASFLAGS = -xarch=generic64 -Wall
 
 ASSEM_SRC = x86-64-assem.S

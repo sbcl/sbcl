@@ -10,7 +10,7 @@
 # files for more information.
 
 LINKFLAGS += -dynamic -export-dynamic
-CFLAGS =  -g -Wall -O2
+CFLAGS += -g -Wall -O2
 
 ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c

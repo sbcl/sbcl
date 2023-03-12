@@ -50,7 +50,7 @@ else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
 
-CFLAGS =  -g -W -Wall \
+CFLAGS += -g -W -Wall \
        -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
        -fno-omit-frame-pointer \
        -O5 -m64 -DWINVER=0x0501 \

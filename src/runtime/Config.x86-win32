@@ -48,7 +48,7 @@ endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
 
-CFLAGS = -g -Wall -O3 \
+CFLAGS += -g -Wall -O3 \
         -fno-omit-frame-pointer -march=i686 -DWINVER=0x600 -D_WIN32_WINNT=0x600 \
         -D__W32API_USE_DLLIMPORT__ \
 	-mpreferred-stack-boundary=2
