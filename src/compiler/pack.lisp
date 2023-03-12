@@ -1617,7 +1617,7 @@
   (let ((path t)) ; dummy initial value
     (labels ((path (lambda)
                (do ((acc '())
-                    (lambda lambda (lambda-parent lambda)))
+                    (lambda lambda (lexenv-lambda (sb-c::lambda-lexenv lambda))))
                    ((null lambda) acc)
                  (push lambda acc)))
              (register-scope (lambda)

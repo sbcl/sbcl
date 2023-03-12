@@ -603,9 +603,6 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
-(defun lambda-parent (lambda)
-  (lexenv-lambda (lambda-lexenv lambda)))
-
 (defun node-component (node)
   (declare (type node node))
   (the component (block-component (node-block node))))
