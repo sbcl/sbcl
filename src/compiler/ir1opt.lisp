@@ -1063,7 +1063,7 @@
 (defun dxify-downward-funargs (node dxable-args fun-name)
   #+sb-xc-host
   (declare (ignore fun-name))
-  (let (entry cleanup)
+  (let (cleanup)
     ;; Experience shows that users place incorrect DYNAMIC-EXTENT declarations
     ;; without due consideration and care. Since the declaration was ignored
     ;; in more contexts than not, it was relatively harmless.
@@ -1116,25 +1116,12 @@
                            (ref-p use)
                            (lambda-p (ref-leaf use))
                            (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
-                  (unless entry
-                    (multiple-value-setq (entry cleanup) (insert-dynamic-extent-cleanup node)))
+                  (unless cleanup
+                    (setq cleanup (insert-dynamic-extent-cleanup node)))
                   (let ((dx-info (make-dx-info :kind 'dynamic-extent :value arg
                                                :cleanup cleanup)))
                     (setf (lvar-dynamic-extent arg) dx-info)
                     (push dx-info (cleanup-nlx-info cleanup))))))))))
-
-;;; This does not work. The intent was to prepend this transform to the list
-;;; of (FUN-INFO-TRANSFORMS INFO) when applicable, in the known fun case.
-;;; But the reason it doesn't work isn't that the transform doesn't transform
-;;; the code - it does; but compiler doesn't appear to respect the DX-FLET.
-(defglobal *dxify-args-transform*
-  (make-transform :type (specifier-type 'function)
-                  :%fun (lambda (node)
-                              "auto-DX"
-                              (or (let ((name (combination-fun-source-name node)))
-                                    (dxify-downward-funargs
-                                     node (fun-name-dx-args name) name))
-                                  (give-up-ir1-transform)))))
 
 (defun check-proper-sequences (combination info)
   (when (fun-info-annotation info)
@@ -1208,12 +1195,11 @@
                       (validate-call-type node type leaf)))
                   (if (neq (basic-combination-kind node) kind)
                       (ir1-optimize-combination node)
-                      (binding* ((name (and leaf ;; don't want to transform CASTs
-                                            (lvar-fun-name fun))
-                                       :exit-if-null)
-                                 (dxable-args (fun-name-dx-args name) :exit-if-null))
-                        (awhen (dxify-downward-funargs node dxable-args name)
-                          (transform-call node it name))))))))
+                      (let ((name (lvar-fun-name fun)))
+                        (when name
+                          (let ((dxable-args (fun-name-dx-args name)))
+                            (when dxable-args
+                              (dxify-downward-funargs node dxable-args name))))))))))
         (:known
          (aver info)
          (clear-reoptimize-args)
@@ -1231,8 +1217,7 @@
                         (not (constant-lvar-p (second args))))
                (setf (basic-combination-args node) (nreverse args))))
 
-           (let ((fun-source-name (combination-fun-source-name node))
-                 (optimizer (fun-info-optimizer info)))
+           (let ((optimizer (fun-info-optimizer info)))
              (unless (and optimizer (funcall optimizer node))
                ;; First give the VM a peek at the call
                (multiple-value-bind (style transform)
@@ -1244,7 +1229,7 @@
                    (:transform
                     ;; The VM mostly knows how to handle this.  We need
                     ;; to massage the call slightly, though.
-                    (transform-call node transform fun-source-name))
+                    (transform-call node transform (combination-fun-source-name node)))
                    ((:default :maybe)
                     ;; Let transforms have a crack at it.
                     ;; We should always try with the dxify-args transform,

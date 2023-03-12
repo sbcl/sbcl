@@ -59,6 +59,8 @@
 
   (values))
 
+;;; Insert code to establish a dynamic extent cleanup around CALL,
+;;; returning the cleanup.
 (defun insert-dynamic-extent-cleanup (call)
   (let* ((entry (with-ir1-environment-from-node call
                   (make-entry)))
@@ -78,7 +80,7 @@
     ;; insert cleanup code.
     (node-ends-block call)
     (push entry (lambda-entries (node-home-lambda entry)))
-    (values entry cleanup)))
+    cleanup))
 
 ;;; Given a local call CALL to FUN, find the associated argument LVARs
 ;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
@@ -95,13 +97,13 @@
 ;;; dynamic-extent allocate.
 (defun recognize-potentially-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
-  (let (entry cleanup)
+  (let (cleanup)
     (loop for arg in (basic-combination-args call)
           for var in (lambda-vars fun)
           do (let ((dx-kind (leaf-dynamic-extent var)))
                (when (and arg dx-kind (not (lvar-dynamic-extent arg)))
-                 (unless entry
-                   (multiple-value-setq (entry cleanup) (insert-dynamic-extent-cleanup call)))
+                 (unless cleanup
+                   (setq cleanup (insert-dynamic-extent-cleanup call)))
                  (let ((dx-info (make-dx-info :kind dx-kind :value arg
                                               :cleanup cleanup)))
                    (setf (lvar-dynamic-extent arg) dx-info)

@@ -322,8 +322,6 @@
 (defun find-dynamic-extent-lvars (component)
   (declare (type component component))
   (dolist (lambda (component-lambdas component))
-    ;; Mark closures as dynamic-extent allocatable by making the
-    ;; ENCLOSE node for the closure use an LVAR.
     (dolist (entry (lambda-entries lambda))
       (let* ((cleanup (entry-cleanup entry))
              (dx-infos (cleanup-nlx-info cleanup)))
@@ -366,6 +364,8 @@
                           (t
                            (note-no-stack-allocation lvar)
                            (setf (lvar-dynamic-extent lvar) nil))))))))))))
+  ;; Mark closures as dynamic-extent allocatable by making the ENCLOSE
+  ;; node for the closure use an LVAR.
   (dolist (lambda (component-lambdas component))
     (let ((fun (if (eq (lambda-kind lambda) :optional)
                    (lambda-optional-dispatch lambda)
