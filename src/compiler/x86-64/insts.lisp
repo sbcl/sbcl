@@ -3129,6 +3129,14 @@
      ;; We disassemble it wrongly, but I think ours is a valid encoding.
      (emit-sse-inst segment dst src #xf3 #xb8 :operand-size size))))
 
+(define-instruction tzcnt (segment &prefix prefix dst src)
+  (:printer ext-xmm-reg/mem ((prefix #xF3) (op #xBC) (reg nil :type 'reg)))
+  (:emitter
+   (let ((size (pick-operand-size prefix dst src)))
+     (aver (neq size :byte))
+     ;; FIXME: same bug as POPCNT - we can't disassemble if size is :WORD
+     (emit-sse-inst segment dst src #xf3 #xBC :operand-size size))))
+
 (define-instruction crc32 (segment src-size dst src)
   ;; The low bit of the final opcode byte sets the source size.
   ;; REX.W bit sets the destination size. can't have #x66 prefix and REX.W = 1.
