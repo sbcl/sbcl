@@ -399,7 +399,10 @@
                (setf (cleanup-mess-up cleanup) (functional-enclose fun))
                (setf (enclose-cleanup (functional-enclose fun)) cleanup)
                (setf (leaf-dynamic-extent fun) (leaf-dynamic-extent var))
-               (setf (lvar-dynamic-extent old-lvar) nil))))))
+               (let ((dx-info (lvar-dynamic-extent old-lvar)))
+                 (setf (lvar-dynamic-extent old-lvar) nil)
+                 (setf (cleanup-nlx-info cleanup)
+                       (remove dx-info (cleanup-nlx-info cleanup)))))))))
       t)))
 
 (defun node-dominates-p (node1 node2)
@@ -801,7 +804,10 @@
                         (and (functional-p leaf)
                              (functional-enclose leaf)
                              (eq (functional-kind (node-home-lambda (functional-enclose leaf)))
-                                 :toplevel))))))
+                                 :toplevel))
+                        ;; Ignore non-closures.
+                        (and (lambda-p leaf)
+                             (not (environment-closure (lambda-environment leaf))))))))
                ;; It's supposed to be slow, so who cares it can't
                ;; stack allocate something.
                (policy use (= speed 0)))

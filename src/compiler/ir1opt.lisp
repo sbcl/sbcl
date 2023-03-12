@@ -1058,19 +1058,12 @@
        "The return value of ~A should not be discarded."
        (lvar-fun-name (basic-combination-fun node) t)))))
 
-(defglobal *debug-auto-dx* nil)
-;;; Generalized transform: For each downward funarg, unless it is
-;;; a global var (like #'EQL), or the user already DXified,
-;;; or this transform already ran, then try to wrap in DX-FLET.
-;;; Change the call only if at least one DXable arg is known
-;;; to be a fuction. If no eligible arg is, then do nothing.
-;;; For now this only works on globally named functions.
+;;; For each downward funarg, mark the funarg as dynamic extent. For
+;;; now this only works on globally named functions.
 (defun dxify-downward-funargs (node dxable-args fun-name)
-  (when *debug-auto-dx*
-    (format t "~&DXifying funargs to ~S~%" fun-name))
-  (let* ((dx-flets)
-         (received-args)
-         (passed-args))
+  #+sb-xc-host
+  (declare (ignore fun-name))
+  (let (entry cleanup)
     ;; Experience shows that users place incorrect DYNAMIC-EXTENT declarations
     ;; without due consideration and care. Since the declaration was ignored
     ;; in more contexts than not, it was relatively harmless.
@@ -1081,74 +1074,54 @@
     ;; that callers should always use more stack space. You should really
     ;; only do that if you don't also need an arbitrarily long call chain.
     ;; MAP and friends are good examples where this pertains]
-    (when #+sb-xc-host t ; always trust our own code
+    (when #+sb-xc-host t                ; always trust our own code
           #-sb-xc-host
           (or (let ((pkg (sb-xc:symbol-package (fun-name-block-name fun-name))))
                 ;; callee "probably" won't get redefined
                 (or (not pkg) (package-locked-p pkg)))
               (policy node (= safety 0)))
-      (dolist (arg-spec dxable-args)
-        (when (symbolp arg-spec)
-          ;; If there are keywords, we had better have a FUN-TYPE
-          (let ((fun-type (lvar-type (combination-fun node))))
-            ;; Can't do anything unless we can ascertain where
-            ;; the keyword arguments start.
-            (when (fun-type-p fun-type)
-              (let* ((keys-index
-                      (+ (length (fun-type-required fun-type))
-                         (length (fun-type-optional fun-type))))
-                     (keywords-supplied
-                      (nthcdr keys-index (combination-args node))))
-                ;; Everything in a keyword position needs to be
-                ;; constant, or else no transform occurs.
-                (loop
-                   (unless (cdr keywords-supplied) (return))
-                   (let ((keyword (car keywords-supplied)))
-                     (unless (constant-lvar-p keyword)
-                       (return))
-                     (when (eq (lvar-value keyword) arg-spec)
-                       ;; Map it to a positional arg
-                       (setq arg-spec (1+ keys-index))
-                       (return))
-                     (setq keywords-supplied (cddr keywords-supplied))
-                     (incf keys-index 2)))))))
-        (when (integerp arg-spec)
-          ;; OK, turn the Nth argument into a dx-flet
-          (let* ((arg (or (nth arg-spec (combination-args node))
-                          (return-from dxify-downward-funargs nil)))
-                 (use (principal-lvar-use arg)))
-            (when (and (ref-p use)
-                       (lambda-p (ref-leaf use))
-                       (neq (leaf-dynamic-extent (lambda-parent (ref-leaf use)))
-                            'truly-dynamic-extent))
-              (unless received-args
-                (setq received-args
-                      (make-gensym-list (length (combination-args node))))
-                (setq passed-args (copy-list received-args)))
-              (let ((tempname (let ((*gensym-counter* (length dx-flets)))
-                                (gensym "LAMBDA")))
-                    (original-lambda
-                     (functional-inline-expansion
-                      (lambda-entry-fun (ref-leaf use)))))
-                (aver (typep original-lambda '(cons (eql lambda))))
-                (let ((original-lambda-list (second original-lambda)))
-                  ;; KISS - the closure that you're passing can have 0 or more
-                  ;; mandatory args and nothing else.
-                  (unless (intersection original-lambda-list lambda-list-keywords)
-                    (push `(,tempname ,original-lambda-list
-                             (%funcall ,(nth arg-spec received-args)
-                                       ,@original-lambda-list))
-                          dx-flets)
-                    (setf (nth arg-spec passed-args) `#',tempname)))))))))
-    (when dx-flets
-      (let ((new
-             `(lambda ,received-args
-                (dx-flet ,(nreverse dx-flets)
-                  (,@(if (symbolp fun-name) `(,fun-name) `(funcall #',fun-name))
-                   ,@passed-args)))))
-        (when *debug-auto-dx*
-          (format t "->~%~S~%" new))
-        new))))
+          (dolist (arg-spec dxable-args)
+            (when (symbolp arg-spec)
+              ;; If there are keywords, we had better have a FUN-TYPE
+              (let ((fun-type (lvar-type (combination-fun node))))
+                ;; Can't do anything unless we can ascertain where
+                ;; the keyword arguments start.
+                (when (fun-type-p fun-type)
+                  (let* ((keys-index
+                           (+ (length (fun-type-required fun-type))
+                              (length (fun-type-optional fun-type))))
+                         (keywords-supplied
+                           (nthcdr keys-index (combination-args node))))
+                    ;; Everything in a keyword position needs to be
+                    ;; constant.
+                    (loop
+                      (unless (cdr keywords-supplied) (return))
+                      (let ((keyword (car keywords-supplied)))
+                        (unless (constant-lvar-p keyword)
+                          (return))
+                        (when (eq (lvar-value keyword) arg-spec)
+                          ;; Map it to a positional arg
+                          (setq arg-spec (1+ keys-index))
+                          (return))
+                        (setq keywords-supplied (cddr keywords-supplied))
+                        (incf keys-index 2)))))))
+            (when (integerp arg-spec)
+              (let* ((arg (or (nth arg-spec (combination-args node))
+                              (return-from dxify-downward-funargs)))
+                     (use (principal-lvar-use arg)))
+                (when (and (not (lvar-dynamic-extent arg))
+                           ;; We check that the use is a lambda so
+                           ;; that we don't end up getting notes about
+                           ;; not being able to allocate later.
+                           (ref-p use)
+                           (lambda-p (ref-leaf use))
+                           (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
+                  (unless entry
+                    (multiple-value-setq (entry cleanup) (insert-dynamic-extent-cleanup node)))
+                  (let ((dx-info (make-dx-info :kind 'dynamic-extent :value arg
+                                               :cleanup cleanup)))
+                    (setf (lvar-dynamic-extent arg) dx-info)
+                    (push dx-info (cleanup-nlx-info cleanup))))))))))
 
 ;;; This does not work. The intent was to prepend this transform to the list
 ;;; of (FUN-INFO-TRANSFORMS INFO) when applicable, in the known fun case.
@@ -1279,6 +1252,7 @@
                     ;; that has FUNCTION-DESIGNATOR in its arg signature
                     ;; (pretty much any CL: function). This is just sad.
                     ;; Are type checks getting in the way?
+                    ;; FIXME: reinvestigate this. It might work now.
                     (or (try-equality-constraint node)
                         (dolist (x (fun-info-transforms info))
                           (when (eq show :all)

@@ -59,6 +59,27 @@
 
   (values))
 
+(defun insert-dynamic-extent-cleanup (call)
+  (let* ((entry (with-ir1-environment-from-node call
+                  (make-entry)))
+         (cleanup (make-cleanup :kind :dynamic-extent
+                                :mess-up entry)))
+    (setf (entry-cleanup entry) cleanup)
+    (insert-node-before call entry)
+    (setf (node-lexenv call)
+          (make-lexenv :default (node-lexenv call)
+                       :cleanup cleanup))
+    (setf (ctran-next (node-prev call)) nil)
+    (let ((ctran (make-ctran)))
+      (with-ir1-environment-from-node call
+        (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
+        (link-node-to-previous-ctran call ctran)))
+    ;; Make CALL end its block, so that we have a place to
+    ;; insert cleanup code.
+    (node-ends-block call)
+    (push entry (lambda-entries (node-home-lambda entry)))
+    (values entry cleanup)))
+
 ;;; Given a local call CALL to FUN, find the associated argument LVARs
 ;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
 ;;; mark them as dynamic extent, setting up the cleanup corresponding
@@ -80,24 +101,7 @@
           do (let ((dx-kind (leaf-dynamic-extent var)))
                (when (and arg dx-kind (not (lvar-dynamic-extent arg)))
                  (unless entry
-                   (setq entry (with-ir1-environment-from-node call
-                                 (make-entry)))
-                   (setq cleanup (make-cleanup :kind :dynamic-extent
-                                               :mess-up entry))
-                   (setf (entry-cleanup entry) cleanup)
-                   (insert-node-before call entry)
-                   (setf (node-lexenv call)
-                         (make-lexenv :default (node-lexenv call)
-                                      :cleanup cleanup))
-                   (setf (ctran-next (node-prev call)) nil)
-                   (let ((ctran (make-ctran)))
-                     (with-ir1-environment-from-node call
-                       (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
-                       (link-node-to-previous-ctran call ctran)))
-                   ;; Make CALL end its block, so that we have a place to
-                   ;; insert cleanup code.
-                   (node-ends-block call)
-                   (push entry (lambda-entries (node-home-lambda entry))))
+                   (multiple-value-setq (entry cleanup) (insert-dynamic-extent-cleanup call)))
                  (let ((dx-info (make-dx-info :kind dx-kind :value arg
                                               :cleanup cleanup)))
                    (setf (lvar-dynamic-extent arg) dx-info)

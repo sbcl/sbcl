@@ -600,11 +600,9 @@
 ;;; so that new, extra IR1 conversion related to NODE can be done
 ;;; after the original conversion pass has finished.
 (defmacro with-ir1-environment-from-node (node &rest forms)
-  `(flet ((closure-needing-ir1-environment-from-node ()
-            ,@forms))
-     (%with-ir1-environment-from-node
-      ,node
-      #'closure-needing-ir1-environment-from-node)))
+  `(%with-ir1-environment-from-node
+    ,node
+    (lambda () ,@forms)))
 
 ;;; *SOURCE-PATHS* is a hashtable from source code forms to the path
 ;;; taken through the source to reach the form. This provides a way to
