@@ -379,7 +379,7 @@
 ;;; (dx-let ((x (let ((m (make-array)))
 ;;;               (fill m)
 ;;;               m))))
-(defun propagate-ref-dx (new-ref old-lvar)
+(defun propagate-ref-dx (new-ref old-lvar var)
   (let ((dx-info (lvar-dynamic-extent old-lvar))
         (leaf (ref-leaf new-ref)))
     (when dx-info
@@ -392,9 +392,14 @@
                                               (node-lexenv (cleanup-mess-up cleanup))))
              (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
           (clambda
-           (let ((fun (functional-entry-fun leaf)))
-             (setf (enclose-cleanup (functional-enclose fun)) cleanup)
-             (setf (leaf-dynamic-extent fun) (dx-info-kind dx-info))))))
+           (when (and (null (rest (leaf-refs leaf)))
+                      (lexenv-contains-lambda leaf
+                                              (node-lexenv (cleanup-mess-up cleanup))))
+             (let ((fun (functional-entry-fun leaf)))
+               (setf (cleanup-mess-up cleanup) (functional-enclose fun))
+               (setf (enclose-cleanup (functional-enclose fun)) cleanup)
+               (setf (leaf-dynamic-extent fun) (leaf-dynamic-extent var))
+               (setf (lvar-dynamic-extent old-lvar) nil))))))
       t)))
 
 (defun node-dominates-p (node1 node2)
@@ -826,20 +831,29 @@
      (and (not (cast-type-check use))
           (lvar-good-for-dx-p (cast-value use) cleanup dx)))
     (ref
-     (let ((var (ref-leaf use)))
-       ;; LET lambda var with no SETS.
-       (when (and (lambda-var-p var)
-                  (eq (functional-kind (lambda-var-home var)) :let)
-                  (not (lambda-var-sets var))
-                  (lexenv-contains-lambda (lambda-var-home var)
-                                          (node-lexenv (cleanup-mess-up cleanup)))
-                  ;; Check the other refs are GOOD-FOR-DX-P.
-                  (dolist (ref (lambda-var-refs var) t)
-                    (unless (eq use ref)
-                      (when (not (ref-good-for-dx-p ref))
-                        (return nil)))))
-         (lvar-good-for-dx-p
-          (let-var-initial-value var) cleanup dx))))))
+     (let ((leaf (ref-leaf use)))
+       (typecase leaf
+         (lambda-var
+          ;; LET lambda var with no SETS.
+          (when (and (eq (functional-kind (lambda-var-home leaf)) :let)
+                     (not (lambda-var-sets leaf))
+                     (lexenv-contains-lambda (lambda-var-home leaf)
+                                             (node-lexenv (cleanup-mess-up cleanup)))
+                     ;; Check the other refs are good.
+                     (dolist (ref (leaf-refs leaf) t)
+                       (unless (eq use ref)
+                         (when (not (ref-good-for-dx-p ref))
+                           (return nil)))))
+            (lvar-good-for-dx-p
+             (let-var-initial-value leaf) cleanup dx)))
+         (clambda
+          (aver (eq (functional-kind leaf) :external))
+          (when (and (null (rest (leaf-refs leaf)))
+                     (environment-closure (get-lambda-environment leaf))
+                     (lexenv-contains-lambda leaf
+                                             (node-lexenv (cleanup-mess-up cleanup))))
+            (aver (eq use (first (leaf-refs leaf))))
+            t)))))))
 
 (defun lvar-good-for-dx-p (lvar cleanup dx)
   (aver (lvar-uses lvar))

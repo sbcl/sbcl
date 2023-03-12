@@ -324,30 +324,6 @@
   (dolist (lambda (component-lambdas component))
     ;; Mark closures as dynamic-extent allocatable by making the
     ;; ENCLOSE node for the closure use an LVAR.
-    (let ((fun (if (eq (lambda-kind lambda) :optional)
-                   (lambda-optional-dispatch lambda)
-                   lambda)))
-      (when (leaf-dynamic-extent fun)
-        (let ((xep (functional-entry-fun fun)))
-          ;; We need to have a closure environment to dynamic-extent
-          ;; allocate.
-          (when (and xep (environment-closure (get-lambda-environment xep)))
-            (let ((enclose (functional-enclose fun)))
-              (when (and enclose (not (node-lvar enclose)))
-                (let ((lvar (make-lvar)))
-                  (use-lvar enclose lvar)
-                  (let* ((cleanup (enclose-cleanup enclose))
-                         (dx-info (make-dx-info :kind 'enclose :value lvar
-                                                :subparts (list lvar)
-                                                :cleanup cleanup)))
-                    (setf (lvar-dynamic-extent lvar) dx-info)
-                    (setf (cleanup-nlx-info cleanup) (list dx-info)))
-                  ;; The node component of ENCLOSE may be a different
-                  ;; component for top level closure references. We
-                  ;; always compile non-top-level components before
-                  ;; top-level components, so this takes effect at the
-                  ;; right time.
-                  (push lvar (component-dx-lvars (node-component enclose))))))))))
     (dolist (entry (lambda-entries lambda))
       (let* ((cleanup (entry-cleanup entry))
              (dx-infos (cleanup-nlx-info cleanup)))
@@ -374,7 +350,14 @@
                                              (lvar-good-for-dx-p arg cleanup dx))
                                     (mark-dx arg)))))
                              (ref
-                              (mark-dx (let-var-initial-value (ref-leaf use))))))))
+                              (let ((leaf (ref-leaf use)))
+                                (typecase leaf
+                                  (lambda-var
+                                   (mark-dx (let-var-initial-value leaf)))
+                                  (clambda
+                                   (let ((fun (functional-entry-fun leaf)))
+                                     (setf (enclose-cleanup (functional-enclose fun)) cleanup)
+                                     (setf (leaf-dynamic-extent fun) dx))))))))))
                 (let ((lvar (dx-info-value dx-info)))
                   ;; Check that the value hasn't been flushed somehow.
                   (when (lvar-uses lvar)
@@ -383,6 +366,38 @@
                           (t
                            (note-no-stack-allocation lvar)
                            (setf (lvar-dynamic-extent lvar) nil))))))))))))
+  (dolist (lambda (component-lambdas component))
+    (let ((fun (if (eq (lambda-kind lambda) :optional)
+                   (lambda-optional-dispatch lambda)
+                   lambda)))
+      (when (leaf-dynamic-extent fun)
+        (let ((xep (functional-entry-fun fun)))
+          ;; We need to have a closure environment to dynamic-extent
+          ;; allocate.
+          (when (and xep (environment-closure (get-lambda-environment xep)))
+            (let ((enclose (functional-enclose fun)))
+              (when (and enclose (not (node-lvar enclose)))
+                (let ((lvar (make-lvar)))
+                  (use-lvar enclose lvar)
+                  (let ((cleanup (enclose-cleanup enclose)))
+                    (if (eq enclose (cleanup-mess-up cleanup))
+                        (let ((dx-info (make-dx-info :kind 'enclose :value lvar
+                                                     :subparts (list lvar)
+                                                     :cleanup cleanup)))
+                          (setf (lvar-dynamic-extent lvar) dx-info)
+                          (setf (cleanup-nlx-info cleanup) (list dx-info)))
+                        ;; This enclose was marked DX by back
+                        ;; propagation.
+                        (let* ((ref-lvar (node-lvar (first (leaf-refs xep))))
+                               (dx-info (lvar-dynamic-extent ref-lvar)))
+                          (setf (lvar-dynamic-extent lvar) dx-info)
+                          (push lvar (dx-info-subparts dx-info)))))
+                  ;; The node component of ENCLOSE may be a different
+                  ;; component for top level closure references. We
+                  ;; always compile non-top-level components before
+                  ;; top-level components, so this takes effect at the
+                  ;; right time.
+                  (push lvar (component-dx-lvars (node-component enclose)))))))))))
   (values))
 
 ;;;; cleanup emission

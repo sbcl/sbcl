@@ -1265,7 +1265,7 @@
                          (leaf-type var))
               (let ((use-component (node-component use)))
                 (propagate-lvar-annotations-to-refs arg var)
-                (propagate-ref-dx use arg)
+                (propagate-ref-dx use arg var)
                 (update-lvar-dependencies leaf arg)
                 (substitute-leaf-if
                  (lambda (ref)

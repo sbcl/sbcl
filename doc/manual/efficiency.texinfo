@@ -157,9 +157,12 @@ only in zero @code{safety} policies.
 @cindex @code{safety} optimization quality
 @cindex optimization quality, @code{safety}
 closures defined with @code{flet} or @code{labels}, with a bound
-@code{dynamic-extent} declaration. Blocks and tags are also allocated
-on the heap, unless all non-local control transfers to them are
-compiled with zero @code{safety}.
+@code{dynamic-extent} declaration.
+
+@item
+anonymous closures defined with @code{lambda} bound to a variable with
+@code{let}, where the variable has a bound @code{dynamic-extent}
+declaration.
 
 @item
 user-defined structures when the structure constructor defined using
