@@ -27,7 +27,25 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_OPENBSD) || defined(LISP_FEATURE_DRAGONFLY)
+#ifdef LISP_FEATURE_NETBSD
+#define _REG_rax _REG_RAX
+#define _REG_rcx _REG_RCX
+#define _REG_rdx _REG_RDX
+#define _REG_rbx _REG_RBX
+#define _REG_rsp _REG_RSP
+#define _REG_rbp _REG_RBP
+#define _REG_rsi _REG_RSI
+#define _REG_rdi _REG_RDI
+#define _REG_r8  _REG_R8
+#define _REG_r9  _REG_R9
+#define _REG_r10 _REG_R10
+#define _REG_r11 _REG_R11
+#define _REG_r12 _REG_R12
+#define _REG_r13 _REG_R13
+#define _REG_r14 _REG_R14
+#define _REG_r15 _REG_R15
+#endif
+
 void visit_context_registers(void (*proc)(os_context_register_t,int), os_context_t *context)
 {
     proc(OS_CONTEXT_PC(context), 1);
@@ -93,70 +111,6 @@ os_context_fp_addr(os_context_t *context)
 {
     return CONTEXT_ADDR_FROM_STEM(rbp);
 }
-
-#elif defined(LISP_FEATURE_NETBSD)
-void visit_context_registers(void (*proc)(os_context_register_t,int), os_context_t *context)
-
-{
-    proc(OS_CONTEXT_PC(context), 1);
-    proc(CONTEXT_SLOT(context, RAX), 1); proc(CONTEXT_SLOT(context, R8),  1);
-    proc(CONTEXT_SLOT(context, RCX), 1); proc(CONTEXT_SLOT(context, R9),  1);
-    proc(CONTEXT_SLOT(context, RDX), 1); proc(CONTEXT_SLOT(context, R10), 1);
-    proc(CONTEXT_SLOT(context, RBX), 1); proc(CONTEXT_SLOT(context, R11), 1);
-    /* ignore RSP */                     proc(CONTEXT_SLOT(context, R12), 1);
-    /* ignore RBP */                     proc(CONTEXT_SLOT(context, R13), 1);
-    proc(CONTEXT_SLOT(context, RSI), 1); proc(CONTEXT_SLOT(context, R14), 1);
-    proc(CONTEXT_SLOT(context, RDI), 1); proc(CONTEXT_SLOT(context, R15), 1);
-}
-
-os_context_register_t *
-os_context_register_addr(os_context_t *context, int offset)
-{
-    switch(offset) {
-    case reg_RAX:
-        return CONTEXT_ADDR_FROM_STEM(RAX);
-    case reg_RCX:
-        return CONTEXT_ADDR_FROM_STEM(RCX);
-    case reg_RDX:
-        return CONTEXT_ADDR_FROM_STEM(RDX);
-    case reg_RBX:
-        return CONTEXT_ADDR_FROM_STEM(RBX);
-    case reg_RSP:
-        return CONTEXT_ADDR_FROM_STEM(RSP);
-    case reg_RBP:
-        return CONTEXT_ADDR_FROM_STEM(RBP);
-    case reg_RSI:
-        return CONTEXT_ADDR_FROM_STEM(RSI);
-    case reg_RDI:
-        return CONTEXT_ADDR_FROM_STEM(RDI);
-    case reg_R8:
-        return CONTEXT_ADDR_FROM_STEM(R8);
-    case reg_R9:
-        return CONTEXT_ADDR_FROM_STEM(R9);
-    case reg_R10:
-        return CONTEXT_ADDR_FROM_STEM(R10);
-    case reg_R11:
-        return CONTEXT_ADDR_FROM_STEM(R11);
-    case reg_R12:
-        return CONTEXT_ADDR_FROM_STEM(R12);
-    case reg_R13:
-        return CONTEXT_ADDR_FROM_STEM(R13);
-    case reg_R14:
-        return CONTEXT_ADDR_FROM_STEM(R14);
-    case reg_R15:
-        return CONTEXT_ADDR_FROM_STEM(R15);
-    default:
-        return 0;
-    }
-}
-
-os_context_register_t *
-os_context_sp_addr(os_context_t *context)
-{
-    return CONTEXT_ADDR_FROM_STEM(RSP);
-}
-
-#endif
 
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
