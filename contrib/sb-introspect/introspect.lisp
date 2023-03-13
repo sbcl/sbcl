@@ -884,7 +884,7 @@ Experimental: interface subject to change."
                         (not (xset-member-p part seen)))
                  (add-to-xset part seen)
                  (funcall fun part))))
-      (declare (dynamic-extent call))
+      (declare (truly-dynamic-extent #'call))
       (when ext
         (multiple-value-bind (value foundp)
             (let ((table sb-pcl::*eql-specializer-table*))
