@@ -406,11 +406,11 @@
     (assert (not calls))))
 
 (with-test (:name :overflow-arith
-            :skipped-on (not :arm64))
+            :skipped-on (not (or :arm64 :x86-64)))
   (let* ((types '(sb-vm:word sb-vm:signed-word))
          (the-types `(fixnum (unsigned-byte 16) (signed-byte 16) ,@types)))
     (loop
-      for op in '(+ * -)
+      for op in '(+ #-x86-64 * #-x86-64 -)
       do
       (loop
         for a-type in types

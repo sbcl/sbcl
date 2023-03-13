@@ -503,6 +503,11 @@
                                        (dpb 1 (byte 1 sb-vm:n-word-bits) x))))
                              type nil)))
 
+  (deferr add-overflow2-error (x y)
+    (let ((type (or (sb-di:error-context)
+                    'fixnum)))
+      (object-not-type-error (+ x y) type nil)))
+
   (deferr sub-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
