@@ -919,10 +919,8 @@
        (values nil 'destructuring-bind pattern)))))
 
 ;;; Helpers for the variations on CHECK-DS-mumble.
-(defun ds-bind-error (input min max pattern)
+(define-error-wrapper ds-bind-error (input min max pattern)
   (multiple-value-bind (name kind lambda-list) (get-ds-bind-context pattern)
-    #-sb-xc-host
-    (declare (optimize allow-non-returning-tail-call))
     (case kind
      (:special-form
       ;; IR1 translators should call COMPILER-ERROR instead of
@@ -980,8 +978,6 @@
                        (setq seen-other t bad-key key)))))
              (setq tail (cdr next))))))
     (multiple-value-bind (kind name) (get-ds-bind-context pattern)
-      #-sb-xc-host
-      (declare (optimize allow-non-returning-tail-call))
       ;; KLUDGE: Compiling (COERCE x 'list) transforms to COERCE-TO-LIST,
       ;; but COERCE-TO-LIST is an inline function not yet defined, and
       ;; its subsequent definition would signal an inlining failure warning.

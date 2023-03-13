@@ -881,8 +881,7 @@ of specialized arrays is supported."
        (consp (%array-displaced-p array))))
 
 (declaim (ftype (function (array) nil) invalid-array-error))
-(defun invalid-array-error (array)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper invalid-array-error (array)
   (aver (array-header-p array))
   ;; Array invalidation stashes the original dimensions here...
   (let ((dims (%array-displaced-p array))
@@ -896,8 +895,7 @@ of specialized arrays is supported."
 
 (declaim (ftype (function (array t integer &optional t) nil)
                 invalid-array-index-error))
-(defun invalid-array-index-error (array index bound &optional axis)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper invalid-array-index-error (array index bound &optional axis)
   (if (invalid-array-p array)
       (invalid-array-error array)
       (error 'invalid-array-index-error
@@ -1114,9 +1112,8 @@ of specialized arrays is supported."
   "Return T if the given ARRAY has a fill pointer, or NIL otherwise."
   (array-has-fill-pointer-p array))
 
-(defun fill-pointer-error (vector)
-  (declare (optimize allow-non-returning-tail-call)
-           (optimize (sb-c::verify-arg-count 0)))
+(define-error-wrapper fill-pointer-error (vector)
+  (declare (optimize (sb-c::verify-arg-count 0)))
   (error 'simple-type-error
          :datum vector
          :expected-type '(and vector (satisfies array-has-fill-pointer-p))

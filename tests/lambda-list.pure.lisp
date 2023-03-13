@@ -444,18 +444,6 @@
     (lose '(1 2 3))
     (lose '(1 (2) 3))))
 
-(with-test (:name :arg-count-error-tail-calls-error)
- (assert
-  (null
-   (block found
-     (handler-bind ((error
-                     (lambda (c)
-                       (declare (ignore c))
-                       (return-from found
-                         (assoc 'sb-c::ds-bind-error
-                                (sb-debug::list-backtrace))))))
-       (sb-c::ds-bind-error '(foo) 2 3 '((:macro baz . deftype))))))))
-
 (with-test (:name :destructuring-optional/key-warn-once-only)
   (let ((count 0))
     (handler-bind ((warning (lambda (c) (incf count) (muffle-warning c))))

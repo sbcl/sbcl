@@ -13,6 +13,15 @@
 
 (in-package "SB-IMPL")
 
+;;; Like DEFUN, but hides itself in the backtrace. This is meant for
+;;; trivial functions which just do some argument parsing and call
+;;; ERROR for real. Hence, having them and their locals in the
+;;; backtrace would add no useful information pertaining to the error.
+(defmacro define-error-wrapper (name lambda-list &body body)
+  `(defun ,name (,@lambda-list
+                 &aux #-sb-xc-host (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* ',name)))
+     ,@body))
+
 ;;; FIXME: a lot of places in the code that should use ARRAY-RANGE
 ;;; instead use INDEX and vice-versa, but the thing is, we have
 ;;; a ton of fenceposts errors all over the place regardless.
@@ -786,8 +795,7 @@ NOTE: This interface is experimental and subject to change."
 (deftype function-name () '(satisfies legal-fun-name-p))
 
 ;;; Signal an error unless NAME is a legal function name.
-(defun legal-fun-name-or-type-error (name)
-  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper legal-fun-name-or-type-error (name)
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
            :datum name
@@ -1157,8 +1165,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; Without a proclaimed type, the call is "untrusted" and so the compiler
 ;;; would generate a post-call check that the function did not return.
 (declaim (ftype (function (t t t t t) nil) deprecation-error))
-(defun deprecation-error (software version namespace name replacements)
-  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper deprecation-error (software version namespace name replacements)
   (error 'deprecation-error
          :namespace namespace
          :name name

@@ -105,7 +105,6 @@
   "Coerce the Object to an object of type Output-Type-Spec."
   (declare (explicit-check))
   (flet ((coerce-error ()
-           (declare (optimize allow-non-returning-tail-call))
            (error 'simple-type-error
                   :format-control "~S can't be converted to type ~
                                     ~/sb-impl:print-type-specifier/."

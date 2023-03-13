@@ -632,8 +632,7 @@
            (ash requested sb-vm:n-fixnum-tag-bits)))
      (error *heap-exhausted-error-condition*))))
 
-(defun undefined-alien-variable-error ()
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper undefined-alien-variable-error ()
   (error 'undefined-alien-variable-error))
 
 #-win32

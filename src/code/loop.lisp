@@ -562,8 +562,7 @@ code to be loaded.
   (do ((l (source-context loop) (cdr l)) (new nil (cons (car l) new)))
       ((eq l (cdr (source-code loop))) (nreverse new))))
 
-(defun loop-error (format-string &rest format-args)
-  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper loop-error (format-string &rest format-args)
   (%program-error "~?~%current LOOP context:~{ ~S~}."
                   format-string format-args (loop-context)))
 

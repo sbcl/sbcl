@@ -2125,7 +2125,6 @@ PACKAGE."
 ;;; PACKAGE-DESIGNATOR is actually a deleted package, and in that case
 ;;; you generally do want to signal an error instead of proceeding.)
 (defun %find-package-or-lose (package-designator)
-  (declare (optimize allow-non-returning-tail-call))
   (let ((package-designator package-designator))
     (prog () retry
        (let ((result (find-package package-designator)))
@@ -2141,7 +2140,6 @@ PACKAGE."
 ;;; consequences of most operations on deleted packages are
 ;;; unspecified. We try to signal errors in such cases.
 (defun find-undeleted-package-or-lose (package-designator)
-  (declare (optimize allow-non-returning-tail-call))
   (let ((package-designator package-designator))
     (prog () retry
        (let ((maybe-result (%find-package-or-lose package-designator)))

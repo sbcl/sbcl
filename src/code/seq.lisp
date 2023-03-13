@@ -212,16 +212,14 @@
      (make-vector-like ,sequence ,length t)
      (sb-sequence:make-sequence-like ,sequence ,length)))
 
-(defun bad-sequence-type-error (type-spec)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper bad-sequence-type-error (type-spec)
   (error 'simple-type-error
          :datum type-spec
          :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
          :format-control "~S is a bad type specifier for sequences."
          :format-arguments (list type-spec)))
 
-(defun sequence-type-length-mismatch-error (type length)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper sequence-type-length-mismatch-error (type length)
   (error 'simple-type-error
          :datum length
          :expected-type (cond ((array-type-p type)
@@ -237,7 +235,7 @@
          :format-control "The length requested (~S) does not match the type restriction in ~S."
          :format-arguments (list length (type-specifier type))))
 
-(defun sequence-type-too-hairy (type-spec)
+(define-error-wrapper sequence-type-too-hairy (type-spec)
   ;; FIXME: Should this be a BUG? I'm inclined to think not; there are
   ;; words that give some but not total support to this position in
   ;; ANSI.  Essentially, we are justified in throwing this on
@@ -246,7 +244,6 @@
 
   ;; On the other hand, I'm not sure it deserves to be a type-error,
   ;; either. -- bem, 2005-08-10
-  (declare (optimize allow-non-returning-tail-call))
   (%program-error "~S is too hairy for sequence functions." type-spec))
 
 (defmacro when-extended-sequence-type
@@ -303,8 +300,7 @@
                                                      declared-length))))))
 
 (declaim (ftype (function (sequence index) nil) signal-index-too-large-error))
-(defun signal-index-too-large-error (sequence index)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper signal-index-too-large-error (sequence index)
   (let* ((length (length sequence))
          (max-index (and (plusp length)
                          (1- length))))
@@ -317,8 +313,7 @@
                               '(integer 0 (0))))))
 
 (declaim (ftype (function (t t t) nil) sequence-bounding-indices-bad-error))
-(defun sequence-bounding-indices-bad-error (sequence start end)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper sequence-bounding-indices-bad-error (sequence start end)
   (let ((size (length sequence)))
     (error 'bounding-indices-bad-error
            :datum (cons start end)
@@ -327,8 +322,7 @@
            :object sequence)))
 
 (declaim (ftype (function (t t t) nil) array-bounding-indices-bad-error))
-(defun array-bounding-indices-bad-error (array start end)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper array-bounding-indices-bad-error (array start end)
   (let ((size (array-total-size array)))
     (error 'bounding-indices-bad-error
            :datum (cons start end)
@@ -337,8 +331,7 @@
            :object array)))
 
 (declaim (ftype (function (t) nil) circular-list-error))
-(defun circular-list-error (list)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper circular-list-error (list)
   (error 'simple-type-error
          :format-control "List is circular:~%  ~S"
          :format-arguments (list list)

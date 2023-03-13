@@ -40,16 +40,16 @@
 
 ;;;; reader errors
 
-(defun reader-eof-error (stream context)
+(define-error-wrapper reader-eof-error (stream context)
   ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
-  (declare (explicit-check) (optimize allow-non-returning-tail-call))
+  (declare (explicit-check))
   (error 'reader-eof-error
          :stream stream
          :context context))
 
-(defun simple-reader-error (stream control &rest args)
+(define-error-wrapper simple-reader-error (stream control &rest args)
   ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
-  (declare (explicit-check) (optimize allow-non-returning-tail-call))
+  (declare (explicit-check))
   (error 'simple-reader-error
          :stream stream
          :format-control control
@@ -1794,8 +1794,7 @@ extended <package-name>::<form-in-package> syntax."
 
 ;;;; General reader for dispatch macros
 
-(defun dispatch-char-error (stream sub-char ignore)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper dispatch-char-error (stream sub-char ignore)
   (declare (ignore ignore))
   (if *read-suppress*
       ;; This seems dubious. For comparison's sake, other implementations
@@ -1873,7 +1872,6 @@ extended <package-name>::<form-in-package> syntax."
   whitespace characters and then tries to parse an integer. The
   radix parameter must be between 2 and 36."
   (flet ((parse-error (format-control)
-           (declare (optimize allow-non-returning-tail-call))
            (error 'simple-parse-error
                   :format-control format-control
                   :format-arguments (list string))))

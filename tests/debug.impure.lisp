@@ -1250,6 +1250,21 @@
                 (return (caar (sb-debug:list-backtrace :from top)))))))
       (funcall fn))))
 
+(defun ds-bind-when (x)
+  (when x
+    (sb-c::ds-bind-error '(foo) 2 3 '((:macro baz . deftype))))
+  (print "something to prevent tco"))
+
+(with-test (:name (:stack-top-hint :arg-count-error))
+  (assert (eq 'ds-bind-when
+              (block nil
+                (handler-bind ((error
+                                 (lambda (c)
+                                   (declare (ignore c))
+                                   (let ((top (sb-debug::resolve-stack-top-hint)))
+                                     (return (caar (sb-debug:list-backtrace :from top)))))))
+                  (ds-bind-when t))))))
+
 ;; If an error occurs within a signal handler, we want to see the handling
 ;; frames in the backtrace.
 (with-test (:name (:stack-top-hint :signal))

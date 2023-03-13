@@ -201,16 +201,6 @@
                    (eq (block-start succ)
                        (node-prev dest))))))))
 
-;;; Returns the defined (usually untrusted) type of the combination,
-;;; or NIL if we couldn't figure it out.
-(defun combination-defined-type (combination)
-  (let ((use (principal-lvar-use (basic-combination-fun combination))))
-    (or (when (ref-p use)
-          (let ((type (leaf-defined-type (ref-leaf use))))
-            (when (fun-type-p type)
-              (fun-type-returns type))))
-        *wild-type*)))
-
 ;;; Return true if LVAR destination is executed after node with only
 ;;; uninteresting nodes intervening.
 ;;;

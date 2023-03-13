@@ -410,7 +410,6 @@ there are no character bits or fonts.)"
   "Coerce OBJECT into a CHARACTER if possible. Legal inputs are characters,
 strings and symbols of length 1."
   (flet ((do-error (control args)
-           (declare (optimize allow-non-returning-tail-call))
            (error 'simple-type-error
                   :datum object
                   ;;?? how to express "symbol with name of length 1"?

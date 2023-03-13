@@ -76,8 +76,7 @@
                   (eq (first (sb-impl::ef-names external-format)) :latin-1))))))
 
 (declaim (ftype (sfunction (t) nil) null-error))
-(defun null-error (type)
-  #-sb-xc-host(declare (optimize sb-kernel:allow-non-returning-tail-call))
+(sb-kernel:define-error-wrapper null-error (type)
   (aver (alien-c-string-type-not-null type))
   (error 'type-error
          :expected-type `(alien ,(unparse-alien-type type))

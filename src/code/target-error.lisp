@@ -150,8 +150,7 @@ with that condition (or with no condition) will be returned."
 
 ;;; helper for the various functions which are ANSI-spec'ed to do
 ;;; something with a restart or signal CONTROL-ERROR if there is none
-(defun find-restart-or-control-error (identifier &optional condition (call-test-p t))
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper find-restart-or-control-error (identifier &optional condition (call-test-p t))
   (or (%find-restart identifier condition call-test-p)
       (error 'simple-control-error
              :format-control "No restart ~S is active~@[ for ~S~]."
@@ -2467,16 +2466,14 @@ you did not expect to see this message, please report it."
         :interactive read-evaluated-form
         value))))
 
-(defun etypecase-failure (value keys)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper etypecase-failure (value keys)
   (error 'case-failure
          :name 'etypecase
          :datum value
          :expected-type (if (symbolp keys) keys `(or ,@keys))
          :possibilities keys))
 
-(defun ecase-failure (value keys)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper ecase-failure (value keys)
   ;; inline definition not seen yet. Can't move this file later
   ;; in build because **<foo>-clusters** are needed early.
   (declare (notinline coerce))

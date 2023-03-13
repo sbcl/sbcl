@@ -34,8 +34,7 @@
 
 (defvar *requiring* nil)
 
-(defun require-error (control &rest arguments)
-  (declare (optimize allow-non-returning-tail-call))
+(define-error-wrapper require-error (control &rest arguments)
   (error 'extension-failure
          :format-control control
          :format-arguments arguments
