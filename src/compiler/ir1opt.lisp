@@ -1162,12 +1162,6 @@
                     (transform-call node transform (combination-fun-source-name node)))
                    ((:default :maybe)
                     ;; Let transforms have a crack at it.
-                    ;; We should always try with the dxify-args transform,
-                    ;; but ironically it *does* *not* *work* for any function
-                    ;; that has FUNCTION-DESIGNATOR in its arg signature
-                    ;; (pretty much any CL: function). This is just sad.
-                    ;; Are type checks getting in the way?
-                    ;; FIXME: reinvestigate this. It might work now.
                     (or (try-equality-constraint node)
                         (dolist (x (fun-info-transforms info))
                           (when (eq show :all)
