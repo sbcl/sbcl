@@ -655,8 +655,7 @@ case "$sbcl_arch" in
   x86-64)
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
 
-    $GNUMAKE -C tools-for-build avx2
-    if tools-for-build/avx2; then
+    if ! $GNUMAKE -C tools-for-build avx2 2> /dev/null || tools-for-build/avx2 ; then
        SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
     fi
 
