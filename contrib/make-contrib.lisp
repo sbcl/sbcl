@@ -41,6 +41,28 @@
           (unless (= result 0) (error "C execution failed")))))))
 
 (defparameter +genfile+ "generated-constants")
+(defun logicalize (path generated)
+  (make-pathname :host "SYS"
+                 :directory
+                 (append '(:absolute)
+                         (if generated
+                             (list "OBJ" "FROM-SELF" "CONTRIB" *system*)
+                             (list* "CONTRIB"
+                                    (append (last (pathname-directory *default-pathname-defaults*))
+                                            (cdr (pathname-directory path))))))
+                 :name (pathname-name path)
+                 :type (pathname-type path)))
+
+(defun ignorable-warning-p (c)
+  (and (typep c 'simple-warning)
+       (let ((s (simple-condition-format-control c)))
+         (and (stringp s)
+              ;; these two strings are easy to look for
+              (or (member s '("Capstone not loaded." "GMP not loaded.")
+                          :test 'string=)
+                  ;; this has a load warning and a version warning
+                  (search "MPFR" s))))))
+
 (defun perform (defsystem)
   (let* ((specified-sources (getf defsystem :components))
          ;; This path is basically arbitrary. I wanted to avoid creating
@@ -100,28 +122,24 @@
                           (format nil "~A~A.lisp" objdir +genfile+)) ; file to generate
         ;; foreign-glue contains macros needed to compile the generated file
         (let ((*evaluator-mode* :compile)) (load "../sb-grovel/foreign-glue")))
-      (flet ((logicalize (path generated)
-               (make-pathname :host "SYS"
-                              :directory
-                              (append '(:absolute)
-                                      (if generated
-                                          (list "OBJ" "FROM-SELF" "CONTRIB" *system*)
-                                          (list* "CONTRIB"
-                                                 (append (last (pathname-directory *default-pathname-defaults*))
-                                                         (cdr (pathname-directory path))))))
-                              :name (pathname-name path)
-                              :type (pathname-type path))))
-        (with-compilation-unit ()
-          (loop for (generated-p stem) in (flattened-sources)
-                do
+      (let (wcu-warnings)
+        (handler-bind (((and warning (not style-warning))
+                        (lambda (c)
+                          (unless (ignorable-warning-p c)
+                            (push c wcu-warnings)))))
+          (with-compilation-unit ()
+            (loop for (generated-p stem) in (flattened-sources)
+             do
                 (format t "Compile-File ~S~%" stem)
                 (multiple-value-bind (output warnings errors)
                     (compile-file (logicalize stem generated-p)
                                   :output-file (format nil "~A~A.fasl" objdir stem))
-                  (declare (ignore warnings))
-                  (when errors (sb-sys:os-exit 1))
+                  (when (or warnings errors) (sb-sys:os-exit 1))
                   (fasls output)
                   (load output)))))
+        ;; Deferred warnings occur *after* exiting the W-C-U body.
+        ;; See also lp#1078460 - "unknown variable" is not really ever resolved.
+        (when wcu-warnings (sb-sys:os-exit 1)))
       (let ((outputs (mapcar 'namestring (fasls)))
             (joined (format nil "../../obj/sbcl-home/contrib/~A.fasl" *system*)))
         (ensure-directories-exist joined)
