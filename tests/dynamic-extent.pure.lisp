@@ -1811,3 +1811,23 @@
        (print y)
        (funcall (car y))))
    ((3) 3)))
+
+(defun known-function-autodx (x thing list)
+  (subst-if x (lambda (y) (eq y thing)) list))
+
+(with-test (:name :auto-dx-known-functions-too)
+  (assert (equal (known-function-autodx 3 4 (list 1 2 3 4)) '(1 2 3 3)))
+  (assert-no-consing (known-function-autodx 3 4 nil)))
+
+;;; It's difficult to isolate the runtime effect of no consing for the
+;;; closure in this case, so just check we don't get a note about
+;;; stack allocation at compile time.
+(with-test (:name :auto-dx-known-functions-too.transform)
+  (assert (null
+           ;; check no notes
+           (nth-value 4
+                      (checked-compile-and-assert
+                       ()
+                       '(lambda (y list)
+                         (map 'vector (lambda (x) (+ x y)) list))
+                       ((3 '(1 2 3 4)) #(4 5 6 7) :test #'equalp))))))

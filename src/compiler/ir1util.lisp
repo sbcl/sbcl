@@ -383,8 +383,8 @@
              (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
           (clambda
            (when (and (null (rest (leaf-refs leaf)))
-                      (lexenv-contains-lambda leaf
-                                              (node-lexenv (cleanup-mess-up cleanup))))
+                      (eq (node-home-lambda (xep-enclose leaf))
+                          (node-home-lambda (cleanup-mess-up cleanup))))
              (let ((fun (functional-entry-fun leaf)))
                (setf (cleanup-mess-up cleanup) (functional-enclose fun))
                (setf (enclose-cleanup (functional-enclose fun)) cleanup)
@@ -843,8 +843,10 @@
           (aver (eq (functional-kind leaf) :external))
           (when (and (null (rest (leaf-refs leaf)))
                      (environment-closure (get-lambda-environment leaf))
-                     (lexenv-contains-lambda leaf
-                                             (node-lexenv (cleanup-mess-up cleanup))))
+                     ;; To make sure the lambda allocator is in the
+                     ;; same stack frame as the dynamic extent.
+                     (eq (node-home-lambda (xep-enclose leaf))
+                         (node-home-lambda (cleanup-mess-up cleanup))))
             (aver (eq use (first (leaf-refs leaf))))
             t)))))))
 

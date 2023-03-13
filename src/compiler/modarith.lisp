@@ -352,6 +352,7 @@
              (cond
                ((eq signedp (cdr w)) (<= width (car w)))
                ((eq signedp nil) (< width (car w))))))
+      (declare (truly-dynamic-extent #'inexact-match))
       (let ((tgt (find-if #'inexact-match twidths)))
         (when tgt
           (return-from best-modular-version
