@@ -78,8 +78,7 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
                        (:mapped (member t nil))
                        (:input-handle (or null fixnum stream))
                        (:output-handle (or null fixnum stream))
-                       #+win32 (:overlapped t)
-                       &allow-other-keys)
+                       #+win32 (:overlapped t))
     (or stream null)
     ()
   ;; :derive-type #'result-type-open-class

@@ -605,7 +605,7 @@
              if-exists if-does-not-exist
              (external-format :default)
              class mapped input-handle output-handle
-             &allow-other-keys)
+             #+win32 (overlapped t))
   "Return a stream which reads from or writes to Filename.
   Defined keywords:
    :direction - one of :input, :output, :io, or :probe
@@ -622,6 +622,7 @@
    :input-handle - a stream or Unix file descriptor to read from
    :output-handle - a stream or Unix file descriptor to write to"
   (declare (ignore element-type external-format input-handle output-handle
+                   #+win32 overlapped
                    if-exists if-does-not-exist))
   (let ((class (or class 'sb-sys:fd-stream))
         (options (copy-list options))
