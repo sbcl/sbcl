@@ -46,16 +46,10 @@ typedef dev_t aliased_dev_t;
 typedef unsigned long long wst_ino_t;
 typedef long long wst_off_t;
 typedef unsigned long long wst_dev_t;
-#elif defined(LISP_FEATURE_LARGEFILE) || defined(LISP_FEATURE_DARWIN)
+#else
 typedef ino_t wst_ino_t;
 typedef aliased_dev_t wst_dev_t;
 typedef off_t wst_off_t;
-#else
-/* These wrappers shouldn't exist, and since pulling in runtime.h caused
- * problems on Win32, we don't use the u32 typedef. */
-typedef ino_t wst_ino_t;
-typedef unsigned int wst_dev_t; /* since Linux dev_t can be 64 bits */
-typedef unsigned int wst_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 #endif
 
 #ifdef LISP_FEATURE_OS_PROVIDES_BLKSIZE_T
