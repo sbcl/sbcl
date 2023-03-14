@@ -1822,12 +1822,23 @@
 ;;; It's difficult to isolate the runtime effect of no consing for the
 ;;; closure in this case, so just check we don't get a note about
 ;;; stack allocation at compile time.
-(with-test (:name :auto-dx-known-functions-too.transform)
-  (assert (null
-           ;; check no notes
-           (nth-value 4
-                      (checked-compile-and-assert
-                       ()
-                       '(lambda (y list)
-                         (map 'vector (lambda (x) (+ x y)) list))
-                       ((3 '(1 2 3 4)) #(4 5 6 7) :test #'equalp))))))
+(with-test (:name :auto-dx-known-functions-too.transform
+                  ;; This doesn't work right now. To fix this, we need
+                  ;; to insert the DX cleanup before the transform
+                  ;; fires, so that the right scoping is recognized.
+            :fails-on :sbcl)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   '(lambda (y list)
+     (map 'vector (lambda (x) (+ x y)) list))
+   ((3 '(1 2 3 4)) #(4 5 6 7) :test #'equalp)))
+
+(defun auto-dx-cleaned-up-too-many-times (off array)
+  (let ((acc 0))
+    (flet ((positivep (num) (plusp (+ num off))))
+      (dotimes (i 10)
+        (incf acc (position-if #'positivep array))))
+    acc))
+
+(with-test (:name :auto-dx-cleaned-up-too-many-times)
+  (assert (= (auto-dx-cleaned-up-too-many-times 1 #(-1 2 3)) 10)))

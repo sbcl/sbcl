@@ -496,6 +496,7 @@
            (and (listp x) (eq (car x) 'quasiquote) (singleton-p (cdr x))))
          (recurse (x)
            (%quasiquoted-macroexpand-all x env depth)))
+    (declare (truly-dynamic-extent #'recurse))
     (if (atom expr)
         (cond ((simple-vector-p expr) (map 'vector #'recurse expr))
               ((comma-p expr)
