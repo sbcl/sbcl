@@ -522,7 +522,7 @@ case "$sbcl_os" in
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
         case "$sbcl_arch" in
-	    mips | arm | arm64 | x86 | x86-64)
+	    mips | arm | x86 )
 		printf ' :largefile' >> $ltf
 		;;
         esac
@@ -588,9 +588,6 @@ case "$sbcl_os" in
         ;;
     sunos)
         printf ' :unix :sunos :elf' >> $ltf
-        if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :largefile' >> $ltf
-        fi
         link_or_copy Config.$sbcl_arch-sunos Config
         link_or_copy $sbcl_arch-sunos-os.h target-arch-os.h
         link_or_copy sunos-os.h target-os.h
