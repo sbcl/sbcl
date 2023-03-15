@@ -676,7 +676,8 @@
 ;;; results of the calls.
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
-  (let ((lambda (return-lambda node)))
+  (let ((lambda (return-lambda node))
+        single-value-p)
     (when (and
            (singleton-p (tail-set-funs (lambda-tail-set lambda)))
            (dolist (ref (leaf-refs lambda)
@@ -687,41 +688,51 @@
                (unless (and (combination-p combination)
                             (eq (combination-kind combination) :local)
                             (eq (combination-fun combination) lvar)
-                            (not (or (node-lvar combination)
+                            (not (or (and (node-lvar combination)
+                                          (not (setf single-value-p
+                                                     (lvar-single-value-p (node-lvar combination)))))
                                      (node-tail-p combination))))
                  (return)))))
       ;; Delete the uses if the result is not used anywhere
       (let* ((lvar (return-result node))
              (combination (lvar-uses lvar)))
-        (unless (or (and (combination-p combination)
-                         (lvar-fun-is (combination-fun combination) '(values))
-                         (null (combination-args combination)))
-                    (do-uses (node lvar)
-                      (typecase node
-                        (combination
-                         ;; Don't unlink non flushable combinations
-                         ;; because they can be tail called.
-                         (unless (flushable-combination-p node)
-                           (return t))))))
-          (let ((ctran (make-ctran))
-                (new-lvar (make-lvar node))
-                (defined-fun (functional-inline-expanded lambda)))
-            (setf (ctran-next (node-prev node)) nil)
-            (flush-dest lvar)
-            (with-ir1-environment-from-node node
-              (ir1-convert (node-prev node) ctran new-lvar '(values)))
-            (setf (return-result node) new-lvar)
-
-            (link-node-to-previous-ctran node ctran)
-            (dolist (ref (leaf-refs lambda))
-              (let* ((lvar (node-lvar ref))
-                     (combination (lvar-dest lvar)))
-                (setf (node-derived-type combination) *wild-type*)))
-            (setf (return-result-type node) *wild-type*
-                  (tail-set-type (lambda-tail-set lambda)) *wild-type*)
-            (when (defined-fun-p defined-fun)
-              (setf (defined-fun-functional defined-fun) nil))
-            (return-from ir1-optimize-return)))))
+        (flet ((erase-types ()
+                 (dolist (ref (leaf-refs lambda))
+                   (let* ((lvar (node-lvar ref))
+                          (combination (lvar-dest lvar)))
+                     (setf (node-derived-type combination) *wild-type*)))
+                 (setf (return-result-type node) *wild-type*
+                       (tail-set-type (lambda-tail-set lambda)) *wild-type*)
+                 (do-uses (use lvar)
+                   (reoptimize-node use))
+                 (let ((defined-fun (functional-inline-expanded lambda)))
+                   (when (defined-fun-p defined-fun)
+                     (setf (defined-fun-functional defined-fun) nil)))))
+          (cond (single-value-p
+                 (unless (type-single-value-p (lvar-derived-type lvar))
+                   (filter-lvar lvar (lambda (x) `(values ,x)))
+                   (erase-types)
+                   (return-from ir1-optimize-return)))
+                ((not (or (and (combination-p combination)
+                               (lvar-fun-is (combination-fun combination) '(values))
+                               (null (combination-args combination)))
+                          (do-uses (node lvar)
+                            (typecase node
+                              (combination
+                               ;; Don't unlink non flushable combinations
+                               ;; because they can be tail called.
+                               (unless (flushable-combination-p node)
+                                 (return t)))))))
+                 (let ((ctran (make-ctran))
+                       (new-lvar (make-lvar node)))
+                   (setf (ctran-next (node-prev node)) nil)
+                   (flush-dest lvar)
+                   (with-ir1-environment-from-node node
+                     (ir1-convert (node-prev node) ctran new-lvar '(values)))
+                   (setf (return-result node) new-lvar)
+                   (link-node-to-previous-ctran node ctran)
+                   (erase-types)
+                   (return-from ir1-optimize-return)))))))
     (tagbody
      :restart
        (let* ((tails (lambda-tail-set lambda))
