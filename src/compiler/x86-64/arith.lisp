@@ -584,14 +584,14 @@
       (inst jmp :o error))))
 
 (defun wordpair-to-bignum (result flag low high node)
-  (inst push flag)
   (inst push high)
   (inst push low)
+  (inst mov :byte result flag)
   (call-reg-specific-asm-routine node "BIGNUM-TO-" result))
 (defun unsigned-wordpair-to-bignum (result flag low high node)
-  (inst push flag)
   (inst push high)
   (inst push low)
+  (inst mov :byte result flag)
   (call-reg-specific-asm-routine node "+BIGNUM-TO-" result))
 
 (define-vop (*/signed=>integer)

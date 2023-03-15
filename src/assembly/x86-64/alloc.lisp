@@ -50,35 +50,33 @@
           (popw number bignum-digits-offset other-pointer-lowtag)))
      (from-digits (reg)
        ;; stack args:
-       ;; +24   is-two-digit [passed in 1 byte]
        ;; +16   high-digit
        ;;  +8   low-digit
        ;; rsp : return-pc
        `(define-assembly-routine (,(symbolicate "BIGNUM-TO-" reg) (:return-style :none))
             ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
-          (inst cmp :byte (ea 24 rsp-tn) 0)
-          (inst jmp :e one-word-bignum)
+          (inst test :byte result result) ; is-two-digit flag
+          (inst jmp :z one-word-bignum)
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) result nil nil nil)
           (inst movdqu float0-tn (ea 8 rsp-tn))
           (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
-          (inst ret 24) ; pop args
+          (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
           (inst movq float0-tn (ea 8 rsp-tn))
           (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
-          (inst ret 24)))
+          (inst ret 16)))
      ;; "from unsigned" might need to allocate 3 digits, but it receives only high:low
      ;; because the highest digit if needed must be all 0.
      (from-digits-unsigned (reg)
        ;; stack args:
-       ;; +24   is-two-or-three-digit [passed in 1 byte]
        ;; +16   high-digit
        ;;  +8   low-digit
        ;; rsp : return-pc
        `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg) (:return-style :none))
             ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
-          (inst cmp :byte (ea 24 rsp-tn) 0) ; test for 2-or-3-digit
-          (inst jmp :e one-word-bignum)
+          (inst test :byte result result) ; is-two-or-three-digit flag
+          (inst jmp :z one-word-bignum)
           ;; Since 2 digits and 3 digits consume the same number of bytes
           ;; due to padding, they can share the allocation request.
           (alloc-other bignum-widetag (+ bignum-digits-offset 3) result nil nil nil)
@@ -93,12 +91,12 @@
           ;; else, no sign bit, so change it to 2-digit bignum
           (inst mov :byte (ea (- 1 other-pointer-lowtag) result) 2)
           SKIP
-          (inst ret 24) ; pop args
+          (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
           (inst movq float0-tn (ea 8 rsp-tn))
           (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
-          (inst ret 24)))
+          (inst ret 16)))
      ;; The high bit is in the carry flag.
      (two-word-bignum (reg)
        `(define-assembly-routine (,(symbolicate "TWO-WORD-BIGNUM-TO-" reg) (:return-style :none))
