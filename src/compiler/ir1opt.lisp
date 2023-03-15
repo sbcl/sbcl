@@ -708,21 +708,21 @@
                  (let ((defined-fun (functional-inline-expanded lambda)))
                    (when (defined-fun-p defined-fun)
                      (setf (defined-fun-functional defined-fun) nil)))))
-          (cond (single-value-p
+          (cond ((do-uses (node lvar)
+                   (typecase node
+                     (combination
+                      ;; Don't unlink non flushable combinations
+                      ;; because they can be tail called.
+                      (unless (flushable-combination-p node)
+                        (return t))))))
+                (single-value-p
                  (unless (type-single-value-p (lvar-derived-type lvar))
                    (filter-lvar lvar (lambda (x) `(values ,x)))
                    (erase-types)
                    (return-from ir1-optimize-return)))
-                ((not (or (and (combination-p combination)
-                               (lvar-fun-is (combination-fun combination) '(values))
-                               (null (combination-args combination)))
-                          (do-uses (node lvar)
-                            (typecase node
-                              (combination
-                               ;; Don't unlink non flushable combinations
-                               ;; because they can be tail called.
-                               (unless (flushable-combination-p node)
-                                 (return t)))))))
+                ((not (and (combination-p combination)
+                           (lvar-fun-is (combination-fun combination) '(values))
+                           (null (combination-args combination))))
                  (let ((ctran (make-ctran))
                        (new-lvar (make-lvar node)))
                    (setf (ctran-next (node-prev node)) nil)
