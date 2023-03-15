@@ -753,6 +753,29 @@
                (elt (lambda-vars entry) p))))
         (leaf-debug-name leaf))))
 
+;;; Insert code to establish a dynamic extent cleanup around CALL,
+;;; returning the cleanup.
+(defun insert-dynamic-extent-cleanup (call)
+  (let* ((entry (with-ir1-environment-from-node call
+                  (make-entry)))
+         (cleanup (make-cleanup :kind :dynamic-extent
+                                :mess-up entry)))
+    (setf (entry-cleanup entry) cleanup)
+    (insert-node-before call entry)
+    (setf (node-lexenv call)
+          (make-lexenv :default (node-lexenv call)
+                       :cleanup cleanup))
+    (setf (ctran-next (node-prev call)) nil)
+    (let ((ctran (make-ctran)))
+      (with-ir1-environment-from-node call
+        (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
+        (link-node-to-previous-ctran call ctran)))
+    ;; Make CALL end its block, so that we have a place to
+    ;; insert cleanup code.
+    (node-ends-block call)
+    (push entry (lambda-entries (node-home-lambda entry)))
+    cleanup))
+
 (defun note-no-stack-allocation (lvar &key flush)
   (do-uses (use (principal-lvar lvar))
     (dolist (use (ensure-list (if (cast-p use)
@@ -793,8 +816,9 @@
                              (eq (functional-kind (node-home-lambda (functional-enclose leaf)))
                                  :toplevel))
                         ;; Ignore non-closures.
-                        (and (lambda-p leaf)
-                             (not (environment-closure (lambda-environment leaf))))))))
+                        (unless flush
+                          (and (lambda-p leaf)
+                               (not (environment-closure (lambda-environment leaf)))))))))
                ;; It's supposed to be slow, so who cares it can't
                ;; stack allocate something.
                (policy use (= speed 0)))

@@ -59,43 +59,17 @@
 
   (values))
 
-;;; Insert code to establish a dynamic extent cleanup around CALL,
-;;; returning the cleanup.
-(defun insert-dynamic-extent-cleanup (call)
-  (let* ((entry (with-ir1-environment-from-node call
-                  (make-entry)))
-         (cleanup (make-cleanup :kind :dynamic-extent
-                                :mess-up entry)))
-    (setf (entry-cleanup entry) cleanup)
-    (insert-node-before call entry)
-    (setf (node-lexenv call)
-          (make-lexenv :default (node-lexenv call)
-                       :cleanup cleanup))
-    (setf (ctran-next (node-prev call)) nil)
-    (let ((ctran (make-ctran)))
-      (with-ir1-environment-from-node call
-        (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
-        (link-node-to-previous-ctran call ctran)))
-    ;; Make CALL end its block, so that we have a place to
-    ;; insert cleanup code.
-    (node-ends-block call)
-    (push entry (lambda-entries (node-home-lambda entry)))
-    cleanup))
-
-;;; Given a local call CALL to FUN, find the associated argument LVARs
-;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
-;;; mark them as dynamic extent, setting up the cleanup corresponding
-;;; to the dynamic extent as well. We mark them now so that
-;;; optimizations optimizing away LVARs have the chance to propagate
-;;; the dynamic extent information. Environment analysis is
-;;; responsible for actually deciding if the lvars can be
-;;; dynamic-extent allocated, dealing with transitively marking the
+;;; Given a local call CALL to FUN, mark the associated args of CALL
+;;; corresponding to declared dynamic extent LAMBDA-VARs as dynamic
+;;; extent, setting up the corresponding cleanup. We do this now so
+;;; that the cleanup has the right scope. Environment analysis is
+;;; responsible for actually deciding if the arguments can be
+;;; dynamic-extent allocated, and deals with transitively marking the
 ;;; otherwise-inaccessible parts of these values as dynamic extent as
-;;; well. This is because environment analysis happens after all major
-;;; changes to the dataflow in IR1 have been done and it is clear
-;;; whether an LVAR is actually used by a combination which can
-;;; dynamic-extent allocate.
-(defun recognize-potentially-dynamic-extent-lvars (call fun)
+;;; well. We do this because environment analysis happens after all
+;;; major changes to the dataflow in IR1 have been done and it is
+;;; clear whether a combination can actually stack allocate it's value.
+(defun mark-dynamic-extent-args (call fun)
   (declare (type combination call) (type clambda fun))
   (let (cleanup)
     (loop for arg in (basic-combination-args call)
@@ -156,7 +130,7 @@
   (propagate-to-args call fun)
   (setf (basic-combination-kind call) :local)
   (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
-  (recognize-potentially-dynamic-extent-lvars call fun)
+  (mark-dynamic-extent-args call fun)
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
   (values))
