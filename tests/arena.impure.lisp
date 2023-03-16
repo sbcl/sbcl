@@ -396,6 +396,15 @@
   (with-arena (*arena*) (gc))
   (assert (heap-allocated-p sb-kernel::*gc-epoch*)))
 
+(defvar *thing-created-by-hook* nil)
+(push (lambda () (push (cons 1 2) *thing-created-by-hook*))
+      *after-gc-hooks*)
+(test-util:with-test (:name :post-gc-hooks-unuse-arena)
+  (with-arena (*arena*) (gc))
+  (setq *after-gc-hooks* nil)
+  (assert (heap-allocated-p *thing-created-by-hook*))
+  (assert (heap-allocated-p (car *thing-created-by-hook*))))
+
 ;;; CAUTION: tests of C-FIND-HEAP->ARENA that execute after destroy-arena and a following
 ;;; NEW-ARENA might spuriously fail depending on how eagerly malloc() reuses addresses.
 ;;; The failure goes something like this:
