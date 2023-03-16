@@ -2940,8 +2940,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (write-wordindexed/raw asm-code (+ base index 1) entrypoint)
           #+immobile-space
           (unless (member (car item) ; these can't be called from compiled Lisp
-                          '(sb-vm::fpr-save sb-vm::save-xmm sb-vm::save-ymm
-                            sb-vm::fpr-restore sb-vm::restore-xmm sb-vm::restore-ymm))
+                          '(sb-vm::fpr-save sb-vm::fpr-restore))
             (aver (< index (cold-vector-len *asm-routine-vector*)))
             (write-wordindexed/raw *asm-routine-vector*
                                    (+ sb-vm:vector-data-offset index) entrypoint)))

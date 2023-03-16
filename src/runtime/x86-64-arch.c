@@ -73,21 +73,6 @@ static void xgetbv(unsigned *eax, unsigned *edx)
 
 #define VECTOR_FILL_T "VECTOR-FILL/T"
 
-void set_alloc_tramp_vectors(int ymm_enable)
-{
-    struct code* code = (struct code*)asm_routines_start;
-    lispobj* instructions = (lispobj*)code + code_header_words(code);
-    int index;
-    get_asm_routine_by_name("FPR-SAVE", &index);
-    if (index)
-        instructions[index] =
-            (lispobj)get_asm_routine_by_name(ymm_enable ? "SAVE-YMM" : "SAVE-XMM", 0);
-    get_asm_routine_by_name("FPR-RESTORE", &index);
-    if (index)
-        instructions[index] =
-            (lispobj)get_asm_routine_by_name(ymm_enable ? "RESTORE-YMM" : "RESTORE-XMM", 0);
-}
-
 // Poke in a byte that changes an opcode to enable faster vector fill.
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
 void tune_asm_routines_for_microarch(void)
@@ -111,7 +96,6 @@ void tune_asm_routines_for_microarch(void)
             }
         }
     }
-    set_alloc_tramp_vectors(avx_supported);
     int our_cpu_feature_bits = 0;
     // avx2_supported gets copied into bit 1 of *CPU-FEATURE-BITS*
     if (avx2_supported) our_cpu_feature_bits |= 1;
@@ -138,7 +122,6 @@ void untune_asm_routines_for_microarch(void)
 {
     asm_routine_poke(VECTOR_FILL_T, 0x12, 0xEB); // Change JL to JMP
     SetSymbolValue(CPU_FEATURE_BITS, 0, 0);
-    set_alloc_tramp_vectors(0);
 }
 
 #ifndef _WIN64

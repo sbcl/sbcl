@@ -446,7 +446,7 @@
     ((:arg x (descriptor-reg) rdx-offset)
      (:res r (descriptor-reg) rdx-offset))
   (progn x r)
-  (with-registers-preserved (lisp :except rdx-tn)
+  (with-registers-preserved (lisp :except rdx)
     (call-static-fun 'update-object-layout 1)))
 
 (define-assembly-routine (sb-impl::install-hash-table-lock
@@ -456,7 +456,7 @@
     ((:arg x (descriptor-reg) rdx-offset)
      (:res r (descriptor-reg) rdx-offset))
   (progn x r)
-  (with-registers-preserved (lisp :except rdx-tn)
+  (with-registers-preserved (lisp :except rdx)
     (call-static-fun 'sb-impl::install-hash-table-lock 1)))
 
 ;;; From a perspective of reducing code bloat, this asm routine does not merit
@@ -469,7 +469,7 @@
      (:res res (descriptor-reg) rdx-offset))
   (progn c-arg1 c-arg2) ; "use" the args
   ;; Don't preserve the register which holds the lisp return value
-  (with-registers-preserved (c :except rdx-tn)
+  (with-registers-preserved (c :except rdx)
     (pseudo-atomic ()
       (inst call (make-fixup "alloc_code_object" :foreign)))
     (move res rax-tn)))

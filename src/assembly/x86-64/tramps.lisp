@@ -5,24 +5,36 @@
 
 (in-package "SB-VM")
 
-(macrolet ((do-fprs (operation regset)
+(macrolet ((do-fprs (operation regset &aux (displacement 0))
+             ;; The YMM case could be removed now I suppose, since we use XSAVE + XRSTOR
              (multiple-value-bind (mnemonic fpr-align)
                  (ecase regset
                    (:xmm (values 'movaps 16))
                    (:ymm (values 'vmovaps 32)))
-               `(progn
-                  ,@(loop for regno below 16
-                       collect
-                         (ecase operation
-                           (push
-                            `(inst ,mnemonic (ea ,(+ 8 (* regno fpr-align)) rsp-tn)
-                                   (sb-x86-64-asm::get-fpr ,regset ,regno)))
-                           (pop
-                            `(inst ,mnemonic (sb-x86-64-asm::get-fpr ,regset ,regno)
-                                   (ea ,(+ 8 (* regno fpr-align)) rsp-tn)))))))))
+               (collect ((insts))
+                 ;; RAX as the base register encodes shorter than RSP in an EA.
+                 (insts '(inst lea rax-tn (ea 8 rsp-tn)))
+                 (dotimes (regno 16 `(progn ,@(insts)))
+                   (when (>= displacement 128)
+                     (insts '(inst add rax-tn 128))
+                     (decf displacement 128)) ; EA displacement stays 1-byte this way
+                   (let ((fpr `(sb-x86-64-asm::get-fpr ,regset ,regno)))
+                     (insts (ecase operation
+                              (push `(inst ,mnemonic (ea ,displacement rax-tn) ,fpr))
+                              (pop `(inst ,mnemonic ,fpr (ea ,displacement rax-tn))))))
+                   (incf displacement fpr-align))))))
   ;; Caller will have allocated 512+64+256 bytes above the stack-pointer
   ;; prior to the CALL. Use that as the save area.
-  (define-assembly-routine (save-ymm) ()
+  (define-assembly-routine (fpr-save) ()
+    (test-cpu-feature cpu-has-ymm-registers)
+    (inst jmp :nz have-ymm)
+    (do-fprs push :xmm)
+    (inst ret)
+    HAVE-YMM
+    ;; Apparently we must not clobber RDX here, though I'm not sure sure why not.
+    ;; We've saved the values from Lisp already. (Do we pass 3 C args somewhere though?)
+    ;; We can clobber RAX - the XMM-only case does - but I don't care to tweak
+    ;; the hardwired offsets that pertain to byte displacements from RSP.
     (inst push rax-tn)
     (inst push rdx-tn)
     (inst mov rax-tn 7)
@@ -35,25 +47,24 @@
     (inst xsave (ea 24 rsp-tn))
     (inst pop rdx-tn)
     (inst pop rax-tn))
-  (define-assembly-routine (restore-ymm) ()
+
+  (define-assembly-routine (fpr-restore) ()
+    (test-cpu-feature cpu-has-ymm-registers) (inst jmp :nz have-ymm)
+    (do-fprs pop :xmm)
+    (inst ret)
+    HAVE-YMM
     (inst push rax-tn)
     (inst push rdx-tn)
     (inst mov rax-tn 7)
     (zeroize rdx-tn)
     (inst xrstor (ea 24 rsp-tn))
     (inst pop rdx-tn)
-    (inst pop rax-tn))
-  ;; As above, but only 256 bytes of the save area are needed, the rest goes to waste.
-  (define-assembly-routine (save-xmm (:export fpr-save)) ()
-    fpr-save ; KLUDGE: this is element 4 of the entry point vector
-    (do-fprs push :xmm))
-  (define-assembly-routine (restore-xmm (:export fpr-restore)) ()
-    fpr-restore ; KLUDGE: this is element 6 of the entry point vector
-    (do-fprs pop :xmm)))
+    (inst pop rax-tn)))
 
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
-  (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC. RSI is a vop temp
-  (with-registers-preserved (c)
+  (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC
+  ;; RSI and RDI are vop temps, so don't bother preserving them
+  (with-registers-preserved (c :except (rsi rdi))
     (pseudo-atomic ()
       #-system-tlabs (inst break halt-trap)
       #+system-tlabs (inst call (make-fixup "switch_to_arena" :foreign)))))

@@ -63,51 +63,49 @@
        (inst ret)))
     ((:none :full-call-no-return))))
 
+(defconstant xsave-area-size (+ 512 64 256))
+;;; Save or restore all FPRs at the stack pointer as it existed just prior
+;;; to the call to the asm routine.
+(defun call-fpr-save/restore-routine (selector)
+  (ecase selector
+    (:save (inst call (make-fixup 'fpr-save :assembly-routine)))
+    (:restore (inst call (make-fixup 'fpr-restore :assembly-routine)))))
+
+(defmacro regs-pushlist (&rest regs)
+  `(progn ,@(mapcar (lambda (stem) `(inst push ,(symbolicate stem "-TN"))) regs)))
+(defmacro regs-poplist (&rest regs)
+  `(progn ,@(mapcar (lambda (stem) `(inst pop ,(symbolicate stem "-TN")))
+                    (reverse regs))))
+
 (defmacro with-registers-preserved ((convention &key except) &body body)
   ;: Convention:
   ;;   C    = save GPRs that C call can change
   ;;   Lisp = save GPRs that lisp call can change
-  (let ((fpr-align 64))
-    (flet ((gpr-save/restore (operation except)
-             (declare (type (member push pop) operation))
-             (let ((registers (ecase convention
-                               ;; RBX and R12..R15 are preserved across C call
-                               (c '#1=(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn))
-                               ;; all GPRs are potentially destroyed across lisp call
-                               (lisp '(rbx-tn r12-tn #-sb-thread r13-tn r14-tn r15-tn . #1#)))))
-               (when except
-                 (setf registers (remove except registers)))
-               ;; Preserve alignment
-               (when (oddp (length registers))
-                 (push (car registers) registers))
-               (mapcar (lambda (reg)
-                         `(inst ,operation ,reg))
-                       (if (eq operation 'pop) (reverse registers) registers)))))
-    `(progn
-       (inst push rbp-tn)
-       (inst mov rbp-tn rsp-tn)
-       (inst and rsp-tn ,(- fpr-align))
-       (inst sub rsp-tn ,(+ 512 64 256)) ;; XSAVE area
-       ;; Using rip-relative call indirect makes shrinkwrapped cores work
-       ;; with no modification whatsoever to editcore.
-       ;; It wouldn't work straightforwardly using a call indirect
-       ;; with an absolute EA.
-       ;; KLUDGE: index of FPR-SAVE is 4
-       ;; (inst call (ea (make-fixup 'fpr-save :assembly-routine*)))
-       (inst call (ea (make-fixup nil :code-object
-                                  (+ (component-header-length)
-                                     (* 4 sb-vm:n-word-bytes)
-                                     (- other-pointer-lowtag)))
-                      rip-tn))
-       ,@(gpr-save/restore 'push except)
-       ,@body
-       ,@(gpr-save/restore 'pop except)
-       ;; KLUDGE: index of FPR-RESTORE is 6
-       ;; (inst call (ea (make-fixup 'fpr-restore :assembly-routine*)))
-       (inst call (ea (make-fixup nil :code-object
-                                  (+ (component-header-length)
-                                     (* 6 sb-vm:n-word-bytes)
-                                     (- other-pointer-lowtag)))
-                      rip-tn))
-       (inst mov rsp-tn rbp-tn)
-       (inst pop rbp-tn)))))
+  (aver (member convention '(lisp c)))
+  (let ((fpr-align 64)
+        (except (ensure-list except))
+        (clobberables '(rax rbx rcx rdx rsi rdi r8 r9 r10 r11 r12 r13 r14 r15)))
+    (aver (subsetp except clobberables)) ; Catch spelling mistakes
+    (let* ((gprs ; take SET-DIFFERENCE with EXCEPT but in a predictable order
+            (remove-if (lambda (x) (member x except))
+                       (ecase convention
+                         ;; RBX and R12..R15 are preserved across C call
+                         (c '(rax rcx rdx rsi rdi r8 r9 r10 r11))
+                         ;; all GPRs are potentially destroyed across lisp call
+                         (lisp clobberables))))
+           ;; each 8 registers pushed preserves 64-byte alignment
+           (alignment-bytes
+            (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
+      `(progn
+         (inst push rbp-tn)
+         (inst mov rbp-tn rsp-tn)
+         (inst and rsp-tn ,(- fpr-align))
+         (regs-pushlist ,@gprs)
+         (inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
+         (call-fpr-save/restore-routine :save)
+         ,@body
+         (call-fpr-save/restore-routine :restore)
+         (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
+         (regs-poplist ,@gprs)
+         (inst mov rsp-tn rbp-tn)
+         (inst pop rbp-tn)))))
