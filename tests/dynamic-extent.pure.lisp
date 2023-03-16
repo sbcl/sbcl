@@ -1851,3 +1851,15 @@
 
 (with-test (:name :auto-dx-cleaned-up-too-many-times)
   (assert (= (auto-dx-cleaned-up-too-many-times 1 #(-1 2 3)) 10)))
+
+(with-test (:name :auto-dx-correct-mess-up)
+  (checked-compile-and-assert
+   (:allow-notes nil
+    :optimize '(:speed 1))
+   '(lambda (x y z)
+     (map 'list
+      (lambda (a b)
+        (+ z a b))
+      x
+      y))
+   (('(1 2 3 4) '(1 2 3 4) 1) '(3 5 7 9) :test #'equal)))

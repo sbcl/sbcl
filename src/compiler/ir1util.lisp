@@ -386,7 +386,6 @@
                       (lexenv-contains-lambda leaf
                                               (node-lexenv (cleanup-mess-up cleanup))))
              (let ((fun (functional-entry-fun leaf)))
-               (setf (cleanup-mess-up cleanup) (functional-enclose fun))
                (setf (enclose-cleanup (functional-enclose fun)) cleanup)
                (setf (leaf-dynamic-extent fun) (leaf-dynamic-extent var))
                (let ((dx-info (lvar-dynamic-extent old-lvar)))

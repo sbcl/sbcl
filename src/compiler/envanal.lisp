@@ -375,15 +375,17 @@
                            (ref-p use)
                            (lambda-p (ref-leaf use))
                            (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
-                  (let* ((enclose (xep-enclose (ref-leaf use)))
-                         (this-cleanup
-                           (or (enclose-cleanup enclose)
-                               cleanup
-                               (setq cleanup (insert-dynamic-extent-cleanup node)))))
-                    (let ((dx-info (make-dx-info :kind 'dynamic-extent :value arg
-                                                 :cleanup this-cleanup)))
-                      (setf (lvar-dynamic-extent arg) dx-info)
-                      (push dx-info (cleanup-nlx-info this-cleanup)))))))))))
+                  (let ((enclose (xep-enclose (ref-leaf use))))
+                    (cond ((enclose-cleanup enclose)
+                           (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
+                                 'dynamic-extent))
+                          (t
+                           (unless cleanup
+                             (setq cleanup (insert-dynamic-extent-cleanup node)))
+                           (let ((dx-info (make-dx-info :kind 'dynamic-extent :value arg
+                                                        :cleanup cleanup)))
+                             (setf (lvar-dynamic-extent arg) dx-info)
+                             (push dx-info (cleanup-nlx-info cleanup)))))))))))))
 
 ;;; Starting from the potentially (declared) dynamic extent lvars
 ;;; recognized during local call analysis and the declared dynamic
@@ -467,15 +469,28 @@
                                                      :subparts (list lvar)
                                                      :cleanup cleanup)))
                           (setf (lvar-dynamic-extent lvar) dx-info)
-                          (dolist (dx-info (cleanup-nlx-info cleanuP))
+                          (dolist (dx-info (cleanup-nlx-info cleanup))
                             (setf (lvar-dynamic-extent (dx-info-value dx-info)) nil))
                           (setf (cleanup-nlx-info cleanup) (list dx-info)))
-                        ;; This enclose was marked DX by back
-                        ;; propagation.
                         (let* ((ref-lvar (node-lvar (first (leaf-refs xep))))
                                (dx-info (lvar-dynamic-extent ref-lvar)))
-                          (setf (lvar-dynamic-extent lvar) dx-info)
-                          (push lvar (dx-info-subparts dx-info)))))
+                          (cond (dx-info
+                                 ;; This enclose was marked DX by back
+                                 ;; propagation.
+                                 (setf (lvar-dynamic-extent lvar) dx-info)
+                                 (push lvar (dx-info-subparts dx-info)))
+                                (t
+                                 ;; This enclose was either a
+                                 ;; LET-bound anonymous lambda or
+                                 ;; inferred from a call-site to be
+                                 ;; DXable.
+                                 (let ((dx-info
+                                         (make-dx-info :kind 'enclose
+                                                       :value lvar
+                                                       :subparts (list lvar)
+                                                       :cleanup cleanup)))
+                                   (setf (lvar-dynamic-extent lvar) dx-info)
+                                   (push dx-info (cleanup-nlx-info cleanup))))))))
                   ;; The node component of ENCLOSE may be a different
                   ;; component for top level closure references. We
                   ;; always compile non-top-level components before
