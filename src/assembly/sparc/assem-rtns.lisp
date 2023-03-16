@@ -228,5 +228,5 @@
 
   exit
 
-  (inst b (entry-point-label 'unwind))
+  (inst b (make-fixup 'unwind :assembly-routine))
   (move target catch))

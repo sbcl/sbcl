@@ -123,18 +123,23 @@
     for export in exports
     collect `(push ,(expand-one-export-spec export) *entry-points*)))
 
-;;; Create a placeholder that will later resolve to the label of an entry point.
-;;; This is because we don't know all the names of routines until seeing them.
-;;; This is an alternative to using a fixup. It may generate shorter code.
-(defun sb-vm::entry-point-label (name) `(sb-assem::entry ,name))
-
 (defun resolve-ep-labels (section)
   (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
       ((null statement))
-    (binding* ((patch (member-if (lambda (x) (typep x '(cons (eql sb-assem::entry))))
-                                 (stmt-operands statement))
-                      :exit-if-null)
-               (ep (assoc (cadar patch) *entry-points*)))
+    ;; We also output some raw words using fixups; I'm not sure if they should be
+    ;; changed to labels. For now, restrict to control transfers.
+    (binding* ((patch
+                (when (member (stmt-mnemonic statement)
+                              '("B" "BEQ" "JMP" "CALL") ; KLUDGE
+                              :test 'string=)
+                  (member-if (lambda (x)
+                               (and (typep x 'fixup)
+                                    (eq (fixup-flavor x) :assembly-routine)
+                                    (eql (fixup-offset x) 0)))
+                             (stmt-operands statement)))
+                :exit-if-null)
+               (ep (assoc (fixup-name (car patch)) *entry-points*)))
+      ;; oy. what is (third ep) ? An offset?
       (aver (and ep (= (third ep) 0)))
       (rplaca patch (second ep)))))
 

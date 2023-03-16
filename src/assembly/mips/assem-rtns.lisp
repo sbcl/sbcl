@@ -222,5 +222,5 @@
   (loadw catch catch catch-block-previous-catch-slot)
 
   EXIT
-  (inst beq zero-tn (entry-point-label 'unwind))
+  (inst beq zero-tn (make-fixup 'unwind :assembly-routine))
   (inst move target catch))

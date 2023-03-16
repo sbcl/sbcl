@@ -24,9 +24,8 @@
         label)))
 
 (defun invoke-asm-routine (inst routine vop)
-  (declare (ignorable vop))
   (inst* (the (member jmp call) inst)
-         (if (sb-c::code-immobile-p vop)
+         (if (or (null vop) (sb-c::code-immobile-p vop))
              (make-fixup routine :assembly-routine)
              (ea (make-fixup routine :assembly-routine*)))))
 

@@ -560,10 +560,10 @@ necessary, since type inference may take arbitrarily long to converge.")
   (defun code-immobile-p (thing)
     #+sb-xc-host (declare (ignore thing)) #+sb-xc-host t
     #-sb-xc-host
-    (let ((component (typecase thing
+    (let ((component (etypecase thing
                        (vop  (node-component (vop-node thing)))
                        (node (node-component thing))
-                       (t    thing))))
+                       (component thing))))
       (eq (component-mem-space component) :immobile))))
 
 (defun %compile-component (component)
