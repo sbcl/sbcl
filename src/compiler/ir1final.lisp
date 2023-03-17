@@ -155,6 +155,10 @@
       (> two-arg->)
       (<= two-arg-<=)
       (>= two-arg->=)
+      #+sb-xc-host
+      ,@'((sb-xc:< two-arg-<)
+          (sb-xc:= two-arg-=)
+          (sb-xc:> two-arg->))
       (char-equal two-arg-char-equal)
       (char-greaterp two-arg-char-greaterp)
       (char-lessp two-arg-char-lessp)
