@@ -86,6 +86,11 @@
         (except (ensure-list except))
         (clobberables '(rax rbx rcx rdx rsi rdi r8 r9 r10 r11 r12 r13 r14 r15)))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
+    (when (member 'rax except)
+      ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
+      ;; routine (by *not* preserving it) will be meaningless.
+      ;; You'd have to modify -SAVE / -RESTORE to avoid clobbering RAX.
+      (error "Excluding RAX from preserved GPRs probably will not do what you want."))
     (let* ((gprs ; take SET-DIFFERENCE with EXCEPT but in a predictable order
             (remove-if (lambda (x) (member x except))
                        (ecase convention

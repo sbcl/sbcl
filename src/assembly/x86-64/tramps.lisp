@@ -31,35 +31,31 @@
     (do-fprs push :xmm)
     (inst ret)
     HAVE-YMM
-    ;; Apparently we must not clobber RDX here, though I'm not sure sure why not.
-    ;; We've saved the values from Lisp already. (Do we pass 3 C args somewhere though?)
-    ;; We can clobber RAX - the XMM-only case does - but I don't care to tweak
-    ;; the hardwired offsets that pertain to byte displacements from RSP.
-    (inst push rax-tn)
+    ;; Although most of the time RDX can be clobbered, some of the time it can't.
+    ;; If WITH-REGISTERS-PRESERVED wraps a lisp function to make it appear to preserve
+    ;; all registers, we obviously need to return its primary value in RDX.
+    ;; RAX need not be saved though.
     (inst push rdx-tn)
-    (inst mov rax-tn 7)
     (zeroize rdx-tn)
+    ;; After PUSH the save area is at RSP+16 with the return-PC at [RSP+8]
     ;; Zero the header
-    (loop for i from (+ 512 24) by 8
-          repeat 8
-          do
-          (inst mov (ea i rsp-tn) rdx-tn))
-    (inst xsave (ea 24 rsp-tn))
-    (inst pop rdx-tn)
-    (inst pop rax-tn))
+    (inst lea rax-tn (ea (+ 512 16) rsp-tn))
+    (dotimes (i 8)
+      (inst mov (ea (ash i word-shift) rax-tn) rdx-tn))
+    (inst mov rax-tn 7)
+    (inst xsave (ea 16 rsp-tn))
+    (inst pop rdx-tn))
 
   (define-assembly-routine (fpr-restore) ()
     (test-cpu-feature cpu-has-ymm-registers) (inst jmp :nz have-ymm)
     (do-fprs pop :xmm)
     (inst ret)
     HAVE-YMM
-    (inst push rax-tn)
     (inst push rdx-tn)
-    (inst mov rax-tn 7)
+    (inst mov rax-tn 7) ; OK to clobber RAX
     (zeroize rdx-tn)
-    (inst xrstor (ea 24 rsp-tn))
-    (inst pop rdx-tn)
-    (inst pop rax-tn)))
+    (inst xrstor (ea 16 rsp-tn))
+    (inst pop rdx-tn)))
 
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
   (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC
