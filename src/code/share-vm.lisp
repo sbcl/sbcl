@@ -204,51 +204,59 @@
 ;;; allocated off the heap
 #-x86-64 (defun copy-number-to-heap (n) n)
 
-(defun hexdump (thing &optional (n-words 2 wordsp)
+(defun hexdump (thing &optional (count 2 countp)
                             ;; pass NIL explicitly if T crashes on you
                         (decode t))
   (declare (notinline %code-fun-offset))
-  (multiple-value-bind (obj addr count)
-      (typecase thing
-        ;; if you pass a SAP, use it as the address to dump
-        (system-area-pointer (values nil (sap-int thing) n-words))
-        ;; If you pass a bignum, assume you're trying to display its data.
-        ((and word fixnum) (values nil thing n-words))
-        (t
-          (values
-           thing
-           (logandc2 (get-lisp-obj-address thing) lowtag-mask)
-           (if wordsp
-               n-words
-               (if (and (typep thing 'code-component) (plusp (code-n-entries thing)))
-                   ;; Display up through the first fun header
-                   (+ (code-header-words thing)
-                      (ash (%code-fun-offset thing 0) (- word-shift))
-                      simple-fun-insts-offset)
-                   ;; at most 16 words
-                   (min 16 (ash (primitive-object-size thing) (- word-shift))))))))
-    (with-pinned-objects (obj)
-      (dotimes (i count)
-        (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
-          (multiple-value-bind (lispobj ok fmt)
-              (cond ((and (typep thing 'code-component)
-                          (< 1 i (code-header-words thing)))
-                     (values (code-header-ref thing i) t))
-                    #+compact-symbol
-                    ((and (typep thing '(and symbol (not null)))
-                          (= i symbol-name-slot))
-                     (values (list (symbol-package-id thing) (symbol-name thing))
-                             t
-                             "{~{~A,~S~}}"))
-                    (decode
-                     (cond #+system-tlabs ; fingers crossed, assume arena pointers are valid
-                           ((and (is-lisp-pointer word) (find-containing-arena word))
-                            (values (%make-lisp-obj word) t))
-                           (t
-                            (make-lisp-obj word nil)))))
-            (let ((*print-lines* 1)
-                  (*print-pretty* t))
-              (format t "~x: ~v,'0x~:[~; = ~@?~]~%"
-                      (+ addr (ash i word-shift))
-                      (* 2 n-word-bytes)
-                      word ok (or fmt "~S") lispobj))))))))
+  (with-pinned-object-iterator (pin)
+    (pin thing)
+    (multiple-value-bind (obj addr nwords)
+        (typecase thing
+          ;; if you pass a SAP, use it as the address to dump
+          (system-area-pointer (values nil (sap-int thing) count))
+          ;; If you pass a bignum, assume you're trying to display its data.
+          ((and word fixnum) (values nil thing count))
+          (t
+            (values
+             thing
+             (logandc2 (get-lisp-obj-address thing) lowtag-mask)
+             (if countp
+                 (if (listp thing) 2 count)
+                 (if (and (typep thing 'code-component) (plusp (code-n-entries thing)))
+                     ;; Display up through the first fun header
+                     (+ (code-header-words thing)
+                        (ash (%code-fun-offset thing 0) (- word-shift))
+                        simple-fun-insts-offset)
+                     ;; at most 16 words
+                     (min 16 (ash (primitive-object-size thing) (- word-shift))))))))
+      ;; For all objects except lists, there is 1 iteration showing NWORDS.
+      ;; Lists iterate up to COUNT times showing 2 words each time.
+      (dotimes (iteration (if (and (consp thing) countp) count 1))
+        (dotimes (i nwords)
+          (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
+            (multiple-value-bind (lispobj ok fmt)
+                (cond ((and (typep thing 'code-component)
+                            (< 1 i (code-header-words thing)))
+                       (values (code-header-ref thing i) t))
+                      #+compact-symbol
+                      ((and (typep thing '(and symbol (not null)))
+                            (= i symbol-name-slot))
+                       (values (list (symbol-package-id thing) (symbol-name thing))
+                               t
+                               "{~{~A,~S~}}"))
+                      (decode
+                       (cond #+system-tlabs ; fingers crossed, assume arena pointers are valid
+                             ((and (is-lisp-pointer word) (find-containing-arena word))
+                              (values (%make-lisp-obj word) t))
+                             (t
+                              (make-lisp-obj word nil)))))
+              (let ((*print-lines* 1)
+                    (*print-pretty* t))
+                (format t "~x: ~v,'0x~:[~; = ~@?~]~%"
+                        (+ addr (ash i word-shift))
+                        (* 2 n-word-bytes)
+                        word ok (or fmt "~S") lispobj)))))
+        (when (listp obj)
+          (when (atom (setq obj (cdr obj))) (return))
+          (pin obj)
+          (setq addr (logandc2 (get-lisp-obj-address obj) lowtag-mask)))))))
