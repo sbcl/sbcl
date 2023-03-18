@@ -1155,9 +1155,6 @@
       ;; it looks as though it's never interesting to get debug names
       ;; from them, so it's moot. -- WHN)
       (leaf-source-name leaf)))
-(defun leaf-%debug-name (leaf)
-  (when (functional-p leaf)
-    (functional-%debug-name leaf)))
 
 ;;; Is FUNCTIONAL LET-converted? (where we're indifferent to whether
 ;;; it returns one value or multiple values)
