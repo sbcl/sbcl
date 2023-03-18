@@ -213,9 +213,7 @@
            (type tn res))
   (aver (not (eql (functional-kind functional) :deleted)))
   (unless (leaf-info functional)
-    (setf (leaf-info functional)
-          (make-entry-info :name
-                           (functional-debug-name functional))))
+    (setf (leaf-info functional) (make-entry-info)))
   (let ((closure (etypecase functional
                    (clambda
                     (assertions-on-ir2-converted-clambda functional)
