@@ -32,8 +32,10 @@
                  (eq (functional-kind x) :deleted))
                (component-new-functionals component)))
   (setf (component-new-functionals component) ())
-  (mapc #'add-lambda-vars-and-let-vars-to-closures
-        (component-lambdas component))
+  (dolist (fun (component-lambdas component))
+    (compute-closure fun)
+    (dolist (let (lambda-lets fun))
+      (compute-closure let)))
 
   (find-non-local-exits component)
   (find-dynamic-extent-lvars component)
@@ -69,20 +71,18 @@
   (declare (type node node))
   (get-lambda-environment (node-home-lambda node)))
 
-;;; private guts of ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES
-;;;
-;;; This is the old CMU CL COMPUTE-CLOSURE, which only works on
-;;; LAMBDA-VARS directly, not on the LAMBDA-VARS of LAMBDA-LETS. It
-;;; seems never to be valid to use this operation alone, so in SBCL,
-;;; it's private, and the public interface,
-;;; ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES, always runs over all the
-;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
-;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
-(defun %add-lambda-vars-to-closures (clambda &optional explicit-value-cell)
-  (let ((env (get-lambda-environment clambda))
+;;; Find any variables in FUN with references outside of the home
+;;; environment and close over them. If a closed-over variable is set,
+;;; then we set the INDIRECT flag so that we will know the closed over
+;;; value is really a pointer to the value cell. We also warn about
+;;; unreferenced variables here, just because it's a convenient place
+;;; to do it. We return true if we close over anything.
+(defun compute-closure (fun)
+  (declare (type clambda fun))
+  (let ((env (get-lambda-environment fun))
         (did-something nil))
-    (note-unreferenced-fun-vars clambda)
-    (dolist (var (lambda-vars clambda))
+    (note-unreferenced-fun-vars fun)
+    (dolist (var (lambda-vars fun))
       (dolist (ref (leaf-refs var))
         (let ((ref-env (get-node-environment ref)))
           (unless (eq ref-env env)
@@ -104,32 +104,9 @@
 
           (let ((set-env (get-node-environment set)))
             (unless (eq set-env env)
-              (setf did-something t
-                    (lambda-var-indirect var) t)
-              (when explicit-value-cell
-                (setf (lambda-var-explicit-value-cell var) t))
+              (setq did-something t)
+              (setf (lambda-var-indirect var) t)
               (close-over var set-env env))))))
-    did-something))
-
-;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
-;;; in the LAMBDA-VARS of elements of LAMBDA-LETS -- with references
-;;; outside of the home environment and close over them. If a
-;;; closed-over variable is set, then we set the INDIRECT flag so that
-;;; we will know the closed over value is really a pointer to the
-;;; value cell. We also warn about unreferenced variables here, just
-;;; because it's a convenient place to do it. We return true if we
-;;; close over anything.
-(defun add-lambda-vars-and-let-vars-to-closures (clambda &optional explicit-value-cell)
-  (declare (type clambda clambda))
-  (let ((did-something nil))
-    (when (%add-lambda-vars-to-closures clambda explicit-value-cell)
-      (setf did-something t))
-    (dolist (lambda-let (lambda-lets clambda))
-      ;; There's no need to recurse through full COMPUTE-CLOSURE
-      ;; here, since LETS only go one layer deep.
-      (aver (null (lambda-lets lambda-let)))
-      (when (%add-lambda-vars-to-closures lambda-let explicit-value-cell)
-        (setf did-something t)))
     did-something))
 
 (defun xep-enclose (xep)
