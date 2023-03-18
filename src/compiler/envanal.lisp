@@ -38,6 +38,14 @@
       (compute-closure let)))
 
   (find-non-local-exits component)
+  ;; Close over closures.
+  (dolist (fun (component-lambdas component))
+    (when (and (eq (functional-kind fun) :external)
+               (environment-closure (lambda-environment fun)))
+      (let ((enclose-env (get-node-environment (xep-enclose fun))))
+        (dolist (ref (leaf-refs fun))
+          (close-over fun (get-node-environment ref) enclose-env)))))
+
   (find-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
@@ -119,30 +127,12 @@
 ;;; reach the home environment, we stop propagating the closure.
 (defun close-over (thing ref-env home-env)
   (declare (type environment ref-env home-env))
-  (let ((flooded-envs nil))
-    (labels ((flood (flooded-env)
-               (unless (or (eql flooded-env home-env)
-                           (member flooded-env flooded-envs))
-                 (push flooded-env flooded-envs)
-                 (unless (memq thing (environment-closure flooded-env))
-                   (push thing (environment-closure flooded-env))
-                   (let ((lambda (environment-lambda flooded-env)))
-                     (cond ((eq (functional-kind lambda) :external)
-                            (let ((enclose-env (get-node-environment (xep-enclose lambda))))
-                              (flood enclose-env)
-                              (dolist (ref (leaf-refs lambda))
-                                (close-over lambda
-                                            (get-node-environment ref) enclose-env))))
-                           (t (dolist (ref (leaf-refs lambda))
-                                ;; FIXME: This assertion looks
-                                ;; reasonable, but does not work for
-                                ;; :CLEANUPs.
-                                #+nil
-                                (let ((dest (node-dest ref)))
-                                  (aver (basic-combination-p dest))
-                                  (aver (eq (basic-combination-kind dest) :local)))
-                                (flood (get-node-environment ref))))))))))
-      (flood ref-env)))
+  (cond ((eq ref-env home-env))
+        ((memq thing (environment-closure ref-env)))
+        (t
+         (push thing (environment-closure ref-env))
+         (dolist (ref (leaf-refs (environment-lambda ref-env)))
+           (close-over thing (get-node-environment ref) home-env))))
   (values))
 
 ;;; Determine whether it is possible for things that can be closed

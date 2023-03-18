@@ -1064,14 +1064,13 @@
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
              (write-char #\space)
-             (let* ((entry-fun (functional-entry-fun leaf))
-                    (env (and entry-fun (lambda-environment entry-fun))))
+             (let* ((env (lambda-environment leaf)))
                (when env
                  (write-string "{env:")
                  (dolist (thing (environment-closure env))
                    (write-char #\space)
                    (etypecase thing
-                     (leaf (print-leaf leaf))
+                     (leaf (print-leaf thing))
                      (nlx-info (princ thing))))
                  (write-string "}")))
              (write-char #\space))))
