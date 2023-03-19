@@ -73,7 +73,10 @@
   ;; unknown types.
   (with-current-source-form (specifier)
     (handler-case
-        (and (specifier-type specifier)
+        (and (let ((ctype (specifier-type specifier)))
+               (when (eq ctype *empty-type*)
+                 (style-warn "The type of the slot ~s is the empty type NIL" slot-name))
+               ctype)
              (sb-impl::%check-deprecated-type specifier))
       (parse-unknown-type (c)
         (when (typep specifier '(cons (eql quote)))
