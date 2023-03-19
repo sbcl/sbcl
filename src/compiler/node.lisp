@@ -647,6 +647,10 @@
   (name "<unknown>" :type t)
   ;; some kind of info used by the back end.
   (info nil)
+  ;; count of the number of inline expansions we have done while
+  ;; compiling this component, to detect infinite or exponential
+  ;; blowups
+  (inline-expansions 0 :type index)
   ;; a map from combination nodes to things describing how an
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
@@ -1523,14 +1527,6 @@
   var
   (value :prin1 (lvar-uses value)))
 
-(defvar *inline-expansion-limit* 50
-  "an upper limit on the number of inline function calls that will be expanded
-   in any given code object (single function or block compilation)")
-
-(defvar *inline-expansions* nil)
-(declaim (list *inline-expansions*)
-         (always-bound *inline-expansions*))
-
 ;;; The BASIC-COMBINATION structure is used to represent both normal
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
@@ -1562,9 +1558,7 @@
   ;; some kind of information attached to this node by the back end
   ;; or by CHECK-IMPORTANT-RESULT, or by anything else that may need to.
   (info nil)
-  (step-info nil)
-  ;; A plist of inline expansions
-  (inline-expansions *inline-expansions* :type list :read-only t))
+  (step-info nil))
 
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that

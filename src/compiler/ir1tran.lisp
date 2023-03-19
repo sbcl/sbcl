@@ -811,6 +811,10 @@
                                    *current-path*))
                     (ir1-convert start next result res)))))))
 
+(defvar *macro-expansions* nil)
+(declaim (list *macro-expansions*)
+         (always-bound *macro-expansions*))
+
 ;;; Handles the "common" cases: any other forms except special forms
 ;;; and compiler-macros.
 (defun ir1-convert-common-functoid (start next result form op)
@@ -830,13 +834,13 @@
               (aver (and (consp lexical-def) (eq (car lexical-def) 'macro)))
               ;; Unlike inline expansion, macroexpansion is not optional,
               ;; but we clearly can't recurse forever.
-              (let ((expansions (memq lexical-def *inline-expansions*)))
-                (if (<= (or (cadr expansions) 0) *inline-expansion-limit*)
-                    (let ((*inline-expansions*
+              (let ((expansions (memq lexical-def *macro-expansions*)))
+                (if (<= (or (cadr expansions) 0) 50)
+                    (let ((*macro-expansions*
                             (if expansions
                                 (progn (incf (cadr expansions))
-                                       *inline-expansions*)
-                                (list* lexical-def 1 *inline-expansions*))))
+                                       *macro-expansions*)
+                                (list* lexical-def 1 *macro-expansions*))))
                       (ir1-convert start next result
                                    (careful-expand-macro (cdr lexical-def) form)))
                     (progn

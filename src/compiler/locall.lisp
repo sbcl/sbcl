@@ -424,18 +424,16 @@
 ;;; reference.
 (defun maybe-expand-local-inline (original-functional ref call)
   (if (and (policy call
-               (and (>= speed space)
-                    (>= speed compilation-speed)))
+                   (and (>= speed space)
+                        (>= speed compilation-speed)))
            (not (eq (functional-kind (node-home-lambda call)) :external))
-           (inline-expansion-ok call original-functional))
+           (inline-expansion-ok call))
       (let* ((end (component-last-block (node-component call)))
              (pred (block-prev end)))
         (multiple-value-bind (losing-local-object converted-lambda)
             (catch 'locall-already-let-converted
               (with-ir1-environment-from-node call
-                (let* ((*inline-expansions*
-                         (register-inline-expansion original-functional call))
-                       (functional-lexenv (functional-lexenv original-functional))
+                (let* ((functional-lexenv (functional-lexenv original-functional))
                        (call-policy (lexenv-policy (node-lexenv call)))
                        ;; The inline expansion should be converted
                        ;; with the policy in effect at this call site,

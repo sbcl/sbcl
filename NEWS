@@ -5,6 +5,9 @@ changes relative to sbcl-2.3.2:
     be stack allocated, just like closures bound with FLET or
     LABELS. Otherwise-inaccessible closure subparts of objects declared
     dynamic extent can now also be stack allocated
+  * enhancement: exponential blowup in compile-time and eventual heap
+    exhaustion caused by too much inlining is detected better, giving the user
+    a note in this situation and not crashing the compiler.
   * optimization: Many standard CL functions which take functional arguments
     will automatically stack allocate any downward funarg closures.
 
