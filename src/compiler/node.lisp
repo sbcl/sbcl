@@ -1226,15 +1226,8 @@
   ;; depends on in such a way that DFO shouldn't put them in separate
   ;; components.
   (calls-or-closes (make-sset) :type (or null sset))
-  ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
-  ;;
-  ;; In CMU CL, and old SBCL, this was also NILed out when LET
-  ;; conversion happened. That caused some problems, so as of
-  ;; sbcl-0.pre7.37.flaky5.2 when I was trying to get the compiler to
-  ;; emit :EXTERNAL functions directly, and so now the value
-  ;; is no longer NILed out in LET conversion, but instead copied
-  ;; (so that any further optimizations on the rest of the tail
-  ;; set won't modify the value) if necessary.
+  ;; the TAIL-SET that this LAMBDA is in. This is null during creation
+  ;; and in let lambdas.
   (tail-set nil :type (or tail-set null))
   ;; the structure which represents the phsical environment that this
   ;; function's variables are allocated in. This is filled in by

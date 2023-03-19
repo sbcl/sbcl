@@ -902,56 +902,6 @@
       (link-blocks call-block bind-block)
       next-block)))
 
-;;; Remove CLAMBDA from the tail set of anything it used to be in the
-;;; same set as; but leave CLAMBDA with a valid tail set value of
-;;; its own, for the benefit of code which might try to pull
-;;; something out of it (e.g. return type).
-(defun depart-from-tail-set (clambda)
-  ;; Until sbcl-0.pre7.37.flaky5.2, we did
-  ;;   (LET ((TAILS (LAMBDA-TAIL-SET CLAMBDA)))
-  ;;     (SETF (TAIL-SET-FUNS TAILS)
-  ;;           (DELETE CLAMBDA (TAIL-SET-FUNS TAILS))))
-  ;;   (SETF (LAMBDA-TAIL-SET CLAMBDA) NIL)
-  ;; here. Apparently the idea behind the (SETF .. NIL) was that since
-  ;; TAIL-SET-FUNS no longer thinks we're in the tail set, it's
-  ;; inconsistent, and perhaps unsafe, for us to think we're in the
-  ;; tail set. Unfortunately..
-  ;;
-  ;; The (SETF .. NIL) caused problems in sbcl-0.pre7.37.flaky5.2 when
-  ;; I was trying to get Python to emit :EXTERNAL LAMBDAs directly
-  ;; (instead of only being able to emit funny little :TOPLEVEL stubs
-  ;; which you called in order to get the address of an external LAMBDA):
-  ;; the external function was defined in terms of internal function,
-  ;; which was LET-converted, and then things blew up downstream when
-  ;; FINALIZE-XEP-DEFINITION tried to find out its DEFINED-TYPE from
-  ;; the now-NILed-out TAIL-SET. So..
-  ;;
-  ;; To deal with this problem, we no longer NIL out
-  ;; (LAMBDA-TAIL-SET CLAMBDA) here. Instead:
-  ;;   * If we're the only function in TAIL-SET-FUNS, it should
-  ;;     be safe to leave ourself linked to it, and it to you.
-  ;;   * If there are other functions in TAIL-SET-FUNS, then we're
-  ;;     afraid of future optimizations on those functions causing
-  ;;     the TAIL-SET object no longer to be valid to describe our
-  ;;     return value. Thus, we delete ourselves from that object;
-  ;;     but we save a newly-allocated tail-set, derived from the old
-  ;;     one, for ourselves, for the use of later code (e.g.
-  ;;     FINALIZE-XEP-DEFINITION) which might want to
-  ;;     know about our return type.
-  (let* ((old-tail-set (lambda-tail-set clambda))
-         (old-tail-set-funs (tail-set-funs old-tail-set)))
-    (unless (= 1 (length old-tail-set-funs))
-      (setf (tail-set-funs old-tail-set)
-            (delete clambda old-tail-set-funs))
-      (let ((new-tail-set (copy-tail-set old-tail-set)))
-        (setf (lambda-tail-set clambda) new-tail-set
-              (tail-set-funs new-tail-set) (list clambda)))))
-  ;; The documentation on TAIL-SET-INFO doesn't tell whether it could
-  ;; remain valid in this case, so we nuke it on the theory that
-  ;; missing information tends to be less dangerous than incorrect
-  ;; information.
-  (setf (tail-set-info (lambda-tail-set clambda)) nil))
-
 ;;; Handle the environment semantics of LET conversion. We add CLAMBDA
 ;;; and its LETs to LETs for the CALL's home function. We merge the
 ;;; calls for CLAMBDA with the calls for the home function, removing
@@ -970,9 +920,9 @@
           (delete clambda (component-lambdas component)))
     (setf (component-reanalyze component) t))
   (setf (lambda-call-lexenv clambda) (node-lexenv call))
-
-  (depart-from-tail-set clambda)
-
+  (let ((tails (lambda-tail-set clambda)))
+    (setf (tail-set-funs tails)
+          (delete clambda (tail-set-funs tails))))
   (let* ((home (node-home-lambda call))
          (home-env (lambda-environment home))
          (env (lambda-environment clambda)))
