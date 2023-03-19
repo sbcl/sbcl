@@ -111,7 +111,7 @@
   (def "UNKNOWN-KEY-ARG"         sb-c::%unknown-key-arg-error t   key)
   (def "ECASE-FAILURE"           ecase-failure                nil value keys)
   (def "ETYPECASE-FAILURE"       etypecase-failure            nil value keys)
-  (def "NIL-FUN-RETURNED"        nil                          nil fun)
+  (def "NIL-FUN-RETURNED"        nil-fun-returned-error       nil fun)
   (def "UNREACHABLE"             sb-impl::unreachable         nil)
   (def "FAILED-AVER"             sb-impl::%failed-aver        nil form))
 

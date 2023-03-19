@@ -4010,3 +4010,10 @@
                         (catch 'd
                           (lambda () #'f11))
                         (return #'f11)))))))))
+
+(with-test (:name :flushable-nil-funs)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (eq (the (or) (car a))
+             (the (or) (car b))))))

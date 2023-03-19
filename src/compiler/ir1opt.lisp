@@ -2775,10 +2775,8 @@
             ((and (bound-cast-p cast)
                   (bound-cast-check cast)))
             ((and (eq atype *empty-type*)
-                  (do-uses (node value t)
-                    (unless (basic-combination-p node)
-                      (return))))
-             ;; Combinations have nil-fun-returned-error
+                  (basic-combination-p (lvar-uses value)))
+             (insert-code cast `(nil-fun-returned-error ',(combination-fun-debug-name (lvar-uses value))))
              (setf (cast-%type-check cast) nil))
             (t
              (let* ((source-form (node-source-form cast))

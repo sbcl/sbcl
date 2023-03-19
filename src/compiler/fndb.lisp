@@ -1929,6 +1929,7 @@
 
 (defknown %odd-key-args-error () nil)
 (defknown %unknown-key-arg-error (t t) nil)
+(defknown nil-fun-returned-error (t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
   (movable foldable flushable no-verify-arg-count))
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer

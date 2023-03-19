@@ -519,13 +519,34 @@
 
         ;; Replace PLACEHOLDER with the LVAR.
         (let* ((refs (leaf-refs placeholder))
-               (node (first refs))
-               (victim (node-lvar node)))
-          (aver (null (rest refs))) ; PLACEHOLDER must be referenced exactly once.
-          (substitute-lvar filtered-lvar lvar)
-          (substitute-lvar lvar victim)
-          (flush-dest victim))
+               (node (first refs)))
+          (cond (refs
+                 (let ((victim (node-lvar node)))
+                  (aver (null (rest refs))) ; PLACEHOLDER must be referenced exactly once.
+                  (substitute-lvar filtered-lvar lvar)
+                  (substitute-lvar lvar victim)
+                  (flush-dest victim)))
+                (t
+                 (flush-dest lvar))))
 
+        ;; The form may have introduced new local calls, for example,
+        ;; from LET bindings, so invoke local call analysis.
+        (locall-analyze-component *current-component*))))
+  (values))
+
+(defun insert-code (before form)
+  (let ((ctran (node-prev before)))
+    (with-ir1-environment-from-node before
+      (ensure-block-start ctran)
+      (let* ((old-block (ctran-block ctran))
+             (new-start (make-ctran))
+             (filtered-lvar (make-lvar))
+             (new-block (ctran-starts-block new-start)))
+        ;; Splice in the new block before DEST, giving the new block
+        ;; all of DEST's predecessors.
+        (dolist (block (block-pred old-block))
+          (change-block-successor block old-block new-block))
+        (ir1-convert new-start ctran filtered-lvar form)
         ;; The form may have introduced new local calls, for example,
         ;; from LET bindings, so invoke local call analysis.
         (locall-analyze-component *current-component*))))
