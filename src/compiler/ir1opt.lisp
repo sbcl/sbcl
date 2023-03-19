@@ -1304,7 +1304,7 @@
               ((nil maybe-inline) (policy call (zerop space))))
             (defined-fun-p leaf)
             (defined-fun-inline-expansion leaf)
-            (inline-expansion-ok call))
+            (inline-expansion-ok call leaf))
        ;; Inline: if the function has already been converted at another call
        ;; site in this component, we point this REF to the functional. If not,
        ;; we convert the expansion.
@@ -1321,7 +1321,9 @@
                   (when (eq (car *current-path*) 'original-source-start)
                     (setf (ctran-source-path (node-prev call)) *current-path*))
                   ;; Convert.
-                  (let ((res (ir1-convert-inline-expansion leaf inlinep)))
+                  (let* ((*inline-expansions*
+                           (register-inline-expansion leaf call))
+                         (res (ir1-convert-inline-expansion leaf inlinep)))
                     (setf (defined-fun-functional leaf) res)
                     (change-ref-leaf ref res)
                     (unless ir1-converting-not-optimizing-p

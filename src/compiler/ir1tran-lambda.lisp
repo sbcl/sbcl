@@ -997,8 +997,9 @@
                          :source-name source-name
                          :debug-name debug-name))
     ((named-lambda)
-     (let ((name (cadr thing))
-           (lambda-expression `(lambda ,@(cddr thing))))
+     (let* ((name (cadr thing))
+            (lambda-expression `(lambda ,@(cddr thing)))
+            (*inline-expansions* (list name 1 *inline-expansions*)))
        (if (and name (legal-fun-name-p name))
            (let ((simple-lexenv-p (simple-lexical-environment-p *lexenv*)))
              ;; If not in a simple environment, then discard any
