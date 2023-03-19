@@ -1022,7 +1022,9 @@ unless :NAMED is also specified.")))
                       1)))
              (setf index (dd-length defstruct))
              (incf (dd-length defstruct) n-words))))
-
+    (when (eq ctype *empty-type*)
+      (with-current-source-form (spec)
+       (style-warn "The type of the slot ~s is the empty type NIL" name)))
     ;; Check for existence of any BOA constructor that leaves the
     ;; slot with an unspecified value, as when it's initialized
     ;; by an &AUX binding with no value (CLHS 3.4.6)
