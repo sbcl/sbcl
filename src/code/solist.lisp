@@ -143,20 +143,10 @@
       (when (eq (cas (%node-next left) right new) right)
         (return new))))) ; didn't exist
 
-(defun initialize-bin (bins bin-number shift)
-  ;; Find any bin to the left to use as the starting point.
-  ;; The reference algorithm used the "parent" bin, which involved recursion
-  ;; if that bin was itself uninitialized, and so on.
-  ;; Backwards linear scan works just as well and is easier to understand.
-  (let* ((initialized-bin
-          (find-if-not #'unbound-marker-p bins :end bin-number :from-end t))
-         (hash (ash bin-number shift))
-         (node (%so-insert/dummy initialized-bin hash))
-         (old (cas (svref bins bin-number) (make-unbound-marker) node)))
-    (if (unbound-marker-p old) node old)))
-
-;;; The internal methods do not reference a bin, just a lockfree-linked-list
-;;; headed by START, which is a dummy node.
+;;; The internal -PUT methods do not reference a bin, just a lockfree-linked-list
+;;; headed by START, which is a dummy node.  The desired key may or may not exist
+;;; in the list yet. If it exists, the containing node will be returned,
+;;; and if it does not exist, a new node will be allocated and inserted.
 (macrolet ((guts (type searcher equality-fn)
              `(let ((new 0))
                 (aver (dummy-node-p start))
@@ -179,15 +169,30 @@
                    ;; then start from the top just in case KEY was already inserted.
                    (when (eq (cas (%node-next left) right new) right)
                      (return (values new nil)))))))) ; didn't exist
- (defun %so-insert/fixnum (start hash key &optional (data nil datap))
+ (defun %so-put/fixnum (start hash key &optional (data nil datap))
    (declare (fixnum key))
    (guts fixnum %so-search/fixnum =))
- (defun %so-insert/addr (start hash key &optional (data nil datap))
+ (defun %so-put/addr (start hash key &optional (data nil datap))
    (guts t %so-search/addr eq))
- (defun %so-insert/string (start hash key &optional (data nil datap))
+ (defun %so-put/string (start hash key &optional (data nil datap))
    (declare (string key))
    (guts string %so-search/string string=))
  )
+
+(defun initialize-bin (vector index shift)
+  ;; Find any bin to the left to use as the starting point.
+  ;; The reference algorithm used the "parent" bin, which involved recursion
+  ;; if that bin was itself uninitialized, and so on.
+  ;; Backwards linear scan works just as well and is easier to understand.
+  (let* ((initialized-bin (find-if-not #'unbound-marker-p vector :end index :from-end t))
+         (hash (ash index shift))
+         (node (%so-insert/dummy initialized-bin hash))
+         (old (cas (svref vector index) (make-unbound-marker) node)))
+    (if (unbound-marker-p old) node old)))
+
+(defmacro bin-shift (x)
+  ;; Compiler conservatively can't use the declared slot type because it's a CONS
+  `(truly-the (integer 1 (,+hash-nbits+)) (cdr ,x)))
 
 (declaim (inline masked-hash))
 ;;(defun masked-hash (hash) (mask-field (byte (1- +hash-nbits+) 1) hash))
@@ -198,24 +203,50 @@
                     hash-expr &body body)
   `(multiple-value-bind (,hash-var ,node-var ,@rest)
        (let* ((hash (masked-hash ,hash-expr))
-              (bins+shift (so-bins ,table-var)))
+              (bins (so-bins ,table-var)))
          (declare (optimize (safety 0))) ; won't pertain to the body, just these bindings
-         (let* ((bins (car bins+shift))
-                ;; We don't use the declared type- I guess because it's a CONS ?
-                (shift (the (integer 1 (,+hash-nbits+)) (cdr bins+shift)))
-                (bin-number (ash hash (- shift)))
-                (start-node (svref bins bin-number)))
+         (let* ((bin-vector (car bins))
+                (shift (bin-shift bins))
+                (index (ash hash (- shift)))
+                (start-node (svref bin-vector index)))
            (values hash (if (unbound-marker-p start-node)
-                            (initialize-bin bins bin-number shift)
+                            (initialize-bin bin-vector index shift)
                             start-node)
-                   ;; INSERT needs these but FIND and DELETE don't
-                   ,@(if rest '(bins+shift bins shift)))))
+                   ;; INSERT needs the bins but FIND and DELETE don't
+                   ,@(if rest '(bins)))))
      ,@body))
+
+(defun so-expand-bins (table bins &aux (shift (bin-shift bins)))
+  (when (eql shift 1)
+    ;; The table would have to double (1- N-POSITIVE-FIXNUM-BITS) times
+    ;; or something like that - maybe I'm off by 2x - for this failure to happen.
+    (return-from so-expand-bins nil))
+  ;; Try to compare-and-swap the threshold first before changing the bins.
+  ;; This way, at most one thread should win, and rellocate bins.
+  (let* ((bin-vector (car bins))
+         (cur-n-bins (length bin-vector))
+         (new-n-bins (the index (* 2 cur-n-bins)))
+         (cur-threshold (so-threshold table))
+         (new-threshold (the index (* new-n-bins (so-elts-per-bin table)))))
+    ;; These tables don't downsize ever (same as our HASH-TABLE), so just make sure
+    ;; we're increasing the threshold.  Due to unusual scheduling of threads, it could
+    ;; be that CUR-THRESHOLD is already larger than NEW-THRESHOLD.
+    (when (and (> new-threshold cur-threshold)
+               #+(or arm mips sparc) ; no support for raw slot atomic ops, really?
+               (setf (so-threshold table) new-threshold)
+               #-(or arm mips sparc)
+               (eql (cas (so-threshold table) cur-threshold new-threshold)
+                    cur-threshold))
+      (let ((new-bin-vector (make-array new-n-bins :initial-element (make-unbound-marker))))
+        (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+        (dotimes (i cur-n-bins) (setf (svref new-bin-vector (* i 2)) (svref bin-vector i)))
+        ;; If the CAS fails, there was already at least another doubling in another thread.
+        (cas (so-bins table) bins (cons new-bin-vector (1- shift)))))))
 
 (defun so-insert (table key &optional (value nil valuep))
   (when (and valuep (not (so-valuesp table)))
     (error "~S is a set, not a map" table))
-  (with-bin (table hash start-node bins+shift bins shift) (funcall (so-hashfun table) key)
+  (with-bin (table hash start-node bins) (funcall (so-hashfun table) key)
     (multiple-value-bind (node foundp)
         (if (so-valuesp table)
             (funcall (so-inserter table) start-node hash key value)
@@ -225,28 +256,8 @@
              ;; can use the secondary value to notice that the node existed,
              ;; and pick an appropriate way to atomically update the node.
              (aver (typep node 'so-key-node)))
-            ((and (> (atomic-incf (so-count table)) (so-threshold table))
-                  (> shift 1)) ; can't reduce the shift below 1
-             ;; Try to compare-and-swap the threshold first before changing the bins.
-             ;; This way, at most one thread should win, and rellocate bins.
-             (let* ((cur-n-bins (length bins))
-                    (new-n-bins (the index (* 2 cur-n-bins)))
-                    (cur-threshold (so-threshold table))
-                    (new-threshold (the index (* new-n-bins (so-elts-per-bin table)))))
-               ;; These tables don't downsize ever (same as our HASH-TABLE), so just make sure
-               ;; we're increasing the threshold.  Due to unusual scheduling of threads, it could
-               ;; be that CUR-THRESHOLD is already larger than NEW-THRESHOLD.
-               (when (and (> new-threshold cur-threshold)
-                          #+(or arm mips sparc) ; no support for raw slot atomic ops, really?
-                          (setf (so-threshold table) new-threshold)
-                          #-(or arm mips sparc)
-                          (eql (cas (so-threshold table) cur-threshold new-threshold)
-                               cur-threshold))
-                 (let ((new-bins (make-array new-n-bins :initial-element (make-unbound-marker))))
-                   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-                   (dotimes (i cur-n-bins) (setf (aref new-bins (* i 2)) (aref bins i)))
-                   ;; If the CAS fails, there was already at least another doubling in another thread.
-                   (cas (so-bins table) bins+shift (cons new-bins (1- shift))) bins+shift)))))
+            ((> (atomic-incf (so-count table)) (so-threshold table))
+             (so-expand-bins table bins)))
       (values node foundp))))
 
 ;; This is like LFL-DELETE-MACRO but passes both a hash and a key
@@ -368,7 +379,7 @@
 
 (flet ((make (valuesp)
          (%make-so-list #'murmur-hash-word/+fixnum
-                        #'%so-insert/fixnum
+                        #'%so-put/fixnum
                         #'%so-delete/fixnum
                         #'so-find/fixnum
                         #'nofun #'nofun valuesp)))
@@ -377,7 +388,7 @@
 
 (flet ((make (valuesp)
          (%make-so-list #'sxhash
-                        #'%so-insert/string
+                        #'%so-put/string
                         #'%so-delete/string
                         #'so-find/string
                         #'nofun #'nofun valuesp)))
@@ -386,7 +397,49 @@
 
 (flet ((make (valuesp)
          (%make-so-list (lambda (x) (multiplicative-hash (get-lisp-obj-address x)))
-                        #'%so-insert/addr #'%so-delete/addr #'so-find/addr
+                        #'%so-put/addr #'%so-delete/addr #'so-find/addr
                         #'nofun #'nofun valuesp)))
   (defun make-so-set/addr () (make nil))
   (defun make-so-map/addr () (make t)))
+
+;;; This special case can be used during allocation of new objects (and usually only then).
+;;; The address can not have previously existed in the table since it is fresh.
+;;; Additionally, this takes a pre-allocated NODE, does not perform INITIALIZE-BIN,
+;;; and does not increment the occupancy count. The latter two steps can be performed later.
+;;; This can be run within a pseudo-atomic section, and the next step outside of it.
+(defun %so-eq-set-phase1-insert (table node key)
+  (let* ((hash (masked-hash (multiplicative-hash (get-lisp-obj-address key))))
+         (bins (so-bins (truly-the split-ordered-list table)))
+         (shift (bin-shift bins))
+         (bin-vector (car bins))
+         (index (ash hash (- shift)))
+         (start-node (svref bin-vector index)))
+    ;; HASH and KEY of a node are not accessible as read/write slots to clients
+    ;; of the table, but _can_ be written by this insert function only in as much as
+    ;; the caller has to preallocate the node, and we have to fill it in here.
+    (setf (%instance-ref (truly-the instance node) (get-dsd-index so-node node-hash)) hash
+          (%instance-ref node (get-dsd-index so-key-node so-key)) key)
+    (when (unbound-marker-p start-node)
+      ;; Pick any nonempty bin to the left of the intended bin.
+      ;; It's always OK to pick a suboptimal start bin, because there is no requirement
+      ;; to observe the BINS vector in the most up-to-date state anyway.
+      (setf start-node (find-if-not #'unbound-marker-p bin-vector
+                                    :end index :from-end t)))
+    #+sb-devel (aver (dummy-node-p start-node))
+    (loop
+     (multiple-value-bind (right left) (%so-search/addr start-node hash key)
+       #+sb-devel
+       (when (and (not (endp right)) (not (dummy-node-p right)))
+         ;; The successor had better not be the droid you're looking for.
+         (aver (neq key (so-key right))))
+       (setf (%node-next node) right)
+       (when (eq (cas (%node-next left) right node) right)
+         (return t))))))
+
+;;; Complete the insertion of a previously-known-not-to-exist key.
+(defun %so-eq-set-phase2-insert (table node)
+  (with-bin (table hash start-node bins) (node-hash node)
+    (declare (ignore hash start-node))
+    (when (> (atomic-incf (so-count table)) (so-threshold table))
+      (so-expand-bins table bins)))
+  node)

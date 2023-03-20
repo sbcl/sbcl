@@ -466,6 +466,44 @@
                   (assert (string= (so-key node) (pop present-keys))))
                 *so-map*)))
 
+(test-util:with-test (:name :solist-2-phase-insert)
+  (let ((set (sb-lockless:make-so-set/addr))
+        (example-objects
+         (subseq (sb-vm:list-allocated-objects :read-only :type sb-vm:simple-base-string-widetag)
+                 0 1000))
+        (n-deleted 0)
+        (nodes))
+    ;; This example is artificial. The real usage would allocate one object and perform
+    ;; both insert phases in the following pattern:
+    ;;   begin pseudo-atomic
+    ;;     allocate split-order node 'n'
+    ;;     allocate off-heap large unboxed object
+    ;;     phase1 insert node 'n' pointing to large-object
+    ;;   end pseudo-atomic
+    ;;   phase2 insert
+    ;; If GC occurs just after the pseudo-atomic section, it is possible to test each stack word
+    ;; as being a conservative pointer to an off-heap object based on its presence in the table.
+    (dolist (object example-objects)
+      (let ((node (sb-lockless::%make-so-set-node 0 0)))
+        (push node nodes)
+        (sb-lockless::%so-eq-set-phase1-insert set node object)))
+    ;; It has no bearing on currectness that the table count is understated and that
+    ;; the number of bins may be too few prior to running the second step.
+    ;; This is evident from the loop below which shows that each example-object can be found.
+    (dolist (node nodes)
+      (sb-lockless::%so-eq-set-phase2-insert set node)
+      ;; delete some keys at random. This could occur only after the node is fully inserted.
+      (when (zerop (random 10))
+        (sb-lockless:so-delete set (sb-lockless:so-key node))
+        (incf n-deleted))
+      (let ((table-count
+             (loop for object in example-objects
+                   count (sb-lockless:so-find set object))))
+        (assert (= table-count (- 1000 n-deleted)))))
+    ;; Finally the table count should be correct
+    (assert (= (sb-lockless::so-count set) (- 1000 n-deleted)))
+    set))
+
 #|
 ;; Speedup: 4x
 Small test: 20k keys, 8 writers, 2 readers

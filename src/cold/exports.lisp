@@ -3599,6 +3599,8 @@ package is deprecated in favour of SB-MOP.")
   (:export "+TAIL+" "%NODE-NEXT" "GET-NEXT"
            "MAKE-SO-SET/STRING" "MAKE-SO-SET/FIXNUM" "MAKE-SO-SET/ADDR"
            "MAKE-SO-MAP/STRING" "MAKE-SO-MAP/FIXNUM" "MAKE-SO-MAP/ADDR"
+           "MULTIPLICATIVE-HASH"
+           "%SO-EQ-SET-PHASE1-INSERT" "%SO-EQ-SET-PHASE2-INSERT"
            "SO-INSERT" "SO-DELETE" "SO-FIND"
            "SO-KEY" "SO-DATA" "SO-MAPLIST")
   (:shadow "ENDP"))
