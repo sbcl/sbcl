@@ -2593,8 +2593,6 @@
 ;;; CONVERT-MV-BIND-TO-LET. We grab the args of LIST and make them
 ;;; args of the VALUES-LIST call, flushing the old argument lvar
 ;;; (allowing the LIST to be flushed.)
-;;;
-;;; FIXME: Thus we lose possible type assertions on (LIST ...).
 (defoptimizer (values-list optimizer) ((list) node)
   (let ((use (lvar-uses list)))
     (when (combination-p use)
