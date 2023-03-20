@@ -114,9 +114,7 @@
 
 (define-storage-base stack :unbounded :size 3 :size-increment 1)
 (define-storage-base constant :non-packed)
-(define-storage-base immediate-constant :non-packed)
-(define-storage-base noise :unbounded :size 2)
-)
+(define-storage-base immediate-constant :non-packed))
 
 ;;;; SC definitions
 
@@ -152,12 +150,6 @@
   (complex-double-stack stack :element-size 4)  ; complex-double-floats
   #+long-float
   (complex-long-stack stack :element-size 6)    ; complex-long-floats
-
-  ;;
-  ;; magic SCs
-  ;;
-
-  (ignore-me noise)
 
   ;;
   ;; things that can go in the integer registers

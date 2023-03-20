@@ -313,6 +313,7 @@
 ;;; stack by setting NUMBER-STACK-P in all functions that TN is
 ;;; referenced in and in all the functions in their tail sets. REFS is
 ;;; a TN-REFS list of references to the TN.
+#-c-stack-is-control-stack
 (defun note-number-stack-tn (refs)
   (declare (type (or tn-ref null) refs))
 
@@ -766,7 +767,9 @@
 ;;; If TN is in a number stack SC, make all the right annotations.
 ;;; Note that this should be called after TN has been referenced,
 ;;; since it must iterate over the referencing environments.
+#-c-stack-is-control-stack
 (declaim (inline note-if-number-stack))
+#-c-stack-is-control-stack
 (defun note-if-number-stack (tn 2comp restricted)
   (declare (type tn tn) (type ir2-component 2comp))
   (when (if restricted
@@ -948,7 +951,7 @@
 
     #+arm64
     (choose-zero-tn (ir2-component-constant-tns 2comp))
-
+    #-c-stack-is-control-stack
     (macrolet ((frob (slot restricted)
                  `(do ((tn (,slot 2comp) (tn-next tn)))
                       ((null tn))
@@ -956,6 +959,5 @@
       (frob ir2-component-normal-tns nil)
       (frob ir2-component-wired-tns t)
       (frob ir2-component-restricted-tns t)
-      #-c-stack-is-control-stack
       (unwire-nfp-save-tn 2comp)))
   (values))

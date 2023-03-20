@@ -44,17 +44,19 @@
 
 ;;; the TN that is used to hold the number stack frame-pointer in
 ;;; VOP's function, or NIL if no number stack frame was allocated
+#-c-stack-is-control-stack
 (defun current-nfp-tn (vop)
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (let ((block (ir2-block-block (vop-block vop))))
-    (when (ir2-environment-number-stack-p
-           (environment-info
-            (block-environment block)))
-      (ir2-component-nfp (component-info (block-component block)))))))
+      (when (ir2-environment-number-stack-p
+             (environment-info
+              (block-environment block)))
+        (ir2-component-nfp (component-info (block-component block)))))))
 
 ;;; the TN that is used to hold the number stack frame-pointer in the
 ;;; function designated by 2ENV, or NIL if no number stack frame was
 ;;; allocated
+#-c-stack-is-control-stack
 (defun callee-nfp-tn (2env)
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (when (ir2-environment-number-stack-p 2env)

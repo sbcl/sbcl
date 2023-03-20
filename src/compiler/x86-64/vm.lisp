@@ -187,9 +187,7 @@
 ;;; Start from 2, for the old RBP (aka OCFP) and return address
 (define-storage-base stack :unbounded :size 2 :size-increment 1)
 (define-storage-base constant :non-packed)
-(define-storage-base immediate-constant :non-packed)
-(define-storage-base noise :unbounded :size 2)
-)
+(define-storage-base immediate-constant :non-packed))
 
 ;;;; SC definitions
 
@@ -244,12 +242,6 @@
   (double-avx2-stack stack :element-size 4)
   #+sb-simd-pack-256
   (single-avx2-stack stack :element-size 4)
-
-  ;;
-  ;; magic SCs
-  ;;
-
-  (ignore-me noise)
 
   ;;
   ;; things that can go in the integer registers

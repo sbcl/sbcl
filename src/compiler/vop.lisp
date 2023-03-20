@@ -281,6 +281,7 @@
   ;; These TNs will also appear in the {NORMAL,RESTRICTED,WIRED} TNs
   ;; as appropriate to their location.
   (component-tns () :type list)
+  #-c-stack-is-control-stack
   ;; If this component has a NFP, then this is it.
   (nfp nil :type (or tn null))
   ;; a list of the explicitly specified save TNs (kind
@@ -414,6 +415,7 @@
   ;; True if this function has a frame on the number stack. This is
   ;; set by representation selection whenever it is possible that some
   ;; function in our tail set will make use of the number stack.
+  #-c-stack-is-control-stack
   (number-stack-p nil :type boolean)
   ;; a list of all the :ENVIRONMENT TNs live in this environment
   (live-tns nil :type list)
