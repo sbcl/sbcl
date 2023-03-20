@@ -319,11 +319,11 @@
         (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
     (pseudo-atomic ()
       (cond (alloc-temp
-             (allocation nil bytes 0 result-tn node alloc-temp thread-temp)
+             (allocation widetag bytes 0 result-tn node alloc-temp thread-temp)
              (storew* header result-tn 0 0 t)
              (inst or :byte result-tn other-pointer-lowtag))
             (t
-             (allocation nil bytes other-pointer-lowtag result-tn node nil thread-temp)
+             (allocation widetag bytes other-pointer-lowtag result-tn node nil thread-temp)
              (storew* header result-tn 0 other-pointer-lowtag t))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
@@ -614,7 +614,7 @@
         (let ((nbytes (calc-shadow-bits-size result)))
           (pseudo-atomic ()
             ;; Allocate the bits into RESULT
-            (allocation nil nbytes 0 result node temp nil)
+            (allocation simple-bit-vector-widetag nbytes 0 result node temp nil)
             (inst mov :byte (ea result) simple-bit-vector-widetag)
             (inst mov :dword (vector-len-ea result 0)
                   (if (sc-is length immediate) (fixnumize (tn-value length)) length))
@@ -652,7 +652,7 @@
                               type)
                           size-tn node instrumentation-temp thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
-         (allocation nil size-tn 0 result node alloc-temp thread-tn)
+         (allocation type size-tn 0 result node alloc-temp thread-tn)
          (put-header result 0 type length t alloc-temp)
          (inst or :byte result other-pointer-lowtag)))
       #+ubsan
@@ -868,7 +868,7 @@
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation bytes fun-pointer-lowtag result)
-            (allocation nil bytes fun-pointer-lowtag result node temp thread-tn))
+            (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
         (storew* #-immobile-space header ; write the widetag and size
                  #+immobile-space        ; ... plus the layout pointer
                  (let ((layout #-sb-thread (static-symbol-value-ea 'function-layout)
@@ -1015,7 +1015,7 @@
              ;; Yup, the lifetime specs in this vop are pretty confusing.
              (instrument-alloc type bytes node alloc-temp thread-tn)
              (pseudo-atomic (:thread-tn thread-tn)
-              (allocation nil bytes lowtag result node alloc-temp thread-tn)
+              (allocation type bytes lowtag result node alloc-temp thread-tn)
               (storew header result 0 lowtag))))))
 
 #+immobile-space
