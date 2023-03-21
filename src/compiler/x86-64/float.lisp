@@ -1083,45 +1083,56 @@
     complex-double-reg fp-complex-double-immediate complex-double-float
     movsd movapd cmppd movmskpd #b11))
 
-(macrolet ((define (op single-name double-name &rest flags)
-               `(progn
-                  (define-vop (,double-name double-float-compare)
-                    (:translate ,op)
-                    (:info)
-                    (:vop-var vop)
-                    (:conditional ,@flags)
-                    (:generator 3
-                      (note-float-location ',op vop x y)
-                      (sc-case y
-                        (double-stack
-                         (setf y (ea-for-df-stack y)))
-                        (descriptor-reg
-                         (setf y (ea-for-df-desc y)))
-                        (fp-double-immediate
-                         (setf y (register-inline-constant (tn-value y))))
-                        (t))
-                      (inst comisd x y)))
-                  (define-vop (,single-name single-float-compare)
-                    (:translate ,op)
-                    (:info)
-                    (:conditional ,@flags)
-                    (:generator 3
-                      (note-float-location ',op vop x y)
-                      (sc-case y
-                        (single-stack
-                         (setf y (ea-for-sf-stack y)))
-                        (fp-single-immediate
-                         (setf y (register-inline-constant (tn-value y))))
-                        (t))
-                      (inst comiss x y))))))
+(macrolet ((define (op single-name double-name flags &optional flip)
+             `(progn
+                (define-vop (,double-name double-float-compare)
+                  (:translate ,op)
+                  (:info)
+                  (:vop-var vop)
+                  (:conditional ,@flags)
+                  (:generator 3
+                    (note-float-location ',op vop x y)
+                    (sc-case y
+                      (double-stack
+                       (setf y (ea-for-df-stack y)))
+                      (descriptor-reg
+                       (setf y (ea-for-df-desc y)))
+                      (fp-double-immediate
+                       (setf y (register-inline-constant (tn-value y))))
+                      ,(if flip
+                           `(t
+                             (change-vop-flags vop '(,flip))
+                             (rotatef x y))
+                           `(t)))
+                    (inst comisd x y)))
+                (define-vop (,single-name single-float-compare)
+                  (:translate ,op)
+                  (:info)
+                  (:conditional ,@flags)
+                  (:generator 3
+                    (note-float-location ',op vop x y)
+                    (sc-case y
+                      (single-stack
+                       (setf y (ea-for-sf-stack y)))
+                      (fp-single-immediate
+                       (setf y (register-inline-constant (tn-value y))))
+                      ,(if flip
+                           `(t
+                             (change-vop-flags vop '(,flip))
+                             (rotatef x y))
+                           `(t)))
+
+                    (inst comiss x y))))))
   ;;   UNORDERED:    ZF,PF,CF <- 111;
   ;;   GREATER_THAN: ZF,PF,CF <- 000;
   ;;   LESS_THAN:    ZF,PF,CF <- 001;
   ;;   EQUAL:        ZF,PF,CF <- 100;
-  (define < <single-float <double-float not :p :nc)
-  (define > >single-float >double-float not :p :na)
-  (define <= <=single-float <=double-float not :p :a)
-  (define >= >=single-float >=double-float not :p :b))
+  ;;   Using the flags that get a negated meaning by the unordered bits
+  ;;   allows not checking for :P specifically.
+  (define < <single-float <double-float (not :p :nc) :a)
+  (define > >single-float >double-float (:a))
+  (define <= <=single-float <=double-float (not :p :a) :nb)
+  (define >= >=single-float >=double-float (:nb)))
 
 
 ;;;; conversion
