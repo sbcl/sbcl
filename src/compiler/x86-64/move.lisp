@@ -242,18 +242,23 @@
             :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg)
                :load-if (not (location= x y))))
+  (:result-refs result-ref)
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (cond ((and (sc-is x signed-reg unsigned-reg)
-                (not (location= x y)))
-           (if (= n-fixnum-tag-bits 1)
-               (inst lea y (ea x x))
-               (inst lea y (ea nil x (ash 1 n-fixnum-tag-bits)))))
-          (t
-           ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
-           (move y x)
-           (inst shl y n-fixnum-tag-bits)))))
+    (let ((opsize (if (and (eq n-fixnum-tag-bits 1)
+                           (csubtypep (tn-ref-type result-ref)
+                                      (specifier-type '(unsigned-byte 31))))
+                      :dword :qword)))
+      (cond ((and (sc-is x signed-reg unsigned-reg)
+                  (not (location= x y)))
+             (if (= n-fixnum-tag-bits 1)
+                 (inst lea opsize y (ea x x))
+                 (inst lea y (ea nil x (ash 1 n-fixnum-tag-bits)))))
+            (t
+             ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
+             (move y x opsize)
+             (inst shl opsize y n-fixnum-tag-bits))))))
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 

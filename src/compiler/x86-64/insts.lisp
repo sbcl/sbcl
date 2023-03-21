@@ -2033,21 +2033,21 @@
 
 ;;;; bit manipulation
 
-(flet ((emit* (segment opcode dst src)
-         (let ((size (matching-operand-size dst src)))
+(flet ((emit* (segment opcode prefix dst src)
+         (let ((size (pick-operand-size prefix dst src)))
            (when (eq size :byte)
              (error "can't scan bytes: ~S" src))
            (emit-prefixes segment src dst size)
            (emit-bytes segment #x0F opcode)
            (emit-ea segment src dst))))
 
-  (define-instruction bsf (segment dst src)
+  (define-instruction bsf (segment &prefix prefix dst src)
     (:printer ext-reg-reg/mem-no-width ((op #xBC)))
-    (:emitter (emit* segment #xBC dst src)))
+    (:emitter (emit* segment #xBC prefix dst src)))
 
-  (define-instruction bsr (segment dst src)
+  (define-instruction bsr (segment &prefix prefix dst src)
     (:printer ext-reg-reg/mem-no-width ((op #xBD)))
-    (:emitter (emit* segment #xBD dst src))))
+    (:emitter (emit* segment #xBD prefix dst src))))
 
 (flet ((emit* (segment prefix src index opcode)
          (let ((size (pick-operand-size prefix src index)))
