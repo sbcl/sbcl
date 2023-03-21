@@ -4017,3 +4017,14 @@
       `(lambda (a b)
          (eq (the (or) (car a))
              (the (or) (car b))))))
+
+(with-test (:name :cmov-modifying-input)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b d)
+         (declare (double-float d))
+         (values (if (not (> d 10d0))
+                     b
+                     a)
+                 a))
+    ((1 2 1d0) (values 2 1))))

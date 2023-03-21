@@ -206,8 +206,9 @@
                         (setf else temp))
                       (load-immediate res then))
                      ((location= else res)
-                      (inst xchg else then)
-                      (rotatef else then))
+                      (move temp else)
+                      (move res then)
+                      (setf else temp))
                      (t
                       (move res then)))
                (when (sc-is else immediate)
