@@ -1725,7 +1725,7 @@
     POS
     (inst bsr res res)
     (inst jmp :z ZERO)
-    (inst inc res)
+    (inst inc :dword res)
     (inst jmp DONE)
     ZERO
     (zeroize res)
@@ -1742,7 +1742,7 @@
   (:generator 26
     (inst bsr res arg)
     (inst jmp :z ZERO)
-    (inst inc res)
+    (inst inc :dword res)
     (inst jmp DONE)
     ZERO
     (zeroize res)
@@ -1782,12 +1782,13 @@
   (:arg-types positive-fixnum)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
+  (:arg-refs arg-ref)
   (:generator 24
-    (move res arg)
-    (when (> n-fixnum-tag-bits 1)
-      (inst shr res (1- n-fixnum-tag-bits)))
-    (inst or res 1)
-    (inst bsr res res)))
+    (let ((size (if (csubtypep (tn-ref-type arg-ref) (specifier-type '(unsigned-byte 31)))
+                              :dword :qword)))
+      (move res arg size)
+      (inst or size res 1)
+      (inst bsr size res res))))
 
 (define-vop (fixnum-len)
   (:translate integer-length)
