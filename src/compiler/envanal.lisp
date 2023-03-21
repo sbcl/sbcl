@@ -345,12 +345,12 @@
                   (let ((enclose (xep-enclose (ref-leaf use))))
                     (cond ((enclose-cleanup enclose)
                            (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
-                                 'dynamic-extent))
+                                 'dynamic-extent-no-note))
                           (t
                            (unless cleanup
                              (setq cleanup (insert-dynamic-extent-cleanup node)))
-                           (let ((dx-info (make-dx-info :kind 'dynamic-extent :value arg
-                                                        :cleanup cleanup)))
+                           (let ((dx-info (make-dx-info :kind 'dynamic-extent-no-note
+                                                        :value arg :cleanup cleanup)))
                              (setf (lvar-dynamic-extent arg) dx-info)
                              (push dx-info (cleanup-nlx-info cleanup)))))))))))))
 
