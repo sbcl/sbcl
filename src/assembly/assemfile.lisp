@@ -32,6 +32,7 @@
          (asmstream (make-asmstream))
          (*asmstream* asmstream)
          (sb-vm::*adjustable-vectors* nil))
+    (declare (special sb-vm::*adjustable-vectors*))
     (unwind-protect
         (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
               (*readtable* sb-cold:*xc-readtable*))

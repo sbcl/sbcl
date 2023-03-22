@@ -218,9 +218,6 @@
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
  ("src/compiler/meta-vmdef" :c-headers)
 
- ("src/compiler/fixup") ; for DEFSTRUCT FIXUP, needed by generic/core
- ("src/compiler/generic/core") ; for CORE-OBJECT-P, needed by x86-64/vm
-
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/{arch}/vm" :c-headers)
 
@@ -352,9 +349,11 @@
  ("src/compiler/disassem")
  ("src/compiler/assem")
 
+ ("src/compiler/codegen")
  ;; Compiling this requires fop definitions from code/load.lisp.
  ("src/compiler/dump")
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
+ ("src/compiler/generic/core")
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
@@ -470,7 +469,6 @@
  ("src/compiler/ir2opt")
  ("src/compiler/pack")
  ("src/compiler/pack-iterative")
- ("src/compiler/codegen")
  ("src/compiler/debug")
 
  ("src/code/format-time" :not-host)

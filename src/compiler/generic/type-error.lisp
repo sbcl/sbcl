@@ -127,6 +127,28 @@
     (inst byte code))
   (encode-internal-error-args values))
 
+(defvar *adjustable-vectors*)
+
+(defmacro with-adjustable-vector ((var) &rest body)
+  `(let ((,var (or (pop *adjustable-vectors*)
+                   (make-array 16
+                               :element-type '(unsigned-byte 8)
+                               :fill-pointer 0
+                               :adjustable t))))
+     ;; Don't declare the length - if it gets adjusted and pushed back
+     ;; onto the freelist, it's anyone's guess whether it was expanded.
+     ;; This code was wrong for >12 years, so nobody must have needed
+     ;; more than 16 elements. Maybe we should make it nonadjustable?
+     (declare (type (vector (unsigned-byte 8)) ,var))
+     (setf (fill-pointer ,var) 0)
+     ;; No UNWIND-PROTECT here - semantics are unaffected by nonlocal exit,
+     ;; and this macro is about speeding up the compiler, not slowing it down.
+     ;; GC will clean up any debris, and since the vector does not point
+     ;; to anything, even an accidental promotion to a higher generation
+     ;; will not cause transitive garbage retention.
+     (prog1 (progn ,@body)
+       (push ,var *adjustable-vectors*))))
+
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)
     (dolist (where values)

@@ -140,16 +140,6 @@
 (declaim (freeze-type segment))
 (defprinter (segment :identity t))
 
-;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
-(defun sb-c:note-fixup (segment kind fixup)
-  (emit-back-patch
-   segment
-   0
-   (lambda (segment posn)
-     (push (sb-c:make-fixup-note kind fixup
-                                  (- posn (segment-header-skew segment)))
-           (segment-fixup-notes segment)))))
-
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)
   (segment-%current-index segment))
