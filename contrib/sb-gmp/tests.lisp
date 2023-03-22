@@ -203,6 +203,10 @@
     (sb-gmp::gmp-intexp 1 (ash 1 127))
   1)
 
+(deftest intexp-2
+    (sb-gmp::gmp-intexp 113/355 -1)
+  355/113)
+
 (deftest remove-1
     (multiple-value-list (mpz-remove 28 2))
   (7 2))

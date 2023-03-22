@@ -969,7 +969,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
     (t
      (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
      (cond ((minusp power)
-            (/ (the integer (gmp-intexp base (- power)))))
+            (/ (gmp-intexp base (- power))))
            ((eql base 2)
             (mpz-mul-2exp 1 power))
            ((typep base 'ratio)
