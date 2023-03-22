@@ -696,13 +696,13 @@
       ;; Delete the uses if the result is not used anywhere
       (let* ((lvar (return-result node))
              (combination (lvar-uses lvar)))
-        (flet ((erase-types ()
+        (flet ((erase-types (type)
                  (dolist (ref (leaf-refs lambda))
                    (let* ((lvar (node-lvar ref))
                           (combination (lvar-dest lvar)))
-                     (setf (node-derived-type combination) *wild-type*)))
-                 (setf (return-result-type node) *wild-type*
-                       (tail-set-type (lambda-tail-set lambda)) *wild-type*)
+                     (setf (node-derived-type combination) type)))
+                 (setf (return-result-type node) type
+                       (tail-set-type (lambda-tail-set lambda)) type)
                  (do-uses (use lvar)
                    (reoptimize-node use))
                  (let ((defined-fun (functional-inline-expanded lambda)))
@@ -718,7 +718,7 @@
                 (single-value-p
                  (unless (type-single-value-p (lvar-derived-type lvar))
                    (filter-lvar lvar (lambda (x) `(values ,x)))
-                   (erase-types)
+                   (erase-types (make-single-value-type (lvar-type lvar)))
                    (return-from ir1-optimize-return)))
                 ((not (and (combination-p combination)
                            (lvar-fun-is (combination-fun combination) '(values))
@@ -731,7 +731,7 @@
                      (ir1-convert (node-prev node) ctran new-lvar '(values)))
                    (setf (return-result node) new-lvar)
                    (link-node-to-previous-ctran node ctran)
-                   (erase-types)
+                   (erase-types *wild-type*)
                    (return-from ir1-optimize-return)))))))
     (tagbody
      :restart

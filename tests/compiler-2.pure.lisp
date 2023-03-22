@@ -4028,3 +4028,12 @@
                      a)
                  a))
     ((1 2 1d0) (values 2 1))))
+
+(with-test (:name :ir1-optimize-return-type-widening)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (flet ((f ()
+                  (ceiling a b)))
+           (values (the integer (f)))))
+    ((1 2) 1)))
