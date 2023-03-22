@@ -67,7 +67,7 @@
     (apply #'compiler-mumble foo)))
 
 
-(deftype object () '(or fasl-output core-object null))
+(deftype object () '(or fasl-output #-sb-xc-host core-object null))
 
 (defvar *compile-object* nil)
 (declaim (type object *compile-object*))
@@ -548,6 +548,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 (progn
   (defun component-mem-space (component)
     (or (component-%mem-space component)
+        #-sb-xc-host
         (setf (component-%mem-space component)
               (if (fasl-output-p *compile-object*)
                   (and (eq *compile-file-to-memory-space* :immobile)
@@ -1514,6 +1515,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((object *compile-object*))
     (etypecase object
       (fasl-output (fasl-dump-toplevel-lambda-call tll object))
+      #-sb-xc-host
       (core-object (core-call-toplevel-lambda      tll object))
       (null))))
 

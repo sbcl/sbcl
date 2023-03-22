@@ -199,6 +199,13 @@
     (list (make-hash-table :test 'equal :synchronized t)))
   (declaim (type (cons hash-table) *code-coverage-info*)))
 
+;;; Unique number assigned into high 4 bytes of 64-bit code size slot
+;;; so that we can sort the contents of text space in a more-or-less
+;;; predictable manner based on the order in which code was loaded.
+;;; This wraps around at 32 bits, but it's still deterministic.
+(define-load-time-global *code-serialno* 0)
+(declaim (fixnum *code-serialno*))
+
 (deftype id-array ()
   '(and (array t (*))
         ;; Might as well be as specific as we can.

@@ -353,7 +353,7 @@
  ;; Compiling this requires fop definitions from code/load.lisp.
  ("src/compiler/dump")
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
- ("src/compiler/generic/core")
+ ("src/compiler/generic/core" :not-host)
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
@@ -521,8 +521,6 @@
  ("src/code/serve-event" :not-host)
 
  ("src/code/late-extensions") ; needs condition system
- ("src/compiler/generic/target-core" :not-host) ; uses stuff from
-                                                ;   "compiler/generic/core"
 
  ("src/code/alloc"             :not-host) ; needs foo-SPACE-START
  ("src/code/brothertree"       :not-host)
