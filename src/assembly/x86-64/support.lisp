@@ -82,9 +82,14 @@
   ;;   C    = save GPRs that C call can change
   ;;   Lisp = save GPRs that lisp call can change
   (aver (member convention '(lisp c)))
+  (aver (eql card-table-reg 12)) ; change detector
   (let ((fpr-align 64)
         (except (ensure-list except))
-        (clobberables '(rax rbx rcx rdx rsi rdi r8 r9 r10 r11 r12 r13 r14 r15)))
+        (clobberables
+         `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
+           ;; 13 is usable only if not permanently wired to the thread base
+           #+gs-seg r13
+           r14 r15)))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
     (when (member 'rax except)
       ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly

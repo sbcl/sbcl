@@ -203,8 +203,6 @@
 ;;; NODE may be used to make policy-based decisions.
 ;;; This function should only be used inside a pseudo-atomic section,
 ;;; which to the degree needed should also cover subsequent initialization.
-;;; CONSP says whether we're allocating conses. But we also need LOWTAG
-;;; because the vop could want the CONS to have 0 or list-pointer lowtag.
 ;;;
 ;;; A mnemonic device for the argument pattern here:
 ;;; 1. what to allocate: type, size, lowtag describe the object

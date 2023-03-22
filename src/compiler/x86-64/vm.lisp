@@ -636,3 +636,11 @@
 (defmacro compact-fsc-instance-hash (fin)
   `(sap-ref-32 (int-sap (get-lisp-obj-address ,fin))
                (+ (ash 3 word-shift) 4 (- fun-pointer-lowtag))))
+
+(eval-when (:compile-toplevel)
+  (let ((locs (sb-c::sc-locations (gethash 'any-reg sb-c:*backend-sc-names*))))
+    ;; These locations are not saved by WITH-REGISTERS-PRESERVED
+    ;; because Lisp can't treat them as general purpose.
+    ;; By design they are also (i.e. must be) nonvolatile aross C call.
+    (aver (not (logbitp 12 locs)))
+    #-gs-seg (aver (not (logbitp 13 locs)))))
