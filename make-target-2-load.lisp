@@ -235,7 +235,8 @@
        :all)
       (when wps
         (dolist (wp wps)
-          (format t "Found string ~S~%" (weak-pointer-value wp)))
+          (sb-int:binding* ((v (weak-pointer-value wp) :exit-if-null))
+            (format t "Found string ~S~%" v)))
         (warn "Potential problem with format-control strings.
 Please check that all strings which were not recognizable to the compiler
 (as the first argument to WARN, etc.) are wrapped in SB-FORMAT:TOKENS"))
