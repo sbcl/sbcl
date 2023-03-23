@@ -469,8 +469,8 @@
 (test-util:with-test (:name :solist-2-phase-insert)
   (let ((set (sb-lockless:make-so-set/addr))
         (example-objects
-         (subseq (sb-vm:list-allocated-objects :read-only :type sb-vm:simple-base-string-widetag)
-                 0 1000))
+         (sb-vm:list-allocated-objects (or #+x86-64 :read-only :dynamic)
+                                       :type sb-vm:simple-base-string-widetag :count 1000))
         (n-deleted 0)
         (nodes))
     ;; This example is artificial. The real usage would allocate one object and perform
