@@ -104,6 +104,11 @@ static inline void* arena_mutex(struct arena* a) {
 void arena_release_memblks(lispobj arena_taggedptr)
 {
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    // Avoid a race with GC in scavenge_arenas(). We're messing up the chain
+    // of blocks and can't have anything else looking at them.
+    __attribute__((unused)) lispobj old_hidden
+      = __sync_val_compare_and_swap(&arena->hidden, NIL, LISP_T);
+    gc_assert(old_hidden == NIL);
     ARENA_MUTEX_ACQUIRE(arena);
     struct arena_memblk* first = (void*)arena->uw_first_block;
     struct arena_memblk* block = first->next;
@@ -118,6 +123,7 @@ void arena_release_memblks(lispobj arena_taggedptr)
     first->next = NULL;
     arena->uw_extension_count = 0;
     arena->uw_length = arena->uw_original_size;
+    arena->hidden = NIL;
     ARENA_MUTEX_RELEASE(arena);
 }
 

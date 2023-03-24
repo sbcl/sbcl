@@ -56,6 +56,7 @@
          (bug "Arena token overflow. Need to implement double-precision count"))
         ((eql (arena-link arena) 0)) ; never used - do nothing
         (t
+         (aver (not (arena-hidden arena)))
          (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
                         (get-lisp-obj-address arena))
          (setf (arena-bytes-wasted arena) 0)
