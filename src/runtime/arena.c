@@ -121,7 +121,14 @@ void arena_release_memblks(lispobj arena_taggedptr)
     char* mem_base = (char*)first + sizeof (struct arena_memblk);
     first->freeptr = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
     first->next = NULL;
-    arena->uw_extension_count = 0;
+    // Release huge-object blocks
+    block = (void*)arena->uw_huge_objects;
+    while (block) {
+        struct arena_memblk* next = block->next;
+        free(block);
+        block = next;
+    }
+    arena->uw_huge_objects = 0;
     arena->uw_length = arena->uw_original_size;
     arena->hidden = NIL;
     ARENA_MUTEX_RELEASE(arena);
@@ -242,28 +249,63 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
             if (mem != actual_current_block) { // oops - looking at the wrong memblk
                 mem = actual_current_block;
                 // fall into the mutex release and restart below
-            }  else {
-                // really add an extension block
-                if (a->uw_extension_count == a->uw_max_extensions) { // can't extend further
+            } else { // potentially extend
+                // An object occupying 1/512th or more of an extension is separately allocated.
+                int oversized = nbytes > (sword_t)(a->uw_growth_amount >> 9);
+                long request = oversized ? nbytes : (sword_t)a->uw_growth_amount;
+                if (a->uw_length + request > a->uw_size_limit) { // limit reached
                     ARENA_MUTEX_RELEASE(a);
-                    lose("Fatal: arena memory exhausted");
+                    lose("Fatal: won't add arena %s block. Length=%lx request=%lx max=%lx",
+                         oversized ? "huge-object" : "extension",
+                         a->uw_length, request, a->uw_size_limit);
                 }
-                char* new_mem = ARENA_GET_OS_MEMORY(a->uw_growth_amount);
+                // For a huge object, ensure that there will be adequate space after aligning
+                // the bounds. Don't worry about it for a regular extension block though
+                // because there's no chance that the current request won't fit.
+                // Moreover, use malloc() for oversized objects instead of the macro
+                // because we don't actually remember the originally requested size
+                // to pass to ARENA_DISPOSE_MEMORY in arena_release_memblks
+                long actual_request;
+                char* new_mem;
+                if (oversized) {
+                    actual_request = request + 3*CHUNK_ALIGN;
+                    new_mem = malloc(actual_request);
+                } else {
+                    actual_request = request;
+                    new_mem = ARENA_GET_OS_MEMORY(actual_request);
+                }
                 if (new_mem == 0) {
                     ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: arena memory exhausted and could not obtain more memory");
                 }
                 struct arena_memblk* extension= (void*)new_mem;
                 char* mem_base = new_mem + sizeof (struct arena_memblk);
+                // Alignment serves the needs of hide/unhide because mprotect()
+                // operates only on boundaries as dictated by the OS and/or CPU.
                 char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
                 extension->freeptr = aligned_mem_base;
-                char* limit = new_mem + a->uw_growth_amount;
+                char* limit = new_mem + actual_request;
                 char* aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
                 extension->limit = aligned_limit;
                 extension->next = NULL;
                 extension->padding = 0;
-                a->uw_length += a->uw_growth_amount; // tally up the total length
-                a->uw_extension_count++;
+                // tally up the total length
+                // For huge objects, count only the directly requested space,
+                // not the "bookends" (alignment chunks)
+                a->uw_length += request;
+                if (oversized) {
+                    long usable_space = aligned_limit - aligned_mem_base;
+                    // This should assert() because it's very bad, but assertions can be
+                    // disabled, so explicitly lose() if it happens.
+                    if (nbytes > usable_space) lose("alignment glitch");
+                    extension->next = (void*)a->uw_huge_objects;
+                    a->uw_huge_objects = (uword_t)extension;
+                    // A huge object needs to be zero-filled. It probably was, because it
+                    // probably just got mmapped() but there's no way to know.
+                    memset(aligned_mem_base, 0, nbytes);
+                    ARENA_MUTEX_RELEASE(a);
+                    return aligned_mem_base;
+                }
                 mem->next = extension;
                 // Other threads can start using the new block already
                 a->uw_current_block = (lispobj)extension;
@@ -303,11 +345,16 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
      *  1. amount remaining in the TLAB is not significant. Just toss it out.
      *     Refill the TLAB with the default quantum plus the user's actual request.
      *     Then carve out the new object from the beginning of the TLAB.
+     *     Exception: if 'nbytes' exceeds 64KiB then always treat it as case 2.
+     *     This avoids an anomaly in the situation where 'nbytes' so large that it
+     *     can not be obtained from the current arena block, but instead uses malloc()
+     *     directly. In such case, attempting to refill the TLAB from the same
+     *     block is futile.
      *
      *  2. amount remaining in the TLAB is worth keeping.
      *     Don't refill the TLAB; just make the new object as a discrete claim.
      */
-    if (avail < min_keep) { // case 1
+    if (avail < min_keep && nbytes <= 65536) { // case 1
         struct arena* in_use_arena = (void*)native_pointer(th->arena);
         __sync_fetch_and_add(&in_use_arena->uw_bytes_wasted, avail);
         long total_request = nbytes + 8192;
@@ -545,6 +592,7 @@ void arena_mprotect(lispobj arena, int option)
         // the block itself is not within [base,limit] and so can be read even if prot==PROT_NONE
         blk = blk->next;
     } while (blk);
+    // TODO: mprotect huge-object blocks
 #endif
 }
 

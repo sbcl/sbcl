@@ -251,18 +251,19 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
   (current-block 0 :type word)
   ;; Address of the one mandatory 'struct arena_memblk' for this arena
   (first-block 0 :type word)
+  ;; Huge objects are those whose size exceeds a tiny fraction of the growth amount.
+  (huge-objects 0 :type word)
   ;; Arena allocation parameters
   (original-size 0 :type word)
   (growth-amount 0 :type word) ; additive
-  (max-extensions 0 :type word)
+  ;; Maximum we'll allow the arena to grow to, accounting for extension blocks
+  ;; and huge object blocks.
+  (size-limit 0 :type word)
   ;; Sum of sizes of currently allocated blocks
   (length 0 :type word)
   ;; Sum of unusable bytes resulting from discarding the tail of the
   ;; most recently claimed chunk when switching from the arena to the heap.
   (bytes-wasted 0 :type word)
-  ;; How may times extended since allocation or most recent rewind.
-  ;; This is for bounding the maximum extension.
-  (extension-count 0 :type word)
   ;; Small integer identifier starting from 0
   (index 0 :type fixnum)
   ;; T if all memory has been protected with PROT_NONE (for debugging)

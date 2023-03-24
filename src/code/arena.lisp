@@ -81,9 +81,8 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                 (alien-funcall (extern-alien "sbcl_new_arena" (function unsigned unsigned))
                                size))))
     (%set-instance-layout arena layout)
-    (setf (arena-max-extensions arena) max-extensions
+    (setf (arena-size-limit arena) (+ size (* max-extensions growth-amount))
           (arena-growth-amount arena) growth-amount
-          (arena-max-extensions arena) max-extensions
           (arena-index arena) index
           (arena-hidden arena) nil
           (arena-token arena) 1

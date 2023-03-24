@@ -12,6 +12,15 @@
 (defun f (x y z)
   (with-arena (*arena*) (list x y z)))
 
+(test-util:with-test (:name :arena-huge-object)
+  ;; This arena can grow to 10 MiB.
+  (let ((a (sb-vm:new-arena 1048576 1048576 9)))
+    ;; 4 arrays of about 2MiB each should fit in the allowed space
+    (dotimes (i 4)
+      (test-util:opaque-identity
+       (sb-vm:with-arena (a) (make-array 2097152 :element-type '(unsigned-byte 8)))))
+    (sb-vm:destroy-arena a)))
+
 #+nil
 (test-util:with-test (:name :arena-alloc-waste-reduction)
   (let* ((list1 (f 'foo 'bar'baz))
