@@ -395,3 +395,12 @@
                       (and (sb-c::functional-p fun)
                            (eq (sb-c::functional-kind fun) :let))))
                   calls)))))
+
+(with-test (:name :unused-flet-values)
+  (let ((calls (ir-full-calls
+                `(lambda (x y)
+                   (flet ((f ()
+                            (values x (+ x y))))
+                     (declare (notinline f))
+                     (values (f)))))))
+    (assert (not calls))))
