@@ -5630,6 +5630,19 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc();
     unwind_binding_stack();
+#ifdef LISP_FEATURE_SB_THREAD
+    /* During save, if the only pointer to a heap object is from a thread, then that
+     * heap object is effectively dead, because the binding stacks and TLS of the main
+     * thread will be recreated on startup and contain no pointers.
+     * Make it as if that already happened, otherwise excess garbage may be retained
+     * (as can be seen if DEBUG_CORE_LOADING is defined).
+     * non-thread builds do not use TLS */
+    {
+    char* from = (char*)&thread->lisp_thread;
+    char* to = SymbolValue(FREE_TLS_INDEX,0) + (char*)thread;
+    memset(from, 0, to-from);
+    }
+#endif
     save_lisp_gc_iteration = 1;
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(0);
