@@ -677,7 +677,8 @@
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let ((lambda (return-lambda node))
-        single-value-p)
+        ;; single-value-p
+        )
     (when (and
            (singleton-p (tail-set-funs (lambda-tail-set lambda)))
            (dolist (ref (leaf-refs lambda)
@@ -689,8 +690,9 @@
                             (eq (combination-kind combination) :local)
                             (eq (combination-fun combination) lvar)
                             (not (or (and (node-lvar combination)
-                                          (not (setf single-value-p
-                                                     (lvar-single-value-p (node-lvar combination)))))
+                                          ;; (not (setf single-value-p
+                                          ;;            (lvar-single-value-p (node-lvar combination))))
+                                          )
                                      (node-tail-p combination))))
                  (return)))))
       ;; Delete the uses if the result is not used anywhere
@@ -721,11 +723,11 @@
                       ;; because they can be tail called.
                       (unless (flushable-combination-p node)
                         (return t))))))
-                (single-value-p
-                 (unless (type-single-value-p (lvar-derived-type lvar))
-                   (filter-lvar lvar (lambda (x) `(values ,x)))
-                   (erase-types (make-single-value-type (lvar-type lvar)))
-                   (return-from ir1-optimize-return)))
+                ;; (single-value-p
+                ;;  (unless (type-single-value-p (lvar-derived-type lvar))
+                ;;    (filter-lvar lvar (lambda (x) `(values ,x)))
+                ;;    (erase-types (make-single-value-type (lvar-type lvar)))
+                ;;    (return-from ir1-optimize-return)))
                 ((not (and (combination-p combination)
                            (lvar-fun-is (combination-fun combination) '(values))
                            (null (combination-args combination))))
