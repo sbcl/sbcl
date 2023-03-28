@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.2:
+changes in sbcl-2.3.3 relative to sbcl-2.3.2:
   * enhancement: LET-bound anonymous closures declared dynamic extent can now
     be stack allocated, just like closures bound with FLET or
     LABELS. Otherwise-inaccessible closure subparts of objects declared
