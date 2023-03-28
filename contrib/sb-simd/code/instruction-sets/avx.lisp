@@ -229,7 +229,7 @@
    (f64.2-movemask      #:vmovmskpd    (u2)    (f64.2)       :cost 1)
    (f64.2-%round        #:vroundpd     (f64.2) (f64.2 imm3)  :cost 2)
    (f64.2-permute       #:vpermilpd    (f64.2) (f64.2 imm2)  :cost 1)
-   (f64.2-shuffle       #:vshufpd      (f64.2) (f64.2 f64.2 imm1) :cost 1)
+   (f64.2-shuffle       #:vshufpd      (f64.2) (f64.2 f64.2 imm2) :cost 1)
    (f64.2-movemask      #:vmovmskpd    (u2)    (f64.2)       :cost 1)
    ;; f32.8
    (f32.8-from-s32.8    #:vcvtdq2ps    (f32.8) (s32.8)      :cost 5)
@@ -329,7 +329,7 @@
    (f64.4-%round        #:vroundpd     (f64.4) (f64.4 imm3)  :cost 2)
    (f64.4-permute       #:vpermilpd    (f64.4) (f64.4 imm4)  :cost 1)
    (f64.4-permute128    #:vperm2f128   (f64.4) (f64.4 f64.4 imm8) :cost 1)
-   (f64.4-shuffle       #:vshufpd      (f64.4) (f64.4 f64.4 imm2) :cost 1)
+   (f64.4-shuffle       #:vshufpd      (f64.4) (f64.4 f64.4 imm4) :cost 1)
    (f64.4-reverse       nil            (f64.4) (f64.4)       :cost 2 :encoding :fake-vop)
    (f64.2-from-f64.4    #:vextractf128 (f64.2) (f64.4 imm1)  :cost 1)
    (f64.4-insert-f64.2  #:vinsertf128  (f64.4) (f64.4 f64.2 imm1) :cost 1)

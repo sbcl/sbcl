@@ -440,7 +440,7 @@
 (define-fake-vop f64.2-values (x)
   (values
    (%f64!-from-p128 x)
-   (%f64!-from-p128 (%f64.2-shuffle x 1))))
+   (%f64!-from-p128 (%f64.2-shuffle x x 1))))
 
 (define-fake-vop f64.2-broadcast (x)
   (let ((v (%f64.2!-from-f64 x)))

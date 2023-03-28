@@ -112,7 +112,7 @@
    (f64.2-sqrt        #:sqrtpd     (f64.2) (f64.2)       :cost 20)
    (f64.2-unpackhi    #:unpckhpd   (f64.2) (f64.2 f64.2) :cost 1 :encoding :sse)
    (f64.2-unpacklo    #:unpcklpd   (f64.2) (f64.2 f64.2) :cost 1 :encoding :sse)
-   (f64.2-shuffle     #:shufpd     (f64.2) (f64.2 imm2)  :cost 1)
+   (f64.2-shuffle     #:shufpd     (f64.2) (f64.2 f64.2 imm2)  :cost 1 :encoding :sse)
    (f64.2-movemask    #:movmskpd   (u2)    (f64.2)       :cost 1)
    ;; u8.16
    (u8.16!-from-u8    #:movq       (u8.16) (u8)          :cost 1)
