@@ -456,11 +456,6 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-#-sb-xc-host
-(defun pseudostatic-immobile-symbol-p (symbol)
-  (and (immobile-space-obj-p symbol)
-       (= (generation-of symbol) +pseudo-static-generation+)))
-
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -469,20 +464,17 @@
          character)
      immediate-sc-number)
     (symbol ; Symbols in static and immobile space are immediate
-     (when (or ;; With #+immobile-symbols, all symbols are in immobile-space.
-               ;; And the cross-compiler always uses immobile-space if enabled.
-               #+(or immobile-symbols (and immobile-space sb-xc-host)) t
-
-               ;; Otherwise, if #-immobile-symbols, and the symbol is pseudostatic
-               ;; in immobile space, it is an immediate value.
-               ;; If compiling to memory, the symbol's address alone suffices.
-               #+(and (not sb-xc-host) immobile-space (not immobile-symbols))
-               (or (pseudostatic-immobile-symbol-p value)
-                   (locally (declare (notinline sb-c::producing-fasl-file))
-                     (and (not (sb-c::producing-fasl-file))
-                          (immobile-space-obj-p value))))
-
-               (static-symbol-p value))
+     (when (or (static-symbol-p value)
+               ;; The cross-compiler always uses immobile-space if it exists.
+               #+(and immobile-space sb-xc-host) t
+               ;; With #+immobile-symbols, all interned symbols are in immobile-space.
+               #+immobile-symbols (sb-xc:symbol-package value)
+               #-sb-xc-host
+               (if (immobile-space-obj-p value)
+                   (or (= (generation-of value) +pseudo-static-generation+)
+                       ;; If compiling to memory, the symbol's address alone suffices.
+                       (locally (declare (notinline sb-c::producing-fasl-file))
+                         (not (sb-c::producing-fasl-file))))))
        immediate-sc-number))
     #+metaspace (sb-vm:layout (bug "Can't reference layout as a constant"))
     #+(and immobile-space (not metaspace)) (wrapper immediate-sc-number)
