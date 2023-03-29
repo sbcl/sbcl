@@ -471,12 +471,12 @@
               (t ;; copy forward
                (assemble ()
                  (inst cmp dest result)
-                 (inst b :le DONE)
+                 (inst b :le INNER-LOOP-DONE)
                  (inst ldr temp (@ result (load-store-offset
                                            (- (* delta n-word-bytes)))))
                  (inst str temp (@ result n-word-bytes :post-index))
                  (inst b LOOP)
-                 DONE
+                 INNER-LOOP-DONE
                  (inst mov csp-tn dest))))
 
         DO-REGS

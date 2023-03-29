@@ -425,29 +425,56 @@
 ;;; or current segment (if machine-encoding). Use ASSEMBLE to change it.
 (defvar *current-destination*)
 
-(defmacro assemble ((&optional dest vop &key labels) &body body
-                    &environment env)
+;;; This formerly had some absolutely bizarre behavior regarding a manually-specified
+;;; list of labels. It was so confusing that I couldn't figure out either what it was
+;;; designed to do, or what it did do, because they certainly weren't the same thing.
+;;; My best guess is that if you needed labels which were not directly at the "spine"
+;;; of the ASSEMBLE form, but nested within, you could force it to call GEN-LABEL
+;;; for you, which is no different from calling GEN-LABEL _outside_ of the ASSEMBLE.
+;;; (Which most people do anyway if they need to)
+;;; But in anything more than a straightfoward usage, the expansion could be wrong.
+;;; For example this fragment calls EMIT-LABEL on the same label instance twice:
+#|
+ (sb-cltl2:macroexpand-all
+  '(assemble ()
+     B
+     (assemble (nil nil :labels (foo))
+       (inst pop rax-tn)
+       B
+       (assemble ()
+         B
+         (wat)))))
+=>
+(LET* ((B (GEN-LABEL)))
+  (SYMBOL-MACROLET ()
+    (EMIT-LABEL B)
+    (LET* ((B (GEN-LABEL)) (FOO (GEN-LABEL)))
+      (SYMBOL-MACROLET ((SB-ASSEM::..INHERITED-LABELS.. (B)))
+        (INST* 'POP RAX-TN)
+        (EMIT-LABEL B)
+        (LET* ()
+          (SYMBOL-MACROLET ((SB-ASSEM::..INHERITED-LABELS.. NIL))
+            (EMIT-LABEL B)
+            (WAT)))))))
+|#
+
+(defmacro assemble ((&optional dest vop) &body body &environment env)
   "Execute BODY (as a progn) with DEST as the current section or segment."
-  (flet ((label-name-p (thing)
-           (and thing (symbolp thing))))
-    (let* ((visible-labels (remove-if-not #'label-name-p body))
-           (inherited-labels
-             (multiple-value-bind (expansion expanded)
-                 (#+sb-xc-host cl:macroexpand
-                  #-sb-xc-host %macroexpand '..inherited-labels.. env)
-               (if expanded (copy-list expansion) nil)))
-           (new-labels
-             (sort (append labels
-                           (set-difference visible-labels
-                                           inherited-labels))
-                   #'string<))
-           (nested-labels
-             (sort (set-difference (append inherited-labels new-labels)
-                                   visible-labels)
-                   #'string<)))
-      (when (intersection labels inherited-labels)
-        (error "duplicate nested labels: ~S"
-               (intersection labels inherited-labels)))
+  (flet ((label-name-p (thing) (typep thing '(and symbol (not null)))))
+    (let ((inherited (multiple-value-bind (expansion expanded)
+                         (#+sb-xc-host cl:macroexpand
+                          #-sb-xc-host %macroexpand '..inherited-labels.. env)
+                       (if expanded expansion)))
+          (new-labels (sort (remove-if-not #'label-name-p body) #'string<)))
+      ;; Compare for dups using STRING=. Two reasons to use that rather than EQ:
+      ;; (1) the assembler input is generally string-like - consider that instruction
+      ;;     mnemonics are looked up by string even though written as symbols.
+      ;; (2) the above SORT could yield an unpredictable result across build hosts
+      (unless (= (length (remove-duplicates new-labels :test #'string=))
+                 (length new-labels))
+        (error "Repeated labels in ASSEMBLE body"))
+      (awhen (intersection inherited new-labels)
+        (style-warn "Shadowed asm labels ~S should be renamed not to conflict" it))
       `(let* (,@(when dest
                   `((*current-destination*
                      ,(case dest
@@ -455,11 +482,9 @@
                         (:elsewhere '(asmstream-elsewhere-section *asmstream*))
                         (t dest)))))
               ,@(when vop `((*current-vop* ,vop)))
-              ,@(mapcar (lambda (name)
-                          `(,name (gen-label)))
+              ,@(mapcar (lambda (name) `(,name (gen-label)))
                         new-labels))
-         (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-                               `((..inherited-labels.. ,nested-labels))))
+         (symbol-macrolet ((..inherited-labels.. ,(append inherited new-labels)))
            ,@(mapcar (lambda (form)
                        (if (label-name-p form)
                            `(emit-label ,form)
