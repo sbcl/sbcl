@@ -199,7 +199,7 @@
 (defun %load-mpfr ()
   (or (some #'try-load-shared-object
             #-(or win32 darwin) '("libmpfr.so" "libmpfr.so.4" "libmpfr.so.6")
-            #+darwin '("libmpfr.dylib" "libmpfr.4.dylib" "libmpfr.6.dylib")
+            #+darwin '("libmpfr.dylib" "libmpfr.4.dylib" "libmpfr.6.dylib" #+arm64 "/opt/homebrew/lib/libmpfr.dylib")
             #+win32 '("mpfr.dll"))
       (warn "MPFR was not loaded. This is likely because the shared library ~
              was not found.")))
