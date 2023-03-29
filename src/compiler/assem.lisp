@@ -465,7 +465,7 @@
                          (#+sb-xc-host cl:macroexpand
                           #-sb-xc-host %macroexpand '..inherited-labels.. env)
                        (if expanded expansion)))
-          (new-labels (sort (remove-if-not #'label-name-p body) #'string<)))
+          (new-labels (sort (copy-list (remove-if-not #'label-name-p body)) #'string<)))
       ;; Compare for dups using STRING=. Two reasons to use that rather than EQ:
       ;; (1) the assembler input is generally string-like - consider that instruction
       ;;     mnemonics are looked up by string even though written as symbols.
