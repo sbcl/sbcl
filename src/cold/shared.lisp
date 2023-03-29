@@ -25,6 +25,12 @@
 (when (sb-sys:find-dynamic-foreign-symbol-address "show_gc_generation_throughput")
   (setf (extern-alien "show_gc_generation_throughput" int) 1))
 
+#+sbcl ; prevent "illegal to redefine standard type: RATIONAL" etc
+(when (member "SB-XC" (package-nicknames "CL") :test 'string=)
+  (sb-ext:unlock-package "CL")
+  (rename-package "CL" "COMMON-LISP" '("CL"))
+  (sb-ext:lock-package "CL"))
+
 (in-package "SB-COLD")
 
 (defun parse-make-host-parallelism (str)
