@@ -677,8 +677,7 @@
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let ((lambda (return-lambda node))
-        ;; single-value-p
-        )
+        single-value-p)
     (when (and
            (singleton-p (tail-set-funs (lambda-tail-set lambda)))
            (dolist (ref (leaf-refs lambda)
@@ -690,25 +689,19 @@
                             (eq (combination-kind combination) :local)
                             (eq (combination-fun combination) lvar)
                             (not (or (and (node-lvar combination)
-                                          ;; (not (setf single-value-p
-                                          ;;            (lvar-single-value-p (node-lvar combination))))
-                                          )
+                                          (not (setf single-value-p
+                                                     (lvar-single-value-p (node-lvar combination)))))
                                      (node-tail-p combination))))
                  (return)))))
       ;; Delete the uses if the result is not used anywhere
       (let* ((lvar (return-result node))
              (combination (lvar-uses lvar)))
-        (labels ((casts-and-exits (node type)
-                   (when (or (cast-p node)
-                             (exit-p node))
-                     (setf (node-derived-type node) type)
-                     (casts-and-exits (node-dest node) type)))
-                 (erase-types (type)
+        (labels ((erase-types (type)
                    (dolist (ref (leaf-refs lambda))
                      (let* ((lvar (node-lvar ref))
                             (combination (lvar-dest lvar)))
                        (setf (node-derived-type combination) type)
-                       (casts-and-exits (node-dest combination) type)))
+                       (principal-lvar-single-valuify (node-lvar combination))))
                    (setf (return-result-type node) type
                          (tail-set-type (lambda-tail-set lambda)) type)
                    (do-uses (use lvar)
@@ -723,11 +716,11 @@
                       ;; because they can be tail called.
                       (unless (flushable-combination-p node)
                         (return t))))))
-                ;; (single-value-p
-                ;;  (unless (type-single-value-p (lvar-derived-type lvar))
-                ;;    (filter-lvar lvar (lambda (x) `(values ,x)))
-                ;;    (erase-types (make-single-value-type (lvar-type lvar)))
-                ;;    (return-from ir1-optimize-return)))
+                (single-value-p
+                 (unless (type-single-value-p (lvar-derived-type lvar))
+                   (filter-lvar lvar (lambda (x) `(values ,x)))
+                   (erase-types (make-single-value-type (lvar-type lvar)))
+                   (return-from ir1-optimize-return)))
                 ((not (and (combination-p combination)
                            (lvar-fun-is (combination-fun combination) '(values))
                            (null (combination-args combination))))

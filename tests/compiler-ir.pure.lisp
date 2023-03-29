@@ -396,8 +396,7 @@
                            (eq (sb-c::functional-kind fun) :let))))
                   calls)))))
 
-(with-test (:name :unused-flet-values
-            :fails-on :sbcl)
+(with-test (:name :unused-flet-values)
   (let ((calls (ir-full-calls
                 `(lambda (x y)
                    (flet ((f ()
