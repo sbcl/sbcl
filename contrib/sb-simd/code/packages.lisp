@@ -310,6 +310,9 @@
      #:f32-not
      #:f32-max
      #:f32-min
+     #:f32-sqrt
+     #:f32-rsqrt
+     #:f32-reciprocal
      #:f32+
      #:f32-
      #:f32*
@@ -336,6 +339,9 @@
      #:f64-not
      #:f64-max
      #:f64-min
+     #:f64-sqrt
+     #:f64-rsqrt
+     #:f64-reciprocal
      #:f64+
      #:f64-
      #:f64*
@@ -504,6 +510,8 @@
      #:s32
      #:s32vec
      #:s32-array
+     #:s32-from-f32
+     #:s32-from-f64
      #:s32-if
      #:s32-and
      #:s32-or
@@ -588,6 +596,7 @@
     (:shadow
      ;; f32
      #:f32
+     #:f32-from-s64
      #:f32-and
      #:f32-or
      #:f32-xor
@@ -595,6 +604,9 @@
      #:f32-not
      #:f32-max
      #:f32-min
+     #:f32-sqrt
+     #:f32-rsqrt
+     #:f32-reciprocal
      #:f32+
      #:f32-
      #:f32*
@@ -645,6 +657,8 @@
      #:f32.4-sqrt
      #:f32.4-movemask
      #:f32.4-shuffle
+     #:f32.4-unpackhi
+     #:f32.4-unpacklo
      #:f32.4-incf
      #:f32.4-decf
      #:f32.4-aref #:f32.4-row-major-aref
@@ -662,6 +676,7 @@
      #:f64-not
      #:f64-max
      #:f64-min
+     #:f64-sqrt
      #:f64+
      #:f64-
      #:f64*
@@ -746,6 +761,11 @@
      #:u8.16+
      #:u8.16-
      #:u8.16=
+     #:u8.16/=
+     #:u8.16<
+     #:u8.16<=
+     #:u8.16>
+     #:u8.16>=
      #:u8.16-unpackhi
      #:u8.16-unpacklo
      #:u8.16-movemask
@@ -772,6 +792,11 @@
      #:u16.8+
      #:u16.8-
      #:u16.8=
+     #:u16.8/=
+     #:u16.8<
+     #:u16.8<=
+     #:u16.8>
+     #:u16.8>=
      #:u16.8-unpackhi
      #:u16.8-unpacklo
      #:u16.8-movemask
@@ -780,6 +805,9 @@
      #:u16.8-shiftr
      #:u16.8-incf
      #:u16.8-decf
+     #:u16.8-elt
+     #:u16.8-shufflehi
+     #:u16.8-shufflelo
      #:u16.8-aref #:u16.8-row-major-aref
      #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
      ;; u32.4
@@ -796,6 +824,11 @@
      #:u32.4+
      #:u32.4-
      #:u32.4=
+     #:u32.4/=
+     #:u32.4<
+     #:u32.4<=
+     #:u32.4>
+     #:u32.4>=
      #:u32.4-unpackhi
      #:u32.4-unpacklo
      #:u32.4-movemask
@@ -846,6 +879,11 @@
      #:s8.16+
      #:s8.16-
      #:s8.16=
+     #:s8.16/=
+     #:s8.16<
+     #:s8.16<=
+     #:s8.16>
+     #:s8.16>=
      #:s8.16-unpackhi
      #:s8.16-unpacklo
      #:s8.16-movemask
@@ -865,6 +903,11 @@
      #:s16.8+
      #:s16.8-
      #:s16.8=
+     #:s16.8/=
+     #:s16.8<
+     #:s16.8<=
+     #:s16.8>
+     #:s16.8>=
      #:s16.8-unpackhi
      #:s16.8-unpacklo
      #:s16.8-movemask
@@ -880,6 +923,8 @@
      #:make-s32.4
      #:s32.4
      #:s32.4!
+     #:s32.4-from-f32.4
+     #:s32.4-from-f64.2
      #:s32.4-values
      #:s32.4-broadcast
      #:s32.4-and
@@ -890,6 +935,11 @@
      #:s32.4+
      #:s32.4-
      #:s32.4=
+     #:s32.4/=
+     #:s32.4<
+     #:s32.4<=
+     #:s32.4>
+     #:s32.4>=
      #:s32.4-unpackhi
      #:s32.4-unpacklo
      #:s32.4-movemask
@@ -929,7 +979,8 @@
     (:export
      #:f32.4-hadd
      #:f32.4-hdup
-     #:f32.4-ldup))
+     #:f32.4-ldup
+     #:f64.2-hadd))
 
   (defpackage #:sb-simd-ssse3
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse3)
@@ -1033,6 +1084,7 @@
      #:s64.2-from-s16.8
      #:s64.2-from-u32.4
      #:s64.2-from-s32.4
+     #:s64.2-mul
      #:s64.2=
      #:s64.2/=
      #:s64.2-elt))
@@ -1048,10 +1100,16 @@
     #6#
     #7=
     (:export
+     ;; u64.2
      #:u64.2>
      #:u64.2>=
      #:u64.2<
-     #:u64.2<=))
+     #:u64.2<=
+     ;; s64.2
+     #:s64.2>
+     #:s64.2>=
+     #:s64.2<
+     #:s64.2<=))
 
   (defpackage #:sb-simd-avx
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-x86-64)
@@ -1067,6 +1125,9 @@
      #:f32-not
      #:f32-max
      #:f32-min
+     #:f32-sqrt
+     #:f32-rsqrt
+     #:f32-reciprocal
      #:f32+
      #:f32-
      #:f32*
@@ -1090,6 +1151,7 @@
      #:f64-not
      #:f64-max
      #:f64-min
+     #:f64-sqrt
      #:f64+
      #:f64-
      #:f64*
@@ -1106,6 +1168,12 @@
      #:f64-row-major-aref)
     #8=
     (:export
+     #:f32!
+     #:f64!
+     #:u8!
+     #:u16!
+     #:u32!
+     #:u64!
      #:p128
      #:p256
      #:vzeroupper
@@ -1118,6 +1186,7 @@
      #:f32.4-broadcast
      #:f32.4-if
      #:f32.4-from-f64.4
+     #:f32.4-from-s32.4
      #:f32.4-and
      #:f32.4-or
      #:f32.4-xor
@@ -1159,6 +1228,8 @@
      #:f32.4-movemask
      #:f32.4-incf
      #:f32.4-decf
+     #:f32.4-dupeven
+     #:f32.4-dupodd
      #:f32.4-aref #:f32.4-row-major-aref
      #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref
      ;; f64.2
@@ -1216,7 +1287,7 @@
      #:f32.8-values
      #:f32.8-broadcast
      #:f32.8-if
-     #:f32.8-from-u32.8
+     #:f32.8-from-s32.8
      #:f32.8-and
      #:f32.8-or
      #:f32.8-xor
@@ -1342,6 +1413,7 @@
      #:u8.16-unpackhi
      #:u8.16-unpacklo
      #:u8.16-movemask
+     #:u8.16-shuffle
      #:u8.16-aref #:u8.16-row-major-aref
      #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref
      ;; u16.8
@@ -1369,6 +1441,8 @@
      #:u16.8-unpackhi
      #:u16.8-unpacklo
      #:u16.8-movemask
+     #:u16.8-shufflehi
+     #:u16.8-shufflelo
      #:u16.8-aref #:u16.8-row-major-aref
      #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
      ;; u32.4
@@ -1495,6 +1569,7 @@
      #:s8.16-unpackhi
      #:s8.16-unpacklo
      #:s8.16-movemask
+     #:s8.16-shuffle
      #:s8.16-aref #:s8.16-row-major-aref
      #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref
      ;; s16.8
@@ -1524,6 +1599,8 @@
      #:s16.8-unpackhi
      #:s16.8-unpacklo
      #:s16.8-movemask
+     #:s16.8-shufflehi
+     #:s16.8-shufflelo
      #:s16.8-aref #:s16.8-row-major-aref
      #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref
      ;; s32.4
@@ -1532,8 +1609,9 @@
      #:s32.4!
      #:s32.4-values
      #:s32.4-broadcast
+     #:s32.4-from-s32.8
+     #:s32.4-from-f32.4
      #:s32.4-if
-     #:s32.4-from-f64.4
      #:s32.4-and
      #:s32.4-or
      #:s32.4-xor
@@ -1612,9 +1690,11 @@
      #:s32.8!
      #:s32.8-values
      #:s32.8-broadcast
-     #:s32.4-from-s32.8
+     #:s32.8-from-f32.8
+     #:s32.8-from-f64.4
      #:s32.8-insert-s32.4
      #:s32.8-permute128
+     #:s32.8-permute
      #:s32.8-aref #:s32.8-row-major-aref
      #:s32.8-non-temporal-aref #:s32.8-non-temporal-row-major-aref
      ;; s64.4
@@ -1686,6 +1766,7 @@
      ;; f32.8
      ;; f64.4
      #:f64.4-reverse
+     #:f64.4-permute4x64
      ;; u8.16
      ;; u16.8
      ;; u32.4
@@ -1724,6 +1805,7 @@
      #:u8.32-unpackhi
      #:u8.32-unpacklo
      #:u8.32-movemask
+     #:u8.32-shuffle
      #:u8.32-permute128
      #:u8.16-from-u8.32
      #:u8.32-insert-u8.16
@@ -1753,6 +1835,8 @@
      #:u16.16-unpacklo
      #:u16.16-unpackhi
      #:u16.16-movemask
+     #:u16.16-shufflehi
+     #:u16.16-shufflelo
      #:u16.8-from-u16.16
      #:u16.16-insert-u16.8
      #:u16.16-permute128
@@ -1821,7 +1905,7 @@
      #:s8.32-xor
      #:s8.32-andc1
      #:s8.32-not
-     #:s8.32-max
+     #:s8.32-min
      #:s8.32-max
      #:s8.32+
      #:s8.32-
@@ -1875,6 +1959,8 @@
      #:s16.16-unpackhi
      #:s16.16-unpacklo
      #:s16.16-movemask
+     #:s16.16-shufflehi
+     #:s16.16-shufflelo
      #:s16.16-shiftl
      #:s16.16-shiftr
      #:s16.16-sign
@@ -1932,6 +2018,7 @@
      #:s64.4-not
      #:s64.4+
      #:s64.4-
+     #:s64.4-mul
      #:s64.4=
      #:s64.4/=
      #:s64.4>

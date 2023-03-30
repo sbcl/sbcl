@@ -56,6 +56,22 @@
   (define-u64-packer u64-from-s32s s32)
   (define-u64-packer u64-from-s64 s64))
 
+(define-fake-vop s32-from-f32 (x)
+  (multiple-value-bind (significant exponent sign)
+      (integer-decode-float x)
+    (let* ((abs (* significant (expt (float-radix x) exponent))))
+      (if (minusp sign)
+          (- (min abs (expt 2 31)))
+          (min abs (1- (expt 2 31)))))))
+
+(define-fake-vop s32-from-f64 (x)
+  (multiple-value-bind (significant exponent sign)
+      (integer-decode-float x)
+    (let* ((abs (* significant (expt (float-radix x) exponent))))
+      (if (minusp sign)
+          (- (min abs (expt 2 31)))
+          (min abs (1- (expt 2 31)))))))
+
 (macrolet ((define-u64-unpacker (name scalar-record-name)
              (with-accessors ((type value-record-name)
                               (bits value-record-bits))
@@ -106,6 +122,12 @@
 
 ;;; f32
 
+(define-fake-vop f32-reciprocal (x)
+  (/ x))
+
+(define-fake-vop f32-rsqrt (x)
+  (/ (sqrt x)))
+
 (define-fake-vop f32-if (mask a b)
   (if (logbitp 31 mask) a b))
 
@@ -121,10 +143,6 @@
   (def two-arg-f32- -)
   (def two-arg-f32* *)
   (def two-arg-f32/ /)
-  #+(or)
-  (def f32-reciprocal reciprocal)
-  #+(or)
-  (def f32-rsqrt rsqrt)
   (def f32-sqrt sqrt)
   (def two-arg-f32=  =  :result-key u32-from-boolean)
   (def two-arg-f32/= /= :result-key u32-from-boolean)
@@ -134,6 +152,12 @@
   (def two-arg-f32>= >= :result-key u32-from-boolean))
 
 ;;; f64
+
+(define-fake-vop f64-reciprocal (x)
+  (/ x))
+
+(define-fake-vop f64-rsqrt (x)
+  (/ (sqrt x)))
 
 (define-fake-vop f64-if (mask a b)
   (if (logbitp 63 mask) a b))
@@ -163,10 +187,6 @@
   (def two-arg-f64- -)
   (def two-arg-f64* *)
   (def two-arg-f64/ /)
-  #+(or)
-  (def f64-reciprocal reciprocal)
-  #+(or)
-  (def f64-rsqrt rsqrt)
   (def f64-sqrt sqrt)
   (def two-arg-f64=  =  :result-key u64-from-boolean)
   (def two-arg-f64/= /= :result-key u64-from-boolean)
@@ -1365,6 +1385,9 @@
 (define-fake-vop s64.4-broadcast (x)
   (let ((v (%s64.2-broadcast x)))
     (%s64.4-insert-s64.2 (%s64.4!-from-p128 v) v 1)))
+
+(define-fake-vop f64.4-reverse (x)
+  (%f64.4-permute (%f64.4-permute128 x x #4r01) #4r11))
 
 (in-package #:sb-simd-avx2)
 

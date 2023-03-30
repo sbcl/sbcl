@@ -45,8 +45,6 @@
    (f64-array  64  (array double-float)))
   (:instructions
    ;; ub64 packers and unpackers
-   (u64-from-f32  nil (u64) (f32 f32)                 :encoding :fake-vop)
-   (u64-from-f64  nil (u64) (f64)                     :encoding :fake-vop)
    (u64-from-u8s  nil (u64) (u8 u8 u8 u8 u8 u8 u8 u8) :encoding :fake-vop)
    (u64-from-u16s nil (u64) (u16 u16 u16 u16)         :encoding :fake-vop)
    (u64-from-u32s nil (u64) (u32 u32)                 :encoding :fake-vop)
@@ -208,6 +206,8 @@
    (s16-andc1       nil (s16) (s16 s16) :encoding :fake-vop)
    (s16-not         nil (s16) (s16)     :encoding :fake-vop)
    ;; s32
+   (s32-from-f32    nil (s32) (f32)     :encoding :fake-vop)
+   (s32-from-f64    nil (s32) (f32)     :encoding :fake-vop)
    (s32-if          nil (s32) (u32 s32 s32) :encoding :fake-vop)
    (two-arg-s32-and nil (s32) (s32 s32) :encoding :fake-vop :associative t)
    (two-arg-s32-or  nil (s32) (s32 s32) :encoding :fake-vop :associative t)

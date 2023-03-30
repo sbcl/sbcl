@@ -13,4 +13,7 @@
   (check-package '#:sb-simd-sse4.1)
   (check-package '#:sb-simd-sse4.2)
   (check-package '#:sb-simd-avx)
-  (check-package '#:sb-simd-avx2))
+  (check-package '#:sb-simd-avx2)
+  ;; Ensure that every instruction has a corresponding VOP.
+  (dolist (instruction-record (filter-available-function-records #'instruction-record-p))
+    (is (fboundp (instruction-record-vop instruction-record)))))

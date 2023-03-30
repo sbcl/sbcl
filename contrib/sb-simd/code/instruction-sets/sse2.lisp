@@ -64,8 +64,6 @@
    (two-arg-f64>=     #:cmpsd      (u64) (f64 f64) :cost 4 :encoding :custom :prefix '(:nlt))
    (f64-andc1         #:andnpd     (f64) (f64 f64) :cost 1 :encoding :sse)
    (f64-not           nil          (f64) (f64)     :cost 1 :encoding :fake-vop)
-   (f64.2-hsum        nil          (f64) (f64.2)   :cost 3 :encoding :fake-vop)
-   (f64.2-hprod       nil          (f64) (f64.2)   :cost 3 :encoding :fake-vop)
    (f64-sqrt          #:sqrtsd     (f64) (f64)     :cost 15)
    ;; scalar reinterpret casts
    ( u8!-from-p128    nil          (u8)    (p128)        :cost 1 :encoding :fake-vop)
