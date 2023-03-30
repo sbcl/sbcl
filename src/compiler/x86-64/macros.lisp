@@ -212,7 +212,7 @@
                          &body forms)
   (declare (ignorable thread default-exit))
   #+sb-safepoint
-  `(progn ,@forms (unless ,elide-if (emit-safepoint)))
+  `(assemble () ,@forms (unless ,elide-if (emit-safepoint)))
   #-sb-safepoint
   (let ((true
           ;; TRUE is anything nonzero. Moving a register to memory is
