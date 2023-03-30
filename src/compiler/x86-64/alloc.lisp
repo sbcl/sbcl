@@ -1016,6 +1016,25 @@
               (allocation type bytes lowtag result node alloc-temp thread-tn)
               (storew header result 0 lowtag))))))
 
+#+sb-xc-host
+(define-vop (alloc-code)
+  (:args (total-words :scs (unsigned-reg) :target rdi)
+         (boxed-words :scs (unsigned-reg) :target rsi))
+  (:temporary (:sc unsigned-reg :offset rdi-offset
+               :from (:argument 0) :to :result) rdi)
+  (:temporary (:sc unsigned-reg :offset rsi-offset
+               :from (:argument 1) :to :result) rsi)
+  (:results (res :scs (descriptor-reg)))
+  (:generator 1
+    (move rdi total-words) ; C arg 1
+    (move rsi boxed-words) ; C arg 2
+    (with-registers-preserved (c :except rdi)
+      (pseudo-atomic ()
+        #-immobile-code (inst call (ea (make-fixup "alloc_code_object" :foreign 8)))
+        #+immobile-code (inst call (make-fixup "alloc_code_object" :foreign)))
+      (move rdi rax-tn))
+    (move res rdi)))
+
 #+immobile-space
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))

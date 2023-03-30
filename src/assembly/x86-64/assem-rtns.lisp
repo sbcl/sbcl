@@ -457,18 +457,3 @@
   (progn x r)
   (with-registers-preserved (lisp :except rdx)
     (call-static-fun 'sb-impl::install-hash-table-lock 1)))
-
-;;; From a perspective of reducing code bloat, this asm routine does not merit
-;;; being one at all. A vop would suffice, because it's a single-use vop.
-;;; However the WITH-REGISTERS-PRESERVED macro seems to think that it is utilized
-;;; only by asm code in *ASSEMBLER-ROUTINES*. I had trouble with it otherwise.
-(define-assembly-routine (alloc-code (:return-style :raw))
-    ((:arg c-arg1 (signed-reg) rdi-offset)
-     (:arg c-arg2 (signed-reg) rsi-offset)
-     (:res res (descriptor-reg) rdx-offset))
-  (progn c-arg1 c-arg2) ; "use" the args
-  ;; Don't preserve the register which holds the lisp return value
-  (with-registers-preserved (c :except rdx)
-    (pseudo-atomic ()
-      (inst call (make-fixup "alloc_code_object" :foreign)))
-    (move res rax-tn)))

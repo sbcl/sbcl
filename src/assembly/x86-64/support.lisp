@@ -67,9 +67,15 @@
 ;;; Save or restore all FPRs at the stack pointer as it existed just prior
 ;;; to the call to the asm routine.
 (defun call-fpr-save/restore-routine (selector)
-  (ecase selector
-    (:save (inst call (make-fixup 'fpr-save :assembly-routine)))
-    (:restore (inst call (make-fixup 'fpr-restore :assembly-routine)))))
+  (let ((routine (ecase selector
+                   (:save 'fpr-save)
+                   (:restore 'fpr-restore))))
+    (if (or (not (boundp 'sb-c:*component-being-compiled*))
+            (sb-c::code-immobile-p sb-c:*component-being-compiled*))
+        ;; direct call from asm routine or immobile code
+        (inst call (make-fixup routine :assembly-routine))
+        ;; indirect call from dynamic space
+        (inst call (ea (make-fixup routine :assembly-routine*))))))
 
 (defmacro regs-pushlist (&rest regs)
   `(progn ,@(mapcar (lambda (stem) `(inst push ,(symbolicate stem "-TN"))) regs)))
