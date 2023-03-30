@@ -147,7 +147,6 @@
     ;; acquisition and release of the spinlock. Preventing GC is irrelevant,
     ;; but would not be if we recycled tls indices of garbage symbols.
     (pseudo-atomic ()
-     (assemble () ; for conversion of tagbody-like labels to assembler labels
      RETRY
        (inst bts :qword :lock free-tls-index-ea lock-bit)
        (inst jmp :nc got-tls-index-lock)
@@ -180,7 +179,7 @@
        (inst mov scratch-reg (+ (- (ash 1 lock-bit)) n-word-bytes))
        (inst add :qword :lock free-tls-index-ea scratch-reg)
        (inst pop scratch-reg)
-     DONE)) ; end PSEUDO-ATOMIC
+     DONE) ; end PSEUDO-ATOMIC
     (inst ret)
     (emit-label tls-full)
     ;; The disassembly of this code looks nicer when the failure path

@@ -1076,7 +1076,6 @@
     ;; There is no way to inform GC that we are currently looking at a page
     ;; in anticipation of allocating to it.
     (pseudo-atomic ()
-     (assemble ()
        (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
        (inst test :dword rax rax)
        (inst jmp :z FAIL) ; fail if hint page is 0
@@ -1109,6 +1108,6 @@
        (inst jmp OUT)
        FAIL
        (inst mov result nil-value)
-       OUT))))
+       OUT)))
 
 ) ; end MACROLET

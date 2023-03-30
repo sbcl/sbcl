@@ -410,7 +410,6 @@
                     (rdi rdi-tn))
   (ensure-thread-base-tn-loaded)
   (pseudo-atomic ()
-    (assemble ()
       #+immobile-space
       (progn
         (inst mov rax object)
@@ -433,7 +432,7 @@
       ;; set 'written' flag in the code header
       (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi) #x40)
       ;; store newval into object
-      (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax))))
+      (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax)))
   (inst ret 24)) ; remove 3 stack args
 
 ;;; These are trampolines, but they benefit from not being in the 'tramps' file

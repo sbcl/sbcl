@@ -208,36 +208,39 @@
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
-(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &body forms)
+(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
+                         &body forms)
   (declare (ignorable thread))
   #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
   #-sb-safepoint
-  (with-unique-names (label pa-bits-ea)
-   (let ((true
+  (let ((true
           ;; TRUE is anything nonzero. Moving a register to memory is
           ;; allegedly faster than reading an imm8 operand. I don't know,
           ;; but I'm not going to debate it. However THREAD-TN is a better
           ;; choice than RBP-TN since it's never written to.
           #+(and sb-thread (not gs-seg)) 'thread-tn
-          #-(and sb-thread (not gs-seg)) 'rbp-tn))
-    `(let ((,label (gen-label))
-           (,pa-bits-ea
+          #-(and sb-thread (not gs-seg)) 'rbp-tn)
+        (pa-bits-ea '#:pa-bits))
+    `(let ((,pa-bits-ea
             #+sb-thread (thread-slot-ea
                          thread-pseudo-atomic-bits-slot
                          #+gs-seg ,@(if thread (list thread)))
             #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
-       (unless ,elide-if
-         (inst mov ,pa-bits-ea ,true))
-       ,@forms
-       (unless ,elide-if
-         (inst xor ,pa-bits-ea ,true)
-         (inst jmp :z ,label)
-         ;; if PAI was set, interrupts were disabled at the same time
-         ;; using the process signal mask.
-         #+int1-breakpoints (inst icebp)
-         #-int1-breakpoints (inst break pending-interrupt-trap)
-         (emit-label ,label))))))
+       (macrolet ((exit-pseudo-atomic ()
+                    '(let ((.out. (gen-label)))
+                       (inst xor ,pa-bits-ea ,true)
+                       (inst jmp :z .out.)
+                       ;; if PAI was set, interrupts were disabled at the same time
+                       ;; using the process signal mask.
+                       #+int1-breakpoints (inst icebp)
+                       #-int1-breakpoints (inst break pending-interrupt-trap)
+                       (emit-label .out.))))
+         (unless ,elide-if
+            (inst mov ,pa-bits-ea ,true))
+         (assemble () ,@forms)
+         (when (and ,default-exit (not ,elide-if))
+           (exit-pseudo-atomic))))))
 
 ;;;; indexed references
 
