@@ -210,7 +210,7 @@
 ;;; depending on #+gs-seg.
 (defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
                          &body forms)
-  (declare (ignorable thread))
+  (declare (ignorable thread default-exit))
   #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
   #-sb-safepoint
