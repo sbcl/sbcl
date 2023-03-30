@@ -31,7 +31,7 @@
   (:vop-var vop)
   (:generator 1
     (without-scheduling ()
-      (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+      (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value)
       (storew value object offset lowtag))))
 
 ;;;; Symbol hacking VOPs:
@@ -139,7 +139,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
       (without-scheduling ()
-        (emit-gc-store-barrier fdefn nil type)) ; type = temp
+        (emit-gengc-barrier fdefn nil type)) ; type = temp
       (load-type type function (- fun-pointer-lowtag))
       (inst xor type simple-fun-widetag)
       (inst beq type normal-fn)
@@ -190,7 +190,7 @@
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (without-scheduling ()
-      (emit-gc-store-barrier symbol nil temp2)
+      (emit-gengc-barrier symbol nil temp2)
       (storew val symbol symbol-value-slot other-pointer-lowtag))))
 
 (define-vop (unbind)
@@ -200,7 +200,7 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (without-scheduling ()
-      (emit-gc-store-barrier symbol nil temp)
+      (emit-gengc-barrier symbol nil temp)
       (storew value symbol symbol-value-slot other-pointer-lowtag))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
@@ -225,7 +225,7 @@
       (inst beq symbol skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (without-scheduling ()
-        (emit-gc-store-barrier symbol nil temp)
+        (emit-gengc-barrier symbol nil temp)
         (storew value symbol symbol-value-slot other-pointer-lowtag))
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
@@ -267,7 +267,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
     (without-scheduling ()
-      (emit-gc-store-barrier object nil temp)
+      (emit-gengc-barrier object nil temp)
       (storew value object (+ closure-info-offset offset) fun-pointer-lowtag))))
 
 (define-vop (closure-init-from-fp)

@@ -33,7 +33,7 @@
 ;;;    be younger than the newly constructed thing.
 ;;; 2. hash-table k/v pair should mark once only.
 ;;;    (the vector elements are certainly on the same card)
-(defun emit-gc-store-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
+(defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
   (when (sc-is object constant immediate)
     (aver (symbolp (tn-value object))))
   (when (require-gc-store-barrier-p object value-tn-ref value-tn)
@@ -53,7 +53,7 @@
     ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
     (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) 0)))
 
-(defun gen-cell-set (ea value val-temp)
+(defun emit-store (ea value val-temp)
   (sc-case value
    (immediate
       (let ((bits (encode-value-if-immediate value)))
@@ -92,9 +92,9 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
-    (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value)
+    (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)
     (let ((ea (object-slot-ea object offset lowtag)))
-      (gen-cell-set ea value val-temp))))
+      (emit-store ea value val-temp))))
 
 ;;; X86 special
 (define-vop (cell-xadd)

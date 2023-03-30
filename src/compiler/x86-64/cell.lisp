@@ -63,8 +63,8 @@
                        ;; gencgc does not need to emit the barrier for constructors
                        (eq name :allocator)
                        (sb-c::set-slot-old-p node)))
-               (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value)))
-           (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))))
+               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)))
+           (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -80,7 +80,7 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 5
-     (emit-gc-store-barrier object nil rax (vop-nth-arg 2 vop) new)
+     (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop) new)
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
      (move result rax)))
@@ -96,7 +96,7 @@
 (defmacro emit-symbol-write-barrier (sym &rest rest)
   ;; IMMEDIATE sc means that the symbol is static or immobile.
   ;; Static symbols are roots, and immobile symbols use page fault handling.
-  `(unless (sc-is ,sym immediate) (emit-gc-store-barrier ,sym ,@rest)))
+  `(unless (sc-is ,sym immediate) (emit-gengc-barrier ,sym ,@rest)))
 
 (define-vop (%set-symbol-global-value)
   (:args (symbol :scs (descriptor-reg immediate))
@@ -106,7 +106,7 @@
   (:vop-var vop)
   (:generator 4
     (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
-    (gen-cell-set (if (sc-is symbol immediate)
+    (emit-store (if (sc-is symbol immediate)
                       (symbol-slot-ea (tn-value symbol) symbol-value-slot)
                       (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))
                   value val-temp)))
@@ -156,7 +156,7 @@
              (eq (info :variable :wired-tls (tn-value symbol)) :always-thread-local))
         ;; We never need the GC barrier for TLS.  I think it would be preferable
         ;; to resolve this in IR1, maybe turning it into SET-TLS-VALUE.
-        (gen-cell-set (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)
+        (emit-store (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)
                       value val-temp)
         (let ((store (gen-label)))
           (cond ((and (sc-is symbol immediate)
@@ -179,7 +179,7 @@
           (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
           (get-symbol-value-slot-ea cell symbol)
           (emit-label STORE)
-          (gen-cell-set (ea cell) value val-temp)))))
+          (emit-store (ea cell) value val-temp)))))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -542,7 +542,7 @@
   (:temporary (:sc unsigned-reg) raw)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (emit-gc-store-barrier fdefn nil raw)
+    (emit-gengc-barrier fdefn nil raw)
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     (inst cmp :byte (ea (- fun-pointer-lowtag) function)
           simple-fun-widetag)
@@ -665,7 +665,7 @@
     (store-binding-stack-pointer bsp)
     (storew temp bsp (- binding-value-slot binding-size))
     (storew symbol bsp (- binding-symbol-slot binding-size))
-    (emit-gc-store-barrier symbol nil temp)
+    (emit-gengc-barrier symbol nil temp)
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
 #+sb-thread
@@ -695,7 +695,7 @@
   (:generator 0
     (load-binding-stack-pointer bsp)
     (loadw symbol bsp (- binding-symbol-slot binding-size))
-    (emit-gc-store-barrier symbol nil value) ; VALUE is the card-mark temp
+    (emit-gengc-barrier symbol nil value) ; VALUE is the card-mark temp
     (loadw value bsp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (storew 0 bsp (- binding-symbol-slot binding-size))
@@ -723,7 +723,7 @@
       (loadw symbol bsp binding-symbol-slot)
       (inst test symbol symbol))
     (inst jmp :z SKIP)
-    #-sb-thread (progn (emit-gc-store-barrier symbol nil value) ; VALUE is the card-mark temp
+    #-sb-thread (progn (emit-gengc-barrier symbol nil value) ; VALUE is the card-mark temp
                        (loadw value bsp binding-value-slot)
                        (storew value symbol symbol-value-slot other-pointer-lowtag))
     #+sb-thread (progn (loadw value bsp binding-value-slot)
@@ -777,7 +777,7 @@
            (scs (and prim-type (sb-c::primitive-type-scs prim-type))))
       (when (and (not (singleton-p scs))
                  (member descriptor-reg-sc-number scs))
-        (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)))
+        (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value)))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
@@ -863,7 +863,7 @@
       (setq use-xmm-p (or (>= (logcount zerop-mask) 3)
                           (loop for slot below max-index
                              thereis (= (ldb (byte 2 slot) zerop-mask) #b11))))
-      (emit-gc-store-barrier instance nil val-temp values)
+      (emit-gengc-barrier instance nil val-temp values)
       (when use-xmm-p
         (inst xorpd xmm-temp xmm-temp))
       (loop
@@ -892,7 +892,7 @@
             (inst mov val-temp val)
             (inst mov ea val-temp))
            (t
-            (gen-cell-set ea val val-temp)))
+            (emit-store ea val val-temp)))
          (unless indices (return)))))
     (aver (not values))))
 
@@ -1079,7 +1079,7 @@
 
   (define-dblcas %cons-cas-pair nil
     (:generator 2
-      (emit-gc-store-barrier object nil temp)
+      (emit-gengc-barrier object nil temp)
       (generate-dblcas (ea (- list-pointer-lowtag) object)
                        expected-old-lo expected-old-hi new-lo new-hi
                        eax ebx ecx edx result-lo result-hi)))
@@ -1090,7 +1090,7 @@
     (:generator 2
       (let ((ea (ea (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)
                     object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
-        (emit-gc-store-barrier object ea temp)
+        (emit-gengc-barrier object ea temp)
         (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi
                          eax ebx ecx edx result-lo result-hi))))
 
@@ -1099,7 +1099,7 @@
   ;; (Hmm, does the constraint differ by +/- compact-instance-header?)
   (define-dblcas %instance-cas-pair t
     (:generator 2
-      (emit-gc-store-barrier object nil temp)
+      (emit-gengc-barrier object nil temp)
       (let ((ea (ea (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)
                     object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
         (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi

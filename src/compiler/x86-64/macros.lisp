@@ -288,10 +288,10 @@
            ,@(ecase name
                (%compare-and-swap-svref
                 ;; store barrier needs the EA of the affected element
-                '((emit-gc-store-barrier object ea rax (vop-nth-arg 3 vop) new-value)))
+                '((emit-gengc-barrier object ea rax (vop-nth-arg 3 vop) new-value)))
                (%instance-cas
                 ;; store barrier affects only the object's base address
-                '((emit-gc-store-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
+                '((emit-gengc-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
                ((%raw-instance-cas/word %raw-instance-cas/signed-word)))
            (move rax old-value)
            (inst cmpxchg :lock ea new-value)
@@ -426,5 +426,5 @@
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index)))))
            ,@(when (member name '(instance-index-set %closure-index-set))
-               '((emit-gc-store-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
-           (gen-cell-set ea value val-temp)))))
+               '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
+           (emit-store ea value val-temp)))))
