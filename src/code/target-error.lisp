@@ -912,7 +912,7 @@ with that condition (or with no condition) will be returned."
   ()
   (:report
    (lambda (condition stream)
-     (format stream "~@<Attempt to use ~S on a dotted list: ~
+     (format stream "~@<Attempt to use ~S on a dotted list or non-list: ~
                      ~2I~_~S~:>"
              'values-list (type-error-datum condition)))))
 
