@@ -823,21 +823,21 @@ have been evaluated."
                         `(let ((,nsp (%primitive current-nsp)))
                            (restoring-nsp ,nsp ,@body)))))
         (t
-         (binding* (((vars values forms decls) (parse-letish bindings body 'let))
-                    (ctran (make-ctran))
-                    (fun-lvar (make-lvar))
-                    ((next result)
-                     (processing-decls (decls vars nil next result
-                                              post-binding-lexenv)
-                       (let ((fun (ir1-convert-lambda-body
-                                   forms
-                                   vars
-                                   :post-binding-lexenv post-binding-lexenv
-                                   :debug-name (debug-name 'let bindings))))
-                         (reference-leaf start ctran fun-lvar fun))
-                       (values next result))))
-           (ir1-convert-combination-args fun-lvar ctran next result values
-                                         :arg-source-forms bindings)))))
+         (multiple-value-bind (vars values forms decls)
+             (parse-letish bindings body 'let)
+           (let ((ctran (make-ctran))
+                 (fun-lvar (make-lvar)))
+             (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
+                 (process-decls decls vars nil :binding-form-p t)
+               (declare (ignore result-type))
+               (let ((fun (ir1-convert-lambda-body
+                           forms
+                           vars
+                           :post-binding-lexenv post-binding-lexenv
+                           :debug-name (debug-name 'let bindings))))
+                 (reference-leaf start ctran fun-lvar fun)))
+             (ir1-convert-combination-args fun-lvar ctran next result values
+                                           :arg-source-forms bindings))))))
 
 (def-ir1-translator let* ((bindings &body body)
                           start next result)
@@ -846,7 +846,9 @@ have been evaluated."
 Similar to LET, but the variables are bound sequentially, allowing each VALUE
 form to reference any of the previous VARS."
   (multiple-value-bind (vars values forms decls) (parse-letish bindings body 'let*)
-    (processing-decls (decls vars nil next result post-binding-lexenv)
+    (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
+        (process-decls decls vars nil :binding-form-p t)
+      (declare (ignore result-type))
       (ir1-convert-aux-bindings
        start next result forms vars values post-binding-lexenv
        :value-source-forms bindings))))
@@ -862,7 +864,7 @@ form to reference any of the previous VARS."
   (declare (type ctran start next) (type (or lvar null) result)
            (type list body))
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (processing-decls (decls vars funs next result)
+    (let ((*lexenv* (process-decls decls vars funs)))
       (ir1-convert-progn-body start next result forms))))
 
 (def-ir1-translator locally ((&body body) start next result)
@@ -948,68 +950,65 @@ also processed as top level forms."
 Evaluate the BODY-FORMS with local function definitions. The bindings do
 not enclose the definitions; any use of NAME in the FORMS will refer to the
 lexically apparent function definition in the enclosing environment."
-  (binding* (((names defs forms decls) (parse-fletish definitions body 'flet))
-             (fvars (mapcar (lambda (name def original)
-                              (let ((*current-path* (ensure-source-path original)))
-                                (ir1-convert-lambda
-                                 def
-                                 :source-name name
-                                 :maybe-add-debug-catch t
-                                 :debug-name
-                                 (let ((n (if (and (symbolp name)
-                                                   (not (cl:symbol-package name)))
-                                              (string name)
-                                              name)))
-                                   (debug-name 'flet n t)))))
-                            names defs definitions)))
-    (processing-decls (decls nil fvars next result)
-      (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
-        (ir1-convert-fbindings start next result fvars forms)))))
+  (multiple-value-bind (names defs forms decls)
+      (parse-fletish definitions body 'flet)
+    (let* ((fvars (mapcar (lambda (name def original)
+                            (let ((*current-path* (ensure-source-path original)))
+                              (ir1-convert-lambda
+                               def
+                               :source-name name
+                               :maybe-add-debug-catch t
+                               :debug-name
+                               (let ((n (if (and (symbolp name)
+                                                 (not (cl:symbol-package name)))
+                                            (string name)
+                                            name)))
+                                 (debug-name 'flet n t)))))
+                          names defs definitions))
+           (*lexenv* (make-lexenv :default (process-decls decls nil fvars)
+                                  :funs (pairlis names fvars))))
+      (ir1-convert-fbindings start next result fvars forms))))
 
+;;; For LABELS, we have to create dummy function vars and add them to
+;;; the function namespace while converting the functions. We then
+;;; modify all the references to these leaves so that they point to
+;;; the real functional leaves. We also backpatch the FENV so that if
+;;; the lexical environment is used for inline expansion we will get
+;;; the right functions.
 (def-ir1-translator labels ((definitions &body body) start next result)
   "LABELS ({(name lambda-list declaration* form*)}*) declaration* body-form*
 
 Evaluate the BODY-FORMS with local function definitions. The bindings enclose
 the new definitions, so the defined functions can call themselves or each
 other."
-  (binding* (((names defs forms decls) (parse-fletish definitions body 'labels))
-             ;; dummy LABELS functions, to be used as placeholders
-             ;; during construction of real LABELS functions
-             (placeholder-funs (mapcar (lambda (name)
-                                         (make-functional
-                                          :%source-name name
-                                          :%debug-name (debug-name
-                                                        'labels-placeholder
-                                                        name)))
-                                       names))
+  (multiple-value-bind (names defs forms decls)
+      (parse-fletish definitions body 'labels)
+    (let* ((new-fenv
              ;; (like PAIRLIS but guaranteed to preserve ordering:)
-             (placeholder-fenv (mapcar #'cons names placeholder-funs))
-             ;; the real LABELS functions, compiled in a LEXENV which
-             ;; includes the dummy LABELS functions
-             (real-funs
-              (let ((*lexenv* (make-lexenv :funs placeholder-fenv)))
-                (mapcar (lambda (name def original)
-                          (let ((*current-path* (ensure-source-path original)))
-                            (ir1-convert-lambda def
-                                                :source-name name
-                                                :maybe-add-debug-catch t
-                                                :debug-name (debug-name 'labels name t))))
-                        names defs definitions))))
-
-    ;; Modify all the references to the dummy function leaves so
-    ;; that they point to the real function leaves.
-    (loop for real-fun in real-funs and
-       placeholder-cons in placeholder-fenv do
-         (substitute-leaf real-fun (cdr placeholder-cons))
-         (setf (cdr placeholder-cons) real-fun))
-
-    ;; Voila.
-    (processing-decls (decls nil real-funs next result)
+             (mapcar (lambda (name)
+                       (cons name
+                             (make-functional
+                              :%source-name name
+                              :%debug-name (debug-name
+                                            'labels-placeholder
+                                            name))))
+                     names))
+           ;; the real LABELS functions, compiled in a LEXENV which
+           ;; includes the dummy LABELS functions
+           (real-funs
+             (let ((*lexenv* (make-lexenv :funs new-fenv)))
+               (mapcar (lambda (name def original)
+                         (let ((*current-path* (ensure-source-path original)))
+                           (ir1-convert-lambda def
+                                               :source-name name
+                                               :maybe-add-debug-catch t
+                                               :debug-name (debug-name 'labels name t))))
+                       names defs definitions))))
+      (loop for real-fun in real-funs and cons in new-fenv do
+        (substitute-leaf real-fun (cdr cons))
+        (setf (cdr cons) real-fun))
       (let ((*lexenv* (make-lexenv
-                       ;; Use a proper FENV here (not the
-                       ;; placeholder used earlier) so that if the
-                       ;; lexical environment is used for inline
-                       ;; expansion we'll get the right functions.
+                       :default (process-decls decls nil real-funs)
                        :funs (pairlis names real-funs))))
         (ir1-convert-fbindings start next result real-funs forms)))))
 

@@ -1629,10 +1629,10 @@
   ;; assertion is satisfied:
   ;;
   ;; NIL
-  ;;    No type check is necessary (VALUE type is a subtype of the TYPE-TO-CHECK.)
+  ;;    No type check is necessary (proven type of VALUE is a subtype of the TYPE-TO-CHECK.)
   ;;
   ;; :EXTERNAL
-  ;;    Type check will be performed by NODE-DEST.
+  ;;    A type check will be performed by NODE-DEST.
   ;;
   ;; T
   ;;    A type check is needed.

@@ -1127,8 +1127,7 @@
 
 (declaim (start-block process-decls make-new-inlinep
                       find-in-bindings
-                      process-muffle-decls
-                      %processing-decls))
+                      process-muffle-decls))
 
 ;;; Given a list of LAMBDA-VARs and a variable name, return the
 ;;; LAMBDA-VAR for that name, or NIL if it isn't found. We return the
@@ -1735,34 +1734,6 @@ the stack without triggering overflow protection.")
             lambda-list explicit-check source-form
             (when local-optimize
               (process-optimize-decl local-optimize (lexenv-policy lexenv))))))
-
-(defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
-  (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
-      (process-decls decls vars fvars :binding-form-p binding-form-p)
-    (cond ((eq result-type *wild-type*)
-           (funcall fun ctran lvar post-binding-lexenv))
-          (t
-           (let ((value-ctran (make-ctran))
-                 (value-lvar (make-lvar)))
-             (multiple-value-prog1
-                 (funcall fun value-ctran value-lvar post-binding-lexenv)
-               (let ((cast (make-cast value-lvar result-type
-                                      (lexenv-policy *lexenv*))))
-                 (link-node-to-previous-ctran cast value-ctran)
-                 (setf (lvar-dest value-lvar) cast)
-                 (use-continuation cast ctran lvar))))))))
-
-(defmacro processing-decls ((decls vars fvars ctran lvar
-                                   &optional post-binding-lexenv)
-                            &body forms)
-  (declare (symbol ctran lvar))
-  (let ((post-binding-lexenv-p (not (null post-binding-lexenv)))
-        (post-binding-lexenv (or post-binding-lexenv (gensym "LEXENV"))))
-    `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
-                        ,post-binding-lexenv-p
-                        (lambda (,ctran ,lvar ,post-binding-lexenv)
-                          (declare (ignorable ,post-binding-lexenv))
-                          ,@forms))))
 
 ;;; Return the SPECVAR for NAME to use when we see a local SPECIAL
 ;;; declaration. If there is a global variable of that name, then
