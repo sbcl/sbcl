@@ -5,6 +5,33 @@
 
 (in-package "SB-VM")
 
+;;; The SYNCHRONOUS-TRAP routine has nearly the same effect as executing INT3
+;;; but is more friendly to gdb. There may be some subtle bugs with regard to
+;;; blocking/unblocking of async signals which arrive nearly around the same
+;;; time as a synchronous trap.
+#+sw-int-avoidance ; "software interrupt avoidance"
+(define-assembly-routine (synchronous-trap) ()
+  (inst pushf)
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst and rsp-tn (- 16))
+  (inst sub rsp-tn 8) ; PUSHing an odd number of GPRs
+  ;; Arrange in the utterly confusing order that a linux signal context has them
+  ;; so that we can memcpy() into a context. Push RBX twice to maintain alignment.
+  (regs-pushlist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
+  ;;                             ^^^ technically this is the slot for RBP
+  (inst sub rsp-tn (* 16 16))
+  (dotimes (i 16) (inst movdqa (ea (* i 16) rsp-tn) (sb-x86-64-asm::get-fpr :xmm i)))
+  (inst lea rdi-tn (ea 24 rbp-tn)) ; stack-pointer at moment of "interrupt"
+  (inst mov rsi-tn rsp-tn)         ; pointer to saved CPU state
+  (inst call (make-fixup "synchronous_trap" :foreign))
+  (dotimes (i 16) (inst movdqa (sb-x86-64-asm::get-fpr :xmm i) (ea (* i 16) rsp-tn)))
+  (inst add rsp-tn (* 16 16))
+  (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
+  (inst mov rsp-tn rbp-tn)
+  (inst pop rbp-tn)
+  (inst popf))
+
 (macrolet ((do-fprs (operation regset &aux (displacement 0))
              ;; The YMM case could be removed now I suppose, since we use XSAVE + XRSTOR
              (multiple-value-bind (mnemonic fpr-align)

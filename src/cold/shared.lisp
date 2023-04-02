@@ -310,6 +310,17 @@
           ;; Just print something and go on with life.
           (setq sb-xc:*features* (remove :int4-breakpoints sb-xc:*features*))
           (warn "Removed :INT4-BREAKPOINTS from target features"))
+        (when (target-featurep :x86-64)
+          (let ((int3-enable (target-featurep :int3-breakpoints))
+                (int4-enable (target-featurep :int4-breakpoints))
+                (ud2-enable (target-featurep :ud2-breakpoints)))
+            (when (or ud2-enable int4-enable)
+              (setq sb-xc:*features* (remove :int3-breakpoints sb-xc:*features*))
+              (when (and ud2-enable int4-enable)
+                (error "UD2-BREAKPOINTS and INT4-BREAKPOINTS are mutually exclusive choices")))
+            (unless (or int3-enable int4-enable ud2-enable)
+              ;; don't love the name, but couldn't think of a better one
+              (push :sw-int-avoidance sb-xc:*features*))))
         (when (or (target-featurep :arm64)
                   (and (target-featurep :x86-64)
                        (member :sse4 backend-subfeatures)))

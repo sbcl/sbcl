@@ -267,9 +267,9 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 
 /* Not safe in general, but if your thread names are all
  * simple-base-string and won't move, this is slightly ok */
-__attribute__((unused)) static char* cur_thread_name()
+char* vm_thread_name(struct thread* th)
 {
-    struct thread* th = get_sb_vm_thread();
+    if (!th) return "non-lisp";
     struct thread_instance *lispthread =
         (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
     struct vector* name = VECTOR(lispthread->name);
@@ -375,16 +375,21 @@ sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 {
     int i;
     int len = 0;
-    for(i = 1; i <= MAX_SIGNUM; i++)
+    if (!sigset) { strcpy(result,"nil"); return; }
+    if (*(uint32_t*)sigset == 0xFFFFFFFF) { strcpy(result,"All"); return; }
+    result[0] = '{';
+    len = 1;
+    for (i = 1; i <= MAX_SIGNUM; i++)
         if (sigismember(sigset, i)) {
             // ensure room for (generously) 3 digits + comma + null, or give up
             if (len > result_length - 5) {
                 strcpy(result, "too many to list");
                 return;
             }
-            len += sprintf(result+len, "%s%d", len?",":"", i);
+            len += sprintf(result+len, "%s%d", len>1?",":"", i);
         }
-    result[len] = 0;
+    result[len] = '}';
+    result[len+1] = 0;
 }
 
 

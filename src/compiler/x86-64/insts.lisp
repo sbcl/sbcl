@@ -2244,6 +2244,19 @@
 
 ;;;; interrupt instructions
 
+;;; The default interrupt instruction is INT3 which signals SIGTRAP.
+;;; This makes for a lot of trouble when using gdb to debug lisp, because gdb really wants
+;;; to use SIGTRAP for itself. And allegedly there were OSes where SIGTRAP was unreliable
+;;; but I have never seen it, other than it being intercepted by gdb.
+;;; (Maybe that's what someone meant by "unreliable"?)
+;;; So depending on your requirement, SIGILL can be raised instead via either the INTO
+;;; instruction which is illegal on amd64, or UD2 for compabitility with 32-bit code.
+;;; UD2 is not needed on amd64 but is on 32-bit where INTO is a legal instruction.
+;;; However, if trying to debug code which also gets an "actual" SIGILL, this still poses
+;;; a problem for gdb. To workaround that we can emit a call to a asm routine which
+;;; has essentially the same effect as the signal.
+;;; Orthogonal to the preceding choices, INT1 can be used for pseudo-atomic-interrupted
+;;; but that doesn't work on all systems.
 (define-instruction break (segment &optional (code nil codep))
   (:printer byte-imm ((op #xCC)) :default :print-name 'int3 :control #'break-control)
   (:printer word-imm ((op #x0B0F)) :default :print-name 'ud2 :control #'break-control)
@@ -2251,6 +2264,11 @@
   ;; use of sigtrap and shortens the error break by 1 byte relative to UD2.
   (:printer byte-imm ((op #xCE)) :default :print-name 'into :control #'break-control)
   (:emitter
+   #+sw-int-avoidance ; emit CALL [EA] to skip over the trap instruction
+   (let ((where (ea (make-fixup 'sb-vm::synchronous-trap :assembly-routine*))))
+     (emit-prefixes segment where nil :do-not-set)
+     (emit-byte segment #xFF)
+     (emit-ea segment where #b010))
    #-ud2-breakpoints (emit-byte segment (or #+int4-breakpoints #xCE #xCC))
    #+ud2-breakpoints (emit-word segment #x0B0F)
    (when codep (emit-byte segment (the (unsigned-byte 8) code)))))

@@ -1,3 +1,4 @@
+:int3-breakpoints
 :64-bit
 :gencgc
 :use-cons-region
