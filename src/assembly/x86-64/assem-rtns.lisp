@@ -396,3 +396,90 @@
   (progn x r)
   (with-registers-preserved (lisp :except rdx)
     (call-static-fun 'sb-impl::install-hash-table-lock 1)))
+
+(define-assembly-routine
+    (return-values-list (:return-style :none))
+    ((:arg list descriptor-reg rax-offset)
+
+     (:temp rbx unsigned-reg rbx-offset)
+     (:temp rdx unsigned-reg rdx-offset)
+     (:temp rdi unsigned-reg rdi-offset)
+     (:temp rsi unsigned-reg rsi-offset)
+     (:temp count unsigned-reg rcx-offset)
+     (:temp null unsigned-reg r8-offset)
+     (:temp temp unsigned-reg r9-offset)
+     (:temp return unsigned-reg r10-offset))
+  (flet ((check (label)
+           (assemble ()
+             (%test-lowtag list temp skip nil list-pointer-lowtag)
+             (cerror-call nil 'bogus-arg-to-values-list-error list)
+             (inst jmp label)
+             skip)))
+    (assemble ()
+      (inst mov null nil-value)
+
+      (zeroize count)
+      (check ZERO-VALUES)
+      (inst cmp list null)
+      (inst jmp :e ZERO-VALUES)
+
+      (loadw rdx list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null)
+      (inst jmp :e ONE-VALUE)
+      (check ONE-VALUE)
+
+      (inst mov count (fixnumize 2))
+      (loadw rdi list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null)
+      (inst jmp :e TWO-VALUES)
+      (check TWO-VALUES)
+
+      (inst mov count (fixnumize 3))
+      (loadw rsi list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null)
+      (inst jmp :e THREE-VALUES)
+      (check THREE-VALUES)
+
+      ;; As per the calling convention RBX is expected to point at the SP
+      ;; before the stack frame.
+      (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+
+      (inst mov return (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
+      (inst lea rsp-tn (ea (frame-byte-offset sp->fp-offset) rbp-tn))
+      (inst mov rbp-tn (ea (frame-byte-offset ocfp-save-offset) rbp-tn))
+
+      LOOP
+      (inst add count (fixnumize 1))
+      (pushw list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (check DONE)
+      (inst cmp list nil-value)
+      (inst jmp :ne LOOP)
+
+      DONE
+      (inst stc)
+      (inst push return)
+      (inst ret)
+
+      ONE-VALUE
+      (inst mov rsp-tn rbp-tn)
+      (inst clc)
+      (inst pop rbp-tn)
+      (inst ret)
+
+      ZERO-VALUES
+      (inst mov rdx null)
+      (inst mov rdi null)
+
+      TWO-VALUES
+      (inst mov rsi null)
+
+      THREE-VALUES
+      (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+      (inst mov rsp-tn rbp-tn)
+      (inst stc)
+      (inst pop rbp-tn)
+      (inst ret))))

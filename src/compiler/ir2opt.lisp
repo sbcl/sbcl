@@ -1226,6 +1226,30 @@
               (delete-vop to)
               nil)))))))
 
+(when-vop-existsp (:named sb-vm::return-values-list)
+  (defoptimizer (vop-optimize values-list)
+      (vop)
+    (let ((return (next-vop-is vop '(return-multiple))))
+      (when (and return
+                 ;; The list might be allocated on the stack and the
+                 ;; return values might overwrite it.
+                 (not
+                  (find-if (lambda (lvar)
+                             (and (lvar-dynamic-extent lvar)
+                                  (eq (ir2-lvar-primitive-type (lvar-info lvar))
+                                      (primitive-type-or-lose 'list))))
+                           (ir2-block-end-stack (ir2-block-prev (vop-block return))))))
+        (vop-bind (list) () vop
+          (emit-and-insert-vop (vop-node return)
+                               (vop-block return)
+                               (template-or-lose 'sb-vm::return-values-list)
+                               (reference-tn list nil)
+                               nil
+                               return)
+          (delete-vop vop)
+          (delete-vop return))
+        nil))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))

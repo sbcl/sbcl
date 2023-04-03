@@ -3972,14 +3972,16 @@
                    (ctu:disassembly-lines
                     (checked-compile
                      `(lambda (l)
-                        (values-list l))))))
+                        (let (*)
+                          (values-list l)))))))
   (assert (not (find-if (lambda (line)
                           (search "BOGUS-ARG-TO-VALUES-LIST-ERROR" line :test #'equal))
                         (ctu:disassembly-lines
                          (checked-compile
                           `(lambda (l)
                              (declare (optimize (safety 0)))
-                             (values-list l))))))))
+                             (let (*)
+                               (values-list l)))))))))
 
 (with-test (:name :explicit-value-cell-top-level)
   (ctu:file-compile
