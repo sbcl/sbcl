@@ -1030,7 +1030,7 @@
 
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine*
-    :gc-barrier :symbol-tls-index
+    :card-table-index-mask :symbol-tls-index
     :alien-code-linkage-index :alien-data-linkage-index
     :foreign :foreign-dataref
     :code-object
@@ -1084,7 +1084,7 @@
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
-           (named (not (member flavor '(:code-object :gc-barrier))))
+           (named (not (member flavor '(:code-object :card-table-index-mask))))
            (data
             (or #-sb-xc-host ; ASM routine indices aren't known to the cross-compiler
                 (when (member flavor '(:assembly-routine :assembly-routine*))
@@ -1097,7 +1097,7 @@
                               flavor data))
            (operand
             (ecase flavor
-              ((:code-object :gc-barrier) (the null name))
+              ((:code-object :card-table-index-mask) (the null name))
               (:layout
                (if (symbolp name)
                    name

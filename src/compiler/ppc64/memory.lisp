@@ -18,7 +18,7 @@
     ;; (inst ld (car temps) thread-base-tn (ash thread-card-table-slot word-shift))
     ;; RLIDCL dest, source, (64-rightshift), (64-indexbits)
     (inst rldicl (car temps) (or cell-address object) (- 64 gencgc-card-shift)
-          (make-fixup nil :gc-barrier))
+          (make-fixup nil :card-table-index-mask))
     ;; THREAD-TN's low byte is 0.
     (inst stbx thread-base-tn card-table-base-tn (car temps))))
 

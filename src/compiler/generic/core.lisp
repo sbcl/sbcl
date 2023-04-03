@@ -80,7 +80,7 @@
                    (:layout (get-lisp-obj-address
                              (wrapper-friend (if (symbolp name) (find-layout name) name))))
                    (:layout-id (layout-id name))
-                   #+gencgc (:gc-barrier (extern-alien "gc_card_table_nbits" int))
+                   #+gencgc (:card-table-index-mask (extern-alien "gc_card_table_nbits" int))
                    (:immobile-symbol (get-lisp-obj-address name))
                    ;; It is legal to take the address of symbol-value only if the
                    ;; value is known to be an immobile object
@@ -128,7 +128,7 @@
         (binding* (((offset kind flavor data)
                     (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
                    (name
-                    (cond ((member flavor '(:code-object :gc-barrier)) nil)
+                    (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
                           ((and (plusp data)
                                 (member flavor '(:assembly-routine :assembly-routine*)))
                            (aref sb-fasl::*asm-routine-index-to-name* data))

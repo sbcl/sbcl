@@ -1137,7 +1137,7 @@
 
 (sb-vm::define-vop (trythis)
   (:generator 1
-   (sb-vm::inst and sb-vm::rax-tn (sb-c:make-fixup nil :gc-barrier))))
+   (sb-vm::inst and sb-vm::rax-tn (sb-c:make-fixup nil :card-table-index-mask))))
 (defun zook ()
   (sb-sys:%primitive trythis)
   nil)

@@ -2966,7 +2966,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (when (>= index end) (return))
     (binding* (((offset kind flavor)
                 (!unpack-fixup-info (descriptor-integer (svref fixups (incf index)))))
-               (name (cond ((member flavor '(:code-object :gc-barrier)) nil)
+               (name (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
                            (t (svref fixups (incf index)))))
                (string
                 (when (and (descriptor-p name)
@@ -2989,7 +2989,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (cold-layout-id (gethash (descriptor-bits (->layout name))
                                        *cold-layout-by-addr*)))
              ;; The machine-dependent code decides how to patch in 'nbits'
-             #+gencgc (:gc-barrier sb-vm::gencgc-card-table-index-nbits)
+             #+gencgc (:card-table-index-mask sb-vm::gencgc-card-table-index-nbits)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.

@@ -1722,7 +1722,7 @@
             ((or (integerp src)
                  (and (fixup-p src)
                       (memq (fixup-flavor src) '(:layout-id :layout :immobile-symbol
-                                                 :gc-barrier))))
+                                                 :card-table-index-mask))))
              (emit-prefixes segment dst nil size :lock (lockp prefix))
              (cond ((accumulator-p dst)
                     (emit-byte segment
@@ -3342,7 +3342,7 @@
   (declare (type index offset))
   (let ((sap (code-instructions code)))
     (case flavor
-      (:gc-barrier ; the VALUE is nbits, so convert it to an AND mask
+      (:card-table-index-mask ; the VALUE is nbits, so convert it to an AND mask
        (setf (sap-ref-32 sap offset) (1- (ash 1 value))))
       (:layout-id ; layout IDs are signed quantities on x86-64
        (setf (signed-sap-ref-32 sap offset) value))
@@ -3385,7 +3385,7 @@
     (let* ((fixup (fixup-note-fixup note))
            (offset (fixup-note-position note))
            (flavor (fixup-flavor fixup)))
-      (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
+      (cond ((eq flavor :card-table-index-mask) (push offset imm-fixups))
             #+immobile-space
             ((and (eq (fixup-note-kind note) :abs32)
                   (memq flavor ; these all point to fixedobj space

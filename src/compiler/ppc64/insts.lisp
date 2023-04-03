@@ -1473,7 +1473,7 @@
                   (:declare (type (integer 0 63) sh) (type (or (integer 0 63) fixup) m))
                   (:printer md-form ((op 30) (subop ,op) (rc ,rc)))
                   (:emitter
-                   (when (and (fixup-p m) (eq (fixup-flavor m) :gc-barrier))
+                   (when (and (fixup-p m) (eq (fixup-flavor m) :card-table-index-mask))
                      (note-fixup segment :rldic-m m)
                      (setq m 0))
                    (emit-md-form-inst segment 30
@@ -2435,7 +2435,7 @@
   (let (result)
     (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil nil result))
       (let ((fixup (fixup-note-fixup note)))
-        (when (eq (fixup-flavor fixup) :gc-barrier)
+        (when (eq (fixup-flavor fixup) :card-table-index-mask)
           (push (fixup-note-position note) result))))))
 
 (define-instruction store-coverage-mark (segment mark-index temp)

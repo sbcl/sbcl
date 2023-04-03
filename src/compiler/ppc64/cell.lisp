@@ -560,7 +560,7 @@
     (inst ld temp thread-base-tn (ash thread-card-table-slot word-shift))
     (pseudo-atomic (pa-flag)
       ;; Compute card mark index
-      (inst rldicl card object (- 64 gencgc-card-shift) (make-fixup nil :gc-barrier))
+      (inst rldicl card object (- 64 gencgc-card-shift) (make-fixup nil :card-table-index-mask))
       ;; Touch the card mark byte.
       (inst stbx thread-base-tn temp card) ; THREAD-TN's low byte is 0
       ;; set 'written' flag in the code header

@@ -85,7 +85,7 @@
 ;;; It will never be used with a constant displacement.
 (define-symbol-macro card-table-reg 12)
 (define-symbol-macro gc-card-table-reg-tn r12-tn)
-(define-symbol-macro card-index-mask (make-fixup nil :gc-barrier))
+(define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))
 
 (macrolet ((defreg (name offset size)
              (declare (ignore size))

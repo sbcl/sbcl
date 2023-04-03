@@ -4,7 +4,7 @@
 ;;; wants to see the two shifts as consecutive instructions.
 (defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn)
   (when (require-gc-store-barrier-p object value-tn-ref value-tn)
-    (inst sll temp (or cell-address object) (make-fixup nil :gc-barrier))
+    (inst sll temp (or cell-address object) (make-fixup nil :card-table-index-mask))
     (inst srl temp temp 0)
     (inst addu temp temp cardbase-tn)
     (inst sb zero-tn temp 0)))

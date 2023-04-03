@@ -953,7 +953,7 @@
     (maybe-emit-operand-size-prefix segment size)
     (cond
      ((or (integerp src)
-          (and (fixup-p src) (memq (fixup-flavor src) '(:gc-barrier :layout-id))))
+          (and (fixup-p src) (memq (fixup-flavor src) '(:card-table-index-mask :layout-id))))
       (cond ((and (neq size :byte) (typep src '(signed-byte 8)))
              (emit-byte segment #b10000011)
              (emit-ea segment dst opcode)
@@ -2414,7 +2414,7 @@
        (case flavor
          (:layout-id
           (setf (signed-sap-ref-32 sap offset) value))
-         (:gc-barrier
+         (:card-table-index-mask
           ;; the VALUE is nbits, so convert it to an AND mask
           (setf (sap-ref-32 sap offset) (1- (ash 1 value))))
          (t
@@ -2452,7 +2452,7 @@
                  (push offset abs-fixups)))
               ((and (eq kind :relative) (member flavor '(:assembly-routine :foreign)))
                (push offset rel-fixups))
-              ((eq flavor :gc-barrier)
+              ((eq flavor :card-table-index-mask)
                (push offset imm-fixups))
               ((or (and (eq kind :absolute)
                         (member flavor '(:assembly-routine :foreign :foreign-dataref)))
