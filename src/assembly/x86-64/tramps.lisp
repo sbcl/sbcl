@@ -238,3 +238,56 @@
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
+
+;;; Perform a store to code, updating the GC card mark bit.
+;;; This has two additional complications beyond the ordinary
+;;; generational barrier:
+;;; 1. immobile code uses its own card table which maps linearly
+;;;    with the page index, unlike the dynamic space card table
+;;;    that has a different way of computing a card address.
+;;; 2. code objects are so seldom written that it behooves us to
+;;;    track within each object whether it has been written,
+;;;    thereby avoiding scanning of unwritten objects.
+;;;    This is especially important for immobile space where
+;;;    it is likely that new code will be co-located on a page
+;;;    with old code due to the non-moving allocator.
+(define-assembly-routine (code-header-set (:return-style :none)) ()
+  ;; stack: ret-pc, object, index, value-to-store
+  (symbol-macrolet ((object (ea 8 rsp-tn))
+                    (word-index (ea 16 rsp-tn))
+                    (newval (ea 24 rsp-tn))
+                    ;; these are declared as vop temporaries
+                    (rax rax-tn)
+                    (rdx rdx-tn)
+                    (rdi rdi-tn))
+    (pseudo-atomic ()
+      #+immobile-space
+      (progn
+        #-sb-thread
+        (let ((fixup (make-fixup "all_threads" :foreign-dataref)))
+          ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
+          ;; to stack, because we do do not give the register allocator access to it.
+          (inst mov thread-tn (rip-relative-ea fixup))
+          (inst mov thread-tn (ea thread-tn)))
+        (inst mov rax object)
+        (inst sub rax (thread-slot-ea thread-text-space-addr-slot))
+        (inst shr rax (1- (integer-length immobile-card-bytes)))
+        (inst cmp rax (thread-slot-ea thread-text-card-count-slot))
+        (inst jmp :ae try-dynamic-space)
+        (inst mov rdi (thread-slot-ea thread-text-card-marks-slot))
+        (inst bts :dword :lock (ea rdi-tn) rax)
+        (inst jmp store))
+      TRY-DYNAMIC-SPACE
+      (inst mov rax object)
+      (inst shr rax gencgc-card-shift)
+      (inst and :dword rax card-index-mask)
+      (inst mov :byte (ea gc-card-table-reg-tn rax) 0)
+      STORE
+      (inst mov rdi object)
+      (inst mov rdx word-index)
+      (inst mov rax newval)
+      ;; set 'written' flag in the code header
+      (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi) #x40)
+      ;; store newval into object
+      (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax)))
+  (inst ret 24)) ; remove 3 stack args

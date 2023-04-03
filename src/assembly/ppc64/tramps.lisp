@@ -154,7 +154,6 @@
 ;;; While we can (and do) hack arch_write_linkage_table_entry
 ;;; to unwrap the descriptor, it would be nice not to have to do that.
 #|
-#+sb-assembling
 (define-assembly-routine (call-into-c (:return-style :none))
     ((:temp reg_zero   signed-reg  0)
      (:temp reg_nsp    signed reg  1)

@@ -131,7 +131,7 @@
 ;;; we actually called. We also have to compute RCX from the difference
 ;;; between RSI and the stack top.
 #-sb-assembling ; avoid "Redefinition" warning (this file is processed twice)
-(defun !prepare-for-tail-call-variable (fun temp nargs rdx rdi rsi
+(defun prepare-for-tail-call-variable (fun temp nargs rdx rdi rsi
                                         r8 r9 r10
                                         &optional jump-to-the-end)
   (assemble ()
@@ -202,7 +202,7 @@
      (:temp r8 unsigned-reg r8-offset)
      (:temp r9 unsigned-reg r9-offset)
      (:temp r10 unsigned-reg r10-offset))
-  (!prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10)
+  (prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10)
 
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
@@ -219,7 +219,7 @@
      (:temp r8 unsigned-reg r8-offset)
      (:temp r9 unsigned-reg r9-offset)
      (:temp r10 unsigned-reg r10-offset))
-  (!prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10 t)
+  (prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10 t)
 
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test :byte rbx-tn lowtag-mask)
@@ -373,67 +373,6 @@
 
   ;; nlx-entry expects start in RBX and count in RCX
   (inst jmp (ea (* unwind-block-entry-pc-slot n-word-bytes) block)))
-
-#+sb-assembling
-(defun ensure-thread-base-tn-loaded ()
-  #-sb-thread
-  (let ((fixup (make-fixup "all_threads" :foreign-dataref)))
-    ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
-    ;; to stack, because we do do not give the register allocator access to it.
-    ;; And call_into_lisp saves it as per convention, not that it matters,
-    ;; because there's no way to get back into C code anyhow.
-    #-immobile-space (inst mov thread-tn (ea fixup))
-    #+immobile-space (inst mov thread-tn (rip-relative-ea fixup))
-    (inst mov thread-tn (ea thread-tn))))
-
-;;; Perform a store to code, updating the GC card mark bit.
-;;; This has two additional complications beyond the ordinary
-;;; generational barrier:
-;;; 1. immobile code uses its own card table which maps linearly
-;;;    with the page index, unlike the dynamic space card table
-;;;    that has a different way of computing a card address.
-;;; 2. code objects are so seldom written that it behooves us to
-;;;    track within each object whether it has been written,
-;;;    thereby avoiding scanning of unwritten objects.
-;;;    This is especially important for immobile space where
-;;;    it is likely that new code will be co-located on a page
-;;;    with old code due to the non-moving allocator.
-#+sb-assembling
-(define-assembly-routine (code-header-set (:return-style :none)) ()
-  ;; stack: ret-pc, object, index, value-to-store
-  (symbol-macrolet ((object (ea 8 rsp-tn))
-                    (word-index (ea 16 rsp-tn))
-                    (newval (ea 24 rsp-tn))
-                    ;; these are declared as vop temporaries
-                    (rax rax-tn)
-                    (rdx rdx-tn)
-                    (rdi rdi-tn))
-  (ensure-thread-base-tn-loaded)
-  (pseudo-atomic ()
-      #+immobile-space
-      (progn
-        (inst mov rax object)
-        (inst sub rax (thread-slot-ea thread-text-space-addr-slot))
-        (inst shr rax (1- (integer-length immobile-card-bytes)))
-        (inst cmp rax (thread-slot-ea thread-text-card-count-slot))
-        (inst jmp :ae try-dynamic-space)
-        (inst mov rdi (thread-slot-ea thread-text-card-marks-slot))
-        (inst bts :dword :lock (ea rdi-tn) rax)
-        (inst jmp store))
-      TRY-DYNAMIC-SPACE
-      (inst mov rax object)
-      (inst shr rax gencgc-card-shift)
-      (inst and :dword rax card-index-mask)
-      (inst mov :byte (ea gc-card-table-reg-tn rax) 0)
-      STORE
-      (inst mov rdi object)
-      (inst mov rdx word-index)
-      (inst mov rax newval)
-      ;; set 'written' flag in the code header
-      (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi) #x40)
-      ;; store newval into object
-      (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax)))
-  (inst ret 24)) ; remove 3 stack args
 
 ;;; These are trampolines, but they benefit from not being in the 'tramps' file
 ;;; because they'll automatically get a vop and an assembly routine this way,
