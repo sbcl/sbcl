@@ -150,7 +150,7 @@ must walk the entire queue."
 ;;; but want to pass them around now as compiled-functions without waiting
 ;;; for COMPILE. If the timing is right, the compiler will be done by the time
 ;;; of the call to such functions, but if not, that's OK - it just works.
-#+(and x86-64 sb-thread)
+#+sb-thread
 (progn
   (define-load-time-global *compilation-queue* (make-queue :name "compiler"))
 
@@ -175,21 +175,28 @@ must walk the entire queue."
                        (error "Compiling ~S failed" fin))
                      (lambda (&rest args)
                        (apply compiled-function args))))
-           (signal-semaphore (elt item 2) (ash most-positive-fixnum -1)))))))
+           (open-gate (elt item 2)))))))
 
   (setq sb-impl::*bg-compiler-function* #'run-background-compile)
 
   (defun promise-compile (lexpr)
-    (let ((fin (%primitive sb-vm::fixed-alloc 'fin 5
-                           sb-vm:funcallable-instance-widetag
-                           sb-vm:fun-pointer-lowtag nil))
-          (sem (make-semaphore)))
+    ;;   Dynamic      Immobile
+    ;;   -------      --------
+    ;;   header       header+layout
+    ;;   trampoline   trampoline -----\
+    ;;   layout       machine code   <--
+    ;;   impl-fun     machine code
+    ;;   unused       impl-fun
+    ;;   unused
+    ;; The constant 1 here is ok for #+ or #- immobile-space.
+    (let ((fin (sb-kernel:%make-funcallable-instance 1))
+          (gate (make-gate)))
       (sb-kernel:%set-fun-layout fin (sb-kernel:find-layout 'function))
-      (sb-vm::write-funinstance-prologue fin)
+      #+immobile-space (sb-vm::write-funinstance-prologue fin)
       (setf (sb-kernel:%funcallable-instance-fun fin)
             (lambda (&rest args)
-              (wait-on-semaphore sem)
+              (wait-on-gate gate)
               (apply fin args)))
-      (enqueue (vector fin lexpr sem) *compilation-queue*)
+      (enqueue (vector fin lexpr gate) *compilation-queue*)
       (sb-impl::finalizer-thread-notify)
       fin)))

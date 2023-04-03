@@ -261,9 +261,7 @@
                  (= n dc (1+ d)))))))
   t)
 
-;;; I don't remember if funcallable instances with #-immobile-space
-;;; work the way I need them to for this test.
-#+(and sb-thread x86-64 immobile-space)
+#+sb-thread
 (progn
   (defvar *bigfun*
     '(lambda (arg)
@@ -287,6 +285,9 @@
              (sec (float (/ (- after before) internal-time-units-per-second))))
         (format t "~&::: INFO: ~A time = ~F~%" label sec)
         sec)))
+
+  (test-util:with-test (:name :compilation-queue-does-it-work)
+    (assert (equal (test-bg-compile) '(x))))
 
   (test-util:with-test (:name :compilation-queue :skipped-on :sbcl)
     (when (>= *cpus* 2)
