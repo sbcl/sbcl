@@ -1197,7 +1197,7 @@
        (cond ((and (>= (length line) 4) (string= line "VOP " :end1 4))
               (let ((string (subseq line 4 (position #\space line :start 5))))
                 (setq current-vop string)))
-             ((search ":FLAVOR GC-BARRIER" line)
+             ((search ":FLAVOR CARD-TABLE-INDEX-MASK" line)
               (push current-vop result)))))))
 
 (with-test (:name :closure-init-gc-barrier)
