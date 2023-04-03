@@ -156,7 +156,7 @@
            (and vop (eq (vop-name vop) 'make-unbound-marker))))))
 
 (defun emit-fixed-alloc (node block name words type lowtag result lvar)
-  (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
+  (let ((stack-allocate-p (lvar-dynamic-extent lvar)))
     (cond (stack-allocate-p
            (vop current-stack-pointer node block
                 (ir2-lvar-stack-pointer (lvar-info lvar)))
@@ -166,7 +166,7 @@
 
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
-  (let* ((lvar (node-lvar node))
+  (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
@@ -175,7 +175,7 @@
 
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
-  (let* ((lvar (node-lvar node))
+  (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (if (constant-lvar-p extra)
@@ -192,7 +192,7 @@
 
 (defoptimizer ir2-convert-structure-allocation
     ((dd slot-specs &rest args) node block name words type lowtag)
-  (let* ((lvar (node-lvar node))
+  (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
