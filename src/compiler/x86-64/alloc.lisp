@@ -865,13 +865,17 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
+  (:vop-var vop)
   (:generator 10
     (let* ((words (+ length closure-info-offset)) ; including header
            (bytes (pad-data-block words))
-           (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
+           (header (logior (ash (1- words) n-widetag-bits) closure-widetag))
+           (remain-pseudo-atomic
+            (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
       (unless stack-allocate-p
         (instrument-alloc closure-widetag bytes node (list result temp) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+      (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
+                      :elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation bytes fun-pointer-lowtag result)
             (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))

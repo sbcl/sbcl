@@ -1384,6 +1384,29 @@
              (loop (names (vop-name vop))
                    (if (eq vop last) (return (names)))
                    (setq vop (vop-next vop))))))
+       (terminate-inits (last)
+         (emit-and-insert-vop (vop-node last) (vop-block last)
+                              (template-or-lose 'end-pseudo-atomic)
+                              nil nil (vop-next last)))
+       (process-closure-inits (vop)
+         (let* ((result-ref (vop-results vop))
+                (closure (tn-ref-tn result-ref))
+                (last))
+           (do ((init (vop-next vop) (vop-next init)))
+               ((or (not init) (neq (vop-name init) 'closure-init)))
+             ;; IR2-CONVERT-ENCLOSE can output more than one MAKE-CLOSURE
+             ;; and then some CLOSURE-INITs.  This happens with mutually-referential
+             ;; closures. Sadly we can't optimize that to move the inits underneath
+             ;; the allocator's pseudo-atomic.So just beware of the pattern
+             ;;   MAKE => c1 / INIT c1 / MAKE => c2 / INIT c2 / INIT c1
+             (unless (eq closure (tn-ref-tn (vop-args init)))
+               (return))
+             (setf (vop-codegen-info init) (append (vop-codegen-info init) '(:pseudo-atomic))
+                   last init))
+           (when last
+             (setf (vop-codegen-info vop)
+                   (append (vop-codegen-info vop) '(:pseudo-atomic)))
+             (terminate-inits last))))
        (process-range (first last)
          (aver (neq first last))
          (unless (eq (vop-block first) (vop-block last))
@@ -1412,13 +1435,15 @@
          ;; terminate the pseudo-atomic sequence. It's a separate vop to do that.
          (setf (vop-codegen-info first)
                (append (butlast (vop-codegen-info first)) '(:pseudo-atomic)))
-         (emit-and-insert-vop (vop-node last) (vop-block last)
-                              (template-or-lose 'end-pseudo-atomic)
-                              nil nil (vop-next last))))
+         (terminate-inits last)))
   (do-ir2-blocks (block component)
     (let ((vop (ir2-block-start-vop block)))
       (loop (unless vop (return))
             (case (vop-name vop)
+              (make-closure
+               (let ((dx (third (vop-codegen-info vop))))
+                 (unless dx
+                   (process-closure-inits vop))))
               ((fixed-alloc var-alloc)
                (let ((last (car (last (vop-codegen-info vop)))))
                  (when (vop-p last)
