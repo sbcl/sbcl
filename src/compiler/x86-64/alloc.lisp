@@ -311,8 +311,10 @@
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.  NWORDS counts the header word.
 (defun alloc-other (widetag nwords result-tn node alloc-temps thread-temp
+                    &optional init
                     &aux (bytes (pad-data-block nwords)))
   (declare (ignorable thread-temp))
+  (declare (dynamic-extent init))
   #+bignum-assertions
   (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
   (instrument-alloc widetag bytes node (cons result-tn (ensure-list alloc-temps)) thread-temp)
@@ -325,7 +327,9 @@
              (inst or :byte result-tn other-pointer-lowtag))
             (t
              (allocation widetag bytes other-pointer-lowtag result-tn node nil thread-temp)
-             (storew* header result-tn 0 other-pointer-lowtag t))))))
+             (storew* header result-tn 0 other-pointer-lowtag t)))
+      (when init
+        (funcall init)))))
 
 ;;;; CONS, ACONS, LIST and LIST*
 (macrolet ((pop-arg (ref)
@@ -848,11 +852,12 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 37
-    (alloc-other fdefn-widetag fdefn-size result node nil thread-tn)
-    (storew name result fdefn-name-slot other-pointer-lowtag)
-    (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
-    (storew (make-fixup 'undefined-tramp :assembly-routine)
-            result fdefn-raw-addr-slot other-pointer-lowtag)))
+    (alloc-other fdefn-widetag fdefn-size result node nil thread-tn
+      (lambda ()
+        (storew name result fdefn-name-slot other-pointer-lowtag)
+        (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
+        (storew (make-fixup 'undefined-tramp :assembly-routine)
+                result fdefn-raw-addr-slot other-pointer-lowtag)))))
 
 (define-vop (make-closure)
   (:info label length stack-allocate-p)
@@ -882,11 +887,9 @@
                           (inst mov temp header)
                           (inst or temp layout)))
                    temp)
-                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
-      ;; Finished with the pseudo-atomic instructions
-      ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
-      (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-      (storew temp result closure-fun-slot fun-pointer-lowtag)
+                 result 0 fun-pointer-lowtag (not stack-allocate-p))
+        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
+        (storew temp result closure-fun-slot fun-pointer-lowtag))
       #+metaspace
       (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
         (inst lea temp (rip-relative-ea origin :code))
@@ -903,11 +906,12 @@
     (cond (stack-allocate-p
            (stack-allocation (pad-data-block value-cell-size) other-pointer-lowtag result)
            (let ((header (compute-object-header value-cell-size value-cell-widetag)))
-             (storew header result 0 other-pointer-lowtag)))
+             (storew header result 0 other-pointer-lowtag)
+             (storew value result value-cell-value-slot other-pointer-lowtag)))
           (t
-           (alloc-other value-cell-widetag value-cell-size result node nil thread-tn)))
-    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
-    (storew value result value-cell-value-slot other-pointer-lowtag)))
+           (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
+                        (lambda ()
+                          (storew value result value-cell-value-slot other-pointer-lowtag)))))))
 
 ;;;; automatic allocators for primitive objects
 
