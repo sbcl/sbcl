@@ -209,7 +209,7 @@
              #+sb-thread `(thread-slot-ea
                            thread-pseudo-atomic-bits-slot
                            #+gs-seg ,@(if thread (list thread)))
-             #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*))
+             #-sb-thread `(static-symbol-value-ea '*pseudo-atomic-bits*))
            (nonzero-bits ()
              ;; reg-mem move is allegedly faster than imm-mem according to
              ;; someone at some point. Whether that's true or not, it is what it is.
