@@ -205,42 +205,43 @@
   ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
   (inst test :byte rax-tn (ea (- static-space-start gc-safepoint-trap-offset))))
 
+(macrolet ((pa-bits-ea ()
+             #+sb-thread `(thread-slot-ea
+                           thread-pseudo-atomic-bits-slot
+                           #+gs-seg ,@(if thread (list thread)))
+             #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*))
+           (nonzero-bits ()
+             ;; reg-mem move is allegedly faster than imm-mem according to
+             ;; someone at some point. Whether that's true or not, it is what it is.
+             ;; THREAD-TN is a better choice than RBP-TN since it's constant.
+             #+(and sb-thread (not gs-seg)) 'thread-tn
+             #-(and sb-thread (not gs-seg)) 'rbp-tn))
+  (defun emit-begin-pseudo-atomic ()
+    #-sb-safepoint (inst mov (pa-bits-ea) (nonzero-bits)))
+  (defun emit-end-pseudo-atomic ()
+    #+sb-safepoint (emit-safepoint)
+    #-sb-safepoint
+    (assemble ()
+      (inst xor (pa-bits-ea) (nonzero-bits))
+      (inst jmp :z OUT)
+      ;; if PAI was set, interrupts were disabled at the same time
+      ;; using the process signal mask.
+      #+int1-breakpoints (inst icebp)
+      #-int1-breakpoints (inst break pending-interrupt-trap)
+      OUT)))
+
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
 (defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
                          &body forms)
-  (declare (ignorable thread default-exit))
-  #+sb-safepoint
-  `(assemble () ,@forms (unless ,elide-if (emit-safepoint)))
-  #-sb-safepoint
-  (let ((true
-          ;; TRUE is anything nonzero. Moving a register to memory is
-          ;; allegedly faster than reading an imm8 operand. I don't know,
-          ;; but I'm not going to debate it. However THREAD-TN is a better
-          ;; choice than RBP-TN since it's never written to.
-          #+(and sb-thread (not gs-seg)) 'thread-tn
-          #-(and sb-thread (not gs-seg)) 'rbp-tn)
-        (pa-bits-ea '#:pa-bits))
-    `(let ((,pa-bits-ea
-            #+sb-thread (thread-slot-ea
-                         thread-pseudo-atomic-bits-slot
-                         #+gs-seg ,@(if thread (list thread)))
-            #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
-       (macrolet ((exit-pseudo-atomic ()
-                    '(let ((.out. (gen-label)))
-                       (inst xor ,pa-bits-ea ,true)
-                       (inst jmp :z .out.)
-                       ;; if PAI was set, interrupts were disabled at the same time
-                       ;; using the process signal mask.
-                       #+int1-breakpoints (inst icebp)
-                       #-int1-breakpoints (inst break pending-interrupt-trap)
-                       (emit-label .out.))))
-         (unless ,elide-if
-            (inst mov ,pa-bits-ea ,true))
-         (assemble () ,@forms)
-         (when (and ,default-exit (not ,elide-if))
-           (exit-pseudo-atomic))))))
+  (declare (ignorable thread))
+  `(macrolet ((exit-pseudo-atomic () '(emit-end-pseudo-atomic)))
+     (unless ,elide-if
+       (emit-begin-pseudo-atomic))
+     (assemble () ,@forms)
+     (when (and ,default-exit (not ,elide-if))
+       (exit-pseudo-atomic))))
 
 ;;;; indexed references
 

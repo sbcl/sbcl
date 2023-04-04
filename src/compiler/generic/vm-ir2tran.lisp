@@ -146,7 +146,8 @@
                                     tn)))))
                      :allocator slot lowtag))))))))
   (unless (null args)
-    (bug "Leftover args: ~S" args)))
+    (bug "Leftover args: ~S" args))
+  (ir2-block-last-vop block))
 
 (defun unbound-marker-tn-p (tn)
   (let ((writes (tn-writes tn)))
@@ -164,13 +165,25 @@
           (t
            (vop fixed-alloc node block name words type lowtag nil result)))))
 
+(defun link-allocator-to-inits (allocator-vop last-init-vop lvar)
+  (declare (ignorable allocator-vop last-init-vop lvar))
+  ;; This can easily enough be changed to any set of platforms for which it is
+  ;; desirable to assign structure slots within pseudo-atomic in a constructor
+  #+x86-64
+  (unless (or (lvar-dynamic-extent lvar) (eq last-init-vop allocator-vop))
+    ;; extra codegen info is OK
+    (setf (vop-codegen-info allocator-vop)
+          (append (vop-codegen-info allocator-vop) (list last-init-vop)))))
+
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
-    (emit-inits node block result lowtag inits args)
+    (let ((allocator-vop (ir2-block-last-vop block))
+          (last-init-vop (emit-inits node block result lowtag inits args)))
+      (link-allocator-to-inits allocator-vop last-init-vop lvar))
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -187,7 +200,9 @@
                  (ir2-lvar-stack-pointer (lvar-info lvar))))
           (vop var-alloc node block (lvar-tn node block extra) name words
                type lowtag stack-allocate-p result)))
-    (emit-inits node block result lowtag inits args)
+    (let ((allocator-vop (ir2-block-last-vop block))
+          (last-init-vop (emit-inits node block result lowtag inits args)))
+      (link-allocator-to-inits allocator-vop last-init-vop lvar))
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
@@ -207,8 +222,11 @@
                       #-compact-instance-header
                       c-dd))
         (emit-fixed-alloc node block name words metadata lowtag result lvar))
-      (emit-inits node block result lowtag
-                  `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
+      (let ((allocator-vop (ir2-block-last-vop block))
+            (last-init-vop
+             (emit-inits node block result lowtag
+                         `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)))
+        (link-allocator-to-inits allocator-vop last-init-vop lvar))
       (move-lvar-result node block locs lvar))))
 
 ;;; FIXME: this causes emission of GC store barriers, but it should not.

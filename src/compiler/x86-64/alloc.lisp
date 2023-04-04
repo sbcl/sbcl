@@ -198,6 +198,9 @@
 ;;; the allocator to use cons_tlab.
 (defconstant +cons-primtype+ list-pointer-lowtag)
 
+(define-vop (sb-c::end-pseudo-atomic)
+  (:generator 1 (emit-end-pseudo-atomic)))
+
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
 ;;; NODE may be used to make policy-based decisions.
@@ -918,16 +921,18 @@
     (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (flet
-  ((alloc (name words type lowtag stack-allocate-p result
-                    &optional alloc-temp node vop
-                    &aux (bytes (pad-data-block words)))
-    (declare (ignorable vop))
+  ((alloc (vop name words type lowtag stack-allocate-p result
+                    &optional alloc-temp node
+                    &aux (bytes (pad-data-block words))
+                         (remain-pseudo-atomic
+                          (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
     (unless stack-allocate-p
       (instrument-alloc type bytes node (list result alloc-temp) thread-tn))
-    (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+    (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
+                    :elide-if stack-allocate-p :thread-tn thread-tn)
       ;; If storing a header word, defer ORing in the lowtag until after
       ;; the header is written so that displacement can be 0.
       (cond (stack-allocate-p
@@ -964,11 +969,12 @@
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:vop-var vop)
     (:node-var node)
-    (:generator 50 (alloc name words type lowtag dx result alloc-temp node vop)))
+    (:generator 50 (alloc vop name words type lowtag dx result alloc-temp node)))
   (define-vop (sb-c::fixed-alloc-to-stack)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
-    (:generator 50 (alloc name words type lowtag dx result))))
+    (:vop-var vop)
+    (:generator 50 (alloc vop name words type lowtag dx result))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
@@ -990,31 +996,34 @@
   (:temporary (:sc unsigned-reg :offset 0) alloc-temp)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
+  (:vop-var vop)
   (:generator 50
+   (let ((remain-pseudo-atomic (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
    ;; With the exception of bignums, these objects have effectively
    ;; 32-bit headers because the high 4 byes contain a layout pointer.
-   (let ((operand-size (if (= type bignum-widetag) :qword :dword)))
-      (inst lea operand-size bytes
-            (ea (* (1+ words) n-word-bytes) nil
-                extra (ash 1 (- word-shift n-fixnum-tag-bits))))
-      (inst mov operand-size header bytes)
-      (inst shl operand-size header (- (length-field-shift type) word-shift)) ; w+1 to length field
-      (inst lea operand-size header                    ; (w-1 << 8) | type
-            (ea (+ (ash -2 (length-field-shift type)) type) header))
-      (inst and operand-size bytes (lognot lowtag-mask)))
-   #+bignum-assertions
-   (when (= type bignum-widetag) (inst shl :dword bytes 1)) ; use 2x the space
-   (cond (stack-allocate-p
+     (let ((operand-size (if (= type bignum-widetag) :qword :dword)))
+       (inst lea operand-size bytes
+             (ea (* (1+ words) n-word-bytes) nil
+                 extra (ash 1 (- word-shift n-fixnum-tag-bits))))
+       (inst mov operand-size header bytes)
+       (inst shl operand-size header (- (length-field-shift type) word-shift)) ; w+1 to length field
+       (inst lea operand-size header                    ; (w-1 << 8) | type
+             (ea (+ (ash -2 (length-field-shift type)) type) header))
+       (inst and operand-size bytes (lognot lowtag-mask)))
+     #+bignum-assertions
+     (when (= type bignum-widetag) (inst shl :dword bytes 1)) ; use 2x the space
+     (cond (stack-allocate-p
              (stack-allocation bytes lowtag result)
              (storew header result 0 lowtag))
-         (t
+           (t
              ;; can't pass RESULT as a possible choice of scratch register
              ;; because it might be in the same physical reg as BYTES.
              ;; Yup, the lifetime specs in this vop are pretty confusing.
              (instrument-alloc type bytes node alloc-temp thread-tn)
-             (pseudo-atomic (:thread-tn thread-tn)
+             (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
+                             :thread-tn thread-tn)
               (allocation type bytes lowtag result node alloc-temp thread-tn)
-              (storew header result 0 lowtag))))))
+              (storew header result 0 lowtag)))))))
 
 #+sb-xc-host
 (define-vop (alloc-code)

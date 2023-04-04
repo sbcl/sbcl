@@ -41,6 +41,9 @@
 
 #-x86-64 (define-vop (fixed-alloc-to-stack fixed-alloc))
 
+;;; x86-64 defines this vop for real
+#-x86-64 (define-vop (end-pseudo-atomic) (:generator 1))
+
 ;;; SPLAT is always a no-op for architectures other than x86-64
 ;;; because:
 ;;; - the heap is zero-filled, and only value that can be

@@ -618,11 +618,13 @@
                      (if (template-conditional-p info) 0 (length rtypes))
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
-      (unless (= (+ (length (vop-codegen-info vop))
-                    (if (typep (template-result-types info) '(cons (eql :conditional)))
-                        -1
-                        0))
-                 (template-info-arg-count info))
+      (unless (or (= (+ (length (vop-codegen-info vop))
+                        (if (typep (template-result-types info) '(cons (eql :conditional)))
+                            -1
+                            0))
+                     (template-info-arg-count info))
+                  ;; Allow these 2 allocator vops to take an undeclared info arg
+                  (member (vop-info-name info) '(sb-vm::fixed-alloc sb-vm::var-alloc)))
         (barf "wrong number of codegen info args in ~S" vop))))
   (values))
 

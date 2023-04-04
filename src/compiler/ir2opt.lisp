@@ -1364,6 +1364,69 @@
               (setq vop (or (awhen optimizer (funcall it vop))
                             (vop-next vop))))))))
 
+;;; These are the acceptable vops in a sequence that can be brought together
+;;; under one pseudo-atomic invocation. In general any vop that does not
+;;; allocate is OK, but I'd rather be restrictive than permissive here.
+(defglobal *vops-allowed-within-pseudo-atomic*
+    '(set-slot %raw-instance-set/word %raw-instance-set/signed-word %raw-instance-set/single
+      %raw-instance-set/double %raw-instance-set/complex-single %raw-instance-set/complex-double
+      move move-operand make-unbound-marker make-funcallable-instance-tramp
+      sb-vm::move-from-fixnum+1 sb-vm::move-from-fixnum-1))
+
+;;; This should be among the final IR2 optimizer passes so that no new vops get
+;;; inserted that would change the decision about whether to extend
+;;; the scope of pseudo-atomic to cover them.
+(defun attempt-pseudo-atomic-store-bunching (component)
+  (labels
+      ((collect-vop-subseq-names (first last)
+         (collect ((names))
+           (let ((vop first))
+             (loop (names (vop-name vop))
+                   (if (eq vop last) (return (names)))
+                   (setq vop (vop-next vop))))))
+       (process-range (first last)
+         (aver (neq first last))
+         (unless (eq (vop-block first) (vop-block last))
+           ;;(format t "~&FAIL P-A bunch: different IR2 blocks in ~S..~S~%" first last)
+           (return-from process-range))
+         (let ((vop (vop-next first)))
+           ;; Test whether all SET-SLOT vops after FIRST vop (an allocator)
+           ;; up to and including LAST are unaffected by allocation vops
+           ;; due to MOVE-FROM-SAP or similar.
+           (loop
+            (unless (member (vop-name vop) *vops-allowed-within-pseudo-atomic*)
+              ;;(format t "~&FAIL P-A bunch: ~A~%" (collect-vop-subseq-names first last)))
+              (return-from process-range)) ; can't
+            (if (eq vop last) (return))
+            (setq vop (vop-next vop))))
+         ;; Inform each SET-SLOT that it is in pseudo-atomic.
+         (let ((vop (vop-next first)))
+           (loop
+            (when (eq (vop-name vop) 'set-slot)
+              (setf (vop-codegen-info vop)
+                    (append (vop-codegen-info vop) '(:pseudo-atomic))))
+            (if (eq vop last) (return))
+            (setq vop (vop-next vop))))
+         ;; The allocator has to recognize :PSEUDO-ATOMIC in its codegen info
+         ;; but the slot setters don't all have to be updated to understand how to
+         ;; terminate the pseudo-atomic sequence. It's a separate vop to do that.
+         (setf (vop-codegen-info first)
+               (append (butlast (vop-codegen-info first)) '(:pseudo-atomic)))
+         (emit-and-insert-vop (vop-node last) (vop-block last)
+                              (template-or-lose 'end-pseudo-atomic)
+                              nil nil (vop-next last))))
+  (do-ir2-blocks (block component)
+    (let ((vop (ir2-block-start-vop block)))
+      (loop (unless vop (return))
+            (case (vop-name vop)
+              ((fixed-alloc var-alloc)
+               (let ((last (car (last (vop-codegen-info vop)))))
+                 (when (vop-p last)
+                   (process-range vop last)
+                   ;; fast-forward
+                   (setq vop last)))))
+            (setq vop (vop-next vop)))))))
+
 (defun ir2-optimize (component &optional stage)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
@@ -1372,6 +1435,7 @@
        (run-vop-optimizers component stage)
        (delete-no-op-vops component)
        (ir2-optimize-jumps component)
+       #+x86-64 (attempt-pseudo-atomic-store-bunching component)
        (optimize-constant-loads component))
       (select-representations
        ;; Give the optimizers a second opportunity to alter newly inserted vops
