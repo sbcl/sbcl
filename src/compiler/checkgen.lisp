@@ -249,7 +249,7 @@
                  ;; message is about vectors, which is used more frequently.
                  (csubtypep (specifier-type 'vector)
                             (single-value-type (cast-type-to-check cast))))
-                #+arm64
+                #+(or arm64 x86-64)
                 ((lvar-fun-is (combination-fun dest)
                               '(values-list)))
                 (t

@@ -83,7 +83,7 @@
 ;;; unknown values continuations.
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
-  (:arg-types list)
+  (:arg-refs arg-ref)
   (:policy :fast-safe)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
@@ -98,11 +98,15 @@
     (unless (eq (tn-kind start) :unused)
       (move start rsp-tn))               ; WARN pointing 1 below
 
+    (when (and (policy node (> safety 0))
+               (not (csubtypep (tn-ref-type arg-ref) (specifier-type 'list))))
+      (inst jmp type-check))
     LOOP
     (inst cmp list nil-value)
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
+    TYPE-CHECK
     (cond ((policy node (> safety 0))
            (%test-lowtag list rax LOOP nil list-pointer-lowtag)
            (cerror-call vop 'bogus-arg-to-values-list-error list))

@@ -345,4 +345,6 @@
 
 (defun values-list (list)
   "Return all of the elements of LIST, in order, as values."
+  #+(or arm64 x86-64)
+  (declare (explicit-check))
   (values-list list))
