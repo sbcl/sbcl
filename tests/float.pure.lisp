@@ -687,14 +687,10 @@
 
 ;;; For #+64-bit we could eradicate the legacy interface
 ;;; to MAKE-DOUBLE-FLOAT, and just take the bits.
-(defun mdf (x)
-  (let ((f (sb-sys:%primitive sb-vm::fixed-alloc
-                              'make-double-float 2 sb-vm:double-float-widetag
-                              sb-vm:other-pointer-lowtag nil)))
-    (setf (sb-sys:sap-ref-word (sb-sys:int-sap (sb-kernel:get-lisp-obj-address f))
-                               (- 8 sb-vm:other-pointer-lowtag))
-          (the sb-vm:word x))
-    f))
+(defun mdf (bits)
+  (let ((hi (ldb (byte 32 32) bits))
+        (lo (ldb (byte 32  0) bits)))
+    (sb-kernel:make-double-float (sb-disassem:sign-extend hi 32) lo)))
 (compile 'mdf)
 
 #+64-bit
