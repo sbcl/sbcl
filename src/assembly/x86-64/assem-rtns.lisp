@@ -418,7 +418,6 @@
     (assemble ()
       (inst mov null nil-value)
 
-      (zeroize count)
       (check ZERO-VALUES)
       (inst cmp list null)
       (inst jmp :e ZERO-VALUES)
@@ -426,7 +425,14 @@
       (loadw rdx list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (inst cmp list null)
-      (inst jmp :e ONE-VALUE)
+      (inst jmp :ne CONTINUE)
+      ONE-VALUE
+      (inst mov rsp-tn rbp-tn)
+      (inst clc)
+      (inst pop rbp-tn)
+      (inst ret)
+
+      CONTINUE
       (check ONE-VALUE)
 
       (inst mov count (fixnumize 2))
@@ -464,13 +470,8 @@
       (inst push return)
       (inst ret)
 
-      ONE-VALUE
-      (inst mov rsp-tn rbp-tn)
-      (inst clc)
-      (inst pop rbp-tn)
-      (inst ret)
-
       ZERO-VALUES
+      (zeroize count)
       (inst mov rdx null)
       (inst mov rdi null)
 
