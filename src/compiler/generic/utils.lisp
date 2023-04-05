@@ -274,6 +274,12 @@
 (defun instance-tn-ref-p (tn-ref)
   (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance)))
 
+;;; Note that this is a allowed to fail by returning NIL.
+;;; So it's really testing "CERTAINLY-STACK-CONSED-P", which is
+;;; T if and only if if knows, and NIL if it doesn't know,
+;;; or OBJECT is heap-consed.
+;;; In general this is a crummy way to deduce the object's creator,
+;;; because MOVE-OPERAND has a nasty way of interfering.
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
     (when (or (not write)    ; grrrr, the only write is from a LOAD tn

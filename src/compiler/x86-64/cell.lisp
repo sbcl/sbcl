@@ -767,17 +767,18 @@
 (define-vop (closure-init)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
-  (:info offset)
+  (:info offset dx)
   (:vop-var vop)
   ;; temp is wasted if we don't need a barrier, which we almost never do
   (:temporary (:sc unsigned-reg) temp)
   (:generator 4
-    (let* ((value-tn (tn-ref-tn (tn-ref-across (vop-args vop))))
-           (prim-type (sb-c::tn-primitive-type value-tn))
-           (scs (and prim-type (sb-c::primitive-type-scs prim-type))))
-      (when (and (not (singleton-p scs))
-                 (member descriptor-reg-sc-number scs))
-        (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value)))
+    (unless dx
+      (let* ((value-tn (tn-ref-tn (tn-ref-across (vop-args vop))))
+             (prim-type (sb-c::tn-primitive-type value-tn))
+             (scs (and prim-type (sb-c::primitive-type-scs prim-type))))
+        (when (and (not (singleton-p scs))
+                   (member descriptor-reg-sc-number scs))
+          (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value))))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)

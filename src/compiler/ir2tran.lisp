@@ -289,18 +289,20 @@
                   (loop for what in closure and n from 0 do
                     (if (lambda-p what)
                         (unless (eq (functional-kind what) :deleted)
-                          (delayed (list tn (find-in-environment what env) n)))
+                          (delayed (list tn (find-in-environment what env) n
+                                         leaf-dx-p)))
                         (unless (and (lambda-var-p what)
                                      (null (leaf-refs what)))
                           (let ((initial-value (closure-initial-value what env nil)))
                             (if initial-value
-                                (vop closure-init node ir2-block tn initial-value n)
+                                (vop closure-init node ir2-block tn initial-value n
+                                     leaf-dx-p)
                                 ;; An initial-value of NIL means to
                                 ;; stash the frame pointer... which
                                 ;; requires a different VOP.
                                 (vop closure-init-from-fp node ir2-block tn n))))))))))))
-      (loop for (tn what n) in (delayed)
-            do (vop closure-init node ir2-block tn what n))))
+      (loop for (tn what n leaf-dx-p) in (delayed)
+            do (vop closure-init node ir2-block tn what n leaf-dx-p))))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
