@@ -417,8 +417,7 @@
              skip)))
     (assemble ()
       (inst mov null nil-value)
-
-      (check ZERO-VALUES)
+      (%test-lowtag list temp ZERO-VALUES-ERROR t list-pointer-lowtag)
       (inst cmp list null)
       (inst jmp :e ZERO-VALUES)
 
@@ -470,6 +469,8 @@
       (inst push return)
       (inst ret)
 
+      ZERO-VALUES-ERROR
+      (cerror-call nil 'bogus-arg-to-values-list-error list)
       ZERO-VALUES
       (zeroize count)
       (inst mov rdx null)
