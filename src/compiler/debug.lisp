@@ -1065,16 +1065,17 @@
            (write-string "enclose ")
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
-             (write-char #\space)
-             (let* ((env (lambda-environment leaf)))
-               (when env
-                 (write-string "{env:")
-                 (dolist (thing (environment-closure env))
-                   (write-char #\space)
-                   (etypecase thing
-                     (leaf (print-leaf thing))
-                     (nlx-info (princ thing))))
-                 (write-string "}")))
+             (when (lambda-p leaf)
+               (write-char #\space)
+               (let ((env (lambda-environment leaf)))
+                 (when env
+                   (write-string "{env:")
+                   (dolist (thing (environment-closure env))
+                     (write-char #\space)
+                     (etypecase thing
+                       (leaf (print-leaf thing))
+                       (nlx-info (princ thing))))
+                   (write-string "}"))))
              (write-char #\space))))
         (when (and *debug-print-types*
                    (valued-node-p node))
