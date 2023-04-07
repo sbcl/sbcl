@@ -2624,6 +2624,11 @@
           (setf (combination-args node) args)
           t)))))
 
+(deftransform values-list ((list) * * :node node :policy (< safety 3))
+  (if (lvar-single-value-p (node-lvar node))
+      `(car list)
+      (give-up-ir1-transform)))
+
 ;;; If VALUES appears in a non-MV context, then effectively convert it
 ;;; to a PROG1. This allows the computation of the additional values
 ;;; to become dead code.
