@@ -83,7 +83,15 @@
   `(progn ,@(mapcar (lambda (stem) `(inst pop ,(symbolicate stem "-TN")))
                     (reverse regs))))
 
-(defmacro with-registers-preserved ((convention &key except) &body body)
+;;; Invoke BODY, saving and restoring all registers except FLAGS and anything in EXCEPT.
+;;; If this is utilized at other than an assembly routine entry point, it's best to
+;;; specify a frame register, because backtracing might become confused otherwise.
+;;; Consider the case where the stack pointer has already been decremented to make space
+;;; for local storage. Then the word at the stack pointer is not a return address.
+;;; After the customary 2-instruction prologue of "PUSH RBP ; MOV RBP,RSP"
+;;; there is a correct chain of saved RBP values, but 1 word up from the current RBP
+;;; is probably not a saved program counter, and will look weird to treat it as such.
+(defmacro with-registers-preserved ((convention &key except (frame-reg 'rbp)) &body body)
   ;: Convention:
   ;;   C    = save GPRs that C call can change
   ;;   Lisp = save GPRs that lisp call can change
@@ -92,15 +100,23 @@
   (let ((fpr-align 64)
         (except (ensure-list except))
         (clobberables
-         `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
+         (remove frame-reg
+                 `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
            ;; 13 is usable only if not permanently wired to the thread base
-           #+gs-seg r13
-           r14 r15)))
+                       #+gs-seg r13
+                       r14 r15)))
+        (frame-tn (symbolicate frame-reg "-TN")))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
+    ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
+    ;; routine (by *not* preserving it) will be meaningless.
+    ;; You'd have to modify -SAVE / -RESTORE to avoid clobbering RAX.
+    ;; This is a bit limiting: if you ask not to preserve RAX, what you mean is exactly that:
+    ;; it does not matter what value is gets. But EXCEPT has a dual purpose of also
+    ;; propagating the value out from BODY. We _should_ allow RAX in the list of things
+    ;; not to save, in case the caller wants to be maximally efficient and specify that RAX
+    ;; can be trashed with impunity. But it helps with incorrect usage for now
+    ;; to raise this error.
     (when (member 'rax except)
-      ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
-      ;; routine (by *not* preserving it) will be meaningless.
-      ;; You'd have to modify -SAVE / -RESTORE to avoid clobbering RAX.
       (error "Excluding RAX from preserved GPRs probably will not do what you want."))
     (let* ((gprs ; take SET-DIFFERENCE with EXCEPT but in a predictable order
             (remove-if (lambda (x) (member x except))
@@ -113,15 +129,15 @@
            (alignment-bytes
             (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
       `(progn
-         (inst push rbp-tn)
-         (inst mov rbp-tn rsp-tn)
+         (inst push ,frame-tn)
+         (inst mov ,frame-tn rsp-tn)
          (inst and rsp-tn ,(- fpr-align))
          (regs-pushlist ,@gprs)
          (inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
          (call-fpr-save/restore-routine :save)
-         ,@body
+         (assemble () ,@body)
          (call-fpr-save/restore-routine :restore)
          (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
          (regs-poplist ,@gprs)
-         (inst mov rsp-tn rbp-tn)
-         (inst pop rbp-tn)))))
+         (inst mov rsp-tn ,frame-tn)
+         (inst pop ,frame-tn)))))

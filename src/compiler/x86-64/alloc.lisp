@@ -1041,11 +1041,13 @@
                :from (:argument 0) :to :result) rdi)
   (:temporary (:sc unsigned-reg :offset rsi-offset
                :from (:argument 1) :to :result) rsi)
+  (:temporary (:sc unsigned-reg :offset r15-offset) dummy)
   (:results (res :scs (descriptor-reg)))
+  (:ignore dummy)
   (:generator 1
     (move rdi total-words) ; C arg 1
     (move rsi boxed-words) ; C arg 2
-    (with-registers-preserved (c :except rdi)
+    (with-registers-preserved (c :except rdi :frame-reg r15)
       (pseudo-atomic ()
         #-immobile-code (inst call (ea (make-fixup "alloc_code_object" :foreign 8)))
         #+immobile-code (inst call (make-fixup "alloc_code_object" :foreign)))

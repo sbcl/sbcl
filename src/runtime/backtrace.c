@@ -473,10 +473,7 @@ stack_pointer_p(struct thread* thread, void *p)
 static int
 ra_pointer_p (struct thread* th, void *ra)
 {
-  /* the check against 4096 is still a mystery to everyone interviewed about
-   * it, but recent changes to sb-sprof seem to suggest that such values
-   * do occur sometimes. */
-  return ((uword_t) ra) > 4096 && !stack_pointer_p (th, ra);
+  return !stack_pointer_p (th, ra);
 }
 
 static int NO_SANITIZE_MEMORY
@@ -492,6 +489,7 @@ x86_call_context (struct thread* th, void *fp, void **ra, void **ocfp)
   c_ocfp    = *((void **) fp);
   c_ra      = *((void **) fp + 1);
 
+  // frame is valid even if the return address is bogus
   c_valid_p = (c_ocfp > fp
                && stack_pointer_p(th, c_ocfp)
                && ra_pointer_p(th, c_ra));
