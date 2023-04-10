@@ -69,6 +69,104 @@
 
   ;; Return.
   (lisp-return lra :multiple-values))
+
+(define-assembly-routine
+    (return-values-list
+     (:return-style :none)
+     (:vop-var vop)
+     (:vop-prefix
+      (let ((cur-nfp (current-nfp-tn vop)))
+        (when cur-nfp
+          (inst add nsp-tn cur-nfp (add-sub-immediate
+                                    (bytes-needed-for-non-descriptor-stack-frame)))))))
+
+    ;; These four are really arguments.
+    ((:arg list descriptor-reg r5-offset)
+     (:temp count any-reg nargs-offset)
+     (:temp temp descriptor-reg r6-offset)
+     (:temp ndescr non-descriptor-reg nl0-offset)
+
+     (:temp lr non-descriptor-reg lr-offset)
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp r3 descriptor-reg r3-offset))
+  (flet ((check (label)
+           (assemble ()
+             (%test-lowtag list temp skip nil list-pointer-lowtag)
+             (cerror-call nil 'bogus-arg-to-values-list-error list)
+             (inst b label)
+             skip)))
+    (assemble ()
+      (move ocfp-tn cfp-tn)
+      (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
+      (%test-lowtag list ndescr ZERO-VALUES-ERROR t list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq ZERO-VALUES)
+
+      (loadw r0 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :ne CONTINUE)
+
+      ONE-VALUE
+      (move csp-tn ocfp-tn)
+      (lisp-return lr :single-value)
+      CONTINUE
+      (check ONE-VALUE)
+
+      (inst mov count (fixnumize 2))
+      (loadw r1 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq TWO-VALUES)
+      (check TWO-VALUES)
+
+      (inst mov count (fixnumize 3))
+      (loadw r2 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq THREE-VALUES)
+      (check THREE-VALUES)
+
+      (inst mov count (fixnumize 4))
+      (loadw r3 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq FOUR-VALUES)
+      (check FOUR-VALUES)
+
+      (inst add csp-tn ocfp-tn (* n-word-bytes 4))
+
+      LOOP
+      (inst add count count (fixnumize 1))
+      (loadw temp list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst str temp (@ csp-tn n-word-bytes :post-index))
+      (check DONE)
+      (inst cmp list null-tn)
+      (inst b :ne LOOP)
+
+      DONE
+      (lisp-return lr :multiple-values)
+
+      ZERO-VALUES-ERROR
+      (cerror-call nil 'bogus-arg-to-values-list-error list)
+      ZERO-VALUES
+      (inst mov count 0)
+      (inst mov r0 null-tn)
+      (inst mov r1 null-tn)
+
+      TWO-VALUES
+      (inst mov r2 null-tn)
+      (inst mov r3 null-tn)
+
+      THREE-VALUES
+      (inst mov r3 null-tn)
+
+      FOUR-VALUES
+      (inst add csp-tn ocfp-tn (lsl count (- word-shift n-fixnum-tag-bits)))
+      (lisp-return lr :multiple-values))))
 
 ;;;; tail-call-variable.
 (defun prepare-for-tail-call-variable (nargs args count dest temp r0 r1 r2 r3)

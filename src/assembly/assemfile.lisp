@@ -198,7 +198,8 @@
          (results (remove :res vars :key #'reg-spec-kind :test #'neq))
          (return-style (or (cadr (assoc :return-style options)) :raw))
          (cost (or (cadr (assoc :cost options)) 247))
-         (vop (make-symbol "VOP")))
+         (vop (or (cadr (assoc :vop-var options))
+                  (make-symbol "VOP"))))
     ;; :full-call-no-return entails the call site behavior for :full-call
     ;; without automatic insertion of the return sequence. This avoids some confusion
     ;; on the part of the human reading the code, especially if the asm routine
@@ -245,10 +246,12 @@
          ;; any :SAVE-P specified in options supersedes one from call-temps.
          ;; It would be wiser to signal an error about duplicate options.
          ,@(remove-if (lambda (x)
-                        (member x '(:return-style :cost :call-temps)))
+                        (member x '(:return-style :cost :call-temps
+                                    :vop-var :vop-prefix)))
                       options
                       :key #'car)
          (:generator ,cost
+           ,@(cdr (assoc :vop-prefix options))
            ,@(mapcar (lambda (arg)
                        `(move ,(reg-spec-temp arg) ,(reg-spec-name arg)))
                      args)
