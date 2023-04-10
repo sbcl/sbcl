@@ -105,7 +105,7 @@
            ;; 13 is usable only if not permanently wired to the thread base
                        #+gs-seg r13
                        r14 r15)))
-        (frame-tn (symbolicate frame-reg "-TN")))
+        (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
     ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
     ;; routine (by *not* preserving it) will be meaningless.
@@ -129,8 +129,9 @@
            (alignment-bytes
             (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
       `(progn
-         (inst push ,frame-tn)
-         (inst mov ,frame-tn rsp-tn)
+         ,@(when frame-tn
+             `((inst push ,frame-tn)
+               (inst mov ,frame-tn rsp-tn)))
          (inst and rsp-tn ,(- fpr-align))
          (regs-pushlist ,@gprs)
          (inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
@@ -139,5 +140,6 @@
          (call-fpr-save/restore-routine :restore)
          (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
          (regs-poplist ,@gprs)
-         (inst mov rsp-tn ,frame-tn)
-         (inst pop ,frame-tn)))))
+         ,@(when frame-tn
+             `((inst mov rsp-tn ,frame-tn)
+               (inst pop ,frame-tn)))))))
