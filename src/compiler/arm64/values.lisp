@@ -133,8 +133,7 @@
     (loadw temp list cons-car-slot list-pointer-lowtag)
     (inst b :eq DONE)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst add csp-tn csp-tn n-word-bytes)
-    (storew temp csp-tn -1)
+    (inst str temp (@ csp-tn n-word-bytes :post-index))
     TYPE-CHECK
     (cond ((policy node (> safety 0))
            (test-type list ndescr LOOP nil (list-pointer-lowtag))
