@@ -314,7 +314,7 @@ os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
  * Additionally, if 'n_write_protected' is non-NULL, then assign
  * into *n_write_protected the count of marked pages.
  */
-static page_index_t
+page_index_t
 count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
 {
     page_index_t i, total = 0, dirty = 0;
@@ -882,11 +882,28 @@ static page_index_t
         alloc_start_pages[7] = gencgc_alloc_start_page; \
         max_alloc_start_page = gencgc_alloc_start_page;
 
-static inline page_index_t
+static page_index_t
 get_alloc_start_page(unsigned int page_type)
 {
     if (page_type > 7) lose("bad page_type: %d", page_type);
-    return alloc_start_pages[page_type];
+    struct thread* th = get_sb_vm_thread();
+    page_index_t global_start = alloc_start_pages[page_type];
+    page_index_t hint;
+    switch (page_type) {
+    case PAGE_TYPE_MIXED:
+        if ((hint = thread_extra_data(th)->mixed_page_hint) > 0 && hint <= global_start) {
+            thread_extra_data(th)->mixed_page_hint = - 1;
+            return hint;
+        }
+        break;
+    case PAGE_TYPE_CONS:
+        if ((hint = thread_extra_data(th)->cons_page_hint) > 0 && hint <= global_start) {
+            thread_extra_data(th)->cons_page_hint = - 1;
+            return hint;
+        }
+        break;
+    }
+    return global_start;
 }
 
 static inline void

@@ -163,6 +163,15 @@ void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
     ARENA_DISPOSE_MEMORY(arena, arena->uw_original_size);
 }
 
+static page_index_t close_heap_region(struct alloc_region* r, int page_type) {
+    page_index_t result = -1;
+    if (r->start_addr) {
+        result = find_page_index(r->start_addr);
+        gc_close_region(r, page_type);
+    }
+    return result;
+}
+
 void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
                      __attribute__((unused)) lispobj* ra) // return address
 {
@@ -189,8 +198,10 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
             arena_chain = arena_taggedptr;
         }
         // Close only the non-system regions
-        if (th->mixed_tlab.start_addr) gc_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
-        if (th->cons_tlab.start_addr) gc_close_region(&th->cons_tlab, PAGE_TYPE_CONS);
+        thread_extra_data(th)->mixed_page_hint =
+            close_heap_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
+        thread_extra_data(th)->cons_page_hint =
+            close_heap_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
 #if 0 // this causes a data race, the very thing it's trying to avoid
         int arena_index = fixnum_value(arena->index);
@@ -405,8 +416,9 @@ void gc_scavenge_arenas()
                 do {
                     // The block is its own lower bound for scavenge.
                     // Its first 4 words look like fixnums, so no need to skip 'em.
-                    fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
-                            a, block, block->freeptr);
+                    if (gencgc_verbose)
+                        fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
+                                a, block, block->freeptr);
                     heap_scavenge((lispobj*)block, (lispobj*)block->freeptr);
                 } while ((block = block->next) != NULL);
             }
