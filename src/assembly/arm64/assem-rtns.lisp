@@ -305,7 +305,7 @@
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw
-                          (:return-style :none))
+                          (:return-style :full-call-no-return))
     ((:arg target descriptor-reg r0-offset)
      (:arg start any-reg r9-offset)
      (:arg count any-reg nargs-offset)
@@ -386,7 +386,10 @@
   (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
               unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
   (inst mov-sp nsp-tn next-uwp)
-  (inst br lr)
+
+  ;; Since THROW is called with BLR for better backtraces use BLR here
+  ;; too, the branch predictor doesn't like unpaired BLR+RET.
+  (inst blr lr)
   RET
   (inst ldr count (@ csp-tn -8 :pre-index))
   (inst ldp block start (@ csp-tn -16 :pre-index))
@@ -402,7 +405,7 @@
               unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
   (inst mov-sp nsp-tn next-uwp)
 
-  (inst br lr))
+  (inst blr lr))
 
 (define-vop ()
   (:translate %continue-unwind)

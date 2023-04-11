@@ -14,14 +14,14 @@
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options vop))
   (ecase style
-    ((:none :raw)
+    ((:none :raw :full-call-no-return)
      (let ((lr (gensym)))
        (values
         `((progn
             ,lr
             ,@(if (eq style :none)
                   `((load-inline-constant tmp-tn '(:fixup ,name :assembly-routine))
-                    (inst blr tmp-tn))
+                    (inst br tmp-tn))
                   `((load-inline-constant ,lr '(:fixup ,name :assembly-routine))
                     (inst blr ,lr)))))
         `((:temporary (:sc non-descriptor-reg :from (:eval 0) :to (:eval 1) :offset lr-offset)
@@ -30,5 +30,5 @@
 (defun generate-return-sequence (style)
   (ecase style
     (:raw
-     `((inst br lr-tn)))
-    (:none)))
+     `((inst ret)))
+    ((:none :full-call-no-return))))
