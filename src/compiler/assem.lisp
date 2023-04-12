@@ -452,8 +452,8 @@
   "Execute BODY (as a progn) with DEST as the current section or segment."
   (flet ((label-name-p (thing) (typep thing '(and symbol (not null)))))
     (let ((inherited (multiple-value-bind (expansion expanded)
-                         (#+sb-xc-host cl:macroexpand
-                          #-sb-xc-host %macroexpand '..inherited-labels.. env)
+                         (#+sb-xc-host cl:macroexpand-1
+                          #-sb-xc-host %macroexpand-1 '..inherited-labels.. env)
                        (if expanded expansion)))
           (new-labels (sort (copy-list (remove-if-not #'label-name-p body)) #'string<)))
       ;; Compare for dups using STRING=. Two reasons to use that rather than EQ:
