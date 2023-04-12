@@ -1371,27 +1371,44 @@
     '(set-slot %raw-instance-set/word %raw-instance-set/signed-word %raw-instance-set/single
       %raw-instance-set/double %raw-instance-set/complex-single %raw-instance-set/complex-double
       move move-operand make-unbound-marker make-funcallable-instance-tramp
+      sb-vm::move-from-word/fixnum sb-vm::move-to-word/fixnum
       sb-vm::move-from-fixnum+1 sb-vm::move-from-fixnum-1))
+
+;;; Return list of vops between and including VOP and LAST
+;;; without regard to IR2 block boundaries (as long as there is
+;;; no branching control flow in the specified range)
+(defun collect-vops-between (vop last)
+  (collect ((result))
+    (loop (result vop)
+          (if (eq vop last) (return))
+          (setq vop
+                (or (vop-next vop)
+                    ;; IR2 blocks were split. Assert that the flow is straight-line
+                    (let ((successors (ir2block-successors (vop-block vop))))
+                      (aver (singleton-p successors))
+                      (let* ((successor (car successors))
+                             (predecessors (ir2block-predecessors successor)))
+                        (aver (eq (car predecessors) (vop-block vop)))
+                        (aver (not (cdr predecessors)))
+                        (ir2-block-start-vop successor))))))
+    (result)))
 
 ;;; This should be among the final IR2 optimizer passes so that no new vops get
 ;;; inserted that would change the decision about whether to extend
 ;;; the scope of pseudo-atomic to cover them.
 (defun attempt-pseudo-atomic-store-bunching (component)
   (labels
-      ((collect-vop-subseq-names (first last)
-         (collect ((names))
-           (let ((vop first))
-             (loop (names (vop-name vop))
-                   (if (eq vop last) (return (names)))
-                   (setq vop (vop-next vop))))))
-       (terminate-inits (last)
+      ((terminate-inits (last)
+         ;; The allocator has to recognize :PSEUDO-ATOMIC in its codegen info
+         ;; but the slot setters don't all have to be updated to understand how to
+         ;; terminate the pseudo-atomic sequence. It's a separate vop to do that.
          (emit-and-insert-vop (vop-node last) (vop-block last)
                               (template-or-lose 'end-pseudo-atomic)
                               nil nil (vop-next last)))
        (process-closure-inits (vop)
          (let* ((result-ref (vop-results vop))
                 (closure (tn-ref-tn result-ref))
-                (last))
+                (last-init))
            (do ((init (vop-next vop) (vop-next init)))
                ((or (not init) (neq (vop-name init) 'closure-init)))
              ;; IR2-CONVERT-ENCLOSE can output more than one MAKE-CLOSURE
@@ -1402,54 +1419,60 @@
              (unless (eq closure (tn-ref-tn (vop-args init)))
                (return))
              (setf (vop-codegen-info init) (append (vop-codegen-info init) '(:pseudo-atomic))
-                   last init))
-           (when last
+                   last-init init))
+           (when last-init
              (setf (vop-codegen-info vop)
                    (append (vop-codegen-info vop) '(:pseudo-atomic)))
-             (terminate-inits last))))
-       (process-range (first last)
+             (terminate-inits last-init))))
+       (process-general-inits (first last &aux last-init)
          (aver (neq first last))
-         (unless (eq (vop-block first) (vop-block last))
-           ;;(format t "~&FAIL P-A bunch: different IR2 blocks in ~S..~S~%" first last)
-           (return-from process-range))
-         (let ((vop (vop-next first)))
-           ;; Test whether all SET-SLOT vops after FIRST vop (an allocator)
-           ;; up to and including LAST are unaffected by allocation vops
-           ;; due to MOVE-FROM-SAP or similar.
-           (loop
-            (unless (member (vop-name vop) *vops-allowed-within-pseudo-atomic*)
-              ;;(format t "~&FAIL P-A bunch: ~A~%" (collect-vop-subseq-names first last)))
-              (return-from process-range)) ; can't
-            (if (eq vop last) (return))
-            (setq vop (vop-next vop))))
-         ;; Inform each SET-SLOT that it is in pseudo-atomic.
-         (let ((vop (vop-next first)))
-           (loop
-            (when (eq (vop-name vop) 'set-slot)
-              (setf (vop-codegen-info vop)
-                    (append (vop-codegen-info vop) '(:pseudo-atomic))))
-            (if (eq vop last) (return))
-            (setq vop (vop-next vop))))
-         ;; The allocator has to recognize :PSEUDO-ATOMIC in its codegen info
-         ;; but the slot setters don't all have to be updated to understand how to
-         ;; terminate the pseudo-atomic sequence. It's a separate vop to do that.
-         (setf (vop-codegen-info first)
-               (append (butlast (vop-codegen-info first)) '(:pseudo-atomic)))
-         (terminate-inits last)))
+         (dolist (init (cdr (collect-vops-between first last)))
+           (cond
+             ((eq (vop-name init) 'set-slot)
+              (setf (vop-codegen-info init) (append (vop-codegen-info init) '(:pseudo-atomic))
+                    last-init init))
+             ((not (member (vop-name init) *vops-allowed-within-pseudo-atomic*))
+              (return))))
+         (when last-init
+           (setf (vop-codegen-info first)
+                 (append (butlast (vop-codegen-info first)) '(:pseudo-atomic)))
+           (terminate-inits last-init))))
   (do-ir2-blocks (block component)
     (let ((vop (ir2-block-start-vop block)))
+      ;; This needs to avoid processing an allocator more than once.
+      ;; Here's how it could happen:
+      ;; ir2 block 1 | whatever
+      ;;             | allocate \
+      ;;             | set-slot | -- to be bunched
+      ;;             | set-slot |
+      ;; ir2 block 2 | set-slot /
+      ;;             | whatever
+      ;;             | ..
+      ;;             | allocate
+      ;;             | set-slot
+      ;;
+      ;; Depending on where the loop continues iterating after performing the bunching
+      ;; operation, we might see the second ALLOCATE twice. Consider if we pick up
+      ;; at the "whatever" vop after the third SET-SLOT. The we process the next
+      ;; allocate and set-slot.  When that's done, the inner loop finishes and we start
+      ;; on the outer loop (in DO-IR2-BLOCKS) which takes BLOCK-NEXT of block 1 as the
+      ;; starting point. So then we see block 2 again, and the 2nd allocate again.
       (loop (unless vop (return))
             (case (vop-name vop)
               (make-closure
-               (let ((dx (third (vop-codegen-info vop))))
-                 (unless dx
+               (let ((dx (third (vop-codegen-info vop)))
+                     (already-done (eq (fourth (vop-codegen-info vop)) :pseudo-atomic)))
+                 (unless (or dx already-done)
                    (process-closure-inits vop))))
               ((fixed-alloc var-alloc)
                (let ((last (car (last (vop-codegen-info vop)))))
                  (when (vop-p last)
-                   (process-range vop last)
-                   ;; fast-forward
-                   (setq vop last)))))
+                   (process-general-inits vop last)))))
+            ;; Probably could skip over some vops if any were already processed
+            ;; but it's clearer to just do the naive one-at-a-time skip
+            ;; which avoids confusion when IR2 blocks were split
+            ;; and the processing either did or didn't modify anything.
+            ;; As long as we don't re-process an allocation vop, all it well.
             (setq vop (vop-next vop)))))))
 
 (defun ir2-optimize (component &optional stage)
