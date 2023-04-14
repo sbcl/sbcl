@@ -1085,11 +1085,15 @@ struct visitor {
     struct hopscotch_table *reached;
 };
 
-static void trace_sym(lispobj, struct symbol*, struct hopscotch_table*);
-#define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,seen)
+static void trace_sym(lispobj, struct symbol*, struct hopscotch_table*,
+                      void (*)(lispobj, void*), void*);
+
+#define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,seen,action,data)
 static void graph_visit(lispobj __attribute__((unused)) referer,
                         lispobj ptr,
-                        struct hopscotch_table* seen)
+                        struct hopscotch_table* seen,
+                        void (*action)(lispobj, void*),
+                        void* data)
 {
     if (lowtag_of(ptr) == FUN_POINTER_LOWTAG
         && widetag_of(FUNCTION(ptr)) == SIMPLE_FUN_WIDETAG)
@@ -1097,6 +1101,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
     if (hopscotch_get(seen, ptr, 0))
         return;
     hopscotch_insert(seen, ptr, 1);
+    if (action) action(ptr, data);
     lispobj layout, *obj;
     sword_t nwords, i;
     if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
@@ -1113,7 +1118,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:
             layout = layout_of(obj);
-            graph_visit(ptr, layout, seen);
+            graph_visit(ptr, layout, seen, action, data);
             nwords = headerobj_size(obj);
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             for (i=0; i<(nwords-1); ++i)
@@ -1129,7 +1134,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         // then we scan word indices 1 and 2 off the object base address.
         case CLOSURE_WIDETAG:
             // We must scan the closure's trampoline word.
-            graph_visit(ptr, fun_taggedptr_from_self(obj[1]), seen);
+            graph_visit(ptr, fun_taggedptr_from_self(obj[1]), seen, action, data);
             // Closures can utilize one payload word beyond what the header
             // indicates. This is quite sucky and I don't know why I did that.
             // However, it is correctly accounted for by SHORT_BOXED_NWORDS
@@ -1138,7 +1143,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             for(i=2; i<=nwords; ++i) RECURSE(obj[i]);
             break;
         case SYMBOL_WIDETAG:
-            trace_sym(ptr, SYMBOL(ptr), seen);
+            trace_sym(ptr, SYMBOL(ptr), seen, action, data);
             break;
         case WEAK_POINTER_WIDETAG:
             nwords = TINY_BOXED_NWORDS(*obj);
@@ -1156,7 +1161,8 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             }
       }
 }
-static void trace_sym(lispobj ptr, struct symbol* sym, struct hopscotch_table* seen)
+static void trace_sym(lispobj ptr, struct symbol* sym, struct hopscotch_table* seen,
+                      void (*action)(lispobj, void*), void* data)
 {
     RECURSE(decode_symbol_name(sym->name));
     RECURSE(sym->value);
@@ -1166,12 +1172,13 @@ static void trace_sym(lispobj ptr, struct symbol* sym, struct hopscotch_table* s
 
 static void tally(lispobj ptr, struct visitor* v)
 {
+    sword_t words;
     if (lowtag_of(ptr) == LIST_POINTER_LOWTAG)
-        ++v->headers[0].count;
+        ++v->headers[0].count, words = 2;
     else {
         lispobj* obj = native_pointer(ptr);
         lispobj header = *obj;
-        sword_t words = object_size2(obj, header);
+        words = object_size2(obj, header);
         int widetag = header_widetag(header);
         int header_index = widetag>>2;
         ++v->headers[header_index].count;
@@ -1218,26 +1225,37 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
 
 #define count_this_pointer_p(ptr) (find_page_index((void*)ptr) >= 0)
 
+/* Caller must provide an uninitialized hopscotch table.
+ * This function will initialize it and perform a graph visit.
+ * Caller may subsequently inspect the table and/or visit other objects as
+ * dictated by thread stacks, etc. Caller may - but need not - provide
+ * an 'action' to invoke on each object */
+void visit_heap_from_static_roots(struct hopscotch_table* reached,
+                                  void (*action)(lispobj, void*),
+                                  void* data)
+{
+    hopscotch_create(reached, HOPSCOTCH_HASH_FUN_DEFAULT,
+                     0, // no values
+                     1<<18, /* initial size */
+                     0);
+
+    trace_sym(NIL, SYMBOL(NIL), reached, action, data);
+    lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
+    lispobj* end = static_space_free_pointer;
+    while (where<end) {
+        graph_visit(0, compute_lispobj(where), reached, 0, 0);
+        where += object_size(where);
+    }
+}
+
 static void sanity_check_loaded_core(lispobj initial_function)
 {
     struct visitor v[2];
     struct hopscotch_table reached;
     memset(v, 0, sizeof v);
     // Pass 1: Count objects reachable from known roots.
-    hopscotch_create(&reached, HOPSCOTCH_HASH_FUN_DEFAULT,
-                     0, // no values
-                     1<<18, /* initial size */
-                     0);
-    {
-      trace_sym(NIL, SYMBOL(NIL), &reached);
-      lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
-      lispobj* end = static_space_free_pointer;
-      while (where<end) {
-        graph_visit(0, compute_lispobj(where), &reached);
-        where += object_size(where);
-      }
-    }
-    graph_visit(0, initial_function, &reached); // not otherwise reachable
+    visit_heap_from_static_roots(&reached, 0, 0);
+    graph_visit(0, initial_function, &reached, 0, 0); // not otherwise reachable
     // having computed the reaching graph, tally up the dynamic space objects
     int key_index;
     lispobj ptr;
