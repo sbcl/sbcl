@@ -21,6 +21,16 @@
        (sb-vm:with-arena (a) (make-array 2097152 :element-type '(unsigned-byte 8)))))
     (sb-vm:destroy-arena a)))
 
+(test-util:with-test (:name :no-arena-symbol-property)
+  (let* ((a (sb-vm:new-arena 1048576))
+         (copy-of-foo
+          (sb-vm:with-arena (a)
+            (setf (get 'testsym 'fooprop) 9)
+            (copy-symbol 'testsym t))))
+    (test-util:opaque-identity copy-of-foo)
+    (assert (not (c-find-heap->arena)))
+    (sb-vm:destroy-arena a)))
+
 #+nil
 (test-util:with-test (:name :arena-alloc-waste-reduction)
   (let* ((list1 (f 'foo 'bar'baz))
