@@ -143,8 +143,8 @@
       `(%make-list ,length ,(second rest))
       (values nil t))) ; give up
 
-(deftransform %make-list ((length item) ((constant-arg (integer 0 2)) t)) nil
-  `(list ,@(%make-list (lvar-value length) 'item)))
+(deftransform %make-list ((length item) ((constant-arg (integer 0 2)) t))
+  `(list ,@(make-list (lvar-value length) :initial-element 'item)))
 
 (define-source-transform copy-list (list &environment env)
   ;; If speed is more important than space, or cons profiling is wanted,
