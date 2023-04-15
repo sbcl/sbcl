@@ -1241,6 +1241,9 @@
     ;; So these go on the stack last, i.e. nearest the top.
     ;; Reversing sorts the entry points in ascending address order
     ;; except possibly when there are multiple entry points to one routine
+    (unless (= (length (remove-duplicates (mapcar 'car routines)))
+               (length routines))
+      (error "Duplicated asm routine name"))
     (dolist (routine (reverse routines))
       (dump-object (car routine) file)
       (dump-integer (+ (label-position (cadr routine)) (caddr routine))
