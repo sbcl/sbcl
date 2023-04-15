@@ -466,11 +466,26 @@
                   (assert (string= (so-key node) (pop present-keys))))
                 *so-map*)))
 
+(defvar *example-objects*
+  (subseq (append
+           (remove-if (lambda (x) (/= (sb-kernel:generation-of x) sb-vm:+pseudo-static-generation+))
+                      (sb-vm:list-allocated-objects :dynamic :type sb-vm:simple-base-string-widetag))
+           (sb-vm:list-allocated-objects :read-only :type sb-vm:simple-base-string-widetag))
+          0 1000))
+
+(test-util:with-test (:name :c-find-in-solist)
+  (let ((set (sb-lockless:make-so-set/addr))  )
+    (dolist (x *example-objects*)
+      (sb-lockless:so-insert set x))
+    (assert (not (sb-lockless:c-so-find/addr set 'random)))
+    (dolist (x *example-objects*)
+      (let ((node (sb-lockless:c-so-find/addr set x)))
+        (assert node)
+        (assert (eq (sb-lockless:so-key node) x))))))
+
 (test-util:with-test (:name :solist-2-phase-insert)
   (let ((set (sb-lockless:make-so-set/addr))
-        (example-objects
-         (sb-vm:list-allocated-objects (or #+x86-64 :read-only :dynamic)
-                                       :type sb-vm:simple-base-string-widetag :count 1000))
+        (example-objects *example-objects*)
         (n-deleted 0)
         (nodes))
     ;; This example is artificial. The real usage would allocate one object and perform

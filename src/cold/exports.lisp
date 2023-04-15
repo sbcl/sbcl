@@ -3602,5 +3602,6 @@ package is deprecated in favour of SB-MOP.")
            "MULTIPLICATIVE-HASH"
            "%SO-EQ-SET-PHASE1-INSERT" "%SO-EQ-SET-PHASE2-INSERT"
            "SO-INSERT" "SO-DELETE" "SO-FIND"
+           "C-SO-FIND/ADDR"
            "SO-KEY" "SO-DATA" "SO-MAPLIST")
   (:shadow "ENDP"))

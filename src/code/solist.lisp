@@ -443,3 +443,23 @@
     (when (> (atomic-incf (so-count table)) (so-threshold table))
       (so-expand-bins table bins)))
   node)
+
+(defun c-so-find/addr (solist key)
+  (let ((bins (so-bins solist)))
+    ;; Technically this needs to inhibit GC or else use immobile objects
+    ;; for all list nodes, but it's good enough for now.
+    (sb-sys:with-pinned-objects (solist bins (car bins) key)
+      (let ((result
+             (sb-alien:alien-funcall
+              (sb-alien:extern-alien "split_ordered_list_find"
+                                     (function sb-alien:unsigned
+                                               sb-alien:unsigned sb-alien:unsigned))
+              (logandc2 (get-lisp-obj-address solist) sb-vm:lowtag-mask)
+              (get-lisp-obj-address key))))
+        (unless (= result 0)
+          ;; need to be unsafe here, otherwise might get
+          ;; "<integer> is not a valid argument to SB-KERNEL:MAKE-LISP-OBJ"
+          ;; because the allocation region wasn't closed.
+          ;; Would it better for tests to close the region? Maybe,
+          ;; but we can't count on everybody doing that.
+          (%make-lisp-obj (logior result sb-vm:instance-pointer-lowtag)))))))

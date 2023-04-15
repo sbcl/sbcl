@@ -22,6 +22,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
+#include "genesis/split-ordered-list.h"
 #include "brothertree.h"
 #include "forwarding-ptr.h"
 
@@ -322,3 +323,41 @@ int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements)
     return -1;
 }
 #endif
+
+/* Find in an address-based split-ordered list
+ * Unlike the lisp algorithm, this does not "assist" a pending deletion
+ * by completing it with compare-and-swap - this loop simply ignores
+ * any deleted nodes that haven't been snipped out yet. */
+struct split_ordered_list_node*
+split_ordered_list_find(struct split_ordered_list* solist,
+                        lispobj key)
+{
+    struct cons* bins_and_shift = CONS(solist->bins);
+    struct vector* bins = VECTOR(bins_and_shift->car);
+    int shift = fixnum_value(bins_and_shift->cdr);
+    // see MULTIPLICATIVE-HASH in src/code/solist.lisp
+#ifdef LISP_FEATURE_64_BIT
+    lispobj prod = 11400714819323198485UL * key;
+#else
+    lispobj prod = 2654435769U * key;
+#endif
+    lispobj full_hash = (prod >> (1+N_FIXNUM_TAG_BITS)) | 1;
+    int bin_index = full_hash >> shift;
+    lispobj nodeptr = bins->data[bin_index];
+    while ((nodeptr & WIDETAG_MASK) == UNBOUND_MARKER_WIDETAG) {
+        nodeptr = bins->data[--bin_index];
+    }
+    struct split_ordered_list_node* node = (void*)native_pointer(nodeptr);
+    lispobj hash_as_fixnum = make_fixnum(full_hash);
+    while (1) {
+        if (node->hash == hash_as_fixnum) { // possible hit
+            if (node->key == key && // looking good
+                lowtag_of(node->next) != 0) { // node is not deleted, great
+                return node;
+            }
+        }
+        if (node->hash > hash_as_fixnum ||
+            node->next == LFLIST_TAIL_ATOM) return NULL;
+        node = (void*)native_pointer(node->next);
+    }
+}
