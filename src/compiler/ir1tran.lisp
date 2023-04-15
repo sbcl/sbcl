@@ -654,7 +654,7 @@
 ;;; needed. If LEAF represents a defined function which has already
 ;;; been converted in the same compilation block, and is not
 ;;; NOTINLINE, then reference the functional instead.
-(defun reference-leaf (start next result leaf &optional (name '.anonymous.))
+(defun reference-leaf (start next result leaf)
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
@@ -669,7 +669,7 @@
                                     '(nil :optional)))
                      (maybe-reanalyze-functional leaf))
                    leaf))
-         (ref (make-ref leaf name)))
+         (ref (make-ref leaf)))
     (when (and result
                (lambda-var-p leaf)
                (lambda-var-constant leaf))
@@ -717,7 +717,7 @@
            #+sb-xc-host
            (warn "reading an ignored variable: ~S" name)))
        (maybe-note-undefined-variable-reference var name)
-       (reference-leaf start next result var name))
+       (reference-leaf start next result var))
       ((cons (eql macro))               ; symbol-macro
        ;; FIXME: the following comment is probably wrong now.
        ;; If we warn here on :early and :late deprecation
