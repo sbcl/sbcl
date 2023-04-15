@@ -362,24 +362,31 @@
 (defoptimizer (make-array-header* stack-allocate-result) ((&rest args))
   t)
 (defoptimizer (allocate-vector stack-allocate-result)
-      ((#+ubsan poisoned type length words) node dx)
-    (and
-     ;; Can't put unboxed data on the stack unless we scavenge it
-     ;; conservatively.
-     #-c-stack-is-control-stack
-     (constant-lvar-p type)
-     #-c-stack-is-control-stack
-     (member (lvar-value type)
-             '#.(list (sb-vm:saetp-typecode (find-saetp 't))
-                      (sb-vm:saetp-typecode (find-saetp 'fixnum))))
-     (or (eq dx 'truly-dynamic-extent)
-         (zerop (policy node safety))
-         ;; a vector object should fit in one page -- otherwise it might go past
-         ;; stack guard pages.
-         (values-subtypep (lvar-derived-type words)
-                          (specifier-type
-                           `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
-                                           sb-vm:vector-data-offset)))))))
+    ((#+ubsan poisoned type length words) node dx)
+  (and
+   ;; Can't put unboxed data on the stack unless we scavenge it
+   ;; conservatively.
+   #-c-stack-is-control-stack
+   (constant-lvar-p type)
+   #-c-stack-is-control-stack
+   (member (lvar-value type)
+           '#.(list (sb-vm:saetp-typecode (find-saetp 't))
+                    (sb-vm:saetp-typecode (find-saetp 'fixnum))))
+   (cond ((or (eq dx 'truly-dynamic-extent)
+              (zerop (policy node safety))
+              ;; a vector object should fit in one page -- otherwise it might go past
+              ;; stack guard pages.
+              (values-subtypep (lvar-derived-type words)
+                               (specifier-type
+                                `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
+                                                sb-vm:vector-data-offset)))))
+          t)
+         (t
+          (compiler-notify "~@<Could~2:I not safely stack allocate the result of ~S, as it might ~
+                               silently overflow the stack. The vector ~
+                               must fit in a page of memory.~:@>"
+                           (find-original-source (node-source-path node)))
+          nil))))
 (defoptimizer (allocate-vector ltn-annotate)
     ((#+ubsan poisoned type length words) call ltn-policy)
   (vectorish-ltn-annotate-helper call ltn-policy
@@ -422,16 +429,23 @@
 #+x86-64
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
-    (or (eq dx 'truly-dynamic-extent)
-        (zerop (policy node safety))
-        ;; At most one page (this is more paranoid than %listify-rest-args).
-        ;; Really what you want to do is decrement the stack pointer by one page
-        ;; at a time, filling in CDR pointers downward. Then this restriction
-        ;; could be removed, because allocation would never miss the guard page
-        ;; if it tries to consume too much stack space.
-        (values-subtypep (lvar-derived-type length)
-                         (specifier-type
-                          `(integer 0 ,(/ +backend-page-bytes+ sb-vm:n-word-bytes 2))))))
+    (cond ((or (eq dx 'truly-dynamic-extent)
+               (zerop (policy node safety))
+               ;; At most one page (this is more paranoid than %listify-rest-args).
+               ;; Really what you want to do is decrement the stack pointer by one page
+               ;; at a time, filling in CDR pointers downward. Then this restriction
+               ;; could be removed, because allocation would never miss the guard page
+               ;; if it tries to consume too much stack space.
+               (values-subtypep (lvar-derived-type length)
+                                (specifier-type
+                                 `(integer 0 ,(/ +backend-page-bytes+ sb-vm:n-word-bytes 2)))))
+           t)
+          (t
+           (compiler-notify "~@<Could~2:I not safely stack allocate the result of ~S, as it might ~
+                                silently overflow the stack. The list ~
+                                must fit in a page of memory.~:@>"
+                            (find-original-source (node-source-path node)))
+           nil)))
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (vectorish-ltn-annotate-helper call ltn-policy
                                    'sb-vm::allocate-list-on-stack

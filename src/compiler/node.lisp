@@ -208,8 +208,7 @@
 ;;; dynamic extent declaration.
 (defstruct (dx-info (:copier nil))
   ;; The kind of dynamic extent this is.
-  (kind (missing-arg) :type (member enclose dynamic-extent truly-dynamic-extent
-                                    dynamic-extent-no-note))
+  (kind (missing-arg) :type (member enclose dynamic-extent truly-dynamic-extent))
   ;; The value recognized to be declared dynamic extent.
   (value (missing-arg) :type lvar)
   ;; The stack-allocatable values in the transitive closure of the
@@ -368,7 +367,7 @@
 
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
-  #-sb-xc-host (declare (dynamic-extent fun)) ; "unable"
+  (declare (dynamic-extent fun))
   (let ((*current-component* (node-component node))
         (*lexenv* (node-lexenv node))
         (*current-path* (node-source-path node)))
@@ -872,8 +871,7 @@
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (dynamic-extent nil :type (member nil truly-dynamic-extent dynamic-extent
-                                    dynamic-extent-no-note))
+  (dynamic-extent nil :type (member nil truly-dynamic-extent dynamic-extent))
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)

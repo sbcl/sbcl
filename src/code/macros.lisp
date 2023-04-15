@@ -1915,8 +1915,7 @@ symbol-case giving up: case=((V U) (F))
     ;; A full call to MAKE-STRING-OUTPUT-STREAM uses a larger initial buffer
     ;; if BASE-CHAR but I really don't care to think about that here.
     `(let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
-       #+c-stack-is-control-stack
-       (declare (sb-c::dynamic-extent-no-note ,initial-buffer))
+       (declare (dynamic-extent ,initial-buffer))
        (dx-let ((,dummy (%allocate-string-ostream)))
          (let ((,var (%init-string-output-stream ,dummy ,initial-buffer
                                                  ,wild-result-type)))

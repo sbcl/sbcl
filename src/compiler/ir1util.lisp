@@ -761,18 +761,6 @@
 
 ;;;; DYNAMIC-EXTENT related
 
-(defun lambda-var-original-name (leaf)
-  (let ((home (lambda-var-home leaf)))
-    (if (eq :external (functional-kind home))
-        (let* ((entry (functional-entry-fun home))
-               (p (1- (or (position leaf (lambda-vars home))
-                          (bug "can't find leaf")))))
-          (leaf-debug-name
-           (if (optional-dispatch-p entry)
-               (elt (optional-dispatch-arglist entry) p)
-               (elt (lambda-vars entry) p))))
-        (leaf-debug-name leaf))))
-
 ;;; Insert code to establish a dynamic extent cleanup around CALL,
 ;;; returning the cleanup.
 (defun insert-dynamic-extent-cleanup (call)
@@ -795,64 +783,6 @@
     (node-ends-block call)
     (push entry (lambda-entries (node-home-lambda entry)))
     cleanup))
-
-(defun note-no-stack-allocation (lvar &key flush)
-  (do-uses (use (principal-lvar lvar))
-    (dolist (use (ensure-list (if (cast-p use)
-                                  (principal-lvar-use (cast-value use))
-                                  use)))
-      (unless (or
-               (eq (dx-info-kind (lvar-dynamic-extent lvar))
-                   'dynamic-extent-no-note)
-               ;; If we're flushing, don't complain if we can flush the combination.
-               (and flush
-                    (or
-                     (node-to-be-deleted-p use)
-                     (and (combination-p use)
-                          (flushable-combination-p use))))
-               (and (ref-p use)
-                    (let ((leaf (ref-leaf use)) )
-                      (or
-                       ;; Don't complain about not being able to stack allocate constants.
-                       (constant-p leaf)
-                       ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
-                       ;; reports that way.
-                       ;; Also don't report if the home is :EXTERNAL. This allows declaring
-                       ;; funargs as dynamic-extent which can inform compilation of callers
-                       ;; to this lambda that they can DXify the arg.
-                       (and (lambda-var-p leaf)
-                            (member (lambda-kind (lambda-var-home (ref-leaf use)))
-                                    '(:optional :external)))
-                       (or
-                        ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
-                        ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
-                        ;; where TEST is declared DX, and one possible use of this LVAR is
-                        ;; to the supplied arg, and other is essentially constant-like.
-                        (and (global-var-p leaf)
-                             (eq (global-var-kind leaf) :global-function))
-                        ;; Ignore top level closures
-                        (and (functional-p leaf)
-                             (functional-enclose leaf)
-                             (eq (functional-kind (node-home-lambda (functional-enclose leaf)))
-                                 :toplevel))
-                        ;; Ignore non-closures.
-                        (unless flush
-                          (and (lambda-p leaf)
-                               (not (environment-closure (lambda-environment leaf)))))))))
-               ;; It's supposed to be slow, so who cares it can't
-               ;; stack allocate something.
-               (policy use (= speed 0)))
-        ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
-        ;; would be a far better description, but since we use
-        ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node
-        ;; can have different handled conditions.
-        (let ((*compiler-error-context* use))
-          (if (and (ref-p use) (lambda-var-p (ref-leaf use)))
-              (compiler-notify "~@<could~2:I not stack allocate ~S in: ~S~:@>"
-                               (lambda-var-original-name (ref-leaf use))
-                               (find-original-source (node-source-path use)))
-              (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
-                               (find-original-source (node-source-path use)))))))))
 
 (defun use-good-for-dx-p (use cleanup dx)
   (typecase use
@@ -1669,8 +1599,6 @@
 (defun flush-dest (lvar)
   (declare (type (or lvar null) lvar))
   (unless (null lvar)
-    (when (lvar-dynamic-extent lvar)
-      (note-no-stack-allocation lvar :flush t))
     (setf (lvar-dest lvar) nil)
     (do-uses (use lvar)
       (flush-node use))
@@ -2938,6 +2866,18 @@ is :ANY, the function name is not checked."
                     leaf)
                    (when constants
                      (values :calls constants))))))))))
+
+(defun lambda-var-original-name (leaf)
+  (let ((home (lambda-var-home leaf)))
+    (if (eq :external (functional-kind home))
+        (let* ((entry (functional-entry-fun home))
+               (p (1- (or (position leaf (lambda-vars home))
+                          (bug "can't find leaf")))))
+          (leaf-debug-name
+           (if (optional-dispatch-p entry)
+               (elt (optional-dispatch-arglist entry) p)
+               (elt (lambda-vars entry) p))))
+        (leaf-debug-name leaf))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
   (loop for annot in (lvar-annotations lvar)

@@ -345,11 +345,11 @@
                   (let ((enclose (xep-enclose (ref-leaf use))))
                     (cond ((enclose-cleanup enclose)
                            (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
-                                 'dynamic-extent-no-note))
+                                 'dynamic-extent))
                           (t
                            (unless cleanup
                              (setq cleanup (insert-dynamic-extent-cleanup node)))
-                           (let ((dx-info (make-dx-info :kind 'dynamic-extent-no-note
+                           (let ((dx-info (make-dx-info :kind 'dynamic-extent
                                                         :value arg :cleanup cleanup)))
                              (setf (lvar-dynamic-extent arg) dx-info)
                              (push dx-info (cleanup-nlx-info cleanup)))))))))))))
@@ -413,7 +413,6 @@
                     (cond ((lvar-good-for-dx-p lvar cleanup dx)
                            (mark-dx lvar))
                           (t
-                           (note-no-stack-allocation lvar)
                            (setf (lvar-dynamic-extent lvar) nil))))))))))))
   ;; Mark closures as dynamic-extent allocatable by making the ENCLOSE
   ;; node for the closure use an LVAR.

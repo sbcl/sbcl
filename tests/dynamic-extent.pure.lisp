@@ -1036,25 +1036,17 @@
 (declaim (inline barvector))
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
-(with-test (:name :dx-compiler-notes
-            :fails-on (and))
+(with-test (:name :dx-compiler-notes)
   (flet ((assert-notes (j lambda)
            (let ((notes (nth 4 (multiple-value-list (checked-compile lambda))))) ; TODO
              (unless (= (length notes) j)
                (error "Wanted ~S notes, got ~S for~%   ~S"
                       j (length notes) lambda)))))
-    ;; These ones should complain.
-    (assert-notes 1 `(lambda (x)
-                       (let ((v (make-array x)))
+    ;; This should complain.
+    (assert-notes 1 `(lambda ()
+                       (let ((v (make-array (1+ #.sb-vm::+backend-page-bytes+))))
                          (declare (dynamic-extent v))
-                         (length v))))
-    (assert-notes 2 `(lambda (x)
-                       (let ((y (if (plusp x)
-                                    (true x)
-                                    (true (- x)))))
-                         (declare (dynamic-extent y))
-                         (print y)
-                         nil)))
+                         (print (sb-ext:stack-allocated-p v)))))
     ;; These ones should not complain.
     (assert-notes 0 `(lambda (name)
                        (with-alien

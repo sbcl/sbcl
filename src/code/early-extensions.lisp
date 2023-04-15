@@ -1338,7 +1338,7 @@ NOTE: This interface is experimental and subject to change."
 
 (defun call-with-sane-io-syntax (function)
   (declare (type function function))
-  #-sb-xc-host (declare (dynamic-extent function)) ; "unable"
+  (declare (dynamic-extent function))
   ;; force BOUNDP to be tested by declaring maximal safety
   ;; in case unsafe code really screwed things up.
   (declare (optimize (safety 3)))
