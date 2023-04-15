@@ -317,12 +317,7 @@
                    `(macro . (the ,type ,expansion))))
                 (:constant
                  (let ((value (symbol-value name)))
-                   ;; Objects that are freely coalescible become
-                   ;; anonymous since we aren't interested in
-                   ;; accessing them through their name.
-                   (if (sb-xc:typep value '(or number character symbol))
-                       (find-constant value)
-                       (make-constant value (ctype-of value) name))))
+                   (make-constant value (ctype-of value) name)))
                 (t
                  (make-global-var :kind kind
                                   :%source-name name

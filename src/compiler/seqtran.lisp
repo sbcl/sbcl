@@ -2853,8 +2853,8 @@
         (constants '()))
     (loop while (and reverse
                      (constant-lvar-p (car reverse))
-                     (not (leaf-has-source-name-p
-                           (nth-value 1 (lvar-value (car reverse))))))
+                     (legal-immediate-constant-p
+                      (nth-value 1 (lvar-value (car reverse)))))
           do (push (lvar-value (pop reverse)) constants))
     (if (null constants)
         `(lambda ,gensyms
@@ -2887,8 +2887,7 @@
     ;; though I doubt it would provide benefit to many real-world scenarios.
     (dolist (elt elts)
       (cond ((and (constant-lvar-p elt)
-                  (not (leaf-has-source-name-p
-                        (nth-value 1 (lvar-value elt)))))
+                  (legal-immediate-constant-p (nth-value 1 (lvar-value elt))))
              (push (lvar-value elt) constants))
             (t
              (setq constants :fail)

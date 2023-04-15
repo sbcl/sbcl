@@ -107,7 +107,7 @@
               (record-xref :calls (leaf-debug-name inline-var) context node nil))))
          ;; Reading a constant
          (constant
-          (record-xref :references (ref-%source-name node) context node nil)))))
+          (record-xref :references (leaf-%source-name leaf) context node nil)))))
     ;; Setting a special variable
     (cset
      (let ((var (set-var node)))

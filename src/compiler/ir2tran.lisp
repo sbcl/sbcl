@@ -56,6 +56,17 @@
          (entry-info-closure-tn (lambda-info thing))))
       (bug "~@<~2I~_~S ~_not found in ~_~S~:>" thing env)))
 
+;;; If LEAF already has a constant TN, return that, otherwise make a
+;;; TN for it.
+(defun constant-tn (leaf)
+  (declare (type constant leaf))
+  ;; Anonymize the constant for things we never want to dump by name
+  ;; (freely coalescible objects) now so that we don't get duplicate
+  ;; constants in the compiled component.
+  (make-constant-tn (if (legal-immediate-constant-p leaf)
+                        (find-constant (constant-value leaf))
+                        leaf)))
+
 ;;; Return a TN that represents the value of LEAF, or NIL if LEAF
 ;;; isn't directly represented by a TN. ENV is the environment that
 ;;; the reference is done in.
@@ -65,14 +76,14 @@
     (lambda-var
      (unless (lambda-var-indirect leaf)
        (find-in-environment leaf env)))
-    (constant (make-constant-tn leaf))
+    (constant (constant-tn leaf))
     (t nil)))
 
 ;;; This is used to conveniently get a handle on a constant TN during
 ;;; IR2 conversion. It returns a constant TN representing the Lisp
 ;;; object VALUE.
 (defun emit-constant (value)
-  (make-constant-tn (find-constant value)))
+  (constant-tn (find-constant value)))
 
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
@@ -99,7 +110,7 @@
                   (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
            (t (emit-move node block tn res)))))
       (constant
-       (move-lvar-result node block (list (make-constant-tn leaf)) lvar)
+       (move-lvar-result node block (list (constant-tn leaf)) lvar)
        (return-from ir2-convert-ref))
       (functional
        (ir2-convert-closure node block leaf res))

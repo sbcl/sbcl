@@ -100,6 +100,14 @@
   (declare (type lvar lvar))
   (ir2-lvar-primitive-type (lvar-info lvar)))
 
+;;; Return true if a constant LEAF is of a type which we can legally
+;;; directly reference in code. Named constants with arbitrary pointer
+;;; values cannot, since we must preserve EQLness.
+(defun legal-immediate-constant-p (leaf)
+  (declare (type constant leaf))
+  (or (not (leaf-has-source-name-p leaf))
+      (sb-xc:typep (constant-value leaf) '(or symbol number character))))
+
 ;;; If LVAR is used only by a REF to a leaf that can be delayed, then
 ;;; return the leaf, otherwise return NIL.
 (defun lvar-delayed-leaf (lvar)

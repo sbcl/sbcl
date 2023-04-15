@@ -1470,9 +1470,7 @@
                 (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
-  ;; CONSTANT nodes are always anonymous, since we wish to coalesce named and
-  ;; unnamed constants that are equivalent, we need to keep track of the
-  ;; reference name for XREF.
+  ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
   (%source-name (missing-arg) :type symbol :read-only t)
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
   (constraints nil))

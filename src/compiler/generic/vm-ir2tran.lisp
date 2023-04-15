@@ -313,7 +313,7 @@
                     ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value)
                           ;; check for constant named-ness to not
                           ;; trigger load form processing.
-                          (not (leaf-has-source-name-p (nth-value 1 (lvar-value value)))))
+                          (legal-immediate-constant-p (nth-value 1 (lvar-value value))))
                      (funcall setter (tnify i) (emit-constant (lvar-value value))))
                     (t
                      ;; FIXME: for simple-vector, fixnums should get stored via an ANY-REG
