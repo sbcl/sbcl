@@ -25,13 +25,4 @@ int bsearch_lesseql_uword(uword_t item, uword_t* array, int nelements);
 int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements);
 int bsearch_lesseql_uint32(uint32_t item, uint32_t* array, int nelements);
 
-struct split_ordered_list_node {
-    lispobj header;
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    lispobj _layout;
-#endif
-    lispobj next;
-    lispobj hash;
-    lispobj key;
-};
 #endif

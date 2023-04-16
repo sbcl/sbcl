@@ -350,14 +350,14 @@ split_ordered_list_find(struct split_ordered_list* solist,
     struct split_ordered_list_node* node = (void*)native_pointer(nodeptr);
     lispobj hash_as_fixnum = make_fixnum(full_hash);
     while (1) {
-        if (node->hash == hash_as_fixnum) { // possible hit
-            if (node->key == key && // looking good
-                lowtag_of(node->next) != 0) { // node is not deleted, great
+        if (node->node_hash == hash_as_fixnum) { // possible hit
+            if (node->so_key == key && // looking good
+                lowtag_of(node->_node_next) != 0) { // node is not deleted, great
                 return node;
             }
         }
-        if (node->hash > hash_as_fixnum ||
-            node->next == LFLIST_TAIL_ATOM) return NULL;
-        node = (void*)native_pointer(node->next);
+        if (node->node_hash > hash_as_fixnum ||
+            node->_node_next == LFLIST_TAIL_ATOM) return NULL;
+        node = (void*)native_pointer(node->_node_next);
     }
 }

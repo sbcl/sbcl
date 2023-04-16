@@ -189,6 +189,7 @@
  ("src/compiler/info-vector" :c-headers)
  ("src/compiler/globaldb" :c-headers)
  ("src/compiler/generic/objdef" :c-headers)
+ ("src/code/lockfree-list" :c-headers)
 
  ("src/compiler/generic/vm-array" :c-headers)
  ("src/code/primordial-type" :c-headers)

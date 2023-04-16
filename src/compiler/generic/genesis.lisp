@@ -3464,38 +3464,45 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       (output-c)
       (format t "~%#endif /* __ASSEMBLER__ */~%"))))
 
-(defun write-structure-object (dd *standard-output* &optional structname)
-  (flet ((cstring (designator) (c-name (string-downcase designator))))
-    (format t "#ifndef __ASSEMBLER__~2%")
-    (format t "#include ~S~%" (lispobj-dot-h))
-    (format t "struct ~A {~%" (or structname (cstring (dd-name dd))))
-    (format t "    lispobj header; // = word_0_~%")
-    ;; "self layout" slots are named '_layout' instead of 'layout' so that
-    ;; classoid's expressly declared layout isn't renamed as a special-case.
-    #-compact-instance-header (format t "    lispobj _layout;~%")
-    ;; Output exactly the number of Lisp words consumed by the structure,
-    ;; no more, no less. C code can always compute the padded length from
-    ;; the precise length, but the other way doesn't work.
-    (let ((names
-           (coerce (loop for i from sb-vm:instance-data-start below (dd-length dd)
-                         collect (list (format nil "word_~D_" (1+ i))))
-                   'vector)))
-      (dolist (slot (dd-slots dd))
-        (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
-              (name (cstring (dsd-name slot))))
-          (case (dsd-raw-type slot)
-            ((t) (rplaca cell name))
-            ;; remind C programmers which slots are untagged
-            (sb-vm:signed-word (rplaca cell (format nil "sw_~a" name)))
-            (sb-vm:word (rplaca cell (format nil "uw_~a" name)))
-            (t (rplacd cell name)))))
-      (loop for slot across names
-            do (format t "    lispobj ~A;~@[ // ~A~]~%"
-                       ;; reserved word
-                       (if (string= (car slot) "default") "_default" (car slot))
-                       (cdr slot))))
-    (format t "};~%")
-    (format t "~%#endif /* __ASSEMBLER__ */~2%")))
+(defun write-structure-object (dd *standard-output* &optional structure-tag)
+  (labels
+      ((cstring (designator) (c-name (string-downcase designator)))
+       (output (dd structure-tag)
+         (format t "struct ~A {~%" structure-tag)
+         (format t "    lispobj header; // = word_0_~%")
+         ;; "self layout" slots are named '_layout' instead of 'layout' so that
+         ;; classoid's expressly declared layout isn't renamed as a special-case.
+         #-compact-instance-header (format t "    lispobj _layout;~%")
+         ;; Output exactly the number of Lisp words consumed by the structure,
+         ;; no more, no less. C code can always compute the padded length from
+         ;; the precise length, but the other way doesn't work.
+         (let ((names
+                (coerce (loop for i from sb-vm:instance-data-start below (dd-length dd)
+                              collect (list (format nil "word_~D_" (1+ i))))
+                        'vector)))
+           (dolist (slot (dd-slots dd))
+             (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
+                   (name (cstring (dsd-name slot))))
+               (case (dsd-raw-type slot)
+                 ((t) (rplaca cell name))
+                 ;; remind C programmers which slots are untagged
+                 (sb-vm:signed-word (rplaca cell (format nil "sw_~a" name)))
+                 (sb-vm:word (rplaca cell (format nil "uw_~a" name)))
+                 (t (rplacd cell name)))))
+           (loop for slot across names
+                 do (format t "    lispobj ~A;~@[ // ~A~]~%"
+                            ;; reserved word
+                            (if (string= (car slot) "default") "_default" (car slot))
+                            (cdr slot))))
+         (format t "};~%")))
+  (format t "#ifndef __ASSEMBLER__~2%")
+  (format t "#include ~S~%" (lispobj-dot-h))
+  (output dd (or structure-tag (cstring (dd-name dd))))
+  (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
+    (terpri)
+    (output (wrapper-info (find-layout 'sb-lockless::so-data-node))
+            "split_ordered_list_node"))
+  (format t "~%#endif /* __ASSEMBLER__ */~2%")))
 
 (defun write-thread-init (stream)
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
