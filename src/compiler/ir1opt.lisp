@@ -1355,7 +1355,9 @@
   (let* ((where (when fun (leaf-where-from fun)))
          (same-file-p (eq :defined-here where)))
     (cond ((not (fun-type-p type))
-           (when fun
+           ;; Using the defined-type too early is a bit of a waste: during
+           ;; conversion we cannot use the untrusted ASSERT-CALL-TYPE, etc.
+           (when (and fun (not ir1-converting-not-optimizing-p))
              (let ((defined-type (leaf-defined-type fun)))
                (when (and (fun-type-p defined-type)
                           (neq fun (combination-type-validated-for-leaf call)))
@@ -1364,7 +1366,7 @@
                  ;; multiple times.
                  (setf (combination-type-validated-for-leaf call) fun)
                  (when (and (valid-fun-use call defined-type
-                                           :argument-test #'always-subtypep
+                                           :argument-test nil
                                            :result-test nil
                                            :lossage-fun (if same-file-p
                                                             #'compiler-warn
@@ -1377,7 +1379,7 @@
           (t
            (multiple-value-bind (valid unwinnage unknown-keys)
                (valid-fun-use call type
-                              :argument-test #'always-subtypep
+                              :argument-test nil
                               :result-test nil
                               :lossage-fun #'compiler-warn
                               :unwinnage-fun #'compiler-notify)

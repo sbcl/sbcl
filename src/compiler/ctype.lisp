@@ -34,6 +34,8 @@
 ;;; the function that we use for type checking. The derived type is
 ;;; its first argument and the type we are testing against is its
 ;;; second argument. The function should return values like CSUBTYPEP.
+;;; Can be NIL when no type testing is needed. (When ir1 converting,
+;;; as opposed to checking whether an ir1-transform is applicable.)
 (defvar *ctype-test-fun*)
 
 ;;; *LOSSAGE-DETECTED* is set when a "definite incompatibility" is
@@ -79,12 +81,6 @@
      dtype)))
 
 ;;;; stuff for checking a call against a function type
-
-;;; A dummy version of SUBTYPEP useful when we want a functional like
-;;; SUBTYPEP that always returns true.
-(defun always-subtypep (type1 type2)
-  (declare (ignore type1 type2))
-  (values t t))
 
 ;;; Determine whether a use of a function is consistent with its type.
 ;;; These values are returned:
@@ -241,21 +237,19 @@ and no value was provided for it." name))))))))))
 (defun check-arg-type (lvar type n)
   (declare (type lvar lvar) (type ctype type) (type index n))
   (cond
+    ((eq (lvar-type lvar) *empty-type*)
+     (note-unwinnage "The ~:R argument never returns a value." n)
+     nil)
+    ((not *ctype-test-fun*))
     ((not (constant-type-p type))
-     (let ((ctype (lvar-type lvar)))
-       (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype type)
-         (cond ((not win)
-                (note-unwinnage "can't tell whether the ~:R argument is a ~S"
-                                n (type-specifier type))
-                nil)
-               ((not int)
+     (let* ((ctype (lvar-type lvar))
+            (int (funcall *ctype-test-fun* ctype type)))
+       (cond ((not int)
+              (unless (type= ctype (specifier-type '(eql dummy)))
                 (note-lossage "The ~:R argument is a ~S, not a ~S."
-                              n (type-specifier ctype) (type-specifier type))
-                nil)
-               ((eq ctype *empty-type*)
-                (note-unwinnage "The ~:R argument never returns a value." n)
-                nil)
-               (t t)))))
+                              n (type-specifier ctype) (type-specifier type)))
+              nil)
+             (t t))))
     ((not (constant-lvar-p lvar))
      (note-unwinnage "The ~:R argument is not a constant." n)
      nil)
@@ -575,23 +569,24 @@ and no value was provided for it." name))))))))))
 ;;; complaining if not or if we can't tell.
 (defun check-approximate-arg-type (call-types decl-type context &rest args)
   (declare (list call-types) (type ctype decl-type) (string context))
-  (let ((losers *empty-type*))
-    (dolist (ctype call-types)
-      (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype decl-type)
-        (cond
-          ((not win)
-           (note-unwinnage "can't tell whether previous ~? ~
+  (when *ctype-test-fun*
+    (let ((losers *empty-type*))
+      (dolist (ctype call-types)
+        (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype decl-type)
+          (cond
+            ((not win)
+             (note-unwinnage "can't tell whether previous ~? ~
                            argument type ~S is a ~S"
-                           context
-                           args
-                           (type-specifier ctype)
-                           (type-specifier decl-type)))
-          ((not int)
-           (setq losers (type-union ctype losers))))))
+                             context
+                             args
+                             (type-specifier ctype)
+                             (type-specifier decl-type)))
+            ((not int)
+             (setq losers (type-union ctype losers))))))
 
-    (unless (eq losers *empty-type*)
-      (note-lossage "~:(~?~) argument should be a ~S but was a ~S in a previous call."
-                    context args (type-specifier decl-type) (type-specifier losers))))
+      (unless (eq losers *empty-type*)
+        (note-lossage "~:(~?~) argument should be a ~S but was a ~S in a previous call."
+                      context args (type-specifier decl-type) (type-specifier losers)))))
   (values))
 
 ;;; Check the types of each manifest keyword that appears in a keyword
