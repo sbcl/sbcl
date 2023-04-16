@@ -6313,3 +6313,18 @@
               `(lambda (z)
                  (funcall (constantly z))))))
     (assert (not (ctu:find-named-callees #'constantly)))))
+
+(with-test (:name :note-argument-not-returning)
+  (let ((notes
+          (nth-value
+           4 (checked-compile `(lambda ()
+                                 (block nil
+                                   (let ()
+                                     (cons
+                                      (eval 'nil)
+                                      (return
+                                        :good)))))))))
+    (assert (dolist (note notes nil)
+              (when (string= (format nil "~a" note)
+                             "The second argument never returns a value.")
+                (return t))))))
