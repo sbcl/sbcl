@@ -469,11 +469,10 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
-(defun dump-1-var (fun var tn minimal buffer &optional same-name-p)
+(defun dump-1-var (fun var tn minimal buffer &optional name same-name-p)
   (declare (type lambda-var var) (type (or tn null) tn)
            (type clambda fun))
-  (let* ((name (lambda-var-original-name var))
-         (save-tn (and tn (tn-save-tn tn)))
+  (let* ((save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
          (flags 0)
          (info (lambda-var-arg-info var))
@@ -554,6 +553,18 @@
              (vector-push-extend (tn-sc+offset save-tn) buffer)))))
   (values))
 
+(defun leaf-principal-name (leaf)
+  ;; If all the references are from the same substituted variable
+  ;; use its name.
+  ;; Helps with &key processing variables.
+  (let ((refs (leaf-refs leaf)))
+    (loop for ref in refs
+          for name = (ref-%source-name ref)
+          for first-name = name then first-name
+          unless (eq name first-name)
+          return (leaf-debug-name leaf)
+          finally (return name))))
+
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
 ;;; hash table in which we enter the translation from LAMBDA-VARS to
@@ -563,10 +574,10 @@
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((vars))
     (labels ((frob-leaf (leaf tn gensym-p)
-               (let ((name (lambda-var-original-name leaf)))
+               (let ((name (leaf-principal-name leaf)))
                  (when (and name (leaf-refs leaf) (tn-offset tn)
                             (or gensym-p (cl:symbol-package name)))
-                   (vars (cons leaf tn)))))
+                   (vars (list* name leaf tn)))))
              (frob-lambda (x gensym-p)
                (dolist (leaf (lambda-vars x))
                  (frob-leaf leaf (leaf-info leaf) gensym-p))))
@@ -582,21 +593,21 @@
 
     (let ((sorted (sort (vars) #'string<
                         :key (lambda (x)
-                               (symbol-name (lambda-var-original-name (car x))))))
+                               (symbol-name (car x)))))
           (prev-name nil)
           (i 0)
           (buffer (make-array 0 :fill-pointer 0 :adjustable t))
           ;; XEPs don't have any useful variables
           (minimal (eq (functional-kind fun) :external)))
       (declare (type index i))
-      (dolist (x sorted)
-        (let* ((var (car x))
-               (name (lambda-var-original-name var)))
-          (dump-1-var fun var (cdr x) minimal buffer
-                      (and prev-name (eq prev-name name)))
-          (setf prev-name name)
-          (setf (gethash var var-locs) i)
-          (incf i)))
+      (loop for (name var . tn) in sorted
+            do
+            (dump-1-var fun var tn minimal buffer
+                        name
+                        (and prev-name (eq prev-name name)))
+            (setf prev-name name)
+            (setf (gethash var var-locs) i)
+            (incf i))
       (compact-vector buffer))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of

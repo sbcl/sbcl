@@ -2172,7 +2172,7 @@ is :ANY, the function name is not checked."
 ;;; whether to substitute
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
-  (declare (dynamic-extent test))
+  #-sb-xc-host (declare (dynamic-extent test)) ; "unable"
   (dolist (ref (leaf-refs old-leaf))
     (when (funcall test ref)
       (change-ref-leaf ref new-leaf)))
@@ -2873,12 +2873,10 @@ is :ANY, the function name is not checked."
         (let* ((entry (functional-entry-fun home))
                (p (1- (or (position leaf (lambda-vars home))
                           (bug "can't find leaf")))))
-          (if (= p -1)
-              (leaf-debug-name leaf)
-              (leaf-debug-name
-               (if (optional-dispatch-p entry)
-                   (elt (optional-dispatch-arglist entry) p)
-                   (elt (lambda-vars entry) p)))))
+          (leaf-debug-name
+           (if (optional-dispatch-p entry)
+               (elt (optional-dispatch-arglist entry) p)
+               (elt (lambda-vars entry) p))))
         (leaf-debug-name leaf))))
 
 (defun process-lvar-modified-annotation (lvar annotation)

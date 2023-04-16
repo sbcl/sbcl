@@ -899,8 +899,7 @@
   ;; the value of the constant
   (value (missing-arg) :type t))
 (defprinter (constant :identity t)
-  (%source-name :test (neq %source-name '.anonymous.))
-  value)
+  value (%source-name :test (neq %source-name '.anonymous.)))
 
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
@@ -1464,15 +1463,19 @@
 (defstruct (ref (:include valued-node (reoptimize nil))
                 (:constructor make-ref
                               (leaf
+                               &optional (%source-name '.anonymous.)
                                &aux (leaf-type (leaf-type leaf))
                                     (derived-type
                                      (make-single-value-type leaf-type))))
                 (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
+  ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
+  (%source-name (missing-arg) :type symbol :read-only t)
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
   (constraints nil))
 (defprinter (ref :identity t)
+  (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
