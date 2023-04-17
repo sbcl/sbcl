@@ -75,47 +75,6 @@
                 (find-symbol (string name) "COMMON-LISP")
                 name))))
 
-(when sb-c::*track-full-called-fnames*
-  (let (possibly-suspicious likely-suspicious)
-    (sb-int:call-with-each-globaldb-name
-     (lambda (name)
-       (let* ((cell (sb-int:info :function :emitted-full-calls name))
-              (inlinep (eq (sb-int:info :function :inlinep name) 'inline))
-              (source-xform (sb-int:info :function :source-transform name))
-              (info (sb-int:info :function :info name)))
-         (if (and cell
-                  (or inlinep
-                      source-xform
-                      (and info (sb-c::fun-info-templates info))
-                      (sb-int:info :function :compiler-macro-function name)))
-             (cond (inlinep
-                    ;; A full call to an inline function almost always indicates
-                    ;; an out-of-order definition. If not an inline function,
-                    ;; the call could be due to an inapplicable transformation.
-                    (push (cons name cell) likely-suspicious))
-                   ;; structure constructors aren't inlined by default,
-                   ;; though we have a source-xform.
-                   ((and (listp source-xform) (eq :constructor (cdr source-xform))))
-                   (t
-                    (push (cons name cell) possibly-suspicious)))))))
-    (flet ((show (label list)
-             (when list
-               (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
-                       label
-                       (mapcar (lambda (x) (list* (ash (cadr x) -2) (car x) (cddr x)))
-                               (sort list #'> :key #'cadr))))))
-      ;; Called inlines not in the presence of a declaration to the contrary
-      ;; indicate that perhaps the function definition appeared too late.
-      (show "Likely" likely-suspicious)
-      ;; Failed transforms are considered not quite as suspicious
-      ;; because it could either be too late, or that the transform failed.
-      (show "Possibly" possibly-suspicious))
-    ;; As each platform's build becomes warning-free,
-    ;; it should be added to the list here to prevent regresssions.
-    (when (and likely-suspicious
-               (target-featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
-      (warn "Expected zero inlinining failures"))))
-
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.
 #+nil

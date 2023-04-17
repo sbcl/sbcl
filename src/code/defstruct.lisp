@@ -1474,7 +1474,7 @@ unless :NAMED is also specified.")))
                            accessor-name
                            (dsd-name dsd))))))))
 
-    (awhen (remove-if-not #'sb-impl::emitted-full-call-count fnames)
+    (awhen (remove-if-not #'sb-c::emitted-full-call-count fnames)
       (sb-c:compiler-style-warn
        'sb-c:inlining-dependency-failure
        ;; This message omits the http://en.wikipedia.org/wiki/Serial_comma

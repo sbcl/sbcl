@@ -324,7 +324,6 @@
       (:function . :assumed-type)
       (:type . :deprecated)
       (:type . :expander)
-      (:function . :emitted-full-calls)
       (:setf . :expander)
       (:type . :compiler-layout)
       (:variable . :wired-tls)

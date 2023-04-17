@@ -353,28 +353,6 @@
 ;;; null, we don't care.
 (define-info-type (:function :inlinep) :type-spec sb-c::inlinep)
 
-;;; Track how many times IR2 converted a call to this function as a full call
-;;; that was not in the scope of a local or global notinline declaration.
-;;; Useful for finding functions that were supposed to have been converted
-;;; through some kind of transformation but were not.
-(define-info-type (:function :emitted-full-calls) :type-spec list)
-
-;; Return the number of calls to NAME that IR2 emitted as full calls,
-;; not counting calls via #'F that went untracked.
-;; Return 0 if the answer is nonzero but a warning was already signaled
-;; about any full calls were emitted. This return convention satisfies the
-;; intended use of this statistic - to decide whether to generate a warning
-;; about failure to inline NAME, which is shown at most once per name
-;; to avoid unleashing a flood of identical warnings.
-(defun emitted-full-call-count (name)
-  (let ((status (car (info :function :emitted-full-calls name))))
-     (and (integerp status)
-          ;; Bit 0 tells whether any call was NOT in the presence of
-          ;; a 'notinline' declaration, thus eligible to be inline.
-          ;; Bit 1 tells whether any warning was emitted yet.
-          (= (logand status 3) #b01)
-          (ash status -2)))) ; the call count as tracked by IR2
-
 ;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline
 ;;; expansion is inhibited.

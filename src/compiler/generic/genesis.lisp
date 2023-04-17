@@ -2953,6 +2953,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (pop-stack)
   (values))
 
+(define-cold-fop (fop-note-full-calls)
+  (sb-c::accumulate-full-calls (host-object-from-core (pop-stack)))
+  (values))
+
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (code-obj fixups index count &aux (end (1- (+ index count))))
   (let ((retained-fixups (svref fixups index)))

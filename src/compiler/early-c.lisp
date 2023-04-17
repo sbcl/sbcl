@@ -228,6 +228,13 @@
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)
+  ;; Map of function name -> something about how many calls were converted
+  ;; as ordinary calls not in the scope of a local or global notinline declaration.
+  ;; Useful for finding functions that were supposed to have been converted
+  ;; through some kind of transformation but were not.
+  ;; FIXME: this should be scoped to a compile/load but there are
+  ;; apparently some difficulties in doing so.
+  ; (emitted-full-calls (make-hash-table :test 'equal))
   ;; if emitting a cfasl, the fasl stream to that
   (compile-toplevel-object nil :read-only t)
   ;; The current block compilation state.  These are initialized to
@@ -272,3 +279,38 @@
 ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
 #+linux ; shadow space differs by OS
 (defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)
+
+(define-load-time-global *emitted-full-calls* (make-hash-table :test 'equal))
+
+(defmacro get-emitted-full-calls (name)
+;; Todo: probably remove the wrapping cons. It was for globaldb
+;; which is particularly inefficient at updates (because it can only
+;; use an R/C/U paradigm, and so conses on every insert,
+;; unlike a hash-table which can just update the cell)
+  `(gethash ,name *emitted-full-calls*))
+
+;; Return the number of calls to NAME that IR2 emitted as full calls,
+;; not counting calls via #'F that went untracked.
+;; Return 0 if the answer is nonzero but a warning was already signaled
+;; about any full calls were emitted. This return convention satisfies the
+;; intended use of this statistic - to decide whether to generate a warning
+;; about failure to inline NAME, which is shown at most once per name
+;; to avoid unleashing a flood of identical warnings.
+(defun emitted-full-call-count (name)
+  (let ((status (car (get-emitted-full-calls name))))
+    (and (integerp status)
+         ;; Bit 0 tells whether any call was NOT in the presence of
+         ;; a 'notinline' declaration, thus eligible to be inline.
+         ;; Bit 1 tells whether any warning was emitted yet.
+         (= (logand status 3) #b01)
+         (ash status -2)))) ; the call count as tracked by IR2
+
+(defun accumulate-full-calls (data)
+  (loop for (name status) in data
+        do
+        (let ((existing (gethash name *emitted-full-calls* 0)))
+          (setf (gethash name *emitted-full-calls*)
+                (logior (+ (logand existing #b11) ; old flag bits
+                           (logand status #b11))  ; new flag bits
+                        (logand existing -4)      ; old count
+                        (logand status -4))))))   ; new count

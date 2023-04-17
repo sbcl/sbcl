@@ -715,7 +715,7 @@ has written, having proved that it is unreachable."))
 ;;
 (defun warn-if-compiler-macro-dependency-problem (name)
   (unless (compiler-macro-function name)
-    (let ((status (car (info :function :emitted-full-calls name)))) ; TODO use emitted-full-call-count?
+    (let ((status (car (get-emitted-full-calls name))))
       (when (and (integerp status) (oddp status))
         ;; Show the total number of calls, because otherwise the warning
         ;; would be worded rather obliquely: "N calls were compiled
@@ -734,7 +734,7 @@ has written, having proved that it is unreachable."))
 ;;
 (defun warn-if-inline-failed/proclaim (name new-inlinep)
   (when (eq new-inlinep 'inline)
-    (let ((warning-count (sb-impl::emitted-full-call-count name)))
+    (let ((warning-count (emitted-full-call-count name)))
       (when (and warning-count
                  ;; Warn only if the the compiler did not have the expansion.
                  (not (fun-name-inline-expansion name))

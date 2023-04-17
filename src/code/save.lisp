@@ -343,6 +343,7 @@ sufficiently motivated to do lengthy fixes."
   (sb-kernel::rebuild-ctype-hashsets)
   (drop-all-hash-caches)
   (os-deinit)
+  (clrhash sb-c::*emitted-full-calls*) ; Don't immortalize compiler's scratchpad
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)
