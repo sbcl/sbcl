@@ -889,7 +889,7 @@
 (def-type-model (member-type (:constructor* nil (xset fp-zeroes)))
   (xset nil :type xset :hasher xset-elts-hash :test xset=)
   (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=)))
-(define-load-time-global *xset-mutex* (or #-sb-xc-host (sb-thread:make-mutex)))
+(define-load-time-global *xset-mutex* (or #-sb-xc-host (sb-thread:make-mutex :name "xset")))
 ;;; This hashset is guarded by *XSET-MUTEX*. It is _not_ declared as synchronized
 ;;; so that HASHSET-INSERT-IF-ABSENT should not acquire a mutex inside a mutex
 ;;; (stable hashes have to be assigned while holding the lock)

@@ -90,13 +90,11 @@
      (unless (= actual expected) (bug "XC layout hash calculation failed")))
    (setf (gethash (car x) *forward-referenced-wrappers*) (cdr x))))
 
-;;; FIXME: This lock is only seized in the classoid/layout/class
-;;; system, and is now a misnomer.
 #-sb-xc-host
-(define-load-time-global **world-lock** nil)
+(define-load-time-global **world-lock** nil) ; the PCL world, that is
 #-sb-xc-host
 (!cold-init-forms
- (setq **world-lock** (sb-thread:make-mutex :name "World Lock")))
+ (setq **world-lock** (sb-thread:make-mutex :name "PCL global mutex")))
 
 (defmacro with-world-lock (() &body body)
   #+sb-xc-host `(progn ,@body)
@@ -866,7 +864,7 @@ between the ~A definition and the ~A definition"
 (define-type-method (classoid :simple-subtypep) (class1 class2)
   ;; Simple method should never be called on EQ args since there is an EQ check higher up
   (aver (not (eq class1 class2)))
-  (with-world-lock () ; FIXME: why such coarse lock granularity here?
+  (with-world-lock ()
     (if (%ensure-both-classoids-valid class1 class2)
         (let ()
           (if (get-subclassoid class1 class2)

@@ -214,7 +214,7 @@ from now. For timers with a repeat interval it returns true."
 (defun make-cancellable-interruptor (timer)
   ;; return a list of two functions: one that does the same as
   ;; FUNCTION until the other is called, from when it does nothing.
-  (let ((mutex (sb-thread:make-mutex))
+  (let ((mutex (sb-thread:make-mutex :name "interruptor"))
         (cancelledp nil)
         (function (if (%timer-repeat-interval timer)
                       (lambda ()

@@ -47,7 +47,7 @@
 
 (define-load-time-global *arena-index-generator* 0)
 (declaim (fixnum *arena-index-generator*))
-(define-load-time-global *arena-lock* (sb-thread:make-mutex))
+(define-load-time-global *arena-lock* (sb-thread:make-mutex :name "arena"))
 
 ;;; Release all memblks back to the OS, except the first one associated with this arena.
 (defun rewind-arena (arena)

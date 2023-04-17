@@ -111,7 +111,7 @@
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)
-  (mutex (sb-thread:make-mutex))
+  (mutex (sb-thread:make-mutex :name "info hashtable"))
   ;; The number of phantom entries for simulated deletion.
   ;; Our tombstones are not the usual ones. Ordinarily an open-addressing
   ;; table will use tombstone keys that can be written over if inserting a new

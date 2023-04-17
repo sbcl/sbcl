@@ -120,7 +120,7 @@
          (storage (allocate-hashset-storage capacity weakness)))
     (make-robinhood-hashset :hash-function hash-function
                             :test-function test-function
-                            :mutex (if synchronized #-sb-xc-host (sb-thread:make-mutex)
+                            :mutex (if synchronized #-sb-xc-host (sb-thread:make-mutex :name "hashset")
                                                     #+sb-xc-host nil)
                             :storage storage)))
 
