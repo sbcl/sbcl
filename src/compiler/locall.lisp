@@ -900,6 +900,9 @@
         (block-succ call-block)
       (unlink-blocks call-block next-block)
       (link-blocks call-block bind-block)
+      (unless (eq (car (ctran-source-path (node-prev call))) 'original-source-path)
+        (setf (ctran-source-path (block-start bind-block))
+              (ctran-source-path (node-prev call))))
       next-block)))
 
 ;;; Handle the environment semantics of LET conversion. We add CLAMBDA

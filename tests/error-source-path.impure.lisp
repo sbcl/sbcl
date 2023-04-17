@@ -289,6 +289,19 @@
                            (funcall x)))))
           '(cons sb-ext:code-deletion-note null))))
 
+(with-test (:name :dead-code-note-after-transforms.2)
+  (assert
+   (typep (nth-value 4
+                     (checked-compile
+                      `(lambda (a v)
+                         (declare (vector v))
+                         (block nil
+                           (when (integerp a)
+                             (if (integerp a)
+                                 (return))
+                             (length v))))))
+          '(cons sb-ext:code-deletion-note null))))
+
 (with-test (:name :ignore-deleted-subforms)
   (assert-condition-source-paths
    (lambda (x m)
