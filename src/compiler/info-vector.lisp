@@ -692,13 +692,6 @@ This is interpreted as
 ;;; This is because each update must shallow-copy any data that existed
 ;;; for NAME, as a consequence of the very minimal lockfree protocol.
 ;;;
-;;; If, for example, you wanted to track how many times a full-call to
-;;; each global function was emitted during compilation, you could create
-;;; an info-type (:function :full-calls) and the value of that info-type
-;;; could be a cons cell holding an integer. In this way incrementing
-;;; the cell contents does not affecting the globaldb. In contrast,
-;;; (INCF (INFO :function :full-calls myname)) would perform poorly.
-;;;
 ;;; See also ATOMIC-SET-INFO-VALUE and GET-INFO-VALUE-INITIALIZING
 ;;; for atomic read/modify/write operations.
 ;;;
