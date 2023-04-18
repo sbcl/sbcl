@@ -326,6 +326,7 @@
   "Define the alien type NAME to be equivalent to TYPE. Name may be NIL for
    STRUCT and UNION types, in which case the name is taken from the type
    specifier."
+  (declare (symbol name))
   (with-auxiliary-alien-types env
     (let ((alien-type (parse-alien-type type env)))
       `(eval-when (:compile-toplevel :load-toplevel :execute)

@@ -208,7 +208,7 @@
 ;;; MAP-ALLOCATED-OBJECTS
 #+immobile-space
 (progn
-    (define-alien-type (struct immobile-page)
+    (define-alien-type nil
         ;; ... and yet another place for Lisp to become out-of-sync with C.
         (struct immobile-page
                 (flags (unsigned 8))

@@ -398,7 +398,7 @@ statistics are appended to it."
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
 ;;; Why is PAGE-INDEX-T in SB-KERNEL but PAGE and the page table are in SB-VM?
-(define-alien-type (struct sb-vm::page)
+(define-alien-type nil
     (struct sb-vm::page
             ;; To cut down the size of the page table, the scan_start_offset
             ;; - a/k/a "start" - is measured in 4-byte integers regardless
