@@ -1501,6 +1501,20 @@ static inline boolean stable_eql_hash_p(lispobj obj)
     hashvec[hv_index] == MAGIC_HASH_VECTOR_VALUE))
 
 
+/* The standard pointer tagging scheme admits an optimization that cuts the number
+ * of instructions down when testing for either 'a' or 'b' (or both) being a tagged
+ * pointer, because the bitwise OR of two pointers is considered a pointer.
+ * This trick is inadmissible for the PPC64 lowtag arrangement.
+ *
+ * NOTE: this is allowed to return a false positive. e.g. take the fixnum 1
+ * (internally #b10) and single-float-widetag = 0x19. (Assume 64-bit words)
+ * The bitwise OR is (#b11001 | #b10) = #b11011 which looks like a pointer */
+#ifdef LISP_FEATURE_PPC64
+#define at_least_one_pointer_p(a,b) (is_lisp_pointer(a) || is_lisp_pointer(b))
+#else
+#define at_least_one_pointer_p(a,b) (is_lisp_pointer(a|b))
+#endif
+
 /* Scavenge the "real" entries in the hash-table kv vector. The vector element
  * at index 0 bounds the scan. The element at length-1 (the hash table itself)
  * was scavenged already.

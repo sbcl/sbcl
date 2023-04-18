@@ -201,16 +201,6 @@ is_lisp_pointer(lispobj obj)
 #endif
 }
 
-/* The standard pointer tagging scheme admits an optimization that cuts the number
- * of instructions down when testing for either 'a' or 'b' (or both) being a tagged
- * pointer, because the bitwise OR of two pointers is considered a pointer.
- * This trick is inadmissible for the PPC64 lowtag arrangement */
-#ifdef LISP_FEATURE_PPC64
-#define at_least_one_pointer_p(a,b) (is_lisp_pointer(a) || is_lisp_pointer(b))
-#else
-#define at_least_one_pointer_p(a,b) (is_lisp_pointer(a|b))
-#endif
-
 #include "fixnump.h"
 
 /* Is the Lisp object obj something with immediate nature (e.g. a
