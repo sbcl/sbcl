@@ -531,14 +531,18 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
         /* This produces false positives, don't return potential pointers, but instead print them.
          * Using the output, you can try to probe the suspect memory with SB-VM:HEXDUMP */
         if (th == get_sb_vm_thread()) {
-          scan_thread_control_stack(&arena, // = the approximate stack pointer
-                                    th->control_stack_end,
-                                    th->lisp_thread);
+            scan_thread_control_stack(&arena, // = the approximate stack pointer
+                                      th->control_stack_end,
+                                      th->lisp_thread);
         } else {
-          int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
-          if (ici != 1) lose("can't find interrupt context");
-          lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
-          scan_thread_control_stack((lispobj*)sp, th->control_stack_end, th->lisp_thread);
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+            lispobj *sp = os_get_csp(th);
+#else
+            int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
+            if (ici != 1) lose("can't find interrupt context");
+            lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
+#endif
+            scan_thread_control_stack((lispobj*)sp, th->control_stack_end, th->lisp_thread);
         }
 #endif
         scan_thread_words((lispobj*)th->binding_stack_start,
