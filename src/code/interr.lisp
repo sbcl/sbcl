@@ -307,7 +307,7 @@
          :operation '/
          :operands (list this that)))
 
-(defun restart-type-error (type condition pc-offset)
+(defun restart-type-error (type condition &optional pc-offset)
   (let ((tn-offset (car *current-internal-error-args*)))
     (labels ((retry-value (value)
                (if (typep value type)
@@ -320,8 +320,9 @@
                (sb-di::sub-set-debug-var-slot
                 nil tn-offset (retry-value value)
                 *current-internal-error-context*)
-               (sb-vm::incf-context-pc *current-internal-error-context*
-                                       pc-offset)
+               (when pc-offset
+                 (sb-vm::incf-context-pc *current-internal-error-context*
+                                         pc-offset))
                (return-from restart-type-error))
              (try (condition)
                (restart-case (error condition)
@@ -335,9 +336,12 @@
 (defun object-not-type-error (object type &optional (context nil context-p))
   (if (invalid-array-p object)
       (invalid-array-error object)
-      (let* ((context (if context-p
-                          context
-                          (sb-di:error-context)))
+      (let* ((context (cond (context-p
+                             context)
+                            ((= *current-internal-trap-number* sb-vm:cerror-trap)
+                             'cerror)
+                            (t
+                             (sb-di:error-context))))
              (condition
                (make-condition (if (and (%instancep object)
                                         (wrapper-invalid (%instance-wrapper object)))
@@ -355,10 +359,14 @@
                                                 (t
                                                  type))
                                :context (and (not (integerp context))
+                                             (not (eq context 'cerror))
                                              context))))
-        (if (integerp context)
-            (restart-type-error type condition context)
-            (error condition)))))
+        (cond ((integerp context)
+               (restart-type-error type condition context))
+              ((eq context 'cerror)
+               (restart-type-error type condition))
+              (t
+               (error condition))))))
 
 (macrolet ((def (errname fun-name)
              `(setf (svref **internal-error-handlers**

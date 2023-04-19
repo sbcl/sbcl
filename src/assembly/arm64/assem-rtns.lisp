@@ -297,9 +297,13 @@
   NOT-CALLABLE
   (inst cmp fun null-tn) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst b :eq undefined)
-
-  (emit-error-break nil error-trap (error-number-or-lose 'sb-kernel::object-not-callable-error)
-                    (list fun)))
+  (cerror-call nil 'sb-kernel::object-not-callable-error fun)
+  (inst and temp fun lowtag-mask)
+  (inst cmp temp fun-pointer-lowtag)
+  (inst b :ne TAIL-CALL-SYMBOL)
+  (loadw lr-tn fun closure-fun-slot fun-pointer-lowtag)
+  (inst add lr-tn lr-tn 4)
+  (inst br lr-tn))
 
 
 ;;;; Non-local exit noise.
