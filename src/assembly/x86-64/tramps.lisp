@@ -148,11 +148,13 @@
 (define-assembly-routine (enable-alloc-counter) ()
   (with-registers-preserved (c)
     (inst lea rdi-tn (ea 8 rbp-tn))
+    #+sb-thread
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
   (with-registers-preserved (c)
     (inst lea rdi-tn (ea 8 rbp-tn))
+    #+sb-thread
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
 
 (define-assembly-routine (undefined-tramp (:return-style :none))
