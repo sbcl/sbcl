@@ -23,7 +23,7 @@ changes in sbcl-2.3.3 relative to sbcl-2.3.2:
   * bug fix: restore compilation on ARM64 with OpenBSD.  (lp#2009585, reported
     by okflo)
   * bug fix: compiling a HANDLER-BIND with an function undefined at
-    compile-time produces a compile-time STYLE-WARNING.  (lp2010176)
+    compile-time produces a compile-time STYLE-WARNING.  (lp#2010176)
   * bug fix: support files bigger than 4GB on ARM64/Linux, *BSD. (lp#2011453,
     reported by Yan)
   * bug fix: it is now possible to run sb-simd tests on systems without AVX2.
