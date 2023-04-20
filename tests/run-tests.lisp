@@ -221,6 +221,7 @@
       ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
       ,(maybe "SB-THREAD" "*STARTING-THREADS*")
       ,(maybe "SB-THREAD" "*SPROF-DATA*")
+      ,(maybe "SB-APROF" "*N-PROFILE-SITES*")
       sb-thread::*all-threads*
       ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
       ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
