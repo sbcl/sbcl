@@ -55,7 +55,9 @@
   "Default number of bytes per buffer.")
 
 (defun alloc-buffer (&optional (size +bytes-per-buffer+))
-  (declare (sb-c::tlab :system) (inline !make-buffer))
+  (declare (sb-c::tlab :system)
+           (inline allocate-system-memory) ; so the SAP gets heap-consed
+           (inline !make-buffer))
   ;; Don't want to allocate & unwind before the finalizer is in place.
   (without-interrupts
     (let* ((sap (allocate-system-memory size))

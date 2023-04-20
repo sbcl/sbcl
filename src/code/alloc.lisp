@@ -12,6 +12,7 @@
 
 (in-package "SB-VM")
 
+(declaim (maybe-inline allocate-system-memory))
 (define-alien-routine ("os_allocate" allocate-system-memory)
   system-area-pointer
   (bytes unsigned))

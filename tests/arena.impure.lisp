@@ -115,8 +115,11 @@
     (assert (null finder-result))))
 
 (defun test-with-open-file ()
-  (with-open-file (stream (format nil "/proc/~A/stat" (sb-unix:unix-getpid))
-                          :if-does-not-exist nil)
+  ;; Force allocation of a new BUFFER containing a new SAP,
+  ;; and thereby a new finalizer (a closure) so that the test can
+  ;; ascertain that none of those went to the arena.
+  (setq sb-impl::*available-buffers* nil)
+  (with-open-file (stream *load-pathname*)
     (if stream
         (let ((pn (pathname stream)))
           (values pn (namestring pn) (read-line stream nil)))
