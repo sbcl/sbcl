@@ -51,12 +51,6 @@ pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #include <stdio.h>
 #include "genesis/vector.h"
 
-// Counters 0 and 1 are reserve for variable-size allocations
-// (hit count and total size) that overflow the maximum counter index.
-// Counter 2 is reserved for fixed-size allocations.
-// Constant-size allocations consume 1 entry (hit count)
-// Variable-size consume 2 (hit count and total size).
-unsigned int alloc_profile_n_counters = 3;
 unsigned int max_alloc_point_counters;
 
 void allocation_profiler_start()
@@ -115,13 +109,6 @@ void allocation_profiler_stop()
     }
     ret = mutex_release(&alloc_profiler_lock);
     gc_assert(ret);
-#if 0
-    if (warning_issued) {
-        fprintf(stderr, "allocation profile needed %d counters\n",
-                alloc_profile_n_counters);
-        warning_issued = 0;
-    }
-#endif
 }
 
 #ifdef LISP_FEATURE_METASPACE

@@ -65,7 +65,7 @@
 (defpackage #:sb-aprof
   (:use #:cl #:sb-ext #:sb-alien #:sb-sys #:sb-int #:sb-kernel)
   (:export #:aprof-run #:aprof-show #:aprof-reset
-           #:aprof-start #:patch-all-code)
+           #:aprof-start #:aprof-stop #:patch-all-code)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-vm #:thread-reg)
   (:import-from #:sb-x86-64-asm
@@ -85,43 +85,122 @@
 
 (define-alien-variable alloc-profile-buffer system-area-pointer)
 (defun aprof-reset ()
-  (alien-funcall (extern-alien "memset" (function void system-area-pointer int size-t))
-                 alloc-profile-buffer
-                 0
-                 (* (/ (length *allocation-profile-metadata*) 2)
-                    sb-vm:n-word-bytes)))
+  (let ((buffer alloc-profile-buffer))
+    (unless (= (sap-int buffer) 0)
+      (alien-funcall (extern-alien "memset" (function void system-area-pointer int size-t))
+                     alloc-profile-buffer
+                     0
+                     (* (/ (length *allocation-profile-metadata*) 2)
+                        sb-vm:n-word-bytes)))))
 
-(defun patch-code (code locs &aux (n 0) (n-patched 0))
-  (do-packed-varints (loc locs)
-    (incf n)
-    (let ((byte (sap-ref-8 (code-instructions code) loc)))
-      (when (eql byte #xEB)
-        (setf (sap-ref-8 (code-instructions code) loc) #x74) ; JEQ
-        (incf n-patched))))
-  (values n n-patched))
+(defun patch-code (code locs enable &aux (n 0) (n-patched 0))
+  (let ((enable-counted (sb-fasl:get-asm-routine 'sb-vm::enable-alloc-counter))
+        (enable-sized (sb-fasl:get-asm-routine 'sb-vm::enable-sized-alloc-counter))
+        (enable-counted-indirect
+         (sb-fasl:get-asm-routine 'sb-vm::enable-alloc-counter t))
+        (enable-sized-indirect
+         (sb-fasl:get-asm-routine 'sb-vm::enable-sized-alloc-counter t))
+        (stack (make-array 1 :element-type 'sb-vm:word))
+        (insts (code-instructions code)))
+    (declare (truly-dynamic-extent stack))
+    (with-alien ((allocation-tracker-counted (function void system-area-pointer) :extern)
+                 (allocation-tracker-sized (function void system-area-pointer) :extern))
+      (do-packed-varints (loc locs)
+        (incf n)
+        (let ((byte (sap-ref-8 insts loc)))
+          (when (eql byte #xEB)
+            (setf (sap-ref-8 insts loc) #x74) ; JEQ
+            (when enable
+              (let* ((next-pc (+ loc 2))
+                     (aligned-next-pc (align-up next-pc 8))
+                     (opcode (sap-ref-8 insts aligned-next-pc)))
+                (case opcode
+                  (#xE8 ; CALL rel32
+                   (let* ((rel32 (signed-sap-ref-32 insts (1+ aligned-next-pc)))
+                          (return-pc (sap+ insts (+ aligned-next-pc 5)))
+                          (target (sap+ return-pc rel32)))
+                     ;; The C rountine looks at the return address to see where
+                     ;; to patch in the new instructions, and it gets the return address
+                     ;; from the stack, the pointer to which is supplied as the arg.
+                     ;; So STACK is the simulated stack containing the return PC.
+                     (setf (aref stack 0) (sap-int return-pc))
+                     (cond ((= (sap-int target) enable-counted)
+                            (alien-funcall allocation-tracker-counted (vector-sap stack)))
+                           ((= (sap-int target) enable-sized)
+                            (alien-funcall allocation-tracker-sized (vector-sap stack)))
+                           ;; Dynamic-space code can't encode call32 to an asm routine. Instead
+                           ;; might see CALL to a JMP within the code blob so that we don't
+                           ;; produce one absolute fixup per allocation site.
+                           ((and (sap>= target insts)
+                                 (sap< target (sap+ insts (%code-text-size code)))
+                                 (= (sap-ref-8 target 0) #xFF)
+                                 (= (sap-ref-8 target 1) #x24)
+                                 (= (sap-ref-8 target 2) #x25))
+                            (let ((ea (sap-ref-32 target 3)))
+                              (cond ((= ea enable-counted-indirect)
+                                     (alien-funcall allocation-tracker-counted (vector-sap stack)))
+                                    ((= ea enable-sized-indirect)
+                                     (alien-funcall allocation-tracker-sized (vector-sap stack)))
+                                    (t
+                                     (error "Unrecognized CALL [EA] at patch site in ~A @ ~X"
+                                            code loc)))))
+                           (t
+                            (error "Unrecognized CALL at patch site in ~A @ ~X"
+                                   code loc)))))
+                  (t
+                   (error "Unrecognized opcode at patch site in ~A @ ~X"
+                          code loc)))))
+            (incf n-patched)))))
+    (values n n-patched)))
 
-(defun patch-all-code ()
+;; Fixed-size allocations consume 1 entry (hit count).
+;; Variable-size consume 2 (hit count and total bytes).
+;; Counters 0 and 1 are reserved for variable-size allocations
+;; (hit count and total size) that overflow the maximum counter index.
+;; Counter 2 is reserved for fixed-size allocations.
+(define-load-time-global *n-profile-sites* 3)
+
+(defun aprof-start ()
+  (with-alien ((alloc-profile-data unsigned :extern))
+    (when (zerop alloc-profile-data) ; raw data buffer not made yet
+      (let ((v *allocation-profile-metadata*))
+        ;; Lisp metadata may or may not exist depending on whether you saved a core image
+        ;; with the metadata baked in.
+        (unless v
+          (setq v (make-array 300000)
+                *allocation-profile-metadata* v))
+        (with-pinned-objects (v)
+          (setf alloc-profile-data (get-lisp-obj-address v))))))
+  (alien-funcall (extern-alien "allocation_profiler_start" (function void))))
+
+(defun aprof-stop ()
+  (alien-funcall (extern-alien "allocation_profiler_stop" (function void))))
+
+;;; Passing ENABLE presumes that you want to later use the profiler
+;;; without relying on self-modifying code. Everything can be patched now
+;;; and then the image dumped. This plays more nicely with some sandboxed
+;;; environments that forbid executable text segments, which is
+;;; predominantly a concern for ELFinated cores.
+(defun patch-all-code (&optional enable)
+  (when enable
+    ;; Somewhat un-obviously, we have to "start" the profiler so that the C
+    ;; support figures out how many alloc site indices it can utilize
+    ;; based on the size of the profile data vector passed from lisp.
+    (aprof-start)
+    ;; Then stop, because we don't actually want to profile anything now.
+    (aprof-stop))
   (let ((total-n-patch-points 0)
         (total-n-patched 0)
         (ht sb-c::*allocation-patch-points*))
     (dohash ((code locs) ht)
       (remhash code ht)
-      (multiple-value-bind (n-patch-points n-patched) (patch-code code locs)
+      (multiple-value-bind (n-patch-points n-patched)
+          ;; just being pedantic about pinning here for documentation
+          (with-pinned-objects (code)
+            (patch-code code locs enable))
         (incf total-n-patch-points n-patch-points)
         (incf total-n-patched n-patched)))
     (values total-n-patch-points total-n-patched)))
-
-(defun aprof-start ()
-  (let ((v *allocation-profile-metadata*))
-    (unless v
-      (setq v (make-array 100000) *allocation-profile-metadata* v)
-      (with-pinned-objects (v)
-        (setf (extern-alien "alloc_profile_data" unsigned)
-              (sb-kernel:get-lisp-obj-address v)))))
-  (alien-funcall (extern-alien "allocation_profiler_start" (function void))))
-
-(defun aprof-stop ()
-  (alien-funcall (extern-alien "allocation_profiler_stop" (function void))))
 
 (defglobal *tag-to-type*
   (map 'vector
@@ -527,7 +606,7 @@
 (defun aprof-collect (stream)
   (sb-disassem:get-inst-space) ; for effect
   (let* ((metadata *allocation-profile-metadata*)
-         (n-hit (extern-alien "alloc_profile_n_counters" int))
+         (n-hit *n-profile-sites*)
          (metadata-len (/ (length metadata) 2))
          (n-counters (min metadata-len n-hit))
          (sap (extern-alien "alloc_profile_buffer" system-area-pointer))
@@ -551,7 +630,7 @@
          (incf index (if total-bytes 2 1)) ; <count,bytes> or just a count
          (unless (eql count 0)
            (with-pinned-objects (code)
-            (let ((pc (+ (sb-kernel:get-lisp-obj-address code)
+            (let ((pc (+ (get-lisp-obj-address code)
                           (- sb-vm:other-pointer-lowtag)
                           pc-offset))
                   (name (pc-offs-to-fun-name

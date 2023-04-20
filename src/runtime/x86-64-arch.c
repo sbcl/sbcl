@@ -659,7 +659,6 @@ lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
 #define LOCK_PREFIX 0xF0
 #undef SHOW_PC_RECORDING
 
-extern unsigned int alloc_profile_n_counters;
 extern unsigned int max_alloc_point_counters;
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_WIN32
@@ -669,12 +668,12 @@ extern pthread_mutex_t alloc_profiler_lock;
 #endif
 #endif
 
-static unsigned int claim_index(int qty)
+static unsigned int claim_index(int qty) // qty is 1 or 2
 {
     static boolean warning_issued;
-    unsigned int index = alloc_profile_n_counters;
-    alloc_profile_n_counters += qty;
-    if (alloc_profile_n_counters <= max_alloc_point_counters)
+    unsigned int index = fixnum_value(SYMBOL(N_PROFILE_SITES)->value);
+    SYMBOL(N_PROFILE_SITES)->value += make_fixnum(qty);
+    if (fixnum_value(SYMBOL(N_PROFILE_SITES)->value) <= max_alloc_point_counters)
        return index;
     if (!warning_issued) {
        fprintf(stderr, "allocation profile buffer overflowed\n");
