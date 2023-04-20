@@ -1236,7 +1236,7 @@
       (let ((insts nil))
         (do-symbols (symbol package)
           (setq insts (nconc (copy-list (get symbol 'instructions)) insts)))
-        (setf ispace (build-inst-space insts)))
+        (setf ispace (sb-vm:without-arena "disassem" (build-inst-space insts))))
       (setf *disassem-inst-space* ispace))
     ispace))
 
