@@ -188,7 +188,8 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
     struct extra_thread_data *extra_data = thread_extra_data(th);
     if (arena) { // switching from the dynamic space to an arena
         if (th->arena)
-            lose("arena error: can't switch from %p to %p", (void*)th->arena, arena);
+            lose("arena error: can't switch from %p to %p", (void*)th->arena,
+                 (void*)arena_taggedptr);
         // Page table lock guards the arena chain, as well as the page table
         acquire_gc_page_table_lock();
         // See if this arena has ever been switched to,
