@@ -69,6 +69,10 @@ if [ "$CORE_DEFINED" = "no" ]; then
     CORE="$BASE"/output/sbcl.core
 fi
 
+if [ -d "$BASE"/android-libs ]; then
+    export LD_LIBRARY_PATH="$BASE"/android-libs
+fi
+
 if build_directory_p "$BASE"; then
     export SBCL_HOME
     if [ "$CORE_DEFINED" = "no" ]; then

@@ -1,0 +1,56 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+-include ../../output/ndk-config
+
+CC=${TOOLCHAIN}/bin/${TARGET_TAG}${ANDROID_API}-clang
+LD=${TOOLCHAIN}/${TARGET_TAG}/bin/ld
+
+# NDK implements pthread in libc so there is no need to add it to OS_LIBS
+
+ASSEM_SRC = x86-64-assem.S
+ARCH_SRC = x86-64-arch.c
+
+OS_SRC = linux-os.c linux-mman.c x86-64-linux-os.c android-os.c x86-64-android-os.c
+OS_LIBS = -ldl
+
+CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
+LINKFLAGS += -Wl,--export-dynamic
+SOFLAGS += -Wl,-soname,libsbcl.so
+
+ifdef LISP_FEATURE_LARGEFILE
+  CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+endif
+
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lzstd
+  CFLAGS += -I../../android-libs
+  DEPEND_FLAGS += -I../../android-libs
+  LINKFLAGS += -L../../android-libs
+  SOFLAGS += -L../../android-libs
+endif
+
+ifdef HAVE_LIBUNWIND
+  OS_LIBS += -lunwind
+endif
+
+DISABLE_PIE=no
+
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
+else
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+endif
+
+ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
+  LIBSBCL = sbcl.o
+  USE_LIBSBCL = sbcl.o
+endif

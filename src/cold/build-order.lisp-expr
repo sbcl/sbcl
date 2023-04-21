@@ -490,7 +490,7 @@
  #+android ("src/code/android-os" :not-host)
  #+sunos ("src/code/sunos-os" :not-host)
  #+bsd   ("src/code/bsd-os"   :not-host)
- #+linux ("src/code/linux-os" :not-host)
+ #+(and linux (not android)) ("src/code/linux-os" :not-host)
  #+haiku ("src/code/haiku-os" :not-host)
  #+win32 ("src/code/win32-os" :not-host)
 

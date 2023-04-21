@@ -48,6 +48,10 @@ SBCL_CONTRIB_BLOCKLIST=${SBCL_CONTRIB_BLOCKLIST:-""}
 perform_host_lisp_check=no
 fancy=false
 some_options=false
+android=false
+if [ -z $ANDROID_API ]; then
+    ANDROID_API=21
+fi
 for option
 do
   optarg_ok=true
@@ -92,6 +96,10 @@ do
 	;;
       --with)
         WITH_FEATURES="$WITH_FEATURES :$optarg"
+        if [ "$optarg" = "android" ]
+        then
+            android=true
+        fi
         ;;
       --without)
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
@@ -100,6 +108,12 @@ do
                SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST $optarg"
         ;; esac
 	;;
+      --android-api=)
+        $optarg_ok && ANDROID_API=$optarg
+        ;;
+      --ndk=)
+        $optarg_ok && NDK=$optarg
+        ;;
       --fancy)
         WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
         # Lower down we add :sb-thread for platforms where it can be built.
@@ -277,6 +291,7 @@ fi
 if [ -n "$SBCL_TARGET_LOCATION" ]; then
     echo "SBCL_TARGET_LOCATION=\"$SBCL_TARGET_LOCATION\"; export SBCL_TARGET_LOCATION" >> output/build-config
 fi
+echo "android=$android; export android" >> output/build-config
 
 # And now, sorting out the per-target dependencies...
 
@@ -337,6 +352,9 @@ link_or_copy() {
       else
          cp -r "$1" "$2"
       fi
+   elif $android ; then
+       # adb push doesn't like symlinks on unrooted devices.
+       cp -r "$1" "$2"
    else
        ln -s "$1" "$2"
    fi
@@ -366,7 +384,14 @@ echo //ensuring the existence of output/ directory
 if [ ! -d output ] ; then mkdir output; fi
 
 echo //guessing default target CPU architecture from host architecture
-case `uname -m` in
+if $android
+then
+    uname_arch=`adb shell uname -m`
+else
+    uname_arch=`uname -m`
+fi
+
+case $uname_arch in
     *86) guessed_sbcl_arch=x86 ;;
     i86pc) guessed_sbcl_arch=x86 ;;
     *x86_64) guessed_sbcl_arch=x86-64 ;;
@@ -430,6 +455,32 @@ if [ "$sbcl_arch" = "" ] ; then
     echo "can't guess target SBCL architecture, please specify --arch=<name>"
     exit 1
 fi
+
+if $android
+then
+    case $sbcl_arch in
+        arm64) TARGET_TAG=aarch64-linux-android ;;
+        arm) TARGET_TAG=armv7a-linux-androideabi
+             echo "Unsupported configuration"
+             exit 1
+             ;;
+        x86) TARGET_TAG=i686-linux-android
+             echo "Unsupported configuration"
+             exit 1
+             ;;
+        x86-64) TARGET_TAG=x86_64-linux-android ;;
+    esac
+    HOST_TAG=$sbcl_os-x86_64
+    TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/$HOST_TAG
+    export CC=$TOOLCHAIN/bin/$TARGET_TAG$ANDROID_API-clang
+    echo "CC=$CC; export CC" >> output/build-config
+    echo "NDK=$NDK" > output/ndk-config
+    echo "HOST_TAG=$HOST_TAG" >> output/ndk-config
+    echo "TARGET_TAG=$TARGET_TAG" >> output/ndk-config
+    echo "TOOLCHAIN=$TOOLCHAIN" >> output/ndk-config
+    echo "ANDROID_API=$ANDROID_API" >> output/ndk-config
+fi
+
 if $fancy
 then
     # If --fancy, enable threads on platforms where they can be built.
@@ -526,10 +577,16 @@ case "$sbcl_os" in
 		printf ' :largefile' >> $ltf
 		;;
         esac
-
-        link_or_copy Config.$sbcl_arch-linux Config
-        link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
-        link_or_copy linux-os.h target-os.h
+        if $android
+        then
+            link_or_copy Config.$sbcl_arch-android Config
+            link_or_copy $sbcl_arch-android-os.h target-arch-os.h
+            link_or_copy android-os.h target-os.h
+        else
+            link_or_copy Config.$sbcl_arch-linux Config
+            link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
+            link_or_copy linux-os.h target-os.h
+        fi
         ;;
     haiku)
         printf ' :unix :haiku :elf :int4-breakpoints' >> $ltf
@@ -582,6 +639,9 @@ case "$sbcl_os" in
         if [ $sbcl_arch = "arm64" ]; then
             printf ' :darwin-jit :gcc-tls' >> $ltf
         fi
+        if $android; then
+            echo "Android build is unsupported on darwin"
+        fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
         link_or_copy Config.$sbcl_arch-darwin Config
@@ -633,6 +693,11 @@ cd "$original_dir"
 # (define-feature :c-stack-grows-downwards-not-upwards (features)
 #   (member :x86 features))
 
+if $android
+then
+    . tools-for-build/android_run.sh
+fi
+
 case "$sbcl_arch" in
   x86)
     if [ "$sbcl_os" = "darwin" ]; then
@@ -652,8 +717,15 @@ case "$sbcl_arch" in
   x86-64)
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
 
-    if ! $GNUMAKE -C tools-for-build avx2 2> /dev/null || tools-for-build/avx2 ; then
-       SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
+    if $android; then
+        $GNUMAKE -C tools-for-build avx2 2> /dev/null
+        if ! android_run tools-for-build/avx2 ; then
+            SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
+        fi
+    else
+        if ! $GNUMAKE -C tools-for-build avx2 2> /dev/null || tools-for-build/avx2 ; then
+            SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
+        fi
     fi
 
     case "$sbcl_os" in
@@ -697,10 +769,16 @@ esac
 # cross-compilers!
 #
 # FIXME: integrate to grovel-features, mayhaps
-$GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
-tools-for-build/determine-endianness >> $ltf
+if $android
+then
+        $CC tools-for-build/determine-endianness.c -o tools-for-build/determine-endianness
+        android_run tools-for-build/determine-endianness >> $ltf
+else
+        $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
+        tools-for-build/determine-endianness >> $ltf
+fi
 
-export sbcl_os sbcl_arch
+export sbcl_os sbcl_arch android
 sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf

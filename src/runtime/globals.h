@@ -161,8 +161,10 @@ EXTERN(foreign_function_call_active)
 #if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 EXTERN(current_control_stack_pointer)
 #endif
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
 EXTERN(current_control_frame_pointer)
-# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#endif
+# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_SB_THREAD)
 EXTERN(current_binding_stack_pointer)
 # endif
 

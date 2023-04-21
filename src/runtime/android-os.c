@@ -11,6 +11,7 @@
  */
 
 #include <sys/utsname.h>
+#include <string.h>
 
 extern char * software_version () {
   struct utsname u;

@@ -1,0 +1,59 @@
+Changes made to the source code:
+    * src/runtime/globals.h:
+        Linking the shared library was failing because symbols
+        current_control_frame_pointer and current_binding_stack_pointer
+        could not be found.
+        It seems that #ifdef lines were messed up in
+        commit 6793d7dd32d1fa48d2ee395e240e1b7ff857912e.
+        So I fixed them (as I could).
+    * Since it uses both :linux and :android flags,
+        #+(and linux (not android)) was used instead of #+linux
+        in two places:
+        - src/cold/build-order.lisp-expr: don't load linux-os.lisp.
+        - src/code/run-program.lisp: don't define software-version function.
+    * In src/runtime/android-os.h: include <strings.h> where bzero
+        function is defined.
+    * In src/runtime/android-os.c: include <string.h> where strdup
+        function is defined.
+    * src/runtime/run-program.c: there is no getdtablesize function on
+        android, so use the alternative (with #if defined).
+    * New (empty) *-android-os.c and *-android-os.h files.
+
+Changes made to the build system:
+    * make-config.sh now recognises android specific flags.
+        --with-android enables the build
+        --android-api defines the android API level used. Defaults to 21,
+            that corresponds to the Android 5.0 (Lollipop).
+            Also controlled by an environment variable ANDROID_API.
+        --ndk sets the path to Android NDK.
+            Also controlled by an environment variable NDK.
+    * In the GNUMakefile adds $SOFLAGS variable.
+        It is used to pass -Wl,-soname,libsbcl.so when building for android.
+        (NDK crosscompiler doesn't set soname by default.)
+    * clean.sh now ignores the android-libs folder.
+        (clean.sh deletes all *.so files, but we want to be able to link
+        against precompiled libzstd for example.)
+    * ADB is used to determine the CPU architecture in make-config.sh when
+        building for android.
+    * In make-config.sh: output/ndk-config is created to set up NDK
+        specific variables (mostly the path to the C crosscompiler).
+    * In make-config.sh: when building for android, copy Config files
+        instead of creating symbolic links - adb push doesn't like them.
+    * When building for android, ADB is used to run C programs.
+        tools-for-build/android_run.sh defines shell function to do that.
+        It is used in the following scripts:
+          - tools-for-build/grovel-features.sh
+          - make-target-1.sh
+          - make-config.sh
+    * In make-contrib.lisp: there is no C compiler on the android device.
+        So when it needs to compile a C program, it just prints its name.
+        In the make-android.sh there is a wrapper that compiles the C
+        program on host and pushes it on the device when it is needed.
+    * make-android.sh is similar to make.sh, but takes care of copying
+        files to the android device through adb and dealing with the problem
+        of compiling C programs when building contribs.
+    * make-target-contrib-android.sh is similar to make-target-contrib.sh,
+        but it doesn't use GNU make, since it is not available on the
+        android device.
+    * run-sbcl.sh now sets LD_LIBRARY_PATH to android-libs when it exists.
+    * New Config.*-android files.

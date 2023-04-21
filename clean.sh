@@ -68,7 +68,8 @@ find . \( \
         -name CVS -o \
         -name .hg -o \
         -name .git -o \
-        -name .svn \) -type d -prune -o \
+        -name .svn -o \
+        -name android-libs \) -type d -prune -o \
        \( \
         \( -type l -path ./src/runtime/\* \) -o \
         -name '*~' -o \

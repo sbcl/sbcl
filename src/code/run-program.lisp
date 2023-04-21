@@ -1322,7 +1322,7 @@ Users Manual for details about the PROCESS structure.
           (t
            (fail "invalid option: ~S" object))))))
 
-#+(or linux sunos haiku)
+#+(or (and linux (not android)) sunos haiku)
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL
   if not available."
