@@ -251,8 +251,12 @@
   (inst jmp :e undefined)
 
   (inst pop (ea n-word-bytes rbp-tn))
-  (emit-error-break nil error-trap (error-number-or-lose 'sb-kernel::object-not-callable-error)
-                    (list fun)))
+  (cerror-call nil 'sb-kernel::object-not-callable-error fun)
+  (inst push (ea n-word-bytes rbp-tn))
+  (%lea-for-lowtag-test fdefn fun fun-pointer-lowtag)
+  (inst test :byte rbx-tn lowtag-mask)
+  (inst jmp :nz (make-fixup 'call-symbol :assembly-routine))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
 
 (define-assembly-routine (throw
