@@ -484,37 +484,33 @@
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
   (:generator 5
-    (inst subs temp amount zr-tn)
-    (inst b :ge LEFT)
-    (inst neg temp temp)
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer -63 *)))
-           (ecase variant
-             (:signed (inst asr result number temp))
-             (:unsigned (inst lsr result number temp))))
-          (t
-           (inst cmp temp n-word-bits)
-           (ecase variant
-             (:signed
-              ;; Only the first 6 bits count for shifts.
-              ;; This sets all bits to 1 if AMOUNT is larger than 63,
-              ;; cutting the amount to 63.
-              (inst csinv temp temp zr-tn :lo)
-              (inst asr result number temp))
-             (:unsigned
-              (inst csel result number zr-tn :lo)
-              (inst lsr result result temp)))))
-
-    (inst b END)
-    LEFT
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer * 63)))
-           (inst lsl result number temp))
-          (t
-           (inst cmp temp n-word-bits)
-           (inst csel result number zr-tn :lo)
-           (inst lsl result result temp)))
-    END))
+    (cond
+      ((csubtypep (tn-ref-type amount-ref)
+                  (specifier-type `(integer -63 63)))
+       (inst neg temp amount)
+       (inst lsl result number amount)
+       (inst tbz amount 63 done)
+       (ecase variant
+         (:signed (inst asr result number temp))
+         (:unsigned (inst lsr result number temp))))
+      (t
+       (inst cmp amount 0)
+       (inst csneg temp amount amount :ge)
+       (unless (csubtypep (tn-ref-type amount-ref)
+                          (specifier-type `(integer -63 63)))
+         (inst cmp temp n-word-bits)
+         ;; Only the first 6 bits count for shifts.
+         ;; This sets all bits to 1 if AMOUNT is larger than 63,
+         ;; cutting the amount to 63.
+         (inst csinv temp temp zr-tn :lo))
+       (inst lsl result number temp)
+       (inst tbz amount 63 done)
+       (ecase variant
+         (:signed (inst asr result number temp))
+         (:unsigned
+          (inst csel result number zr-tn :lo)
+          (inst lsr result result temp)))))
+    done))
 
 (define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
   (:note "inline ASH")
