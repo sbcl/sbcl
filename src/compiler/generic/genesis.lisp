@@ -1877,7 +1877,8 @@ core and return a descriptor to it."
   ;; but tagged with INSTANCE-POINTER-LOWTAG.
   (setq *lflist-tail-atom*
         (if core-file-name
-            (allocate-struct-of-type 'sb-lockless::list-node *static*)
+            (write-slots (allocate-struct-of-type 'sb-lockless::list-node *static*)
+                         :%node-next nil)
             (let ((words (+ 1 #-compact-instance-header 1)))
               (allocate-struct words (make-fixnum-descriptor 0) *static*))))
 

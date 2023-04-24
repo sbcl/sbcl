@@ -58,7 +58,6 @@
 
 ;;; Lockfree lists are terminated by +TAIL+. The %NEXT bits in +TAIL+
 ;;; must not imply that the node is marked for deletion.
-(setf (%node-next +tail+) nil)
 (assert (not (node-markedp +tail+)))
 
 (defmacro endp (node) `(eq ,node ,+tail+))

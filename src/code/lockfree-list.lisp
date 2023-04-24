@@ -13,7 +13,12 @@
              (:conc-name nil)
              (:constructor %make-sentinel-node ())
              (:copier nil))
-    (%node-next nil))
+  ;; Logically the type of NEXT is _always_ LIST-NODE, but the bits might appear
+  ;; as though they represent a fixnum. So FIXNUM has to be in the :TYPE declaration
+  ;; or else the compiler will make incorrect inferences particularly with
+  ;; regard to MAKE-MAKED-REF which uses %MAKE-LISP-OBJ to remove lowtag bits.
+    (%node-next +tail+ :type (or fixnum list-node)))
+
 ;;; We look for +TAIL+ in IMMEDIATE-CONSTANT-SC.
 #+sb-xc-host
 (progn (defstruct list-node)
