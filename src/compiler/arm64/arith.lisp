@@ -584,7 +584,7 @@
                          (amount :scs (signed-reg unsigned-reg)))
                   ;; For modular variants
                   (:variant-vars cut)
-                  (:arg-types ,type positive-fixnum)
+                  (:arg-types ,type unsigned-num)
                   (:arg-refs nil amount-ref)
                   (:results (result :scs (,result-type)))
                   (:result-types ,type)
