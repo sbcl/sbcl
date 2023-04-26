@@ -1225,7 +1225,7 @@
   (:translate ash)
   (:args (number :scs (any-reg control-stack) :target result)
          (amount :scs (unsigned-reg) :target ecx))
-  (:arg-types tagged-num positive-fixnum)
+  (:arg-types tagged-num unsigned-num)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:results (result :scs (any-reg control-stack) :from (:argument 0)))
   (:result-types tagged-num)

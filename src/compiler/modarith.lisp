@@ -468,9 +468,7 @@
                 (when (<= width ,width)
                   (cond ((or (and (constant-lvar-p count)
                                   (plusp (lvar-value count)))
-                             (csubtypep count-type
-                                        (specifier-type '(and word
-                                                          #-arm64 fixnum))))
+                             (csubtypep count-type (specifier-type 'word)))
                          (cut-to-width integer ,kind width ,signedp)
                          ',left-name)
                         #+(or arm64 x86-64)
