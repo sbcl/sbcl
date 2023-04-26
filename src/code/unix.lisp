@@ -551,7 +551,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
            (type word cmd))
-  (void-syscall ("ioctl" int unsigned-long (* char)) fd cmd arg))
+  (void-syscall ("ioctl" int unsigned-long &optional (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
 

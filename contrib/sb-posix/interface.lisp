@@ -232,9 +232,10 @@
   (define-call-internally ioctl-without-arg "ioctl" int minusp
                           (fd file-descriptor) (cmd unsigned-long))
   (define-call-internally ioctl-with-int-arg "ioctl" int minusp
-                          (fd file-descriptor) (cmd unsigned-long) (arg int))
+                          (fd file-descriptor) (cmd unsigned-long) &optional (arg int))
   (define-call-internally ioctl-with-pointer-arg "ioctl" int minusp
                           (fd file-descriptor) (cmd unsigned-long)
+                          &optional
                           (arg alien-pointer-to-anything-or-nil))
   (define-entry-point "ioctl" (fd cmd &optional (arg nil argp))
     (if argp
