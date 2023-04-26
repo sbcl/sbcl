@@ -56,7 +56,7 @@ static boolean string_to_long(char *token, uword_t *value)
         return 0;
 
     if (token[0] == '0')
-        if (token[1] == 'x') {
+        if (token[1] == 'x' || token[1] == 'X') {
             base = 16;
             token += 2;
         }
