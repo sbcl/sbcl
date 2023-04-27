@@ -66,7 +66,6 @@
                         (with-subforms ,macro-lambda-list ,form-var
                                        ,@body)))))))
         `((lambda (name immediate deferred)
-            (aver (not (info :function :definition name)))
             (setf (info :function :definition name) (cons deferred immediate)))
           ',name
           ,(when immediate-code
