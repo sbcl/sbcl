@@ -484,32 +484,45 @@
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
   (:generator 5
-    (cond
-      ((csubtypep (tn-ref-type amount-ref)
-                  (specifier-type `(integer -63 63)))
-       (inst neg temp amount)
-       (inst lsl result number amount)
-       (inst tbz amount 63 done)
-       (ecase variant
-         (:signed (inst asr result number temp))
-         (:unsigned (inst lsr result number temp))))
-      (t
-       (inst cmp amount 0)
-       (inst csneg temp amount amount :ge)
-       (unless (csubtypep (tn-ref-type amount-ref)
-                          (specifier-type `(integer -63 63)))
+    (let ((negative (csubtypep (tn-ref-type amount-ref)
+                               (specifier-type `(integer * 0)))))
+      (cond
+        ((csubtypep (tn-ref-type amount-ref)
+                    (specifier-type `(integer -63 63)))
+         (inst neg temp amount)
+         (unless negative
+           (inst lsl result number amount)
+           (inst tbz amount 63 done))
+         (ecase variant
+           (:signed (inst asr result number temp))
+           (:unsigned (inst lsr result number temp))))
+        ((not negative)
+         (inst cmp amount 0)
+         (inst csneg temp amount amount :ge)
          (inst cmp temp n-word-bits)
          ;; Only the first 6 bits count for shifts.
          ;; This sets all bits to 1 if AMOUNT is larger than 63,
          ;; cutting the amount to 63.
-         (inst csinv temp temp zr-tn :lo))
-       (inst lsl result number temp)
-       (inst tbz amount 63 done)
-       (ecase variant
-         (:signed (inst asr result number temp))
-         (:unsigned
-          (inst csel result number zr-tn :lo)
-          (inst lsr result result temp)))))
+         (inst csinv temp temp zr-tn :lo)
+         (inst lsl result number temp)
+         (inst tbz amount 63 done)
+         (ecase variant
+           (:signed (inst asr result number temp))
+           (:unsigned
+            (unless (csubtypep (tn-ref-type amount-ref)
+                               (specifier-type `(integer -63 *)))
+              (inst csel result number zr-tn :lo))
+            (inst lsr result result temp))))
+        (t
+         (inst neg temp amount)
+         (inst cmp temp n-word-bits)
+         (ecase variant
+           (:signed
+            (inst csinv temp temp zr-tn :lo)
+            (inst asr result number temp))
+           (:unsigned
+            (inst csel result number zr-tn :lo)
+            (inst lsr result result temp))))))
     done))
 
 (define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
@@ -620,41 +633,6 @@
   (def fast-ash-left/fixnum=>fixnum fast-ash-left-c/fixnum=>fixnum any-reg tagged-num any-reg 2)
   (def fast-ash-left/signed=>signed fast-ash-left-c/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned fast-ash-left-c/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
-
-(define-vop (fast-%ash/right/unsigned)
-  (:translate %ash/right)
-  (:policy :fast-safe)
-  (:args (number :scs (unsigned-reg))
-         (amount :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num)
-  (:results (result :scs (unsigned-reg) :from (:argument 0)))
-  (:result-types unsigned-num)
-  (:generator 4
-     (inst lsr result number amount)))
-
-(define-vop (fast-%ash/right/signed)
-  (:translate %ash/right)
-  (:policy :fast-safe)
-  (:args (number :scs (signed-reg))
-         (amount :scs (unsigned-reg)))
-  (:arg-types signed-num unsigned-num)
-  (:results (result :scs (signed-reg) :from (:argument 0)))
-  (:result-types signed-num)
-  (:generator 4
-    (inst asr result number amount)))
-
-(define-vop (fast-%ash/right/fixnum)
-  (:translate %ash/right)
-  (:policy :fast-safe)
-  (:args (number :scs (any-reg))
-         (amount :scs (unsigned-reg) :target temp))
-  (:arg-types tagged-num unsigned-num)
-  (:results (result :scs (any-reg) :from (:argument 0)))
-  (:result-types tagged-num)
-  (:temporary (:sc unsigned-reg :target result) temp)
-  (:generator 3
-    (inst asr temp number amount)
-    (inst and result temp (bic-mask fixnum-tag-mask))))
 
 (define-vop (fast-ash-left-modfx/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum)
