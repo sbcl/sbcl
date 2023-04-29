@@ -1,5 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.3.3:
+  * enhancement: attempts to call non-callable objects can now provide
+    USE-VALUE restarts on x86-64 and arm64.
+  * bug fix: ioctl() (both in SBCL's internals and through SB-POSIX) was
+    broken on ARM64/Darwin.  (reported by fiddlerwoaroof)
+  * platform support:
+    ** support for cross-compiling the system to Android has been added;
+       (thanks to Gleefre)
+    ** include likely absolute paths for gmp and mpfr on ARM64/Darwin; (thanks
+       to Elias Lawson-Fox)
+    ** include another absolute path for mpfr on Windows; (thanks to Ari
+       Projansky)
+    ** the PROMISE-COMPILE feature from the SB-CONCURRENCY contrib is now
+       available on all threaded platforms;
+  * optimization: VALUES-LIST performs less redundant work on x86-64 and
+    ARM64.
+
 changes in sbcl-2.3.3 relative to sbcl-2.3.2:
   * enhancement: LET-bound anonymous closures declared dynamic extent can now
     be stack allocated, just like closures bound with FLET or
@@ -22,7 +39,7 @@ changes in sbcl-2.3.3 relative to sbcl-2.3.2:
     cross-compiler.  (lp#2009493, reported by Kirill)
   * bug fix: restore compilation on ARM64 with OpenBSD.  (lp#2009585, reported
     by okflo)
-  * bug fix: compiling a HANDLER-BIND with an function undefined at
+  * bug fix: compiling a HANDLER-BIND with a function undefined at
     compile-time produces a compile-time STYLE-WARNING.  (lp#2010176)
   * bug fix: support files bigger than 4GB on ARM64/Linux, *BSD. (lp#2011453,
     reported by Yan)
