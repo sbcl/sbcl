@@ -2488,15 +2488,24 @@
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word)
   "convert to inline logical operations"
-  (if (and (constant-lvar-p size)
-           (constant-lvar-p posn)
-           (<= (+ (lvar-value size) (lvar-value posn)) sb-vm:n-fixnum-bits))
-      (let ((size (lvar-value size))
-            (posn (lvar-value posn)))
-        `(logand (ash (mask-signed-field sb-vm:n-fixnum-bits int) ,(- posn))
-                 ,(ash most-positive-word (- size sb-vm:n-word-bits))))
-      `(logand (ash int (- posn))
-               (ash ,most-positive-word (- size ,sb-vm:n-word-bits)))))
+  (let ((width (and (constant-lvar-p size)
+                    (constant-lvar-p posn)
+                    (+ (lvar-value size) (lvar-value posn)))))
+    (cond ((and width
+                (<= width sb-vm:n-fixnum-bits))
+           (let ((size (lvar-value size))
+                 (posn (lvar-value posn)))
+             `(logand (ash (mask-signed-field sb-vm:n-fixnum-bits int) ,(- posn))
+                      ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
+          ((and width
+                (<= width sb-vm:n-word-bits))
+           (let ((size (lvar-value size))
+                 (posn (lvar-value posn)))
+             `(logand (ash (logand int most-positive-word) ,(- posn))
+                      ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
+          (t
+           `(logand (ash int (- posn))
+                    (ash ,most-positive-word (- size ,sb-vm:n-word-bits)))))))
 
 (deftransform %mask-field ((size posn int) (fixnum fixnum integer) word)
   "convert to inline logical operations"
