@@ -28,9 +28,6 @@
   (print-unreadable-object (object stream :type t)
     (princ (slot-value object 'will-be-unbound) stream)))
 
-(defclass class-with-unbound-slot ()
-  (foo))
-
 (with-test (:name (inspect :no-error print-object :lp-454682))
   (let ((class (find-class 'class-with-prototype-print-error)))
     ;; Prototype may not be initialized at this point.
@@ -81,7 +78,27 @@
          (result (test-inspect array)))
     (assert (search "ARRAY of NIL" result))))
 
-(with-test (:name (inspect object unbound-slot))
-  (let* ((object (make-instance 'class-with-unbound-slot))
+(defclass standard-object-with-unbound-slot ()
+  (foo))
+
+(with-test (:name (inspect standard-object unbound-slot))
+  (let* ((object (make-instance 'standard-object-with-unbound-slot))
+         (result (test-inspect object)))
+    (assert (search "#<unbound slot>" result))))
+
+(defstruct (structure-with-unbound-slot
+             (:constructor make-structure-with-unbound-slot (&aux foo)))
+  foo)
+
+(with-test (:name (inspect standard-object unbound-slot))
+  (let* ((object (make-structure-with-unbound-slot))
+         (result (test-inspect object)))
+    (assert (search "#<unbound slot>" result))))
+
+(define-condition condition-with-unbound-slot ()
+  (foo))
+
+(with-test (:name (inspect condition unbound-slot))
+  (let* ((object (make-condition 'condition-with-unbound-slot))
          (result (test-inspect object)))
     (assert (search "#<unbound slot>" result))))

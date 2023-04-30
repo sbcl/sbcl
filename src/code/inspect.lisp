@@ -116,7 +116,8 @@ evaluated expressions.
   (let ((*suppress-print-errors*
          (if (subtypep 'serious-condition *suppress-print-errors*)
              *suppress-print-errors*
-             'serious-condition)))
+             'serious-condition))
+        (unbound (load-time-value (make-unprintable-object "unbound slot") t)))
     (format stream "~%~A" description)
     (loop for element in elements
        for index from 0
@@ -124,13 +125,9 @@ evaluated expressions.
               (if named-p
                   (values (cdr element) (car element))
                   element)
-            (format stream "~W. ~@[~A: ~]" index name)
-            (if (eq value sb-pcl:+slot-unbound+)
-                (print-unreadable-object
-                    (value stream :type nil :identity nil)
-                  (write-string "unbound slot" stream))
-                (write value :stream stream))
-            (terpri stream)))))
+            (when (unbound-marker-p value)
+              (setf value unbound))
+            (format stream "~W. ~@[~A: ~]~W~%" index name value)))))
 
 ;;;; INSPECTED-PARTS
 
@@ -171,9 +168,10 @@ evaluated expressions.
         (info (wrapper-info (sb-kernel:wrapper-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (dd-slots info) (nreverse parts-list))
-        (push (cons (dsd-name dd-slot)
-                    (funcall (dsd-accessor-name dd-slot) object))
-              parts-list)))))
+        (let* ((reader (dsd-reader dd-slot (neq (dd-type info) 'structure)))
+               (index (dsd-index dd-slot))
+               (value (funcall reader object index)))
+          (push (cons (dsd-name dd-slot) value) parts-list))))))
 
 (defmethod inspected-parts ((object structure-object))
   (values (format nil "The object is a STRUCTURE-OBJECT of type ~S.~%"
