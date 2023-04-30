@@ -2642,29 +2642,51 @@
   (defun ash-inverted (integer amount)
     (ash integer (- amount)))
 
-  (deftransform ash ((integer amount) (word t) word
+  (deftransform ash ((integer amount) (word t) *
                      :important nil :node node)
     (when (constant-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
-    (let ((use (lvar-uses amount)))
+    (let ((use (lvar-uses amount))
+          (result-type (single-value-type (node-derived-type node)))
+          (dest (node-dest node))
+          truly-type)
+      (unless (csubtypep result-type (specifier-type 'word))
+        (cond ((or (combination-typed-p dest mask-signed-field (eql #. (1- sb-vm:n-word-bits)))
+                   (combination-typed-p dest logand t word))
+               (setf truly-type t))
+              (t
+               (give-up-ir1-transform))))
       (cond ((combination-typed-p use %negate (:or word
                                                    sb-vm:signed-word))
              (splice-fun-args amount '%negate 1)
-             `(ash-inverted integer amount))
+             (if truly-type
+                 `(truly-the word (ash-inverted integer amount))
+                 `(ash-inverted integer amount)))
             (t
              (give-up-ir1-transform)))))
 
-  (deftransform ash ((integer amount) (sb-vm:signed-word t) sb-vm:signed-word
+  (deftransform ash ((integer amount) (sb-vm:signed-word t) *
                      :important nil :node node)
     (when (constant-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
-    (let ((use (lvar-uses amount)))
+    (let ((use (lvar-uses amount))
+          (result-type (single-value-type (node-derived-type node)))
+          (dest (node-dest node))
+          truly-type)
+      (unless (csubtypep result-type (specifier-type 'sb-vm:signed-word))
+        (cond ((or (combination-typed-p dest mask-signed-field (eql #.(1- sb-vm:n-word-bits)))
+                   (combination-typed-p dest logand t word))
+               (setf truly-type t))
+              (t
+               (give-up-ir1-transform))))
       (cond ((combination-typed-p use %negate (:or word
                                                    sb-vm:signed-word))
              (splice-fun-args amount '%negate 1)
-             `(ash-inverted integer amount))
+             (if truly-type
+                 `(truly-the sb-vm:signed-word (ash-inverted integer amount))
+                 `(ash-inverted integer amount)))
             (t
              (give-up-ir1-transform))))))
 
