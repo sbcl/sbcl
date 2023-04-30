@@ -2622,8 +2622,51 @@
         *universal-type*))
 
   (defoptimizer (%ash/right derive-type) ((n shift))
-    (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right))
-  )
+    (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right)))
+
+(defmacro combination-typed-p (node name &rest types)
+  `(and (combination-p ,node)
+        (eql (lvar-fun-name (combination-fun ,node)) ',name)
+        (let ((args (combination-args ,node)))
+          ,@(loop for type in types
+                  collect
+                  `(let ((arg (pop args)))
+                     (and arg
+                          ,(if (typep type '(cons (eql :or)))
+                               `(or ,@(loop for type in (cdr type)
+                                            collect
+                                            `(csubtypep (lvar-type arg) (specifier-type ',type))))
+                               `(csubtypep (lvar-type arg) (specifier-type ',type)))))))))
+
+(when-vop-existsp (:translate ash-inverted)
+  (defun ash-inverted (integer amount)
+    (ash integer (- amount)))
+
+  (deftransform ash ((integer amount) (word t) word
+                     :important nil :node node)
+    (when (constant-lvar-p amount)
+      (give-up-ir1-transform))
+    (delay-ir1-transform node :ir1-phases)
+    (let ((use (lvar-uses amount)))
+      (cond ((combination-typed-p use %negate (:or word
+                                                   sb-vm:signed-word))
+             (splice-fun-args amount '%negate 1)
+             `(ash-inverted integer amount))
+            (t
+             (give-up-ir1-transform)))))
+
+  (deftransform ash ((integer amount) (sb-vm:signed-word t) sb-vm:signed-word
+                     :important nil :node node)
+    (when (constant-lvar-p amount)
+      (give-up-ir1-transform))
+    (delay-ir1-transform node :ir1-phases)
+    (let ((use (lvar-uses amount)))
+      (cond ((combination-typed-p use %negate (:or word
+                                                   sb-vm:signed-word))
+             (splice-fun-args amount '%negate 1)
+             `(ash-inverted integer amount))
+            (t
+             (give-up-ir1-transform))))))
 
 ;;; Not declaring it as actually being RATIO becuase it is used as one
 ;;; of the legs in the EXPT transform below and that may result in

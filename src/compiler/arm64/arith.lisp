@@ -525,6 +525,62 @@
             (inst lsr result result temp))))))
     done))
 
+(define-vop (ash-inverted/signed/unsigned)
+  (:note "inline ASH")
+  (:args (number)
+         (amount))
+  (:results (result))
+  (:policy :fast-safe)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:arg-refs nil amount-ref)
+  (:variant-vars variant)
+  (:generator 5
+    (let ((positive (csubtypep (tn-ref-type amount-ref)
+                               (specifier-type '(integer 0))))
+          (negative (csubtypep (tn-ref-type amount-ref)
+                               (specifier-type '(integer * 0)))))
+      (cond
+        ((csubtypep (tn-ref-type amount-ref)
+                    (specifier-type `(integer -63 63)))
+         (unless negative
+           (ecase variant
+             (:signed (inst asr result number amount))
+             (:unsigned (inst lsr result number amount))))
+         (unless positive
+           (unless negative
+             (inst tbz amount 63 done))
+           (inst neg temp amount)
+           (inst lsl result number amount)))
+        (negative
+         (inst neg temp amount)
+         (inst cmp temp n-word-bits)
+         (inst csinv temp temp zr-tn :lo)
+         (inst lsl result number temp))
+        (positive
+         (inst cmp amount n-word-bits)
+         (inst csinv temp amount zr-tn :lo)
+         (ecase variant
+           (:signed (inst asr result number temp))
+           (:unsigned
+            (inst csel result number zr-tn :lo)
+            (inst lsr result result temp))))
+        (t
+         (inst cmp amount 0)
+         (inst csneg temp amount amount :ge)
+         (inst cmp temp n-word-bits)
+         ;; Only the first 6 bits count for shifts.
+         ;; This sets all bits to 1 if AMOUNT is larger than 63,
+         ;; cutting the amount to 63.
+         (inst csinv temp temp zr-tn :lo)
+         (ecase variant
+           (:signed (inst asr result number temp))
+           (:unsigned
+            (inst csel result number zr-tn :lo)
+            (inst lsr result result temp)))
+         (inst tbz amount 63 done)
+         (inst lsl result number temp))))
+    done))
+
 (define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
   (:note "inline ASH")
   (:translate ash-modfx)
@@ -586,6 +642,24 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate ash)
+  (:variant :unsigned))
+
+(define-vop (ash-inverted/signed=>signed ash-inverted/signed/unsigned)
+  (:args (number :scs (signed-reg) :to :save)
+         (amount :scs (unsigned-reg signed-reg) :to :save))
+  (:arg-types signed-num (:or unsigned-num signed-num))
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate sb-c::ash-inverted)
+  (:variant :signed))
+
+(define-vop (ash-inverted/unsigned=>unsigned ash-inverted/signed/unsigned)
+  (:args (number :scs (unsigned-reg) :to :save)
+         (amount :scs (unsigned-reg signed-reg) :to :save))
+  (:arg-types unsigned-num (:or unsigned-num signed-num))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate sb-c::ash-inverted)
   (:variant :unsigned))
 
 (macrolet ((def (name name-c sc-type type result-type cost)
