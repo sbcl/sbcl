@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.3:
+changes in sbcl-2.3.4 relative to sbcl-2.3.3:
   * enhancement: attempts to call non-callable objects can now provide
     USE-VALUE restarts on x86-64 and arm64.
   * bug fix: ioctl() (both in SBCL's internals and through SB-POSIX) was
