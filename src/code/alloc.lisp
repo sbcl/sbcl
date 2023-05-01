@@ -117,7 +117,7 @@
 
 (defun make-immobile-symbol (name)
   (let ((symbol (truly-the symbol
-                 (or (%primitive !fast-alloc-immobile-symbol)
+                 (or #+x86-64 (%primitive !fast-alloc-immobile-symbol)
                      (alloc-immobile-fixedobj
                       symbol-size
                       (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))))

@@ -630,6 +630,39 @@
     (inst ldr temp (@ temp))
     (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
     (pseudo-atomic (pa-flag)
+      #+immobile-space
+      (progn
+        #-sb-thread
+        (error "doesn't work yet")
+        (loadw temp thread-tn thread-text-space-addr-slot)
+        (inst sub temp object temp)
+        (inst lsr card temp (1- (integer-length immobile-card-bytes)))
+        (loadw temp thread-tn thread-text-card-count-slot)
+        (inst cmp card temp)
+        (inst b :hs try-dynamic-space)
+        (loadw temp thread-tn thread-text-card-marks-slot)
+
+        ;; compute &((unsigned long*)text_page_touched_bits)[page_index/64]
+        (inst lsr pa-flag card 6)
+        (inst lsl pa-flag pa-flag 3)
+        (inst add temp temp pa-flag)
+
+        ;; compute 1U << (page_index & 63)
+        (inst mov pa-flag 1)
+        (inst and card card 63)
+        (inst lsl pa-flag pa-flag card)
+
+        (cond ((member :arm-v8.1 *backend-subfeatures*)
+               (inst ldset pa-flag pa-flag temp))
+              (t
+               (let ((loop (gen-label)))
+                 (emit-label LOOP)
+                 (inst ldaxr card temp)
+                 (inst orr card card pa-flag)
+                 (inst stlxr pa-flag card temp)
+                 (inst cbnz (32-bit-reg pa-flag) LOOP))))
+        (inst b store))
+      TRY-DYNAMIC-SPACE
       ;; Compute card mark index
       (inst lsr card object gencgc-card-shift)
       (inst and card card temp)
@@ -639,6 +672,8 @@
       (inst ldr temp (@ temp))
       ;; Touch the card mark byte.
       (inst strb null-tn (@ temp card))
+
+      STORE
       ;; set 'written' flag in the code header
       ;; If two threads get here at the same time, they'll write the same byte.
       (let ((byte (- #+big-endian 4 #+little-endian 3 other-pointer-lowtag)))

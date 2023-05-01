@@ -15,7 +15,9 @@ ARCH_SRC = arm64-arch.c
 OS_SRC = linux-os.c linux-mman.c arm64-linux-os.c
 OS_LIBS = -ldl -Wl,-no-as-needed
 
-ifdef LISP_FEATURE_GENCGC
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
+else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
 

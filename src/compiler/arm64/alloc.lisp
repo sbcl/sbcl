@@ -171,3 +171,32 @@
     (pseudo-atomic (lr)
       (allocation nil bytes lowtag result :flag-tn lr)
       (storew header result 0 lowtag))))
+
+#+immobile-space
+(define-vop (!alloc-immobile-fixedobj)
+  (:args (size-class :scs (any-reg) :target c-arg1)
+         (nwords :scs (any-reg) :target c-arg2)
+         (header :scs (any-reg) :target c-arg3))
+  (:results (result :scs (descriptor-reg)))
+  (:save-p t)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset nl0-offset) c-arg1)
+  (:temporary (:sc unsigned-reg :from (:argument 1) :to :eval :offset nl1-offset) c-arg2)
+  (:temporary (:sc unsigned-reg :from (:argument 2) :to :eval :offset nl2-offset) c-arg3)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
+  (:temporary (:sc any-reg :offset r9-offset) cfunc)
+  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset nl0-offset) nl0)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:vop-var vop)
+  (:generator 50
+   (let ((cur-nfp (current-nfp-tn vop)))
+     (when cur-nfp
+       (store-stack-tn nfp-save cur-nfp))
+     (move c-arg1 size-class)
+     (move c-arg2 nwords)
+     (move c-arg3 header)
+     (load-inline-constant lr '(:fixup "call_into_c" :foreign))
+     (load-inline-constant cfunc '(:fixup "alloc_immobile_fixedobj" :foreign))
+     (inst blr lr)
+     (when cur-nfp
+       (load-stack-tn cur-nfp nfp-save))
+     (move result nl0))))

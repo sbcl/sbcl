@@ -33,6 +33,9 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
+;;; The card size for immobile/low space.
+;;; This must be a multiple of the OS page size.
+(defconstant immobile-card-bytes +backend-page-bytes+)
 
 ;;; number of bits per word where a word holds one lisp descriptor
 (defconstant n-word-bits 64)
@@ -64,6 +67,17 @@
 
 ;;;; Where to put the different spaces.
 
+#+(and immobile-space darwin)
+(error "can't work because immobile text must be under 2GB")
+
+#+immobile-space
+(!gencgc-space-setup #x50000000
+                     :read-only-space-size 0
+                     :fixedobj-space-size #.(* 65536 1024)
+                     :text-space-size #.(* 2 65536 1024)
+                     :dynamic-space-start #x1000000000)
+
+#-immobile-space
 (!gencgc-space-setup #+(or linux openbsd freebsd) #xF0000000
                      #+darwin #x300000000
                      #+netbsd #x2F0000000
