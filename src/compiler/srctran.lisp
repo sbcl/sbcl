@@ -2810,6 +2810,16 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
+(defun cast-or-check-bound-type (lvar)
+  (let ((dest (lvar-dest lvar)))
+    (cond ((cast-p dest)
+           (and (cast-type-check dest)
+                (single-value-type (cast-type-to-check dest))))
+          ((and (combination-p dest)
+                (equal (combination-fun-debug-name dest) '(transform-for check-bound))
+                (eq (third (combination-args dest)) lvar))
+           (specifier-type 'sb-vm:signed-word)))))
+
 (macrolet ((def (name fun type &key (types `(,type ,type)) swap)
              (flet ((vop-return-type (vop)
                       (type-specifier
@@ -2829,8 +2839,7 @@
                  `(when-vop-existsp (:translate ,name)
                     (deftransform ,fun ((x y) ,types * :node node :important nil)
                       (delay-ir1-transform node :ir1-phases)
-                      (let ((dest (node-dest node))
-                            (type (single-value-type (node-derived-type node)))
+                      (let ((type (single-value-type (node-derived-type node)))
                             type-to-check
                             checking-for)
                         (declare (ignorable checking-for))
@@ -2843,11 +2852,10 @@
                                         (setf checking-for type-to-check)
                                         (and (neq type-to-check *empty-type*)
                                              (csubtypep type-to-check target-type))))))
-                          (unless (and (cast-p dest)
-                                       (cast-type-check dest)
+                          (unless (and (setf type-to-check (cast-or-check-bound-type (node-lvar node)))
                                        (not (csubtypep type (specifier-type 'word)))
                                        (not (csubtypep type (specifier-type 'sb-vm:signed-word)))
-                                       (setf type-to-check (single-value-type (cast-type-to-check dest)))
+
                                        (or ,@(if (consp cast-types)
                                                  (loop for target-type in cast-types
                                                        collect `(good-cast-p (specifier-type ',target-type)))
