@@ -469,7 +469,7 @@
                                 (of
                                  (ldb (byte sb-vm:n-word-bits 0) x))
                                 (t
-                                 (bug "flags")))
+                                 x))
                           (cond (cf
                                  (dpb 1 (byte 1 sb-vm:n-word-bits) x))
                                 (of

@@ -2248,7 +2248,7 @@
 
 (defknown (signed* signed+ signed-)
   (sb-vm:signed-word sb-vm:signed-word t)
-  sb-vm:signed-word
+  integer
   (movable always-translatable))
 
 (defknown (unsigned* unsigned+ unsigned-)

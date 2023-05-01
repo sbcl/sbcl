@@ -48,7 +48,9 @@
                                                                   (list b))
                                                 for fun = (or (gethash lambda cache)
                                                               (setf (gethash lambda cache)
-                                                                    (checked-compile lambda :allow-warnings t)))
+                                                                    (handler-case (checked-compile lambda :allow-warnings t)
+                                                                      (error (c)
+                                                                        (error "Error compiling ~s:~% ~a" lambda c)))))
                                                 do
                                                 (when (and (zerop (mod (incf progress) (or #+(or arm x86) 100 10000)))
                                                            (interactive-stream-p *standard-output*))

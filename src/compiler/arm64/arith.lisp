@@ -1845,7 +1845,7 @@
   (:translate sb-c::signed+)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg immediate)))
-  (:arg-types signed-num signed-num (:constant t))
+  (:arg-types signed-num signed-num (:constant (satisfies signed-type-specifier-p)))
   (:info type)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
@@ -1862,6 +1862,31 @@
                 (inst adds r x (add-sub-immediate y))))
           (inst adds r x y))
       (inst b :vs error))))
+
+(define-vop (signed+=>unsigned)
+  (:translate sb-c::signed+)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg ;; immediate
+                             )))
+  (:arg-types signed-num signed-num (:constant (satisfies unsigned-type-specifier-p)))
+  (:info type)
+  (:temporary (:sc unsigned-reg) temp1 temp2)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error
+                                       (make-random-tn :kind :normal
+                                                       :sc (sc-or-lose 'signed-reg)
+                                                       :offset (tn-offset r)))))
+      (inst asr temp1 x 63)
+      (inst asr temp2 y 63)
+      (inst adds r x y)
+      (inst adc temp1 temp1 temp2)
+      (inst tbnz temp1 0 error))))
 
 (define-vop ()
   (:translate sb-c::signed-)
@@ -1924,7 +1949,7 @@
       (inst b :cc error))))
 
 (defun signed-type-specifier-p (x)
-  (not (subtypep x 'word)))
+  (subtypep x 'signed-word))
 
 (defun unsigned-type-specifier-p (x)
   (subtypep x 'word))
