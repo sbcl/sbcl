@@ -290,7 +290,8 @@
                           sb-xc:*features*))
              (arch (target-platform-keyword)))
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
-        (when (target-featurep '(:and :sb-thread (:or :linux :freebsd)))
+        ;; Futexes aren't available in all macos versions, but they are available in all versions that support arm, so always enable them there
+        (when (target-featurep '(:and :sb-thread (:or :linux :freebsd :openbsd (:and :darwin :arm64))))
           (pushnew :sb-futex sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (when (member :sb-thread sb-xc:*features*)

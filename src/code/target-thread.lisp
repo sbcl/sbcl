@@ -21,14 +21,11 @@
           with-session-lock
           with-spinlock))
 
-#+(or linux win32)
+#+(or linux win32 freebsd darwin openbsd)
 (defmacro my-kernel-thread-id ()
   `(sb-ext:truly-the
     (unsigned-byte 32)
     (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-kernel-tid-slot))))
-;; using the pthread_id seems fine, the umtx interface uses word-sized values
-#+freebsd
-(defmacro my-kernel-thread-id () `(thread-primitive-thread *current-thread*))
 
 ;;; CAS Lock
 ;;;
@@ -456,7 +453,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
     (defun futex-wait (word-addr oldval to-sec to-usec)
       (with-alien ((%wait (function int unsigned
-                                    #+freebsd unsigned #-freebsd (unsigned 32)
+                                    (unsigned 32)
                                     long unsigned-long)
                           :extern "futex_wait"))
         (with-interrupts

@@ -81,6 +81,9 @@ static void dragonfly_init();
 #ifdef LISP_FEATURE_X86
 #include <machine/cpu.h>
 #endif
+#ifdef LISP_FEATURE_SB_FUTEX
+#include <sys/futex.h>
+#endif
 
 static void openbsd_init();
 #endif
@@ -407,17 +410,17 @@ static void freebsd_init()
 
 #ifdef LISP_FEATURE_SB_FUTEX
 int
-futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
+futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
     struct timespec timeout;
     int ret;
 
     if (sec < 0)
-        ret = _umtx_op((void *)lock_word, UMTX_OP_WAIT, oldval, 0, 0);
+        ret = _umtx_op(lock_word, UMTX_OP_WAIT_UINT_PRIVATE, oldval, 0, 0);
     else {
         timeout.tv_sec = sec;
         timeout.tv_nsec = usec * 1000;
-        ret = _umtx_op((void *)lock_word, UMTX_OP_WAIT, oldval, (void*)sizeof timeout, &timeout);
+        ret = _umtx_op(lock_word, UMTX_OP_WAIT_UINT_PRIVATE, oldval, (void*)sizeof timeout, &timeout);
     }
     if (ret == 0) return 0;
     // technically we would not need to check any of the error codes if the lisp side
@@ -430,7 +433,7 @@ futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 int
 futex_wake(int *lock_word, int n)
 {
-    return _umtx_op((void *)lock_word, UMTX_OP_WAKE, n, 0, 0);
+    return _umtx_op(lock_word, UMTX_OP_WAKE_PRIVATE, n, 0, 0);
 }
 #endif
 #endif /* __FreeBSD__ */
@@ -600,5 +603,26 @@ os_dlsym(void *handle, const char *symbol)
     void * volatile ret = dlsym(handle, symbol);
     return ret;
 }
+
+#ifdef LISP_FEATURE_SB_FUTEX
+int
+futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
+{
+    struct timespec timeout = {.tv_sec = sec, .tv_nsec = usec * 1000};
+    int ret = futex(lock_word, FUTEX_WAIT_PRIVATE, oldval, sec < 0 ? NULL : &timeout, NULL);
+
+    if (ret == 0) return 0;
+    if (errno == ETIMEDOUT) return 1;
+    if (errno == EINTR) return 2;
+    return -1;
+}
+
+int
+futex_wake(int *lock_word, int n)
+{
+    futex(lock_word, FUTEX_WAKE_PRIVATE, n, NULL, NULL);
+    return 0;
+}
+#endif
 
 #endif
