@@ -861,7 +861,7 @@
       (inst jmp :o error))))
 
 (defun signed-type-specifier-p (x)
-  (not (subtypep x 'word)))
+  (subtypep x 'signed-word))
 
 (defun unsigned-type-specifier-p (x)
   (subtypep x 'word))
