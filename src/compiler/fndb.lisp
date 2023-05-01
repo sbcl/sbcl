@@ -2253,7 +2253,7 @@
 
 (defknown (unsigned* unsigned+ unsigned-)
   (word word t)
-  word
+  integer
   (movable always-translatable))
 
 (defknown (unsigned+signed unsigned-signed)

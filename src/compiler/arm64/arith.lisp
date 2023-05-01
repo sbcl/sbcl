@@ -1948,6 +1948,27 @@
       (inst subs r x y)
       (inst b :cc error))))
 
+(define-vop (unsigned-=>signed)
+  (:translate sb-c::unsigned-)
+  (:args (x :scs (unsigned-reg) :to :save)
+         (y :scs (unsigned-reg ;; immediate
+                               ) :to :save))
+  (:arg-types unsigned-num unsigned-num (:constant t))
+  (:info type)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
+      (inst subs r x y)
+      (inst sbc tmp-tn zr-tn zr-tn)
+      (inst and tmp-tn tmp-tn 1)
+      (inst eor tmp-tn tmp-tn (lsr r 63))
+      (inst cbnz tmp-tn error))))
+
 (defun signed-type-specifier-p (x)
   (subtypep x 'signed-word))
 
