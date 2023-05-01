@@ -1921,13 +1921,14 @@ core and return a descriptor to it."
               (emplace-vector vector sb-vm:simple-vector-widetag 256)
               vector))
 
-  ;; Immobile code prefers all FDEFNs adjacent so that code can be located
-  ;; anywhere in the addressable memory allowed by the OS, as long as all
-  ;; FDEFNs are near enough all code (i.e. within a 32-bit jmp offset).
-  ;; That fails if static fdefns are wired to an address below 4GB
-  ;; and code resides above 4GB. But as the Fundamental Theorem says:
-  ;;   any problem can be solved by adding another indirection.
-  #+immobile-code
+  ;; Immobile code on x86-64 prefers all FDEFNs adjacent so that code
+  ;; can be located anywhere in the addressable memory allowed by the
+  ;; OS, as long as all FDEFNs are near enough all code (i.e. within a
+  ;; 32-bit jmp offset).  That fails if static fdefns are wired to an
+  ;; address below 4GB and code resides above 4GB. But as the
+  ;; Fundamental Theorem says: any problem can be solved by adding
+  ;; another indirection.
+  #+(and x86-64 immobile-code)
   (progn
   (setf *c-callable-fdefn-vector*
         (vector-in-core (make-list (length sb-vm::+c-callable-fdefns+)
@@ -1938,24 +1939,29 @@ core and return a descriptor to it."
   (setf *asm-routine-vector* (word-vector (make-list 256 :initial-element 0)
                                           *static*)))
 
-  #-immobile-code
+  #-(and x86-64 immobile-code)
   (dolist (sym sb-vm::+c-callable-fdefns+)
     (ensure-cold-fdefn sym *static*))
 
-  ;; With immobile-code, static-fdefns as a concept are useful -
-  ;; the implication is that the function's definition will not change.
-  ;; But the fdefn per se is not useful - callers refer to callees directly.
-  #-immobile-code
-  (dovector (sym sb-vm:+static-fdefns+)
-    (let* ((fdefn (ensure-cold-fdefn sym *static*))
-           (offset (- (+ (- (descriptor-bits fdefn)
-                            sb-vm:other-pointer-lowtag)
-                         (* sb-vm:fdefn-raw-addr-slot sb-vm:n-word-bytes))
-                      (descriptor-bits *nil-descriptor*)))
-           (desired (sb-vm:static-fun-offset sym)))
-      (unless (= offset desired)
-        (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
-               sym nil offset desired)))))
+  ;; With immobile-code on x86-64, static-fdefns as a concept are
+  ;; useful - the implication is that the function's definition will
+  ;; not change.  But the fdefn per se is not useful - callers refer
+  ;; to callees directly.
+  #-(and x86-64 immobile-code)
+  (progn
+    (dolist (sym sb-vm::+c-callable-fdefns+)
+      (ensure-cold-fdefn sym *static*))
+
+    (dovector (sym sb-vm:+static-fdefns+)
+      (let* ((fdefn (ensure-cold-fdefn sym *static*))
+             (offset (- (+ (- (descriptor-bits fdefn)
+                              sb-vm:other-pointer-lowtag)
+                           (* sb-vm:fdefn-raw-addr-slot sb-vm:n-word-bytes))
+                        (descriptor-bits *nil-descriptor*)))
+             (desired (sb-vm:static-fun-offset sym)))
+        (unless (= offset desired)
+          (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
+                 sym nil offset desired))))))
 
 ;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
 (defun sort-cold-layouts ()
@@ -2002,7 +2008,8 @@ core and return a descriptor to it."
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
-    ;; Put the C-callable fdefns into the static-space vector of fdefns
+    ;; Put the C-callable fdefns into the static-space vector of fdefns on x86-64
+    #+x86-64
     (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
           do (cold-svset *c-callable-fdefn-vector* i (ensure-cold-fdefn sym)))
     (cold-set 'sb-fasl::*asm-routine-vector* *asm-routine-vector*)
@@ -3542,9 +3549,9 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
           #+metaspace "READ_ONLY" #-metaspace "FIXEDOBJ"
           (- (cold-layout-descriptor-bits 'function)
                         (gspace-byte-address (symbol-value *cold-layout-gspace*))))
-  ;; For immobile code, define a constant for the address of the vector of
+  ;; For immobile code on x86-64, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
-  #+immobile-code
+  #+(and x86-64 immobile-code)
   (progn
     (format stream "#define STATIC_FDEFNS LISPOBJ(0x~X)~%"
             (descriptor-bits *c-callable-fdefn-vector*))
@@ -3554,7 +3561,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
 #define ~A_FDEFN (VECTOR(STATIC_FDEFNS)->data[~d])~%"
                      (c-symbol-name symbol) index)))
   ;; Everybody else can address each fdefn directly.
-  #-immobile-code
+  #-(and x86-64 immobile-code)
   (loop for symbol in sb-vm::+c-callable-fdefns+
         for index from 0
         do

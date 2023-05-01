@@ -3817,7 +3817,7 @@ register."
            ;; FIXME: this could handle static calls, but needs some
            ;; help from the backends
           (make-lisp-obj
-           (cond #+immobile-space
+           (cond #+(and immobile-space x86-64)
                  ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
                   ;; Construct a properly tagged FDEFN given the value
                   ;; that machine code references it by for purposes
@@ -3883,7 +3883,7 @@ register."
         ;; CONTEXT, which is registered in thread->interrupt_contexts,
         ;; it will properly point to NEW-CALLEE.
         (cond
-         #+immobile-code
+         #+(and immobile-code x86-64)
          ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
           ;; Store into RAX the necessary value for issuing a CALL to the JMP
           ;; opcode in the FDEFN header.

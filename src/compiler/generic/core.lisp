@@ -86,12 +86,13 @@
                    ;; value is known to be an immobile object
                    ;; (whose address we don't want to wire in).
                    (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
-                   #+immobile-code
+                   #+(and immobile-code x86-64)
                    (:fdefn-call
                     (prog1 (sb-vm::fdefn-entry-address name) ; creates if didn't exist
                       (when statically-link-p
                         (push (cons offset (find-fdefn name)) (elt preserved-lists 0)))))
-                   #+immobile-code (:static-call (sb-vm::function-raw-address name kind)))
+                   #+(and immobile-code x86-64)
+                   (:static-call (sb-vm::function-raw-address name kind)))
                  kind flavor))
 
        (finish-fixups (code-obj preserved-lists)

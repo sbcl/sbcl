@@ -18,8 +18,8 @@
 ;;;; fdefinition (fdefn) objects
 
 (defun make-fdefn (name)
-  #-immobile-space (make-fdefn name)
-  #+immobile-space
+  #-(and x86-64 immobile-space) (make-fdefn name)
+  #+(and x86-64 immobile-space)
   (let ((fdefn (truly-the (values fdefn &optional)
                           (sb-vm::alloc-immobile-fdefn))))
     (sb-vm::%set-fdefn-name fdefn name)
@@ -30,8 +30,8 @@
   (declare (type function fun)
            (type fdefn fdefn)
            (values function))
-  #+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
-  #-immobile-code (setf (fdefn-fun fdefn) fun))
+  #+(and immobile-code x86-64) (sb-vm::%set-fdefn-fun fdefn fun)
+  #-(and immobile-code x86-64) (setf (fdefn-fun fdefn) fun))
 
 ;;; Return the FDEFN object for NAME, or NIL if there is no fdefn.
 ;;; Signal an error if name isn't valid.
@@ -421,7 +421,7 @@
       (:symbol name "removing the function or macro definition of ~A")
     (let ((fdefn (find-fdefn name)))
       (when fdefn
-        #+immobile-code
+        #+(and immobile-code x86-64)
         (when (sb-vm::fdefn-has-static-callers fdefn)
           (sb-vm::remove-static-links fdefn))
         (fdefn-makunbound fdefn)))

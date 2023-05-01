@@ -1139,7 +1139,7 @@
                        nargs (emit-step-p node)
                        #+call-symbol
                        (fun-tn-type fun-lvar fun-tn)))
-                #-immobile-code
+                #-(and x86-64 immobile-code)
                 ((eq fun-tn named)
                  (vop* static-tail-call-named node block
                        (old-fp return-pc pass-refs) ; args
@@ -1148,14 +1148,14 @@
                 (fixed-args-p
                  (when-vop-existsp (:named sb-vm::fixed-tail-call-named)
                   (vop* sb-vm::fixed-tail-call-named node block
-                        (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
+                        (#-(and x86-64 immobile-code) fun-tn old-fp return-pc pass-refs) ; args
                         (nil)           ; results
-                        nargs #+immobile-code named (emit-step-p node))))
+                        nargs #+(and x86-64 immobile-code) named (emit-step-p node))))
                 (t
                  (vop* tail-call-named node block
-                       (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
+                       (#-(and x86-64 immobile-code) fun-tn old-fp return-pc pass-refs) ; args
                        (nil)            ; results
-                       nargs #+immobile-code named (emit-step-p node))))))) ; info
+                       nargs #+(and x86-64 immobile-code) named (emit-step-p node))))))) ; info
   (values))
 
 (defun fixed-args-state (node)
@@ -1224,7 +1224,7 @@
                      arg-locs nargs nvals (emit-step-p node)
                      #+call-symbol
                      (fun-tn-type fun-lvar fun-tn)))
-              #-immobile-code
+              #-(and x86-64 immobile-code)
               ((eq fun-tn named)
                (vop* static-call-named node block
                      (fp args)
@@ -1234,15 +1234,15 @@
               (fixed-args-p
                (when-vop-existsp (:named sb-vm::fixed-call-named)
                  (vop* sb-vm::fixed-call-named node block
-                       (fp #-immobile-code fun-tn args) ; args
+                       (fp #-(and x86-64 immobile-code) fun-tn args) ; args
                        (loc-refs)                       ; results
-                       arg-locs nargs #+immobile-code named nvals ; info
+                       arg-locs nargs #+(and x86-64 immobile-code) named nvals ; info
                        (emit-step-p node))))
               (t
                (vop* call-named node block
-                     (fp #-immobile-code fun-tn args) ; args
+                     (fp #-(and x86-64 immobile-code) fun-tn args) ; args
                      (loc-refs)                       ; results
-                     arg-locs nargs #+immobile-code named nvals ; info
+                     arg-locs nargs #+(and x86-64 immobile-code) named nvals ; info
                      (emit-step-p node))))
         (move-lvar-result node block locs lvar))))
   (values))
@@ -1263,7 +1263,7 @@
                      arg-locs nargs (emit-step-p node)
                      #+call-symbol
                      (fun-tn-type fun-lvar fun-tn)))
-              #-immobile-code
+              #-(and x86-64 immobile-code)
               ((eq fun-tn named)
                (vop* static-multiple-call-named node block
                   (fp args)
@@ -1272,9 +1272,9 @@
                   (emit-step-p node)))
               (t
                (vop* multiple-call-named node block
-                  (fp #-immobile-code fun-tn args)     ; args
-                  (loc-refs)                            ; results
-                  arg-locs nargs #+immobile-code named ; info
+                  (fp #-(and x86-64 immobile-code) fun-tn args)     ; args
+                  (loc-refs)                                        ; results
+                  arg-locs nargs #+(and x86-64 immobile-code) named ; info
                   (emit-step-p node)))))))
   (values))
 

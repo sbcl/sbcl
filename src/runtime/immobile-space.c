@@ -1565,7 +1565,9 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Fixup the constant pool.
           code = (struct code*)where;
           adjust_words(where+2, code_header_words(code)-2);
+#ifdef LISP_FEATURE_X86_64
           apply_absolute_fixups(code->fixups, code);
+#endif
           break;
         case CLOSURE_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
