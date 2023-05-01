@@ -28,8 +28,7 @@
   (dotimes (i 16) (inst movdqa (sb-x86-64-asm::get-fpr :xmm i) (ea (* i 16) rsp-tn)))
   (inst add rsp-tn (* 16 16))
   (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
-  (inst mov rsp-tn rbp-tn)
-  (inst pop rbp-tn)
+  (inst leave)
   (inst popf))
 
 (macrolet ((do-fprs (operation regset &aux (displacement 0))

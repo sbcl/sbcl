@@ -547,8 +547,7 @@
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
     ;; Zot all of the stack except for the old-fp and return-pc.
-    (inst mov rsp-tn rbp-tn)
-    (inst pop rbp-tn)
+    (inst leave)
     (inst ret)))
 
 ;;;; full call
@@ -944,12 +943,10 @@
   (:ignore value)
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
-    ;; Drop stack above old-fp
-    (inst mov rsp-tn rbp-tn)
+    ;; Drop stack above old-fp and restore old frame pointer
+    (inst leave)
     ;; Clear the multiple-value return flag
     (inst clc)
-    ;; Restore the old frame pointer
-    (inst pop rbp-tn)
     ;; And return.
     (inst ret)))
 
@@ -1003,8 +1000,7 @@
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of RBX instead of RBP.
     (cond ((<= nvals register-arg-count)
-           (inst mov rsp-tn rbp-tn)
-           (inst pop rbp-tn)
+           (inst leave)
            (inst ret))
           (t
            ;; Some values are on the stack after RETURN-PC and OLD-FP,
@@ -1051,11 +1047,10 @@
         ;; Return with one value.
         (loadw a0 vals -1)
         ;; Clear the stack until ocfp.
-        (inst mov rsp-tn rbp-tn)
+        (inst leave)
         ;; clear the multiple-value return flag
         (inst clc)
         ;; Out of here.
-        (inst pop rbp-tn)
         (inst ret)
         ;; Nope, not the single case. Jump to the assembly routine.
         (emit-label not-single)))

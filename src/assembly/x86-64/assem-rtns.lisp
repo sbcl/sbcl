@@ -84,18 +84,16 @@
   (inst mov rdx nil-value)
   (inst mov rdi rdx)
   (inst mov rsi rdx)
-  (inst mov rsp-tn rbp-tn)
   (inst stc)
-  (inst pop rbp-tn)
+  (inst leave)
   (inst ret)
 
   ;; Note: we can get this, because the return-multiple vop doesn't
   ;; check for this case when size > speed.
   ONE-VALUE
   (loadw rdx rsi -1)
-  (inst mov rsp-tn rbp-tn)
   (inst clc)
-  (inst pop rbp-tn)
+  (inst leave)
   (inst ret)
 
   TWO-VALUES
@@ -103,9 +101,8 @@
   (loadw rdx rsi -1)
   (loadw rdi rsi -2)
   (inst mov rsi nil-value)
-  (inst mov rsp-tn rbp-tn)
   (inst stc)
-  (inst pop rbp-tn)
+  (inst leave)
   (inst ret)
 
   THREE-VALUES
@@ -113,9 +110,8 @@
   (loadw rdx rsi -1)
   (loadw rdi rsi -2)
   (loadw rsi rsi -3)
-  (inst mov rsp-tn rbp-tn)
   (inst stc)
-  (inst pop rbp-tn)
+  (inst leave)
   (inst ret))
 
 ;;;; TAIL-CALL-VARIABLE
@@ -423,9 +419,8 @@
       (inst cmp list null)
       (inst jmp :ne CONTINUE)
       ONE-VALUE
-      (inst mov rsp-tn rbp-tn)
       (inst clc)
-      (inst pop rbp-tn)
+      (inst leave)
       (inst ret)
 
       CONTINUE
@@ -478,7 +473,6 @@
 
       THREE-VALUES
       (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-      (inst mov rsp-tn rbp-tn)
       (inst stc)
-      (inst pop rbp-tn)
+      (inst leave)
       (inst ret))))

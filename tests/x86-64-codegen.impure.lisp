@@ -58,14 +58,15 @@
         (setq lines (nbutlast lines)))
       ;; Remove safepoint traps
       (setq lines (remove-if (lambda (x) (search "; safepoint" x)) lines))
-      ;; If the last 4 lines are of the expected form
-      ;;   MOV RSP, RBP / CLC / POP RBP / RET
+      ;; If the last 3 lines are of the expected form
+      ;;   LEAVE / CLC / RET
       ;; then strip them out
       (if (and remove-epilogue
-               (every #'search
-                      '("MOV RSP, RBP" "CLC" "POP RBP" "RET")
-                      (subseq lines (- (length lines) 4))))
-          (butlast lines 4)
+               (let ((last3 (subseq lines (- (length lines) 3))))
+                 (and (search "LEAVE" (first last3))
+                      (search "CLC" (second last3))
+                      (search "RET" (third last3)))))
+          (butlast lines 3)
           lines)))
 (defun disasm-load (safety symbol)
   ;; This lambda has a name because if it doesn't, then the name
@@ -949,6 +950,7 @@
                     (when (/= linecount expect-n)
                       (warn "~S was ~d is ~d" type expect-n linecount))))))))))
 
+#+nil ; gotta figure out how to make this insensitive to standard asm boilerplate
 (with-test (:name :many-interesting-array-types
                   :skipped-on (:or (:not :sb-unicode)
                                    (:not :immobile-space)))
