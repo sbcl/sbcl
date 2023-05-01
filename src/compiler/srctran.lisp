@@ -4165,7 +4165,8 @@
 
 (macrolet ((def (name x y type-x type-y)
              `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node)
-                (cond ((csubtypep (lvar-type i) (specifier-type 'fixnum))
+                (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
+                           (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
                        (give-up-ir1-transform))
                       (t
                        ;; Give the range-transform optimizers a chance to trigger.
