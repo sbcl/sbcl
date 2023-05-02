@@ -715,7 +715,7 @@ has written, having proved that it is unreachable."))
 ;;
 (defun warn-if-compiler-macro-dependency-problem (name)
   (unless (compiler-macro-function name)
-    (let ((status (car (get-emitted-full-calls name))))
+    (let ((status (get-emitted-full-calls name)))
       (when (and (integerp status) (oddp status))
         ;; Show the total number of calls, because otherwise the warning
         ;; would be worded rather obliquely: "N calls were compiled
@@ -776,10 +776,10 @@ and defining the function before its first potential use.~@:>"
 ;; that intervening callers know it to be proclaimed inline, and would have
 ;; liked to have a definition, but didn't.
 ;;
-(defun warn-if-inline-failed/call (name lexenv count-cell)
+(defun warn-if-inline-failed/call (name lexenv count)
   ;; Do nothing if the inline expansion is known - it wasn't used
   ;; because of the expansion limit, which is a different problem.
-  (unless (or (logtest 2 (car count-cell)) ; warn at most once per name
+  (unless (or (logtest 2 count) ; warn at most once per name
               (fun-name-inline-expansion name))
     ;; This function is only called by PONDER-FULL-CALL when NAME
     ;; is not lexically NOTINLINE, so therefore if it is globally INLINE,
@@ -793,7 +793,7 @@ and defining the function before its first potential use.~@:>"
       ;; Set a bit saying that a warning about the call was generated,
       ;; which suppresses the warning about either a later
       ;; call or a later proclamation.
-      (setf (car count-cell) (logior (car count-cell) 2))
+      (setf (gethash name *emitted-full-calls*) (logior count 2))
       ;; While there could be a different style-warning for
       ;;   "You should put the DEFUN after the DECLAIM"
       ;; if they appeared reversed, it's not ideal to warn as soon as that.

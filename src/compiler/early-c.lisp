@@ -280,7 +280,8 @@
 #+linux ; shadow space differs by OS
 (defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)
 
-(define-load-time-global *emitted-full-calls* (make-hash-table :test 'equal))
+(define-load-time-global *emitted-full-calls*
+    (make-hash-table :test 'equal :synchronized t))
 
 (defmacro get-emitted-full-calls (name)
 ;; Todo: probably remove the wrapping cons. It was for globaldb
@@ -297,7 +298,7 @@
 ;; about failure to inline NAME, which is shown at most once per name
 ;; to avoid unleashing a flood of identical warnings.
 (defun emitted-full-call-count (name)
-  (let ((status (car (get-emitted-full-calls name))))
+  (let ((status (get-emitted-full-calls name)))
     (and (integerp status)
          ;; Bit 0 tells whether any call was NOT in the presence of
          ;; a 'notinline' declaration, thus eligible to be inline.
