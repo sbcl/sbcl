@@ -14,6 +14,7 @@
 #include "genesis/arena.h"
 #include "genesis/gc-tables.h"
 #include "thread.h"
+#include "graphvisit.h"
 
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
 extern lispobj * component_ptr_from_pc(char *pc);
@@ -675,4 +676,25 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
     lisp_memory_fault_error(context, addr);
 #endif
     return 1;
+}
+
+struct visitor {
+    lispobj arena;
+    long nwords;
+};
+
+static void visit(lispobj obj, void* arg) {
+    struct visitor* v = arg;
+    if (find_containing_arena(obj) == v->arena) v->nwords += object_size(native_pointer(obj));
+}
+size_t count_arena_live_bytes(lispobj arena) {
+    struct hopscotch_table h;
+    struct visitor v;
+    v.arena = arena;
+    v.nwords = 0;
+    struct grvisit_context* c =
+        visit_heap_from_static_roots(&h, visit, &v);
+    hopscotch_destroy(&h);
+    free(c);
+    return v.nwords * N_WORD_BYTES;
 }
