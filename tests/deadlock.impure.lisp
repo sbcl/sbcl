@@ -162,18 +162,13 @@
                      (sb-thread:join-thread t2))))
       (assert (equal '(:ok :ok) res)))))
 
-(defun clock-gettime ()
-  (sb-int:dx-let ((a (make-array 2 :element-type 'sb-ext:word)))
-    (alien-funcall (extern-alien "clock_gettime" (function void int system-area-pointer))
-                   0 (sb-sys:vector-sap a))
-    (values (aref a 0) (aref a 1))))
-
+#+deadlock-test-timing
+(progn
+(defun clock-gettime () (sb-unix:clock-gettime sb-unix:clock-realtime))
 (defun seconds-since (start_sec start_nsec)
-  (sb-int:dx-let ((a (make-array 2 :element-type 'sb-ext:word)))
-    (alien-funcall (extern-alien "clock_gettime" (function void int system-area-pointer))
-                   0 (sb-sys:vector-sap a))
-    (+ (/ (coerce (- (aref a 1) start_nsec) 'double-float) 1000000000)
-       (- (aref a 0) start_sec))))
+  (multiple-value-bind (stop_sec stop_nsec) (clock-gettime)
+    (+ (/ (coerce (- stop_nsec start_nsec) 'double-float) 1000000000)
+       (- stop_sec start_sec)))))
 
 (defglobal *max-avl-tree-total* 0)
 (defglobal *max-avl-tree-born* 0)

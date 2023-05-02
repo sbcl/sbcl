@@ -230,7 +230,7 @@ Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
   (binding*
-     ((clock-start (get-thread-virtual-time))
+     (((start-sec start-nsec) (get-thread-virtual-time))
       ((compiled-definition warnings-p failure-p)
       (if (or (compiled-function-p definition)
               (sb-pcl::generic-function-p definition))
@@ -244,7 +244,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                   (prepare-for-compile definition))
             (sb-vm:without-arena "compile"
               (compile-in-lexenv sexpr lexenv name nil nil nil nil))))))
-    (accumulate-compiler-time '*compile-elapsed-time* clock-start)
+    (accumulate-compiler-time '*compile-elapsed-time* start-sec start-nsec)
     (values (cond (name
                    ;; Do NOT assign anything into the symbol if we did not
                    ;; actually invoke the compiler

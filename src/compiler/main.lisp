@@ -1809,20 +1809,15 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defglobal *compile-elapsed-time* 0) ; nanoseconds
 (defglobal *compile-file-elapsed-time* 0) ; nanoseconds
 (defun get-thread-virtual-time ()
-  #+(and linux (not sb-xc-host))
-  (multiple-value-bind (sec nsec)
-      (sb-unix::clock-gettime sb-unix:clock-thread-cputime-id)
-    (cons sec nsec))
-  #-(and linux (not sb-xc-host))
-  '(0 . 0))
+  #+(and linux (not sb-xc-host)) (sb-unix:clock-gettime sb-unix:clock-thread-cputime-id)
+  #-(and linux (not sb-xc-host)) (values 0 0))
 
-(defun accumulate-compiler-time (symbol start)
-  (declare (ignorable symbol start))
+(defun accumulate-compiler-time (symbol start-sec start-nsec)
+  (declare (ignorable symbol start-sec start-nsec))
   #+(and linux (not sb-xc-host))
-  (destructuring-bind (sec-after . nsec-after) (get-thread-virtual-time)
-    (destructuring-bind (sec-before . nsec-before) start
-      (let* ((sec-diff (- sec-after sec-before))
-             (nsec-diff (- nsec-after nsec-before))
+  (multiple-value-bind (stop-sec stop-nsec) (get-thread-virtual-time)
+      (let* ((sec-diff (- stop-sec start-sec))
+             (nsec-diff (- stop-nsec start-nsec))
              (total-nsec-diff (+ (* sec-diff (* 1000 1000 1000))
                                  nsec-diff))
              (old (symbol-global-value symbol)))
@@ -1835,7 +1830,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                   (cas (symbol-value symbol) old new)
                                   #+x86-64
                                   (%cas-symbol-global-value symbol old new)))
-                (return))))))))
+                (return)))))))
 
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
@@ -1905,14 +1900,15 @@ returning its filename.
   :EMIT-CFASL
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
-  (let* ((output-file-pathname nil)
+  (binding*
+        ((output-file-pathname nil)
          (fasl-output nil)
          (cfasl-pathname nil)
          (cfasl-output nil)
          (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
-         (clock-start (get-thread-virtual-time))
+         ((start-sec start-nsec) (get-thread-virtual-time))
          (input-pathname (verify-source-file input-file))
          (source-info
           (make-file-source-info input-pathname external-format
@@ -1972,7 +1968,7 @@ returning its filename.
       (when (and trace-file (not (streamp trace-file)))
         (close *compiler-trace-output*)))
 
-    (accumulate-compiler-time '*compile-file-elapsed-time* clock-start)
+    (accumulate-compiler-time '*compile-file-elapsed-time* start-sec start-nsec)
 
     ;; CLHS says that the first value is NIL if the "file could not
     ;; be created". We interpret this to mean "a valid fasl could not
