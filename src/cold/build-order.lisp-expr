@@ -524,7 +524,7 @@
 
  ("src/code/late-extensions") ; needs condition system
 
- ("src/code/brothertree")
+ ("src/code/brothertree" :c-headers)
  #+metaspace ("src/code/metaspace" :not-host)
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
