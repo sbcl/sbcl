@@ -4206,6 +4206,12 @@ III. initially undefined function references (alphabetically):
         (out-to "hash-table"
           (write-structure-object (wrapper-info (find-layout 'sb-impl::general-hash-table))
                                   stream "hash_table"))
+        (out-to "brothertree"
+          (write-structure-object (wrapper-info (find-layout 'sb-brothertree::unary-node))
+                                  stream "unary_node")
+          (write-structure-object (wrapper-info (find-layout 'sb-brothertree::binary-node))
+                                  stream "binary_node")
+          (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
         (dolist (class '(defstruct-description defstruct-slot-description
                          package
                          ;; FIXME: probably these should be external?

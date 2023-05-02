@@ -45,12 +45,12 @@
 #define _FORTIFY_SOURCE 0
 #endif
 
-#include "brothertree.h"
 #include "code.h"
 #include "forwarding-ptr.h"
 #include "gc.h"
 #include "gc-internal.h"
 #include "gc-private.h"
+#include "genesis/brothertree.h"
 #include "genesis/cons.h"
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"
@@ -521,7 +521,7 @@ lispobj* search_immobile_code(char* ptr) {
     } else if (ptr < (char*)text_space_highwatermark) {
         lispobj node = brothertree_find_lesseql((uword_t)ptr,
                                                 SYMBOL(IMMOBILE_CODEBLOB_TREE)->value);
-        if (node != NIL) candidate = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
+        if (node != NIL) candidate = (lispobj*)((struct binary_node*)INSTANCE(node))->uw_key;
     }
     if (candidate && widetag_of(candidate) == CODE_HEADER_WIDETAG) {
         int nwords = code_total_nwords((struct code*)candidate);

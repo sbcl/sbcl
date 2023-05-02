@@ -23,7 +23,7 @@
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
 #include "genesis/split-ordered-list.h"
-#include "brothertree.h"
+#include "genesis/brothertree.h"
 #include "forwarding-ptr.h"
 
 lispobj *
@@ -225,11 +225,11 @@ uword_t brothertree_find_eql(uword_t key, lispobj tree)
             tree = ((struct unary_node*)INSTANCE(tree))->child;
         } else {
             struct binary_node* node = (void*)INSTANCE(tree);
-            if (node->key == key) return tree;
+            if (node->uw_key == key) return tree;
             lispobj l = NIL, r = NIL;
             // unless a fringe node, read the left and right pointers
-            if (!fringe_node_p(node)) l = node->left, r = node->right;
-            if (key < node->key) tree = l; else tree = r;
+            if (!fringe_node_p(node)) l = node->_left, r = node->_right;
+            if (key < node->uw_key) tree = l; else tree = r;
         }
     }
     return 0;
@@ -245,11 +245,11 @@ uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
             tree = ((struct unary_node*)INSTANCE(tree))->child;
         } else {
             struct binary_node* node = (void*)INSTANCE(tree);
-            if (node->key == key) return tree;
+            if (node->uw_key == key) return tree;
             lispobj l = NIL, r = NIL;
             // unless a fringe node, read the left and right pointers
-            if (!fringe_node_p(node)) l = node->left, r = node->right;
-            if (key < node->key) tree = l; else { best = tree; tree = r; }
+            if (!fringe_node_p(node)) l = node->_left, r = node->_right;
+            if (key < node->uw_key) tree = l; else { best = tree; tree = r; }
         }
     }
     return best;
@@ -265,11 +265,11 @@ uword_t brothertree_find_greatereql(uword_t key, lispobj tree)
             tree = ((struct unary_node*)INSTANCE(tree))->child;
         } else {
             struct binary_node* node = (void*)INSTANCE(tree);
-            if (node->key == key) return tree;
+            if (node->uw_key == key) return tree;
             lispobj l = NIL, r = NIL;
             // unless a fringe node, read the left and right pointers
-            if (!fringe_node_p(node)) l = node->left, r = node->right;
-            if (key > node->key) tree = r; else { best = tree; tree = l; }
+            if (!fringe_node_p(node)) l = node->_left, r = node->_right;
+            if (key > node->uw_key) tree = r; else { best = tree; tree = l; }
         }
     }
     return best;

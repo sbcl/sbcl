@@ -56,6 +56,7 @@
 #include "genesis/layout.h"
 #include "hopscotch.h"
 #include "genesis/cons.h"
+#include "genesis/brothertree.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
 
@@ -1868,7 +1869,6 @@ copy_unboxed_object(lispobj object, sword_t nwords)
  * However it should work reliably for codeblobs, because if you can hold
  * a reference to the codeblob, then either you'll find it in the generation 0
  * tree, or else can linearly scan for it in an older generation */
-#include "brothertree.h"
 static lispobj dynspace_codeblob_tree_snapshot; // valid only during GC
 lispobj *search_dynamic_space(void *pointer)
 {
@@ -1886,7 +1886,7 @@ lispobj *search_dynamic_space(void *pointer)
                        SYMBOL(DYNSPACE_CODEBLOB_TREE)->value;
         lispobj node = brothertree_find_lesseql((uword_t)pointer, tree);
         if (node != NIL) {
-            lispobj *found = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
+            lispobj *found = (lispobj*)((struct binary_node*)INSTANCE(node))->uw_key;
             int widetag = widetag_of(found);
             if (widetag != CODE_HEADER_WIDETAG && widetag != FUNCALLABLE_INSTANCE_WIDETAG)
                 lose("header not OK for code page: @ %p = %"OBJ_FMTX"\n", found, *found);

@@ -16,19 +16,24 @@
 
 ;(declaim (optimize (sb-c::store-coverage-data 3)))
 
-(deftype keytype () 'sb-vm:word)
+(sb-xc:deftype keytype () 'sb-vm:word)
 
-(defstruct (binary-node (:copier nil)
+(sb-xc:defstruct (binary-node (:copier nil)
                         (:constructor make-binary-node (key %left %right)))
   ;; key must be in slot index 0 because fringe binary nodes have only this slot
   (key 0 :type keytype)
   %left %right)
-(defstruct (unary-node (:copier nil)
+(sb-xc:defstruct (unary-node (:copier nil)
                        (:conc-name "")
                        (:constructor N1 (child)))
   ;; unary should not have unary child but it seems like the deletion algorithm
   ;; temporarily does that and then eliminates it.
   (child nil :type t))
+;;; The remainder of this file is not for the host. This unusual technique suggests
+;;; that we ought to have a way to READ and EVAL some TLFs without declaring that the
+;;; entire file is to be part of both make-host passes.
+#-sb-xc-host
+(progn
 ;;; L2 is a temporary node that gets eliminated by the insertion algorithm.
 ;;; My guess is that the "2" is supposed to be reminiscent of "binary",
 ;;; but it's a leaf, a/k/a "external node".
@@ -342,3 +347,4 @@
               (t node))))
       (unary-node (recurse (child node) best))
       (t best))))
+) ; end PROGN
