@@ -293,6 +293,13 @@
         ;; Futexes aren't available in all macos versions, but they are available in all versions that support arm, so always enable them there
         (when (target-featurep '(:and :sb-thread (:or :linux :freebsd :openbsd (:and :darwin :arm64))))
           (pushnew :sb-futex sb-xc:*features*))
+        ;; If may not be the best idea to put clock_gettime calls around every
+        ;; futex_wait if the OS/libc you're building for does not have a vdso entry point.
+        ;; So leave this out unless enabled explicitly and/or I gather more data on
+        ;; its performance impact.
+        #+nil
+        (when (target-featurep '(:and :sb-futex :x86-64 :linux))
+          (pushnew :futex-wait-metric sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (when (member :sb-thread sb-xc:*features*)
             (pushnew :system-tlabs sb-xc:*features*))

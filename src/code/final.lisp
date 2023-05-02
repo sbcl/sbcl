@@ -22,7 +22,9 @@
 ;;; A mutex is used during rehash due to key movement, but NOT if rehashing
 ;;; due to table growth. (If growing organically, hashes are valid, so you'll
 ;;; find what you're looking for if it's there. Invalid hashes are trickier)
-(define-load-time-global *finalizer-lock* (sb-thread:make-mutex :name "finalizer"))
+(define-load-time-global *finalizer-lock*
+    ;; disambiguate this lock name from the finalizer _thread's_ lock name
+    (sb-thread:make-mutex :name "**FINALIZER-STORE**"))
 (declaim (type sb-thread:mutex *finalizer-lock*))
 
 ;;; List of nodes removed from the split-ordered list due to key movement.

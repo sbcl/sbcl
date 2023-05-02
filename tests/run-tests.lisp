@@ -503,6 +503,28 @@
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
     (makunbound '*allowed-inputs*)
+    (let* ((mutexes
+            (remove-if (lambda (x)
+                         (or (eq x sb-impl::*active-processes-lock*)
+                             (eq x sb-impl::*finalizer-lock*)
+                             #+nil (eq x sb-vm::*allocator-mutex*)))
+                       (sb-vm:list-allocated-objects :all :test #'sb-thread::mutex-p)))
+           (contended (remove-if
+                       (lambda (x)
+                         (or (atom (sb-thread::mutex-%name x))
+                             (zerop (cdr (sb-thread::mutex-%name x)))
+                             ;; finalizer thread is started and stopped often for tests.
+                             ;; No only is it annoying to see it in here, to be correct
+                             ;; we'd need to sum the times of all same-named mutexes.
+                             (string= (sb-thread:mutex-name x) "finalizer")))
+                       mutexes)))
+      (when contended
+        (format t "~&Most-contended mutexes:~%")
+        (dolist (x (sort contended #'> :key (lambda (x) (cdr (sb-thread::mutex-%name x)))))
+          (format t "~12d ~s ~S~%"
+                  (cdr (sb-thread::mutex-%name x))
+                  x
+                  (sb-kernel:generation-of x)))))
     ;; after all the files are done
     (append-failures)))
 

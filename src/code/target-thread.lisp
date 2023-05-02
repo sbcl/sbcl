@@ -435,6 +435,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (progn
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (define-structure-slot-addressor mutex-state-address
+        ;; The following quote is taken from Linux docs. It may not hold elsewhere.
         ;; """ (Futexes are 32 bits in size on all platforms, including 64-bit systems.) """
         ;; which means we need to add 4 bytes to get to the low 32 bits of the slot contents
         ;; where we store state. This would be prettier if we had 32-bit raw slots.
@@ -720,8 +721,11 @@ returns NIL each time."
                (loop                    ; untimed
                      ;; Mark it as contested, and sleep, unless it is now in state 0.
                      (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
-                       (with-pinned-objects (mutex)
-                         (futex-wait (mutex-state-address mutex) 2 -1 0)))
+                       (let ((name (mutex-%name mutex)))
+                         (with-pinned-objects (mutex name)
+                           #+futex-wait-metric
+                           (unless (consp name) (setf (mutex-%name mutex) (cons name 0)))
+                           (futex-wait (mutex-state-address mutex) 2 -1 0))))
                      ;; Try to get it, still marking it as contested.
                      (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
                (loop             ; same as above but check for timeout
