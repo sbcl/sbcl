@@ -434,6 +434,9 @@ and no value was provided for it." name))))))))))
 ;;; CALL. If TYPE is supplied and not null, then we merge the
 ;;; information into the information already accumulated in TYPE.
 (defun note-fun-use (call &optional type)
+  (declare (inline make-approximate-key-info
+                   make-approximate-fun-type)
+           (sb-c::tlab :system))
   (declare (type combination call)
            (type (or approximate-fun-type null) type)
            #-sb-xc-host
