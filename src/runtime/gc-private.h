@@ -16,6 +16,7 @@
 #define _GC_PRIVATE_H_
 
 #include "genesis/instance.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/weak-pointer.h"
 #include "immobile-space.h"
 #include "code.h"
@@ -463,11 +464,15 @@ static inline int instanceoid_length(lispobj header) {
 #else
 
 // first 2 words of ordinary instance are: header, layout
-# define instance_layout(native_ptr) ((lispobj*)native_ptr)[1]
+# define instance_layout(native_ptr) ((struct instance*)native_ptr)->slots[0]
 // first 4 words of funcallable instance are: header, trampoline, layout, fin-fun
-# define funinstance_layout(native_ptr) ((lispobj*)native_ptr)[2]
+// unless funinstances contains executable bytes, in which case it's a little different.
+# define funinstance_layout(native_ptr) \
+   ((struct funcallable_instance*)native_ptr)->layout
+// This macro is complicated so that it remains an lvalue.
 # define layout_of(native_ptr) \
-  ((lispobj*)native_ptr)[1+((widetag_of(native_ptr)>>FUNINSTANCE_SELECTOR_BIT_NUMBER)&1)]
+  ((lispobj*)native_ptr)[(widetag_of(native_ptr)&(1<<FUNINSTANCE_SELECTOR_BIT_NUMBER))? \
+       offsetof(struct funcallable_instance,layout)>>WORD_SHIFT:1]
 
 #endif
 

@@ -65,7 +65,7 @@
 ;;  header, entrypoint, raw (x2), implementation function, slot vector
 ;; and the hash goes in 4 unused bytes of the second raw slot.
 (sb-kernel:!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots #-compact-instance-header hash-code)
+  :slot-names (clos-slots #-executable-funinstances hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid

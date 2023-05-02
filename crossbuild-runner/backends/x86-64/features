@@ -13,5 +13,6 @@
 :integer-eql-vop
 :undefined-fun-restarts
 :call-symbol
+:executable-funinstances
 :unbind-in-unwind
 :no-continue-unwind

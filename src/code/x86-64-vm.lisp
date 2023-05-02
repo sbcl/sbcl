@@ -202,8 +202,6 @@
 (defun write-funinstance-prologue (fin)
   ;; Encode: MOV RAX,[RIP+9] / JMP [RAX-3] / NOP / MOV EBX, #x0
   ;; and the #x0 is replaced with a hash code.
-  (declare (ignorable fin))
-  #-immobile-space (return-from write-funinstance-prologue)
   (with-pinned-objects (fin)
     (let* ((sap (sap+ (int-sap (get-lisp-obj-address fin))
                       (- (ash 2 word-shift) fun-pointer-lowtag))))

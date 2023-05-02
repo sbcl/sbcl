@@ -74,9 +74,9 @@
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
          (fin (truly-the funcallable-instance
                          (%make-standard-funcallable-instance
-                          slots #-compact-instance-header hash))))
+                          slots #-executable-funinstances hash))))
     (setf (%fun-wrapper fin) wrapper)
-    #+compact-instance-header
+    #+executable-funinstances
     (let ((32-bit-hash
            ;; don't know how good our hash is, so use all N-FIXNUM-BITS of it
            ;; as input to murmur-hash, which should definitely affect all bits,

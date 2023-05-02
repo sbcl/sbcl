@@ -1625,19 +1625,27 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;                                      logical    arithmetic
 ;;;                                      bitmap     value
 ;;; Funcallable object:
-;;;   Non-compact header:                #b...1100        -4
+;;;   Executable w/ standard header:     #b.101000       -24
 ;;;       word0:     header
 ;;;       word1: (*) entry address
-;;;       word2: (u) layout
-;;;       word3: (t) implementation-fun
-;;;       word4: (t) tagged slots ...
-;;;   Compact header:                    #b...1000        -7
+;;;       word2: (u) machine instructions
+;;;       word3: (u) machine instructions
+;;;       word4: (t) implementation-fun
+;;;       word5: (u) layout
+;;;       word6: (t) tagged slots ...
+;;;   Executable w/ compact header:      #b...1000        -8
 ;;;       word0:     header/layout
 ;;;       word1: (*) entry address
 ;;;       word2: (u) machine instructions
 ;;;       word3: (u) machine instructions
 ;;;       word4: (t) implementation-fun
 ;;;       word5: (t) tagged slots ...
+;;;   Non-executable:                    #b...1100        -4
+;;;       word0:     header
+;;;       word1: (*) entry address
+;;;       word2: (u) layout
+;;;       word3: (t) implementation-fun
+;;;       word4: (t) tagged slots ...
 ;;; (*) entry address can be treated as either tagged or raw.
 ;;;     For some architectures it has a lowtag, but points to
 ;;;     read-only space. For others it is a fixnum.
@@ -2258,7 +2266,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                                     x))
                                        slot-names) &aux (object ,allocate))
                  ,@set-layout
-                 #+x86-64
+                 #+executable-funinstances
                  ,@(when (and (eq dd-type 'funcallable-structure)
                               ;; fmt-control is not an executable function
                               (neq class-name 'sb-format::fmt-control))

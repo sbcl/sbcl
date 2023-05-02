@@ -440,7 +440,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
             /* funcallable-instance might have all descriptor slots
              * except for the trampoline, which points to an asm routine.
              * This is not true for self-contained trampoline GFs though. */
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef LISP_FEATURE_EXECUTABLE_FUNINSTANCES
             page_type = PAGE_TYPE_CODE, region = code_region;
 #else
             struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
@@ -460,7 +460,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
         }
         copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
         gc_assert(copy != object);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef LISP_FEATURE_EXECUTABLE_FUNINSTANCES
         if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
             struct funcallable_instance* old = (void*)native_pointer(object);
             struct funcallable_instance* new = (void*)native_pointer(copy);
@@ -955,18 +955,22 @@ scav_funinstance(lispobj *where, lispobj header)
     struct layout * layout = LAYOUT(layoutptr);
     scav1(&layout->friend, layout->friend);
 #else
+    // This handles compact or non-compact layouts with indifference.
     lispobj old = layoutptr;
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
 #endif
     struct funcallable_instance* fin = (void*)where;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // payload: entry addr, 2 raw words, implementation function
-    scavenge(&fin->function, nslots-3);
+#ifdef LISP_FEATURE_EXECUTABLE_FUNINSTANCES
+    lispobj* firstword = &fin->function;
 #else
-    // payload: trampoline entry addr, layout, implementation function, ...
-    scavenge(&fin->function, nslots-2);
+    lispobj* firstword = &fin->layout;
 #endif
+    // This will potentially see the layout "again" if it appears as an
+    // ordinary descriptor slot. Thankfully it's not a problem for gencgc
+    // to process a slot twice.
+    lispobj* lastword = where + (nslots+1); // exclusive upper bound
+    scavenge(firstword, lastword - firstword);
     return 1 + (nslots | 1);
 }
 

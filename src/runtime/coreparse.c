@@ -378,6 +378,26 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
 #endif
 }
 
+/* Refer to the figures above CALCULATE-DD-BITMAP in src/code/defstruct
+ * for the meaning of these constants.
+ * I think this fixes what may have been a latent bug in space relocation.
+ * Due to inconsistent use of the bitmap, it could have processed funinstance
+ * LAYOUT slots twice.  Layout is supposed to have a 0 bit, meaning do NOT scan
+ * in a loop over slots, but instead externally to the loop. By marking it as 1,
+ * it could be processed both outside and inside the loop. In the extremely rare
+ * case of partial overlap of the desired and actual heap addresses, a pointer
+ * somewhere in the middle can not be discerned as having been fixed up or not
+ * fixed up based on its value. You have to know based on code flow.
+ * Therefore layouts slots always have to be treated as raw in the bitmap,
+ * but I did not see where it is enforced in lisp for funinstances. */
+#ifndef LISP_FEATURE_EXECUTABLE_FUNINSTANCES
+# define FUNINSTANCE_BITMAP -4
+#elif defined LISP_FEATURE_COMPACT_INSTANCE_HEADER
+# define FUNINSTANCE_BITMAP -8
+#else
+# define FUNINSTANCE_BITMAP -24
+#endif
+
 static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
     lispobj *where = (lispobj*)start;
@@ -399,14 +419,6 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         widetag = header_widetag(word);
         nwords = sizetab[widetag](where);
         switch (widetag) {
-        case FUNCALLABLE_INSTANCE_WIDETAG:
-            // Special note on the word at where[1] in funcallable instances:
-            // - If no immobile code, then the word points to read-only space,
-            ///  hence needs no adjustment.
-            // - Otherwise, the word might point to a relocated range,
-            //   either the instance itself, or a trampoline in immobile space.
-            adjust_word_at(where+1, adj);
-            /* FALLTHROUGH */
         case INSTANCE_WIDETAG:
             layout = layout_of(where);
             adjusted_layout = adjust_word(adj, layout);
@@ -414,11 +426,32 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // so it would not be fixed up otherwise.
             if (adjusted_layout != layout) layout_of(where) = adjusted_layout;
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(adjusted_layout));
+            {
             lispobj* slots = where+1;
-            for (i=0; i<(nwords-1); ++i)
+            for (i=0; i<(nwords-1); ++i) // -1 from nwords because 'slots' is +1 from 'where'
                 if (bitmap_logbitp(i, bitmap)) adjust_pointers(slots+i, 1, adj);
+            }
             continue;
-          case SYMBOL_WIDETAG:
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+            /* If non-executable funinstance, then word index 1 points at read-only space,
+             * hence needs no adjustment. Otherwise, the word points within the funinstance.
+             * Either way, adjust_word_at will do the right thing */
+            adjust_word_at(where+1, adj);
+            /* We have to adjust the layout, but its bitmap can be disregarded.
+             * There is no variation in bitmap by particular subtype of funinstance */
+            layout = funinstance_layout(where);
+            adjusted_layout = adjust_word(adj, layout);
+            if (adjusted_layout != layout) funinstance_layout(where) = adjusted_layout;
+            const int mask = FUNINSTANCE_BITMAP;
+            gc_assert((mask & (1<<0)) == 0); // bitmap must reflect it as untagged
+            {
+            lispobj* slots = where+1;
+            // slots[0] is where[1] which we just adjusted, so skip it.
+            for (i=1; i<(nwords-1); ++i) // -1 from nwords because 'slots' is +1 from 'where'
+                if ((1<<i) & mask) adjust_pointers(slots+i, 1, adj);
+            }
+            continue;
+        case SYMBOL_WIDETAG:
             { // Copied from scav_symbol() in gc-common
             struct symbol* s = (void*)where;
             adjust_pointers(&s->value, 3, adj); // value, fdefn, info
@@ -1077,7 +1110,7 @@ static void trace_sym(lispobj, struct symbol*, struct grvisit_context*);
 static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* context)
 {
 #define ILLEGAL_WORD 0xFFFFFFFFDEADBEEF
-    if (ptr == ILLEGAL_WORD) lose("object %lx contains a garbage word", referer);
+    if (ptr == ILLEGAL_WORD) lose("object %"OBJ_FMTX" contains a garbage word", referer);
     if (lowtag_of(ptr) == FUN_POINTER_LOWTAG
         && widetag_of(FUNCTION(ptr)) == SIMPLE_FUN_WIDETAG)
         ptr = fun_code_tagged(FUNCTION(ptr));

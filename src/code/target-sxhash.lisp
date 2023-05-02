@@ -100,7 +100,7 @@
 (declaim (inline fsc-instance-hash))
 (defun fsc-instance-hash (fin)
   (truly-the hash-code
-   #+compact-instance-header
+   #+executable-funinstances
    (with-pinned-objects (fin)
      (let ((hash (sb-vm::compact-fsc-instance-hash
                   (truly-the sb-pcl::standard-funcallable-instance fin))))
@@ -109,7 +109,7 @@
        ;; Some uses of the hash might expect the high bits to have randomness in them.
        ;; This returns a positive fixnum to conform with the requirement on SXHASH.
        (murmur-hash-word/+fixnum hash)))
-   #-compact-instance-header
+   #-executable-funinstances
    (sb-pcl::standard-funcallable-instance-hash-code
     (truly-the sb-pcl::standard-funcallable-instance fin))))
 
