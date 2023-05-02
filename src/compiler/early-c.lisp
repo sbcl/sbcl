@@ -281,7 +281,7 @@
 (defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)
 
 (define-load-time-global *emitted-full-calls*
-    (make-hash-table :test 'equal :synchronized t))
+    (make-hash-table :test 'equal #-sb-xc-host :synchronized #-sb-xc-host t))
 
 (defmacro get-emitted-full-calls (name)
 ;; Todo: probably remove the wrapping cons. It was for globaldb
