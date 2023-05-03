@@ -2241,27 +2241,7 @@
   (defknown round-single (single-float #1#) single-float
       (foldable flushable movable always-translatable)))
 
-(defknown fixnum*
-  (fixnum fixnum t)
-  fixnum
-  (movable always-translatable))
-
-(defknown (signed* signed+ signed-)
-  (sb-vm:signed-word sb-vm:signed-word t)
-  integer
-  (movable always-translatable))
-
-(defknown (unsigned* unsigned+ unsigned-)
-  (word word t)
-  integer
-  (movable always-translatable))
-
-(defknown (unsigned+signed unsigned-signed)
-  (word sb-vm:signed-word t)
-  integer
-  (movable always-translatable))
-
-(defknown (signed-unsigned)
-  (sb-vm:signed-word word t)
+(defknown (overflow* overflow+ overflow-)
+  (integer integer t)
   integer
   (movable always-translatable))

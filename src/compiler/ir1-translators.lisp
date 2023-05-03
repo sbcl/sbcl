@@ -427,7 +427,10 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
   (declare (type symbol name))
   (let* ((template (or (gethash name *backend-template-names*)
                        (bug "undefined primitive ~A" name)))
-         (required (length (template-arg-types template)))
+         (required (- (vop-info-num-args  template)
+                      (if (template-more-args-type template)
+                          1
+                          0)))
          (info (template-info-arg-count template))
          (min (+ required info))
          (nargs (length args)))
