@@ -1297,7 +1297,7 @@ core and return a descriptor to it."
 
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #+metaspace '*read-only*
-                                 #+immobile-space '*immobile-fixedobj*
+                                 #+compact-instance-header '*immobile-fixedobj*
                                  '*dynamic*))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
@@ -1902,10 +1902,7 @@ core and return a descriptor to it."
                          sb-vm:symbol-value-slot
                          (ash (cold-layout-descriptor-bits 'function) 32))
 
-  #+metaspace
-  (cold-set '**primitive-object-layouts**
-            (allocate-vector sb-vm:simple-vector-widetag 256 256 *read-only*))
-  #+(and immobile-space (not metaspace))
+  #+compact-instance-header
   (cold-set '**primitive-object-layouts**
             (let ((filler
                    (make-random-descriptor
@@ -3539,7 +3536,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       (format stream "#define ~A_tlsindex 0x~X~%"
               c-symbol (ensure-symbol-tls-index symbol))))
   ;; This #define is relative to the start of the fixedobj space to allow heap relocation.
-  #+(or immobile-space metaspace)
+  #+compact-instance-header
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(~A_SPACE_START+0x~x)~%~}"
           "FUNCTION"
           #+metaspace "READ_ONLY" #-metaspace "FIXEDOBJ"

@@ -1509,20 +1509,13 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
  * and return the layout's address in tempspace. */
 static struct layout* fix_object_layout(lispobj* obj)
 {
-    // This works on instances, funcallable instances (and/or closures)
-    // but the latter only if the layout is in the header word.
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    gc_assert(widetag_of(obj) == INSTANCE_WIDETAG
-              || widetag_of(obj) == FUNCALLABLE_INSTANCE_WIDETAG
-              || widetag_of(obj) == CLOSURE_WIDETAG);
-#else
-    gc_assert(widetag_of(obj) == INSTANCE_WIDETAG);
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    // Without compact instance headers, there are no layouts in immobile-space,
+    return LAYOUT(layout_of(obj));
 #endif
+    gc_assert(instanceoid_widetag_p(widetag_of(obj)));
     lispobj layout = layout_of(obj);
     if (layout == 0) return 0;
-#ifdef LISP_FEATURE_METASPACE
-    return LAYOUT(layout);
-#else
     if (forwarding_pointer_p(native_pointer(layout))) { // usually
         layout = forwarding_pointer_value(native_pointer(layout));
         layout_of(obj) = layout;
@@ -1531,7 +1524,6 @@ static struct layout* fix_object_layout(lispobj* obj)
     gc_assert(header_widetag(native_layout->header) == INSTANCE_WIDETAG);
     gc_assert(layoutp(make_lispobj(native_layout, INSTANCE_POINTER_LOWTAG)));
     return native_layout;
-#endif
 }
 
 static void apply_absolute_fixups(lispobj, struct code*);
@@ -1824,9 +1816,6 @@ static void defrag_immobile_space(boolean verbose)
             } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         }
     }
-#ifndef LISP_FEATURE_METASPACE
-    gc_assert(obj_type_histo[INSTANCE_WIDETAG/4]);
-#endif
 
     // Calculate space needed for fixedobj pages after defrag.
     // page order is: layouts, symbols, fdefns.

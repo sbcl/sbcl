@@ -50,13 +50,13 @@
          (nwords (+ fixed-words extra-id-words bitmap-words))
          (layout
           (truly-the sb-vm:layout
-                     #-(or metaspace immobile-space) (%make-instance/mixed nwords)
-                     #+metaspace (sb-vm::allocate-metaspace-chunk (1+ nwords))
-                     #+(and immobile-space (not metaspace))
+                     #+compact-instance-header
                      (sb-vm::alloc-immobile-fixedobj
                       (1+ nwords)
                       (logior (ash nwords sb-vm:instance-length-shift)
-                              sb-vm:instance-widetag))))
+                              sb-vm:instance-widetag))
+                     #-compact-instance-header
+                     (%make-instance/mixed nwords)))
          (wrapper #-metaspace layout))
     (%set-instance-layout layout
           (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout

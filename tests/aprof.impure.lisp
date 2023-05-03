@@ -109,7 +109,7 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (values (make-this-struct) (make-that-struct)))
 (compile 'make-structs)
-(with-test (:name :aprof-instance :skipped-on (not :immobile-space))
+(with-test (:name :aprof-instance :skipped-on (not :compact-instance-header))
   (let (seen-this seen-that)
     (dolist (line (split-string
                    (with-output-to-string (s)

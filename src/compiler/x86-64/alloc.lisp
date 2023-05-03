@@ -180,6 +180,14 @@
   #-system-tlabs (declare (ignore type node))
   #+system-tlabs
   (or sb-c::*force-system-tlab*
+      ;; FIXME: for some reason, even though "src/code/avltree" is listed
+      ;; in src/cold/shared as forcing system-tlab allocation, we still end up
+      ;; withe AVLNODE function consing its node into an arena (if active).
+      ;; This means that thread creation will cause *ALL-THREADS* to point
+      ;; to an arena, which is terrible. Hence this kludge.
+      ;; Unfortunately, if not using #+compact-instance-header, then we don't
+      ;; receive a literal #<layout> for the type here. Maybe it's a constant TN?
+      ;; I stopped caring at some point.
       (and (sb-kernel::wrapper-p type)
            (let ((typename (classoid-name (wrapper-classoid type))))
              (or (sb-xc:subtypep typename 'ctype)
@@ -879,8 +887,8 @@
         (if stack-allocate-p
             (stack-allocation bytes fun-pointer-lowtag result)
             (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
-        (storew* #-immobile-space header ; write the widetag and size
-                 #+immobile-space        ; ... plus the layout pointer
+        (storew* #-compact-instance-header header ; write the widetag and size
+                 #+compact-instance-header        ; ... plus the layout pointer
                  (let ((layout #-sb-thread (static-symbol-value-ea 'function-layout)
                                #+sb-thread (thread-slot-ea thread-function-layout-slot)))
                    (cond ((typep header '(unsigned-byte 16))

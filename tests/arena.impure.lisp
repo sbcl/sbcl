@@ -1,5 +1,6 @@
-#-system-tlabs (invoke-restart 'run-tests::skip-file)
-#+interpreter (invoke-restart 'run-tests::skip-file)
+#+(or (not system-tlabs) (not compact-instance-header) interpreter)
+(invoke-restart 'run-tests::skip-file)
+
 (in-package sb-vm)
 
 (defvar *many-arenas*

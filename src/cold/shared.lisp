@@ -390,10 +390,8 @@
           ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")
          ("(and immobile-symbols (not immobile-space))"
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
-         ("(and system-tlabs (or (not sb-thread) (not immobile-space)))"
-          ;; I don't think it really reqires immobile-space but I haven't tried
-          ;; it and I don't care to support that.
-          ":SYSTEM-TLABS requires SB-THREAD and IMMOBILE-SPACE")
+         ("(and system-tlabs (not sb-thread))"
+          ":SYSTEM-TLABS requires SB-THREAD")
          ("(and sb-futex (not sb-thread))"
           "Can't enable SB-FUTEX on platforms lacking thread support")
          ;; There is still hope to make multithreading on DragonFly x86-64

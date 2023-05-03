@@ -67,9 +67,9 @@
 #-sb-xc-host
 (!cold-init-forms
 
-;; This vector is allocated in immobile space when possible. There isn't
-;; a way to do that from lisp, so it's special-cased in genesis.
-#-immobile-space (setq **primitive-object-layouts** (make-array 256))
+;; This vector is allocated into immobile fixedobj space if #+compact-instance-header.
+;; There isn't a way to do that from lisp, so it's special-cased in genesis.
+#-compact-instance-header (setq **primitive-object-layouts** (make-array 256))
 ;; If #+metaspace, we can't generally store layouts in heap objects except in
 ;; the instance header, but this vector can because it too will go in metaspace.
 (map-into **primitive-object-layouts**

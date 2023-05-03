@@ -477,7 +477,7 @@
                          (not (sb-c::producing-fasl-file))))))
        immediate-sc-number))
     #+metaspace (sb-vm:layout (bug "Can't reference layout as a constant"))
-    #+(and immobile-space (not metaspace)) (wrapper immediate-sc-number)
+    #+(and compact-instance-header (not metaspace)) (wrapper immediate-sc-number)
     (single-float
        (if (eql value $0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float

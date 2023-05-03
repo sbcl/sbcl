@@ -71,7 +71,7 @@
                            `((setf (sap-ref-word sap 0)
                                    (logior (function-header-word copy)
                                            closure-extra-data-indicator))))
-                       #+immobile-space ; copy the layout
+                       #+compact-instance-header ; copy the layout
                        (setf (sap-ref-32 sap 4) ; ASSUMPTION: little-endian
                              (logior (get-lisp-obj-address
                                       (wrapper-friend ,(find-layout 'function)))))

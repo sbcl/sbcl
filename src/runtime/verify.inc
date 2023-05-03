@@ -230,9 +230,11 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         for (i=2; i <nheader_words; ++i) CHECK(object[i], object+i);
         // Check the SIMPLE-FUN headers
         for_each_simple_fun(i, fheaderp, code, 1, {
-#if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
+#if defined LISP_FEATURE_COMPACT_INSTANCE_HEADER
             lispobj __attribute__((unused)) layout = funinstance_layout((lispobj*)fheaderp);
             gc_assert(!layout || layout == LAYOUT_OF_FUNCTION);
+#elif defined LISP_FEATURE_64_BIT
+            gc_assert((fheaderp->header >> 32) == 0);
 #endif
         });
 #if 0 // this looks redundant. It's checked with each pointer, no?
