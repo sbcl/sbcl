@@ -176,31 +176,6 @@
       (when rax-save (inst pop rax-tn))
       (emit-label skip-instrumentation))))
 
-(defun system-tlab-p (type node)
-  #-system-tlabs (declare (ignore type node))
-  #+system-tlabs
-  (or sb-c::*force-system-tlab*
-      ;; FIXME: for some reason, even though "src/code/avltree" is listed
-      ;; in src/cold/shared as forcing system-tlab allocation, we still end up
-      ;; withe AVLNODE function consing its node into an arena (if active).
-      ;; This means that thread creation will cause *ALL-THREADS* to point
-      ;; to an arena, which is terrible. Hence this kludge.
-      ;; Unfortunately, if not using #+compact-instance-header, then we don't
-      ;; receive a literal #<layout> for the type here. Maybe it's a constant TN?
-      ;; I stopped caring at some point.
-      (and (sb-kernel::wrapper-p type)
-           (let ((typename (classoid-name (wrapper-classoid type))))
-             (or (sb-xc:subtypep typename 'ctype)
-                 (eq typename 'sb-thread::avlnode))))
-      (and node
-           (named-let search-env ((env (sb-c::node-lexenv node)))
-             (dolist (data (sb-c::lexenv-user-data env)
-                           (and (sb-c::lexenv-parent env)
-                                (search-env (sb-c::lexenv-parent env))))
-               (when (and (eq (first data) :declare)
-                          (eq (second data) 'sb-c::tlab))
-                 (return (eq (third data) :system))))))))
-
 ;;; An arbitrary marker for the cons primitive-type, not to be confused
 ;;; with the CONS-TYPE in our type-algebraic sense. Mostly just informs
 ;;; the allocator to use cons_tlab.

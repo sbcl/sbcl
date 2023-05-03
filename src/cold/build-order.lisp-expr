@@ -556,7 +556,7 @@
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
  ("src/code/gc"                :not-host)
- ("src/code/avltree"           :not-host)
+ ("src/code/avltree"           :c-headers)
  ("src/code/target-thread"     :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro

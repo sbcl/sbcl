@@ -300,9 +300,9 @@
         #+nil
         (when (target-featurep '(:and :sb-futex :x86-64 :linux))
           (pushnew :futex-wait-metric sb-xc:*features*))
+        (when (target-featurep '(:and :x86-64 :sb-thread))
+          (pushnew :system-tlabs sb-xc:*features*))
         (when (target-featurep :immobile-space)
-          (when (member :sb-thread sb-xc:*features*)
-            (pushnew :system-tlabs sb-xc:*features*))
           (pushnew :compact-instance-header sb-xc:*features*)
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
@@ -775,6 +775,9 @@
              (search "src/code/arena" stem)
              (search "src/code/avltree" stem)
              (search "src/code/brothertree" stem)
+             (search "src/code/early-classoid" stem)
+             (search "src/code/type-class" stem)
+             (search "src/code/class" stem)
              (search "src/code/debug" stem) ; also matches debug-{info,int,var-io}
              (search "src/code/early-defmethod" stem)
              (search "src/code/final" stem)

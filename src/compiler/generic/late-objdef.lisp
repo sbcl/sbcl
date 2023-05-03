@@ -278,14 +278,3 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
   ;; It is 0 until added to the global chain so we can tell the difference between
   ;; an arena that was made but never used, and one that was used at some point.
   (link 0))
-
-;;; AVLNODE is primitive-object-like because it is needed by C code that looks up
-;;; entries in the tree of lisp threads.  But objdef doesn't have SB-XC:DEFSTRUCT
-;;; working, and I'm reluctant to create yet another 'something-thread' file to
-;;; put this in, not to mention that SB-THREAD is the wrong package anyway.
-(in-package "SB-THREAD")
-(sb-xc:defstruct (avlnode (:constructor avlnode (key data left right)))
-  (left  nil :read-only t)
-  (right nil :read-only t)
-  (key   0   :read-only t :type sb-vm:word)
-  data)

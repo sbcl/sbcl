@@ -1,6 +1,15 @@
 
 (in-package sb-thread)
 
+(sb-xc:defstruct (avlnode (:constructor avlnode (key data left right)))
+  (left  nil :read-only t)
+  (right nil :read-only t)
+  (key   0   :read-only t :type sb-vm:word)
+  data)
+
+;;; The remainder of this file is not for the host.
+#-sb-xc-host
+(progn
 ;;; Return the difference in left and right heights. Some people do the subtraction
 ;;; the other way around (like on Wikipedia). Oh well, it is what it is.
 (defun avl-balance-factor (node)
@@ -202,3 +211,4 @@
           (t
            (format stream "~s ~d" :count ct))))
   (format stream " #x~x>" (get-lisp-obj-address self)))
+) ; end PROGN

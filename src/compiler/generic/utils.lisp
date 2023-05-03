@@ -446,3 +446,22 @@
                     smallest-f d n))
            (values (ceiling (expt 2 fraction-bits) d) fraction-bits)))))
 
+(defun system-tlab-p (type node)
+  #-system-tlabs (declare (ignore type node))
+  #+system-tlabs
+  (or sb-c::*force-system-tlab*
+      (let ((typename (cond ((sb-kernel::wrapper-p type)
+                             (classoid-name (wrapper-classoid type)))
+                            ((sb-kernel::defstruct-description-p type)
+                             (dd-name type)))))
+        (when (and typename (sb-xc:subtypep typename 'ctype))
+          (error "~S instance constructor called in a non-system file"
+                 typename)))
+      (and node
+           (named-let search-env ((env (sb-c::node-lexenv node)))
+             (dolist (data (sb-c::lexenv-user-data env)
+                           (and (sb-c::lexenv-parent env)
+                                (search-env (sb-c::lexenv-parent env))))
+               (when (and (eq (first data) :declare)
+                          (eq (second data) 'sb-c::tlab))
+                 (return (eq (third data) :system))))))))

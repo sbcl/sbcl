@@ -96,17 +96,14 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 (define-vop (delete-arena)
   (:args (x :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
-  #+immobile-space
   (:temporary (:sc unsigned-reg :offset rbx-offset) rsp-save)
   (:vop-var vop)
   (:generator 1
     (move rdi x)
-    #-immobile-space (inst break halt-trap)
-    #+immobile-space
     (pseudo-atomic ()
       (inst mov rsp-save rsp-tn)
       (inst and rsp-tn -16) ; align as required by some ABIs
-      (inst call (make-fixup "sbcl_delete_arena" :foreign))
+      (inst call (ea (make-fixup "sbcl_delete_arena" :foreign 8)))
       (inst mov rsp-tn rsp-save)))))
 
 ;;; Destroy memory associated with ARENA, unlinking it from the global chain.
