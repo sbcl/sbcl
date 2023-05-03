@@ -34,7 +34,7 @@
   ;; the funcallable-instance implementation used not to be threadsafe
   ;; against setting the funcallable-instance function to a closure
   ;; (because the code and lexenv were set separately).
-  (let ((fun (sb-kernel:%make-funcallable-instance 0))
+  (let ((fun (test-util::make-funcallable-instance 0))
         (stop nil)
         (condition nil))
     ;; If the %FUN-LAYOUT were unset or its bitmap were 0, then the

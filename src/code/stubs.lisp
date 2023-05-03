@@ -125,7 +125,7 @@
   ; (def %instance-ref (instance index)) ; defined in 'target-defstruct'
   (def %instance-set (instance index new-value))
   ;; funcallable instances
-  (def %make-funcallable-instance)
+  ;(def %make-funcallable-instance)
   (def %fun-layout)
   (def %fun-wrapper)
   (def %set-fun-layout (fin new-value))

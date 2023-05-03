@@ -1038,3 +1038,10 @@
     (values tot-bytes
             (1- (hash-table-count seen))
             seen)))
+
+;;; x86-64 does not permit var-alloc to translate %make-funcallable-instance
+;;; so this case has to be amenable to fixed-alloc.
+(defun make-funcallable-instance (n)
+  (funcall
+   (compile nil
+            `(lambda () (sb-kernel:%make-funcallable-instance ,n)))))

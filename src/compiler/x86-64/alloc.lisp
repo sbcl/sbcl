@@ -953,7 +953,6 @@
       ;; the header is written so that displacement can be 0.
       (cond (stack-allocate-p
              (stack-allocation bytes (if type 0 lowtag) result))
-            #+immobile-space
             ((eql type funcallable-instance-widetag)
              (inst push bytes)
              (invoke-asm-routine 'call 'alloc-funinstance vop)
@@ -1004,7 +1003,6 @@
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name)
   (:results (result :scs (descriptor-reg) :from (:eval 1)))
   (:temporary (:sc unsigned-reg :from :eval :to (:eval 1)) bytes)
   (:temporary (:sc unsigned-reg :from :eval :to :result) header)
@@ -1014,6 +1012,11 @@
   (:node-var node)
   (:vop-var vop)
   (:generator 50
+   (when (eq name '%make-funcallable-instance)
+     ;; %MAKE-FUNCALLABLE-INSTANCE needs to allocate to pages of code,
+     ;; which it failed to do if the var-alloc translation was invoked.
+     ;; But it seems we never need this! (so is it FIXME or isn't it?)
+     (error "can't %MAKE-FUNCALLABLE-INSTANCE of unknown length"))
    (let ((remain-pseudo-atomic (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
    ;; With the exception of bignums, these objects have effectively
    ;; 32-bit headers because the high 4 byes contain a layout pointer.

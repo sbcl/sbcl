@@ -259,6 +259,10 @@
         (assert (zerop (slot (deref sb-vm::page-table p) 'sb-vm::start)))
         (let ((base (+ (* p sb-vm:gencgc-page-bytes)
                        sb-vm:dynamic-space-start)))
+          ;; This mapping operation may fail if the page's first object is not at the base
+          ;; or it ends with a page-spanning object. But this diagnostic logic should
+          ;; never be invoked. If it is, you should find the cause of that rather than
+          ;; worry about this slightly dubious use of map-objects-in-range.
           (sb-vm::map-objects-in-range
            (lambda (obj widetag size)
              (declare (ignore widetag size))
@@ -276,10 +280,7 @@
       ;; Some have as little as .5% space wasted.
       (assert (<= waste (* 3/100 code-bytes-consumed))))))
 
-(with-test (:name :code/data-separation
-           ;; I do not understand why this fails for this feature combination
-            :skipped-on (and :executable-funinstances
-                             (not :compact-instance-header)))
+(with-test (:name :code/data-separation)
   (compile 'ensure-code/data-separation)
   (ensure-code/data-separation))
 
