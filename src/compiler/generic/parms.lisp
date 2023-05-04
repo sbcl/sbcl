@@ -349,12 +349,14 @@
   #-sb-thread 1024) ; crazy value
 
 ;;; Thread slots accessed at negative indices relative to struct thread.
+;;; FIXME: this is extremely unmaintainable.
 (defconstant thread-header-slots
   ;; This seems to need to be an even number.
   ;; I'm not sure what the constraint on that stems from.
   #+(and x86-64 sb-safepoint) 14 ; the safepoint trap page is at word index -15
   #+(and x86-64 (not sb-safepoint)) 16
-  #-x86-64 0)
+  #+(and (not x86-64) immobile-space) 16
+  #+(and (not x86-64) (not immobile-space)) 0)
 
 #+gencgc
 (progn
