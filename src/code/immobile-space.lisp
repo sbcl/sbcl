@@ -46,11 +46,9 @@
 
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components
-         (make-array 20000 :element-type '(unsigned-byte 32)
-                           :fill-pointer 0 :adjustable t))
+         (make-array 20000 :element-type 'sb-vm:word :fill-pointer 0 :adjustable t))
         (relocs
-         (make-array 100000 :element-type '(unsigned-byte 32)
-                            :fill-pointer 0 :adjustable t))
+         (make-array 100000 :element-type 'sb-vm:word :fill-pointer 0 :adjustable t))
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
