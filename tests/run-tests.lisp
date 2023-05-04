@@ -503,6 +503,11 @@
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
     (makunbound '*allowed-inputs*)
+    ;; MUTEX-P could crash on a layoutless instance (tests may make such things).
+    ;; Normally a layoutless instance can never be see because user code can not
+    ;; publish an object until leaving its constructor, and a structure constructor
+    ;; wouldn't return before storing a layout. But MAP-ALLOCATED-OBJECTS finds it.
+    #+nil
     (let* ((mutexes
             (remove-if (lambda (x)
                          (or (eq x sb-impl::*active-processes-lock*)
