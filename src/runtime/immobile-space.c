@@ -1290,7 +1290,7 @@ void prepare_immobile_space_for_final_gc()
     SYMBOL(IMMOBILE_CODEBLOB_TREE)->value = NIL;
 }
 
-int* code_component_order;
+uword_t* code_component_order;
 
 int compute_codeblob_offsets_nwords(int* pcount)
 {
@@ -1639,8 +1639,8 @@ static void fixup_space(lispobj* where, size_t n_words)
     }
 }
 
-int* immobile_space_reloc_index;
-int* immobile_space_relocs;
+uword_t* immobile_space_reloc_index;
+uword_t* immobile_space_relocs;
 
 // Take and return an untagged pointer, or 0 if the object did not survive GC.
 static lispobj* get_load_address(lispobj* old)
@@ -1768,7 +1768,7 @@ static void defrag_immobile_space(boolean verbose)
 {
     int i;
 
-    int *components = code_component_order;
+    uword_t *components = code_component_order;
 
     // Count the number of symbols, fdefns, and layouts that will be relocated
     int obj_type_histo[64];
@@ -1858,7 +1858,7 @@ static void defrag_immobile_space(boolean verbose)
 #else
         for (i=0 ; components[i*2] ; ++i) {
 #endif
-            lispobj* addr = (lispobj*)(long)components[i*2];
+            lispobj* addr = (lispobj*)components[i*2];
             gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
             addr = native_pointer((lispobj)addr);
             int widetag = widetag_of(addr);
