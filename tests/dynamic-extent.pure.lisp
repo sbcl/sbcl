@@ -1746,6 +1746,11 @@
           (sb-ext:heap-allocated-p m))))
    (() :dynamic)))
 
+;;; The point of PRINTing seems to be to force a use of the DX value
+;;; and also show that it's not garbage. But assuming it works,
+;;; we don't need to actually see the output
+(defun print-nothing (x) (print x (make-broadcast-stream)))
+
 (with-test (:name :dx-do-propagate-let-var)
   (checked-compile-and-assert
    ()
@@ -1754,8 +1759,8 @@
                           (declare (optimize debug))
                           y))))
        (declare (dynamic-extent x))
-       (print x)
-       (print x)
+       (print-nothing x)
+       (print-nothing x)
        (assert (sb-ext:stack-allocated-p x))
        (assert (sb-ext:stack-allocated-p (cdr x))))
      nil)
@@ -1765,7 +1770,7 @@
   (checked-compile-and-assert
    ()
    '(lambda (z)
-     (let ((x (lambda () (print z))))
+     (let ((x (lambda () (print-nothing z))))
        (declare (dynamic-extent x))
        (funcall x)
        (funcall x)
@@ -1777,14 +1782,14 @@
   (checked-compile-and-assert
    ()
    '(lambda (x)
-     (let ((y (cons (lambda () (print x))
-                    (lambda () (print x)))))
+     (let ((y (cons (lambda () (print-nothing x))
+                    (lambda () (print-nothing x)))))
        (declare (dynamic-extent y))
-       (print y)
+       (print-nothing y)
        (assert (sb-ext:stack-allocated-p y))
        (assert (sb-ext:stack-allocated-p (car y)))
        (assert (sb-ext:stack-allocated-p (cdr y)))
-       (print y)
+       (print-nothing y)
        (funcall (car y))))
    ((3) 3)))
 
@@ -1792,15 +1797,15 @@
   (checked-compile-and-assert
    ()
    '(lambda (x)
-     (let ((y (cons (flet ((g () (print x)))
+     (let ((y (cons (flet ((g () (print-nothing x)))
                       #'g)
-                    (lambda () (print x)))))
+                    (lambda () (print-nothing x)))))
        (declare (dynamic-extent y))
-       (print y)
+       (print-nothing y)
        (assert (sb-ext:stack-allocated-p y))
        (assert (sb-ext:stack-allocated-p (car y)))
        (assert (sb-ext:stack-allocated-p (cdr y)))
-       (print y)
+       (print-nothing y)
        (funcall (car y))))
    ((3) 3)))
 
