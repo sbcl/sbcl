@@ -595,20 +595,25 @@
            (type template template))
   (collect ((info-args))
     (let ((last nil)
-          (first nil))
+          (first nil)
+          (info-arg-count (template-info-arg-count template)))
       (do ((args args (cdr args))
            (types (template-arg-types template) (cdr types)))
           ((null args))
         (let ((type (first types))
               (arg (first args)))
-          (if (and (consp type) (eq (car type) ':constant))
-              (info-args (lvar-value arg))
-              (let ((ref (reference-tn (lvar-tn node block arg) nil)))
-                (setf (tn-ref-type ref) (lvar-type arg))
-                (if last
-                    (setf (tn-ref-across last) ref)
-                    (setf first ref))
-                (setq last ref)))))
+          (cond ((or (and (consp type) (eq (car type) ':constant))
+                     (and (not type)
+                          (> info-arg-count 0)))
+                 (decf info-arg-count)
+                 (info-args (lvar-value arg)))
+                (t
+                 (let ((ref (reference-tn (lvar-tn node block arg) nil)))
+                   (setf (tn-ref-type ref) (lvar-type arg))
+                   (if last
+                       (setf (tn-ref-across last) ref)
+                       (setf first ref))
+                   (setq last ref))))))
 
       (values (the (or tn-ref null) first) (info-args)))))
 
@@ -779,23 +784,19 @@
 ;;; IR1 conversion. The only difference between this and the function
 ;;; case of IR2-CONVERT-TEMPLATE is that there can be codegen-info
 ;;; arguments.
-(defoptimizer (%%primitive ir2-convert) ((template info &rest args) call block)
+(defoptimizer (%%primitive ir2-convert) ((template &rest args) call block)
   (let* ((template (lvar-value template))
-         (info (lvar-value info))
          (lvar (node-lvar call))
          (rtypes (template-result-types template))
          (results (make-template-result-tns call lvar rtypes))
          (r-refs (reference-tn-list results t)))
     (multiple-value-bind (args info-args)
-        (reference-args call block (cddr (combination-args call)) template)
+        (reference-args call block (cdr (combination-args call)) template)
       (aver (not (template-more-results-type template)))
       (aver (not (template-conditional-p template)))
-      (aver (null info-args))
-
-      (if info
-          (emit-template call block template args r-refs info)
+      (if info-args
+          (emit-template call block template args r-refs info-args)
           (emit-template call block template args r-refs))
-
       (move-lvar-result call block results lvar)))
   (values))
 

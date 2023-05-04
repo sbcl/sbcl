@@ -455,11 +455,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-                 `(%%primitive ',template
-                               ',(eval-info-args
-                                  (subseq args required min))
-                               ,@(subseq args 0 required)
-                               ,@(subseq args min)))))
+                 `(%%primitive ',template ,@args))))
 
 (defmacro inline-%primitive (template &rest args)
   (let* ((required (length (template-arg-types template)))
@@ -484,11 +480,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
     (when (template-more-results-type template)
       (bug "%PRIMITIVE was used with an unknown values template."))
 
-    `(%%primitive ',template
-                  ',(eval-info-args
-                     (subseq args required min))
-                  ,@(subseq args 0 required)
-                  ,@(subseq args min))))
+    `(%%primitive ',template ,@args)))
 
 ;;;; QUOTE
 

@@ -1916,7 +1916,7 @@
 (defknown %continue-unwind () nil)
 (defknown %throw (t &rest t) nil) ; This is MV-called.
 (defknown %nlx-entry (t) *)
-(defknown %%primitive (t t &rest t) *)
+(defknown %%primitive (t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %nip-values (t t &rest t) (values))
 (defknown %dummy-dx-alloc (t t) t)

@@ -2820,9 +2820,9 @@
                 (eq (third (combination-args dest)) lvar))
            (specifier-type 'sb-vm:signed-word)))))
 
-(defun overflow-transform (name x y node)
+(defun overflow-transform (name x y node &optional (swap t))
   (delay-ir1-transform node :ir1-phases)
-  (LET ((type (single-value-type (node-derived-type node))))
+  (let ((type (single-value-type (node-derived-type node))))
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word)))
       (give-up-ir1-transform))
@@ -2830,13 +2830,34 @@
            (cast (or (cast-or-check-bound-type (node-lvar node))
                      (give-up-ir1-transform)))
            (result-type (type-intersection type cast)))
-      (loop for vop in vops
-            for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
-            when (and (csubtypep (lvar-type x) x-type)
-                      (csubtypep (lvar-type y) y-type)
-                      (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop)))))
-            return `(%primitive ,(vop-info-name vop) x y ',(type-specifier cast))
-            finally (give-up-ir1-transform)))))
+      (flet ((subp (lvar type)
+               (cond
+                 ((not (constant-type-p type))
+                  (csubtypep (lvar-type lvar) type))
+                 ((not (constant-lvar-p lvar))
+                  nil)
+                 (t
+                  (let ((value (lvar-value lvar))
+                        (type (type-specifier (constant-type-type type))))
+                    (if (typep type '(cons (eql satisfies)))
+                        (funcall (second type) value)
+                        (sb-xc:typep value type)))))))
+       (loop with rotate
+             for vop in vops
+             for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
+             when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                       (or (and (subp x x-type)
+                                (subp y y-type))
+                           (and swap
+                                (subp y x-type)
+                                (subp x y-type)
+                                (setf rotate t))))
+             return `(%primitive ,(vop-info-name vop)
+                                 ,@(if rotate
+                                       '(y x)
+                                       '(x y))
+                                 ',(type-specifier cast))
+             finally (give-up-ir1-transform))))))
 
 (deftransform * ((x y) ((or word sb-vm:signed-word) (or word sb-vm:signed-word))
                  * :node node :important nil)
@@ -2848,7 +2869,7 @@
 
 (deftransform - ((x y) ((or word sb-vm:signed-word) (or word sb-vm:signed-word))
                  * :node node :important nil)
-  (overflow-transform 'overflow- x y node))
+  (overflow-transform 'overflow- x y node nil))
 
 ;;; These must come before the ones below, so that they are tried
 ;;; first.

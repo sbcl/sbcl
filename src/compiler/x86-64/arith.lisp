@@ -766,11 +766,11 @@
       (move r x)
       (inst imul r y)
       (inst jmp :o error))))
-#+fixme
+
 (define-vop (overflow*-fixnum*/c)
   (:translate overflow*)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (satisfies plausible-signed-imm32-operand-p)))
+  (:arg-types tagged-num (:constant (signed-byte 32)))
   (:info y type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -779,7 +779,6 @@
   (:generator 2
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
-           (y (plausible-signed-imm32-operand-p y))
            (error (generate-error-code+ (lambda ()
                                           (inst mov r (fixnumize y)))
                                         vop
