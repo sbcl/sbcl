@@ -27,6 +27,16 @@
     (assert (null (c-find-heap->arena)))
     (destroy-arena a)))
 
+(test-util:with-test (:name :no-arena-symbol-name)
+  (let* ((a (new-arena 1048576))
+         (symbol
+          (sb-vm:with-arena (a)
+            (let ((string (format nil "test~D" (random 10))))
+              (make-symbol string)))))
+    (assert (heap-allocated-p symbol))
+    (assert (heap-allocated-p (symbol-name symbol)))
+    (destroy-arena a)))
+
 (test-util:with-test (:name :no-arena-symbol-property)
   (let* ((a (new-arena 1048576))
          (copy-of-foo
@@ -36,6 +46,25 @@
     (test-util:opaque-identity copy-of-foo)
     (assert (not (c-find-heap->arena)))
     (destroy-arena a)))
+
+(defun find-some-pkg () (find-package "NOSUCHPKG"))
+
+(test-util:with-test (:name :find-package-1-element-cache)
+  (let* ((cache (let ((code (fun-code-header #'find-some-pkg)))
+                  (loop for i from code-constants-offset
+                        below (code-header-words code)
+                        when (and (typep (code-header-ref code i) '(cons string))
+                                  (string= (car (code-header-ref code i))
+                                           "NOSUCHPKG"))
+                        return (code-header-ref code i))))
+         (elements (cdr cache)))
+    (assert (equalp (cdr cache) #(NIL NIL NIL)))
+    (let* ((a (new-arena 1048576))
+           (pkg (with-arena (a) (find-some-pkg))))
+      (assert (not pkg)) ; no package was found of course
+      (assert (neq (cdr cache) elements)) ; the cache got affected
+      (assert (not (c-find-heap->arena)))
+      (destroy-arena a))))
 
 #+nil
 (test-util:with-test (:name :arena-alloc-waste-reduction)

@@ -377,12 +377,31 @@ distinct from the global value. Can also be SETF."
 
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
+  ;; This constructor assumes that you should never create a symbol in an arena.
+  ;; That being the case, you also never want to have its name in an arena,
+  ;; or else it would make a heap->arena reference. Theoretically gensyms could
+  ;; go in an arena, but that's such an obscure case. This has worked well so far
+  ;; with the system TLAB assumption that I'm leaving that as-is, and mitigating the
+  ;; problem with arena-allocated strings, rather than guessing whether you really
+  ;; did want an arena-allocated symbol.
   (declare (sb-c::tlab :system))
-  ;; Avoid writing to the string header if it's already flagged as readonly, or off-heap.
-  (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
-             (dynamic-space-obj-p name))
-    (logior-array-flags name sb-vm:+vector-shareable+)) ; Set "logically read-only" bit
-  (let ((symbol
+  (binding*
+      ((name
+        ;; We clearly have permission to copy: "It is implementation-dependent whether
+        ;; the string that becomes the new-symbol's name is the given name"
+        ;; but may or may not have leeway to change the element-type.
+        ;; I don't feel like writing a different variant of POSSIBLY-FROB-TO-HEAP just
+        ;; to satisfy pedants. However, only users of arenas would detect
+        ;; a change of element-type, if they care at all, which they don't.
+        (if (or (dynamic-space-obj-p name) (read-only-space-obj-p name))
+            name ; use as-is
+            (possibly-base-stringize-to-heap name)))
+       (()
+        (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
+                   ;; Readonly space is physically unwritable. Don't touch it.
+                   (dynamic-space-obj-p name))
+          (logior-array-flags name sb-vm:+vector-shareable+))) ; Set "logically read-only" bit
+       (symbol
          (truly-the symbol
           ;; If no immobile-space, easy: all symbols go in dynamic-space
           #-immobile-space (sb-vm::%%make-symbol name)

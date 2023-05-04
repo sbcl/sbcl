@@ -2156,6 +2156,7 @@ PACKAGE."
 (macrolet ((def-finder (name sub-finder validp)
              `(defun ,name (cell)
                 (declare (optimize speed))
+                (declare (sb-c::tlab :system))
                 (let ((memo (cdr cell)))
                   (declare (type (simple-vector 3) memo)) ; weak vector: #(cookie nick-id #<pkg>)
                   (when (eq (aref memo 0) *package-names-cookie*) ; valid cache entry
@@ -2170,7 +2171,7 @@ PACKAGE."
                         (return-from ,name pkg))))
                   (let* ((string (car cell))
                          (pkg (,sub-finder string))
-                         (new (make-weak-vector 3 :initial-element 0)))
+                         (new (sb-c::allocate-weak-vector 3)))
                     (setf (elt new 0) *package-names-cookie*
                           (elt new 1) (info-gethash string (car *package-nickname-ids*))
                           (elt new 2) pkg)

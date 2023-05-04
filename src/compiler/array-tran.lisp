@@ -2027,3 +2027,25 @@
 (defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
     ((array))
   (values array (specifier-type '(and vector (not simple-array)))))
+
+;;; I am highly reluctant to add a transform on MAKE-WEAK-VECTOR which allows it to inline,
+;;; because frankly we may need to cease supporting weak-vectors as they currently exist.
+;;; Instead it would be just a vector of weak pointers. The problem stems from allowing
+;;; multiple objects to refer weakly to a given object X in relation to on-the-fly GC.
+;;; It is inefficient or dangerous (or both) to allow multiple weak referers to X to
+;;; simultaneously exist unless you can ensure that they are smashed simultaneously too.
+;;; If you don't ensure that, then there is a window in which thread1 observes
+;;; weak-pointer-value = NIL while thread2 still has an access path to X simply by
+;;; dereferencing the weak pointer. So weak vectors compound that problem because users can
+;;; iterate over the vector and enliven everything.
+;;; A possible solution: weak pointers may need to become interned so any object has at
+;;; most 1 weak referer. Also weak hash-tables need a good amount of thought.
+;;;
+;;; But we need this macro in order for some internal code such as a FIND-PACKAGE
+;;; inline cache (from the optimizer) to inline the vector allocation without it
+;;; having to know how to call ALLOCATE-VECTOR.
+(sb-xc:defmacro allocate-weak-vector (n)
+  ;; Explicitly compute a widetag with the weakness bit ORed in.
+  (let ((type (logior (ash sb-vm:vector-weak-flag sb-vm:array-flags-position)
+                      sb-vm:simple-vector-widetag)))
+    `(truly-the simple-vector (allocate-vector #+ubsan nil ,type ,n ,n))))
