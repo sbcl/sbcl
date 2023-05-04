@@ -285,7 +285,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 #ifdef reg_CODE
             code_pointer(*os_context_register_addr(context, reg_CODE));
 #else
-        (struct code *)dynamic_space_code_from_pc((char *)pc);
+        (struct code *)component_ptr_from_pc((char *)pc);
 #endif
         info->lra = NIL;
 
@@ -331,7 +331,7 @@ int lisp_frame_previous(struct thread *thread, struct call_info *info)
 #ifdef reg_CODE
         (struct code*)native_pointer(this_frame->code);
 #else
-        (struct code *)dynamic_space_code_from_pc((char *)lra);
+        (struct code*)component_ptr_from_pc((char *)lra);
 #endif
 #ifdef reg_LRA
         info->pc = lra;

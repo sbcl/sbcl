@@ -49,7 +49,6 @@ extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);
 extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
                         lispobj arg2);
 extern lispobj *component_ptr_from_pc(char *pc);
-extern lispobj *dynamic_space_code_from_pc(char *pc);
 
 #if defined(LISP_FEATURE_X86)||defined(LISP_FEATURE_X86_64)
 extern unsigned int * single_stepping;
