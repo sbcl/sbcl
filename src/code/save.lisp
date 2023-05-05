@@ -237,7 +237,8 @@ sufficiently motivated to do lengthy fixes."
           ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
           ;; prior causes compilation to occur into immobile space.
           ;; Failing to see all immobile code would miss some relocs.
-          #+immobile-code (sb-vm::choose-code-component-order root-structures)
+          ;; FIXME: this could work on non-x86, but it doesn't right now.
+          #+(and x86-64 immobile-code) (sb-vm::choose-code-component-order root-structures)
           ;; Must clear this cache if asm routines are movable.
           (setq sb-disassem::*assembler-routines-by-addr* nil
                 ;; and save some space by deleting the instruction decoding table

@@ -1310,7 +1310,10 @@ void prepare_immobile_space_for_save(boolean verbose)
         printf("[defragmenting immobile space... ");
         fflush(stdout);
     }
+
+#ifdef LISP_FEATURE_X86_64
     defrag_immobile_space(verbose);
+#endif
 
     lispobj* obj = (lispobj*)FIXEDOBJ_SPACE_START;
     lispobj* limit = fixedobj_free_pointer;
