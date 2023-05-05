@@ -168,8 +168,6 @@ static const unsigned block_header_prev_free_bit = 1 << 9;
  * So there's really no need to do anything about it.
 static const unsigned block_header_oversized = 1 << 10;
 */
-
-#define IMMOBILE_CARD_SHIFT 12
 void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
 {
     // The size we request is 1 word less, because the allocator's block header
@@ -186,7 +184,7 @@ void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
     lispobj* end = (lispobj*)c + nwords;
     if (end > text_space_highwatermark) text_space_highwatermark = end;
     // Adjust the scan start if this became the lowest addressable in-use block on its page
-    low_page_index_t tlsf_page = ((char*)c - (char*)tlsf_mem_start) >> IMMOBILE_CARD_SHIFT;
+    low_page_index_t tlsf_page = ((char*)c - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
     int offset = (uword_t)c & (IMMOBILE_CARD_BYTES-1);
     if (offset < tlsf_page_sso[tlsf_page]) tlsf_page_sso[tlsf_page] = offset;
     text_page_genmask[find_text_page_index(c)] |= 1;
@@ -224,7 +222,7 @@ void tlsf_unalloc_codeblob(tlsf_t tlsf, struct code* code)
         gc_assert(!((uword_t)text_space_highwatermark & LOWTAG_MASK));
     }
     // See if the page scan start needs to change
-    low_page_index_t tlsf_page = ((char*)code - (char*)tlsf_mem_start) >> IMMOBILE_CARD_SHIFT;
+    low_page_index_t tlsf_page = ((char*)code - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
     int offset = (uword_t)code & (IMMOBILE_CARD_BYTES-1);
     if (offset == tlsf_page_sso[tlsf_page]) {
         lispobj* next = end;
@@ -234,7 +232,7 @@ void tlsf_unalloc_codeblob(tlsf_t tlsf, struct code* code)
         }
         // If the next used block is on the same page, then it becomes the page scan start
         // even if it the ending sentinel block (which counts as "used").
-        if ((((uword_t)next ^ (uword_t)code) >> IMMOBILE_CARD_SHIFT) == 0) {
+        if ((((uword_t)next ^ (uword_t)code) / IMMOBILE_CARD_BYTES) == 0) {
             tlsf_page_sso[tlsf_page] = (uword_t)next & (IMMOBILE_CARD_BYTES-1);
         } else {
             tlsf_page_sso[tlsf_page] = USHRT_MAX;
