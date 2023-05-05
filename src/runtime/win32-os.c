@@ -1205,6 +1205,7 @@ handle_exception_ex(EXCEPTION_RECORD *exception_record,
     EXCEPTION_DISPOSITION disp = ExceptionContinueExecution;
     switch (code) {
     case EXCEPTION_STACK_OVERFLOW:
+    {
         void *sp = voidreg(win32_context, sp);
         fprintf(stderr, "INFO: Caught stack overflow exception (sp=0x%p); "
                         "proceed with caution.\n", sp);
@@ -1212,6 +1213,7 @@ handle_exception_ex(EXCEPTION_RECORD *exception_record,
         self->state_word.control_stack_guard_page_protected = 0;
         rc = -1;
         break;
+    }
 
     case EXCEPTION_ACCESS_VIOLATION:
         rc = handle_access_violation(ctx, exception_record, fault_address, self);
