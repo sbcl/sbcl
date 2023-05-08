@@ -1328,7 +1328,8 @@
     (case accumulate
       (:nconc
        (when res
-         (setf (cdr (last temp)) res)))
+         (psetf temp res
+                (cdr (last temp)) res)))
       (:list (setf (cdr temp) (list res)
                    temp (cdr temp))))))
 
