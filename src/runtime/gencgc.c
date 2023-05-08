@@ -3641,7 +3641,14 @@ dynamic_space_code_from_pc(char *pc)
 static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
-    if (page < 0) return;
+    if (page < 0) {
+        // FIXME: Is this actually necessary? The intention is to keep
+        // the on-stack code live, not to pin it, as it's already
+        // immobile.
+        if (immobile_space_p(addr))
+            immobile_space_preserve_pointer((void*)component_ptr_from_pc((char*)addr));
+        return;
+    }
     if (immune_set_memberp(page)) return;
 
     struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
