@@ -111,9 +111,6 @@
 
 ;;;; Fdefinition (fdefn) objects.
 
-(define-vop (fdefn-fun cell-ref)
-  (:variant fdefn-fun-slot other-pointer-lowtag))
-
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
   (:policy :fast-safe)

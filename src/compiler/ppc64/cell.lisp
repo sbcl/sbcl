@@ -294,8 +294,6 @@
 
 ;;;; Fdefinition (fdefn) objects.
 
-(define-vop (fdefn-fun cell-ref) ; does not translate anything
-  (:variant fdefn-fun-slot other-pointer-lowtag))
 (define-vop (untagged-fdefn-fun cell-ref) ; does not translate anything
   (:variant fdefn-fun-slot 0))
 

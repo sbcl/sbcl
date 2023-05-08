@@ -180,7 +180,8 @@
                     (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res))
                 #-untagged-fdefns
                 (if unsafe
-                    (vop fdefn-fun node block fdefn-tn res)
+                    (vop slot node block fdefn-tn 'fdefn-fun sb-vm:fdefn-fun-slot
+                         sb-vm:other-pointer-lowtag res)
                     (vop safe-fdefn-fun node block fdefn-tn res)))))))))
 
 ;;; some sanity checks for a CLAMBDA passed to IR2-CONVERT-CLOSURE
