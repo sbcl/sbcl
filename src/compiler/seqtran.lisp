@@ -71,19 +71,22 @@
         `(let ,fn-binding
            ,(ecase accumulate
              (:nconc
-              (let ((temp (gensym))
+              (let ((last (gensym "LAST"))
                     (map-result (gensym)))
                 `(let ((,map-result
-                        ;; MUFFLE- is not injected when cross-compiling.
-                        ;; See top of file for explanation.
-                        (locally
-                            #-sb-xc-host
-                            (declare (muffle-conditions compiler-note))
-                          (list nil))))
+                         ;; MUFFLE- is not injected when cross-compiling.
+                         ;; See top of file for explanation.
+                         (locally
+                             #-sb-xc-host
+                           (declare (muffle-conditions compiler-note))
+                           (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
-                   (do-anonymous ((,temp ,map-result) . ,(do-clauses))
+                   (do-anonymous ((,last ,map-result) . ,(do-clauses))
                      (,endtest (cdr ,map-result))
-                     (setq ,temp (last (nconc ,temp ,call)))))))
+                     (let ((result ,call))
+                       (when result
+                         (psetf ,last result
+                                (cdr (last ,last)) result)))))))
              (:list
               (let ((temp (gensym))
                     (map-result (gensym)))

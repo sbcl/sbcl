@@ -1328,14 +1328,7 @@
     (case accumulate
       (:nconc
        (when res
-         (setf (cdr temp) res)
-         ;; KLUDGE: it is said that MAPCON is equivalent to
-         ;; (apply #'nconc (maplist ...)) which means (nconc 1) would
-         ;; return 1, but (nconc 1 1) should signal an error.
-         ;; The transformed MAP code returns the last result, do that
-         ;; here as well for consistency and simplicity.
-         (when (consp res)
-           (setf temp (last res)))))
+         (setf (cdr (last temp)) res)))
       (:list (setf (cdr temp) (list res)
                    temp (cdr temp))))))
 
