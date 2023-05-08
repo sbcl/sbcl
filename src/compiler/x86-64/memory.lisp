@@ -73,17 +73,8 @@
    (t
       (inst mov :qword ea value))))
 
-;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
-;;; offset to be read or written is a property of the VOP used.
-(define-vop (cell-ref)
-  (:args (object :scs (descriptor-reg)))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:variant-vars offset lowtag)
-  (:policy :fast-safe)
-  (:generator 4
-    (loadw value object offset lowtag)))
-;; This vop's sole purpose is to be an ancestor for other vops, to assign
-;; default operands, policy, and generator.
+;; This vop's sole purpose is to provide the implementation of value-cell-set.
+;; It could be removed, for x86-64 anyway.
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
