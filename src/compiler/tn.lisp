@@ -344,20 +344,32 @@
 
 ;;;; TN referencing
 
+(defmacro link-tn-ref (write-p tn ref)
+  `(cond (,write-p
+          (let ((w (tn-writes ,tn)))
+            (when w
+              (setf (tn-ref-prev w) ,ref))
+            (setf (tn-ref-next ref) w
+                  (tn-writes tn) ,ref)))
+         (t
+          (let ((r (tn-reads ,tn)))
+            (when r
+              (setf (tn-ref-prev r) ,ref))
+            (setf (tn-ref-next ,ref) r
+                  (tn-reads tn) ,ref)))))
+
 ;;; Make a TN-REF that references TN and return it. WRITE-P should be
 ;;; true if this is a write reference, otherwise false. All we do
 ;;; other than calling the constructor is add the reference to the
 ;;; TN's references.
 (defun reference-tn (tn write-p)
   (declare (type tn tn) (type boolean write-p))
-  (let ((res (make-tn-ref tn write-p)))
+  (let ((ref (make-tn-ref tn write-p)))
     (unless (eql (tn-kind tn) :unused)
       (when (tn-primitive-type tn)
-        (aver (setf (tn-ref-type res) (tn-type tn))))
-      (if write-p
-          (push-in tn-ref-next res (tn-writes tn))
-          (push-in tn-ref-next res (tn-reads tn))))
-    res))
+        (aver (setf (tn-ref-type ref) (tn-type tn))))
+      (link-tn-ref write-p tn ref))
+    ref))
 
 (defun reference-tn-refs (refs write-p)
   (when refs
@@ -407,10 +419,20 @@
 ;;; Remove Ref from the references for its associated TN.
 (defun delete-tn-ref (ref)
   (declare (type tn-ref ref))
-  (if (tn-ref-write-p ref)
-      (deletef-in tn-ref-next (tn-writes (tn-ref-tn ref)) ref)
-      (deletef-in tn-ref-next (tn-reads (tn-ref-tn ref)) ref))
-  (values))
+  (let ((tn (tn-ref-tn ref))
+        (prev (tn-ref-prev ref))
+        (next (tn-ref-next ref)))
+    (cond ((tn-ref-write-p ref)
+           (if prev
+               (setf (tn-ref-next prev) next)
+               (setf (tn-writes tn) next)))
+          (t
+           (if prev
+               (setf (tn-ref-next prev) next)
+               (setf (tn-reads tn) next))))
+    (when next
+      (setf (tn-ref-prev next) prev))
+    (setf (tn-ref-prev ref) nil)))
 
 ;;; Do stuff to change the TN referenced by Ref. We remove Ref from its
 ;;; old TN's refs, add ref to TN's refs, and set the TN-REF-TN.
@@ -418,10 +440,8 @@
   (declare (type tn-ref ref) (type tn tn))
   (delete-tn-ref ref)
   (setf (tn-ref-tn ref) tn)
-  (if (tn-ref-write-p ref)
-      (push-in tn-ref-next ref (tn-writes tn))
-      (push-in tn-ref-next ref (tn-reads tn)))
-  (values))
+  (link-tn-ref (tn-ref-write-p ref) tn ref)
+  nil)
 
 ;;;; miscellaneous utilities
 

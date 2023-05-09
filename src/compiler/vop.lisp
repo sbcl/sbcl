@@ -536,6 +536,8 @@
   ;; the link for a list running through all TN-REFs for this TN of
   ;; the same kind (read or write)
   (next nil :type (or tn-ref null))
+  ;; For faster delete-tn-ref
+  (prev nil :type (or tn-ref null))
   ;; the VOP where the reference happens, or NIL temporarily
   (vop nil :type (or vop null))
   ;; the link for a list of all TN-REFs in VOP, in reverse order of
