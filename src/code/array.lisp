@@ -1848,7 +1848,7 @@ function to be removed without further warning."
                                     body))
                             (setf (svref ,table-name ,typecode) #',fun-name))))
        (defmacro ,dispatch-name (&rest args)
-         (check-type (first args) symbol)
+         (aver (symbolp (first args)))
          (let ((tag (gensym "TAG")))
            `(funcall
              (truly-the function
