@@ -1862,6 +1862,30 @@
       (inst cbnz high error)
       (inst tbnz* r 63 error))))
 
+(define-vop (overflow*-signed-unsigned=>unsigned)
+  (:translate overflow*)
+  (:args (x :scs (signed-reg))
+         (y :scs (unsigned-reg ;; immediate
+                  )))
+  (:arg-types signed-num unsigned-num)
+  (:info type)
+  (:temporary (:sc unsigned-reg) high)
+  (:results (r :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 4
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
+      (assemble ()
+        (inst cbz y SKIP)
+        (inst tbnz* x 63 error)
+        SKIP
+        (inst mul r x y)
+        (inst umulh high x y)
+        (inst cbnz high error)))))
+
 (define-vop (overflow*-signed-unsigned=>signed)
   (:translate overflow*)
   (:args (x :scs (signed-reg))
@@ -1874,7 +1898,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 4
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
