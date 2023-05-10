@@ -1971,7 +1971,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 3
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error
@@ -2014,7 +2014,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 8
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
@@ -2050,7 +2050,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::signed-unsigned-add-overflow-error r)))
@@ -2112,7 +2112,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 3
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
@@ -2132,7 +2132,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::signed-unsigned-add-overflow-error r)))
@@ -2152,7 +2152,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
@@ -2180,6 +2180,27 @@
       (inst tbnz* x 63 error)
       (inst b :lo error))))
 
+(define-vop (overflow-signed=>unsigned)
+  (:translate overflow-)
+  (:args (x :scs (signed-reg) :to :save)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types signed-num signed-num)
+  (:info type)
+  (:temporary (:scs (unsigned-reg)) temp)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
+      (inst asr temp x 63)
+      (inst asr tmp-tn y 63)
+      (inst subs r x y)
+      (inst sbc temp temp tmp-tn)
+      (inst tbnz* temp 0 error))))
+
 (define-vop (overflow-unsigned-signed=>unsigned)
   (:translate overflow-)
   (:args (x :scs (unsigned-reg) :to :result)
@@ -2191,7 +2212,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 7
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))

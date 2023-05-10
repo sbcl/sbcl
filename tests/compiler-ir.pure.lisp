@@ -410,7 +410,7 @@
   (let* ((types '(sb-vm:word sb-vm:signed-word))
          (the-types `(fixnum (unsigned-byte 16) (signed-byte 16) ,@types)))
     (loop
-      for op in '(+ * #-arm64 -)
+      for op in '(+ * -)
       do
       (loop
         for a-type in types
