@@ -506,7 +506,12 @@
   (deferr sub-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (object-not-type-error (- x y) type nil))))
+      (object-not-type-error (- x y) type nil)))
+
+  (deferr mul-overflow2-error (x y)
+    (let ((type (or (sb-di:error-context)
+                    'fixnum)))
+      (object-not-type-error (* x y) type nil))))
 
 ;;;; INTERNAL-ERROR signal handler
 
