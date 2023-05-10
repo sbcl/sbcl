@@ -404,3 +404,26 @@
                      (declare (notinline f))
                      (values (f)))))))
     (assert (not calls))))
+
+(with-test (:name :overflow-arith
+            :skipped-on (not :arm64))
+  (let* ((types '(sb-vm:word sb-vm:signed-word))
+         (the-types `(fixnum (unsigned-byte 16) (signed-byte 16) ,@types)))
+    (loop
+      for op in '(+ * #-arm64 -)
+      do
+      (loop
+        for a-type in types
+        do
+        (loop
+          for b-type in types
+          do
+          (loop for the-type in the-types
+                for lambda = `(lambda (a b)
+                                (declare (,a-type a)
+                                         (,b-type b))
+                                (the ,the-type (,op a b)))
+                do (unless (find-if (lambda (x)
+                                      (eql (search "OVERFLOW" (string x)) 0))
+                                    (ir2-vops lambda))
+                     (cerror "" "~s" lambda))))))))

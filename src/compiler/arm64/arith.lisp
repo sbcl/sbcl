@@ -1788,7 +1788,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 3
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
@@ -1808,6 +1808,26 @@
                (inst smulh high x y))))
       (inst cmp high (asr r 63))
       (inst b :ne error))))
+
+(define-vop (overflow*-signed=>unsigned)
+  (:translate overflow*)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg ;; immediate
+                             )))
+  (:arg-types signed-num signed-num)
+  (:info type)
+  (:temporary (:sc signed-reg) high)
+  (:results (r :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 2
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
+      (inst mul r x y)
+      (inst smulh high x y)
+      (inst cbnz high error))))
 
 (define-vop (overflow*-unsigned)
   (:translate overflow*)
@@ -1853,7 +1873,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 3
+  (:generator 4
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
@@ -1874,7 +1894,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 4
+  (:generator 5
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
@@ -1898,7 +1918,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 5
+  (:generator 6
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
