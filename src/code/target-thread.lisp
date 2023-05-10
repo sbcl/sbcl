@@ -2583,9 +2583,7 @@ mechanism for inter-thread communication."
                (format t " ~3d ~30a : ~s~%"
                        #+sb-thread (ash sym (- sb-vm:word-shift))
                        #-sb-thread 0
-                       ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
-                       ;; which is not defined during cross-compilation.
-                       #+sb-thread (funcall 'sb-impl::find-symbol-from-tls-index sym)
+                       #+sb-thread (sb-vm:symbol-from-tls-index sym)
                        #-sb-thread sym
                        val))))
       (format t "~&TLS: (base=~x)~%" (sap-int sap))

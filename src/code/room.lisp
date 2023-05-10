@@ -1399,7 +1399,7 @@ We could try a few things to mitigate this:
       (t
        :extend
        (case (widetag-of this)
-         (#.sb-vm:value-cell-widetag
+         (#.value-cell-widetag
           (visit (value-cell-ref this)))))))
   (values n witness))
 
@@ -1456,6 +1456,23 @@ We could try a few things to mitigate this:
            (%make-lisp-obj base)
            (%make-lisp-obj limit))))
       result)))))
+
+(defun show-hashed-instances ()
+  (flet ((foo (legend pred)
+           (format t "~&Instances in ~a state:~%" legend)
+           (map-allocated-objects pred :all)))
+    (foo "HASHED+MOVED"
+         (lambda (obj type size)
+           (declare (ignore size))
+           (when (and (= type instance-widetag)
+                      (logbitp 9 (instance-header-word obj)))
+             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))
+    (foo "HASHED (unmoved)"
+         (lambda (obj type size)
+           (declare (ignore size))
+           (when (and (= type instance-widetag)
+                      (= (ldb (byte 2 8) (instance-header-word obj)) 1))
+             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))))
 
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add

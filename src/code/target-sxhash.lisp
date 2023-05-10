@@ -573,19 +573,3 @@
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
 
-(defun show-hashed-instances ()
-  (flet ((foo (legend pred)
-           (format t "~&Instances in ~a state:~%" legend)
-           (sb-vm:map-allocated-objects pred :all)))
-    (foo "HASHED+MOVED"
-         (lambda (obj type size)
-           (declare (ignore size))
-           (when (and (= type sb-vm:instance-widetag)
-                      (logbitp 9 (instance-header-word obj)))
-             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))
-    (foo "HASHED (unmoved)"
-         (lambda (obj type size)
-           (declare (ignore size))
-           (when (and (= type sb-vm:instance-widetag)
-                      (= (ldb (byte 2 8) (instance-header-word obj)) 1))
-             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))))

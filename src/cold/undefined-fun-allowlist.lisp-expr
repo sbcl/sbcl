@@ -17,7 +17,7 @@
   compute-applicable-methods
   slot-makunbound
   make-load-form-saving-slots
-  sb-vm:map-allocated-objects
+  sb-vm:symbol-from-tls-index
   sb-ext:primitive-object-size
   sb-vm::remove-static-links)
  ;; CLOS implementation
