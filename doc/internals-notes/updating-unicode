@@ -1,0 +1,48 @@
+Updating Unicode versions (notes on the 10.0.0-11.0.0 update):
+
+1. Download ucd.zip for the version to update to, along with UCA's
+   allkeys.txt; replace all files in tools-for-build/ and tests/data/
+   with the corresponding versions.
+
+   (See tools-for-build/update-unicode-datafiles.sh)
+
+   a. think about ConfusablesEdited.txt which claims to be version 12:
+      maybe that's the first version Confusables.txt existed?  Cross
+      that bridge when we get to it.
+
+2. Look at the data files, and adjust more-ucd-consts.lisp-expr
+
+   At least scripts are likely to have been added.
+
+3. Try to build.
+
+   (This didn't go wrong this time; there may be fewer hard-coded
+   things than there were in the distant past.  I was slightly
+   surprised that I adjusted more-ucd-consts.lisp-expr correctly first
+   time.)
+
+4. Run tests.  Expect failures:
+
+   a. failures in unicode-properties.pure.lisp
+
+      - a failure in :BIDI-CLASS might mean that the unallocated
+        character properties have changed.  Look at
+        DerivedBidiClass.txt and compare the ranges documented in the
+        header with ucd.lisp `unallocated-bidi-class`.
+
+      - failures in :GRAPHEME-BREAK-CLASS and :WORD-BREAK-CLASS come
+        from the change in the breaking algorithm.  The major change
+        comes from handling emoji in a more principled way, but this
+        involves us needing to parse and preserve emoji data, so add
+        emoji-data.txt from UTS 51.  There are also more minor
+        changes: some characters added to the explicit list of
+        :aletter in WORD-BREAK-CLASS, and the new :wsegspace class.
+        Details in UAX 29.
+
+   b. failures in unicode-breaking.pure.lisp
+
+      - failures in :GRAPHEME-BREAKING / :WORD-BREAKING /
+        :LINE-BREAKING comes from needing to update those breaking
+        algorithms for the new classes, and the refinements they
+        bring.  Grapheme- and word-breaking is in UAX 29;
+        line-breaking is UAX 14.

@@ -794,68 +794,6 @@ The result is not guaranteed to have the same length as the input."
 ;;; (nobrk) prevents a break between `first` and `second`
 ;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `third`
 
-;;; Unicode 9.0-10.0 only: obsoleted in 11.0
-(defun emoji-grapheme-break-class (char)
-  (let ((code (char-code char))
-        (e-base
-          #(#x261D
-            #x26F9
-            #x270A #x270B #x270C #x270D
-            #x1F385
-            #x1F3C2 #x1F3C3 #x1F3C4
-            #x1F3C7
-            #x1F3CA #x1F3CB #x1F3CC
-            #x1F442 #x1F443
-            #x1F446 #x1F447 #x1F448 #x1F449 #x1F44A #x1F44B #x1F44C #x1F44D #x1F44E #x1F44F #x1F450
-            #x1F46E
-            #x1F470 #x1F471 #x1F472 #x1F473 #x1F474 #x1F475 #x1F476 #x1F477 #x1F478
-            #x1F47C
-            #x1F481 #x1F482 #x1F483
-            #x1F485 #x1F486 #x1F487
-            #x1F4AA
-            #x1F574 #x1F575
-            #x1F57A
-            #x1F590
-            #x1F595 #x1F596
-            #x1F645 #x1F646 #x1F647
-            #x1F64B #x1F64C #x1F64D #x1F64E #x1F64F
-            #x1F6A3
-            #x1F6B4 #x1F6B5 #x1F6B6
-            #x1F6C0
-            #x1F6CC
-            #x1F918 #x1F919 #x1F91A #x1F91B #x1F91C
-            #x1F91E #x1F91F
-            #x1F926
-            #x1F930 #x1F931 #x1F932 #x1F933 #x1F934 #x1F935 #x1F936 #x1F937 #x1F938 #x1F939
-            #x1F93D #x1F93E
-            #x1F9D1 #x1F9D2 #x1F9D3 #x1F9D4 #x1F9D5 #x1F9D6 #x1F9D7 #x1F9D8 #x1F9D9 #x1F9DA #x1F9DB #x1F9DC #x1F9DD))
-        (glue-after-zwj
-          #(#x2640
-            #x2642
-            #x2695 #x2696
-            #x2708
-            #x2764
-            #x1F308
-            #x1F33E
-            #x1F373
-            #x1F393
-            #x1F3A4
-            #x1F3A8
-            #x1F3EB
-            #x1F3ED
-            #x1F48B
-            #x1F4BB #x1F4BC
-            #x1F527
-            #x1F52C
-            #x1F5E8
-            #x1F680
-            #x1F692)))
-    (cond
-      ((binary-search code e-base) :e-base)
-      ((<= #x1F3FB code #x1F3FF) :e-modifier)
-      ((binary-search code glue-after-zwj) :glue-after-zwj)
-      ((<= #x1F466 code #x1F469) :e-base-gaz))))
-
 (defun grapheme-break-class (char)
   "Returns the grapheme breaking class of CHARACTER, as specified in UAX #29."
   (let ((cp (when char (char-code char)))
@@ -882,7 +820,8 @@ The result is not guaranteed to have the same length as the input."
            (<= #xE0080 cp #xE00FF)
            (<= #xE01F0 cp #xE0FFF)) :control)
       ((or (member gc '(:Mn :Me))
-           (proplist-p char :other-grapheme-extend))
+           (proplist-p char :other-grapheme-extend)
+           (proplist-p char :emoji-modifier))
        :extend)
       ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
@@ -896,27 +835,36 @@ The result is not guaranteed to have the same length as the input."
       ((and (or (eql gc :Mc)
                 (eql cp #x0E33) (eql cp #x0EB3))
             (not (binary-search cp not-spacing-mark))) :spacing-mark)
-      ((hangul-syllable-type char))
-      ((emoji-grapheme-break-class char)))))
+      ((hangul-syllable-type char)))))
 
 (macrolet ((def (name extendedp)
              `(defun ,name (function string)
                 (do* ((length (length string))
                       (start 0)
                       (end 1 (1+ end))
+                      (char1 nil)
                       (c1 nil)
-                      (c2 (and (> (length string) 0) (grapheme-break-class (char string 0))))
-                      (emoji-modifier-sequence-p nil)
+                      (char2 (char string 0))
+                      (c2 (and (> (length string) 0) (grapheme-break-class char2)))
+                      (extended-pictographic-state nil)
                       (nri (if (eql c2 :regional-indicator) 1 0)))
                      ((>= end length)
                       (if (= end length) (progn (funcall function string start end) nil)))
                   (flet ((brk () (funcall function string start end) (setf start end)))
                     (declare (truly-dynamic-extent #'brk))
-                    (shiftf c1 c2 (grapheme-break-class (char string end)))
+                    (shiftf char1 char2 (char string end))
+                    (shiftf c1 c2 (grapheme-break-class char2))
                     (if (eql c2 :regional-indicator) (incf nri) (setf nri 0))
-                    (setf emoji-modifier-sequence-p
-                          (or (member c1 '(:e-base :e-base-gaz))
-                              (and emoji-modifier-sequence-p (eql c1 :extend))))
+                    (setf extended-pictographic-state
+                          (cond
+                            ((proplist-p char1 :extended-pictographic) :start)
+                            ((and (member extended-pictographic-state '(:start :extend))
+                                  (eql c1 :extend))
+                             :extend)
+                            ((and (member extended-pictographic-state '(:start :extend))
+                                  (eql c1 :zwj))
+                             :zwj)
+                            (t nil)))
                     (cond
                       ((and (eql c1 :cr) (eql c2 :lf)))
                       ((or (member c1 '(:control :cr :lf))
@@ -929,8 +877,8 @@ The result is not guaranteed to have the same length as the input."
                       ((member c2 '(:extend :zwj)))
                       ,@(when extendedp
                           `(((or (eql c2 :spacing-mark) (eql c1 :prepend)))))
-                      ((and emoji-modifier-sequence-p (eql c2 :e-modifier)))
-                      ((and (eql c1 :zwj) (member c2 '(:glue-after-zwj :e-base-gaz))))
+                      ((and (eql extended-pictographic-state :zwj)
+                            (proplist-p char2 :extended-pictographic)))
                       ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator) (evenp nri)))
                       (t (brk))))))))
   (def map-legacy-grapheme-boundaries nil)
@@ -971,14 +919,18 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
          #(#x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
            #x02DE #x02DF #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
            #x02F6 #x02F7 #x02F8 #x02F9 #x02FA #x02FB #x02FC #x02FD #x02FE #x02FF
-           #x05F3 #xA720 #xA721 #xA789 #xA78A #xAB5B))
+           #x055A #x055B #x055C #x055E #x058A
+           #x05F3 #xA708 #xA716 #xA720 #xA721 #xA789 #xA78A #xAB5B))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
          #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
         (midnum
          ;; Grepping of Line_Break = IS adjusted per UAX #29
          #(#x002C #x003B #x037E #x0589 #x060C #x060D #x066C #x07F8 #x2044
-           #xFE10 #xFE14 #xFE50 #xFE54 #xFF0C #xFF1B)))
+           #xFE10 #xFE14 #xFE50 #xFE54 #xFF0C #xFF1B))
+        (zs-and-glue
+         ;; Grepping of Line_Break = ";GL.*Zs"
+         #(#x00A0 #x2007 #x202F)))
     (cond
       ((not char) nil)
       ((= cp 10) :LF)
@@ -1004,7 +956,7 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
       ((or (and (eql gc :Nd) (not (<= #xFF10 cp #xFF19))) ;Fullwidth digits
            (eql cp #x066B)) :numeric)
       ((or (eql gc :Pc) (= cp #x202F)) :extendnumlet)
-      ((emoji-grapheme-break-class char))
+      ((and (eql gc :Zs) (not (binary-search cp zs-and-glue))) :wsegspace)
       (t nil))))
 
 (defmacro flatpush (thing list)
@@ -1047,54 +999,51 @@ word breaking rules specified in UAX #29. Returns a list of strings"
              (unless (or (eql c2 :format) (eql c2 :extend) (eql c2 :zwj))
                (setf flag nil)))
             ((and (eql c1 :cr) (eql c2 :lf)) (nobrk))
-            ;; CR+LF are bound together by the grapheme clustering
+            ;; CR+LF is handled in the line above
             ((or (eql c1 :newline) (eql c1 :cr) (eql c1 :lf)
                  (eql c2 :newline) (eql c2 :cr) (eql c2 :lf)) (brk))
-            ((and (eql c1 :zwj)
-                  (or (eql c2 :glue-after-zwj) (eql c2 :e-base-gaz)))
+            ((and (eql c1 :zwj) (and second (proplist-p second :extended-pictographic)))
              (nobrk))
+            ((and (eql c1 :wsegspace) (eql c2 :wsegspace)) (nobrk))
             ((or (eql c2 :format) (eql c2 :extend) (eql c2 :zwj))
              ;; handle Any x (Format|Extend|ZWJ)
-             (nobrk)
-             ;; handle "Ignore except after sot, CR, LF, Newline [and ZWJ]"
-             (unless (member c1 '(:cr :lf :newline :zwj))
-               ;; so that the next iteration preserves first:
-               (setf second first)
-               ;; so that we don't spuriously count the preserved first
-               ;; as a new regional-indicator:
-               (when (eql c1 :regional-indicator)
-                 (decf nri (if (atom first) 1 (count :regional-indicator first :key #'word-break-class))))))
-            ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
-                  (or (eql c2 :aletter) (eql c2 :hebrew-letter))) (nobrk))
-            ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
-                  (member c2 '(:midletter :midnumlet :single-quote))
-                  (or (eql c3 :aletter) (eql c3 :hebrew-letter)))
-             (nobrk) (setf flag t)) ; Handle the multiple breaks from this rule
-            ((and (eql c1 :hebrew-letter) (eql c2 :double-quote)
-                  (eql c3 :hebrew-letter))
-             (nobrk) (setf flag t))
-            ((and (eql c1 :hebrew-letter) (eql c2 :single-quote)) (nobrk))
-            ((or (and (eql c1 :numeric) (member c2 '(:numeric :aletter :hebrew-letter)))
-                 (and (eql c2 :numeric) (member c1 '(:numeric :aletter :hebrew-letter))))
              (nobrk))
-            ((and (eql c1 :numeric)
-                  (member c2 '(:midnum :midnumlet :single-quote))
-                  (eql c3 :numeric))
-             (nobrk) (setf flag t))
-            ((and (eql c1 :katakana) (eql c2 :katakana)) (nobrk))
-            ((or (and (member c1
-                              '(:aletter :hebrew-letter :katakana
-                                :numeric :extendnumlet)) (eql c2 :extendnumlet))
-                 (and (member c2
-                              '(:aletter :hebrew-letter :katakana
-                                :numeric :extendnumlet)) (eql c1 :extendnumlet)))
-             (nobrk))
-            ((and (or (eql c1 :e-base) (eql c1 :e-base-gaz))
-                  (eql c2 :e-modifier))
-             (nobrk))
-            ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator) (oddp nri))
-             (nobrk))
-            (t (brk))))))))
+            (t
+             (when (or (eql c1 :format) (eql c1 :extend) (eql c1 :zwj))
+               ;; find the class of the non-ZWJ_FE character preceding in this word, if any
+               (setf c1 (loop for char in word
+                              for class = (word-break-class char)
+                              unless (or (eql class :format) (eql class :extend) (eql class :zwj))
+                              do (return class))))
+             (cond
+               ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
+                     (or (eql c2 :aletter) (eql c2 :hebrew-letter))) (nobrk))
+               ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
+                     (member c2 '(:midletter :midnumlet :single-quote))
+                     (or (eql c3 :aletter) (eql c3 :hebrew-letter)))
+                (nobrk) (setf flag t)) ; Handle the multiple breaks from this rule
+               ((and (eql c1 :hebrew-letter) (eql c2 :double-quote)
+                     (eql c3 :hebrew-letter))
+                (nobrk) (setf flag t))
+               ((and (eql c1 :hebrew-letter) (eql c2 :single-quote)) (nobrk))
+               ((or (and (eql c1 :numeric) (member c2 '(:numeric :aletter :hebrew-letter)))
+                    (and (eql c2 :numeric) (member c1 '(:numeric :aletter :hebrew-letter))))
+                (nobrk))
+               ((and (eql c1 :numeric)
+                     (member c2 '(:midnum :midnumlet :single-quote))
+                     (eql c3 :numeric))
+                (nobrk) (setf flag t))
+               ((and (eql c1 :katakana) (eql c2 :katakana)) (nobrk))
+               ((or (and (member c1
+                                 '(:aletter :hebrew-letter :katakana
+                                   :numeric :extendnumlet)) (eql c2 :extendnumlet))
+                    (and (member c2
+                                 '(:aletter :hebrew-letter :katakana
+                                   :numeric :extendnumlet)) (eql c1 :extendnumlet)))
+                (nobrk))
+               ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator) (oddp nri))
+                (nobrk))
+               (t (brk))))))))))
 
 (defun sentence-break-class (char)
   "Returns the sentence breaking class of CHARACTER, as specified in UAX #29."
@@ -1327,8 +1276,8 @@ sentence breaking rules specified in UAX #29"
          (between :any '(:zw :bk :cr :lf :nl) :cant) ; LB6, LB7
          (when after-spaces (cmpush after-spaces) (cmpush second)
                (setf state nil after-spaces nil) (go tail))
-         (after-spaces :zw :any :can)        ; LB8
-         (between :zwj '(:id :eb :em) :cant) ; LB8a
+         (after-spaces :zw :any :can)                ; LB8
+         (between :zwj :any :cant)                   ; LB8a
          ;; LB9 and LB10 (for CM) handled in LINE-BREAK-CLASS / LINE-PREBREAK
          (when (eql t1 :zwj) (setf t1 :al))          ; LB10 (for ZWJ)
          (when (eql t2 :zwj) (setf t2 :al))          ; LB10 (for ZWJ)
