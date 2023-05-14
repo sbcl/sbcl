@@ -88,10 +88,10 @@
            (unless (eql (peek-char nil ,s nil nil) nil)
              (error "Unread data in data file: ~S" ,name)))))))
 
-(defmacro with-input-emoji-file ((s name) &body body)
-  ;; KLUDGE: the emoji data includes literal emoji.  We just remove
-  ;; all high-bit stuff, on the assumption that the actual data is
-  ;; still ASCII.
+(defmacro with-input-arbitrary-utf8-file ((s name) &body body)
+  ;; KLUDGE: the emoji data includes literal emoji; likewise the
+  ;; confusables.  We just remove all high-bit stuff, on the
+  ;; assumption that the actual data is still ASCII.
   (let ((in (gensym "IN"))
         (out (gensym "OUT")))
     `(let ((filename (format nil "~A.txt" ,name)))
@@ -372,11 +372,11 @@ Length should be adjusted when the standard changes.")
       ((in #(#x0600 #x07BF #x0860 #x086F #x08A0 #x08FF
              #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
              #x10D00 #x10D3F #x10F30 #x10F6F #x1EC70 #x1ECBF
-             #x1EE00 #x1EEFF) "AL"))
+             #x1ED00 #x1ED4F #x1EE00 #x1EEFF) "AL"))
       ((in #(#x0590 #x05FF #x07C0 #x085F #x0870 #x089F
              #xFB1D #xFB4F #x10800 #x10CFF #x10D40 #x10F2F
-             #x10F70 #x10FFF #x1E800 #x1EC6F #x1ECC0 #x1EDFF
-             #x1EF00 #x1EFFF) "R"))
+             #x10F70 #x10FFF #x1E800 #x1EC6F #x1ECC0 #x1ECFF
+             #x1ED50 #x1EDFF #x1EF00 #x1EFFF) "R"))
       ((in #(#x20A0 #x20CF) "ET"))
       ;; BN is non-characters and default-ignorable.
       ;; Default-ignorable will be dealt with elsewhere
@@ -794,7 +794,7 @@ Length should be adjusted when the standard changes.")
     (parse-property s) ;; NFKC_CF
     (parse-property s)) ;; Changes_When_NFKC_Casefolded
 
-  (with-input-emoji-file (s "emoji-data")
+  (with-input-arbitrary-utf8-file (s "emoji-data")
     (parse-property s) ;; Initial comments
     (parse-property s :emoji)
     (parse-property s :emoji-presentation)
@@ -842,7 +842,7 @@ Length should be adjusted when the standard changes.")
 
 ;;; Other properties
 (defparameter *confusables*
-  (with-input-txt-file (stream "ConfusablesEdited")
+  (with-input-arbitrary-utf8-file (stream "confusables")
     (read-line stream)
     (loop for line = (read-line stream nil nil)
           while line

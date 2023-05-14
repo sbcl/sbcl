@@ -38,7 +38,8 @@
      "Ahom" "Anatolian_Hieroglyphs" "Hatran" "Multani" "Old_Hungarian"
      "SignWriting" "Adlam" "Bhaiksuki" "Marchen" "Newa" "Osage" "Tangut"
      "Masaram_Gondi" "Nushu" "Soyombo" "Zanabazar_Square" "Dogra" "Gunjala_Gondi"
-     "Makasar" "Medefaidrin" "Hanifi_Rohingya" "Sogdian" "Old_Sogdian"))
+     "Makasar" "Medefaidrin" "Hanifi_Rohingya" "Sogdian" "Old_Sogdian"
+     "Elymaic" "Nandinagari" "Nyiakeng_Puachue_Hmong" "Wancho"))
 
  (*line-break-classes*
     ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EB" "EM"

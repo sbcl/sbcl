@@ -1,14 +1,16 @@
-Updating Unicode versions (notes on the 10.0.0-11.0.0 update):
+Updating Unicode versions (notes on the 10.0.0-12.1.0 update):
 
 1. Download ucd.zip for the version to update to, along with UCA's
-   allkeys.txt; replace all files in tools-for-build/ and tests/data/
-   with the corresponding versions.
+   allkeys.txt and CollationTest.zip, confusables.txt from security,
+   and emoji-data.txt from emoji; replace all files in
+   tools-for-build/ and tests/data/ with the corresponding versions.
 
    (See tools-for-build/update-unicode-datafiles.sh)
 
-   a. think about ConfusablesEdited.txt which claims to be version 12:
-      maybe that's the first version Confusables.txt existed?  Cross
-      that bridge when we get to it.
+   a. obsolete: replaced by confusables.txt.  (think about
+      ConfusablesEdited.txt which claims to be version 12: maybe
+      that's the first version Confusables.txt existed?  Cross that
+      bridge when we get to it.)
 
 2. Look at the data files, and adjust more-ucd-consts.lisp-expr
 
