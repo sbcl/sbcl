@@ -1,7 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.4:
-  * enhancement: Unicode support has been updated to support version 13.0.0 of
+  * enhancement: Unicode support has been updated to support version 14.0.0 of
     the Unicode standard, including addition of characters and refinements to
     grapheme-, word- and line-breaking algorithms.
 

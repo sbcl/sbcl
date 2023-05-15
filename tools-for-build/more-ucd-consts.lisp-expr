@@ -40,7 +40,8 @@
      "Masaram_Gondi" "Nushu" "Soyombo" "Zanabazar_Square" "Dogra" "Gunjala_Gondi"
      "Makasar" "Medefaidrin" "Hanifi_Rohingya" "Sogdian" "Old_Sogdian"
      "Elymaic" "Nandinagari" "Nyiakeng_Puachue_Hmong" "Wancho"
-     "Chorasmian" "Dives_Akuru" "Khitan_Small_Script" "Yezidi"))
+     "Chorasmian" "Dives_Akuru" "Khitan_Small_Script" "Yezidi"
+     "Cypro_Minoan" "Old_Uyghur" "Tangsa" "Toto" "Vithkuqi"))
 
  (*line-break-classes*
     ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EB" "EM"

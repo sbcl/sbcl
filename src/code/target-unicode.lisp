@@ -1328,15 +1328,19 @@ sentence breaking rules specified in UAX #29"
          (between :jl '(:jl :jv :h2 :h3) :cant)         ; LB26
          (between '(:jv :h2) '(:jv :jt) :cant)          ; LB26
          (between '(:jt :h3) :jt :cant)                 ; LB26
-         (between '(:jl :jv :jt :h2 :h3) '(:in :po) :cant) ; LB27
+         (between '(:jl :jv :jt :h2 :h3) :po :cant)        ; LB27
          (between :pr '(:jl :jv :jt :h2 :h3) :cant)        ; LB27
          (between '(:al :hl :is) '(:al :hl) :cant) ; LB28, LB29
          (unless (member (east-asian-width (if (consp second) (car second) second)) '(:h :w :f))
-           (between '(:al :hl :nu) :op :cant))     ; LB30
+           (between '(:al :hl :nu) :op :cant))        ; LB30
          (unless (member (east-asian-width (if (consp first) (car first) first)) '(:h :w :f))
-           (between :cp '(:al :hl :nu) :cant))     ; LB30
+           (between :cp '(:al :hl :nu) :cant))        ; LB30
          (between :ri :ri (if (oddp nri) :cant :can)) ; LB30a
-         (between :eb :em :cant)
+         (between :eb :em :cant)                      ; LB30b
+         (let ((firstchar (if (consp first) (car first) first)))
+           (when (and (eql (general-category firstchar) :Cn)
+                      (proplist-p firstchar :extended-pictographic))
+             (between :any :em :cant)))               ; LB30b
          (between :any :any :can)       ; LB31
        tail
          (setf first second)
