@@ -369,14 +369,30 @@ Length should be adjusted when the standard changes.")
            (when (ordered-ranges-member code-point vector)
              (gethash class *bidi-classes*))))
     (cond
-      ((in #(#x0600 #x07BF #x0860 #x08FF
-             #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
-             #x10D00 #x10D3F #x10F30 #x10F6F #x1EC70 #x1ECBF
-             #x1ED00 #x1ED4F #x1EE00 #x1EEFF) "AL"))
-      ((in #(#x0590 #x05FF #x07C0 #x085F
-             #xFB1D #xFB4F #x10800 #x10CFF #x10D40 #x10F2F
-             #x10F70 #x10FFF #x1E800 #x1EC6F #x1ECC0 #x1ECFF
-             #x1ED50 #x1EDFF #x1EF00 #x1EFFF) "R"))
+      ((in #(#x0600 #x07BF
+             #x0860 #x08FF
+             #xFB50 #xFDCF
+             #xFDF0 #xFDFF
+             #xFE70 #xFEFF
+             #x10D00 #x10D3F
+             #x10EC0 #x10EFF
+             #x10F30 #x10F6F
+             #x1EC70 #x1ECBF
+             #x1ED00 #x1ED4F
+             #x1EE00 #x1EEFF)
+           "AL"))
+      ((in #(#x0590 #x05FF
+             #x07C0 #x085F
+             #xFB1D #xFB4F
+             #x10800 #x10CFF
+             #x10D40 #x10EBF
+             #x10F00 #x10F2F
+             #x10F70 #x10FFF
+             #x1E800 #x1EC6F
+             #x1ECC0 #x1ECFF
+             #x1ED50 #x1EDFF
+             #x1EF00 #x1EFFF)
+           "R"))
       ((in #(#x20A0 #x20CF) "ET"))
       ;; BN is non-characters and default-ignorable.
       ;; Default-ignorable will be dealt with elsewhere
@@ -390,7 +406,7 @@ Length should be adjusted when the standard changes.")
       (t (error "Somehow we've gone too far in unallocated bidi determination")))))
 
 (defun complete-misc-table ()
-  (loop for code-point from 0 to #x10FFFF do ; Flood-fil unallocated codepoints
+  (loop for code-point from 0 to #x10FFFF do ; Flood-fill unallocated codepoints
        (unless (second (multiple-value-list (gethash code-point *ucd-entries*)))
          (let* ((unallocated-misc
                  ;; unallocated characters have a GC of "Cn", aren't digits

@@ -827,7 +827,7 @@ The result is not guaranteed to have the same length as the input."
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
       ((or
         ;; Consonant_Preceding_Repha
-        (= cp #x0D4E) (= cp #x11941) (= cp #x11D46)
+        (= cp #x0D4E) (= cp #x11941) (= cp #x11D46) (= cp #x11F02)
         ;; Consonant_Prefixed
         (<= #x111C2 cp #x111C3) (= cp #x1193F) (= cp #x11A3A) (<= #x11A84 cp #x11A89)
         (proplist-p char :prepended-concatenation-mark))

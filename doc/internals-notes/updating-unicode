@@ -1,4 +1,4 @@
-Updating Unicode versions (notes on the 10.0.0-13.0.0 updates):
+Updating Unicode versions (notes on the 10.0.0-15.0.0 updates):
 
 1. Download ucd.zip for the version to update to, along with UCA's
    allkeys.txt and CollationTest.zip, and confusables.txt from

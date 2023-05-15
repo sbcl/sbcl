@@ -122,6 +122,9 @@ is replaced with replacement."
            (loop for i from (parse (car parts)) to (parse (cadr parts)) collect i)
            (mapcar #'parse parts))))))
 
+(defun line-codepoints (line)
+  (codepoint-or-range (car (split-string line #\;))))
+
 (defun test-property-line (fn line)
   (destructuring-bind (%codepoints value) (split-string line #\;)
     (let* ((codepoints (codepoint-or-range %codepoints))
@@ -130,21 +133,57 @@ is replaced with replacement."
                       (string-upcase
                        (subseq property 0 (position #\# property)))
                       "KEYWORD")))
+      (loop for i in codepoints
+            unless (eql expected (funcall fn (code-char i)))
+            do (error "Character ~S has the wrong value for the tested property.  Wanted ~S, got ~S."
+                      (code-char i) expected (funcall fn (code-char i)))))))
 
-      (loop for i in codepoints do
-           (unless (eql expected (funcall fn (code-char i)))
-             (error "Character ~S has the wrong value for the tested property.
-Wanted ~S, got ~S."
-                    (code-char i) expected (funcall fn (code-char i))))))))
+(defun test-unallocated-bidi-class (code class missing)
+  (loop for ((start . end) . expected) in missing
+        if (and (<= start code) (<= code end))
+        do (assert (eql class expected))
+        and do (return)))
 
 (defun test-bidi-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/DerivedBidiClass.txt" :external-format :utf-8)
-    (with-test (:name (:bidi-class))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'bidi-class line)))))
+    (let ((missing-prefix "# @missing: ")
+          (bidi-class-table
+           '(("Left_To_Right" . :L)
+             ("Right_To_Left" . :R)
+             ("Arabic_Letter" . :AL)
+             ("European_Terminator" . :ET)))
+          (tested (make-array #x110000 :initial-element 0 :element-type 'bit))
+          missing)
+      (with-test (:name (:bidi-class :assigned))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'bidi-class line)
+              and do (loop for code in (line-codepoints line) do (setf (aref tested code) 1))
+              when (eql (mismatch missing-prefix line) (length missing-prefix))
+              do (let* ((semipos (position #\; line))
+                        (rangetext (subseq line (length missing-prefix) semipos))
+                        (first-dot (position #\. rangetext))
+                        (last-dot (position #\. rangetext :from-end t))
+                        (start (parse-integer rangetext :end first-dot :radix 16))
+                        (end (parse-integer rangetext :start (1+ last-dot) :radix 16))
+                        (range (cons start end))
+                        (class-name (subseq line (+ semipos 2)))
+                        (class (cdr (assoc class-name bidi-class-table :test 'string=))))
+                   (push (cons range class) missing))))
+      (with-test (:name (:bidi-class :missing-data))
+        ;; Consistency check: the @missing lines in the data file have
+        ;; "Left_To_Right" first and overrides following it, and we've
+        ;; pushed in reverse order; test (:BIDI-CLASS :MISSING)
+        ;; depends on this order.
+        (let ((last (car (last missing))))
+          (assert (equal last '((0 . #x10FFFF) . :L)))))
+      (with-test (:name (:bidi-class :missing))
+        (loop for code from 0 to #x10FFFF
+              for char = (code-char code)
+              if (= (aref tested code) 0)
+              do (test-unallocated-bidi-class code (bidi-class char) missing))))))
 
 (test-bidi-class)
 
