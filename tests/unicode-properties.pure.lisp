@@ -180,7 +180,7 @@ is replaced with replacement."
         (let ((last (car (last missing))))
           (assert (equal last '((0 . #x10FFFF) . :L)))))
       (with-test (:name (:bidi-class :missing))
-        (loop for code from 0 to #x10FFFF
+        (loop for code from 0 to (min (1- char-code-limit) #x10FFFF)
               for char = (code-char code)
               if (= (aref tested code) 0)
               do (test-unallocated-bidi-class code (bidi-class char) missing))))))
