@@ -15,8 +15,12 @@
  "× 002C × 0308 ÷ 0030 ÷" ; ",<combining diaresis>0" UAX#14 25.12: IS × NU
  "× 0025 ÷ 0028 ÷" ; "%(" UAX#14 25.7: PO × OP
  "× 0025 × 0308 ÷ 0028 ÷" ; "%<combining diaresis>(" UAX#14 25.7: PO × OP
+ "× 0025 ÷ 2329 ÷" ; "%〈" UAX#14 25.7: PO × OP
+ "× 0025 × 0308 ÷ 2329 ÷" ; "%<combining diaresis>〈" UAX#14 25.7: PO × OP
  "× 0024 ÷ 0028 ÷" ; "$(" UAX#14 25.9: PR × OP
  "× 0024 × 0308 ÷ 0028 ÷" ; "$<combining diaresis>(" UAX#14 25.9: PR × OP
+ "× 0024 ÷ 2329 ÷" ; "$〈" UAX#14 25.9: PR × OP
+ "× 0024 × 0308 ÷ 2329 ÷" ; "$<combining diaresis>〈" UAX#14 25.9: PR × OP
  "× 002F ÷ 0030 ÷" ; "/0" UAX#14 25.14: SY × NU
  "× 002F × 0308 ÷ 0030 ÷" ; "/<combining diaresis>0" UAX#14 25.14: SY × NU
  "× 0065 × 0071 × 0075 × 0061 × 006C × 0073 × 0020 × 002E ÷ 0033 × 0035 × 0020 ÷ 0063 × 0065 × 006E × 0074 × 0073 ÷" ; "equals .35 cents" UAX#14 25.12: IS × NU

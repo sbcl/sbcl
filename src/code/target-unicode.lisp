@@ -917,13 +917,17 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
             #xFF70 #xFF70)))
         (also-aletter
          #(#x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
-           #x02DE #x02DF #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
+           #x02DE #x02DF
+           #x02E5 #x02E6 #x02E7 #x02E8 #x02E9 #x02EA #x02EB
+           #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
            #x02F6 #x02F7 #x02F8 #x02F9 #x02FA #x02FB #x02FC #x02FD #x02FE #x02FF
            #x055A #x055B #x055C #x055E #x058A
-           #x05F3 #xA708 #xA716 #xA720 #xA721 #xA789 #xA78A #xAB5B))
+           #x05F3 #xA708 #xA709 #xA70A #xA70B #xA70C #xA70D #xA70E #xA70F
+           #xA710 #xA711 #xA712 #xA713 #xA714 #xA715 #xA716
+           #xA720 #xA721 #xA789 #xA78A #xAB5B))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
-         #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
+         #(#x003A #x00B7 #x0387 #x055F #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
         (midnum
          ;; Grepping of Line_Break = IS adjusted per UAX #29
          #(#x002C #x003B #x037E #x0589 #x060C #x060D #x066C #x07F8 #x2044
@@ -1311,7 +1315,7 @@ sentence breaking rules specified in UAX #29"
          (between :any '(:ba :hy :ns) :cant)   ; LB21
          (between :bb :any :cant)              ; LB21
          (between :sy :hl :cant)               ; LB21b
-         (between '(:al :hl :ex :id :eb :em :in :nu) :in :cant) ; LB22
+         (between :any :in :cant) ; LB22
          (between '(:al :hl) :nu :cant)                         ; LB23
          (between :nu '(:al :hl) :cant)                         ; LB23
          (between :pr '(:id :eb :em) :cant)        ; LB23a
@@ -1327,8 +1331,10 @@ sentence breaking rules specified in UAX #29"
          (between '(:jl :jv :jt :h2 :h3) '(:in :po) :cant) ; LB27
          (between :pr '(:jl :jv :jt :h2 :h3) :cant)        ; LB27
          (between '(:al :hl :is) '(:al :hl) :cant) ; LB28, LB29
-         (between '(:al :hl :nu) :op :cant)        ; LB30
-         (between :cp '(:al :hl :nu) :cant)        ; LB30
+         (unless (member (east-asian-width (if (consp second) (car second) second)) '(:h :w :f))
+           (between '(:al :hl :nu) :op :cant))     ; LB30
+         (unless (member (east-asian-width (if (consp first) (car first) first)) '(:h :w :f))
+           (between :cp '(:al :hl :nu) :cant))     ; LB30
          (between :ri :ri (if (oddp nri) :cant :can)) ; LB30a
          (between :eb :em :cant)
          (between :any :any :can)       ; LB31
@@ -1444,8 +1450,10 @@ it defaults to 80 characters"
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
             (let* ((unified-ideograph-p (proplist-p char1 :unified-ideograph))
-                   (tangut-p (<= #x17000 code1 #x18AFF))
+                   (tangut-p (or (<= #x17000 code1 #x18AFF)
+                                 (<= #x18D00 code1 #x18D8F)))
                    (nushu-p (<= #x1B170 code1 #x1B2FF))
+                   (khitan-small-p (<= #x18B00 code1 #x18CFF))
                    (boffset 0)
                    (base
                      (cond ((and unified-ideograph-p
@@ -1454,6 +1462,7 @@ it defaults to 80 characters"
                            (unified-ideograph-p #xFB80)
                            (tangut-p (setq boffset #x17000) #xFB00)
                            (nushu-p (setq boffset #x1B170) #xFB01)
+                           (khitan-small-p (setq boffset #x18B00) #xFB02)
                            (t #xFBC0)))
                    (a (+ base (if (or tangut-p nushu-p) 0 (ash code1 -15))))
                    (b (logior #x8000 (if (or tangut-p nushu-p) (- code1 boffset) (logand code1 #x7FFF)))))

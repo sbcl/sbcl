@@ -1,9 +1,9 @@
-Updating Unicode versions (notes on the 10.0.0-12.1.0 update):
+Updating Unicode versions (notes on the 10.0.0-13.0.0 updates):
 
 1. Download ucd.zip for the version to update to, along with UCA's
-   allkeys.txt and CollationTest.zip, confusables.txt from security,
-   and emoji-data.txt from emoji; replace all files in
-   tools-for-build/ and tests/data/ with the corresponding versions.
+   allkeys.txt and CollationTest.zip, and confusables.txt from
+   security; replace all files in tools-for-build/ and tests/data/
+   with the corresponding versions.
 
    (See tools-for-build/update-unicode-datafiles.sh)
 
@@ -48,3 +48,16 @@ Updating Unicode versions (notes on the 10.0.0-12.1.0 update):
         algorithms for the new classes, and the refinements they
         bring.  Grapheme- and word-breaking is in UAX 29;
         line-breaking is UAX 14.
+
+      - we implement the approximation to line-breaking rule LB25
+        ("don't break in numbers"), not the regular-expression form.
+        The test files assume the full implementation, so we override
+        the expected test answers for a small number of lines in
+        LineBreakTest; see tests/data/line-break-exceptions.lisp-expr
+
+   c. failures in unicode-collation.pure.lisp
+
+      - sometimes new scripts get implicit collation key weights, or
+        existing scripts have new blocks added.  Supporting this
+        involves changing the else branch in COLLATION-KEY in
+        target-unicode.

@@ -2,11 +2,10 @@
 
 UCDIR="$1"
 declare -A SKIP FOUND
-SKIP["ConfusablesEdited.txt"]=true
 
 for file in tools-for-build/*.txt tests/data/*.txt; do
     f="$(basename "$file")"
-    for dir in "" auxiliary extracted CollationTest; do
+    for dir in "" auxiliary extracted CollationTest emoji; do
         if [ -z "$dir" ]; then
             t="$UCDIR/$f"
         else
