@@ -94,7 +94,7 @@
   ;; assumption that the actual data is still ASCII.
   (let ((in (gensym "IN"))
         (out (gensym "OUT")))
-    `(let ((filename (format nil "~A.txt" ,name)))
+    `(progn
        (with-open-file (,in (make-pathname :name ,name :type "txt"
                                            :defaults *unicode-character-database*)
                             :element-type '(unsigned-byte 8))
