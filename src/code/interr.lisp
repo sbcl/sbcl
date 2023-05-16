@@ -442,10 +442,7 @@
     (declare (ignorable raw-low raw-high))
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (object-not-type-error #+x86-64
-                             (* low high)
-                             #-x86-64
-                             (if (memq (sb-c:sc+offset-scn raw-low) `(,sb-vm:any-reg-sc-number
+      (object-not-type-error (if (memq (sb-c:sc+offset-scn raw-low) `(,sb-vm:any-reg-sc-number
                                                                       ,sb-vm:descriptor-reg-sc-number))
                                  (ash (logior
                                        (ash high sb-vm:n-word-bits)
