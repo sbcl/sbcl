@@ -2079,7 +2079,14 @@
 (define-instruction adr (segment rd label &optional (offset 0))
   (:printer pc-relative ((op 0)))
   (:emitter
-   (emit-pc-relative-inst 0 segment rd label offset)))
+   (cond ((fixup-p label)
+          (aver (zerop offset))
+          (note-fixup segment :pc-relative label)
+          (emit-pc-relative segment 1 0 0 (reg-offset rd)) ; ADRP
+          (assemble (segment)
+            (inst add rd rd 0)))
+         (t
+          (emit-pc-relative-inst 0 segment rd label offset)))))
 
 (define-instruction adrp (segment rd label)
   (:printer pc-relative ((op 1)))
@@ -3314,6 +3321,16 @@
       (:uncond-branch
        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))
+      (:pc-relative
+       (let ((page-displacement
+               (- (ash value -12)
+                  (ash (+ (sap-int sap) offset) -12))))
+         (setf (ldb (byte 2 29) (sap-ref-32 sap offset))
+               (ldb (byte 2 0) page-displacement))
+         (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
+               (ldb (byte 19 2) page-displacement)))
+       (setf (ldb (byte 12 10) (sap-ref-32 sap (+ offset 4)))
+             (ldb (byte 12 0) value)))
       (:ldr-str
        (setf (ldb (byte 12 10) (sap-ref-32 sap offset))
              (ash (the (unsigned-byte #.(+ 12 word-shift)) value)

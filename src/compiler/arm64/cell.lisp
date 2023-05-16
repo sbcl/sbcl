@@ -351,7 +351,7 @@
     (load-type type function (- fun-pointer-lowtag))
     (inst cmp type simple-fun-widetag)
     (inst b :eq SIMPLE-FUN)
-    (load-inline-constant lip '(:fixup closure-tramp :assembly-routine))
+    (load-asm-routine lip 'closure-tramp)
     SIMPLE-FUN
     (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -364,7 +364,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine))
+    (load-asm-routine temp 'undefined-tramp)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 
@@ -392,8 +392,7 @@
       (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
       (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
       (move alloc-tls-symbol symbol)
-      (load-inline-constant lr '(:fixup alloc-tls-index :assembly-routine))
-      (inst blr lr)
+      (invoke-asm-routine 'alloc-tls-index lr)
       TLS-INDEX-VALID
       (inst ldr alloc-tls-symbol (@ thread-tn tls-index))
       (inst stp alloc-tls-symbol tls-index

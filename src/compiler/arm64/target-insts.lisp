@@ -417,6 +417,7 @@
                             (ash (cadr value) 2))
                     (ash value 2)))
          (address (+ value (dstate-cur-addr dstate))))
+    (maybe-note-assembler-routine address nil dstate)
     ;; LRA pointer
     (if (= (logand address lowtag-mask) other-pointer-lowtag)
         (- address (- other-pointer-lowtag n-word-bytes))

@@ -87,7 +87,7 @@
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result lr fdefn-widetag fdefn-size)
-      (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine))
+      (load-asm-routine temp 'undefined-tramp)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
@@ -134,7 +134,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (load-inline-constant result '(:fixup funcallable-instance-tramp :assembly-routine))))
+    (load-asm-routine result 'funcallable-instance-tramp)))
 
 (define-vop (fixed-alloc)
   (:args)

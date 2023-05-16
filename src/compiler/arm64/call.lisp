@@ -615,8 +615,7 @@
                       (lambda ()
                         ;; The size will be computed by subtracting from CSP
                         (inst mov tmp-tn context)
-                        (load-inline-constant lr `(:fixup listify-&rest :assembly-routine))
-                        (inst blr lr)
+                        (invoke-asm-routine 'listify-&rest lr)
                         (inst mov result tmp-tn)
                         (inst b leave-pa))))
         (move result dst)
@@ -1121,26 +1120,24 @@
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (load-inline-constant tmp-tn
-      (if (eq fun-type :function)
-          '(:fixup tail-call-variable :assembly-routine)
-          '(:fixup tail-call-callable-variable :assembly-routine)))
-    (inst br tmp-tn)))
+    (invoke-asm-routine (if (eq fun-type :function)
+                            'tail-call-variable
+                            'tail-call-callable-variable)
+                        tmp-tn
+                        :tail t)))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (lexenv lr type)
   (case type
     (:symbol
-     (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
-     (inst br tmp-tn))
+     (invoke-asm-routine 'tail-call-symbol tmp-tn :tail t))
     (t
      (assemble ()
        (when (eq type :designator)
          (inst and tmp-tn lexenv lowtag-mask)
          (inst cmp tmp-tn fun-pointer-lowtag)
          (inst b :eq call)
-         (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
-         (inst br tmp-tn))
+         (invoke-asm-routine 'tail-call-symbol tmp-tn :tail t))
        call
        (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
        (inst add lr lr 4)
@@ -1149,16 +1146,14 @@
 (defun call-unnamed (lexenv lr type)
   (case type
     (:symbol
-     (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
-     (inst blr tmp-tn))
+     (invoke-asm-routine 'call-symbol tmp-tn))
     (t
      (assemble ()
        (when (eq type :designator)
          (inst and tmp-tn lexenv lowtag-mask)
          (inst cmp tmp-tn fun-pointer-lowtag)
          (inst b :eq call)
-         (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
-         (inst blr tmp-tn)
+         (invoke-asm-routine 'call-symbol tmp-tn)
          (inst b ret))
        call
        (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
@@ -1284,8 +1279,7 @@
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine))
-    (inst br tmp-tn)))
+    (invoke-asm-routine 'return-multiple tmp-tn :tail t)))
 
 ;;; Single-stepping
 

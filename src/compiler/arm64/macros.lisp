@@ -164,8 +164,7 @@
       (load-immediate-word tmp-tn size)
       (inst mov tmp-tn size))
   (let ((asm-routine (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp)))
-    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine)))
-  (inst blr alloc-tn)
+    (invoke-asm-routine asm-routine alloc-tn))
   (inst b back-label))
 
 ;;; Leaves the untagged pointer in TMP-TN,

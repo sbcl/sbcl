@@ -11,6 +11,24 @@
 
 (in-package "SB-VM")
 
+(defun invoke-asm-routine (name reg &key tail)
+  (cond ((or (not (boundp '*component-being-compiled*))
+             (sb-c::code-immobile-p *component-being-compiled*))
+         (if tail
+             (inst b (make-fixup name :assembly-routine))
+             (inst bl (make-fixup name :assembly-routine))))
+        (t
+         (load-inline-constant reg `(:fixup ,name :assembly-routine))
+         (if tail
+             (inst br reg)
+             (inst blr reg)))))
+
+(defun load-asm-routine (reg name)
+  (if (or (not (boundp '*component-being-compiled*))
+          (sb-c::code-immobile-p *component-being-compiled*))
+      (inst adr reg (make-fixup name :assembly-routine))
+      (load-inline-constant reg `(:fixup ,name :assembly-routine))))
+
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options vop))
   (ecase style
@@ -20,10 +38,8 @@
         `((progn
             ,lr
             ,@(if (eq style :none)
-                  `((load-inline-constant tmp-tn '(:fixup ,name :assembly-routine))
-                    (inst br tmp-tn))
-                  `((load-inline-constant ,lr '(:fixup ,name :assembly-routine))
-                    (inst blr ,lr)))))
+                  `((invoke-asm-routine ',name tmp-tn :tail t))
+                  `((invoke-asm-routine ',name ,lr)))))
         `((:temporary (:sc non-descriptor-reg :from (:eval 0) :to (:eval 1) :offset lr-offset)
                       ,lr)))))))
 

@@ -303,8 +303,7 @@
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
-      (load-inline-constant tmp-tn '(:fixup unwind :assembly-routine))
-      (inst br tmp-tn)
+      (invoke-asm-routine 'unwind tmp-tn :tail t)
 
       (emit-label ENTRY-LABEL)
       (inst mov nargs 0)
