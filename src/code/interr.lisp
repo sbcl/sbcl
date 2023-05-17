@@ -503,17 +503,23 @@
   (deferr add-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (object-not-type-error (+ x y) type nil)))
+      (if (numberp x)
+          (object-not-type-error (+ x y) type nil)
+          (object-not-type-error x 'number nil))))
 
   (deferr sub-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (object-not-type-error (- x y) type nil)))
+      (if (numberp x)
+          (object-not-type-error (- x y) type nil)
+          (object-not-type-error x 'number nil))))
 
   (deferr mul-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (object-not-type-error (* x y) type nil))))
+      (if (numberp x)
+          (object-not-type-error (* x y) type nil)
+          (object-not-type-error x 'number nil)))))
 
 ;;;; INTERNAL-ERROR signal handler
 

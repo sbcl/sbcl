@@ -252,6 +252,15 @@
                 #+(or arm64 x86-64)
                 ((lvar-fun-is (combination-fun dest)
                               '(values-list)))
+                ;; Not great
+                ((lvar-fun-is (combination-fun dest)
+                              '(%%primitive))
+                 (destructuring-bind (vop &rest args) (combination-args dest)
+                   (and (constant-lvar-p vop)
+                        (memq (vop-info-name (lvar-value vop)) '(sb-vm::overflow+t
+                                                                 sb-vm::overflow-t
+                                                                 sb-vm::overflow*t))
+                        (eq lvar (car args)))))
                 (t
                  (values-subtypep (lvar-externally-checkable-type lvar)
                                   (cast-type-to-check cast))))))))
