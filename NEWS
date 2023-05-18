@@ -4,7 +4,10 @@ changes relative to sbcl-2.3.4:
   * enhancement: Unicode support has been updated to support version 15.0.0 of
     the Unicode standard, including addition of characters and their collation
     keys, and refinements to grapheme-, word- and line-breaking algorithms.
-
+  * optimization: improved arithmetic operations in the form of 
+    (the word-sized-type (-+* word-sized word-sized)) when the result can
+    overflow. For arm64 and x86-64.
+    
 changes in sbcl-2.3.4 relative to sbcl-2.3.3:
   * enhancement: attempts to call non-callable objects can now provide
     USE-VALUE restarts on x86-64 and arm64.
