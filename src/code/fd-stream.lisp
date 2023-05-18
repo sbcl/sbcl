@@ -2378,7 +2378,7 @@
 (defun open (filename
              &key
                (direction :input)
-               (element-type 'base-char)
+               (element-type 'character)
                (if-exists nil if-exists-given)
                (if-does-not-exist nil if-does-not-exist-given)
                (external-format :default)
