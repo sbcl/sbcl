@@ -700,7 +700,8 @@ calling @code{load-shared-object}.
 @section Foreign Function Calls
 
 The foreign function call interface allows a Lisp program to call
-many functions written in languages that use the C calling convention.
+functions written in other languages. Calling convention
+is detected automatically.
 
 Lisp sets up various signal handling routines and other environment
 information when it first starts up, and expects these to be in place
