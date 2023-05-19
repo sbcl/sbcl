@@ -1505,30 +1505,28 @@
               (let ((type (truly-the layout (translate (%instance-layout obj) spaces))))
                 (do-layout-bitmap (i taggedp type (%instance-length obj))
                   (when taggedp
-                    (scanptr vaddr obj (1+ i)))))
-              (return-from scan-obj))
+                    (scanptr vaddr obj (1+ i))))))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
-                (when (logtest (get-header-data obj) vector-addr-hashing-flag)
-                  (do ((i 2 (+ i 2)) (needs-rehash))
-                      ;; Refer to the figure at the top of src/code/hash-table.lisp.
-                      ;; LEN is an odd number.
-                      ((>= i (1- len))
-                       (when needs-rehash
-                         (setf (svref obj 1) 1)))
-                    ;; A weak or EQ-based hash table any of whose keys is a function
-                    ;; or code-component might need the 'rehash' flag set.
-                    ;; In practice, it is likely already set, because any object that
-                    ;; could move in the final GC probably did move.
-                    (when (scanptr vaddr obj (+ vector-data-offset i))
-                      (setq needs-rehash t))
-                    (scanptr vaddr obj (+ vector-data-offset i 1)))
-                  (return-from scan-obj))
-                (setq nwords (+ len 2))))
+                (cond ((logtest (get-header-data obj) vector-addr-hashing-flag)
+                       (do ((i 2 (+ i 2)) (needs-rehash))
+                           ;; Refer to the figure at the top of src/code/hash-table.lisp.
+                           ;; LEN is an odd number.
+                           ((>= i (1- len))
+                            (when needs-rehash
+                              (setf (svref obj 1) 1)))
+                         ;; A weak or EQ-based hash table any of whose keys is a function
+                         ;; or code-component might need the 'rehash' flag set.
+                         ;; In practice, it is likely already set, because any object that
+                         ;; could move in the final GC probably did move.
+                         (when (scanptr vaddr obj (+ vector-data-offset i))
+                           (setq needs-rehash t))
+                         (scanptr vaddr obj (+ vector-data-offset i 1))))
+                      (t
+                       (scanptrs vaddr obj 1 (+ len 1))))))
              (#.fdefn-widetag
               (scanptrs vaddr obj 1 2)
-              (scanptrs vaddr obj 3 3 t)
-              (return-from scan-obj))
+              (scanptrs vaddr obj 3 3 t))
              ((#.closure-widetag #.funcallable-instance-widetag)
               ;; read the trampoline slot
               (let ((word (sap-ref-word (int-sap (get-lisp-obj-address obj))
@@ -1537,16 +1535,9 @@
                   (abs-fixup (+ vaddr n-word-bytes)
                              (+ core-offs n-word-bytes)
                              word)))
-              (when (eq widetag funcallable-instance-widetag)
-                (let* ((layout (truly-the sb-vm:layout (translate (%fun-layout obj) spaces)))
-                       (bitmap (%raw-instance-ref/signed-word
-                                layout (sb-kernel::type-dd-length sb-vm:layout))))
-                  (unless (= (sb-kernel:bitmap-nwords layout) 1)
-                    (error "Strange funcallable-instance bitmap"))
-                  (unless (eql bitmap sb-kernel:+layout-all-tagged+)
-                      ;; tagged slots precede untagged slots,
-                      ;; so integer-length is the count of tagged slots.
-                      (setq nwords (1+ (integer-length bitmap)))))))
+              ;; untaggged pointers are generally not supported in
+              ;; funcallable instances, so scan everything.
+              (scanptrs vaddr obj 1 (1- nwords)))
              ;; mixed boxed/unboxed objects
              (#.code-header-widetag
               (aver (not pie))
@@ -1561,12 +1552,10 @@
                 ;; [PIE requires all code in immobile space, and this reloc
                 ;; is for a dynamic space object]
                 (scanptrs 0 (%code-entry-point obj i) 2 5))
-              (setq nwords (code-header-words obj)))
+              (scanptrs vaddr obj 1 (1- (code-header-words obj))))
              ;; boxed objects that can reference code/simple-funs
-             ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag))
-             (t
-              (return-from scan-obj)))
-           (scanptrs vaddr obj 1 (1- nwords))))
+             ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag)
+              (scanptrs vaddr obj 1 (1- nwords))))))
       (dolist (space (cdr spaces))
         (unless (= (space-id space) immobile-text-core-space-id)
           (let* ((logical-addr (space-addr space))
