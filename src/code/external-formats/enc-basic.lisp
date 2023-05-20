@@ -131,6 +131,79 @@
     ascii/cr->string-aref
     string->ascii/cr
     :newline-variant :cr)
+
+(defun string->ascii/crlf (string sstart send null-padding)
+  (declare (optimize speed #.*safety-0*)
+           (type simple-string string)
+           (type array-range sstart send null-padding))
+  (let ((array (make-array (+ (* 2 (- send sstart)) null-padding)
+                           :element-type '(unsigned-byte 8)
+                           :fill-pointer 0 :adjustable t)))
+    (loop for i from sstart below send
+          do (let ((code (char-code (char string i))))
+               (cond
+                 ((= code 10)
+                  (vector-push-extend 13 array)
+                  (vector-push-extend 10 array))
+                 ((>= code 128)
+                  (let ((replacement (encoding-error :ascii string i)))
+                    (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
+                    (dotimes (j (length replacement))
+                      (vector-push-extend (aref replacement j) array))))
+                 (t (vector-push-extend code array)))))
+    (dotimes (i null-padding)
+      (vector-push-extend 0 array))
+    (coerce array '(simple-array (unsigned-byte 8) (*)))))
+
+(defmacro define-ascii/crlf->string (accessor type)
+  (let ((name (make-od-name 'ascii/crlf->string accessor)))
+    `(progn
+       (defun ,name (array astart aend)
+         (declare (optimize speed)
+                  (type ,type array)
+                  (type array-range astart aend))
+         (let ((string (make-array (- aend astart) :element-type 'character
+                                   :fill-pointer 0 :adjustable t)))
+           (loop for apos from astart below aend
+                 do (let* ((code (,accessor array apos))
+                           (string-content
+                            (cond
+                              ((= code 13) (if (= apos (1- aend))
+                                               (code-char 13)
+                                               (if (= (,accessor array (1+ apos)) 10)
+                                                   (progn (incf apos) #\Newline)
+                                                   (code-char 13))))
+                              ((< code 128) (code-char code))
+                              (t (decoding-error array apos (1+ apos) :ascii ; '(:ASCII :NEWLINE :CRLF)?
+                                                 'malformed-ascii apos)))))
+                      (if (characterp string-content)
+                          (vector-push-extend string-content string)
+                          (loop for c across string-content
+                                do (vector-push-extend c string))))
+                 finally (return (coerce string 'simple-string))))))))
+(instantiate-octets-definition define-ascii/crlf->string)
+
+(define-external-format/variable-width (:ascii)
+    t #\?
+    (if (char= |ch| #\Newline) 2 1)
+    (cond
+      ((= bits 10)
+       (setf (sap-ref-8 sap tail) 13)
+       (setf (sap-ref-8 sap (1+ tail)) 10))
+      ((>= bits 128) (external-format-encoding-error stream bits))
+      (t (setf (sap-ref-8 sap tail) bits)))
+    ((2 1)
+     (cond
+       ((= (- tail head) 1) 1) ; one octet away from EOF, can't possibly be CRLF
+       ((and (= byte 13) (= (sap-ref-8 sap (1+ head)) 10)) 2)
+       (t 1)))
+    (cond
+      ((= size 2) #\Newline)
+      ((>= byte 128) (return-from decode-break-reason 1))
+      (t (code-char byte)))
+    ascii/crlf->string-aref
+    string->ascii/crlf
+    :newline-variant :crlf)
 
 ;;; Latin-1
 
