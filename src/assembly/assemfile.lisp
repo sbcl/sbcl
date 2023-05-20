@@ -68,6 +68,12 @@
           (let ((segment (assemble-sections
                           asmstream nil
                           (make-segment :run-scheduler nil))))
+            (unless (= (length (remove-duplicates (mapcar 'car *entry-points*)))
+                       (length *entry-points*))
+              (error "Duplicate asm routine: ~S"
+                     (loop for (this . rest) on *entry-points*
+                           when (assoc (car this) rest)
+                           collect (car this))))
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb-assem::segment-fixup-notes segment)
