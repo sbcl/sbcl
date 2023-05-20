@@ -414,13 +414,26 @@ STRING (or the subsequence bounded by START and END)."
   ;; TODO: compare-and-swap the entry if NAME already has an index
   ;; specifying to demand-load this format from a fasl.
   ;; All synonyms of that name will also references the loaded format.
-  (let* ((entry (apply #'%make-external-format :names names args))
-         (table *external-formats*)
-         (free-index (or (get (car names) :external-format)
-                         (position nil table))))
+  (let* ((table *external-formats*)
+         (newline-variant (getf args :newline-variant))
+         (index (get (car names) :external-format))
+         (current-entry (and index (aref table index)))
+         (canonical-ef (if (consp current-entry) (car current-entry) current-entry))
+         (names (if canonical-ef (ef-names canonical-ef) names))
+         (ef (apply #'%make-external-format :names names args))
+         (free-index (or index (position nil table))))
+    (unless (eql newline-variant :lf)
+      (aver index)
+      (aver current-entry)
+      (unless (consp current-entry)
+        (setf current-entry (list current-entry)))
+      (setf (aref table index)
+            (cons (car current-entry)
+                  (acons (list newline-variant) ef (cdr current-entry))))
+      (return-from register-external-format))
     (dolist (name names)
       (setf (get name :external-format) free-index))
-    (setf (aref table free-index) entry)))
+    (setf (aref table free-index) ef)))
 
 (defun wrap-external-format-functions (external-format fun)
   (let ((result (%copy-external-format external-format)))
@@ -468,23 +481,27 @@ STRING (or the subsequence bounded by START and END)."
                          (apply fun rest))))))))
 
     (binding*
-        (((format-name replacement)
+        (((format-name newline replacement)
           (etypecase external-format
             ;; This seem like such an unnecessarily general way to
-            ;; pass an optional parameter. What's up with that???
+            ;; pass optional parameters. What's up with that?  (I
+            ;; think it's because BINDING* uses MULTIPLE-VALUE-BIND
+            ;; but optionals are most easily handled with
+            ;; DESTRUCTURING-BIND)
             ((cons keyword)
              (values (car external-format)
+                     (getf (cdr external-format) :newline :lf)
                      (getf (cdr external-format) :replacement)))
             (symbol
-             (values external-format nil))))
+             (values external-format :lf nil))))
          (table-index (get format-name :external-format) :exit-if-null)
          (formats *external-formats*)
          (table-entry
           ;; The table entry can be one of:
           ;;   1. #<external-format>
-          ;;   2. (#<external-format> (#\char . #<modified-ef>) ...)
+          ;;   2. (#<external-format> ((:crlf #\char) . #<modified-ef>) ...)
           ;;      for a list of modified formats that alter the
-          ;;      choice of replacement character.
+          ;;      newline encoding and choice of replacement character.
           ;;   3. "namestring" - to autoload from a fasl containing
           ;;      the named format.
           (let ((ef (svref formats table-index)))
@@ -501,22 +518,27 @@ STRING (or the subsequence bounded by START and END)."
          ((base-format variations)
           (if (listp table-entry)
               (values (car table-entry) (cdr table-entry))
-              (values table-entry nil))))
-      (when (or (not base-format) (not replacement))
-        (return-from get-external-format base-format))
+              (values table-entry nil)))
+         (newline-base-format
+          (if (eql newline :lf)
+              base-format
+              (cdr (assoc (list newline) variations :test #'equal)))))
+      (when (or (not newline-base-format) (not replacement))
+        (return-from get-external-format newline-base-format))
       (loop
-        (awhen (assoc replacement variations)
-          (return (cdr it)))
-        (let* ((new-ef (replacement-handlerify base-format replacement))
-               (new-table-entry
-                (cons base-format (acons replacement new-ef variations)))
-               (old (cas (svref formats table-index) table-entry new-table-entry)))
-          (when (eq old table-entry)
-            (return new-ef))
-          ;; CAS failure -> some other thread added an entry. It's probably
-          ;; for the same replacement char which is usually #\ufffd.
-          ;; So try again. At worst this conses some more garbage.
-          (setq table-entry old))))))
+        (let ((key (cons newline replacement)))
+          (awhen (assoc key variations :test #'equal)
+            (return (cdr it)))
+          (let* ((new-ef (replacement-handlerify newline-base-format replacement))
+                 (new-table-entry
+                  (cons base-format (acons key new-ef variations)))
+                 (old (cas (svref formats table-index) table-entry new-table-entry)))
+            (when (eq old table-entry)
+              (return new-ef))
+            ;; CAS failure -> some other thread added an entry. It's probably
+            ;; for the same replacement char which is usually #\ufffd.
+            ;; So try again. At worst this conses some more garbage.
+            (setq table-entry old)))))))
 
 (push
   `("SB-IMPL"

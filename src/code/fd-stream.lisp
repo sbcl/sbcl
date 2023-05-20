@@ -827,6 +827,7 @@
   ;; All the names that can refer to this external format.  The first
   ;; one is the canonical name.
   (names (missing-arg) :type list :read-only t)
+  (newline-variant (missing-arg) :type (member :crlf :lf :cr) :read-only t)
   (default-replacement-character (missing-arg) :type character)
   (read-n-chars-fun (missing-arg) :type function)
   (read-char-fun (missing-arg) :type function)
@@ -1436,17 +1437,19 @@
      out-size-expr out-expr in-size-expr in-expr
      octets-to-string-sym string-to-octets-sym
      &key base-string-direct-mapping
-          fd-stream-read-n-characters)
+          fd-stream-read-n-characters
+          (newline-variant :lf))
   (let* ((name (first external-format))
-         (out-function (symbolicate "OUTPUT-BYTES/" name))
-         (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
+         (suffix (symbolicate name '/ newline-variant))
+         (out-function (symbolicate "OUTPUT-BYTES/" suffix))
+         (format (format nil "OUTPUT-CHAR-~A/~A-~~A-BUFFERED" (string name) newline-variant))
          (in-function (or fd-stream-read-n-characters
-                          (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name)))
-         (in-char-function (symbolicate "INPUT-CHAR/" name))
-         (resync-function (symbolicate "RESYNC/" name))
-         (size-function (symbolicate "BYTES-FOR-CHAR/" name))
-         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
-         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name))
+                          (symbolicate "FD-STREAM-READ-N-CHARACTERS/" suffix)))
+         (in-char-function (symbolicate "INPUT-CHAR/" suffix))
+         (resync-function (symbolicate "RESYNC/" suffix))
+         (size-function (symbolicate "BYTES-FOR-CHAR/" suffix))
+         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" suffix))
+         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" suffix))
          (n-buffer (gensym "BUFFER")))
     `(progn
        (defun ,size-function (|ch|)
@@ -1711,6 +1714,7 @@
 
        (register-external-format
         ',external-format
+        :newline-variant ,newline-variant
         :default-replacement-character ,replacement-character
         :read-n-chars-fun #',in-function
         :read-char-fun #',in-char-function
