@@ -316,17 +316,10 @@
      ;; to happen in more places too. (Like the array hairy type
      ;; testing.)
      (if (unknown-type-p type)
-         (let ((spec (unknown-type-specifier type)))
-           ;; KLUDGE: Work around the fact that we load PCL after we
-           ;; type test certain things defined there. This is somewhat
-           ;; suboptimal because this is really only a concern during
-           ;; warm load.
-           (if (member spec '(class sb-pcl::condition-class))
+         (let ((type (specifier-type (unknown-type-specifier type))))
+           (if (unknown-type-p type)
                (values nil nil)
-               (let ((type (specifier-type spec)))
-                 (if (unknown-type-p type)
-                     (values nil nil)
-                     (ctypep obj type)))))
+               (ctypep obj type)))
          ;; Now the tricky stuff.
          (let ((predicate (cadr (hairy-type-specifier type))))
            (case predicate

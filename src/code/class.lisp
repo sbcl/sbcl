@@ -354,7 +354,7 @@ between the ~A definition and the ~A definition"
 ;;; separate operation (think anonymous classes.)
 ;;; -- If INVALIDATE, then all the layouts for any old definition
 ;;;    and subclasses are invalidated, and the SUBCLASSES slot is cleared.
-;;; -- If MODIFY is given, then it is some old layout, and is to be
+;;; -- If DESTRUCT-LAYOUT is given, then it is some old layout, and is to be
 ;;;    destructively altered to hold the same data as LAYOUT.
 (macrolet ((set-bitmap-from-layout (to-layout from-layout)
              `(let ((to-index (bitmap-start ,to-layout))

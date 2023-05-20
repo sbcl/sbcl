@@ -23,15 +23,7 @@
       (let ((info (sb-int:info :function :type s)))
         (when (consp info)
           (let ((parsed (specifier-type info)))
-            (setf (sb-int:info :function :type s) parsed))))))
-  ;; One good kludge deserves another.
-  ;; This is OK only because it's the very first file compiled in warm build.
-  (let ((disallowed-undefineds
-         (remove-if (lambda (x) (member x '(class sb-pcl::condition-class)))
-                    (mapcar #'sb-c::undefined-warning-name
-                            sb-c::*undefined-warnings*))))
-    (assert (not disallowed-undefineds)))
-  (setf sb-c::*undefined-warnings* nil))
+            (setf (sb-int:info :function :type s) parsed)))))))
 
 ;;; Moved from 'cold-error' to this file because of (at least) these reasons:
 ;;;  - the LOAD-TIME-VALUE forms need to run after 'condition.lisp'
