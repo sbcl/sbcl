@@ -221,8 +221,8 @@ SB-C::DXABLE-ARGS
 ;;; There are a few wired IDs:
 ;;;   0 = T
 ;;;   1 = STRUCTURE-OBJECT
-;;;   2 = WRAPPER if #+metaspace, unused if #-metaspace
-;;;   3 = SB-VM:LAYOUT if #+metaspace, WRAPPER if #-metaspace
+;;;   2 = unused : FIXME
+;;;   3 = LAYOUT
 ;;;   4 = SB-LOCKLESS::LIST-NODE
 ;;;   5 = SB-BROTHERTREE::UNARY-NODE
 (ecase layout-id-type
@@ -258,8 +258,7 @@ SB-C::DXABLE-ARGS
   (case name
     ((t) 0)
     (structure-object 1)
-    #+metaspace (wrapper 2)
-    (#+metaspace sb-vm:layout #-metaspace wrapper 3)
+    (layout 3)
     (sb-lockless::list-node 4)
     (sb-brothertree::unary-node 5)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))

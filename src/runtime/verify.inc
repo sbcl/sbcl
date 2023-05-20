@@ -438,9 +438,6 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr, " [RO]");
     if (verify(READ_ONLY_SPACE_START, read_only_space_free_pointer, &state, 0)) goto out;
-#ifdef LISP_FEATURE_METASPACE
-    if (verify(METASPACE_START, (lispobj*)READ_ONLY_SPACE_END, &state, 0)) goto out;
-#endif
     if (verbose)
         fprintf(stderr, " [static]");
     // Just don't worry about NIL, it's seldom the problem

@@ -150,7 +150,7 @@
                              (car body)))
       (let ((default-constructor
              (dd-default-constructor
-              (sb-kernel::wrapper-%info (classoid-wrapper classoid)))))
+              (sb-kernel::layout-%info (classoid-layout classoid)))))
         (unless default-constructor
           (simple-reader-error
            stream
@@ -296,7 +296,7 @@
                       (i sb-vm:instance-data-start (1+ i)))
                      ((>= i len))
                    (process (%instance-ref tree i)))
-                 (let ((dd (wrapper-dd (%instance-wrapper tree))))
+                 (let ((dd (layout-dd (%instance-layout tree))))
                    (dolist (dsd (dd-slots dd))
                      (when (eq (dsd-raw-type dsd) t)
                        (process (%instance-ref tree (dsd-index dsd))))))))

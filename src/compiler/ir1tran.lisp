@@ -337,7 +337,7 @@
       (cl:typep obj 'debug-name-marker)
       ;; STANDARD-OBJECT layouts use MAKE-LOAD-FORM, but all other layouts
       ;; have the same status as symbols - composite objects but leaflike.
-      (and (typep obj 'wrapper) (not (layout-for-pcl-obj-p obj)))
+      (and (typep obj 'layout) (not (layout-for-pcl-obj-p obj)))
       ;; PACKAGEs are also leaflike.
       (cl:typep obj 'package)
       ;; The cross-compiler wants to dump CTYPE instances as leaves,
@@ -388,7 +388,7 @@
            ;; user-defined MAKE-LOAD-FORM methods?
            (when (emit-make-load-form value)
              #+sb-xc-host
-             (aver (eql (wrapper-bitmap (%instance-wrapper value))
+             (aver (eql (layout-bitmap (%instance-layout value))
                         sb-kernel:+layout-all-tagged+))
              (do-instance-tagged-slot (i value)
                (grovel (%instance-ref value i)))))

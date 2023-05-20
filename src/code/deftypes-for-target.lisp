@@ -273,6 +273,4 @@
 (sb-xc:deftype extended-function-designator ()
                '(satisfies extended-function-designator-p))
 
-#-metaspace (sb-xc:deftype sb-vm:layout () 'wrapper)
-
 (/show0 "deftypes-for-target.lisp end of file")

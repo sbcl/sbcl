@@ -344,7 +344,7 @@
                              (sb-di:error-context))))
              (condition
                (make-condition (if (and (%instancep object)
-                                        (wrapper-invalid (%instance-wrapper object)))
+                                        (layout-invalid (%instance-layout object)))
                                    ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
                                    ;; more information in that it says that the object may have at some point
                                    ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
@@ -354,8 +354,8 @@
                                :expected-type (typecase type
                                                 (classoid-cell
                                                  (classoid-cell-name type))
-                                                (wrapper
-                                                 (wrapper-proper-name type))
+                                                (layout
+                                                 (layout-proper-name type))
                                                 (t
                                                  type))
                                :context (and (not (integerp context))

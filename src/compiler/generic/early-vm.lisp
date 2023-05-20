@@ -185,57 +185,5 @@
 
 #+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
 
-;;; Supporting code for LAYOUT allocated in metadata space a/k/a "metaspace".
-;;; These objects are manually allocated and freed.
-;;; Tracts are the unit of allocation requested from the OS.
-;;; Following the nomenclature in https://en.wikipedia.org/wiki/Slab_allocation
-;;; - A slab is the quantum requested within a tract.
-;;; - Chunks are the units of allocation ("objects") within a slab.
-
-(defconstant metaspace-tract-size (* 2 1024 1024)) ; 2 MiB
-(defconstant metaspace-slab-size 2048) ; 2 KiB
-
-;;; Chunks are all the same size per slab, which makes finding the next available
-;;; slot simply a pop from a freelist. The object stored in the chunk can be anything
-;;; not to exceed the chunk size. (You can't span chunks with one object)
-;;; All slabs of a given size with any available space are kept in a doubly-linked
-;;; list for the slab's chunk size.  A slab is removed from the doubly-linked list and
-;;; moved to the slab recycle list when all chunks within it become free.
-;;;
-;;; There are 4 words of overhead per slab.
-;;; At present only 64-bit word size is supported, so we assume
-;;; that pointer-sized words in the slab header consume 8 bytes.
-;;;   word 0: 2 bytes : sizeclass (as a FIXNUM)
-;;;           2 bytes : capacity in objects
-;;;           2 bytes : chunk size
-;;;           2 bytes : number of objects allocated in it
-;;;   word 1: head of freelist
-;;;   word 2: next slab with any holes in the same sizeclass
-;;;   word 3: previous slab with any holes in the same sizeclass
-;;;
-;;; The FIXNUM representation of sizeclass causes the entire lispword
-;;; to read as a fixnum, which makes it possible to map-allocated-objects
-;;; over the slabs in a chunk without fuss. The slab heade appears
-;;; just like 2 conses. (The next/prev pointers look like fixnums)
-;;;
-;;; #+big-endian will need to flip the positions of these sub-fields
-;;; to make the lispword read as fixnum.
-
-;;; Keep in sync with the structure definition in src/runtime/alloc.c
-(defconstant slab-overhead-words 4)
-(defmacro slab-sizeclass (slab) `(sap-ref-16 ,slab 0))
-(defmacro slab-capacity (slab) `(sap-ref-16 ,slab 2))
-(defmacro slab-chunk-size (slab) `(sap-ref-16 ,slab 4))
-(defmacro slab-usage (slab) `(sap-ref-16 ,slab 6))
-(defmacro slab-freelist (slab) `(sap-ref-sap ,slab 8))
-(defmacro slab-next (slab) `(sap-ref-sap ,slab 16))
-(defmacro slab-prev (slab) `(sap-ref-sap ,slab 24))
-(defmacro slab-usable-range-start (slab) `(sap+ ,slab (* 4 n-word-bytes)))
-
-(defmacro init-slab-header (slab sizeclass chunksize capacity)
-  `(setf (slab-sizeclass ,slab) (ash ,sizeclass n-fixnum-tag-bits)
-         (slab-capacity ,slab) ,capacity
-         (slab-chunk-size ,slab) ,chunksize))
-
 #+gencgc
 (defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))

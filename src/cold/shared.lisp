@@ -845,7 +845,7 @@
                ((and structure-object (not package))
                 (let ((type-name (string (type-of x))))
                   ;; This "LAYOUT" refers to *our* object, not host-sb-kernel:layout.
-                  (unless (member type-name '("WRAPPER" "LAYOUT" "FLOAT" "COMPLEXNUM")
+                  (unless (member type-name '("LAYOUT" "FLOAT" "COMPLEXNUM")
                                   :test #'string=)
                     ;(Format t "visit a ~/host-sb-ext:print-symbol-with-prefix/~%" (type-of x))
                     ;; This generalizes over any structure. I need it because we

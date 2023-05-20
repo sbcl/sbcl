@@ -513,10 +513,10 @@
 
 ;;; wrapper for this type being used by the compiler
 (define-info-type (:type :compiler-layout)
-  :type-spec (or wrapper null)
+  :type-spec (or layout null)
   :default (lambda (name)
              (let ((class (find-classoid name nil)))
-               (and class (classoid-wrapper class)))))
+               (and class (classoid-layout class)))))
 
 ;;; DEFTYPE lambda-list
 ;; FIXME: remove this after making swank-fancy-inspector not use it.

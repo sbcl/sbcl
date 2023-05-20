@@ -24,13 +24,13 @@
   (dolist (symbol '(make-s1 make-s2 make-s3))
     (let ((constants
            (ctu:find-code-constants (symbol-function symbol)
-                                    :type 'sb-kernel:wrapper)))
+                                    :type 'sb-kernel:layout)))
       (assert (= (length constants) 1)))))
 
 (with-test (:name :mutex-owner-typecheck)
   (let ((layouts
          (ctu:find-code-constants #'(setf sb-thread::mutex-%owner)
-                                  :type 'sb-kernel:wrapper)))
+                                  :type 'sb-kernel:layout)))
     ;; expect exactly 1 layout, that of MUTEX, for signaling OBJECT-NOT-TYPE.
     ;; To be really pedantic we'd want to assert that in the source file
     ;; the defstruct of MUTEX appears prior to the defstruct of THREAD,
@@ -82,7 +82,7 @@ Evaluation took:
 (with-test (:name :no-equalp-calls)
   (dolist (type '(parent child child2))
     (let* ((equalp-impl
-            (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout type)))
+            (sb-kernel:layout-equalp-impl (sb-kernel:find-layout type)))
            (callees
             (ctu:find-named-callees equalp-impl)))
       (case type

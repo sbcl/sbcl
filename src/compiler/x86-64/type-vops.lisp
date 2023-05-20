@@ -724,15 +724,12 @@
   (:policy :fast-safe)
   (:conditional :e)
   (:args (object :scs (descriptor-reg))
-         (layout :scs (descriptor-reg immediate #+metaspace constant)))
+         (layout :scs (descriptor-reg immediate)))
   (:arg-types * * (:constant t))
   (:info lowtag)
   (:generator 1
-    ;; With metaspace, the layout argument is actually a #<WRAPPER>
-    ;; which does not have IMMEDIATE sc, but rather CONSTANT sc.
-    ;; But we use a layout fixup which stuffs in the pointer to the layout.
     (inst cmp :dword (ea (- 4 lowtag) object)
-          (if (sc-is layout immediate constant)
+          (if (sc-is layout immediate)
               (make-fixup (tn-value layout) :layout)
               layout)))))
 
@@ -1001,7 +998,7 @@
                         instance-pointer-lowtag)
                      layout)
                  test-layout))
-          ((let ((classoid (wrapper-classoid test-layout)))
+          ((let ((classoid (layout-classoid test-layout)))
              (and (eq (classoid-state classoid) :sealed)
                   (not (classoid-subclasses classoid))))
            (emit-constant test-layout)
@@ -1012,7 +1009,7 @@
            (inst cmp (emit-constant test-layout) layout))
 
           (t
-           (let* ((depthoid (wrapper-depthoid test-layout))
+           (let* ((depthoid (layout-depthoid test-layout))
                   (offset (+ (id-bits-offset)
                              (ash (- depthoid 2) 2)
                              (- instance-pointer-lowtag))))
@@ -1058,7 +1055,7 @@
       (%test-lowtag object layout (if not-p target done) t instance-pointer-lowtag))
 
     (cond ((and (not (integerp test-layout))
-                (let ((classoid (wrapper-classoid test-layout)))
+                (let ((classoid (layout-classoid test-layout)))
                   (and (eq (classoid-state classoid) :sealed)
                        (not (classoid-subclasses classoid)))))
            (emit-constant test-layout)

@@ -360,7 +360,7 @@
 ;;; This affected the performance of TYPECASE.
 (with-test (:name :sxhash-on-layout)
   (dolist (x '(pathname cons array))
-    (let ((l (sb-kernel:wrapper-friend (sb-kernel:find-layout x))))
+    (let ((l (sb-kernel:find-layout x)))
       (assert (= (sxhash l) (sb-kernel:layout-clos-hash l))))))
 
 (with-test (:name :equalp-table-fixnum-equal-to-float)
@@ -474,9 +474,9 @@
 ;;; such that LOGANDing any number of nonzero hashes is nonzero.
 (with-test (:name :layout-hashes-constant-1-bit)
   (let ((combined most-positive-fixnum))
-    (maphash (lambda (classoid wrapper)
+    (maphash (lambda (classoid layout)
                (declare (ignore classoid))
-               (let ((hash (sb-kernel:wrapper-clos-hash wrapper)))
+               (let ((hash (sb-kernel:layout-clos-hash layout)))
                  (setq combined (logand combined hash))))
              (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't)))
     (assert (/= 0 combined))))

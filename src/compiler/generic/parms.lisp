@@ -218,7 +218,6 @@
     ,@'(*current-catch-block*
         *current-unwind-protect-block*)
 
-    #+metaspace *metaspace-tracts*
     *immobile-codeblob-tree* ; for generations 0 through 5 inclusive
     *immobile-codeblob-vector* ; for pseudo-static-generation
     *dynspace-codeblob-tree*

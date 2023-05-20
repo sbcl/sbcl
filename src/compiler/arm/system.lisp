@@ -70,7 +70,7 @@
   (:generator 4
     (let ((test-id (layout-id test-layout))
           (offset (+ (id-bits-offset)
-                     (ash (- (wrapper-depthoid test-layout) 2) 2)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst ldr this-id (@ x offset))
       ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.

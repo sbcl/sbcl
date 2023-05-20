@@ -46,7 +46,7 @@
 
 (defun allocate-standard-instance (wrapper)
   (let* ((instance (%new-instance wrapper (1+ sb-vm:instance-data-start)))
-         (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+)))
+         (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+)))
     (%instance-set instance sb-vm:instance-data-start slots)
     instance))
 
@@ -64,18 +64,18 @@
           :format-arguments (list ,fin)))
 
 (defun allocate-standard-funcallable-instance (wrapper name)
-  (declare (wrapper wrapper))
+  (declare (layout wrapper))
   (let* ((hash (if name
                    ;; Named functions have a predictable hash
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
                    (sb-kernel::quasi-random-address-based-hash
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
                     most-positive-fixnum)))
-         (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
+         (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (truly-the funcallable-instance
                          (%make-standard-funcallable-instance
                           slots #-executable-funinstances hash))))
-    (setf (%fun-wrapper fin) wrapper)
+    (setf (%fun-layout fin) wrapper)
     #+executable-funinstances
     (let ((32-bit-hash
            ;; don't know how good our hash is, so use all N-FIXNUM-BITS of it
@@ -117,15 +117,16 @@
 ;;;;
 ;;;; This function builds the base metabraid from the early class definitions.
 
+(defmacro wrapper-info (x) `(sb-kernel::layout-%info ,x))
 (declaim (inline wrapper-slot-list))
 (defun wrapper-slot-list (wrapper)
-  (let ((info (sb-kernel::wrapper-%info wrapper)))
+  (let ((info (wrapper-info wrapper)))
     (if (listp info) info)))
 (defun (setf wrapper-slot-list) (newval wrapper)
   ;; The current value must be a list, otherwise we'd clobber
   ;; a defstruct-description.
-  (aver (listp (sb-kernel::wrapper-%info wrapper)))
-  (setf (sb-kernel::wrapper-%info wrapper) newval))
+  (aver (listp (wrapper-info wrapper)))
+  (setf (wrapper-info wrapper) newval))
 
 (macrolet
     ((with-initial-classes-and-wrappers ((&rest classes) &body body)
@@ -243,7 +244,7 @@
                      name class slots
                      standard-effective-slot-definition-wrapper t))
 
-              (setf (wrapper-slot-table wrapper) (make-slot-table class slots t))
+              (setf (layout-slot-table wrapper) (make-slot-table class slots t))
               (when (layout-for-pcl-obj-p wrapper)
                 (setf (wrapper-slot-list wrapper) slots))
 
@@ -345,7 +346,7 @@
       (destructuring-bind (name supers subs cpl prototype) e
         (let* ((class (find-class name))
                (lclass (find-classoid name))
-               (wrapper (classoid-wrapper lclass)))
+               (wrapper (classoid-layout lclass)))
           (setf (classoid-pcl-class lclass) class)
 
           (!bootstrap-initialize-class 'built-in-class class
@@ -413,7 +414,7 @@
                                  slot-class))
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots)
-      (setf (wrapper-slot-table wrapper)
+      (setf (layout-slot-table wrapper)
             (make-slot-table class slots
                              (member metaclass-name
                                      '(standard-class funcallable-standard-class))))
@@ -719,7 +720,7 @@
 (defun find-slot-cell (wrapper slot-name)
   (declare (symbol slot-name))
   (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-  (let* ((vector (wrapper-slot-table wrapper))
+  (let* ((vector (layout-slot-table wrapper))
          (modulus (truly-the index (svref vector 0)))
          ;; Can elide the 'else' branch of (OR symbol-hash ensure-symbol-hash)
          ;; because every symbol in the slot-table already got a nonzero hash.

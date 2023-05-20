@@ -476,8 +476,7 @@
                        (locally (declare (notinline sb-c::producing-fasl-file))
                          (not (sb-c::producing-fasl-file))))))
        immediate-sc-number))
-    #+metaspace (sb-vm:layout (bug "Can't reference layout as a constant"))
-    #+(and compact-instance-header (not metaspace)) (wrapper immediate-sc-number)
+    #+compact-instance-header (layout immediate-sc-number)
     (single-float
        (if (eql value $0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float
@@ -519,8 +518,8 @@
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-symbol)))
-          #+(and immobile-space (not metaspace))
-          (wrapper
+          #+immobile-space
+          (layout
            (make-fixup val :layout))
           (character (if tag
                          (logior (ash (char-code val) n-widetag-bits)

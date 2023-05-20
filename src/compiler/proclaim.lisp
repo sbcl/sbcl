@@ -386,8 +386,8 @@
 (defun seal-class (classoid)
   (declare (type classoid classoid))
   (setf (classoid-state classoid) :sealed)
-  (sb-kernel::do-subclassoids ((subclassoid wrapper) classoid)
-    (declare (ignore wrapper))
+  (sb-kernel::do-subclassoids ((subclassoid layout) classoid)
+    (declare (ignore layout))
     (setf (classoid-state subclassoid) :sealed)))
 
 (defun process-freeze-type-declaration (type-specifier)

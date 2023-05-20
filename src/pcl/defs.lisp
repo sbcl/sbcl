@@ -122,7 +122,7 @@
     ((not and or) `(,(car type) ,@(mapcar #'convert-to-system-type
                                           (cdr type))))
     ((class class-eq) ; class-eq is impossible to do right
-     (wrapper-classoid (class-wrapper (cadr type))))
+     (layout-classoid (class-wrapper (cadr type))))
     (eql type)
     (t (if (null (cdr type))
            (car type)
@@ -190,7 +190,7 @@
                       (/noshow "entering DIRECT-SUPERS" (classoid-name class))
                       (if (typep class 'built-in-classoid)
                           (built-in-classoid-direct-superclasses class)
-                          (let ((inherits (wrapper-inherits (classoid-wrapper class))))
+                          (let ((inherits (layout-inherits (classoid-layout class))))
                             (/noshow inherits)
                             (list (svref inherits (1- (length inherits)))))))
                     (direct-subs (class)
@@ -213,8 +213,8 @@
                                   `(list ',name
                                          ',(mapcar #'classoid-name (direct-supers class))
                                          ',(mapcar #'classoid-name (direct-subs class))
-                                         ',(map 'list #'wrapper-classoid-name
-                                                (reverse (wrapper-inherits (classoid-wrapper class))))
+                                         ',(map 'list #'layout-classoid-name
+                                                (reverse (layout-inherits (classoid-layout class))))
                                          ,(getf (cdr kernel-bic-entry) :prototype-form))))
                               (remove-if (lambda (kernel-bic-entry)
                                            (member (first kernel-bic-entry)

@@ -324,8 +324,8 @@
           (list (sb-impl::info-env-count sb-int:*info-environment*)))))
 
 (defun structureish-classoid-ancestors (classoid)
-  (map 'list 'sb-kernel:wrapper-classoid
-       (sb-kernel:wrapper-inherits (sb-kernel:classoid-wrapper classoid))))
+  (map 'list 'sb-kernel:layout-classoid
+       (sb-kernel:layout-inherits (sb-kernel:classoid-layout classoid))))
 
 (defun globaldb-cleanup (initial-packages globaldb-summary)
   ;; Package deletion suffices to undo DEFVAR,DEFTYPE,DEFSETF,DEFUN,DEFMACRO

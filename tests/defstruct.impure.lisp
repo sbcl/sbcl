@@ -530,7 +530,7 @@
 (with-test (:name :dd-bitmap-vs-layout-bitmap)
   (dolist (typename '(huge-manyraw hugest-manyraw))
     (let* ((layout (sb-kernel:find-layout typename))
-           (info (sb-kernel:wrapper-dd layout))
+           (info (sb-kernel:layout-dd layout))
            (bitmap (sb-kernel::dd-bitmap info)))
       (assert (typep bitmap 'bignum))
       (assert (= (sb-bignum:%bignum-length bitmap)
@@ -547,7 +547,7 @@
                (eql (huge-manyraw-w1 s) #xffee)
                (eql (huge-manyraw-w2 s) #xeeee)))
   (dolist (slot (sb-kernel:dd-slots
-                 (sb-kernel:wrapper-info (sb-kernel:wrapper-of s))))
+                 (sb-kernel:layout-info (sb-kernel:layout-of s))))
     (let ((name (string (sb-kernel:dsd-name slot))))
       (cond ((eql (mismatch name "SLOT-") 5)
              (let ((n (parse-integer name :start 5)))
@@ -902,7 +902,7 @@ redefinition."
   (assert (funcall predicate instance)))
 
 (defun assert-invalid (instance)
-  (assert (sb-kernel:wrapper-invalid (sb-kernel:%instance-wrapper instance))))
+  (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout instance))))
 
 ;; Don't try to understand this macro; just look at its expansion.
 (defmacro with-defstruct-redefinition-test (name
@@ -1445,9 +1445,9 @@ redefinition."
 
 (test-util:with-test (:name :specialized-equalp)
   ;; make sure we didn't mess up PATHNAME and HASH-TABLE
-  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'pathname))))
+  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'pathname))))
     (assert (eq f #'sb-int:pathname=)))
-  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'hash-table))))
+  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'hash-table))))
     (assert (eq f #'sb-int:hash-table-equalp))))
 
 (defstruct (badbuf (:constructor make-badbuf ()))

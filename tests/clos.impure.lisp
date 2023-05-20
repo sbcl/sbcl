@@ -2664,7 +2664,7 @@
     (eval `(defclass ,class2 (,class1) ()))
     (let ((instance (make-instance class2)))
       (sb-mop:finalize-inheritance (find-class class1))
-      (assert (not (sb-kernel:wrapper-invalid (sb-kernel:wrapper-of instance)))))))
+      (assert (not (sb-kernel:layout-invalid (sb-kernel:layout-of instance)))))))
 
 (with-test (:name (allocate-instance :on symbol))
   (let ((class (gensym "CLASS-")))
@@ -2683,7 +2683,7 @@
                 unbound-slot))
 
 (with-test (:name :layouf-of-nil)
-  (assert (eq (sb-kernel:wrapper-of nil) (sb-kernel:find-layout 'null))))
+  (assert (eq (sb-kernel:layout-of nil) (sb-kernel:find-layout 'null))))
 
 (with-test (:name (defmethod :on-classless-type))
   (handler-bind ((timeout (lambda (condition)

@@ -86,7 +86,7 @@
          (funcall (built-in-classoid-predicate type) object)
          (and (or (%instancep object)
                   (functionp object))
-              (classoid-typep (wrapper-of object) type object))))
+              (classoid-typep (layout-of object) type object))))
     (union-type
      (some (lambda (union-type-type) (recurse object union-type-type))
            (union-type-types type)))
@@ -150,8 +150,8 @@
                       (block nil
                         (classoid-typep
                          (typecase object
-                           (instance (%instance-wrapper object))
-                           (funcallable-instance (%fun-wrapper object))
+                           (instance (%instance-layout object))
+                           (funcallable-instance (%fun-layout object))
                            (t (return)))
                          (cdr (truly-the cons cache))
                          object)))
@@ -173,7 +173,7 @@
     (unless classoid
       (error "The class ~S has not yet been defined."
              (classoid-cell-name cell)))
-    (classoid-typep (layout-friend layout) classoid object)))
+    (classoid-typep layout classoid object)))
 
 ;;; Return true of any object which is either a funcallable-instance,
 ;;; or an ordinary instance that is not a structure-object.
@@ -191,9 +191,9 @@
 ;;; Try to ensure that the object's layout is up-to-date only if it is an instance
 ;;; or funcallable-instance of other than a static or structure classoid type.
 (defun update-object-layout (object)
-  (wrapper-friend (if (%pcl-instance-p object)
-                      (sb-pcl::check-wrapper-validity object)
-                      (wrapper-of object))))
+  (if (%pcl-instance-p object)
+      (sb-pcl::check-wrapper-validity object)
+      (layout-of object)))
 
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 
@@ -225,7 +225,7 @@
 ;;; of thousands of iterations of 'classoid-typep.impure.lisp'
 
 (defun classoid-typep (obj-layout classoid object)
-  (declare (type wrapper obj-layout))
+  (declare (type layout obj-layout))
   ;; FIXME & KLUDGE: We could like to grab the *WORLD-LOCK* here (to ensure that
   ;; class graph doesn't change while we're doing the typep test), but in
   ;; practice that causes trouble -- deadlocking against the compiler
@@ -240,24 +240,24 @@
              ;; that we're testing against. Whether obj-layout is "valid" has no relevance.
              ;; This is racy though because %ENSURE-CLASSOID-VALID should return
              ;; the most up-to-date layout for the classoid, but it doesn't. Oh well.
-             (%ensure-classoid-valid classoid (classoid-wrapper classoid) "typep")
-             (values obj-layout (classoid-wrapper classoid)))
+             (%ensure-classoid-valid classoid (classoid-layout classoid) "typep")
+             (values obj-layout (classoid-layout classoid)))
             (t
              ;; And this case is even more racy, naturally.
-             (do ((layout (classoid-wrapper classoid) (classoid-wrapper classoid))
+             (do ((layout (classoid-layout classoid) (classoid-layout classoid))
                   (i 0 (+ i 1))
                   (obj-layout obj-layout))
-                 ((and (not (wrapper-invalid obj-layout))
-                       (not (wrapper-invalid layout)))
+                 ((and (not (layout-invalid obj-layout))
+                       (not (layout-invalid layout)))
                   (values obj-layout layout))
                (aver (< i 2))
                (%ensure-classoid-valid classoid layout "typep")
-               (when (zerop (wrapper-clos-hash obj-layout))
+               (when (zerop (layout-clos-hash obj-layout))
                  (setq obj-layout (sb-pcl::check-wrapper-validity object))))))
     ;; FIXME: if LAYOUT is for a structure, use the STRUCTURE-IS-A test
     ;; which avoids iterating.
     (or (eq obj-layout layout)
-        (let ((obj-inherits (wrapper-inherits obj-layout)))
+        (let ((obj-inherits (layout-inherits obj-layout)))
           (dotimes (i (length obj-inherits) nil)
             (when (eq (svref obj-inherits i) layout)
               (return t)))))))
@@ -297,7 +297,7 @@
          (if (if (csubtypep type (specifier-type 'function))
                  (funcallable-instance-p obj)
                  (%instancep obj))
-             (if (eq (classoid-wrapper type)
+             (if (eq (classoid-layout type)
                      (info :type :compiler-layout (classoid-name type)))
                  (values (sb-xc:typep obj type) t)
                  (values nil nil))

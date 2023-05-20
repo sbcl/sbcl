@@ -22,7 +22,7 @@
   (let ((res (info :type :compiler-layout name)))
     (cond ((not res)
            (error "Class is not yet defined or was undefined: ~S" name))
-          ((not (typep (wrapper-%info res) 'defstruct-description))
+          ((not (typep (layout-%info res) 'defstruct-description))
            (error "Class is not a structure class: ~S" name))
           (t
            (check-deprecated-type name)
@@ -30,7 +30,7 @@
 
 (defun compiler-layout-ready-p (name)
   (let ((layout (info :type :compiler-layout name)))
-    (and layout (typep (wrapper-%info layout) 'defstruct-description))))
+    (and layout (typep (layout-%info layout) 'defstruct-description))))
 
 (sb-xc:defmacro %make-structure-instance-macro (dd slot-specs &rest slot-vars)
   (if (compiler-layout-ready-p (dd-name dd))
@@ -50,13 +50,13 @@
 
 (sb-xc:defmacro %new-instance (layout size)
   `(let* ((l ,layout)
-          (i (truly-the ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+          (i (truly-the ,(if (constantp layout) (layout-classoid layout) 'instance)
                         (%make-instance ,size))))
      (%set-instance-layout i l)
      i))
 (sb-xc:defmacro %new-instance* (layout len)
   `(let ((i (truly-the
-             ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+             ,(if (constantp layout) (layout-classoid layout) 'instance)
              (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
                  (%make-instance ,len)
                  (%make-instance/mixed ,len)))))
@@ -79,7 +79,7 @@
      (compile nil `(lambda ()
                      (declare (optimize (sb-c:store-source-form 0)))
                      (let ((object (%make-funcallable-instance ,(dd-length dd))))
-                       (setf (%fun-wrapper object) ,(find-layout (dd-name dd)))
+                       (setf (%fun-layout object) ,(find-layout (dd-name dd)))
                        object)))))
 
 ;;;; DEFSTRUCT-DESCRIPTION
@@ -351,7 +351,7 @@
                   ;; Rather than hit MAKE-DEFSTRUCT-DESCRIPTION's type-check
                   ;; on the NAME slot, we can be a little more clear.
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
-         (flagbits (logior #+sb-xc-host (if (member name '(wrapper layout)) +dd-varylen+ 0)
+         (flagbits (logior #+sb-xc-host (if (eq name 'layout) +dd-varylen+ 0)
                            (if null-env-p +dd-nullenv+ 0)))
          (dd (make-defstruct-description name flagbits))
          (*dsd-source-form* nil)
@@ -827,7 +827,7 @@ unless :NAMED is also specified.")))
               (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
                                                         'structure-object))))
                 (concatenate 'simple-vector
-                             (wrapper-inherits super) (vector super)))))
+                             (layout-inherits super) (vector super)))))
          (proto-classoid
           (if (dd-class-p dd)
               ;; The classoid needs a layout whereby to convey inheritance.
@@ -836,9 +836,9 @@ unless :NAMED is also specified.")))
               ;; It's probably too dangerous to stack-allocate, because references
               ;; could leak from the type cache machinery.
               (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                     (layout (make-temporary-wrapper (hash-layout-name (dd-name dd))
+                     (layout (make-temporary-layout (hash-layout-name (dd-name dd))
                                                     classoid inherits)))
-                (setf (classoid-wrapper classoid) layout)
+                (setf (classoid-layout classoid) layout)
                 classoid)))
          (ancestor-slot-comparator-list))
     #+sb-xc-host
@@ -1095,7 +1095,7 @@ unless :NAMED is also specified.")))
     (let* ((type (dd-type dd))
            (included-structure
             (if (dd-class-p dd)
-                (wrapper-info (compiler-layout-or-lose included-name))
+                (layout-info (compiler-layout-or-lose included-name))
                 (typed-structure-info-or-lose included-name))))
 
       ;; checks on legality
@@ -1109,8 +1109,8 @@ unless :NAMED is also specified.")))
           ;; It's not particularly well-defined to :INCLUDE any of the
           ;; CMU CL INSTANCE weirdosities like CONDITION or
           ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
-          (let* ((included-layout (classoid-wrapper included-classoid))
-                 (included-dd (wrapper-dd included-layout)))
+          (let* ((included-layout (classoid-layout included-classoid))
+                 (included-dd (layout-dd included-layout)))
             (when (dd-alternate-metaclass included-dd)
               (error "can't :INCLUDE class ~S (has alternate metaclass)"
                      included-name)))))
@@ -1180,7 +1180,7 @@ unless :NAMED is also specified.")))
          (super
           (if include
               (compiler-layout-or-lose (first include))
-              (classoid-wrapper (find-classoid
+              (classoid-layout (find-classoid
                                 (or (first superclass-opt)
                                     'structure-object))))))
     (case (dd-name info)
@@ -1188,24 +1188,24 @@ unless :NAMED is also specified.")))
        ;; STREAM is an abstract class and you can't :include it,
        ;; so the inheritance has to be hardcoded.
        (concatenate 'simple-vector
-                    (wrapper-inherits super)
-                    (vector super (classoid-wrapper (find-classoid 'stream)))))
+                    (layout-inherits super)
+                    (vector super (classoid-layout (find-classoid 'stream)))))
       ((fd-stream) ; Similarly, FILE-STREAM is abstract
        (concatenate 'simple-vector
-                    (wrapper-inherits super)
+                    (layout-inherits super)
                     (vector super
-                            (classoid-wrapper (find-classoid 'file-stream)))))
+                            (classoid-layout (find-classoid 'file-stream)))))
       ((sb-impl::string-input-stream ; etc
         sb-impl::string-output-stream
         sb-impl::fill-pointer-output-stream)
        (concatenate 'simple-vector
-                    (wrapper-inherits super)
+                    (layout-inherits super)
                     (vector super
-                            (classoid-wrapper (find-classoid 'string-stream)))))
+                            (classoid-layout (find-classoid 'string-stream)))))
       (pathname (vector (find-layout 't)))
       (logical-pathname (vector (find-layout 't) (find-layout 'pathname)))
       (t (concatenate 'simple-vector
-                      (wrapper-inherits super)
+                      (layout-inherits super)
                       (vector super))))))
 
 ;;; Do miscellaneous (LOAD EVAL) time actions for the structure
@@ -1218,17 +1218,17 @@ unless :NAMED is also specified.")))
   (multiple-value-bind (classoid layout old-layout)
       (ensure-structure-class dd inherits "current" "new")
     (cond ((not old-layout)
-           (unless (eq (classoid-wrapper classoid) layout)
+           (unless (eq (classoid-layout classoid) layout)
              (register-layout layout)))
           (t
            (%redefine-defstruct classoid old-layout layout)
-           (let ((old-dd (wrapper-info old-layout)))
+           (let ((old-dd (layout-info old-layout)))
              (when (defstruct-description-p old-dd)
                (dolist (slot (dd-slots old-dd))
                  (fmakunbound (dsd-accessor-name slot))
                  (unless (dsd-read-only slot)
                    (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
-           (setq layout (classoid-wrapper classoid))))
+           (setq layout (classoid-layout classoid))))
     ;; Don't want to (setf find-classoid) on a a built-in-classoid
     (unless (and (built-in-classoid-p classoid)
                  (eq (find-classoid (dd-name dd) nil) classoid))
@@ -1342,7 +1342,7 @@ unless :NAMED is also specified.")))
 ;;; the same for subclasses.  FIXME: maybe rename UNDEFINE-FUN-NAME to
 ;;; UNDECLARE-FUNCTION-NAME?
 (defun undeclare-structure (classoid subclasses-p)
-  (let ((info (wrapper-%info (classoid-wrapper classoid))))
+  (let ((info (layout-%info (classoid-layout classoid))))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
         (clear-info :type :compiler-layout type)
@@ -1360,8 +1360,8 @@ unless :NAMED is also specified.")))
       (values-specifier-type-cache-clear)))
   (when subclasses-p
     (collect ((subs))
-      (do-subclassoids ((classoid wrapper) classoid)
-        (declare (ignore wrapper))
+      (do-subclassoids ((classoid layout) classoid)
+        (declare (ignore layout))
         (undeclare-structure classoid nil)
         (subs (classoid-proper-name classoid)))
           ;; Is it really necessary to warn about
@@ -1384,17 +1384,17 @@ unless :NAMED is also specified.")))
                                 "the most recently loaded"
                                 :compiler-layout clayout))
     (cond (old-layout
-           (undeclare-structure (wrapper-classoid old-layout)
+           (undeclare-structure (layout-classoid old-layout)
                                 (and (classoid-subclasses classoid)
                                      (not (eq layout old-layout))))
-           (setf (wrapper-invalid layout) nil)
+           (setf (layout-invalid layout) nil)
            ;; FIXME: it might be polite to hold onto old-layout and
            ;; restore it at the end of the file.  -- RMK 2008-09-19
            ;; (International Talk Like a Pirate Day).
            (warn "~@<Clobbering the compiler's idea of the layout of ~A.~:@>"
                  classoid))
           (t
-           (unless (eq (classoid-wrapper classoid) layout)
+           (unless (eq (classoid-layout classoid) layout)
              (register-layout layout :invalidate nil))
            ;; Don't want to (setf find-classoid) on a a built-in-classoid
            (unless (and (built-in-classoid-p classoid)
@@ -1546,17 +1546,17 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; both the old and new structure are at the same depthoid.
 #-sb-xc-host
 (defun mutable-layout-p (old-layout new-layout)
-  (declare (type wrapper old-layout new-layout))
-  (if (wrapper-info old-layout)
-      (let ((old-bitmap (wrapper-bitmap old-layout))
+  (declare (type layout old-layout new-layout))
+  (if (layout-info old-layout)
+      (let ((old-bitmap (layout-bitmap old-layout))
             (new-bitmap (%layout-bitmap new-layout)))
         ;; The number of extra ID words has to match, as does the number of bitmap
         ;; words, or else GC will croak when parsing the bitmap.
-        (and (= (calculate-extra-id-words (wrapper-depthoid old-layout))
-                (calculate-extra-id-words (wrapper-depthoid new-layout)))
-             (= (bitmap-nwords (wrapper-friend new-layout))
-                (bitmap-nwords (wrapper-friend old-layout)))
-             (dotimes (i (dd-length (wrapper-dd old-layout)) t)
+        (and (= (calculate-extra-id-words (layout-depthoid old-layout))
+                (calculate-extra-id-words (layout-depthoid new-layout)))
+             (= (bitmap-nwords new-layout)
+                (bitmap-nwords old-layout))
+             (dotimes (i (dd-length (layout-dd old-layout)) t)
                (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
                           (not (logbitp i old-bitmap))) ; that was opaque bits
                  (return nil)))))
@@ -1568,7 +1568,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; be used.
 (defun %redefine-defstruct (classoid old-layout new-layout)
   (declare (type classoid classoid)
-           (type wrapper old-layout new-layout))
+           (type layout old-layout new-layout))
   (declare (ignorable old-layout)) ; for host
   (let ((name (classoid-proper-name classoid)))
     (restart-case
@@ -1598,14 +1598,14 @@ or they must be declared locally notinline at each call site.~@:>"
        ;; I hope you know what you're doing..."
        (register-layout new-layout
                         :invalidate nil
-                        :modify old-layout))))
+                        :destruct-layout old-layout))))
   (values))
 
 (defun dd-custom-gc-method-p (dd)
   (cond ((eq (dd-name dd) 'sb-lockless::list-node) t)
         ((dd-include dd)
          (dd-custom-gc-method-p
-          (wrapper-info (compiler-layout-or-lose (car (dd-include dd))))))))
+          (layout-info (compiler-layout-or-lose (car (dd-include dd))))))))
 
 ;;; Compute DD's bitmap, storing 1 for each tagged word.
 ;;; The GC can parse signed fixnums and bignums, with which we can
@@ -1757,7 +1757,6 @@ or they must be declared locally notinline at each call site.~@:>"
                                     &key compiler-layout
                                     &aux (flags 0))
   (declare (type defstruct-description info))
-  ;; NB: the variables named "layout" are in fact of type WRAPPER
   (multiple-value-bind (classoid old-layout)
       (multiple-value-bind (class constructor)
           (acond ((cdr (dd-alternate-metaclass info))
@@ -1783,10 +1782,10 @@ or they must be declared locally notinline at each call site.~@:>"
               fd-stream
               sb-impl::string-input-stream sb-impl::string-output-stream
               sb-impl::fill-pointer-output-stream)
-             (list (wrapper-classoid (svref inherits (1- (length inherits))))
-                   (wrapper-classoid (svref inherits (- (length inherits) 2)))))
+             (list (layout-classoid (svref inherits (1- (length inherits))))
+                   (layout-classoid (svref inherits (- (length inherits) 2)))))
             (t
-             (list (wrapper-classoid
+             (list (layout-classoid
                     (svref inherits (1- (length inherits))))))))
     (unless (dd-alternate-metaclass info)
       (setq flags +structure-layout-flag+))
@@ -1800,7 +1799,7 @@ or they must be declared locally notinline at each call site.~@:>"
       (setq flags (logior (logand (logior +stream-layout-flag+
                                           +file-stream-layout-flag+
                                           +string-stream-layout-flag+)
-                                  (wrapper-flags ancestor))
+                                  (layout-flags ancestor))
                           flags)))
     (let* ((old-layout (or compiler-layout old-layout))
            (new-layout
@@ -1819,31 +1818,31 @@ or they must be declared locally notinline at each call site.~@:>"
         ;; The assignment of INFO here can almost be deleted,
         ;; except for a few magical types that don't d.t.r.t. in cold-init:
         ;;  STRUCTURE-OBJECT, CONDITION, ALIEN-VALUE, INTERPRETED-FUNCTION
-        (setf (wrapper-info old-layout) info)
+        (setf (layout-info old-layout) info)
         (values classoid old-layout nil))
        (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
         ;; of classic CMU CL. I moved it out to here because it was only
         ;; exercised in this code path anyway. -- WHN 19990510
-        (not (eq (wrapper-classoid new-layout) (wrapper-classoid old-layout)))
+        (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
         (error "shouldn't happen: weird state of OLD-LAYOUT?"))
        ((warn-if-altered-layout  old-context
                                  old-layout
                                  new-context
-                                 (wrapper-length new-layout)
-                                 (wrapper-inherits new-layout)
-                                 (wrapper-depthoid new-layout)
-                                 (wrapper-bitmap new-layout))
+                                 (layout-length new-layout)
+                                 (layout-inherits new-layout)
+                                 (layout-depthoid new-layout)
+                                 (layout-bitmap new-layout))
         (values classoid new-layout old-layout))
        (t
-        (let ((old-info (wrapper-info old-layout)))
+        (let ((old-info (layout-info old-layout)))
           (if old-info
              (cond ((redefine-structure-warning classoid old-info info)
                     (values classoid new-layout old-layout))
                    (t
-                    (setf (wrapper-info old-layout) info)
+                    (setf (layout-info old-layout) info)
                     (values classoid old-layout nil)))
              (progn
-               (setf (wrapper-info old-layout) info)
+               (setf (layout-info old-layout) info)
                (values classoid old-layout nil)))))))))
 
 ;;; Return a list of pairs (name . index). Used for :TYPE'd
@@ -2259,7 +2258,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                       (%make-funcallable-instance ,(dd-length dd)))
                           `((macrolet ((the-layout ()
                                          (info :type :compiler-layout ',class-name)))
-                              (setf (%fun-wrapper object) (the-layout)))))))
+                              (setf (%fun-layout object) (the-layout)))))))
              `((defun ,constructor (,@(mapcar (lambda (x)
                                                 (if (consp x)
                                                     (car x)
@@ -2297,7 +2296,7 @@ or they must be declared locally notinline at each call site.~@:>"
 
 (defun find-defstruct-description (name &optional (errorp t))
   (let* ((classoid (find-classoid name errorp))
-         (info (and classoid (wrapper-%info (classoid-wrapper classoid)))))
+         (info (and classoid (layout-%info (classoid-layout classoid)))))
     (cond ((defstruct-description-p info)
            info)
           (errorp
@@ -2316,13 +2315,13 @@ or they must be declared locally notinline at each call site.~@:>"
 
 #+sb-xc-host
 (defun %instance-ref (instance index)
-  (let* ((wrapper (%instance-wrapper instance))
-         (map (wrapper-index->accessor-map wrapper)))
+  (let* ((layout (%instance-layout instance))
+         (map (layout-index->accessor-map layout)))
     (when (zerop (length map)) ; construct it on demand
-      (let ((slots (dd-slots (wrapper-%info wrapper))))
+      (let ((slots (dd-slots (layout-%info layout))))
         (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
                               :initial-element nil)
-              (wrapper-index->accessor-map wrapper) map)
+              (layout-index->accessor-map layout) map)
         (dolist (dsd slots)
           (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
     (funcall (aref map index) instance)))
@@ -2342,7 +2341,7 @@ or they must be declared locally notinline at each call site.~@:>"
   (if (typep object 'structure-object)
       (let ((type (type-of object)))
         (collect ((inits))
-          (dolist (dsd (dd-slots (wrapper-dd (%instance-wrapper object))))
+          (dolist (dsd (dd-slots (layout-dd (%instance-layout object))))
             (declare (type defstruct-slot-description dsd))
             (let ((slot-name (dsd-name dsd)))
               (when (or (memq slot-name slot-names)
@@ -2394,8 +2393,8 @@ or they must be declared locally notinline at each call site.~@:>"
                                   #'pred
                                   ;; pair = (#<classoid> . #<layout>)
                                   :key (lambda (pair) (classoid-name (car pair))))))))
-        (let* ((wrapper (cdr pair))
-               (dd (wrapper-info wrapper)))
+        (let* ((layout (cdr pair))
+               (dd (layout-info layout)))
           (cond
             (dd
              (let* ((*print-pretty* nil) ; output should be insensitive to host pprint
@@ -2404,10 +2403,10 @@ or they must be declared locally notinline at each call site.~@:>"
                     (*package* (cl:symbol-package classoid-name)))
                (format output "~/sb-ext:print-symbol-with-prefix/ ~S (~%"
                        classoid-name
-                       (list* (the (unsigned-byte 16) (wrapper-flags wrapper))
-                              (wrapper-depthoid wrapper)
-                              (map 'list #'wrapper-classoid-name
-                                   (wrapper-inherits wrapper))))
+                       (list* (the (unsigned-byte 16) (layout-flags layout))
+                              (layout-depthoid layout)
+                              (map 'list #'layout-classoid-name
+                                   (layout-inherits layout))))
                (dolist (dsd (dd-slots dd) (format output ")~%"))
                  (format output "  (~d ~S ~S)~%"
                          (dsd-bits dsd)

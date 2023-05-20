@@ -78,7 +78,7 @@
                    (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
-                             (wrapper-friend (if (symbolp name) (find-layout name) name))))
+                             (if (symbolp name) (find-layout name) name)))
                    (:layout-id (layout-id name))
                    #+gencgc (:card-table-index-mask (extern-alien "gc_card_table_nbits" int))
                    (:immobile-symbol (get-lisp-obj-address name))
@@ -108,7 +108,7 @@
              (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
                                (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
-                     (get-lisp-obj-address (wrapper-friend #.(find-layout 'function)))))))
+                              (get-lisp-obj-address #.(find-layout 'function))))))
          ;; And finally, make the memory range executable.
          ;; x86 doesn't need it, and darwin-jit doesn't do it because the
          ;; temporary object is not executable.

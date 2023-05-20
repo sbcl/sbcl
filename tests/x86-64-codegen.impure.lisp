@@ -167,7 +167,7 @@
          (index
           (position "OBJECT-NOT-TYPE-ERROR" lines :test 'search)))
     (let ((line (nth (+ index 2) lines)))
-      (assert (search "; #<SB-KERNEL:WRAPPER " line))
+      (assert (search "; #<SB-KERNEL:LAYOUT " line))
       (assert (search " SB-ASSEM:LABEL" line)))))
 
 #+immobile-code ; uses SB-C::*COMPILE-TO-MEMORY-SPACE*
@@ -675,15 +675,15 @@
   ;; component.
   (let ((names
           (mapcar (lambda (x)
-                    (sb-kernel:classoid-name (sb-kernel:wrapper-classoid x)))
-                  (ctu:find-code-constants #'sb-kernel:%%typep :type 'sb-kernel:wrapper))))
+                    (sb-kernel:classoid-name (sb-kernel:layout-classoid x)))
+                  (ctu:find-code-constants #'sb-kernel:%%typep :type 'sb-kernel:layout))))
     (assert (null (set-difference names
                                   '(sb-kernel:ctype
                                     sb-kernel:unknown-type
                                     sb-kernel:fun-designator-type
                                     sb-c::abstract-lexenv
                                     sb-kernel::classoid-cell
-                                    sb-kernel:wrapper
+                                    sb-kernel:layout
                                     sb-kernel:classoid
                                     sb-kernel:built-in-classoid
                                     #-immobile-space null))))))
@@ -702,7 +702,7 @@
      (loop for line in (split-string (with-output-to-string (string)
                                        (disassemble f :stream string))
                                      #\newline)
-             thereis (and (search "WRAPPER for" line)
+             thereis (and (search "LAYOUT for" line)
                           (search "CMP DWORD PTR" line)))))
 
 (with-test (:name :thread-local-unbound)
@@ -713,7 +713,7 @@
 #+immobile-code
 (with-test (:name :debug-fun-from-pc-more-robust)
   ;; This test verifies that debug-fun-from-pc does not croak when the PC points
-  ;; within a trampoline allocated to wrap a closure in a simple-funifying wrapper
+  ;; within a trampoline allocated to wrap a closure in a simple-funifying layout
   ;; for installation into a global symbol.
   (let ((closure (funcall (compile nil '(lambda (x)  (lambda () x))) 0))
         (symbol (gensym)))

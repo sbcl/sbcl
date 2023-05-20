@@ -110,25 +110,3 @@ void allocation_profiler_stop()
     ret = mutex_release(&alloc_profiler_lock);
     gc_assert(ret);
 }
-
-#ifdef LISP_FEATURE_METASPACE
-#include "gc-private.h"
-lispobj valid_metaspace_ptr_p(void* addr)
-{
-    struct slab_header* slab = (void*)ALIGN_DOWN((lispobj)addr, METASPACE_SLAB_SIZE);
-    fprintf(stderr, "slab base %p chunk_size %d capacity %d\n", slab, slab->chunksize, slab->capacity);
-    if (!slab->capacity) return 0;
-    lispobj slab_end = (lispobj)slab + METASPACE_SLAB_SIZE;
-    int index = (slab_end - (lispobj)addr) / slab->chunksize;
-    //    for(int i=0; i<slab->capacity; ++i) fprint(stderr, "goober @ %p\n", slab_end - (1+i)*chunksize);
-    //    fprintf(stderr, "index=%d\n", index);
-    if (index < slab->capacity) {
-        lispobj* obj_base = (lispobj*)(slab_end - (index+1)*slab->chunksize);
-        if (widetag_of(obj_base) == INSTANCE_WIDETAG) {
-            fprintf(stderr, "word @ %p is good\n", obj_base);
-            return (lispobj)obj_base;
-        }
-    }
-    return 0;
-}
-#endif

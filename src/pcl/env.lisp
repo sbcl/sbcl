@@ -66,7 +66,7 @@
              plist ,arg-info simple-next-method-call t)
            source-loc))))))
 (!install-cross-compiled-methods 'make-load-form
-                                 :except '(wrapper sb-alien-internals:alien-type))
+                                 :except '(layout sb-alien-internals:alien-type))
 
 (defmethod make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
@@ -78,13 +78,13 @@
         (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
                class))))
 
-(defmethod make-load-form ((object wrapper) &optional env)
+(defmethod make-load-form ((object layout) &optional env)
   (declare (ignore env))
-  (let ((pname (classoid-proper-name (wrapper-classoid object))))
+  (let ((pname (classoid-proper-name (layout-classoid object))))
     (unless pname
       (error "can't dump wrapper for anonymous class:~%  ~S"
-             (wrapper-classoid object)))
-    `(classoid-wrapper (find-classoid ',pname))))
+             (layout-classoid object)))
+    `(classoid-layout (find-classoid ',pname))))
 
 (defmethod make-load-form ((object sb-alien-internals:alien-type) &optional env)
   (or (sb-alien::make-type-load-form object)

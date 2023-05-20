@@ -51,7 +51,7 @@
 ;; ~17 instructions vs. 35
 (define-vop ()
     (:policy :fast-safe)
-    (:translate wrapper-of)
+    (:translate layout-of)
     (:args (object :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg :offset rax-offset) rax)
     (:results (result :scs (descriptor-reg)))
@@ -88,8 +88,7 @@
       (inst jmp  done)
       NULL
       (inst mov  result (make-fixup 'null :layout))
-      DONE
-      #+metaspace (inst mov result (ea +5 result)))) ; layout->wrapper
+      DONE))
 (define-vop ()
     (:policy :fast-safe)
     (:translate %instanceoid-layout)

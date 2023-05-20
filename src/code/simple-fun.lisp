@@ -73,11 +73,7 @@
                                            closure-extra-data-indicator))))
                        #+compact-instance-header ; copy the layout
                        (setf (sap-ref-32 sap 4) ; ASSUMPTION: little-endian
-                             (logior (get-lisp-obj-address
-                                      (wrapper-friend ,(find-layout 'function)))))
-                       #+metaspace ; copy the CODE (not accessible by index-ref)
-                       (setf (sap-ref-lispobj sap (ash sb-vm::closure-code-slot sb-vm:word-shift))
-                             (sb-vm::%closure-code closure)))))
+                             (logior (get-lisp-obj-address ,(find-layout 'function)))))))
                 (%closure-index-set copy j (%closure-index-ref closure j)))))
 
   ;; This is factored out because of a cutting-edge implementation

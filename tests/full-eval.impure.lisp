@@ -121,7 +121,7 @@
    (sb-c::cif 'c)
    (sb-c::cset 'd)
    (sb-c::ref 'e)
-   (sb-kernel:wrapper 'winner)))
+   (sb-kernel:layout 'winner)))
 
 (with-test (:name :interpreted-type-constraint)
   (assert (eq (typecase-test (sb-kernel:find-layout 'cons)) 'winner)))

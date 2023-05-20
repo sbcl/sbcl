@@ -265,10 +265,6 @@ during backtrace.
                                   :alloc-trans %alloc-closure)
   (fun :init :arg :ref-trans #+(or x86 x86-64 arm64) %closure-callee
                              #-(or x86 x86-64 arm64) %closure-fun)
-  ;; 'fun' is an interior pointer to code, but we also need the base pointer
-  ;; for MPS. I'm trying to figure out how to avoid this word of overhead,
-  ;; but it works for the time being.
-  #+metaspace (code :ref-known (flushable) :ref-trans %closure-code)
   (info :rest-p t))
 
 #+executable-funinstances

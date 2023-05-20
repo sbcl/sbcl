@@ -496,38 +496,10 @@ static inline boolean layoutp(lispobj thing)
     if ((layout = instance_layout(INSTANCE(thing))) == 0) return 0;
     return layout_depth2_id(LAYOUT(layout)) == LAYOUT_LAYOUT_ID;
 }
-#ifdef LISP_FEATURE_METASPACE
-static inline boolean wrapperp(lispobj thing)
-{
-    lispobj layout;
-    if (lowtag_of(thing) != INSTANCE_POINTER_LOWTAG) return 0;
-    if ((layout = instance_layout(INSTANCE(thing))) == 0) return 0;
-    return layout_depth2_id(LAYOUT(layout)) == WRAPPER_LAYOUT_ID;
-}
-static inline int wrapper_id(lispobj wrapper)
-{
-    struct layout* layout = LAYOUT(WRAPPER(wrapper)->friend);
-    return layout_depth2_id(layout);
-}
-#endif
 /// Return true if 'thing' is the layout of any subtype of sb-lockless::list-node.
 static inline boolean lockfree_list_node_layout_p(struct layout* layout) {
     return layout_depth2_id(layout) == LFLIST_NODE_LAYOUT_ID;
 }
-
-#ifdef LISP_FEATURE_METASPACE
-#define METASPACE_START (READ_ONLY_SPACE_START+32768) /* KLUDGE */
-// Keep in sync with the macro definitions in src/compiler/generic/early-vm.lisp
-struct slab_header {
-    short sizeclass;
-    short capacity;
-    short chunksize;
-    short count;
-    void* freelist;
-    struct slab_header *next;
-    struct slab_header *prev;
-};
-#endif
 
 /* Check whether 'pointee' was forwarded. If it has been, update the contents
  * of 'cell' to point to it. Otherwise, set 'cell' to 'broken'.

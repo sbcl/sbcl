@@ -960,7 +960,7 @@ symbol-case giving up: case=((V U) (F))
           (mapcar (lambda (x) (mapcar #'find-layout x)) type-unions))
          (byte (nth-value 1
                 (pick-best-sxhash-bits (apply #'append layout-lists)
-                                       #'wrapper-clos-hash 1)))
+                                       #'layout-clos-hash 1)))
          (array (make-array (ash 1 (byte-size byte)) :initial-element nil))
          (perfectp t)
          (seen))
@@ -969,7 +969,7 @@ symbol-case giving up: case=((V U) (F))
           do (dolist (layout layout-list)
                (unless (member layout seen) ; in case of dups / overlaps
                  (push layout seen)
-                 (let ((bin (ldb byte (wrapper-clos-hash layout))))
+                 (let ((bin (ldb byte (layout-clos-hash layout))))
                    (when (aref array bin)
                      (setq perfectp nil))
                    (setf (aref array bin)
@@ -992,19 +992,17 @@ symbol-case giving up: case=((V U) (F))
          0
          (let* ((layout (%instance-layout ,object))
                 (index (ldb ,byte (layout-clos-hash layout)))
-                ;; Compare by WRAPPER, not LAYOUT. LAYOUTs can't go in a simple-vector.
-                (wrapper (layout-friend layout))
                 (cells ,cells))
            (declare (optimize (safety 0)))
            (the (mod ,(1+ (length cases)))
                 ,(if perfectp
-                     `(if (eq (aref cells index) wrapper) (aref cells (+ index ,n-pairs)) 0)
+                     `(if (eq (aref cells index) layout) (aref cells (+ index ,n-pairs)) 0)
                      ;; DOLIST performs a leading test, but we're OK with a cell
                      ;; that is NIL. It'll miss and then exit at the end of the loop.
                      ;; This potentially avoids one comparison vs NIL if we hit immediately.
                      `(let ((list (svref cells index)))
                         (loop (let ((cell (car list)))
-                                (cond ((eq wrapper (car cell)) (return (cdr cell)))
+                                (cond ((eq layout (car cell)) (return (cdr cell)))
                                       ((null (setq list (cdr list))) (return 0))))))))))))
 
 ;;; Given an arbitrary TYPECASE, see if it is a discriminator over
@@ -1049,8 +1047,8 @@ symbol-case giving up: case=((V U) (F))
                (loop (unless worklist (return))
                      (let ((classoid (pop worklist)))
                        (visited classoid)
-                       (sb-kernel::do-subclassoids ((subclassoid wrapper) classoid)
-                         (declare (ignore wrapper))
+                       (sb-kernel::do-subclassoids ((subclassoid layout) classoid)
+                         (declare (ignore layout))
                          (unless (or (member subclassoid (visited))
                                      (member subclassoid worklist))
                            (setf worklist (nconc worklist (list subclassoid)))))))
@@ -2332,12 +2330,3 @@ Works on all CASable places."
        (loop (let ((,new (cdr ,old)))
                (when (eq ,old (setf ,old ,cas-form))
                  (return (car (truly-the list ,old)))))))))
-
-#-metaspace
-(progn
-(sb-xc:defmacro wrapper-friend (x) x)
-(sb-xc:defmacro layout-friend (x) x)
-(sb-xc:defmacro layout-clos-hash (x) `(wrapper-clos-hash ,x))
-#-64-bit (sb-xc:defmacro layout-depthoid (x) `(wrapper-depthoid ,x))
-(sb-xc:defmacro layout-flags (x) `(wrapper-flags ,x))
-)

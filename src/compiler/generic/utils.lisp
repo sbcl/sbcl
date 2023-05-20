@@ -450,8 +450,8 @@
   #-system-tlabs (declare (ignore type node))
   #+system-tlabs
   (or sb-c::*force-system-tlab*
-      (let ((typename (cond ((sb-kernel::wrapper-p type)
-                             (classoid-name (wrapper-classoid type)))
+      (let ((typename (cond ((sb-kernel::layout-p type)
+                             (classoid-name (layout-classoid type)))
                             ((sb-kernel::defstruct-description-p type)
                              (dd-name type)))))
         (when (and typename (sb-xc:subtypep typename 'ctype))

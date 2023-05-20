@@ -165,7 +165,7 @@ evaluated expressions.
 
 (defun inspected-structure-elements (object)
   (let ((parts-list '())
-        (info (wrapper-info (sb-kernel:wrapper-of object))))
+        (info (layout-info (sb-kernel:layout-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (dd-slots info) (nreverse parts-list))
         (let* ((reader (dsd-reader dd-slot (neq (dd-type info) 'structure)))

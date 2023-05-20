@@ -95,7 +95,6 @@
            :PACKAGE-LOCAL-NICKNAMES
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
-           :METASPACE
            :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
        (removable-features
         (append non-target-features public-features)))
@@ -164,9 +163,9 @@
     ;; can't be uninterned if referenced by a defstruct-description.
     ;; So loop over all structure classoids and clobber any
     ;; symbol that should be uninternable.
-    (maphash (lambda (classoid wrapper)
+    (maphash (lambda (classoid layout)
                (when (structure-classoid-p classoid)
-                 (let ((dd (wrapper-%info wrapper)))
+                 (let ((dd (layout-%info layout)))
                    (setf (dd-constructors dd)
                          (delete-if (lambda (x)
                                       (and (consp x) (uninternable-p (car x))))

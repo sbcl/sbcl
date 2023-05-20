@@ -16,7 +16,6 @@
 
 (defun collect-slot-values (obj &aux result)
   (flet ((slots (x)
-           #+metaspace (if (typep x 'sb-vm:layout) (setq x (sb-kernel::layout-friend x)))
            (push x result)))
     (do-referenced-object (obj slots))
     (nreverse result)))
@@ -97,7 +96,7 @@
     (walk-slots-test* o
                       (lambda (slots)
                         (destructuring-bind (layout clos-slots) slots
-                          (and (eq layout (%instance-wrapper o))
+                          (and (eq layout (%instance-layout o))
                                (eq clos-slots (sb-pcl::std-instance-slots o))))))))
 
 (define-condition cfoo (simple-condition) ((a :initarg :a) (b :initarg :b) (c :initform 'c)))
@@ -110,14 +109,14 @@
 
 (defun make-random-funinstance (&rest values)
   (let* ((ctor (apply #'sb-pcl::%make-ctor values))
-         (wrapper (sb-kernel:%fun-wrapper ctor)))
+         (layout (sb-kernel:%fun-layout ctor)))
     ;; If the number of payload words is even, then there's a padding word
     ;; because adding the header makes the unaligned total an odd number.
     ;; Fill that padding word with something - it should not be visible.
     ;; Whether GC should trace the word is a different question,
     ;; on whose correct answer I waver back and forth.
     (when (evenp (sb-kernel:get-closure-length ctor)) ; payload length
-      (let ((max (reduce #'max (sb-kernel:dd-slots (sb-kernel:wrapper-dd wrapper))
+      (let ((max (reduce #'max (sb-kernel:dd-slots (sb-kernel:layout-dd layout))
                          :key 'sb-kernel:dsd-index)))
         (setf (sb-kernel:%funcallable-instance-info ctor (1+ max))
               (elt sb-vm:+static-symbols+ 0))))
@@ -140,7 +139,7 @@
                       (lambda (slots)
                         (destructuring-bind (type fin-fun a b c d) slots
                           (declare (ignore a b c))
-                          (and (typep type 'wrapper)
+                          (and (typep type 'layout)
                                (typep fin-fun 'closure)
                                (typep d '(and integer (not (eql 0))))))))))
 

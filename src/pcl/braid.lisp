@@ -91,7 +91,7 @@
 
 (defun class-of (x)
   (declare (explicit-check))
-  (wrapper-class (wrapper-of x)))
+  (wrapper-class (layout-of x)))
 
 (defun eval-form (form)
   (lambda () (eval form)))
@@ -233,10 +233,9 @@
 
 (define-load-time-global *simple-stream-root-classoid* :unknown)
 
-(defun set-bitmap-and-flags (wrapper &aux (inherits (wrapper-inherits wrapper))
-                                          (flags (wrapper-flags wrapper))
-                                          (layout (wrapper-friend wrapper)))
-  (when (eq (wrapper-classoid wrapper) *simple-stream-root-classoid*)
+(defun set-bitmap-and-flags (layout &aux (inherits (layout-inherits layout))
+                                         (flags (layout-flags layout)))
+  (when (eq (layout-classoid layout) *simple-stream-root-classoid*)
     (setq flags (logior flags +simple-stream-layout-flag+)))
   ;; We decide only at class finalization time whether it is funcallable.
   ;; Picking the right bitmap could probably be done sooner given the metaclass,
@@ -250,23 +249,23 @@
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
       (%raw-instance-set/signed-word
-       layout (sb-kernel::type-dd-length sb-vm:layout)
+       layout (sb-kernel::type-dd-length layout)
        sb-kernel::standard-gf-primitive-obj-layout-bitmap))
     (setq flags (logior (logand (logior +sequence-layout-flag+
                                         +stream-layout-flag+
                                         +simple-stream-layout-flag+
                                         +file-stream-layout-flag+
                                         +string-stream-layout-flag+)
-                                (wrapper-flags ancestor))
+                                (layout-flags ancestor))
                         flags)))
-  (setf (layout-flags (wrapper-friend wrapper)) flags))
+  (setf (layout-flags layout) flags))
 
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun %update-lisp-class-layout (class wrapper)
   ;; Protected by **world-lock** in callers.
-  (let ((classoid (wrapper-classoid wrapper)))
-    (unless (eq (classoid-wrapper classoid) wrapper)
+  (let ((classoid (layout-classoid wrapper)))
+    (unless (eq (classoid-layout classoid) wrapper)
       (set-layout-inherits wrapper
                            (order-layout-inherits
                             (map 'simple-vector #'class-wrapper
@@ -298,7 +297,7 @@
   (when (classoid-cell-pcl-class x)
     (let* ((class (find-class-from-cell name x))
            (layout (class-wrapper class))
-           (lclass (wrapper-classoid layout))
+           (lclass (layout-classoid layout))
            (lclass-pcl-class (classoid-pcl-class lclass))
            (olclass (find-classoid name nil)))
       (if lclass-pcl-class

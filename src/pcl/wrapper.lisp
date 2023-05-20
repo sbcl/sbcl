@@ -27,7 +27,7 @@
 (in-package "SB-PCL")
 
 (defmacro wrapper-class (wrapper)
-  `(classoid-pcl-class (wrapper-classoid ,wrapper)))
+  `(classoid-pcl-class (layout-classoid ,wrapper)))
 
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
@@ -36,7 +36,7 @@
   (let ((found (find-classoid name nil)))
     (cond
      (found
-      (let ((layout (classoid-wrapper found)))
+      (let ((layout (classoid-layout found)))
         (aver layout)
         layout))
      (t
@@ -62,7 +62,7 @@
             (classoid
              (let ((owrap (class-wrapper class)))
                (cond (owrap
-                      (wrapper-classoid owrap))
+                      (layout-classoid owrap))
                      ((or (*subtypep (class-of class) *the-class-standard-class*)
                           (*subtypep (class-of class) *the-class-funcallable-standard-class*)
                           (typep class 'forward-referenced-class))
@@ -77,7 +77,7 @@
                      :flags (logior +pcl-object-layout-flag+ +strictly-boxed-flag+))))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
-            (layout (classoid-wrapper found)))
+            (layout (classoid-layout found)))
        (unless (classoid-pcl-class found)
          (setf (classoid-pcl-class found) class))
        (aver (eq (classoid-pcl-class found) class))
@@ -100,7 +100,7 @@
 ;;; This "simple" function hides a horrible inconsistency: we don't have a single
 ;;; canonical atomically checkable validity indicator. We carry around invalid layouts
 ;;; with nonzero hashes. Why else would there be so may places that can do:
-;;;   (setf (wrapper-invalid layout) nil
+;;;   (setf (layout-invalid layout) nil
 ;;; whilst the layout in question already has a "valid" hash?
 ;;; It's hard to know what the right thing is, but since internal code uses
 ;;; this test to decide how to handle layouts that have been invalidated,
@@ -108,7 +108,7 @@
 ;;; even though logically that *should* be the canonical test.
 (declaim (inline invalid-wrapper-p))
 (defun invalid-wrapper-p (wrapper)
-  (not (null (wrapper-invalid wrapper))))
+  (not (null (layout-invalid wrapper))))
 
 ;;; The portable code inherited from the ancient PCL sources used an extremely
 ;;; clever mechanism to store a mapping from new layouts ("wrappers") to old.
@@ -158,10 +158,10 @@
 (defun %invalidate-wrapper (owrapper state nwrapper)
   (aver (member state '(:flush :obsolete)))
   #+sb-thread (aver (sb-thread:holding-mutex-p sb-kernel::**world-lock**))
-  (let ((classoid (wrapper-classoid nwrapper))
+  (let ((classoid (layout-classoid nwrapper))
         (new-previous ())
         (new-state (cons state nwrapper)))
-    (aver (eq (wrapper-classoid owrapper) classoid))
+    (aver (eq (layout-classoid owrapper) classoid))
     ;; First off, a previous call to INVALIDATE-WRAPPER may have
     ;; recorded OWRAPPER as an NWRAPPER to update to. Since OWRAPPER
     ;; is about to be invalid, it no longer makes sense to update to
@@ -173,8 +173,8 @@
     (dolist (weak-pointer (sb-kernel::standard-classoid-old-layouts classoid))
       (let ((previous (weak-pointer-value weak-pointer)))
         (when previous
-          (setf (wrapper-invalid previous)
-                (cond ((and (eq (car (wrapper-invalid previous)) :obsolete)
+          (setf (layout-invalid previous)
+                (cond ((and (eq (car (layout-invalid previous)) :obsolete)
                             (eq state :flush))
                        ;; :obsolete must stay :obsolete,
                        ;; requiring the protocol for obsolete instances.
@@ -188,12 +188,11 @@
     ;; accessing the wrapper at the same time from outside the lock?
     ;; Inform readers of the reason for wrapper invalidity before marking
     ;; the wrapper as invalid.
-    (setf (wrapper-invalid owrapper) new-state)
+    (setf (layout-invalid owrapper) new-state)
     ;; Ensure that the INVALID slot conveying ancillary data describing the
     ;; invalidity reason is published before causing the invalid layout trap.
     (sb-thread:barrier (:write))
-    #+metaspace (setf (layout-clos-hash (wrapper-friend owrapper)) 0)
-    (setf (wrapper-clos-hash owrapper) 0)
+    (setf (layout-clos-hash owrapper) 0)
     (push (make-weak-pointer owrapper) new-previous)
     ;; This function is called for effect; return value is arbitrary.
     (setf  (sb-kernel::standard-classoid-old-layouts classoid)
@@ -204,8 +203,8 @@
 ;;; (or the names of our callees.)
 (defun check-wrapper-validity (instance)
   (with-world-lock ()
-    (let* ((owrapper (wrapper-of instance))
-           (state (wrapper-invalid owrapper)))
+    (let* ((owrapper (layout-of instance))
+           (state (layout-invalid owrapper)))
       (aver (not (eq state :uninitialized)))
       (cond ((not state)
              owrapper)
@@ -232,7 +231,7 @@
                ;; Error message here is trying to figure out a bit more about the
                ;; situation, since we don't have anything approaching a test-case
                ;; for the bug.
-               (let ((new-state (wrapper-invalid (wrapper-of instance))))
+               (let ((new-state (layout-invalid (layout-of instance))))
                  (when (eq new-state t)
                    (cerror "Nevermind and recurse." 'bug
                            :format-control "~@<~4IProblem forcing cache flushes. Please report ~
@@ -241,19 +240,19 @@
                                             ~% Wrapper-of: ~S~
                                             ~% Class-wrapper: ~S~%~:@>"
                            :format-arguments (mapcar (lambda (x)
-                                                       (cons x (wrapper-invalid x)))
+                                                       (cons x (layout-invalid x)))
                                                      (list owrapper
-                                                           (wrapper-of instance)
+                                                           (layout-of instance)
                                                            (class-wrapper class)))))))
              (check-wrapper-validity instance))
             ((consp state)
-             (let ((new (the wrapper (cdr state))))
+             (let ((new (the layout (cdr state))))
                (ecase (car state)
                  (:flush
                   (cond ((std-instance-p instance)
-                         (setf (%instance-wrapper instance) new))
+                         (setf (%instance-layout instance) new))
                         ((fsc-instance-p instance)
-                         (setf (%fun-wrapper instance) new))
+                         (setf (%fun-layout instance) new))
                         (t
                          (bug "unrecognized instance type"))))
                  (:obsolete
@@ -261,11 +260,11 @@
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)
-  (when (invalid-wrapper-p (wrapper-of instance))
+  (when (invalid-wrapper-p (layout-of instance))
     (check-wrapper-validity instance)))
 
 (defun valid-wrapper-of (instance)
-  (let ((wrapper (wrapper-of instance)))
+  (let ((wrapper (layout-of instance)))
     (if (invalid-wrapper-p wrapper)
         (check-wrapper-validity instance)
         wrapper)))
@@ -355,7 +354,7 @@
                   `((class *the-class-t*)
                     (type t))))
          (unless (eq mt t)
-           (setq wrapper (wrapper-of arg))
+           (setq wrapper (layout-of arg))
            (when (invalid-wrapper-p wrapper)
              (setq ,invalid-wrapper-p t)
              (setq wrapper (check-wrapper-validity arg)))

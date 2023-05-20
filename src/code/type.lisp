@@ -215,10 +215,10 @@
                                                         (specifier-type guard)))))
                      (return
                        (or (eq type2 (car x))
-                           (let ((inherits (wrapper-inherits
-                                            (classoid-wrapper (car x)))))
+                           (let ((inherits (layout-inherits
+                                            (classoid-layout (car x)))))
                              (dotimes (i (length inherits) nil)
-                               (when (eq type2 (wrapper-classoid (svref inherits i)))
+                               (when (eq type2 (layout-classoid (svref inherits i)))
                                  (return t))))))))))
           t))))
 
@@ -1416,7 +1416,7 @@
 #-sb-xc-host
 (progn (declaim (inline class-classoid))
        (defun class-classoid (class)
-         (wrapper-classoid (sb-pcl::class-wrapper class))))
+         (layout-classoid (sb-pcl::class-wrapper class))))
 
 ;;; HAIRY type-class has to be defined prior to defining %PARSE-TYPE.
 ;; ENUMERABLE-P is T because a hairy type could be equivalent to a MEMBER type.
@@ -1536,8 +1536,8 @@
               ;; See https://sourceforge.net/p/sbcl/mailman/message/11217378/
               ;; We rely on caching of singleton EQL types to make this efficient.
               (make-eql-type (sb-mop::eql-specializer-object type-specifier)))
-             ((wrapper-p type-specifier)
-              (wrapper-classoid type-specifier))
+             ((layout-p type-specifier)
+              (layout-classoid type-specifier))
              (t (fail type-specifier))))))
   (when (atom type-specifier)
     ;; Try to bypass the cache, which avoids using a cache line for standard

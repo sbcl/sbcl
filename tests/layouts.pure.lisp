@@ -4,8 +4,8 @@
         do (flet ((check-bit (bit ancestor-type)
                     (let ((ancestor (sb-kernel:find-layout ancestor-type)))
                       (when (or (eq wrapper ancestor)
-                                (find ancestor (sb-kernel:wrapper-inherits wrapper)))
-                        (assert (logtest bit (sb-kernel:wrapper-flags wrapper)))))))
+                                (find ancestor (sb-kernel:layout-inherits wrapper)))
+                        (assert (logtest bit (sb-kernel:layout-flags wrapper)))))))
               (check-bit sb-kernel:+stream-layout-flag+ 'stream)
               (check-bit sb-kernel:+string-stream-layout-flag+ 'string-stream)
               (check-bit sb-kernel:+file-stream-layout-flag+ 'file-stream))))
@@ -14,7 +14,7 @@
   ;; Negative test
   (dolist (name '(hash-table sb-thread:thread sb-thread::avlnode))
     (let ((layout (sb-kernel:find-layout name)))
-      (assert (not (logtest (sb-kernel:wrapper-flags layout)
+      (assert (not (logtest (sb-kernel:layout-flags layout)
                             sb-kernel:+strictly-boxed-flag+)))))
   ;; Positive test, just a small sampling
   (dolist (name '(condition warning error
@@ -23,7 +23,7 @@
                   structure-object sb-c::node
                   fundamental-stream))
     (let ((layout (sb-kernel:find-layout name)))
-      (assert (logtest (sb-kernel:wrapper-flags layout)
+      (assert (logtest (sb-kernel:layout-flags layout)
                        sb-kernel:+strictly-boxed-flag+)))))
 
 ;;; Test some aspects of bitmaps, and the iterator.
@@ -34,7 +34,7 @@
 ;;; This representation allows trailing slots to be either all tagged
 ;;; or all untagged.
 
-(defun ld (x) (sb-kernel:layout-depthoid (truly-the sb-vm::layout x)))
+(defun ld (x) (sb-kernel:layout-depthoid (truly-the layout x)))
 (compile 'ld)
 
 (defstruct d2)
@@ -88,23 +88,23 @@
 (defun layout-id-vector-sap (layout)
   (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address layout))
                (- (ash (+ sb-vm:instance-slots-offset
-                          (sb-kernel:get-dsd-index sb-vm:layout sb-kernel::id-word0))
+                          (sb-kernel:get-dsd-index sb-kernel:layout sb-kernel::id-word0))
                        sb-vm:word-shift)
                   sb-vm:instance-pointer-lowtag)))
 
 ;;;; Ensure ID uniqueness and that layout ID words match the ID's in the INHERITS vector.
 (defparameter *all-wrappers*
   (delete-if
-          ;; temporary layouts (created for parsing DEFSTRUCT)
-          ;; must be be culled out.
-          (lambda (x)
-            (and (typep (sb-kernel:wrapper-classoid x)
-                        'sb-kernel:structure-classoid)
-                 (eq (sb-kernel:wrapper-equalp-impl x)
-                     #'sb-kernel::equalp-err)))
-          (sb-vm::list-allocated-objects :all
-                                         :type sb-vm:instance-widetag
-                                         :test #'sb-kernel::wrapper-p)))
+   ;; temporary layouts (created for parsing DEFSTRUCT)
+   ;; must be be culled out.
+   (lambda (x)
+     (and (typep (sb-kernel:layout-classoid x)
+                 'sb-kernel:structure-classoid)
+          (eq (sb-kernel:layout-equalp-impl x)
+              #'sb-kernel::equalp-err)))
+   (sb-vm::list-allocated-objects :all
+                                  :type sb-vm:instance-widetag
+                                  :test #'sb-kernel::layout-p)))
 
 ;;; Assert no overlaps on ID
 (with-test (:name :id-uniqueness)
@@ -119,15 +119,15 @@
 (with-test (:name :id-versus-inherits)
   (let ((structure-object (sb-kernel:find-layout 'structure-object)))
     (dolist (wrapper *all-wrappers*)
-      (when (find structure-object (sb-kernel:wrapper-inherits wrapper))
-        (let* ((layout (sb-kernel:wrapper-friend wrapper))
+      (when (find structure-object (sb-kernel:layout-inherits wrapper))
+        (let* ((layout wrapper)
                (ids
                 (sb-sys:with-pinned-objects (layout)
                   (let ((sap (layout-id-vector-sap layout)))
-                    (loop for depthoid from 2 to (sb-kernel:wrapper-depthoid wrapper)
+                    (loop for depthoid from 2 to (sb-kernel:layout-depthoid wrapper)
                        collect (sb-sys:signed-sap-ref-32 sap (ash (- depthoid 2) 2))))))
                (expected
-                (map 'list 'sb-kernel:layout-id (sb-kernel:wrapper-inherits wrapper))))
+                (map 'list 'sb-kernel:layout-id (sb-kernel:layout-inherits wrapper))))
           (unless (equal (list* (sb-kernel:layout-id (sb-kernel:find-layout 't))
                                 (sb-kernel:layout-id (sb-kernel:find-layout 'structure-object))
                                 ids)

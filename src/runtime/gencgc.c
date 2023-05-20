@@ -2602,9 +2602,6 @@ static void pin_object(lispobj object)
 
 static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
 {
-#ifdef LISP_FEATURE_METASPACE
-    extern lispobj valid_metaspace_ptr_p(void* addr);
-#endif
     page_index_t page = find_page_index((void*)word);
     if (page < 0) {
         // Though immobile_space_preserve_pointer accepts any pointer,
@@ -2612,18 +2609,6 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
         // because it's inlined. Either is a no-op if no immobile space.
         if (immobile_space_p(word))
             return immobile_space_preserve_pointer((void*)word);
-#ifdef LISP_FEATURE_METASPACE
-        // Treat layout pointers as transparent - it's possible that no pointer
-        // to a wrapper exists, other than a layout which is in a CPU register.
-        if (word >= METASPACE_START
-            && word < READ_ONLY_SPACE_END
-            && lowtag_of(word) == INSTANCE_POINTER_LOWTAG
-            && valid_metaspace_ptr_p((void*)word)) {
-            lispobj wrapper = LAYOUT(word)->friend;
-            // fprintf(stderr, "stack -> metaspace ptr %p -> %p\n", addr, (void*)wrapper);
-            preserve_pointer((void*)wrapper, contextp);
-        }
-#endif
         return 0;
     }
 
@@ -4266,29 +4251,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
 
     scan_binding_stack();
     smash_weak_pointers();
-#ifdef LISP_FEATURE_METASPACE
-    // *PRIMITIVE-OBJECT-LAYOUTS* (in readonly space) is a root, but it only points
-    // to other objects in readonly space; however, those other objects (above
-    // the read_only_space_free_pointer) point weakly to dynamic space.
-    struct slab_header *slab = (void*)METASPACE_START;
-    // This is not maximally efficient, in that it visits all slabs instead of just the
-    // used ones, but it's not so bad, because there are only 1024 slabs.
-    while ((uword_t)slab < READ_ONLY_SPACE_END) {
-        if (slab->sizeclass) {
-            lispobj* chunk = (lispobj*)((char*)slab + METASPACE_SLAB_SIZE);
-            int i;
-            for (i=0; i<slab->capacity; ++i) {
-                chunk = (lispobj*)((char*)chunk - slab->chunksize);
-                if (chunk[1]) { // in-use chunk
-                    // Freeing this layout is more involved than merely zeroing some memory,
-                    // because freelists have to be maintained. A finalizer will do that.
-                    TEST_WEAK_CELL(chunk[1], chunk[1], 0);
-                }
-            }
-        }
-        slab = (void*)((char*)slab + METASPACE_SLAB_SIZE);
-    }
-#endif
     /* Return private-use pages to the general pool so that Lisp can have them */
     gc_dispose_private_pages();
     cull_weak_hash_tables(weak_ht_alivep_funs);

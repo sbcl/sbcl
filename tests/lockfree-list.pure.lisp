@@ -16,7 +16,7 @@
     (assert (eq (sb-kernel::dd-%element-type
                  (sb-kernel:find-defstruct-description type))
                 '*))
-    (assert (not (logtest (sb-kernel:wrapper-flags (find-layout type))
+    (assert (not (logtest (sb-kernel:layout-flags (find-layout type))
                           sb-kernel::+strictly-boxed-flag+)))))
 
 

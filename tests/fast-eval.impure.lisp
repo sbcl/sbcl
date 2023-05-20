@@ -305,7 +305,7 @@
 (defstruct testme x)
 (test-util:with-test (:name :compiled-equalp-method)
   (assert (compiled-function-p
-           (sb-kernel:wrapper-equalp-impl
+           (sb-kernel:layout-equalp-impl
             (sb-kernel:find-layout 'testme)))))
 (let ((f #'testme-x))
   (let ((source-loc (sb-interpreter:fun-source-location f)))

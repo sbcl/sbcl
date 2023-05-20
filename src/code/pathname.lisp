@@ -76,7 +76,7 @@
 
 (let ((to (find-layout 'logical-pathname))
       (from (find-layout 'pathname)))
-  (setf (wrapper-info to) (wrapper-info from)
-        (wrapper-slot-table to) (wrapper-slot-table from)))
+  (setf (layout-info to) (layout-info from)
+        (layout-slot-table to) (layout-slot-table from)))
 (declaim (inline logical-pathname-p))
 (defun logical-pathname-p (x) (typep x 'logical-pathname))

@@ -91,7 +91,7 @@
 
 (defun default-constantp (form)
   (and (constantp form)
-       (not (typep (constant-form-value form) '(or symbol fixnum cons wrapper)))))
+       (not (typep (constant-form-value form) '(or symbol fixnum cons layout)))))
 
 (defun default-test-converter (form)
   (if (default-constantp form)

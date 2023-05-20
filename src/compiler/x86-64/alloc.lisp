@@ -876,11 +876,7 @@
                    temp)
                  result 0 fun-pointer-lowtag (not stack-allocate-p))
         (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-        (storew temp result closure-fun-slot fun-pointer-lowtag))
-      #+metaspace
-      (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
-        (inst lea temp (rip-relative-ea origin :code))
-        (storew temp result closure-code-slot fun-pointer-lowtag)))))
+        (storew temp result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
@@ -947,7 +943,7 @@
       ;; GC can make the best choice about placement if it has a layout.
       ;; Of course with conservative GC the object will be pinned anyway,
       ;; but still, always having a layout is a good thing.
-      (when (typep type 'wrapper) ; store its layout, while still in pseudo-atomic
+      (when (typep type 'layout) ; store its layout, while still in pseudo-atomic
         (inst mov :dword (ea 4 result) (make-fixup type :layout)))
       (inst or :byte result lowtag))))
   ;; DX is strictly redundant in these 2 vops, but they're written this way

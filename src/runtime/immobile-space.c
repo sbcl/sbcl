@@ -1853,14 +1853,7 @@ static void defrag_immobile_space(boolean verbose)
     int n_code_bytes = 0;
 
     if (components) {
-#ifdef LISP_FEATURE_METASPACE
-        /* Skip the 0th entry when assigning new addresses, because it is
-           SB-FASL::*ASSEMBLER-ROUTINES* which is in read-only space and not
-           itself relocatable, but does contain absolute fixups */
-        for (i=1 ; components[i*2] ; ++i) {
-#else
         for (i=0 ; components[i*2] ; ++i) {
-#endif
             lispobj* addr = (lispobj*)components[i*2];
             gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
             addr = native_pointer((lispobj)addr);
@@ -2074,10 +2067,6 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
         if (asm_routines_start <= ptr && ptr < asm_routines_end) {
             continue;
         }
-#ifdef LISP_FEATURE_METASPACE
-        // Pointers to metaspace will never move, at least not for the time being.
-        if (ptr >= READ_ONLY_SPACE_START && ptr < READ_ONLY_SPACE_END) continue;
-#endif
         if (find_fixedobj_page_index((void*)ptr) >= 0) {
             header_addr = search_immobile_space((void*)ptr);
             gc_assert(header_addr);

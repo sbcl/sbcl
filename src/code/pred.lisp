@@ -214,19 +214,11 @@
      (type-specifier (ctype-of object)))
     (simple-fun 'compiled-function)
     (t
-     #+metaspace ; WRAPPER-OF can't be called on layoutless objects.
-     (unless (logtest (get-lisp-obj-address (%instanceoid-layout object))
-                      sb-vm:widetag-mask)
-       ;; [fun-]instances momentarily have no layout in any code interrupted
-       ;; just after allocating and before assigning slots.
-       ;; OUTPUT-UGLY-OBJECT has a similar precaution as this.
-       (return-from type-of (if (functionp object) 'funcallable-instance 'instance)))
-     (let ((wrapper (wrapper-of object)))
-       #-metaspace ; already checked for a good layout if metaspace
-       (when (= (get-lisp-obj-address wrapper) 0)
+     (let ((layout (layout-of object)))
+       (when (= (get-lisp-obj-address layout) 0)
          (return-from type-of
            (if (functionp object) 'funcallable-instance 'instance)))
-       (let* ((classoid (wrapper-classoid wrapper))
+       (let* ((classoid (layout-classoid layout))
               (name (classoid-name classoid)))
          ;; FIXME: should the first test be (not (or (%instancep) (%funcallable-instance-p)))?
          ;; God forbid anyone makes anonymous classes of generic functions.
@@ -519,8 +511,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                 (and (logtest (logior +structure-layout-flag+ +pathname-layout-flag+)
                               (layout-flags layout))
                      (eq (%instance-layout y) layout)
-                     (funcall (wrapper-equalp-impl (layout-friend layout))
-                              x y)))))
+                     (funcall (layout-equalp-impl layout) x y)))))
         ((arrayp x)
          (and (arrayp y)
               ;; string-equal is nearly 2x the speed of array-equalp for comparing strings

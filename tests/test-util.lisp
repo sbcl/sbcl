@@ -1018,7 +1018,7 @@
 (defun deep-size (obj &optional (leafp (lambda (x)
                                          (typep x '(or package symbol sb-kernel:fdefn
                                                        function sb-kernel:code-component
-                                                       sb-kernel:wrapper sb-kernel:classoid)))))
+                                                       sb-kernel:layout sb-kernel:classoid)))))
   (let ((worklist (list obj))
         (seen (make-hash-table :test 'eq))
         (tot-bytes 0))

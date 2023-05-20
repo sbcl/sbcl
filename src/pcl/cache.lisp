@@ -170,7 +170,7 @@
 (export 'compute-cache-index) ; for a test
 (defun compute-cache-index (cache layouts)
   (macrolet ((fetch-hash (x)
-               `(let ((hash (wrapper-clos-hash ,x)))
+               `(let ((hash (layout-clos-hash ,x)))
                   (when (zerop hash) (return-from compute-cache-index nil))
                   hash)))
     (let ((index (fetch-hash (car layouts))))
@@ -228,7 +228,7 @@
             (when (or (> num-keys 1) value-var) (make-symbol "PTR")))
            (line-size (power-of-two-ceiling (+ num-keys (if value-var 1 0)))))
       ;; Why not use PROG* ? are we expressly trying to avoid a new block?
-      `(let* (,@(mapcar (lambda (x y) `(,x (wrapper-clos-hash ,y))) hash-vars layout-vars)
+      `(let* (,@(mapcar (lambda (x y) `(,x (layout-clos-hash ,y))) hash-vars layout-vars)
               (,n-mask (cache-mask ,cache-var))
               (,probe (if (zerop ,(cache-mixer-expression 'logand hash-vars t))
                           (go ,miss-tag)
@@ -295,7 +295,7 @@
       (case key-count
        (1
         (let* ((layout (if (%instancep key) key (car key)))
-               (hash (wrapper-clos-hash layout))
+               (hash (layout-clos-hash layout))
                (index (logand hash mask)))
           (unless (= hash 0)
             (probe-loop (eq (svref vector (truly-the index index)) layout)))))
@@ -437,14 +437,14 @@
       ;; Check if the line is in use, and check validity of the keys.
       (let ((key1 (svref vector index)))
         (when (cache-key-p key1)
-          (if (zerop (wrapper-clos-hash key1))
+          (if (zerop (layout-clos-hash key1))
               ;; First key invalid.
               (return-from cache-has-invalid-entries-p t)
               ;; Line is in use and the first key is valid: check the rest.
               (loop for offset from 1 below key-count
                     do (let ((thing (svref vector (+ index offset))))
                          (when (or (not (cache-key-p thing))
-                                   (zerop (wrapper-clos-hash thing)))
+                                   (zerop (layout-clos-hash thing)))
                            ;; Incomplete line or invalid layout.
                            (return-from cache-has-invalid-entries-p t)))))))
       ;; Line empty of valid, onwards.
@@ -588,7 +588,7 @@
          (total-lines (/ size line-size))
          (total-n-keys 0) ; a "key" is a tuple of layouts
          (n-dirty 0) ; lines that have an unbound marker but are not wholly empty
-         (n-obsolete 0) ; lines that need to be evicted due to 0 in a wrapper-clos-hash
+         (n-obsolete 0) ; lines that need to be evicted due to 0 in a layout-clos-hash
          (histogram
            (when compute-histogram
              (make-array (1+ (cache-limit cache)) :initial-element 0))))
@@ -601,7 +601,7 @@
                         (n-misses 0))
                    (cond ((find-if-not #'cache-key-p layouts)
                           (incf n-dirty))
-                         ((find 0 layouts :key #'wrapper-clos-hash)
+                         ((find 0 layouts :key #'layout-clos-hash)
                           (incf n-obsolete))
                          (t
                           (incf total-n-keys)

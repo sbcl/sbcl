@@ -31,14 +31,14 @@
   (let* ((methods (the simple-vector
                        (cdr (or (assoc gf-name *!initial-methods*)
                                 (error "No methods on ~S" gf-name)))))
-         ;; WRAPPER-OF can't be called until its constants have been patched in,
+         ;; LAYOUT-OF can't be called until its constants have been patched in,
          ;; which is potentially too early in cold init especially if trying
          ;; to debug to figure out what has been patched in.
          ;; And sometimes the thing we need to print is a FMT-CONTROL,
          ;; which means we can see a funcallable-instance here.
-         (arg-wrapper
-          (cond ((%instancep specialized-arg) (%instance-wrapper specialized-arg))
-                ((funcallable-instance-p specialized-arg) (%fun-wrapper specialized-arg))
+         (arg-layout
+          (cond ((%instancep specialized-arg) (%instance-layout specialized-arg))
+                ((funcallable-instance-p specialized-arg) (%fun-layout specialized-arg))
                 ;; Non-instance-like types always call a predicate.
                 (t #.(find-layout 't))))
          (applicable-method
@@ -50,10 +50,10 @@
                      (let ((guard (the symbol (svref method 0))))
                        (if (fboundp guard)
                            (funcall guard specialized-arg)
-                           (let ((test-wrapper (svref method 1)))
-                             (and (sb-kernel::wrapper-p test-wrapper)
-                                  (or (find test-wrapper (wrapper-inherits arg-wrapper))
-                                      (eq arg-wrapper test-wrapper)))))))
+                           (let ((test-layout (svref method 1)))
+                             (and (sb-kernel::layout-p test-layout)
+                                  (or (find test-layout (layout-inherits arg-layout))
+                                      (eq arg-layout test-layout)))))))
                    methods)))
     (cond (applicable-method
            ;; Call using no permutation-vector / no precomputed next method.

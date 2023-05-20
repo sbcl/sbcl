@@ -192,12 +192,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
     words = end - addr;
     write_lispobj(words, file);
 
-#ifdef LISP_FEATURE_METASPACE
-    if (id == READ_ONLY_CORE_SPACE_ID)
-        bytes = (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START);
-    else
-#endif
-        bytes = words * sizeof(lispobj);
+    bytes = words * sizeof(lispobj);
 
 #ifdef LISP_FEATURE_CHENEYGC
     /* KLUDGE: cheneygc can not restart a saved core if the dynamic space is empty,

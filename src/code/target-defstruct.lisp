@@ -30,7 +30,6 @@
 ;;; The third one also gets thrown away.
 (define-load-time-global *layout-id-generator* (cons 0 nil))
 (declaim (type (cons fixnum) *layout-id-generator*))
-;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
@@ -41,7 +40,7 @@
                                  (atomic-incf (car *layout-id-generator*)))))
   (unless (typep id '(and layout-id (not (eql 0))))
     (error "Layout ID limit reached"))
-  (let* ((fixed-words (type-dd-length sb-vm:layout))
+  (let* ((fixed-words (type-dd-length layout))
          (extra-id-words ; count of additional words needed to store ancestors
           (if (logtest flags +structure-layout-flag+)
               (calculate-extra-id-words depthoid)
@@ -49,32 +48,25 @@
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (nwords (+ fixed-words extra-id-words bitmap-words))
          (layout
-          (truly-the sb-vm:layout
+          (truly-the layout
                      #+compact-instance-header
                      (sb-vm::alloc-immobile-fixedobj
                       (1+ nwords)
                       (logior (ash nwords sb-vm:instance-length-shift)
                               sb-vm:instance-widetag))
                      #-compact-instance-header
-                     (%make-instance/mixed nwords)))
-         (wrapper #-metaspace layout))
-    (%set-instance-layout layout
-          (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
-                                         #-metaspace 'wrapper)))
-    #+metaspace
-    (setf wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
-                                 :%info info :invalid invalid :friend layout)
-          (layout-friend layout) wrapper)
+                     (%make-instance/mixed nwords))))
+    (%set-instance-layout layout #.(find-layout 'layout))
     (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
                                 #-64-bit flags)
     (setf (layout-clos-hash layout) clos-hash
-          (wrapper-classoid wrapper) classoid
-          (wrapper-invalid wrapper) invalid)
-    #-64-bit (setf (wrapper-depthoid wrapper) depthoid
-                   (wrapper-length wrapper) length)
-    #-metaspace (setf (wrapper-%info wrapper) info ; already set if #+metaspace
-                      (wrapper-slot-table wrapper) #(1 nil))
-    (set-layout-inherits wrapper inherits (logtest flags +structure-layout-flag+) id)
+          (layout-classoid layout) classoid
+          (layout-invalid layout) invalid)
+    #-64-bit (setf (layout-depthoid layout) depthoid
+                   (layout-length layout) length)
+    (setf (layout-%info layout) info
+          (layout-slot-table layout) #(1 nil))
+    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) id)
     (let ((bitmap-base (+ fixed-words extra-id-words)))
       (dotimes (i bitmap-words)
         (%raw-instance-set/word layout (+ bitmap-base i)
@@ -89,40 +81,22 @@
       (let ((layout-addr (- (get-lisp-obj-address layout) sb-vm:instance-pointer-lowtag)))
         (declare (ignorable layout-addr))
         (declare (sb-c::tlab :system))
-        (finalize wrapper
+        (finalize layout
                   (lambda ()
-                    #+metaspace (sb-vm::unallocate-metaspace-chunk layout-addr)
                     (atomic-push id (cdr *layout-id-generator*)))
                 :dont-save t)))
-    ;; Rather than add and delete this line of debugging which I've done so many times,
-    ;; let's instead keep it but commented out.
-    #+nil
-    (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned
-                                                    unsigned system-area-pointer))
-                   (vector-sap #.(format nil "New wrapper ID=%d %p %p '%s'~%"))
-                   id (get-lisp-obj-address layout) (get-lisp-obj-address wrapper)
-                   (vector-sap (string (classoid-name classoid))))
-    wrapper))
-
-#+metaspace
-(defun make-temporary-wrapper (clos-hash classoid inherits)
-  (let* ((layout (%make-temporary-layout #.(find-layout t) clos-hash))
-         (wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
-                                 :inherits inherits :invalid nil
-                                 :friend layout)))
-    (setf (layout-friend layout) wrapper)
-    wrapper))
+    layout))
 
 ;;; This allocator is used by the expansion of MAKE-LOAD-FORM-SAVING-SLOTS
 ;;; when given a STRUCTURE-OBJECT.
 (defun allocate-struct (type)
-  (let* ((wrapper (classoid-wrapper (the structure-classoid (find-classoid type))))
-         (dd (wrapper-dd wrapper))
-         (structure (let ((len (wrapper-length wrapper)))
+  (let* ((layout (classoid-layout (the structure-classoid (find-classoid type))))
+         (dd (layout-dd layout))
+         (structure (let ((len (layout-length layout)))
                       (if (dd-has-raw-slot-p dd)
                           (%make-instance/mixed len)
                           (%make-instance len)))))
-    (%set-instance-layout structure wrapper)
+    (%set-instance-layout structure layout)
     (dolist (dsd (dd-slots dd) structure)
       (when (eq (dsd-raw-type dsd) 't)
         (%instance-set structure (dsd-index dsd) (make-unbound-marker))))))
@@ -169,22 +143,19 @@
   ;; their ancestors in the vector; they only store self-id at index 0.
   ;; This isn't performance-critical. If it were, then we should store self-ID
   ;; at a fixed index. Using it for type-based dispatch remains a possibility.
-  (let* ((layout (cond #+metaspace ((typep layout 'wrapper) (wrapper-friend layout))
-                       (t layout)))
-         (depth (- (sb-vm::layout-depthoid layout) 2))
+  (let* ((depth (- (sb-vm::layout-depthoid layout) 2))
          (index (if (or (< depth 0) (not (logtest (layout-flags layout)
                                                   +structure-layout-flag+)))
                     0 depth)))
     (truly-the layout-id
               #-64-bit (%raw-instance-ref/signed-word
-                        layout (+ (get-dsd-index sb-vm:layout id-word0) index))
+                        layout (+ (get-dsd-index layout id-word0) index))
               #+64-bit ; use SAP-ref for lack of half-sized slots
               (with-pinned-objects (layout)
                 (signed-sap-ref-32 (id-bits-sap) (ash index 2))))))
 
-(defun set-layout-inherits (wrapper inherits structurep this-id
-                            &aux (layout (wrapper-friend wrapper)))
-  (setf (wrapper-inherits wrapper) inherits)
+(defun set-layout-inherits (layout inherits structurep this-id)
+  (setf (layout-inherits layout) inherits)
   ;;; If structurep, and *only* if, store all the inherited layout IDs.
   ;;; It looks enticing to try to always store "something", but that goes wrong,
   ;;; because only structure-object layouts are growable, and only structure-object
@@ -247,11 +218,11 @@
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
-(defmacro set-wrapper-equalp-impl (wrapper newval)
-  `(%instance-set ,wrapper (get-dsd-index wrapper equalp-impl) ,newval))
+(defmacro set-layout-equalp-impl (layout newval)
+  `(%instance-set ,layout (get-dsd-index layout equalp-impl) ,newval))
 
 (defun assign-equalp-impl (type-name function)
-  (set-wrapper-equalp-impl (find-layout type-name) function))
+  (set-layout-equalp-impl (find-layout type-name) function))
 
 ;;; This variable is just a somewhat hokey way to pass additional
 ;;; arguments to the defstruct hook (which renders the structure definition
@@ -276,8 +247,8 @@
     (setf (documentation (dd-name dd) 'structure) (dd-doc dd)))
 
   (let ((classoid (find-classoid (dd-name dd))))
-    (let ((layout (classoid-wrapper classoid)))
-      (set-wrapper-equalp-impl
+    (let ((layout (classoid-layout classoid)))
+      (set-layout-equalp-impl
           layout
           (cond ((compiled-function-p equalp) equalp)
                 ((eql (dd-bitmap dd) +layout-all-tagged+) #'sb-impl::instance-equalp)
@@ -380,11 +351,11 @@
   (loop for i from sb-vm:instance-data-start below (%instance-length to)
         do (%instance-set to i (%instance-ref from i)))
   to)
-(defun (setf %instance-wrapper) (newval x)
-  (%set-instance-layout x (wrapper-friend newval))
+(defun (setf %instance-layout) (newval x)
+  (%set-instance-layout x newval)
   newval)
-(defun (setf %fun-wrapper) (newval x)
-  (%set-fun-layout x (wrapper-friend newval))
+(defun (setf %fun-layout) (newval x)
+  (%set-fun-layout x newval)
   newval)
 
 ;;; default PRINT-OBJECT method
@@ -443,9 +414,9 @@
   (declare (ignore depth))
   (if (funcallable-instance-p structure)
       (print-unreadable-object (structure stream :identity t :type t))
-      (let* ((wrapper (%instance-wrapper structure))
-             (dd (wrapper-info wrapper))
-             (name (wrapper-classoid-name wrapper)))
+      (let* ((layout (%instance-layout structure))
+             (dd (layout-info layout))
+             (name (layout-classoid-name layout)))
         (cond ((not dd)
                ;; FIXME? this branch may be unnecessary as a consequence
                ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
@@ -496,22 +467,16 @@
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
 
-#+metaspace
-(defmethod print-object ((self sb-vm:layout) stream)
-  (print-unreadable-object (self stream :type t :identity t)
-    (write (layout-id self) :stream stream)))
-
 (defun id-to-layout (id)
   (maphash (lambda (k v)
              (declare (ignore k))
              (when (eql (layout-id v) id)
-               (return-from id-to-layout (wrapper-friend v))))
+               (return-from id-to-layout v)))
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 
 (defun summarize-layouts ()
-  (flet ((flag-bits (x) (logand (layout-flags (wrapper-friend x))
-                                layout-flags-mask)))
+  (flet ((flag-bits (x) (logand (layout-flags x) layout-flags-mask)))
      (let ((prev -1))
        (dolist (layout (sort (loop for v being each hash-value
                                 of (classoid-subclasses (find-classoid 't))

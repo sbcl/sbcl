@@ -334,10 +334,10 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (when (zerop (hash-table-count sb-kernel::*forward-referenced-wrappers*))
+  (when (zerop (hash-table-count sb-kernel::*forward-referenced-layouts*))
     ;; I think this table should always be empty but I'm not sure. If it is,
     ;; recreate it so that we don't preserve an empty vector taking up 16KB
-    (setq sb-kernel::*forward-referenced-wrappers* (make-hash-table :test 'equal)))
+    (setq sb-kernel::*forward-referenced-layouts* (make-hash-table :test 'equal)))
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))

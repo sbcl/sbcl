@@ -75,7 +75,7 @@
   (:generator 4
     (let ((test-id (layout-id test-layout))
           (offset (+ (id-bits-offset)
-                     (ash (- (wrapper-depthoid test-layout) 2) 2)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lwa this-id x offset)
       ;; Always prefer 'cmpwi' if compiling to memory.

@@ -108,7 +108,7 @@
          (class-eq (and name
                         (eq (classoid-state classoid) :sealed)
                         (not (classoid-subclasses classoid))))
-         (dd (and class-eq (wrapper-info layout)))
+         (dd (and class-eq (layout-info layout)))
          (dd-copier (and dd (sb-kernel::dd-copier-name dd)))
          (max-inlined-words 5))
     (unless (and result ; could be unused result (but entire call wasn't flushed?)
@@ -165,7 +165,7 @@
              (not (varying-length-struct-p classoid))
              ;; TODO: if sealed with subclasses which add no slots, use the fixed length
              (not (classoid-subclasses classoid)))
-        (dd-length (wrapper-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
+        (dd-length (layout-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
         (give-up-ir1-transform))))
 
 ;;; This doesn't help a whole lot, but it does fire during compilation of 'info-vector'
@@ -177,9 +177,6 @@
      (%instance-set .instance. .index. .newval.)
      .newval.))
 
-(define-source-transform %instance-wrapper (x) `(layout-friend (%instance-layout ,x)))
-(define-source-transform %fun-wrapper (x) `(layout-friend (%fun-layout ,x)))
-
 ;;; *** These transforms should be the only code, aside from the C runtime
 ;;;     with knowledge of the layout index.
 #+compact-instance-header
@@ -187,9 +184,9 @@
 #-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
-    `(truly-the sb-vm:layout (%instance-ref ,x 0)))
+    `(truly-the layout (%instance-ref ,x 0)))
   (define-source-transform %set-instance-layout (instance layout)
-    `(%instance-set ,instance 0 (the sb-vm:layout ,layout)))
+    `(%instance-set ,instance 0 (the layout ,layout)))
   (define-source-transform function-with-layout-p (x)
     `(funcallable-instance-p ,x)))
 

@@ -20,12 +20,12 @@
   (declare (explicit-check)
            (dynamic-extent arguments))
   (cond ((and (%instancep datum)
-              (let ((wrapper (%instance-wrapper datum)))
-                (and (logtest (wrapper-flags wrapper) +condition-layout-flag+)
+              (let ((layout (%instance-layout datum)))
+                (and (logtest (layout-flags layout) +condition-layout-flag+)
                      ;; An invalid layout will drop into the (MAKE-CONDITION) branch
                      ;; which rightly fails because ALLOCATE-CONDITION asserts that
                      ;; the first argument is a condition-designator, which it won't be.
-                     (not (wrapper-invalid wrapper)))))
+                     (not (layout-invalid layout)))))
          (when (and arguments (not (eq fun-name 'cerror)))
            (cerror "Ignore the additional arguments."
                    'simple-type-error
@@ -293,7 +293,7 @@ specification."
      (%get (condition name operation)
        ;; Shared code for CONDITION-SLOT-VALUE and CONDITION-SLOT-BOUNDP.
        ;; First look for a slot with :CLASS allocation
-       (let ((classoid (wrapper-classoid (%instance-wrapper condition))))
+       (let ((classoid (layout-classoid (%instance-layout condition))))
          (dolist (cslot (condition-classoid-class-slots classoid))
            (when (eq (condition-slot-name cslot) name)
              (return-from %get (car (condition-slot-cell cslot)))))
@@ -315,7 +315,7 @@ specification."
   ;; This is a stupid argument order. Shouldn't NEW-VALUE be first ?
   (defun set-condition-slot-value (condition new-value name)
     (dolist (cslot (condition-classoid-class-slots
-                    (wrapper-classoid (%instance-wrapper condition))))
+                    (layout-classoid (%instance-layout condition))))
       (when (eq (condition-slot-name cslot) name)
         (return-from set-condition-slot-value
           (setf (car (condition-slot-cell cslot)) new-value))))
@@ -333,7 +333,7 @@ specification."
   (defun condition-slot-value (condition name)
     (let ((value (%get condition name 'slot-value)))
       (if (unbound-marker-p value)
-          (let ((class (classoid-pcl-class (wrapper-classoid (%instance-wrapper condition)))))
+          (let ((class (classoid-pcl-class (layout-classoid (%instance-layout condition)))))
             (values (slot-unbound class condition name)))
           value)))
 

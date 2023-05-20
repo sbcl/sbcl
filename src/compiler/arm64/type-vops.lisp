@@ -644,7 +644,7 @@
          (inst cmp layout desc-temp))
         (t
          (let* ((test-id (layout-id test-layout))
-                (depthoid (wrapper-depthoid test-layout))
+                (depthoid (layout-depthoid test-layout))
                 (offset (+ (id-bits-offset)
                            (ash (- depthoid 2) 2)
                            (- instance-pointer-lowtag))))
@@ -700,7 +700,7 @@
                :unused-if
                (and (instance-tn-ref-p args)
                     #1=(and (not (integerp test-layout))
-                            (let ((classoid (wrapper-classoid test-layout)))
+                            (let ((classoid (layout-classoid test-layout)))
                               (and (eq (classoid-state classoid) :sealed)
                                    (not (classoid-subclasses classoid)))))))
               temp)
@@ -733,7 +733,7 @@
   (:temporary (:sc unsigned-reg
                :unused-if
                #1=(and (not (integerp test-layout))
-                       (let ((classoid (wrapper-classoid test-layout)))
+                       (let ((classoid (layout-classoid test-layout)))
                          (and (eq (classoid-state classoid) :sealed)
                               (not (classoid-subclasses classoid))))))
               temp)

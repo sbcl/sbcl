@@ -33,7 +33,7 @@ run_sbcl <<EOF
       (:metaclass sb-mop:funcallable-standard-class))
     (defclass subgf (standard-generic-function) (a) ; remove a slot
       (:metaclass sb-mop:funcallable-standard-class))
-    (let ((nl (sb-kernel:wrapper-friend (sb-kernel:find-layout 'subgf)))) ; new layout
+    (let ((nl (sb-kernel:find-layout 'subgf))) ; new layout
       (assert (not (eq (sb-kernel:%fun-layout #'myfun) nl)))
       (sb-kernel:%set-fun-layout #'myfun nl)
       (gc)))

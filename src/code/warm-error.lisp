@@ -45,7 +45,7 @@
                 (superclassoid-name (classoid-name super)))
             ;; CONDITION is necessarily an INSTANCE,
             ;; but pedantry requires it be the right subtype of instance.
-            (unless (classoid-typep (%instance-wrapper condition)
+            (unless (classoid-typep (%instance-layout condition)
                                     super condition)
               (error 'simple-type-error
                      :datum datum :expected-type superclassoid-name

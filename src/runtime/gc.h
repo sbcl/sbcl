@@ -57,7 +57,7 @@ extern os_vm_size_t bytes_consed_between_gcs;
 
 /* VERIFYING_foo indicates internal state, not a caller's option */
 /* GENERATIONAL implies formatted objects, but there are ranges of objects
- * that are not generational - static, readonly, and metaspace -
+ * that are not generational (static space)
  * so there are no page protection checks performed for pointers from objects
  * in such ranges */
 #define VERIFYING_GENERATIONAL 256

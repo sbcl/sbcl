@@ -220,22 +220,21 @@
   (flushable always-translatable))
 (defknown (%copy-instance %copy-instance-slots) (instance instance) instance
   () :result-arg 0)
-(defknown %instance-layout (instance) sb-vm:layout (foldable flushable))
-(defknown %instance-wrapper (instance) wrapper (foldable flushable))
+(defknown %instance-layout (instance) layout
+  (foldable flushable))
 ;;; %FUN-LAYOUT is to %INSTANCE-LAYOUT as FUN-POINTER-LOWTAG is to INSTANCE-POINTER-LOWTAG
 (defknown %fun-layout (#-compact-instance-header funcallable-instance
                        #+compact-instance-header function)
-  sb-vm:layout (foldable flushable))
-(defknown %fun-wrapper (#-compact-instance-header funcallable-instance
-                        #+compact-instance-header function)
-  wrapper
+  layout
   (foldable flushable))
-(defknown %set-instance-layout (instance sb-vm:layout) (values) ())
+(defknown %set-instance-layout (instance layout) (values)
+  ())
 ;;; %SET-FUN-LAYOUT should only called on FUNCALLABLE-INSTANCE
-(defknown %set-fun-layout (funcallable-instance sb-vm:layout) (values) ())
+(defknown %set-fun-layout (funcallable-instance layout) (values)
+  ())
 ;;; Layout getter that accepts any object, and if it has INSTANCE- or FUN-
 ;;; POINTER-LOWTAG returns the layout, otherwise some agreed-upon layout.
-(defknown %instanceoid-layout (t) sb-vm:layout (flushable))
+(defknown %instanceoid-layout (t) layout (flushable))
 (defknown layout-eq ((or instance function) t (mod 16)) boolean (flushable))
 ;;; Caution: This is not exactly the same as instance_length() in C.
 ;;; The C one is the same as SB-VM::INSTANCE-LENGTH.
@@ -246,7 +245,7 @@
 (defknown (%instance-ref-eq) (instance index t) boolean
   (flushable always-translatable))
 (defknown %instance-set (instance index t) (values) (always-translatable))
-(defknown update-object-layout (t) sb-vm:layout)
+(defknown update-object-layout (t) layout)
 
 #+(or arm64 ppc ppc64 riscv x86 x86-64)
 (defknown %raw-instance-cas/word (instance index sb-vm:word sb-vm:word)

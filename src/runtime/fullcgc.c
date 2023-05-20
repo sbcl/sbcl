@@ -246,11 +246,7 @@ static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
     // Apart from the allowance for untagged pointers in lockfree list nodes,
     // this contains almost none of the special cases that gencgc does.
     if (!layout) return;
-#ifdef LISP_FEATURE_METASPACE
-    gc_mark_obj(LAYOUT(layout)->friend);
-#else
     gc_mark_obj(layout);
-#endif
     if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
         struct list_node* node = (void*)where;
         lispobj next = node->_node_next;
@@ -410,15 +406,6 @@ void execute_full_mark_phase()
         gc_enqueue(obj);
         where += listp(obj) ? 2 : headerobj_size(where);
     }
-#ifdef LISP_FEATURE_METASPACE
-    where = (lispobj*)METASPACE_START;
-    end = (lispobj*)READ_ONLY_SPACE_END;
-    while (where < end) {
-        lispobj obj = compute_lispobj(where);
-        gc_enqueue(obj);
-        where += listp(obj) ? 2 : headerobj_size(where);
-    }
-#endif
     gc_mark_obj(lisp_package_vector);
     gc_mark_obj(lisp_init_function);
     gc_mark_obj(gc_object_watcher);

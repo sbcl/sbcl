@@ -70,10 +70,8 @@
 ;; This vector is allocated into immobile fixedobj space if #+compact-instance-header.
 ;; There isn't a way to do that from lisp, so it's special-cased in genesis.
 #-compact-instance-header (setq **primitive-object-layouts** (make-array 256))
-;; If #+metaspace, we can't generally store layouts in heap objects except in
-;; the instance header, but this vector can because it too will go in metaspace.
 (map-into **primitive-object-layouts**
-          (lambda (name) (wrapper-friend (classoid-wrapper (find-classoid name))))
+          (lambda (name) (classoid-layout (find-classoid name)))
           #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))
               (dolist (x sb-kernel::*builtin-classoids*)
                 (destructuring-bind (name &key codes &allow-other-keys) x

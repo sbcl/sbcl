@@ -64,7 +64,7 @@
   (:temporary (:sc unsigned-reg) this-id temp)
   (:generator 4
     (let ((offset (+ (id-bits-offset)
-                     (ash (- (wrapper-depthoid test-layout) 2) 2)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lw this-id x offset)
       (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))

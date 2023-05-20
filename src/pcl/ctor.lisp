@@ -601,7 +601,7 @@
       ;; ...), because part of the deal is that those only happen from
       ;; FORCE-CACHE-FLUSHES, which create a new valid wrapper for the
       ;; class.  An invalid layout of T needs to be flushed, however.
-      (when (eq (wrapper-invalid (class-wrapper class)) t)
+      (when (eq (layout-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
       (pushnew-in-ctors ctor class)
@@ -625,7 +625,7 @@
       ;; ...), because part of the deal is that those only happen from
       ;; FORCE-CACHE-FLUSHES, which create a new valid wrapper for the
       ;; class.  An invalid layout of T needs to be flushed, however.
-      (when (eq (wrapper-invalid (class-wrapper class)) t)
+      (when (eq (layout-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
       (pushnew-in-ctors ctor class)
@@ -806,7 +806,7 @@
        `(lambda ,(make-ctor-parameter-list ctor)
          (declare #.*optimize-speed*)
          (block nil
-           (when (wrapper-invalid ,wrapper)
+           (when (layout-invalid ,wrapper)
              (install-initial-constructor ,ctor t)
              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
            ,(wrap-in-allocate-forms ctor body early-unbound-markers-p)))
@@ -819,7 +819,7 @@
     `(lambda ()
        (declare #.*optimize-speed*)
        (block nil
-         (when (wrapper-invalid ,wrapper)
+         (when (layout-invalid ,wrapper)
            (install-initial-constructor ,ctor t)
            (return (funcall ,ctor)))
          ,(wrap-in-allocate-forms ctor nil t)))))
@@ -840,7 +840,7 @@
     ;; but there aren't allocation vops that do that.
     (etypecase class
       (standard-class
-        `(let ((.slots. (make-array ,(wrapper-length wrapper)
+        `(let ((.slots. (make-array ,(layout-length wrapper)
                                     ,@(when early-unbound-markers-p
                                         '(:initial-element +slot-unbound+))))
                (.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start))))
@@ -970,7 +970,7 @@
          (safe-p (ctor-safe-p ctor))
          (wrapper (class-wrapper class))
          (slot-vector
-          (make-array (wrapper-length wrapper) :initial-element nil))
+          (make-array (layout-length wrapper) :initial-element nil))
          (class-inits ())
          (default-inits ())
          (defaulting-initargs ())

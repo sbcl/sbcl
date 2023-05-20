@@ -348,7 +348,7 @@
                        (ensure-heap-string (%pathname-type tmp))
                        (%pathname-version tmp))))
              (when (typep host 'logical-host)
-               (setf (%instance-wrapper new) #.(find-layout 'logical-pathname)))
+               (setf (%instance-layout new) #.(find-layout 'logical-pathname)))
              new)))))))
 
 ;;; Weak vectors don't work at all once rendered pseudo-static.

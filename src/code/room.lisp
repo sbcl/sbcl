@@ -617,9 +617,9 @@ We could try a few things to mitigate this:
                  (eql type funcallable-instance-widetag))
          (incf total-objects)
          (let* ((layout (if (eql type funcallable-instance-widetag)
-                            (%fun-wrapper obj)
-                            (%instance-wrapper obj)))
-                (classoid (wrapper-classoid layout))
+                            (%fun-layout obj)
+                            (%instance-layout obj)))
+                (classoid (layout-classoid layout))
                 (found (ensure-gethash classoid totals (cons 0 0)))
                 (size size))
            (declare (fixnum size))
@@ -901,7 +901,7 @@ We could try a few things to mitigate this:
                   ;; both tricky and unnecessary to generalize iteration.
                   ;; So just hardcode the few cases that exist.
                   #+compact-instance-header
-                  (ecase (wrapper-bitmap (%fun-wrapper ,obj))
+                  (ecase (layout-bitmap (%fun-layout ,obj))
                     (-1 ; external trampoline, all slots are tagged
                      ;; In this case, the trampoline word is scanned, with no ill effect.
                      (loop for .i. from 0
@@ -915,7 +915,7 @@ We could try a few things to mitigate this:
                      (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
                   #-compact-instance-header
                   (progn
-                    (aver (eql (wrapper-bitmap (%fun-wrapper ,obj)) -4))
+                    (aver (eql (layout-bitmap (%fun-layout ,obj)) -4))
                     ;;            v ----trampoline
                     ;; = #b1...1100
                     ;;           ^----- layout
@@ -1011,7 +1011,7 @@ We could try a few things to mitigate this:
 ;;; Cribbed from DEEP-SIZE in tests/do-refs.impure
 #+system-tlabs
 (defun points-to-arena (obj)
-  (flet ((leafp (x) (typep x '(or package symbol fdefn wrapper classoid))))
+  (flet ((leafp (x) (typep x '(or package symbol fdefn layout classoid))))
     (let ((worklist (list obj))
           (seen (make-hash-table :test 'eq)))
       (setf (gethash obj seen) t)
@@ -1319,10 +1319,10 @@ We could try a few things to mitigate this:
     (map-code-objects #'visit)))
 
 (defun show-all-layouts ()
-  (let ((l (list-allocated-objects :all :test #'sb-kernel::wrapper-p))
+  (let ((l (list-allocated-objects :all :test #'sb-kernel::layout-p))
         zero trailing-raw trailing-tagged vanilla)
     (dolist (x l)
-      (let ((m (wrapper-bitmap x)))
+      (let ((m (layout-bitmap x)))
         (cond ((eql m +layout-all-tagged+) (push x vanilla))
               ((eql m 0) (push x zero))
               ((minusp m) (push x trailing-tagged))
@@ -1333,22 +1333,22 @@ We could try a few things to mitigate this:
                (format t "~A~%~A~%" s (make-string (length s) :initial-element #\-)))))
       (when zero
         (legend nil "Zero bitmap (~d):" zero)
-        (dolist (x zero) (format t "~a~%" (wrapper-classoid-name x))))
+        (dolist (x zero) (format t "~a~%" (classoid-name (layout-classoid x)))))
       (when trailing-raw
         (legend t "Trailing raw (~d):" trailing-raw)
         (dolist (x trailing-raw)
-          (let ((m (wrapper-bitmap x)))
+          (let ((m (layout-bitmap x)))
             (format t "~30a 0...~v,'0b~%"
-                    (wrapper-classoid-name x)
-                    (acond ((wrapper-info x) (1+ (dd-length it))) (t 32))
+                    (classoid-name (layout-classoid x))
+                    (acond ((layout-info x) (1+ (dd-length it))) (t 32))
                     m))))
       (when trailing-tagged
         (legend t "Trailing tagged (~d):" trailing-tagged)
         (dolist (x trailing-tagged)
-          (let ((m (wrapper-bitmap x)))
+          (let ((m (layout-bitmap x)))
             (format t "~30a 1...~b~%"
-                    (wrapper-classoid-name x)
-                    (acond ((wrapper-info x) (ldb (byte (dd-length it) 0) m))
+                    (classoid-name (layout-classoid x))
+                    (acond ((layout-info x) (ldb (byte (dd-length it) 0) m))
                            (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))
 

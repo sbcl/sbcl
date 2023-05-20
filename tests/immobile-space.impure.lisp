@@ -16,7 +16,7 @@
 
 ;;; Assign a bitmap that is not the special case for "all tagged"
 ;;; but does correctly indicate 1 tagged slot.
-(let* ((l (sb-kernel:wrapper-friend (sb-kernel:find-layout 'trythis)))
+(let* ((l (sb-kernel:find-layout 'trythis))
        (slot (1- (sb-kernel:%instance-length l))))
   (assert (eql (sb-kernel:%raw-instance-ref/signed-word l slot)
                sb-kernel:+layout-all-tagged+))
@@ -31,7 +31,7 @@
 (compile 'll-alloc) ; low level allocator
 (defun make ()
   (let ((inst (ll-alloc)))
-    (setf (sb-kernel:%instance-wrapper (truly-the trythis inst))
+    (setf (sb-kernel:%instance-layout (truly-the trythis inst))
           (sb-kernel:find-layout 'trythis))
     (setf (trythis-a inst) (copy-seq "Hello"))
     inst))

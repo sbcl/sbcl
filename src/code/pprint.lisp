@@ -772,7 +772,7 @@ line break."
   (or (and (eq (info :type :kind type-spec) :instance)
            (let ((layout (info :type :compiler-layout type-spec)))
              (and layout
-                  (let ((info (wrapper-info layout)))
+                  (let ((info (layout-info layout)))
                     (and info
                          (let ((pred (dd-predicate-name info)))
                            (and pred (fboundp pred)

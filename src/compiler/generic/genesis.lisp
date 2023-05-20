@@ -293,9 +293,6 @@
   ;; Each free-range is (START . LENGTH) in words.
   (code-free-ranges (list nil))
   (non-code-free-ranges (list nil))
-  ;; for metaspace
-  #+metaspace
-  current-slab
   ;; Address of every object created in this space.
   (objects (or #+sb-devel (make-array 700000 :fill-pointer 0 :adjustable t)))
   ;; the index of the next unwritten word (i.e. chunk of
@@ -423,41 +420,6 @@
               (t
                (values "bits: #X~X" bits)))))))
 
-;;; Emulate the slab allocator.
-;;; If the current slab (at the head of METASPACE-SLABS)
-;;; has room, then use it. Otherwise allocate a new slab
-;;; at a lower address.
-#+metaspace
-(defun allocate-metaspace-layout (gspace nbytes)
-  (aver (= nbytes (* 8 sb-vm:n-word-bytes)))
-  (let ((slab (gspace-current-slab gspace)))
-    (flet ((init (slab)
-             (let ((bytes-avail (- sb-vm:metaspace-slab-size
-                                   (* sb-vm::slab-overhead-words sb-vm:n-word-bytes))))
-               (sb-vm::init-slab-header
-                slab
-                1 ; sizeclass
-                nbytes
-                ;; FIXME: Technically this should use the chunk size of the sizeclass,
-                ;; not the object size. But they happen to be the same in sizeclass 1.
-                (floor bytes-avail nbytes)))
-             (setf (gspace-current-slab gspace) slab)))
-      (unless slab
-        (let ((space-size (- sb-vm:read-only-space-end sb-vm:read-only-space-start))
-              (slab-base (- sb-vm:read-only-space-end sb-vm:metaspace-slab-size)))
-          (expand-bigvec (gspace-data gspace) space-size)
-          (setf slab (init (make-model-sap slab-base gspace)))))
-      (when (= (sb-vm::slab-usage slab) (sb-vm::slab-capacity slab))
-        (format t "~&Slab @ ~x is full~%" (sap-int slab))
-        (setf slab (init (sap+ slab (- sb-vm:metaspace-slab-size)))))
-      (let* ((count (incf (sb-vm::slab-usage slab)))
-             (ptr (+ (sap-int slab)
-                     (- sb-vm:metaspace-slab-size
-                        (* count (sb-vm::slab-chunk-size slab))))))
-        (make-descriptor (logior ptr sb-vm:instance-pointer-lowtag)
-                         gspace
-                         (- ptr (gspace-byte-address gspace)))))))
-
 ;;; Return a descriptor for a block of LENGTH bytes out of GSPACE. The
 ;;; free word index is boosted as necessary, and if additional memory
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
@@ -466,12 +428,7 @@
   (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
                             sb-vm:word-shift))
          (ptr (+ (gspace-byte-address gspace) relative-ptr))
-         (des (if (and (eq gspace *read-only*) (eq lowtag sb-vm:instance-pointer-lowtag))
-                  #+metaspace
-                  (allocate-metaspace-layout gspace length)
-                  #-metaspace
-                  (error "Shouldn't happen.")
-                  (make-descriptor (logior ptr lowtag) gspace relative-ptr))))
+         (des (make-descriptor (logior ptr lowtag) gspace relative-ptr)))
     (awhen (gspace-objects gspace) (vector-push-extend des it))
     des))
 
@@ -1208,7 +1165,7 @@ core and return a descriptor to it."
 ;;; Since we want to be able to dump structure constants and
 ;;; predicates with reference layouts, we need to create layouts at
 ;;; cold-load time. We use the name to intern layouts by, and dump a
-;;; list of all cold layouts in *!INITIAL-WRAPPERS* so that type system
+;;; list of all cold layouts in *!INITIAL-LAYOUTS* so that type system
 ;;; initialization can find them. The only thing that's tricky [sic --
 ;;; WHN 19990816] is initializing layout's layout, which must point to
 ;;; itself.
@@ -1236,7 +1193,7 @@ core and return a descriptor to it."
      (acond ((gethash class-name *cold-layouts*)
              (cold-layout-depthoid it))
             ((info :type :compiler-layout class-name)
-             (wrapper-depthoid it))
+             (layout-depthoid it))
             (t
              (error "Unknown depthoid for ~S" class-name))))))
 
@@ -1296,17 +1253,11 @@ core and return a descriptor to it."
                      :inherits (cddr flags+depthoid+inherits))))))))
 
 (defvar *vacuous-slot-table*)
-(defvar *cold-layout-gspace* (or #+metaspace '*read-only*
-                                 #+compact-instance-header '*immobile-fixedobj*
+(defvar *cold-layout-gspace* (or #+compact-instance-header '*immobile-fixedobj*
                                  '*dynamic*))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
-
-(defun cold-wrapper-id (wrapper-descriptor)
-  (let* ((layout-descriptor (->layout wrapper-descriptor))
-         (proxy (gethash (descriptor-bits layout-descriptor) *cold-layout-by-addr*)))
-    (cold-layout-id proxy)))
 
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   ;; Layouts created in genesis can't vary in length due to the number of ancestor
@@ -1314,20 +1265,13 @@ core and return a descriptor to it."
   ;; But we can at least assert that there is one less thing to worry about.
   (aver (<= depthoid sb-kernel::layout-id-vector-fixed-capacity))
   (aver (cold-simple-vector-p inherits))
-  (let* ((fixed-words (sb-kernel::type-dd-length sb-vm:layout))
+  (let* ((fixed-words (sb-kernel::type-dd-length layout))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (result (allocate-struct (+ fixed-words bitmap-words)
-                                  (or (awhen (gethash #+metaspace 'sb-vm:layout
-                                                      #-metaspace 'wrapper *cold-layouts*)
+                                  (or (awhen (gethash 'layout *cold-layouts*)
                                         (cold-layout-descriptor it))
                                       (make-fixnum-descriptor 0))
                                   (symbol-value *cold-layout-gspace*)))
-         (wrapper
-          #-metaspace result ; WRAPPER and LAYOUT are synonymous in this case
-          #+metaspace (allocate-struct (sb-kernel::type-dd-length wrapper)
-                                       (or (awhen (gethash 'wrapper *cold-layouts*)
-                                             (cold-layout-descriptor it))
-                                           (make-fixnum-descriptor 0))))
          (this-id (sb-kernel::choose-layout-id name (logtest flags +condition-layout-flag+)))
          (hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))))
 
@@ -1346,9 +1290,7 @@ core and return a descriptor to it."
     (unless core-file-name (return-from make-cold-layout result))
 
     ;; Can't use the easier WRITE-SLOTS unfortunately because bootstrapping is hard
-    (let* ((wrapper-metadata (type-dd-slots-or-lose 'wrapper))
-           (layout-metadata #-metaspace wrapper-metadata
-                            #+metaspace (type-dd-slots-or-lose 'sb-vm:layout)))
+    (let ((layout-metadata (type-dd-slots-or-lose 'layout)))
 
       #+64-bit
       (%write-slots layout-metadata result
@@ -1359,7 +1301,7 @@ core and return a descriptor to it."
                     :length (make-fixnum-descriptor length)
                     :flags flags)
 
-      (%write-slots wrapper-metadata wrapper
+      (%write-slots layout-metadata result
                     :clos-hash hash
                     :invalid *nil-descriptor*
                     :inherits inherits
@@ -1370,23 +1312,18 @@ core and return a descriptor to it."
         ;; classoids is ... too complicated to explain here in a few words,
         ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
         ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.
-        (%write-slots wrapper-metadata wrapper
+        (%write-slots layout-metadata result
                       :slot-table (if (boundp '*vacuous-slot-table*)
                                       *vacuous-slot-table*
                                       (setq *vacuous-slot-table*
                                             (host-constant-to-core '#(1 nil))))))
 
-      ;; If wrappers are used, the wrapper has a copy of the hash,
-      ;; and also the two friends point to each other.
-      #+metaspace
-      (progn (%write-slots layout-metadata result :clos-hash hash :friend wrapper)
-             (%write-slots wrapper-metadata wrapper :friend result))
-
       (let ((byte-offset (+ (descriptor-byte-offset result) (sb-vm::id-bits-offset))))
         (when (logtest flags +structure-layout-flag+)
           (loop for i from 2 below (cold-vector-len inherits)
                 do (setf (bvref-s32 (descriptor-mem result) byte-offset)
-                         (cold-wrapper-id (cold-svref inherits i)))
+                         (cold-layout-id (gethash (descriptor-bits (cold-svref inherits i))
+                                                  *cold-layout-by-addr*)))
                    (incf byte-offset 4)))
         (setf (bvref-s32 (descriptor-mem result) byte-offset) this-id)))
 
@@ -1398,7 +1335,7 @@ core and return a descriptor to it."
   (let ((classoid (find-classoid type-name nil)))
     (typecase classoid
       (structure-classoid
-       (dd-predicate-name (sb-kernel::wrapper-%info (classoid-wrapper classoid))))
+       (dd-predicate-name (sb-kernel::layout-%info (classoid-layout classoid))))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
@@ -1470,7 +1407,7 @@ core and return a descriptor to it."
                          ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
                          ;; we nonetheless must set LAYOUT to NIL or else warm build fails
                          ;; in the twisty maze of class initializations.
-                         (,(dsd-index-cached 'classoid 'wrapper) . nil))))
+                         (,(dsd-index-cached 'classoid 'layout) . nil))))
                   (if (typep obj 'built-in-classoid)
                       slots-to-omit
                       ;; :predicate is not a slot. Don't mess up the object
@@ -1521,37 +1458,25 @@ core and return a descriptor to it."
                   (cold-push (cold-cons result preload) 'sb-kernel::*!initial-ctypes*)))))
        result))))
 
-;;; Convert a layout to a wrapper and back.
-;;; Each points to the other through its first data word.
-(defun ->wrapper (x) #+metaspace (read-wordindexed x 1) #-metaspace x)
-(defun ->layout (x) #+metaspace (read-wordindexed x 1) #-metaspace x)
-
 (defun initialize-layouts ()
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
-           (let ((wrapper (info :type :compiler-layout name)))
-             (aver (eql (length (wrapper-inherits wrapper)) (length inherits)))
-             (->wrapper
-              (make-cold-layout name
-                                (wrapper-depthoid wrapper)
-                                (wrapper-flags wrapper)
-                                (wrapper-length wrapper)
-                                (wrapper-bitmap wrapper)
-                                (vector-in-core inherits))))))
-    ;; The variables are named foo-LAYOUT but are actually foo-WRAPPER.
+           (let ((warm-layout (info :type :compiler-layout name)))
+             (assert (eql (length (layout-inherits warm-layout))
+                          (length inherits)))
+             (make-cold-layout name
+                               (layout-depthoid warm-layout)
+                               (layout-flags warm-layout)
+                               (layout-length warm-layout)
+                               (layout-bitmap warm-layout)
+                               (vector-in-core inherits)))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
-           #+metaspace (layout-layout (chill-layout 'sb-vm:layout t-layout s-o-layout))
-           (wrapper-layout (chill-layout 'wrapper t-layout s-o-layout)))
+           (layout-layout (chill-layout 'layout t-layout s-o-layout)))
       (when core-file-name
-        #-metaspace
-        (dolist (instance (list t-layout s-o-layout wrapper-layout))
-          (set-instance-layout instance wrapper-layout))
-        #+metaspace
-        (progn (dolist (instance (list t-layout s-o-layout layout-layout wrapper-layout))
-                 (set-instance-layout instance (->layout wrapper-layout))
-                 (set-instance-layout (->layout instance) (->layout layout-layout)))))
+        (dolist (instance (list t-layout s-o-layout layout-layout))
+          (set-instance-layout instance layout-layout)))
       (chill-layout 'function t-layout)
       (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
@@ -1971,11 +1896,11 @@ core and return a descriptor to it."
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
-  (cold-set 'sb-kernel::*!initial-wrappers*
+  (cold-set 'sb-kernel::*!initial-layouts*
             (vector-in-core
              (mapcar (lambda (pair)
                        (cold-cons (cold-intern (car pair))
-                                  (->wrapper (cold-layout-descriptor (cdr pair)))))
+                                  (cold-layout-descriptor (cdr pair))))
                      (sort-cold-layouts))))
   ;; MAKE-LAYOUT uses ATOMIC-INCF which returns the value in the cell prior to
   ;; increment, so we need to add 1 to get to the next value for it because
@@ -1983,16 +1908,6 @@ core and return a descriptor to it."
   (cold-set 'sb-kernel::*layout-id-generator*
             (cold-list (make-fixnum-descriptor
                         (1+ sb-kernel::*general-layout-uniqueid-counter*))))
-
-  ;; Consume the rest of read-only-space as metaspace
-  #+metaspace
-  (let* ((space *read-only*)
-         (slab (gspace-current-slab space)))
-    (cold-set 'sb-vm::*metaspace-tracts*
-              (word-vector (list (+ sb-vm::read-only-space-start 32768) ; KLUDGE
-                                 (sap-int slab)
-                                 sb-vm:read-only-space-end
-                                 0))))
 
   #+sb-thread
   (cold-set 'sb-vm::*free-tls-index*
@@ -2492,7 +2407,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
-  (let* ((layout (->layout (pop-stack)))
+  (let* ((layout (pop-stack))
          (result (allocate-struct size layout))
          (bitmap (cold-layout-bitmap (gethash (descriptor-bits layout) *cold-layout-by-addr*)))
          (stack (%fasl-input-stack (fasl-input)))
@@ -2509,12 +2424,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defun find-in-inherits (typename inherits)
   (binding* ((proxy (gethash typename *cold-layouts*) :exit-if-null)
-             (layout (->wrapper (cold-layout-descriptor proxy))))
+             (layout (cold-layout-descriptor proxy)))
     (dotimes (i (cold-vector-len inherits))
       (when (descriptor= (cold-svref inherits i) layout)
         (return t)))))
 
-;;; Always return a WRAPPER if #+metaspace
 (define-cold-fop (fop-layout (depthoid flags length))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
   (let* ((inherits (pop-stack))
@@ -2548,10 +2462,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   flags depthoid length bitmap-value
                   (vector-from-core inherits))
           (bug "Messed up fop-layout for ~s" name))))
-    (->wrapper
-     (if existing-layout
-         (cold-layout-descriptor existing-layout)
-         (make-cold-layout name depthoid flags length bitmap-value inherits)))))
+    (if existing-layout
+        (cold-layout-descriptor existing-layout)
+        (make-cold-layout name depthoid flags length bitmap-value inherits))))
 
 ;;;; cold fops for loading symbols
 
@@ -2779,7 +2692,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                      (list (cold-intern
                             (predicate-for-specializer class-symbol))
                            (acond ((gethash class-symbol *cold-layouts*)
-                                   (->wrapper (cold-layout-descriptor it)))
+                                   (cold-layout-descriptor it))
                                   (t
                                    (aver (predicate-for-specializer class-symbol))
                                    class))
@@ -2902,7 +2815,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (n-fixup-elts (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb-vm:n-word-bytes)))
          (header-n-words (sb-c::asm-routines-boxed-header-nwords))
-         (space (or #+(and immobile-code (not metaspace)) *immobile-text*
+         (space (or #+immobile-code *immobile-text*
                     ;; If there is a read-only space, use it, else use static space.
                     (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
                         *read-only*
@@ -2994,8 +2907,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index name))
              (:layout (cold-layout-descriptor-bits name))
-             (:layout-id ; SYM is a #<WRAPPER>
-              (cold-layout-id (gethash (descriptor-bits (->layout name))
+             (:layout-id ; SYM is a #<LAYOUT>
+              (cold-layout-id (gethash (descriptor-bits name)
                                        *cold-layout-by-addr*)))
              ;; The machine-dependent code decides how to patch in 'nbits'
              #+gencgc (:card-table-index-mask sb-vm::gencgc-card-table-index-nbits)
@@ -3509,7 +3422,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
   (output dd (or structure-tag (cstring (dd-name dd))))
   (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
     (terpri)
-    (output (wrapper-info (find-layout 'sb-lockless::so-data-node))
+    (output (layout-info (find-layout 'sb-lockless::so-data-node))
             "split_ordered_list_node"))
   (format t "~%#endif /* __ASSEMBLER__ */~2%")))
 
@@ -3546,7 +3459,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
   #+compact-instance-header
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(~A_SPACE_START+0x~x)~%~}"
           "FUNCTION"
-          #+metaspace "READ_ONLY" #-metaspace "FIXEDOBJ"
+          "FIXEDOBJ"
           (- (cold-layout-descriptor-bits 'function)
                         (gspace-byte-address (symbol-value *cold-layout-gspace*))))
   ;; For immobile code on x86-64, define a constant for the address of the vector of
@@ -3699,8 +3612,7 @@ III. initially undefined function references (alphabetically):
            (addr (descriptor-bits descriptor)))
       (format t "~10,'0X -> ~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
                 addr
-                #+metaspace (descriptor-bits (->wrapper descriptor))
-                #-metaspace "          "
+                "          "
                 (cold-layout-bitmap proxy)
                 (cold-layout-depthoid proxy)
                 (cold-layout-id proxy)
@@ -3765,12 +3677,7 @@ III. initially undefined function references (alphabetically):
 (defun output-gspace (gspace data-page core-file verbose)
   (force-output core-file)
   (let* ((posn (file-position core-file))
-         (bytes (cond
-                  #+metaspace
-                  ((eq (gspace-identifier gspace) read-only-core-space-id)
-                   (- sb-vm:read-only-space-end sb-vm:read-only-space-start))
-                  (t
-                   (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))))
+         (bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
          (page-count (ceiling bytes sb-c:+backend-page-bytes+))
          (total-bytes (* page-count sb-c:+backend-page-bytes+)))
 
@@ -4156,7 +4063,7 @@ III. initially undefined function references (alphabetically):
              ;;   need to be #included first.
              ;; - it is not intended to be directly consumed because any use would
              ;;   typically need to wrap each slot in some small calculation
-             ;;   such as native_pointer(), but we don't want to embed the wrapper
+             ;;   such as native_pointer(), but we don't want to embed the layout
              ;;   accessors into the autogenerated header. So there would instead be
              ;;   a "src/runtime/foo.h" which includes "src/runtime/genesis/foo.inc"
              ;; 'thread.h' and 'gc-tables.h' violate the naming convention
@@ -4196,24 +4103,18 @@ III. initially undefined function references (alphabetically):
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
         (out-to "layout"
-          #-metaspace
-          (write-structure-object (wrapper-info (find-layout 'wrapper)) stream
+          (write-structure-object (layout-info (find-layout 'layout)) stream
                                   "layout")
-          #+metaspace
-          (progn
-            (write-structure-object (wrapper-info (find-layout 'sb-vm:layout)) stream)
-            (write-structure-object (wrapper-info (find-layout 'wrapper)) stream)
-            (write-cast-operator 'wrapper "wrapper" sb-vm:instance-pointer-lowtag stream))
           (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag stream))
         ;; For purposes of the C code, cast all hash tables as general_hash_table
         ;; even if they lack the slots for weak tables.
         (out-to "hash-table"
-          (write-structure-object (wrapper-info (find-layout 'sb-impl::general-hash-table))
+          (write-structure-object (layout-info (find-layout 'sb-impl::general-hash-table))
                                   stream "hash_table"))
         (out-to "brothertree"
-          (write-structure-object (wrapper-info (find-layout 'sb-brothertree::unary-node))
+          (write-structure-object (layout-info (find-layout 'sb-brothertree::unary-node))
                                   stream "unary_node")
-          (write-structure-object (wrapper-info (find-layout 'sb-brothertree::binary-node))
+          (write-structure-object (layout-info (find-layout 'sb-brothertree::binary-node))
                                   stream "binary_node")
           (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
         (dolist (class '(defstruct-description defstruct-slot-description
@@ -4223,10 +4124,10 @@ III. initially undefined function references (alphabetically):
                          sb-vm::arena sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
-            (write-structure-object (wrapper-info (find-layout class))
+            (write-structure-object (layout-info (find-layout class))
                                     stream)))
         (out-to "thread-instance"
-          (write-structure-object (wrapper-info (find-layout 'sb-thread::thread))
+          (write-structure-object (layout-info (find-layout 'sb-thread::thread))
                                   stream "thread_instance"))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)

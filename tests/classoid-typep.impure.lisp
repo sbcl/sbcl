@@ -35,14 +35,14 @@
 (defclass baz () ())
 (defclass bar (baz) (a))
 (write-to-string *thing*)
-(values *thing* (sb-kernel:%instance-wrapper *thing*)))"))))
+(values *thing* (sb-kernel:%instance-layout *thing*)))"))))
 
 ;;; Given the PCL state set up by the above function,
 ;;; execute CLASSOID-TYPEP simultaneously in two threads.
 (defun concurrent-classoid-typep (obj)
   (let* ((sem (sb-thread:make-semaphore))
-         (obj-layout (sb-kernel:%instance-wrapper obj))
-         (classoid (sb-kernel:wrapper-classoid obj-layout))
+         (obj-layout (sb-kernel:%instance-layout obj))
+         (classoid (sb-kernel:layout-classoid obj-layout))
          (fun (lambda ()
                 (sb-thread:wait-on-semaphore sem)
                 (handler-case (sb-kernel:classoid-typep obj-layout classoid obj)

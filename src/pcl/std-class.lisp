@@ -183,12 +183,12 @@
   (with-slots (direct-subclasses) class
     (with-world-lock ()
       (pushnew subclass direct-subclasses :test #'eq)
-      (let ((wrapper (class-wrapper subclass)))
-        (when wrapper
-          (let ((classoid (wrapper-classoid wrapper)))
-            (dovector (super-wrapper (wrapper-inherits wrapper))
-              (sb-kernel::add-subclassoid (wrapper-classoid super-wrapper)
-                                          classoid wrapper))))))
+      (let ((layout (class-wrapper subclass)))
+        (when layout
+          (let ((classoid (layout-classoid layout)))
+            (dovector (super-layout (layout-inherits layout))
+              (sb-kernel::add-subclassoid (layout-classoid super-layout)
+                                          classoid layout))))))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
@@ -196,9 +196,9 @@
       (setq direct-subclasses (remove subclass direct-subclasses))
       ;; Remove from classoid subclasses as well.
       (let ((classoid (class-classoid subclass)))
-        (dovector (super-wrapper (wrapper-inherits (classoid-wrapper classoid)))
+        (dovector (super-layout (layout-inherits (classoid-layout classoid)))
           (sb-kernel::remove-subclassoid classoid
-                                         (wrapper-classoid super-wrapper)))))
+                                         (layout-classoid super-layout)))))
     subclass))
 
 ;;; Maintaining the direct-methods and direct-generic-functions backpointers.
@@ -623,7 +623,7 @@
             finalized-p t
             (classoid-pcl-class classoid) class
             direct-supers direct-superclasses
-            wrapper (classoid-wrapper classoid)
+            wrapper (classoid-layout classoid)
             %class-precedence-list (compute-class-precedence-list class)
             cpl-available-p t
             (getf plist 'direct-default-initargs)
@@ -631,7 +631,7 @@
       (add-direct-subclasses class direct-superclasses)
       (let ((slots (compute-slots class)))
         (setf (slot-value class 'slots) slots)
-        (setf (wrapper-slot-table wrapper) (make-slot-table class slots)))))
+        (setf (layout-slot-table wrapper) (make-slot-table class slots)))))
   ;; Comment from Gerd's PCL, 2003-05-15:
   ;;
   ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
@@ -775,7 +775,7 @@
        ;;  (LAMBDA () (SB-PCL::FAST-MAKE-INSTANCE #<STRUCTURE-CLASS THING>))
        ;; So maybe we can figure out how to bundle two lambdas together?
        (lambda ()
-         (let* ((dd (wrapper-dd (class-wrapper class)))
+         (let* ((dd (layout-dd (class-wrapper class)))
                 (f (%make-structure-instance-allocator dd nil)))
            (if (functionp f)
                (funcall (setf (slot-value class 'defstruct-constructor) f))
@@ -851,10 +851,10 @@
     (let ((slots (compute-slots class)))
       (setf (slot-value class 'slots) slots)
       (let* ((lclass (find-classoid (slot-value class 'name)))
-             (layout (classoid-wrapper lclass)))
+             (layout (classoid-layout lclass)))
         (setf (classoid-pcl-class lclass) class)
         (setf (slot-value class 'wrapper) layout)
-        (setf (wrapper-slot-table layout) (make-slot-table class slots))))
+        (setf (layout-slot-table layout) (make-slot-table class slots))))
     (setf (slot-value class 'finalized-p) t)
     (add-slot-accessors class direct-slots)))
 
@@ -1104,8 +1104,8 @@
       (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
             (wrapper-slot-list nwrapper) eslotds
-            (wrapper-slot-table nwrapper) (make-slot-table class eslotds)
-            (wrapper-length nwrapper) nslots
+            (layout-slot-table nwrapper) (make-slot-table class eslotds)
+            (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
       (style-warn-about-duplicate-slots class)
       (setf (slot-value class 'finalized-p) t)
@@ -1404,21 +1404,21 @@
            (eq (class-of class) *the-class-standard-class*))))
 
 ;;; What this does depends on which of the four possible values of
-;;; WRAPPER-INVALID the PCL wrapper has; the simplest case is when it
+;;; LAYOUT-INVALID the PCL wrapper has; the simplest case is when it
 ;;; is (:FLUSH <wrapper>) or (:OBSOLETE <wrapper>), when there is
 ;;; nothing to do, as the new wrapper has already been created.  If
-;;; WRAPPER-INVALID returns NIL, then we invalidate it (setting it to
+;;; LAYOUT-INVALID returns NIL, then we invalidate it (setting it to
 ;;; (:FLUSH <wrapper>); UPDATE-SLOTS later gets to choose whether or
 ;;; not to "upgrade" this to (:OBSOLETE <wrapper>).
 ;;;
-;;; This leaves the case where WRAPPER-INVALID returns T, which happens
+;;; This leaves the case where LAYOUT-INVALID returns T, which happens
 ;;; when REGISTER-LAYOUT has invalidated a superclass of CLASS (which
 ;;; invalidated all the subclasses in SB-KERNEL land).  Again, here we
 ;;; must flush the caches and allow UPDATE-SLOTS to decide whether to
 ;;; obsolete the wrapper.
 ;;;
 ;;; FIXME: either here or in INVALID-WRAPPER-P looks like a good place
-;;; for (AVER (NOT (EQ (WRAPPER-INVALID OWRAPPER)
+;;; for (AVER (NOT (EQ (LAYOUT-INVALID OWRAPPER)
 ;;;                    :UNINITIALIZED)))
 ;;;
 ;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
@@ -1435,19 +1435,19 @@
                 ;; a violation of locality or what might be considered
                 ;; good style.  There has to be a better way!  -- CSR,
                 ;; 2002-10-29
-                (eq (wrapper-invalid owrapper) t))
-        (let ((nwrapper (make-wrapper (wrapper-length owrapper)
+                (eq (layout-invalid owrapper) t))
+        (let ((nwrapper (make-wrapper (layout-length owrapper)
                                       class)))
           (setf (wrapper-slot-list nwrapper) (wrapper-slot-list owrapper))
-          (setf (wrapper-slot-table nwrapper) (wrapper-slot-table owrapper))
+          (setf (layout-slot-table nwrapper) (layout-slot-table owrapper))
           (%update-lisp-class-layout class nwrapper)
           (setf (slot-value class 'wrapper) nwrapper)
           ;; Use :OBSOLETE instead of :FLUSH if any superclass has
           ;; been obsoleted.
           (if (find-if (lambda (x)
                          (and (consp x) (eq :obsolete (car x))))
-                       (wrapper-inherits owrapper)
-                       :key #'wrapper-invalid)
+                       (layout-inherits owrapper)
+                       :key #'layout-invalid)
               (%invalidate-wrapper owrapper :obsolete nwrapper)
               (%invalidate-wrapper owrapper :flush nwrapper))))))
   nil)
@@ -1458,14 +1458,14 @@
 (defmethod make-instances-obsolete ((class std-class))
   (with-world-lock ()
     (let* ((owrapper (class-wrapper class))
-           (nwrapper (make-wrapper (wrapper-length owrapper)
+           (nwrapper (make-wrapper (layout-length owrapper)
                                    class)))
       (unless (class-finalized-p class)
         (if (class-has-a-forward-referenced-superclass-p class)
             (return-from make-instances-obsolete class)
             (%update-cpl class (compute-class-precedence-list class))))
       (setf (wrapper-slot-list nwrapper) (wrapper-slot-list owrapper))
-      (setf (wrapper-slot-table nwrapper) (wrapper-slot-table owrapper))
+      (setf (layout-slot-table nwrapper) (layout-slot-table owrapper))
       (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'wrapper) nwrapper)
       (%invalidate-wrapper owrapper :obsolete nwrapper)
@@ -1552,11 +1552,11 @@
 
 (macrolet ((replace-wrapper-and-slots (thing layout slot-vector)
              `(if (functionp ,thing)
-                  (setf (%fun-wrapper ,thing) ,layout
+                  (setf (%fun-layout ,thing) ,layout
                         (fsc-instance-slots ,thing) ,slot-vector)
                   ;; TODO: use a double-wide CAS here if CPU supports it
                   (progn
-                    (setf (%instance-wrapper ,thing) ,layout)
+                    (setf (%instance-layout ,thing) ,layout)
                     (%instance-set ,thing sb-vm:instance-data-start ,slot-vector)))))
 
 (defun %obsolete-instance-trap (owrapper nwrapper instance)
@@ -1565,7 +1565,7 @@
      (binding* ((class (wrapper-class nwrapper))
                 (oslots (get-slots instance))
                 (nwrapper (class-wrapper class))
-                (nslots (make-array (wrapper-length nwrapper)
+                (nslots (make-array (layout-length nwrapper)
                                     :initial-element +slot-unbound+))
                 (added ())
                 (discarded ())
@@ -1664,9 +1664,9 @@
 
 (defun %change-class (copy instance new-class initargs)
   (binding* ((new-wrapper (class-wrapper (ensure-class-finalized new-class)))
-             (new-slots (make-array (wrapper-length new-wrapper)
+             (new-slots (make-array (layout-length new-wrapper)
                                     :initial-element +slot-unbound+))
-             (old-wrapper (wrapper-of instance))
+             (old-wrapper (layout-of instance))
              (old-class (wrapper-class old-wrapper))
              (old-slots (get-slots instance))
              (safe (safe-p new-class))

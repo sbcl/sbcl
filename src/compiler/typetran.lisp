@@ -966,15 +966,14 @@
 
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
-  `(>= (wrapper-depthoid ,layout) ,depthoid))
-(symbol-macrolet ((get-hash #+metaspace 'layout-clos-hash #-metaspace 'wrapper-clos-hash)
-                  (get-flags #+metaspace 'layout-flags #-metaspace 'wrapper-flags))
+  `(>= (layout-depthoid ,layout) ,depthoid))
+(symbol-macrolet ((get-hash 'layout-clos-hash)
+                  (get-flags 'layout-flags))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))
-       (wrapper (let ((res (info :type :compiler-layout name)))
-                 (when (and res (not (wrapper-invalid res))) res)))
-       (layout (and wrapper (wrapper-friend wrapper)))
+       (layout (let ((res (info :type :compiler-layout name)))
+                 (when (and res (not (layout-invalid res))) res)))
        ((lowtag lowtag-test slot-reader)
         (cond ((csubtypep classoid (specifier-type 'funcallable-instance))
                (values sb-vm:fun-pointer-lowtag
@@ -982,7 +981,7 @@
               ((csubtypep classoid (specifier-type 'instance))
                (values sb-vm:instance-pointer-lowtag
                        '(%instancep object) '(%instance-layout object)))))
-       (depthoid (if wrapper (wrapper-depthoid wrapper) -1))
+       (depthoid (if layout (layout-depthoid layout) -1))
        (type (make-symbol "TYPE")))
     (declare (ignorable layout))
 
@@ -1010,16 +1009,16 @@
           ;; I think that means we should know the lowtag always. Nonetheless, this isn't
           ;; an important scenario, and only if you _do_ seal a class could this case be
           ;; reached; users rarely seal their classes since the standard doesn't say how.
-          ((and wrapper
+          ((and layout
                 (eq (classoid-state classoid) :sealed)
                 (not (classoid-subclasses classoid)))
            (cond ((and (eq lowtag sb-vm:instance-pointer-lowtag)
                        (vop-existsp :translate structure-typep))
-                  `(structure-typep object ,wrapper))
+                  `(structure-typep object ,layout))
                  (lowtag-test
                   `(and ,lowtag-test
                         ,(if (vop-existsp :translate layout-eq)
-                             `(layout-eq object ,wrapper ,lowtag)
+                             `(layout-eq object ,layout ,lowtag)
                              `(eq ,slot-reader ,layout))))
                  (t
                   ;; `(eq ,layout
@@ -1029,10 +1028,10 @@
                   ;;        (cond ((%instancep object) (%instance-layout object))
                   ;;              ((funcallable-instance-p object) (%fun-layout object))
                   ;;              (t ,(find-layout 't)))))
-                  (bug "Unexpected metatype for ~S" wrapper))))
+                  (bug "Unexpected metatype for ~S" layout))))
 
           ;; All other structure types
-          ((and (typep classoid 'structure-classoid) wrapper)
+          ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
             (aver (eql lowtag sb-vm:instance-pointer-lowtag))
             ;; we used to check for invalid layouts here, but in fact that's both unnecessary and
@@ -1041,13 +1040,13 @@
             ;; to a structure type test.
            (if (vop-existsp :translate structure-typep)
                ;; A single VOP is easier to optimize later
-               `(structure-typep object ,wrapper)
+               `(structure-typep object ,layout)
                `(and (%instancep object)
                      ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-                          `(%structure-is-a (%instance-layout object) ,wrapper)
+                          `(%structure-is-a (%instance-layout object) ,layout)
                           `(let ((,type (%instance-layout object)))
                              (and (layout-depthoid-ge ,type ,depthoid)
-                                  (%structure-is-a ,type ,wrapper)))))))
+                                  (%structure-is-a ,type ,layout)))))))
 
           ((> depthoid 0)
            ;; fixed-depth ancestors of non-structure types:
@@ -1524,7 +1523,7 @@
                  (#.+pathname-layout-flag+  (specifier-type 'pathname))
                  (#.+structure-layout-flag+ (specifier-type 'structure-object))
                  (t
-                  (wrapper-classoid layout))))
+                  (layout-classoid layout))))
          (diff (type-difference (lvar-type object) type))
          (pred (backend-type-predicate diff)))
     (if pred

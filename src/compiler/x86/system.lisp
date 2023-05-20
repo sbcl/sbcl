@@ -68,7 +68,7 @@
     (inst cmp
           (make-ea :dword
                    :disp (+ (id-bits-offset)
-                            (ash (- (wrapper-depthoid test) 2) 2)
+                            (ash (- (layout-depthoid test) 2) 2)
                             (- instance-pointer-lowtag))
                    :base x)
           (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
