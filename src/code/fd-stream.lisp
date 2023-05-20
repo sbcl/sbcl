@@ -1118,15 +1118,22 @@
                      (catch 'eof-input-catcher
                        (setf decode-break-reason
                              (block decode-break-reason
-                               (input-at-least ,stream-var ,(if (consp bytes)
-                                                                (car bytes)
-                                                                `(setq size ,bytes)))
+                               ,(if (consp bytes)
+                                    (let ((size-info (car bytes)))
+                                      (if (consp size-info)
+                                          `(progn
+                                             (input-at-least ,stream-var ,(cadr size-info))
+                                             (catch 'eof-input-catcher
+                                               (input-at-least ,stream-var ,(car size-info))))
+                                          `(input-at-least ,stream-var ,size-info)))
+                                    `(input-at-least ,stream-var (setq size ,bytes)))
                                (let* ((byte (sap-ref-8 (buffer-sap ibuf) (buffer-head ibuf))))
                                  (declare (ignorable byte))
                                  ,@(when (consp bytes)
                                      `((let ((sap (buffer-sap ibuf))
-                                             (head (buffer-head ibuf)))
-                                         (declare (ignorable sap head))
+                                             (head (buffer-head ibuf))
+                                             (tail (buffer-tail ibuf)))
+                                         (declare (ignorable sap head tail))
                                          (setq size ,(cadr bytes))
                                          (input-at-least ,stream-var size))))
                                  (setq ,element-var (locally ,@read-forms))
@@ -1532,7 +1539,28 @@
                    (when (= (fill-pointer instead) 0)
                      (setf (fd-stream-listen stream) nil))
                    (return-from ,in-function total-copied)))
-               (do ()
+               (do (;; external formats might wish for e.g. 2 octets
+                    ;; to be available, but still be able to handle a
+                    ;; single octet before end of file.  This flag
+                    ;; lets the refilling be tracked so that we know
+                    ;; if we've run out of octets and just have to
+                    ;; make do with what we've got.
+                    ;;
+                    ;; but actually I don't think this works.
+                    ;; Consider: a file which is exactly the size of
+                    ;; the buffer, and whose last character is a CR.
+                    ;; We will get to the last character and request a
+                    ;; refill of the buffer; however, the refill will
+                    ;; throw EOF.  We need something like the
+                    ;; input-at-least logic here (where we catch EOF
+                    ;; ourselves for refills between what the external
+                    ;; format can handle if there is no more, and what
+                    ;; it wants if there is more.)
+                    ;;
+                    ;; but actually actually: it might be that
+                    ;; FAST-READ-CHAR-REFILL is doing this work for
+                    ;; us.
+                    (requested-refill nil))
                    (nil)
                  (let* ((ibuf (fd-stream-ibuf stream))
                         (head (buffer-head ibuf))
@@ -1546,10 +1574,16 @@
                      (setf decode-break-reason
                            (block decode-break-reason
                              ,@(when (consp in-size-expr)
-                                 `((when (> ,(car in-size-expr) (- tail head))
-                                     (return))))
+                                 (let* ((size-info (car in-size-expr))
+                                        (want (if (consp size-info)
+                                                  `(if requested-refill ,(cadr size-info) ,(car size-info))
+                                                  size-info)))
+                                   `((when (> ,want (- tail head))
+                                       (setf requested-refill t)
+                                       (return)))))
                              (let ((byte (sap-ref-8 sap head)))
                                (declare (ignorable byte))
+                               (setf requested-refill nil)
                                (setq size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr))
                                (when (> size (- tail head))
                                  (return))
@@ -1604,12 +1638,21 @@
            (catch 'eof-input-catcher
              (loop
               (incf (buffer-head ibuf))
-              (input-at-least stream ,(if (consp in-size-expr) (car in-size-expr) `(setq size ,in-size-expr)))
+              ,(if (consp in-size-expr)
+                   (let ((size-info (car in-size-expr)))
+                     (if (consp size-info)
+                         `(progn
+                            (input-at-least stream ,(cadr size-info))
+                            (catch 'eof-input-catcher
+                              (input-at-least stream ,(car size-info))))
+                         `(input-at-least stream ,size-info)))
+                   `(input-at-least stream (setq size ,in-size-expr)))
               (unless (block decode-break-reason
                         (let* ((sap (buffer-sap ibuf))
                                (head (buffer-head ibuf))
+                               (tail (buffer-tail ibuf))
                                (byte (sap-ref-8 sap head)))
-                          (declare (ignorable byte))
+                          (declare (ignorable byte tail))
                           ,@(when (consp in-size-expr)
                               `((setq size ,(cadr in-size-expr))
                                 (input-at-least stream size)))
@@ -1622,7 +1665,7 @@
          (locally
              (declare (optimize (speed 3) (safety 0)))
            (let* ((stream ,name)
-                  (size 0) (head 0) (byte 0) (|ch| nil)
+                  (size 0) (head 0) (tail (1- array-dimension-limit)) (byte 0) (|ch| nil)
                   (decode-break-reason nil)
                   (length (dotimes (count (1- array-dimension-limit) count)
                             (setf decode-break-reason
@@ -1646,8 +1689,8 @@
                              (make-string length :element-type 'character))
                             (t
                              (make-string length :element-type element-type)))))
-             (declare (ignorable stream byte)
-                      (type index head length) ;; size
+             (declare (ignorable stream byte tail)
+                      (type index head length tail) ;; size
                       (type (unsigned-byte 8) byte)
                       (type (or null character) |ch|)
                       (type string string))
