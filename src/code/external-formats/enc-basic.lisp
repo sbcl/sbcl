@@ -69,6 +69,68 @@
       (code-char byte))
   ascii->string-aref
   string->ascii)
+
+(declaim (inline code->ascii/cr-mapper))
+(defun code->ascii/cr-mapper (code)
+  (declare (optimize speed #.*safety-0*)
+           (type char-code code))
+  (cond
+    ((= code 10) 13)
+    ((> code 127) nil)
+    (t code)))
+
+(declaim (inline get-ascii-bytes))
+(defun get-ascii/cr-bytes (string pos)
+  (declare (optimize speed #.*safety-0*)
+           (type simple-string string)
+           (type array-range pos))
+  (get-latin-bytes #'code->ascii/cr-mapper :ascii string pos))
+
+(defun string->ascii/cr (string sstart send null-padding)
+  (declare (optimize speed #.*safety-0*)
+           (type simple-string string)
+           (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-ascii/cr-bytes null-padding)))
+
+(defmacro define-ascii/cr->string (accessor type)
+  (let ((name (make-od-name 'ascii/cr->string accessor)))
+    `(progn
+      (defun ,name (array astart aend)
+        (declare (optimize speed)
+                 (type ,type array)
+                 (type array-range astart aend))
+        ;; Since there is such a thing as a malformed ascii byte, a
+        ;; simple "make the string, fill it in" won't do.
+        (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
+          (loop for apos from astart below aend
+                do (let* ((code (,accessor array apos))
+                          (string-content
+                           (cond
+                             ((= code 13) (code-char 10))
+                             ((< code 128) (code-char code))
+                             (t (decoding-error array apos (1+ apos) :ascii ; '(:ASCII :NEWLINE :CR)?
+                                                'malformed-ascii apos)))))
+                     (if (characterp string-content)
+                         (vector-push-extend string-content string)
+                         (loop for c across string-content
+                               do (vector-push-extend c string))))
+                finally (return (coerce string 'simple-string))))))))
+(instantiate-octets-definition define-ascii/cr->string)
+
+(define-external-format/variable-width (:ascii)
+    t #\? 1
+    (cond
+      ((= bits 10) (setf (sap-ref-8 sap tail) 13))
+      ((>= bits 128) (external-format-encoding-error stream bits))
+      (t (setf (sap-ref-8 sap tail) bits)))
+    1
+    (cond
+      ((= byte 13) (code-char 10))
+      ((>= byte 128) (return-from decode-break-reason 1))
+      (t (code-char byte)))
+    ascii/cr->string-aref
+    string->ascii/cr
+    :newline-variant :cr)
 
 ;;; Latin-1
 
