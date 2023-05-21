@@ -356,12 +356,6 @@ between the ~A definition and the ~A definition"
 ;;;    and subclasses are invalidated, and the SUBCLASSES slot is cleared.
 ;;; -- If DESTRUCT-LAYOUT is given, then it is some old layout, and is to be
 ;;;    destructively altered to hold the same data as LAYOUT.
-(macrolet ((set-bitmap-from-layout (to-layout from-layout)
-             `(let ((to-index (bitmap-start ,to-layout))
-                    (from-index (bitmap-start ,from-layout)))
-                (dotimes (i (bitmap-nwords ,from-layout))
-                  (%raw-instance-set/word ,to-layout (+ to-index i)
-                        (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
 (defun register-layout (layout &key (invalidate t) destruct-layout)
   (declare (type layout layout) (type (or layout null) destruct-layout))
   (with-world-lock ()
@@ -383,9 +377,9 @@ between the ~A definition and the ~A definition"
       (when classoid-layout
         (%modify-classoid classoid)
         (do-subclassoids ((subclass subclass-layout) classoid) ; under WORLD-LOCK
-            (%modify-classoid subclass)
-            (when invalidate
-              (%invalidate-layout subclass-layout)))
+          (%modify-classoid subclass)
+          (when invalidate
+            (%invalidate-layout subclass-layout)))
         (when invalidate
           (%invalidate-layout classoid-layout)
           (setf (classoid-subclasses classoid) nil)))
@@ -397,10 +391,10 @@ between the ~A definition and the ~A definition"
           ;; Use at your own risk (interactive use only).
           (let ((inherits (layout-inherits layout))
                 (depthoid (layout-depthoid layout)) ; "new" depthoid
-                (extra-id-words ; "old" extra words
-                 (calculate-extra-id-words (layout-depthoid destruct-layout)))
-                (id ; read my ID before screwing with the depthoid
-                 (layout-id destruct-layout)))
+                (extra-id-words       ; "old" extra words
+                  (calculate-extra-id-words (layout-depthoid destruct-layout)))
+                (id   ; read my ID before screwing with the depthoid
+                  (layout-id destruct-layout)))
             (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
             ;; DEPTHOID implies the number of words of "extra" IDs preceding the bitmap.
@@ -424,7 +418,11 @@ between the ~A definition and the ~A definition"
                                       (+ (get-dsd-index layout id-word0) i)
                                       0))
             (set-layout-inherits destruct-layout inherits t id)
-            (set-bitmap-from-layout destruct-layout layout)
+            (let ((to-index (bitmap-start destruct-layout))
+                  (from-index (bitmap-start layout)))
+              (dotimes (i (bitmap-nwords layout))
+                (%raw-instance-set/word destruct-layout (+ to-index i)
+                                        (%raw-instance-ref/word layout (+ from-index i)))))
             (setf (layout-invalid destruct-layout) nil
                   (classoid-layout classoid) destruct-layout))
           (setf (layout-invalid layout) nil
@@ -439,7 +437,7 @@ between the ~A definition and the ~A definition"
             (setf (classoid-state super) :read-only))
           (add-subclassoid super classoid (or destruct-layout layout))))))
 
-  (values)))
+  (values))
 
 ;;; Arrange the inherited layouts to appear at their expected depth,
 ;;; ensuring that hierarchical type tests succeed. Layouts with
