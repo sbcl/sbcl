@@ -1757,34 +1757,58 @@
             (temps)
             (results)
             (result-types))
-    (loop for (var arg) in vars
-          for (name this-sc) = var
-          for (nil sc type . rest) = (if this-sc
-                                         var
-                                         prev)
-          for prev = (if this-sc
-                         var
-                         prev)
-          do (cond ((eq name :info)
-                    (infos this-sc)
-                    (input arg))
-                   (arg
-                    (input arg)
-                    (args (list* name :scs (list sc) rest))
-                    (arg-types (or type '*)))
-                   (t
-                    (temps `(:temporary (:sc ,sc ,@rest)
-                                        ,name)))))
-    (loop for result in results
-          for (name this-sc) = result
-          for (nil sc type . rest) = (if this-sc
-                                         result
-                                         prev)
-          for prev = (if this-sc
-                         result
-                         prev)
-          do (results (list* name :scs (list sc) rest))
-             (result-types (or type '*)))
+    (flet ((sc-to-type (sc)
+             (case sc
+               (sb-vm::any-reg
+                'fixnum)
+               (sb-vm::unsigned-reg
+                'sb-vm::unsigned-num)
+               (sb-vm::signed-reg
+                'sb-vm::signed-num)
+               (sb-vm::sap-reg
+                'system-area-pointer)
+               (sb-vm::descriptor-reg
+                t)
+               (t
+                '*))))
+     (loop for (var arg) in vars
+           for (name this-sc) = var
+           for (nil sc type . rest) = (if this-sc
+                                          var
+                                          prev)
+           for prev = (if this-sc
+                          var
+                          prev)
+           do (cond ((eq name :info)
+                     (infos this-sc)
+                     (input arg))
+                    (arg
+                     (args (list* name :scs (list sc) rest))
+                     (let ((type (or type (sc-to-type sc))))
+                       (arg-types type)
+                       (input `(the ,(case type
+                                       (sb-vm::unsigned-num
+                                        'word)
+                                       (sb-vm::signed-num
+                                        'sb-vm:signed-word)
+                                       (sb-vm::tagged-num
+                                        'fixnum)
+                                       (* t)
+                                       (t (primitive-type-specifier (primitive-type-or-lose type))))
+                                    ,arg))))
+                    (t
+                     (temps `(:temporary (:sc ,sc ,@rest)
+                                         ,name)))))
+     (loop for result in results
+           for (name this-sc) = result
+           for (nil sc type . rest) = (if this-sc
+                                          result
+                                          prev)
+           for prev = (if this-sc
+                          result
+                          prev)
+           do (results (list* name :scs (list sc) rest))
+              (result-types (or type (sc-to-type sc)))))
     `(inline-%primitive
       ,(eval (%define-vop nil nil
                           (delete nil
