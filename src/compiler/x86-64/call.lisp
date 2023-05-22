@@ -1286,23 +1286,19 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-    (let ((loop (gen-label))
-          (done (gen-label))
-          (leave-pa (gen-label))
-          (stack-allocate-p (node-stack-allocate-p node)))
-      ;; Compute the number of bytes to allocate
-      (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
-        (if (location= count rcx)
-            (inst shl :dword rcx shift)
-            (inst lea :dword rcx (ea nil count (ash 1 shift)))))
-      ;; Setup for the CDR of the last cons (or the entire result) being NIL.
-      (inst mov result nil-value)
-      (inst jrcxz DONE)
-      (unless stack-allocate-p
-        (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+    ;; Compute the number of bytes to allocate
+    (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
+      (if (location= count rcx)
+          (inst shl :dword rcx shift)
+          (inst lea :dword rcx (ea nil count (ash 1 shift)))))
+    ;; Setup for the CDR of the last cons (or the entire result) being NIL.
+    (inst mov result nil-value)
+    (inst jrcxz DONE)
+    (unless (node-stack-allocate-p node)
+      (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
+    (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
-       (if stack-allocate-p
+       (if (node-stack-allocate-p node)
            (stack-allocation rcx 0 dst)
            (allocation +cons-primtype+ rcx 0 dst node value thread-tn
                        :overflow
@@ -1320,7 +1316,7 @@
        ;; The rightmost arguments are at lower addresses.
        ;; Start by indexing the last argument
        (inst neg rcx) ; :QWORD because it's a signed number
-       (emit-label LOOP)
+       LOOP
        ;; Grab one value and store into this cons. Use RCX as an index into the
        ;; vector of values in CONTEXT, but add 8 because CONTEXT points exactly at
        ;; the 0th value, which means that the index is 1 word too low.
@@ -1335,8 +1331,8 @@
        (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
        (inst inc rcx) ; :QWORD because it's a signed number
        (inst jmp :nz loop)
-       (emit-label leave-pa))
-      (emit-label done))))
+       LEAVE-PA)
+    DONE))
 
 ;;; Return the location and size of the &MORE arg glob created by
 ;;; COPY-MORE-ARG. SUPPLIED is the total number of arguments supplied
