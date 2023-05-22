@@ -1306,15 +1306,16 @@
               `(signed-byte ,i)
               (/ i 8)))))
 
-;;; the N-BIN method for FD-STREAMs
+;;; the N-BIN method for binary FD-STREAMs
 ;;;
 ;;; Note that this blocks in UNIX-READ. It is generally used where
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
-(defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p
+(defun fd-stream-read-n-bytes (stream buffer sbuffer start requested eof-error-p
                                &aux (total-copied 0))
   (declare (type fd-stream stream))
   (declare (type index start requested total-copied))
+  (declare (ignore sbuffer))
   (aver (= (length (fd-stream-instead stream)) 0))
   (do ()
       (nil)
@@ -1520,20 +1521,21 @@
                (tail (buffer-tail obuf)))
            ,out-expr))
        ,@(unless fd-stream-read-n-characters
-           `((defun ,in-function (stream buffer start requested eof-error-p
+           `((defun ,in-function (stream buffer sbuffer start requested eof-error-p
                                   &aux (total-copied 0))
                (declare (type fd-stream stream)
                         (type index start requested total-copied)
-                        (type
-                         (simple-array character (#.+ansi-stream-in-buffer-length+))
-                         buffer))
+                        (type ansi-stream-cin-buffer buffer)
+                        (type ansi-stream-csize-buffer sbuffer))
                (when (fd-stream-eof-forced-p stream)
                  (setf (fd-stream-eof-forced-p stream) nil)
                  (return-from ,in-function 0))
-               (do ((instead (fd-stream-instead stream)))
+               (do ((instead (fd-stream-instead stream))
+                    (index (+ start total-copied) (1+ index)))
                    ((= (fill-pointer instead) 0)
                     (setf (fd-stream-listen stream) nil))
-                 (setf (aref buffer (+ start total-copied)) (vector-pop instead))
+                 (setf (aref buffer index) (vector-pop instead))
+                 (setf (aref sbuffer index) 0)
                  (incf total-copied)
                  (when (= requested total-copied)
                    (when (= (fill-pointer instead) 0)
@@ -1587,7 +1589,9 @@
                                (setq size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr))
                                (when (> size (- tail head))
                                  (return))
-                               (setf (aref buffer (+ start total-copied)) ,in-expr)
+                               (let ((index (+ start total-copied)))
+                                 (setf (aref buffer index) ,in-expr)
+                                 (setf (aref sbuffer index) size))
                                (incf total-copied)
                                (incf head size))
                              nil))
@@ -1883,7 +1887,10 @@
           (cond (character-stream-p
                  (setf (ansi-stream-cin-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
-                                   :element-type 'character)))
+                                   :element-type 'character))
+                 (setf (ansi-stream-csize-buffer fd-stream)
+                       (make-array +ansi-stream-in-buffer-length+
+                                   :element-type '(unsigned-byte 8))))
                 ((equal target-type '(unsigned-byte 8))
                  (setf (ansi-stream-in-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
@@ -2045,6 +2052,7 @@
      ;; Drop input buffers
      (setf (ansi-stream-in-index fd-stream) +ansi-stream-in-buffer-length+
            (ansi-stream-cin-buffer fd-stream) nil
+           (ansi-stream-csize-buffer fd-stream) nil
            (ansi-stream-in-buffer fd-stream) nil)
      (cond (arg1
             ;; We got us an abort on our hands.

@@ -22,7 +22,7 @@
 ;;;
 ;;; In:                 Stream, Eof-Errorp, Eof-Value
 ;;; Bin:                Stream, Eof-Errorp, Eof-Value
-;;; N-Bin:              Stream, Buffer, Start, Numbytes, Eof-Errorp
+;;; N-Bin:              Stream, Buffer, Size-Buffer, Start, Numbytes, Eof-Errorp
 ;;; Cout:               Stream, Character
 ;;; Bout:               Stream, Integer
 ;;; Sout:               Stream, String, Start, End
@@ -90,6 +90,9 @@
 (deftype ansi-stream-cin-buffer ()
   `(simple-array character (,+ansi-stream-in-buffer-length+)))
 
+(deftype ansi-stream-csize-buffer ()
+  `(simple-array (unsigned-byte 8) (,+ansi-stream-in-buffer-length+)))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun %stream-opcode (name)
   (ecase name
@@ -124,9 +127,12 @@
   ;;
   ;; (If a stream does not have an input buffer, then the IN-BUFFER
   ;; slot must must be NIL, and the IN-INDEX must be
-  ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.)
+  ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.  If a stream has a CIN-BUFFER, it
+  ;; must also have a CSIZE-BUFFER for the implementation of
+  ;; FILE-POSITION.)
   (in-buffer nil :type (or ansi-stream-in-buffer null))
   (cin-buffer nil :type (or ansi-stream-cin-buffer null))
+  (csize-buffer nil :type (or ansi-stream-csize-buffer null))
   (in-index +ansi-stream-in-buffer-length+
             :type (integer 0 #.+ansi-stream-in-buffer-length+))
 
@@ -139,7 +145,7 @@
   ;; A character FD-STREAM uses this method to transfer octets from the
   ;; source buffer into characters of the destination buffer.
   (n-bin #'ill-bin :type                        ; n-byte input function
-   (sfunction (stream (simple-unboxed-array (*)) index index t) index))
+   (sfunction (stream (simple-unboxed-array (*)) (or ansi-stream-csize-buffer null) index index t) index))
 
   ;; output functions
   (cout #'ill-out :type function)               ; WRITE-CHAR function

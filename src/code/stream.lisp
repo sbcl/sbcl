@@ -179,19 +179,16 @@
     (if (eql delta 0)
         res
         (when res
-         #-sb-unicode
-         (- res delta)
-         #+sb-unicode
          (let ((char-size (if (fd-stream-p stream)
                               (fd-stream-char-size stream)
                               (external-format-char-size (stream-external-format stream)))))
            (- res
               (etypecase char-size
                 (function
-                 (loop with buffer = (ansi-stream-cin-buffer stream)
+                 (loop with buffer = (ansi-stream-csize-buffer stream)
                        with start = (ansi-stream-in-index stream)
                        for i from start below +ansi-stream-in-buffer-length+
-                       sum (funcall char-size (aref buffer i))))
+                       sum (aref buffer i)))
                 (fixnum
                  (* char-size delta)))))))))
 
@@ -344,7 +341,7 @@
       (ansi-stream-read-line-from-frc-buffer stream eof-error-p eof-value)
       ;; Slow path, character by character.
       ;; There is no need to use PREPARE-FOR-FAST-READ-CHAR
-      ;; because the CIN-BUFER is known to be NIL.
+      ;; because the CIN-BUFFER is known to be NIL.
       (let ((ch (funcall (ansi-stream-in stream) stream nil 0)))
         (case ch
           (#\newline (values "" nil))
@@ -555,7 +552,7 @@
   (let ((in-buffer (ansi-stream-in-buffer stream)))
     (unless in-buffer
       (return-from ansi-stream-read-n-bytes
-        (funcall (ansi-stream-n-bin stream) stream buffer start numbytes eof-error-p)))
+        (funcall (ansi-stream-n-bin stream) stream buffer nil start numbytes eof-error-p)))
     (let* ((index (ansi-stream-in-index stream))
            (num-buffered (- +ansi-stream-in-buffer-length+ index)))
       ;; These bytes are of course actual bytes, i.e. 8-bit octets
@@ -568,7 +565,7 @@
              (let ((end (+ start num-buffered)))
                (%byte-blt in-buffer index buffer start end)
                (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-               (+ (funcall (ansi-stream-n-bin stream) stream buffer
+               (+ (funcall (ansi-stream-n-bin stream) stream buffer nil
                            end (- numbytes num-buffered) eof-error-p)
                   num-buffered)))))))
 
@@ -591,9 +588,11 @@
     ;; and +ANSI-STREAM-IN-BUFFER-LENGTH+ have to be re-scanned.
     (update-input-char-pos stream))
   (let* ((ibuf (ansi-stream-cin-buffer stream))
+         (sizebuf (ansi-stream-csize-buffer stream))
          (count (funcall (ansi-stream-n-bin stream)
                          stream
                          ibuf
+                         sizebuf
                          +ansi-stream-in-buffer-extra+
                          (- +ansi-stream-in-buffer-length+
                             +ansi-stream-in-buffer-extra+)
@@ -646,7 +645,9 @@
                   bash-function)
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
-                count))
+                count)
+             (replace sizebuf sizebuf :start1 start :end1 (+ start count)
+                      :start2 +ansi-stream-in-buffer-extra+))
            (setf (ansi-stream-in-index stream) start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
@@ -654,7 +655,7 @@
 (defun fast-read-byte-refill (stream eof-error-p eof-value)
   (let* ((ibuf (ansi-stream-in-buffer stream))
          (count (funcall (ansi-stream-n-bin stream) stream
-                         ibuf 0 +ansi-stream-in-buffer-length+
+                         ibuf nil 0 +ansi-stream-in-buffer-length+
                          nil))
          (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
@@ -968,11 +969,12 @@
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
                 (declare (optimize (safety 1)))
+                ,@(when (member 'sbuffer args) '((declare (ignore sbuffer))))
                 (,fun (symbol-value (synonym-stream-symbol stream))
-                      ,@args))))
+                      ,@(remove 'sbuffer args)))))
   (in-fun synonym-in read-char eof-error-p eof-value)
   (in-fun synonym-bin read-byte eof-error-p eof-value)
-  (in-fun synonym-n-bin read-n-bytes buffer start numbytes eof-error-p))
+  (in-fun synonym-n-bin read-n-bytes buffer sbuffer start numbytes eof-error-p))
 
 (defun synonym-misc (stream operation arg1)
   (declare (optimize (safety 1)))
@@ -1049,10 +1051,11 @@
 
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
-                (,fun (two-way-stream-input-stream stream) ,@args))))
+                ,@(when (member 'sbuffer args) '((declare (ignore sbuffer))))
+                (,fun (two-way-stream-input-stream stream) ,@(remove 'sbuffer args)))))
   (in-fun two-way-in read-char eof-error-p eof-value)
   (in-fun two-way-bin read-byte eof-error-p eof-value)
-  (in-fun two-way-n-bin read-n-bytes buffer start numbytes eof-error-p))
+  (in-fun two-way-n-bin read-n-bytes buffer sbuffer start numbytes eof-error-p))
 
 (defun two-way-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
@@ -1136,7 +1139,8 @@
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 
-(defun concatenated-n-bin (stream buffer start numbytes eof-errorp)
+(defun concatenated-n-bin (stream buffer sbuffer start numbytes eof-errorp)
+  (declare (ignore sbuffer))
   (do ((streams (concatenated-stream-streams stream) (cdr streams))
        (current-start start)
        (remaining-bytes numbytes))
@@ -1239,7 +1243,8 @@
   (in-fun echo-in read-char write-char eof-error-p eof-value)
   (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
 
-(defun echo-n-bin (stream buffer start numbytes eof-error-p)
+(defun echo-n-bin (stream buffer sbuffer start numbytes eof-error-p)
+  (declare (ignore sbuffer))
   (let ((bytes-read 0))
     ;; Note: before ca 1.0.27.18, the logic for handling unread
     ;; characters never could have worked, so probably nobody has ever

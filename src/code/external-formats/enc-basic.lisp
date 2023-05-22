@@ -560,17 +560,20 @@
       (setf (buffer-head ibuf) head)
       total-copied)))
 
-(defun fd-stream-read-n-characters/utf-8 (stream buffer start requested eof-error-p &aux (total-copied 0))
+(defun fd-stream-read-n-characters/utf-8 (stream buffer sbuffer start requested eof-error-p &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
-           (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
+           (type ansi-stream-cin-buffer buffer)
+           (type ansi-stream-csize-buffer sbuffer))
   (when (fd-stream-eof-forced-p stream)
     (setf (fd-stream-eof-forced-p stream) nil)
     (return-from fd-stream-read-n-characters/utf-8 0))
-  (do ((instead (fd-stream-instead stream)))
+  (do ((instead (fd-stream-instead stream))
+       (index (+ start total-copied) (1+ index)))
       ((= (fill-pointer instead) 0)
        (setf (fd-stream-listen stream) nil))
-    (setf (aref buffer (+ start total-copied)) (vector-pop instead))
+    (setf (aref buffer index) (vector-pop instead))
+    (setf (aref sbuffer index) 0)
     (incf total-copied)
     (when (= requested total-copied)
       (when (= (fill-pointer instead) 0)
@@ -597,28 +600,30 @@
                   (declare (ignorable byte))
                   (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
                   (when (> size (- tail head)) (return))
-                  (setf (aref buffer (+ start total-copied))
-                        (code-char
-                         (ecase size
-                           (1 byte)
-                           (2
-                            (let ((byte2 (sap-ref-8 sap (1+ head))))
-                              (unless (<= 128 byte2 191) (return-from decode-break-reason 2))
-                              (dpb byte (byte 5 6) byte2)))
-                           (3
-                            (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))))
-                              (unless
-                                  (and (<= 128 byte2 191) (<= 128 byte3 191) (or (/= byte 224) (<= 160 byte2 191))
-                                       (or (/= byte 237) (<= 128 byte2 159)))
-                                (return-from decode-break-reason 3))
-                              (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
-                           (4
-                            (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))) (byte4 (sap-ref-8 sap (+ 3 head))))
-                              (unless
-                                  (and (<= 128 byte2 191) (<= 128 byte3 191) (<= 128 byte4 191) (or (/= byte 240) (<= 144 byte2 191))
-                                       (or (/= byte 244) (<= 128 byte2 143)))
-                                (return-from decode-break-reason 4))
-                              (dpb byte (byte 3 18) (dpb byte2 (byte 6 12) (dpb byte3 (byte 6 6) byte4))))))))
+                  (let ((index (+ start total-copied)))
+                    (setf (aref buffer index)
+                          (code-char
+                           (ecase size
+                             (1 byte)
+                             (2
+                              (let ((byte2 (sap-ref-8 sap (1+ head))))
+                                (unless (<= 128 byte2 191) (return-from decode-break-reason 2))
+                                (dpb byte (byte 5 6) byte2)))
+                             (3
+                              (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))))
+                                (unless
+                                    (and (<= 128 byte2 191) (<= 128 byte3 191) (or (/= byte 224) (<= 160 byte2 191))
+                                         (or (/= byte 237) (<= 128 byte2 159)))
+                                  (return-from decode-break-reason 3))
+                                (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
+                             (4
+                              (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))) (byte4 (sap-ref-8 sap (+ 3 head))))
+                                (unless
+                                    (and (<= 128 byte2 191) (<= 128 byte3 191) (<= 128 byte4 191) (or (/= byte 240) (<= 144 byte2 191))
+                                         (or (/= byte 244) (<= 128 byte2 143)))
+                                  (return-from decode-break-reason 4))
+                                (dpb byte (byte 3 18) (dpb byte2 (byte 6 12) (dpb byte3 (byte 6 6) byte4))))))))
+                    (setf (aref sbuffer index) size))
                   (incf total-copied)
                   (incf head size))
                 nil))
