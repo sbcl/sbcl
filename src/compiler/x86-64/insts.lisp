@@ -1400,9 +1400,9 @@
   (:printer reg/mem-imm ((op '(#b1100011 #b000))))
   (:emitter
    (let ((size (pick-operand-size prefix dst src)))
-     (emit-mov segment size (sized-thing dst size) (sized-thing src size)))))
+     (emit-mov-instruction segment size (sized-thing dst size) (sized-thing src size)))))
 
-(defun emit-mov (segment size dst src)
+(defun emit-mov-instruction (segment size dst src)
   (cond ((gpr-p dst)
             (cond ((integerp src)
                    ;; We want to encode the immediate using the fewest bytes possible.
