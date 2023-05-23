@@ -207,7 +207,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign))))
+    (load-foreign-symbol res foreign-symbol)))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -218,19 +218,12 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref))
-    (inst ldr res (@ res))))
+    (load-foreign-symbol res foreign-symbol :dataref t)))
 
 (defun emit-c-call (vop nfp-save temp temp2 cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
-    (if (stringp function)
-        (load-inline-constant cfunc `(:fixup ,function :foreign))
-        (sc-case function
-          (sap-reg (move cfunc function))
-          (sap-stack
-           (load-stack-offset cfunc cur-nfp function))))
     (assemble ()
       #+sb-thread
       (progn
@@ -240,8 +233,14 @@
         (inst adr temp2 return)
         (inst stp cfp-tn temp2 (@ csp-tn))
         (storew-pair csp-tn thread-control-frame-pointer-slot temp thread-control-stack-pointer-slot thread-tn)
-        (inst blr cfunc)
-
+        (cond ((stringp function)
+               (invoke-foreign-routine function cfunc))
+              (t
+               (sc-case function
+                 (sap-reg (move cfunc function))
+                 (sap-stack
+                  (load-stack-offset cfunc cur-nfp function)))
+               (inst blr cfunc)))
         (loop for reg in (list r0-offset r1-offset r2-offset r3-offset
                                r4-offset r5-offset r6-offset r7-offset
                                #-darwin r8-offset)
@@ -257,8 +256,13 @@
       #-sb-thread
       (progn
         temp2
-        (load-inline-constant temp '(:fixup "call_into_c" :foreign))
-        (inst blr temp))
+        (if (stringp function)
+            (load-foreign-symbol cfunc function)
+            (sc-case function
+              (sap-reg (move cfunc function))
+              (sap-stack
+              (load-stack-offset cfunc cur-nfp function))))
+        (invoke-foreign-routine "call_into_c" temp))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 

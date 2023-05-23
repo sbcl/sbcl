@@ -29,6 +29,30 @@
       (inst adr reg (make-fixup name :assembly-routine))
       (load-inline-constant reg `(:fixup ,name :assembly-routine))))
 
+(defun invoke-foreign-routine (name reg &key tail)
+  (cond ((or (not (boundp '*component-being-compiled*))
+             (sb-c::code-immobile-p *component-being-compiled*))
+         (if tail
+             (inst b (make-fixup name :foreign))
+             (inst bl (make-fixup name :foreign))))
+        (t
+         (load-inline-constant reg `(:fixup ,name :foreign))
+         (if tail
+             (inst br reg)
+             (inst blr reg)))))
+
+(defun load-foreign-symbol (reg name &key dataref)
+  (let ((kind (if dataref :foreign-dataref :foreign)))
+    (if (or (not (boundp '*component-being-compiled*))
+            (sb-c::code-immobile-p *component-being-compiled*))
+        (if dataref
+            (inst ldr reg (make-fixup name kind))
+            (inst adr reg (make-fixup name kind)))
+        (progn
+          (load-inline-constant reg `(:fixup ,name ,kind))
+          (when dataref
+            (loadw reg reg))))))
+
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options vop))
   (ecase style

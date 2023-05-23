@@ -1462,17 +1462,24 @@
   (:printer ldr-str-reg ((op #b11)))
   (:printer ldr-str-unscaled-imm ((op #b11)))
   (:emitter
-   (if (label-p address)
-       (emit-back-patch segment 4
-                        (lambda (segment posn)
-                          (emit-ldr-literal segment
-                                            #b01
-                                            (if (fp-register-p dst)
-                                                1
-                                                0)
-                                            (ash (- (label-position address) posn) -2)
-                                            (reg-offset dst))))
-       (emit-load-store nil 1 segment dst address))))
+   (typecase address
+     (fixup
+      (note-fixup segment :pc-relative-ldr-str address)
+      (emit-pc-relative segment 1 0 0 (reg-offset dst))  ; ADRP
+      (assemble (segment)
+        (inst ldr dst (@ dst))))
+     (label
+      (emit-back-patch segment 4
+                       (lambda (segment posn)
+                         (emit-ldr-literal segment
+                                           #b01
+                                           (if (fp-register-p dst)
+                                               1
+                                               0)
+                                           (ash (- (label-position address) posn) -2)
+                                           (reg-offset dst)))))
+     (t
+      (emit-load-store nil 1 segment dst address)))))
 
 (def-emitter ldr-str-pair
   (opc 2 30)
@@ -3331,6 +3338,18 @@
                (ldb (byte 19 2) page-displacement)))
        (setf (ldb (byte 12 10) (sap-ref-32 sap (+ offset 4)))
              (ldb (byte 12 0) value)))
+      (:pc-relative-ldr-str
+       (let ((page-displacement
+               (- (ash value -12)
+                  (ash (+ (sap-int sap) offset) -12))))
+         (setf (ldb (byte 2 29) (sap-ref-32 sap offset))
+               (ldb (byte 2 0) page-displacement))
+         (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
+               (ldb (byte 19 2) page-displacement))
+         (unless (zerop (logand value (1- n-word-bytes)))
+           (error "Unaligned LDR/STR fixup at #x~x?" value))
+         (setf (ldb (byte 12 10) (sap-ref-32 sap (+ offset 4)))
+               (ash (ldb (byte 12 0) value) (- word-shift)))))
       (:ldr-str
        (setf (ldb (byte 12 10) (sap-ref-32 sap offset))
              (ash (the (unsigned-byte #.(+ 12 word-shift)) value)

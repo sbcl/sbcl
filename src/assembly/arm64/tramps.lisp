@@ -84,8 +84,7 @@
         (map-pairs stp csp-tn -80 lisp-registers)
         (map-pairs stp nsp-tn 0 float-registers :pre-index -512 :delta 32)
 
-        (load-inline-constant nl2 '(:fixup ,c-name :foreign))
-        (inst blr nl2)
+        (invoke-foreign-routine ,c-name nl2)
 
         (map-pairs ldp nsp-tn 480 float-registers :post-index 512 :delta -32)
         (map-pairs ldp csp-tn -16 lisp-registers :delta -16)

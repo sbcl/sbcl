@@ -625,8 +625,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp card)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 10
-    (load-inline-constant temp `(:fixup "gc_card_table_mask" :foreign-dataref))
-    (inst ldr temp (@ temp))
+    (load-foreign-symbol temp "gc_card_table_mask" :dataref t)
     (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
     (pseudo-atomic (pa-flag)
       #+immobile-space
@@ -666,8 +665,7 @@
       (inst lsr card object gencgc-card-shift)
       (inst and card card temp)
       ;; Load mark table base
-      (load-inline-constant temp `(:fixup "gc_card_mark" :foreign-dataref))
-      (inst ldr temp (@ temp))
+      (load-foreign-symbol temp "gc_card_mark" :dataref t)
       (inst ldr temp (@ temp))
       ;; Touch the card mark byte.
       (inst strb null-tn (@ temp card))

@@ -194,9 +194,8 @@
      (move c-arg1 size-class)
      (move c-arg2 nwords)
      (move c-arg3 header)
-     (load-inline-constant lr '(:fixup "call_into_c" :foreign))
-     (load-inline-constant cfunc '(:fixup "alloc_immobile_fixedobj" :foreign))
-     (inst blr lr)
+     (load-foreign-symbol cfunc "alloc_immobile_fixedobj")
+     (invoke-foreign-routine "call_into_c" lr)
      (when cur-nfp
        (load-stack-tn cur-nfp nfp-save))
      (move result nl0))))

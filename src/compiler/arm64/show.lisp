@@ -26,9 +26,8 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (move nl0 object)
-      (load-inline-constant lr '(:fixup "call_into_c" :foreign))
-      (load-inline-constant cfunc '(:fixup "debug_print" :foreign))
-      (inst blr lr)
+      (load-foreign-symbol cfunc "debug_print")
+      (invoke-foreign-routine "call_into_c" lr)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
       (move result nl0))))
