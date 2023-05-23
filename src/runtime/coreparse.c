@@ -84,7 +84,7 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
-#if defined LISP_FEATURE_LINUX && defined LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_LINUX && (defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64)
 #define ELFCORE 1
 #elif !defined(ELFCORE)
 #define ELFCORE 0
@@ -912,9 +912,6 @@ process_directory(int count, struct ndir_entry *entry,
     set_adjustment(&spaceadj, STATIC_CORE_SPACE_ID, STATIC_SPACE_START);
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (lisp_code_in_elf() && TEXT_SPACE_START != spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base) {
-        lose("code-in-elf + PIE not supported");
-    }
     set_adjustment(&spaceadj, IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, FIXEDOBJ_SPACE_START);
     if (!apply_pie_relocs(TEXT_SPACE_START
                           - spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base,
