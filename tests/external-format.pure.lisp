@@ -27,11 +27,19 @@
 #+(and ppc64 little-endian) (invoke-restart 'run-tests::skip-file)
 
 (defmacro do-external-formats ((xf) &body body)
-  (let ((nxf (gensym)))
+  (let ((nxf (gensym))
+        (xfs (gensym))
+        (xfsym (gensym)))
     `(sb-int:dovector (,nxf sb-impl::*external-formats*)
        (when ,nxf
-         (let ((,xf (first (sb-impl::ef-names (car (sb-int:ensure-list ,nxf))))))
-             ,@body)))))
+         (let* ((,xfs (sb-int:ensure-list ,nxf))
+                (,xfsym (first (sb-impl::ef-names (car ,xfs)))))
+           (dolist (,xf (append (list ,xfsym)
+                                (when (find :cr (cdr ,xfs) :key #'caar)
+                                  (list (list ,xfsym :newline :cr)))
+                                (when (find :crlf (cdr ,xfs) :key #'caar)
+                                  (list (list ,xfsym :newline :crlf)))))
+             ,@body))))))
 
 (defmacro with-ef-test (options &rest rest)
   (let* ((test-name (getf options :name))
@@ -66,11 +74,11 @@
            (pushnew `(with-test (:name (:standard-character :read-write-equivalency ,xf))
                        (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
                          (with-open-file (s *test-path* :direction :output
-                                            :if-exists :supersede :external-format ,xf)
+                                            :if-exists :supersede :external-format ',xf)
                            (loop for character across standard-characters
                                  do (write-char character s)))
                          (with-open-file (s *test-path* :direction :input
-                                            :external-format ,xf)
+                                            :external-format ',xf)
                            (loop for character across standard-characters
                                  do (let ((got (read-char s)))
                                       (unless (eql character got)
