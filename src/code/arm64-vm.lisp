@@ -102,9 +102,10 @@
   (with-pinned-objects (function)
     (with-pinned-context-code-object (context)
       (let* ((fun-addr (get-lisp-obj-address function))
-             (entry (sap-ref-word (int-sap fun-addr)
-                                  (- (ash simple-fun-self-slot word-shift)
-                                     fun-pointer-lowtag))))
+             (entry (+ (sap-ref-word (int-sap fun-addr)
+                                     (- (ash simple-fun-self-slot word-shift)
+                                        fun-pointer-lowtag))
+                       4))) ;; tail call
         (when arg-count
           (setf (context-register context nargs-offset)
                 (get-lisp-obj-address arg-count)))
