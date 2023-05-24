@@ -2261,9 +2261,15 @@
 (define-vop (overflow*t)
   (:translate overflow*)
   (:args (x :scs (descriptor-reg))
-         (y :scs (signed-reg)))
+         (y :scs (signed-reg immediate)))
   (:arg-types t tagged-num)
   (:info type)
+  (:temporary (:sc signed-reg
+               :unused-if
+               (or (not (sc-is y immediate))
+                   (and (plusp (tn-value y))
+                        (= (logcount (tn-value y)) 1))))
+              temp)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
   (:policy :fast-safe)
@@ -2271,12 +2277,35 @@
   (:generator 2
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
-           (error (generate-error-code vop 'sb-kernel::mul-overflow2-error x y)))
+           (value (and (sc-is y immediate)
+                       (tn-value y)))
+           (shift (and value
+                       (plusp value)
+                       (= (logcount value) 1)
+                       (1- (integer-length value))))
+           (error (generate-error-code+ (cond (shift
+                                               (setf y r)
+                                               (lambda ()
+                                                 (load-immediate-word y (fixnumize value))))
+                                              (value
+                                               (setf y temp)
+                                               (load-immediate-word y value)
+                                               nil))
+                                        vop
+                                        'sb-kernel::mul-overflow2-error x y)))
       (inst tbnz x 0 error)
-      (inst mul r x y)
-      (inst smulh tmp-tn x y)
-      (inst cmp tmp-tn (asr r 63))
-      (inst b :ne error))))
+      (cond ((eql shift 0)
+             (move r x))
+            (shift
+             (inst lsl r x shift)
+             (inst asr tmp-tn x (- 64 shift))
+             (inst cmp tmp-tn (asr r 63))
+             (inst b :ne error))
+            (t
+             (inst smulh tmp-tn x y)
+             (inst mul r x y)
+             (inst cmp tmp-tn (asr r 63))
+             (inst b :ne error))))))
 
 (define-vop (signum-signed signed-unop)
   (:args (x :scs (signed-reg any-reg) :target res))
