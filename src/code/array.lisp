@@ -452,10 +452,9 @@
 (defun %save-displaced-new-array-backpointer (array data)
   (flet ((purge (pointers)
            (remove-if-not #'weak-pointer-value pointers)))
-    (when (array-header-p data)
-      (setf (%array-displaced-from data)
-            (cons (make-weak-pointer array)
-                  (purge (%array-displaced-from data)))))))
+    (setf (%array-displaced-from data)
+          (cons (make-weak-pointer array)
+                (purge (%array-displaced-from data))))))
 
 (defmacro populate-dimensions (header list-or-index rank)
   `(if (listp ,list-or-index)
@@ -565,7 +564,8 @@
              (cond (displaced-to
                     (setf (%array-displacement array) (or displaced-index-offset 0))
                     (setf (%array-displaced-p array) t)
-                    (%save-displaced-new-array-backpointer array data))
+                    (when (adjustable-array-p data)
+                      (%save-displaced-new-array-backpointer array data)))
                    (t
                     (setf (%array-displaced-p array) nil)))
              (populate-dimensions array dimensions array-rank)
