@@ -147,38 +147,43 @@
 
 (defmacro define-binop (translate untagged-penalty op
                         &key
-                             (constant-test 'encode-logical-immediate)
-                             (constant-fixnum-test 'fixnum-encode-logical-immediate)
-                             swap
-                             (constant-op op)
-                             (constant-transform 'identity))
+                          (constant-test 'encode-logical-immediate)
+                          (constant-fixnum-test 'fixnum-encode-logical-immediate)
+                          swap
+                          (constant-op op)
+                          (constant-transform 'identity)
+                          negative-op)
   `(progn
      (define-vop (,(symbolicate 'fast- translate '/fixnum=>fixnum)
                   fast-fixnum-binop)
        (:translate ,translate)
        (:generator 2
-                   ,(if swap
-                        `(inst ,op r y x)
-                        `(inst ,op r x y))))
+         ,(if swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
      (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                    fast-fixnum-binop-c)
+                  fast-fixnum-binop-c)
        ,(if swap
             `(:arg-types (:constant (satisfies ,constant-fixnum-test))
                          tagged-num)
             `(:arg-types tagged-num
                          (:constant (satisfies ,constant-fixnum-test))))
-         (:translate ,translate)
-         (:generator 1
-                     (inst ,constant-op r x (,constant-transform (fixnumize y)))))
+       (:translate ,translate)
+       (:generator 1
+         (cond ,@(and negative-op
+                      `(((minusp y)
+                         (inst ,negative-op r x (,constant-transform (fixnumize (- y)))))))
+               (t
+                (inst ,constant-op r x (,constant-transform (fixnumize y)))))))
      (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
                   fast-signed-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-                   ,(if swap
-                        `(inst ,op r y x)
-                        `(inst ,op r x y))))
+         ,(if swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
      (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                   fast-signed-binop-c)
+                  fast-signed-binop-c)
        (:translate ,translate)
        ,(if swap
             `(:arg-types (:constant (satisfies ,constant-test))
@@ -186,16 +191,20 @@
             `(:arg-types signed-num
                          (:constant (satisfies ,constant-test))))
        (:generator ,untagged-penalty
-                   (inst ,constant-op r x (,constant-transform y))))
+         (cond ,@(and negative-op
+                      `(((minusp y)
+                         (inst ,negative-op r x (,constant-transform (- y))))))
+               (t
+                (inst ,constant-op r x (,constant-transform y))))))
      (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
                   fast-unsigned-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-                   ,(if swap
-                        `(inst ,op r y x)
-                        `(inst ,op r x y))))
+         ,(if swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
      (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                   fast-unsigned-binop-c)
+                  fast-unsigned-binop-c)
        (:translate ,translate)
        ,(if swap
             `(:arg-types (:constant (satisfies ,constant-test))
@@ -203,10 +212,16 @@
             `(:arg-types unsigned-num
                          (:constant (satisfies ,constant-test))))
        (:generator ,untagged-penalty
-                   (inst ,constant-op r x (,constant-transform y))))))
+         (cond ,@(and negative-op
+                      `(((minusp y)
+                         (inst ,negative-op r x (,constant-transform (- y))))))
+               (t
+                (inst ,constant-op r x (,constant-transform y))))))))
 
-(define-binop + 4 add :constant-test add-sub-immediate-p :constant-fixnum-test fixnum-add-sub-immediate-p)
-(define-binop - 4 sub :constant-test add-sub-immediate-p :constant-fixnum-test fixnum-add-sub-immediate-p)
+(define-binop + 4 add :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
+  :negative-op sub)
+(define-binop - 4 sub :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
+  :negative-op add)
 (define-binop logand 2 and)
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
