@@ -37,31 +37,87 @@
    #x5c #xf7 #x53 #x54 #x55 #x56 #x57 #x58 #x59 #x5a #xb2 #xd4 #xd6 #xd2 #xd3 #xd5
    #x30 #x31 #x32 #x33 #x34 #x35 #x36 #x37 #x38 #x39 #xb3 #xdb #xdc #xd9 #xda #x9f))
 
-(declaim (inline get-ebcdic-us-bytes))
-(defun get-ebcdic-us-bytes (string pos)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->ebcdic-us-mapper :ebcdic-us string pos))
-
-(defun string->ebcdic-us (string sstart send null-padding)
-    (declare (optimize speed #.*safety-0*)
-             (type simple-string string)
-             (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-ebcdic-us-bytes null-padding)))
-
-(defmacro define-ebcdic-us->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'ebcdic-us->string* accessor)))
-    `(progn
-       (defun ,name (string sstart send array astart aend)
-         (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'ebcdic-us->code-mapper)))))
-(instantiate-octets-definition define-ebcdic-us->string*)
+(macrolet ((def (get-bytes-name string-to-octets-name code-to-byte-mapper)
+             (let ((get-bytes-name/cr (symbolicate get-bytes-name '/cr))
+                   (string-to-octets-name/cr (symbolicate string-to-octets-name '/cr))
+                   (string-to-octets-name/crlf (symbolicate string-to-octets-name '/crlf)))
+             `(progn
+                (declaim (inline ,get-bytes-name ,get-bytes-name/cr))
+                (defun ,get-bytes-name (string pos)
+                  (declare (optimize speed #.*safety-0*)
+                           (type simple-string string)
+                           (type array-range pos))
+                  (get-latin-bytes #',code-to-byte-mapper :ebcdic-us string pos))
+                (defun ,string-to-octets-name (string sstart send null-padding)
+                  (declare (optimize speed #.*safety-0*)
+                           (type simple-string string)
+                           (type array-range sstart send))
+                  (values (string->latin% string sstart send #',get-bytes-name null-padding)))
+                (defun ,get-bytes-name/cr (string pos)
+                  (declare (optimize speed #.*safety-0*)
+                           (type simple-string string)
+                           (type array-range pos))
+                  (get-latin-bytes (lambda (code) (,code-to-byte-mapper (if (= code 10) 13 code)))
+                                   :ebcdic-us string pos))
+                (defun ,string-to-octets-name/cr (string sstart send null-padding)
+                  (declare (optimize speed #.*safety-0*)
+                           (type simple-string string)
+                           (type array-range sstart send))
+                  (values (string->latin% string sstart send #',get-bytes-name/cr null-padding)))
+                (defun ,string-to-octets-name/crlf (string sstart send null-padding)
+                  (declare (optimize speed #.*safety-0*)
+                           (type simple-string string)
+                           (type array-range sstart send))
+                  (let ((array (make-array (+ (* 2 (- send sstart)) null-padding)
+                                           :element-type '(unsigned-byte 8)
+                                           :fill-pointer 0 :adjustable t)))
+                    (loop for i from sstart below send
+                          do (let* ((code (char-code (char string i)))
+                                    (byte (,code-to-byte-mapper code)))
+                               (cond
+                                 ((= code 10)
+                                  (vector-push-extend (,code-to-byte-mapper 13) array)
+                                  (vector-push-extend byte array))
+                                 ((null byte)
+                                  (let ((replacement (encoding-error :ebcdic-us string i)))
+                                    (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
+                                    (dotimes (j (length replacement))
+                                      (vector-push-extend (aref replacement j) array))))
+                                 (t (vector-push-extend byte array)))))
+                    (dotimes (i null-padding)
+                      (vector-push-extend 0 array))
+                    (coerce array '(simple-array (unsigned-byte 8) (*)))))))))
+  (def get-ebcdic-us-bytes string->ebcdic-us code->ebcdic-us-mapper))
 
 (defmacro define-ebcdic-us->string (accessor type)
   (declare (ignore type))
-  `(defun ,(make-od-name 'ebcdic-us->string accessor) (array astart aend)
-     (,(make-od-name 'latin->string accessor) array astart aend #'ebcdic-us->code-mapper)))
+  `(progn
+     (defun ,(make-od-name 'ebcdic-us->string accessor) (array astart aend)
+       (,(make-od-name 'latin->string accessor) array astart aend #'ebcdic-us->code-mapper))
+     (defun ,(make-od-name 'ebcdic-us->string/cr accessor) (array astart aend)
+       (,(make-od-name 'latin->string accessor) array astart aend
+         (lambda (x) (let ((code (ebcdic-us->code-mapper x))) (if (= code 13) 10 code)))))
+     (defun ,(make-od-name 'ebcdic-us->string/crlf accessor) (array astart aend)
+       (let ((string (make-array (- aend astart) :element-type 'character
+                                 :fill-pointer 0 :adjustable t)))
+         (loop for apos from astart below aend
+               do (let* ((byte (,accessor array apos))
+                         (code (ebcdic-us->code-mapper byte))
+                         (string-content
+                          (cond
+                            ((= code 13) (if (= apos (1- aend))
+                                             (code-char 13)
+                                             (let* ((next-byte (,accessor array (1+ apos)))
+                                                    (next-code (ebcdic-us->code-mapper next-byte)))
+                                             (if (= next-code 10)
+                                                 (progn (incf apos) #\Newline)
+                                                 (code-char 13)))))
+                            (t (code-char code)))))
+                      (if (characterp string-content)
+                          (vector-push-extend string-content string)
+                          (loop for c across string-content
+                                do (vector-push-extend c string))))
+                 finally (return (coerce string 'simple-string)))))))
 (instantiate-octets-definition define-ebcdic-us->string)
 
 (define-unibyte-external-format :ebcdic-us (:cp037 :|cp037| :ibm-037 :ibm037)
@@ -72,3 +128,41 @@
   (code-char (ebcdic-us->code-mapper byte))
   ebcdic-us->string-aref
   string->ebcdic-us)
+
+(define-external-format/variable-width (:ebcdic-us)
+    t #\? 1
+    (let* ((newbits (if (= bits 10) 13 bits))
+           (ebcdic-us-byte (code->ebcdic-us-mapper newbits)))
+      (if ebcdic-us-byte
+          (setf (sap-ref-8 sap tail) ebcdic-us-byte)
+          (external-format-encoding-error stream bits)))
+    1
+    (let ((code (ebcdic-us->code-mapper byte)))
+      (if (= code 13) #\Newline (code-char code)))
+    ebcdic-us->string/cr-aref
+    string->ebcdic-us/cr
+    :newline-variant :cr)
+
+(define-external-format/variable-width (:ebcdic-us)
+    t #\?
+    (if (char= |ch| #\Newline) 2 1)
+    (let ((byte (code->ebcdic-us-mapper bits)))
+      (cond
+        ((null byte) (external-format-encoding-error stream bits))
+        ((= bits 10)
+         (setf (sap-ref-8 sap tail) (load-time-value (code->ebcdic-us-mapper 13) t))
+         (setf (sap-ref-8 sap (1+ tail)) byte))
+        (t (setf (sap-ref-8 sap tail) byte))))
+    ((2 1)
+     (cond
+       ((= (- tail head) 1) 1) ; one octet away from EOF, can't possibly be CRLF
+       ((and (= byte (load-time-value (code->ebcdic-us-mapper 13) t))
+             (= (sap-ref-8 sap (1+ head)) (load-time-value (code->ebcdic-us-mapper 10) t)))
+        2)
+       (t 1)))
+    (if (= size 2)
+        #\Newline
+        (code-char (ebcdic-us->code-mapper byte)))
+    ebcdic-us->string/crlf-aref
+    string->ebcdic-us/crlf
+    :newline-variant :crlf)
