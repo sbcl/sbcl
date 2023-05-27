@@ -205,46 +205,168 @@
     string->ascii/crlf
     :newline-variant :crlf)
 
+;;; General unibyte support
+
+(defmacro define-unibyte-to-octets-functions
+    (external-format get-bytes-name string-to-octets-name code->-name)
+  (let ((get-bytes-name/cr (symbolicate get-bytes-name '/cr))
+        (string-to-octets-name/cr (symbolicate string-to-octets-name '/cr))
+        (string-to-octets-name/crlf (symbolicate string-to-octets-name '/crlf)))
+    `(progn
+       (declaim (inline ,get-bytes-name ,get-bytes-name/cr))
+       (defun ,get-bytes-name (string pos)
+         (declare (optimize speed #.*safety-0*)
+                  (type simple-string string)
+                  (type array-range pos))
+         (get-latin-bytes #',code->-name ',external-format string pos))
+       (defun ,string-to-octets-name (string sstart send null-padding)
+         (declare (optimize speed #.*safety-0*)
+                  (type simple-string string)
+                  (type array-range sstart send))
+         (values (string->latin% string sstart send #',get-bytes-name null-padding)))
+       (defun ,get-bytes-name/cr (string pos)
+         (declare (optimize speed #.*safety-0*)
+                  (type simple-string string)
+                  (type array-range pos))
+         (get-latin-bytes (lambda (code) (,code->-name (if (= code 10) 13 code)))
+                          ',external-format string pos))
+       (defun ,string-to-octets-name/cr (string sstart send null-padding)
+         (declare (optimize speed #.*safety-0*)
+                  (type simple-string string)
+                  (type array-range sstart send))
+         (values (string->latin% string sstart send #',get-bytes-name/cr null-padding)))
+       (defun ,string-to-octets-name/crlf (string sstart send null-padding)
+         (declare (optimize speed #.*safety-0*)
+                  (type simple-string string)
+                  (type array-range sstart send))
+         (let ((array (make-array (+ (* 2 (- send sstart)) null-padding)
+                                  :element-type '(unsigned-byte 8)
+                                  :fill-pointer 0 :adjustable t)))
+           (loop for i from sstart below send
+                 do (let* ((code (char-code (char string i)))
+                           (byte (,code->-name code)))
+                      (cond
+                        ((= code 10)
+                         (vector-push-extend (,code->-name 13) array)
+                         (vector-push-extend byte array))
+                        ((null byte)
+                         (let ((replacement (encoding-error ',external-format string i)))
+                           (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
+                           (dotimes (j (length replacement))
+                             (vector-push-extend (aref replacement j) array))))
+                        (t (vector-push-extend byte array)))))
+           (dotimes (i null-padding)
+             (vector-push-extend 0 array))
+           (coerce array '(simple-array (unsigned-byte 8) (*))))))))
+
+(defmacro define-unibyte-to-string-functions (octets-to-string-name ->code-name)
+  (let ((octets-to-string-name/cr (symbolicate octets-to-string-name '/cr))
+        (octets-to-string-name/crlf (symbolicate octets-to-string-name '/crlf)))
+    `(macrolet ((def (accessor type)
+                  (declare (ignore type))
+                  `(progn
+                     (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
+                       (,(make-od-name 'latin->string accessor) array astart aend #',',->code-name))
+                     (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
+                       (,(make-od-name 'latin->string accessor) array astart aend
+                         (lambda (x) (let ((code (,',->code-name x))) (if (= code 13) 10 code)))))
+                     (defun ,(make-od-name ',octets-to-string-name/crlf accessor) (array astart aend)
+                       (let ((string (make-array (- aend astart) :element-type 'character
+                                                 :fill-pointer 0 :adjustable t)))
+                         (loop for apos from astart below aend
+                               do (let* ((byte (,accessor array apos))
+                                         (code (,',->code-name byte))
+                                         (string-content
+                                          (cond
+                                            ((= code 13)
+                                             (if (= apos (1- aend))
+                                                 (code-char 13)
+                                                 (let* ((next-byte (,accessor array (1+ apos)))
+                                                        (next-code (,',->code-name next-byte)))
+                                                   (if (= next-code 10)
+                                                       (progn (incf apos) #\Newline)
+                                                       (code-char 13)))))
+                                            (t (code-char code)))))
+                                    (if (characterp string-content)
+                                        (vector-push-extend string-content string)
+                                        (loop for c across string-content
+                                              do (vector-push-extend c string))))
+                               finally (return (coerce string 'simple-string))))))))
+       (instantiate-octets-definition def))))
+
+(defmacro define-unibyte-external-format-with-newline-variants
+    (name other-names
+     (->code-name code->-name)
+     (->string-name string->name)
+     (->string/cr-name string/cr->name)
+     (->string/crlf-name string/crlf->name))
+  `(progn
+     (define-unibyte-external-format ,name ,other-names
+       (let ((byte (,code->-name bits)))
+         (if byte
+             (setf (sap-ref-8 sap tail) byte)
+             (external-format-encoding-error stream bits)))
+       (code-char (,->code-name byte))
+       ,->string-name
+       ,string->name)
+     (define-external-format/variable-width (,name)
+         t #\? 1
+         (let* ((newbits (if (= bits 10) 13 bits))
+                (byte (,code->-name newbits)))
+           (if byte
+               (setf (sap-ref-8 sap tail) byte)
+               (external-format-encoding-error stream bits)))
+         1
+         (let ((code (,->code-name byte)))
+           (if (= code 13) #\Newline (code-char code)))
+         ,->string/cr-name
+         ,string/cr->name
+         :newline-variant :cr)
+     (define-external-format/variable-width (,name)
+         t #\?
+         (if (char= |ch| #\Newline) 2 1)
+         (let ((byte (,code->-name bits)))
+           (cond
+             ((null byte) (external-format-encoding-error stream bits))
+             ((= bits 10)
+              ;; FIXME: if we required that CODE->-NAME was required
+              ;; to be callable at compile-time, then we could remove
+              ;; the LOAD-TIME-VALUEs here and below.
+              (setf (sap-ref-8 sap tail) (load-time-value (,code->-name 13) t))
+              (setf (sap-ref-8 sap (1+ tail)) byte))
+             (t (setf (sap-ref-8 sap tail) byte))))
+         ((2 1)
+          (cond
+            ((= (- tail head) 1) 1) ; one octet away from EOF, can't possibly be CRLF
+            ((and (= byte (load-time-value (,code->-name 13) t))
+                  (= (sap-ref-8 sap (1+ head)) (load-time-value (,code->-name 10) t)))
+             2)
+            (t 1)))
+         (if (= size 2)
+             #\Newline
+             (code-char (,->code-name byte)))
+         ,->string/crlf-name
+         ,string/crlf->name
+         :newline-variant :crlf)))
+
 ;;; Latin-1
 
-(declaim (inline get-latin1-bytes))
-(defun get-latin1-bytes (string pos)
+;;; FIXME: we need this for the CLRF definition, but having this
+;;; probably now implies that the check for (< CODE 256) in
+;;; GET-LATIN-BYTES is redundant.
+(declaim (inline code->latin1-mapper))
+(defun code->latin1-mapper (code)
   (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'identity :latin-1 string pos))
+           (type char-code code))
+  (and (< code 256) code))
 
-(defun string->latin1 (string sstart send null-padding)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-latin1-bytes null-padding)))
-
-(defmacro define-latin1->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'latin1->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
-(instantiate-octets-definition define-latin1->string*)
-
-(defmacro define-latin1->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'latin1->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
-(instantiate-octets-definition define-latin1->string)
-
-;;; Multiple names for the :ISO{,-}8859-* families are needed because on
-;;; FreeBSD (and maybe other BSD systems), nl_langinfo("LATIN-1") will
-;;; return "ISO8859-1" instead of "ISO-8859-1".
-(define-unibyte-external-format :latin-1 (:latin1 :iso-8859-1 :iso8859-1)
-  (if (>= bits 256)
-      (external-format-encoding-error stream bits)
-      (setf (sap-ref-8 sap tail) bits))
-  (code-char byte)
-  latin1->string-aref
-  string->latin1)
-
+(define-unibyte-to-octets-functions :latin-1 get-latin1-bytes string->latin1 code->latin1-mapper)
+(define-unibyte-to-string-functions latin1->string identity)
+(define-unibyte-external-format-with-newline-variants :latin-1 (:latin1 :iso-8859-1 :iso8859-1)
+  (identity code->latin1-mapper)
+  (latin1->string-aref string->latin1)
+  (latin1->string/cr-aref string->latin1/cr)
+  (latin1->string/crlf-aref string->latin1/crlf))
 
 ;;; UTF-8
 
