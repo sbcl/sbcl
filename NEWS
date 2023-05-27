@@ -11,11 +11,11 @@ changes relative to sbcl-2.3.4:
        function epilogue to restore RSP/RBP.
     ** support SB-FUTEX on OpenBSD.  (thanks to Elijah Stone)
     ** support SB-FUTEX on Darwin/arm64.  (thanks to Elijah Stone)
-    ** fix compilation with clang.  (lp#2018601, thanks to Andrew)
+    ** fix compilation with clang on Windows.  (lp#2018601, thanks to Andrew)
   * bug fix: inspecting objects with unbound slots produces output that is less
     confusable with the string "unbound".  (thanks to Nicolas Martyanoff)
-  * bug fix: make TNs doubly-linked, allowing faster deletion.  (lp#2018124,
-    reported by Matt Kaufmann)
+  * optimization: make TN-REFs doubly-linked, allowing faster deletion.
+    (lp#2018124, reported by Matt Kaufmann)
   * optimization: MAPCAN/MAPCON are less accidentally quadratic.  (thanks to
     Gleefre)
   * optimization: improved arithmetic operations in the form of 
