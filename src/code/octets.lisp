@@ -98,8 +98,6 @@
 (define-condition invalid-utf8-continuation-byte (octet-decoding-error) ())
 (define-condition overlong-utf8-sequence (octet-decoding-error) ())
 
-(define-condition malformed-ascii (octet-decoding-error) ())
-
 (defun decoding-error (array start end external-format reason pos)
   (restart-case
       (error reason

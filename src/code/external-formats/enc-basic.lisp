@@ -12,199 +12,6 @@
 (in-package "SB-IMPL")
 
 
-;;; ASCII
-
-(declaim (inline code->ascii-mapper))
-(defun code->ascii-mapper (code)
-  (declare (optimize speed #.*safety-0*)
-           (type char-code code))
-  (if (> code 127)
-      nil
-      code))
-
-(declaim (inline get-ascii-bytes))
-(defun get-ascii-bytes (string pos)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->ascii-mapper :ascii string pos))
-
-(defun string->ascii (string sstart send null-padding)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-ascii-bytes null-padding)))
-
-(defmacro define-ascii->string (accessor type)
-  (let ((name (make-od-name 'ascii->string accessor)))
-    `(progn
-      (defun ,name (array astart aend)
-        (declare (optimize speed)
-                 (type ,type array)
-                 (type array-range astart aend))
-        ;; Since there is such a thing as a malformed ascii byte, a
-        ;; simple "make the string, fill it in" won't do.
-        (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
-          (loop for apos from astart below aend
-                do (let* ((code (,accessor array apos))
-                          (string-content
-                           (if (< code 128)
-                               (code-char code)
-                               (decoding-error array apos (1+ apos) :ascii
-                                               'malformed-ascii apos))))
-                     (if (characterp string-content)
-                         (vector-push-extend string-content string)
-                         (loop for c across string-content
-                               do (vector-push-extend c string))))
-                finally (return (coerce string 'simple-string))))))))
-(instantiate-octets-definition define-ascii->string)
-
-(define-unibyte-external-format :ascii
-    (:us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
-  (if (>= bits 128)
-      (external-format-encoding-error stream bits)
-      (setf (sap-ref-8 sap tail) bits))
-  (if (>= byte 128)
-      (return-from decode-break-reason 1)
-      (code-char byte))
-  ascii->string-aref
-  string->ascii)
-
-(declaim (inline code->ascii/cr-mapper))
-(defun code->ascii/cr-mapper (code)
-  (declare (optimize speed #.*safety-0*)
-           (type char-code code))
-  (cond
-    ((= code 10) 13)
-    ((> code 127) nil)
-    (t code)))
-
-(declaim (inline get-ascii-bytes))
-(defun get-ascii/cr-bytes (string pos)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->ascii/cr-mapper :ascii string pos))
-
-(defun string->ascii/cr (string sstart send null-padding)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-ascii/cr-bytes null-padding)))
-
-(defmacro define-ascii/cr->string (accessor type)
-  (let ((name (make-od-name 'ascii/cr->string accessor)))
-    `(progn
-      (defun ,name (array astart aend)
-        (declare (optimize speed)
-                 (type ,type array)
-                 (type array-range astart aend))
-        ;; Since there is such a thing as a malformed ascii byte, a
-        ;; simple "make the string, fill it in" won't do.
-        (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
-          (loop for apos from astart below aend
-                do (let* ((code (,accessor array apos))
-                          (string-content
-                           (cond
-                             ((= code 13) (code-char 10))
-                             ((< code 128) (code-char code))
-                             (t (decoding-error array apos (1+ apos) :ascii ; '(:ASCII :NEWLINE :CR)?
-                                                'malformed-ascii apos)))))
-                     (if (characterp string-content)
-                         (vector-push-extend string-content string)
-                         (loop for c across string-content
-                               do (vector-push-extend c string))))
-                finally (return (coerce string 'simple-string))))))))
-(instantiate-octets-definition define-ascii/cr->string)
-
-(define-external-format/variable-width (:ascii)
-    t #\? 1
-    (cond
-      ((= bits 10) (setf (sap-ref-8 sap tail) 13))
-      ((>= bits 128) (external-format-encoding-error stream bits))
-      (t (setf (sap-ref-8 sap tail) bits)))
-    1
-    (cond
-      ((= byte 13) (code-char 10))
-      ((>= byte 128) (return-from decode-break-reason 1))
-      (t (code-char byte)))
-    ascii/cr->string-aref
-    string->ascii/cr
-    :newline-variant :cr)
-
-(defun string->ascii/crlf (string sstart send null-padding)
-  (declare (optimize speed #.*safety-0*)
-           (type simple-string string)
-           (type array-range sstart send null-padding))
-  (let ((array (make-array (+ (* 2 (- send sstart)) null-padding)
-                           :element-type '(unsigned-byte 8)
-                           :fill-pointer 0 :adjustable t)))
-    (loop for i from sstart below send
-          do (let ((code (char-code (char string i))))
-               (cond
-                 ((= code 10)
-                  (vector-push-extend 13 array)
-                  (vector-push-extend 10 array))
-                 ((>= code 128)
-                  (let ((replacement (encoding-error :ascii string i)))
-                    (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
-                    (dotimes (j (length replacement))
-                      (vector-push-extend (aref replacement j) array))))
-                 (t (vector-push-extend code array)))))
-    (dotimes (i null-padding)
-      (vector-push-extend 0 array))
-    (coerce array '(simple-array (unsigned-byte 8) (*)))))
-
-(defmacro define-ascii/crlf->string (accessor type)
-  (let ((name (make-od-name 'ascii/crlf->string accessor)))
-    `(progn
-       (defun ,name (array astart aend)
-         (declare (optimize speed)
-                  (type ,type array)
-                  (type array-range astart aend))
-         (let ((string (make-array (- aend astart) :element-type 'character
-                                   :fill-pointer 0 :adjustable t)))
-           (loop for apos from astart below aend
-                 do (let* ((code (,accessor array apos))
-                           (string-content
-                            (cond
-                              ((= code 13) (if (= apos (1- aend))
-                                               (code-char 13)
-                                               (if (= (,accessor array (1+ apos)) 10)
-                                                   (progn (incf apos) #\Newline)
-                                                   (code-char 13))))
-                              ((< code 128) (code-char code))
-                              (t (decoding-error array apos (1+ apos) :ascii ; '(:ASCII :NEWLINE :CRLF)?
-                                                 'malformed-ascii apos)))))
-                      (if (characterp string-content)
-                          (vector-push-extend string-content string)
-                          (loop for c across string-content
-                                do (vector-push-extend c string))))
-                 finally (return (coerce string 'simple-string))))))))
-(instantiate-octets-definition define-ascii/crlf->string)
-
-(define-external-format/variable-width (:ascii)
-    t #\?
-    (if (char= |ch| #\Newline) 2 1)
-    (cond
-      ((= bits 10)
-       (setf (sap-ref-8 sap tail) 13)
-       (setf (sap-ref-8 sap (1+ tail)) 10))
-      ((>= bits 128) (external-format-encoding-error stream bits))
-      (t (setf (sap-ref-8 sap tail) bits)))
-    ((2 1)
-     (cond
-       ((= (- tail head) 1) 1) ; one octet away from EOF, can't possibly be CRLF
-       ((and (= byte 13) (= (sap-ref-8 sap (1+ head)) 10)) 2)
-       (t 1)))
-    (cond
-      ((= size 2) #\Newline)
-      ((>= byte 128) (return-from decode-break-reason 1))
-      (t (code-char byte)))
-    ascii/crlf->string-aref
-    string->ascii/crlf
-    :newline-variant :crlf)
-
 ;;; General unibyte support
 
 (defmacro define-unibyte-to-octets-functions
@@ -259,18 +66,71 @@
              (vector-push-extend 0 array))
            (coerce array '(simple-array (unsigned-byte 8) (*))))))))
 
-(defmacro define-unibyte-to-string-functions (octets-to-string-name ->code-name)
+(defmacro define-unibyte-to-string-functions
+    (external-format octets-to-string-name ->code-name &optional invalid-bytes-p)
   (let ((octets-to-string-name/cr (symbolicate octets-to-string-name '/cr))
-        (octets-to-string-name/crlf (symbolicate octets-to-string-name '/crlf)))
+        (octets-to-string-name/crlf (symbolicate octets-to-string-name '/crlf))
+        (decoding-condition-name (symbolicate 'malformed- external-format)))
+    (declare (ignorable decoding-condition-name))
     `(macrolet ((def (accessor type)
-                  (declare (ignore type))
+                  (declare (ignorable type))
                   `(progn
-                     (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
-                       (,(make-od-name 'latin->string accessor) array astart aend #',',->code-name))
-                     (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
-                       (,(make-od-name 'latin->string accessor) array astart aend
-                         (lambda (x) (let ((code (,',->code-name x))) (if (= code 13) 10 code)))))
+                     ,@,(when invalid-bytes-p
+                          ``((define-condition ,',decoding-condition-name (octet-decoding-error) ())))
+                     ,,(if invalid-bytes-p
+                           ``(progn
+                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
+                                 (declare (optimize speed)
+                                          (type ,type array)
+                                          (type array-range astart aend))
+                                 (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
+                                   (loop for apos from astart below aend
+                                         do (let* ((byte (,accessor array apos))
+                                                   (code (,',->code-name byte))
+                                                   (string-content
+                                                    (if code
+                                                        (code-char code)
+                                                        (decoding-error array apos (1+ apos)
+                                                                        ,',external-format
+                                                                        ',',decoding-condition-name
+                                                                        apos))))
+                                              (if (characterp string-content)
+                                                  (vector-push-extend string-content string)
+                                                  (loop for c across string-content
+                                                        do (vector-push-extend c string))))
+                                         finally (return (coerce string 'simple-string)))))
+                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
+                                 (declare (optimize speed)
+                                          (type ,type array)
+                                          (type array-range astart aend))
+                                 (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
+                                   (loop for apos from astart below aend
+                                         do (let* ((byte (,accessor array apos))
+                                                   (code (,',->code-name byte))
+                                                   (string-content
+                                                    (cond
+                                                      ((null code)
+                                                       (decoding-error array apos (1+ apos)
+                                                                       ,',external-format
+                                                                       ',',decoding-condition-name
+                                                                       apos))
+                                                      ((= code 13) (code-char 10))
+                                                      (t (code-char code)))))
+                                              (if (characterp string-content)
+                                                  (vector-push-extend string-content string)
+                                                  (loop for c across string-content
+                                                        do (vector-push-extend c string))))
+                                         finally (return (coerce string 'simple-string))))))
+                           ``(progn
+                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
+                                 (,(make-od-name 'latin->string accessor) array astart aend #',',->code-name))
+                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
+                                 (,(make-od-name 'latin->string accessor) array astart aend
+                                   (lambda (x) (let ((code (,',->code-name x))) (if (= code 13) 10 code)))))))
                      (defun ,(make-od-name ',octets-to-string-name/crlf accessor) (array astart aend)
+                       (declare (optimize speed)
+                                (type ,type array)
+                                (type array-range astart aend))
                        (let ((string (make-array (- aend astart) :element-type 'character
                                                  :fill-pointer 0 :adjustable t)))
                          (loop for apos from astart below aend
@@ -278,6 +138,12 @@
                                          (code (,',->code-name byte))
                                          (string-content
                                           (cond
+                                            ,@',(when invalid-bytes-p
+                                                  `(((null code)
+                                                     (decoding-error array apos (1+ apos)
+                                                                     ,external-format
+                                                                     ',decoding-condition-name
+                                                                     apos))))
                                             ((= code 13)
                                              (if (= apos (1- aend))
                                                  (code-char 13)
@@ -299,14 +165,18 @@
      (->code-name code->-name)
      (->string-name string->name)
      (->string/cr-name string/cr->name)
-     (->string/crlf-name string/crlf->name))
+     (->string/crlf-name string/crlf->name)
+     &optional invalid-bytes-p)
   `(progn
      (define-unibyte-external-format ,name ,other-names
        (let ((byte (,code->-name bits)))
          (if byte
              (setf (sap-ref-8 sap tail) byte)
              (external-format-encoding-error stream bits)))
-       (code-char (,->code-name byte))
+       (let ((code (,->code-name byte)))
+         ,(if invalid-bytes-p
+              '(if code (code-char code) (return-from decode-break-reason 1))
+              '(code-char code)))
        ,->string-name
        ,string->name)
      (define-external-format/variable-width (,name)
@@ -318,7 +188,11 @@
                (external-format-encoding-error stream bits)))
          1
          (let ((code (,->code-name byte)))
-           (if (= code 13) #\Newline (code-char code)))
+           ,(if invalid-bytes-p
+                `(if code
+                     (if (= code 13) #\Newline (code-char code))
+                     (return-from decode-break-reason 1))
+                '(if (= code 13) #\Newline (code-char code))))
          ,->string/cr-name
          ,string/cr->name
          :newline-variant :cr)
@@ -344,10 +218,37 @@
             (t 1)))
          (if (= size 2)
              #\Newline
-             (code-char (,->code-name byte)))
+             (let ((code (,->code-name byte)))
+               ,(if invalid-bytes-p
+                    '(if code (code-char code) (return-from decode-break-reason 1))
+                    '(code-char code))))
          ,->string/crlf-name
          ,string/crlf->name
          :newline-variant :crlf)))
+
+;;; ASCII
+
+(declaim (inline code->ascii-mapper))
+(defun code->ascii-mapper (code)
+  (declare (optimize speed #.*safety-0*)
+           (type char-code code))
+  (if (> code 127) nil code))
+
+(declaim (inline ascii->code-mapper))
+(defun ascii->code-mapper (byte)
+  (declare (optimize speed #.*safety-0*)
+           (type (unsigned-byte 8) byte))
+  (if (> byte 127) nil byte))
+
+(define-unibyte-to-octets-functions :ascii get-ascii-bytes string->ascii code->ascii-mapper)
+(define-unibyte-to-string-functions :ascii ascii->string ascii->code-mapper t)
+(define-unibyte-external-format-with-newline-variants :ascii
+    (:us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
+  (ascii->code-mapper code->ascii-mapper)
+  (ascii->string-aref string->ascii)
+  (ascii->string/cr-aref string->ascii/cr)
+  (ascii->string/crlf-aref string->ascii/crlf)
+  t)
 
 ;;; Latin-1
 
@@ -361,7 +262,7 @@
   (and (< code 256) code))
 
 (define-unibyte-to-octets-functions :latin-1 get-latin1-bytes string->latin1 code->latin1-mapper)
-(define-unibyte-to-string-functions latin1->string identity)
+(define-unibyte-to-string-functions :latin-1 latin1->string identity)
 (define-unibyte-external-format-with-newline-variants :latin-1 (:latin1 :iso-8859-1 :iso8859-1)
   (identity code->latin1-mapper)
   (latin1->string-aref string->latin1)

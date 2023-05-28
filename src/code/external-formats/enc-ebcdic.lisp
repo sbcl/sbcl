@@ -39,7 +39,7 @@
 
 (define-unibyte-to-octets-functions :ebcdic-us get-ebcdic-us-bytes string->ebcdic-us code->ebcdic-us-mapper)
 
-(define-unibyte-to-string-functions ebcdic-us->string ebcdic-us->code-mapper)
+(define-unibyte-to-string-functions :ebcdic-us ebcdic-us->string ebcdic-us->code-mapper)
 
 (define-unibyte-external-format-with-newline-variants :ebcdic-us (:cp037 :|cp037| :ibm-037 :ibm037)
   (ebcdic-us->code-mapper code->ebcdic-us-mapper)
