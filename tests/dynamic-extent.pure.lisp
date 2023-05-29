@@ -173,7 +173,7 @@
 
 (defun-with-dx dx-value-cell (x)
   ;; Not implemented everywhere, yet.
-  #+(or x86 x86-64 mips)
+  #+(or arm64 x86 x86-64 mips)
   (let ((cell x))
     (declare (sb-int:truly-dynamic-extent cell))
     (flet ((f ()
@@ -874,7 +874,7 @@
     (assert (every (lambda (x) (eql x 0)) a))))
 
 (with-test (:name (:dx-bug-misc :bdowning-2005-iv-16))
-  #+(or mips x86 x86-64)
+  #+(or arm64 mips x86 x86-64)
   (assert-no-consing (bdowning-2005-iv-16))
   (bdowning-2005-iv-16))
 
@@ -929,7 +929,7 @@
       (multiple-value-bind (y pos2) (read-from-string res nil nil :start pos)
         (assert (equalp f2 y))
         (assert (equalp f3 (read-from-string res nil nil :start pos2))))))
-  #+(or mips x86 x86-64)
+  #+(or arm64 mips x86 x86-64)
   (assert-no-consing (assert (eql n (funcall fun nil))))
   (assert (eql n (funcall fun nil))))
 
