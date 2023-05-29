@@ -235,7 +235,7 @@
       `((fixed+header
          (add ?end ?nbytes)
          (cmp :qword ?end :tlab-limit)
-         (jmp :nbe ?_)
+         (jmp :a ?_)
          (mov :qword :tlab-freeptr ?end)
          (:or (add ?end ?bias) (dec ?end))
          (mov ?_ (ea ?_ ?end) ?header))
@@ -243,7 +243,7 @@
         (var-array
          (add ?end ?nbytes)
          (cmp :qword ?end :tlab-limit)
-         (jmp :nbe ?_)
+         (jmp :a ?_)
          (mov :qword :tlab-freeptr ?end)
          (sub ?end ?nbytes)
          (mov ?_ (ea ?_ ?end) ?header)
@@ -254,7 +254,7 @@
                ;; and free-ptr points to the end of the putative data block.
                (xadd ?free ?size)
                (cmp :qword ?free :tlab-limit)
-               (jmp :nbe ?_)
+               (jmp :a ?_)
                (mov :qword :tlab-freeptr ?free)
                ;; Could have one or two stores prior to ORing in a lowtag.
                (:optional (mov ?_ (ea 0 ?size) ?header))
@@ -267,7 +267,7 @@
                   (lea :qword ?end (ea 0 ?nbytes-var ?free))
                   (add ?end ?free)) ; ?end originally holds the size in bytes
              (cmp :qword ?end :tlab-limit)
-             (jmp :nbe ?_)
+             (jmp :a ?_)
              (mov :qword :tlab-freeptr ?end)
              (mov ?_ (ea 0 ?free) ?header)
              (:optional (mov ?_ (ea ?_ ?free) ?vector-len))
@@ -278,7 +278,7 @@
         ;; not the first cons.
         (list (lea :qword ?end (ea 0 ?nbytes ?free))
               (cmp :qword ?end :tlab-limit)
-              (jmp :nbe ?_)
+              (jmp :a ?_)
               (mov :qword :tlab-freeptr ?end)
               (lea :qword ?free (ea ,(- sb-vm:list-pointer-lowtag
                                         (* sb-vm:cons-size sb-vm:n-word-bytes))
@@ -287,7 +287,7 @@
 
         (acons (lea :qword ?end (ea 32 ?free))
                (cmp :qword ?end :tlab-limit)
-               (jmp :nbe ?_)
+               (jmp :a ?_)
                (mov :qword :tlab-freeptr ?end)
                (:repeat (mov . ignore))
                (lea :qword ?result (ea #.(+ 16 sb-vm:list-pointer-lowtag) ?free)))
@@ -297,7 +297,7 @@
                              (lea :qword ?end (ea 0 ?nbytes-var ?free))
                              (add ?end ?free))
                         (cmp :qword ?end :tlab-limit)
-                        (jmp :nbe ?_)
+                        (jmp :a ?_)
                         (mov :qword :tlab-freeptr ?end)
                         (:repeat (:or (mov . ignore) (lea . ignore)))
                         (:or (or ?free ?lowtag)
