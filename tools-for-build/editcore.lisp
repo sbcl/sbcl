@@ -2062,6 +2062,7 @@
                (format asm-file (if (member :darwin *features*)
                                  "~% .data~%"
                                  "~% .section .rodata~%"))
+               (format asm-file "~% .section .data~%")
                (format asm-file " .globl ~A~%~:*~A:
  .quad ~d~%"
                     (labelize "alien_linkage_values")
