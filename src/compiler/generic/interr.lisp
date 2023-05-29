@@ -127,9 +127,10 @@
    #+x86-64
    ("Sub overflow" sub-overflow 1)
    ("Add overflow" signed-unsigned-add-overflow 1)
-   ("ADd overflow" add-overflow2 2)
+   ("Add overflow" add-overflow2 2)
    ("Sub overflow" sub-overflow2 2)
-   ("Mul overflow" mul-overflow2 2))
+   ("Mul overflow" mul-overflow2 2)
+   ("ASH overflow" ash-overflow2 2))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function

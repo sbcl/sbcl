@@ -2240,7 +2240,8 @@
   (defknown round-single (single-float #1#) single-float
       (foldable flushable movable always-translatable)))
 
-(defknown (overflow* overflow+ overflow-)
+(defknown (overflow* overflow+ overflow-
+           overflow-ash)
   (integer integer t)
   integer
   (movable always-translatable))

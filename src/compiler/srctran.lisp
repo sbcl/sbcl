@@ -2796,19 +2796,20 @@
     `(ash x ,len)))
 
 ;;; * deals better with ASH that overflows
-(deftransform ash ((integer amount) ((or word sb-vm:signed-word)
-                                     (constant-arg (integer 1 *))) *
-                   :important nil
-                   :node node)
-  ;; Give modular arithmetic optimizers a chance
-  (delay-ir1-transform node :ir1-phases)
-  (let ((type (single-value-type (node-asserted-type node)))
-        (shift (lvar-value amount)))
-    (when (or (csubtypep type (specifier-type 'word))
-              (csubtypep type (specifier-type 'sb-vm:signed-word))
-              (>= shift sb-vm:n-word-bits))
-      (give-up-ir1-transform))
-    `(* integer ,(ash 1 shift))))
+(unless-vop-existsp (:translate overflow-ash)
+  (deftransform ash ((integer amount) ((or word sb-vm:signed-word)
+                                       (constant-arg (integer 1 *))) *
+                     :important nil
+                     :node node)
+    ;; Give modular arithmetic optimizers a chance
+    (delay-ir1-transform node :ir1-phases)
+    (let ((type (single-value-type (node-asserted-type node)))
+          (shift (lvar-value amount)))
+      (when (or (csubtypep type (specifier-type 'word))
+                (csubtypep type (specifier-type 'sb-vm:signed-word))
+                (>= shift sb-vm:n-word-bits))
+        (give-up-ir1-transform))
+      `(* integer ,(ash 1 shift)))))
 
 (defun cast-or-check-bound-type (lvar &optional fixnum)
   (let ((dest (lvar-dest lvar)))
@@ -2827,6 +2828,11 @@
   (let ((type (single-value-type (node-derived-type node))))
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word)))
+      (give-up-ir1-transform))
+    (unless (and (or (csubtypep (lvar-type x) (specifier-type 'word))
+                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+                 (or (csubtypep (lvar-type y) (specifier-type 'word))
+                     (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
       (give-up-ir1-transform))
     (let* ((vops (fun-info-templates (fun-info-or-lose name)))
            (cast (or (cast-or-check-bound-type (node-lvar node))
@@ -2874,6 +2880,9 @@
                  * :node node :important nil)
   (overflow-transform 'overflow- x y node nil))
 
+(deftransform ash ((x y) ((or word sb-vm:signed-word) (or word sb-vm:signed-word))
+                 * :node node :important nil)
+  (overflow-transform 'overflow-ash x y node nil))
 
 (defun overflow-transform-unknown-x (name x y node)
   (delay-ir1-transform node :ir1-phases)

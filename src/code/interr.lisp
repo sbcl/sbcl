@@ -478,7 +478,7 @@
       (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
         (err x of cf)))
 
-   #+x86-64
+    #+x86-64
     (deferr sub-overflow-error (x)
       (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
         (err x of (not cf)))))
@@ -519,6 +519,13 @@
                     'fixnum)))
       (if (numberp x)
           (object-not-type-error (* x y) type nil)
+          (object-not-type-error x 'number nil))))
+
+  (deferr ash-overflow2-error (x y)
+    (let ((type (or (sb-di:error-context)
+                    'fixnum)))
+      (if (numberp x)
+          (object-not-type-error (ash x y) type nil)
           (object-not-type-error x 'number nil)))))
 
 ;;;; INTERNAL-ERROR signal handler

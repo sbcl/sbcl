@@ -103,6 +103,20 @@
                   (floor most-positive-fixnum 2)
                   (floor most-negative-fixnum 2))))
 
+(with-test (:name :overflow-ash)
+  (test-ops '(ash)
+            `(t fixnum
+                (signed-byte ,sb-vm:n-word-bits)
+                (unsigned-byte ,sb-vm:n-word-bits)
+                (integer ,(- 1 sb-vm:n-word-bits)
+                         ,(1- sb-vm:n-word-bits))
+                (integer 0
+                         ,(1- sb-vm:n-word-bits)))
+            (list 0 1 3 4 -1 -3 -4
+                  sb-vm:n-word-bits (- sb-vm:n-word-bits)
+                  (- 1 sb-vm:n-word-bits) (1- sb-vm:n-word-bits)
+                  300 -300)))
+
 (with-test (:name :fixnum-integer-cmp)
   (test-ops '(> <)
             `(t fixnum
