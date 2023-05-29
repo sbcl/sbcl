@@ -2506,34 +2506,41 @@ mechanism for inter-thread communication."
 ;;; globaldb should indicate that the variable is both :always-thread-local
 ;;; (which says that the TLS index is nonzero), and :always-bound (which says that
 ;;; the value in TLS is not UNBOUND-MARKER).
-;;; Here's the problem: Some of the backends implement those semantics as dictated
-;;; by globaldb - assigning into TLS even if the current TLS value is NO_TLS_VALUE;
-;;; while others do not make use of that information, and will therefore assign into
-;;; the symbol-global-value if the TLS value is NO_TLS_VALUE.
-;;; This can not be "corrected" by genesis - there is no TLS when genesis executes.
-;;; The only way to do this uniformly for all the platforms is to compute the address
-;;; of the thread-local storage slot, and use (SETF SAP-REF-LISPOBJ) on that.
-;;; (Existence of a vop for ENSURE-SYMBOL-TLS-INDEX is not an indicator that the
-;;; SET vop will assign into a thread-local symbol that currently has no TLS value.)
 (defun init-thread-local-storage (thread)
   ;; In addition to wanting the expressly unsafe variant of SYMBOL-VALUE, any error
   ;; signaled such as invalid-arg-count would just go totally wrong at this point.
   (declare (optimize (safety 0)))
   #-sb-thread
   (macrolet ((expand () `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
+    (setf *current-thread* thread)
     (expand))
-  ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison's sake
+  ;; Bear in mind that relative to the #-sb-thread code these assignments require
+  ;; a trick because none of the symbols have been thread-locally bound.
+  ;; The C runtime shouldn't have to know to prefill most but not all the TLS with
+  ;; NO-TLS-VALUE. Hence these symbols' TLS slots contain NO-TLS-VALUE which under
+  ;; ordinary circumstances could cause the store to affect SYMBOL-GLOBAL-VALUE.
+  ;; So we have to store directly into offsets relative to the primitive thread.
+  ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison.
+  ;; Also note that on x86-64, (SETF SAP-REF-LISPOBJ) won't move immediate-to-memory
+  ;; using one instruction, but sap-ref-word will.
+  ;; So some of these are compile-time converted into their bit representation.
+  ;; (Additionally there is a redundant move from THREAD-TN to a sap register
+  ;; which could probably be eliminated but only via peephole optimization)
   #+sb-thread
   (let ((sap (current-thread-sap)))
     (macrolet ((expand ()
-                 `(setf ,@(loop for (var form) in (cdr *thread-local-specials*)
+                 `(setf (sap-ref-lispobj sap ,(info :variable :wired-tls '*current-thread*))
+                        thread
+                        ,@(loop for (var form) in (cdr *thread-local-specials*)
                                 for index = (info :variable :wired-tls var)
-                                append `((sap-ref-lispobj sap ,index) ,form)))))
+                                append
+                                (cond ((equal form '(sb-kernel:make-unbound-marker))
+                                       `((sap-ref-word sap ,index) ,(sb-vm::unbound-marker-bits)))
+                                      ((eq form nil)
+                                       `((sap-ref-word sap ,index) ,sb-vm:nil-value))
+                                      (t
+                                       `((sap-ref-lispobj sap ,index) ,form)))))))
       (expand)))
-  ;; Straightforwardly assign *current-thread* because it's never the NO-TLS-VALUE marker.
-  ;; I wonder how to to prevent user code from doing this, but it isn't a new problem per se.
-  ;; Perhaps this should be symbol-macro with a vop behind it and no setf expander.
-  (setf *current-thread* thread)
   thread)
 
 (eval-when (:compile-toplevel)
