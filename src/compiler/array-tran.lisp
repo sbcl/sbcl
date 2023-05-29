@@ -1019,20 +1019,22 @@
     (block nil
       (let* ((eltype (cond ((not element-type) t)
                            ((not (constant-lvar-p element-type))
-                            (when (splice-fun-args element-type 'array-element-type 1)
-                              (return
-                                `(multiple-value-bind (widetag shift)
-                                     (sb-vm::array-underlying-widetag-and-shift element-type)
-                                   (%make-array
-                                    dims
-                                    widetag
-                                    shift
-                                    ,@(maybe-arg initial-element)
-                                    ,@(maybe-arg initial-contents)
-                                    ,@(maybe-arg adjustable)
-                                    ,@(maybe-arg fill-pointer)
-                                    ,@(maybe-arg displaced-to)
-                                    ,@(maybe-arg displaced-index-offset)))))
+                            (let ((uses (lvar-uses element-type)))
+                              (when (splice-fun-args element-type 'array-element-type 1)
+                                (return
+                                  `(multiple-value-bind (widetag shift)
+                                       (with-source-path ,(node-source-path uses)
+                                         (sb-vm::array-underlying-widetag-and-shift element-type))
+                                     (%make-array
+                                      dims
+                                      widetag
+                                      shift
+                                      ,@(maybe-arg initial-element)
+                                      ,@(maybe-arg initial-contents)
+                                      ,@(maybe-arg adjustable)
+                                      ,@(maybe-arg fill-pointer)
+                                      ,@(maybe-arg displaced-to)
+                                      ,@(maybe-arg displaced-index-offset))))))
                             (give-up-ir1-transform
                              "ELEMENT-TYPE is not constant."))
                            (t

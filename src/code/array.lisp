@@ -1052,6 +1052,7 @@ of specialized arrays is supported."
 
 (defun array-element-type (array)
   "Return the type of the elements of the array"
+  (declare (explicit-check array))
   (truly-the (or list symbol)
              (widetag->element-type (array-underlying-widetag array))))
 

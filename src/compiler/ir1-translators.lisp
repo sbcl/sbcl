@@ -1156,6 +1156,11 @@ care."
                             *current-path*)))
     (ir1-convert start next result form)))
 
+(def-ir1-translator with-source-path ((source-path form)
+                                      start next result)
+  (let ((*current-path* source-path))
+    (ir1-convert start next result form)))
+
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))
         (index-ctran (make-ctran))
