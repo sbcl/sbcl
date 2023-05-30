@@ -2245,3 +2245,8 @@
   (integer integer t)
   integer
   (movable always-translatable))
+
+(defknown overflow-negate
+  (integer t)
+  integer
+  (movable always-translatable))

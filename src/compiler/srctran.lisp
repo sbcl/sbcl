@@ -2960,6 +2960,31 @@
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow- x y node))
 
+(defun overflow-transform-1 (name x node)
+  (delay-ir1-transform node :ir1-phases)
+  (let ((type (single-value-type (node-derived-type node))))
+    (when (or (csubtypep type (specifier-type 'word))
+              (csubtypep type (specifier-type 'sb-vm:signed-word)))
+      (give-up-ir1-transform))
+    (unless (and (or (csubtypep (lvar-type x) (specifier-type 'word))
+                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))))
+      (give-up-ir1-transform))
+    (let* ((vops (fun-info-templates (fun-info-or-lose name)))
+           (cast (or (cast-or-check-bound-type (node-lvar node))
+                     (give-up-ir1-transform)))
+           (result-type (type-intersection type cast)))
+      (loop for vop in vops
+            for (x-type cast-type) = (fun-type-required (vop-info-type vop))
+            when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                      (neq x-type *universal-type*)
+                      (csubtypep (lvar-type x) x-type))
+            return `(%primitive ,(vop-info-name vop) x ',(type-specifier cast))
+            finally (give-up-ir1-transform)))))
+
+(deftransform %negate ((x) ((or word sb-vm:signed-word))
+                       * :node node :important nil)
+  (overflow-transform-1 'overflow-negate x node))
+
 ;;; These must come before the ones below, so that they are tried
 ;;; first.
 (deftransform floor ((number divisor))

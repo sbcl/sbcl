@@ -526,6 +526,13 @@
                     'fixnum)))
       (if (numberp x)
           (object-not-type-error (ash x y) type nil)
+          (object-not-type-error x 'number nil))))
+
+  (deferr negate-overflow-error (x)
+    (let ((type (or (sb-di:error-context)
+                    'fixnum)))
+      (if (numberp x)
+          (object-not-type-error (- x) type nil)
           (object-not-type-error x 'number nil)))))
 
 ;;;; INTERNAL-ERROR signal handler
