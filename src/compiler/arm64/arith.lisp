@@ -793,11 +793,9 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:generator 30
-    (inst cmp arg 0)
-    (inst csinv temp arg arg :ge)
-    (inst clz temp temp)
-    (inst mov res (fixnumize 64))
+  (:generator 5
+    (inst cls temp arg)
+    (inst mov res (fixnumize 63))
     (inst sub res res (lsl temp n-fixnum-tag-bits))))
 
 (define-vop (unsigned-byte-64-len)
@@ -809,11 +807,10 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:generator 29
+  (:generator 5
     (inst clz temp arg)
     (inst mov res (fixnumize 64))
     (inst sub res res (lsl temp n-fixnum-tag-bits))))
-
 
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)
