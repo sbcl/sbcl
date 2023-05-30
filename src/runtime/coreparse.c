@@ -845,8 +845,10 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
             case IMMOBILE_TEXT_CORE_SPACE_ID:
+#ifdef LISP_FEATURE_X86_64
                 if (addr + request > 0x80000000)
                     lose("Won't map immobile space above 2GB");
+#endif
                 if (id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID)
                     FIXEDOBJ_SPACE_START = addr;
                 else

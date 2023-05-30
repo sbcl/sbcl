@@ -67,20 +67,12 @@
 
 ;;;; Where to put the different spaces.
 
-#+(and immobile-space darwin)
-(error "can't work because immobile text must be under 2GB")
-
-#+immobile-space
-(!gencgc-space-setup #x50000000
+(!gencgc-space-setup #+(or linux openbsd netbsd freebsd)
+                     #x2F0000000
+                     #+darwin #x300000000
                      :read-only-space-size 0
                      :fixedobj-space-size #.(* 65536 1024)
                      :text-space-size #.(* 2 65536 1024)
-                     :dynamic-space-start #x1000000000)
-
-#-immobile-space
-(!gencgc-space-setup #+(or linux openbsd freebsd) #xF0000000
-                     #+darwin #x300000000
-                     #+netbsd #x2F0000000
                      :dynamic-space-start
                      #-darwin #x1000000000
                      #+darwin #x7003000000)
