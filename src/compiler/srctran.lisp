@@ -4277,7 +4277,7 @@
   (def >= > floor))
 
 (macrolet ((def (name x y type-x type-y)
-             `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node)
+             `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node :important nil)
                 (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
                            (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
                        (give-up-ir1-transform))
@@ -4294,10 +4294,10 @@
   (def > i f (integer * #.most-positive-fixnum) fixnum)
   (def < f i fixnum (integer * #.most-positive-fixnum)))
 
-(deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))))
+(deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))
 
-(deftransform > ((x y) (integer (eql #.(1- most-negative-fixnum))))
+(deftransform > ((x y) (integer (eql #.(1- most-negative-fixnum))) * :important nil)
   `(not (< x most-negative-fixnum)))
 
 (deftransform = ((x y) (rational (constant-arg float)))
