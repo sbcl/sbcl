@@ -2261,7 +2261,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 3
+  (:generator 4
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (amount-error amount)
@@ -2332,7 +2332,7 @@
   (:arg-types tagged-num unsigned-num)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
-  (:variant-cost 1))
+  (:variant-cost 2))
 
 (define-vop (overflow-ash-unsigned)
   (:translate overflow-ash)
@@ -2346,7 +2346,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:variant-vars signed)
-  (:generator 2
+  (:generator 3
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (amount-error amount)
@@ -2379,8 +2379,11 @@
                     (move r number))
                    (t
                     (inst lsl r number amount)
-                    (inst asr tmp-tn number (- 64 amount))
-                    (inst cbnz tmp-tn error))))
+                    (cond ((= amount 1)
+                           (inst tbnz* number 63 error))
+                          (t
+                           (inst cmp zr-tn (lsr number (- 64 amount)))
+                           (inst b :ne error))))))
             ((sc-is amount unsigned-reg)
              (unless fits
                (move r number)
@@ -2411,6 +2414,15 @@
              (inst asr tmp-tn number tmp-tn)
              (inst cbnz tmp-tn error))))
     done))
+
+(define-vop (overflow-ash-unsigned-fixnum overflow-ash-unsigned)
+  (:translate overflow-ash)
+  (:args (number :scs (any-reg))
+         (amount :scs (unsigned-reg immediate)))
+  (:arg-types positive-fixnum unsigned-num)
+  (:results (r :scs (any-reg) :from :load))
+  (:result-types tagged-num)
+  (:variant-cost 2))
 
 (define-vop (overflow-ash-signed=>unsigned overflow-ash-unsigned)
   (:translate overflow-ash)

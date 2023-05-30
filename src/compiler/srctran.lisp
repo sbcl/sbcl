@@ -2796,20 +2796,19 @@
     `(ash x ,len)))
 
 ;;; * deals better with ASH that overflows
-(unless-vop-existsp (:translate overflow-ash)
-  (deftransform ash ((integer amount) ((or word sb-vm:signed-word)
-                                       (constant-arg (integer 1 *))) *
-                     :important nil
-                     :node node)
-    ;; Give modular arithmetic optimizers a chance
-    (delay-ir1-transform node :ir1-phases)
-    (let ((type (single-value-type (node-asserted-type node)))
-          (shift (lvar-value amount)))
-      (when (or (csubtypep type (specifier-type 'word))
-                (csubtypep type (specifier-type 'sb-vm:signed-word))
-                (>= shift sb-vm:n-word-bits))
-        (give-up-ir1-transform))
-      `(* integer ,(ash 1 shift)))))
+(deftransform ash ((integer amount) ((or word sb-vm:signed-word)
+                                     (constant-arg (integer 1 *))) *
+                   :important nil
+                   :node node)
+  ;; Give modular arithmetic optimizers a chance
+  (delay-ir1-transform node :ir1-phases)
+  (let ((type (single-value-type (node-asserted-type node)))
+        (shift (lvar-value amount)))
+    (when (or (csubtypep type (specifier-type 'word))
+              (csubtypep type (specifier-type 'sb-vm:signed-word))
+              (>= shift sb-vm:n-word-bits))
+      (give-up-ir1-transform))
+    `(* integer ,(ash 1 shift))))
 
 (defun cast-or-check-bound-type (lvar &optional fixnum)
   (let ((dest (lvar-dest lvar)))
