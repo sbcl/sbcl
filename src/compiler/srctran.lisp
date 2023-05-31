@@ -2854,6 +2854,7 @@
              for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
              when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                        (neq x-type *universal-type*)
+                       (neq y-type *universal-type*)
                        (or (and (subp x x-type)
                                 (subp y y-type))
                            (and swap
@@ -2883,14 +2884,19 @@
                  * :node node :important nil)
   (overflow-transform 'overflow-ash x y node nil))
 
-(defun overflow-transform-unknown-x (name x y node)
+(defun overflow-transform-unknown-x (name x y node &optional swap)
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node)))
-        (x-type (lvar-type x)))
+        (x-type (lvar-type x))
+        (y-type (lvar-type y)))
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word))
-              (csubtypep x-type (specifier-type 'word))
-              (csubtypep x-type (specifier-type 'sb-vm:signed-word)))
+              (if swap
+                  (or
+                   (csubtypep y-type (specifier-type 'word))
+                   (csubtypep y-type (specifier-type 'sb-vm:signed-word)))
+                  (or (csubtypep x-type (specifier-type 'word))
+                      (csubtypep x-type (specifier-type 'sb-vm:signed-word)))))
       (give-up-ir1-transform))
     (let* ((vops (fun-info-templates (fun-info-or-lose name)))
            (cast (or (cast-or-check-bound-type (node-lvar node) t)
@@ -2900,7 +2906,9 @@
         (unless (and (fixnump cast-low)
                      (fixnump cast-high))
           (give-up-ir1-transform))
-        (multiple-value-bind (y-low y-high) (integer-type-numeric-bounds (lvar-type y))
+        (multiple-value-bind (y-low y-high) (if swap
+                                                (integer-type-numeric-bounds x-type)
+                                                (integer-type-numeric-bounds y-type))
           (unless (and (fixnump y-low)
                        (fixnump y-high))
             (give-up-ir1-transform))
@@ -2911,8 +2919,11 @@
                        (and (> y-low distance-high)
                             (< y-high distance-low)))
                       (overflow-
-                       (and (> (- y-high) distance-high)
-                            (< (- y-low) distance-low)))
+                       (if swap
+                           (and (< y-high (+ (1+ most-positive-fixnum) cast-low))
+                                (> y-low (+ (1- most-negative-fixnum) cast-high)))
+                           (and (> (- y-high) distance-high)
+                                (< (- y-low) distance-low))))
                       (overflow*
                        (or (> y-low 0)
                            (< y-high -1))))
@@ -2931,8 +2942,10 @@
                             (sb-xc:typep value type)))))))
             (loop for vop in vops
                   for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
-                  when (and (eq x-type *universal-type*)
-                            (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                  when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                            (if swap
+                                (eq y-type *universal-type*)
+                                (eq x-type *universal-type*))
                             (and (subp x x-type)
                                  (subp y y-type)))
                   return `(%primitive ,(vop-info-name vop)
@@ -2959,6 +2972,10 @@
 (deftransform - ((x y) (t (or word sb-vm:signed-word))
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow- x y node))
+
+(deftransform - ((x y) ((or word sb-vm:signed-word) t)
+                 * :node node :important nil)
+  (overflow-transform-unknown-x 'overflow- x y node t))
 
 (defun overflow-transform-1 (name x node)
   (delay-ir1-transform node :ir1-phases)
