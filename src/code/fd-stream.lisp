@@ -840,12 +840,6 @@
   (bytes-for-char-fun (missing-arg) :type function)
   (read-c-string-fun (missing-arg) :type function)
   (write-c-string-fun (missing-arg) :type function)
-  ;; We indirect through symbols in these functions so that a
-  ;; developer working on the octets code can easily redefine things
-  ;; and use the new function definition without redefining the
-  ;; external format as well.  The slots above don't do any
-  ;; indirection because a developer working with those slots would be
-  ;; redefining the external format anyway.
   (octets-to-string-fun (missing-arg) :type function)
   (string-to-octets-fun (missing-arg) :type function))
 (declaim (freeze-type external-format))

@@ -95,7 +95,7 @@
 
 ;;; Test UTF-8 writing and reading of 1, 2, 3 and 4 octet characters with
 ;;; all possible offsets. Tests for buffer edge bugs. fd-stream buffers are
-;;; 4096 wide.
+;;; 8192 wide.
 (dotimes (width-1 4)
   (let ((character (code-char (elt '(1 #x81 #x801 #x10001) width-1))))
     (dotimes (offset (+ width-1 1))
