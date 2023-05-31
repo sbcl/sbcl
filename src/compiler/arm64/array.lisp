@@ -153,6 +153,10 @@
                     (inst b :hs error))
                    ((eql index 0)
                     (inst cbz bound error))
+                   ((and (tn-p index)
+                         (sc-is index unsigned-reg signed-reg))
+                    (inst cmp index (lsr bound 1))
+                    (inst b :hs error))
                    (t
                     (inst cmp bound index)
                     (inst b :ls error))))))))
@@ -172,9 +176,9 @@
 
 (define-vop (check-bound/untagged check-bound)
   (:args (array)
-         (bound :scs (unsigned-reg signed-reg))
+         (bound)
          (index :scs (unsigned-reg signed-reg)))
-  (:arg-types * (:or unsigned-num signed-num)
+  (:arg-types * *
                 (:or unsigned-num signed-num))
   (:variant nil)
   (:variant-cost 5))
