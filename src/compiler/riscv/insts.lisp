@@ -20,6 +20,8 @@
             sb-vm::zero
             sb-vm::zero-offset
             sb-vm::lip-tn sb-vm::zero-tn
+            sb-vm::code-tn
+            sb-vm::tn-byte-offset
             ;; Types
             sb-vm::u-and-i-inst-immediate
             sb-vm::short-immediate
@@ -929,6 +931,20 @@
                    (- (+ (label-position label position delta-if-after)
                          (component-header-length))
                       other-pointer-lowtag)))))
+
+(define-instruction load-far-constant (segment dest src)
+  (:emitter
+   ;; pc - (code - other-pointer-tag) = header + position
+   ;; (code - other-pointer-tag) - pc + const = const - header - position
+   (let ((offset (- (tn-byte-offset src) (component-header-length))))
+     (emit-back-patch
+      segment 8
+      (lambda (segment position)
+        (assemble (segment)
+          (multiple-value-bind (u i)
+              (u-and-i-inst-immediate (- offset position))
+            (inst auipc lip-tn u)
+            (inst #-64-bit lw #+64-bit ld dest lip-tn i))))))))
 
 (defun emit-header-data (segment type)
   (emit-back-patch

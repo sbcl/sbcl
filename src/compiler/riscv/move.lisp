@@ -50,12 +50,7 @@
       (short-immediate
        (loadw y code-tn (tn-offset x) other-pointer-lowtag))
       (u+i-immediate
-       (multiple-value-bind (u i)
-           (u-and-i-inst-immediate offset)
-         ;; Should be GC safe.
-         (inst lui y u)
-         (inst add lip-tn code-tn y)
-         (inst #-64-bit lw #+64-bit ld y lip-tn i))))))
+       (inst load-far-constant y x)))))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
