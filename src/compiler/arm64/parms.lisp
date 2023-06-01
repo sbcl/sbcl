@@ -70,7 +70,7 @@
 (!gencgc-space-setup #+(or linux openbsd netbsd freebsd)
                      #x2F0000000
                      #+darwin #x300000000
-                     :read-only-space-size 0
+                     #-darwin :read-only-space-size #-darwin 0
                      :fixedobj-space-size #.(* 65536 1024)
                      :text-space-size #.(* 2 65536 1024)
                      :dynamic-space-start
