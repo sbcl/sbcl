@@ -323,10 +323,10 @@ uint32_t os_get_build_time_shared_libraries(uint32_t excl_maximum,
                                        void** opt_store_handles,
                                        const char *opt_store_names[])
 {
-    void* base = opt_root ? opt_root : (void*)runtime_module_handle;
+    char* base = opt_root ? opt_root : (void*)runtime_module_handle;
     /* base defaults to 0x400000 with GCC/mingw32. If you dereference
      * that location, you'll see 'MZ' bytes */
-    void* base_magic_location =
+    char* base_magic_location =
         base + ((IMAGE_DOS_HEADER*)base)->e_lfanew;
 
     /* dos header provided the offset from `base' to
@@ -570,7 +570,7 @@ static void resolve_optional_imports()
 
 #undef RESOLVE
 
-intptr_t win32_get_module_handle_by_address(os_vm_address_t addr)
+intptr_t win32_get_module_handle_by_address(void* addr)
 {
     HMODULE result = 0;
     /* So apparently we could use VirtualQuery instead of
@@ -752,7 +752,7 @@ win32_reset_stack_overflow_guard_page() {
      * unwinding from a stack overflow condition without retriggering the guard
      * page. See test (:EXHAUST :WRITE-TO-STACK-ON-UNWIND). */
 #define WIN32_STACK_GUARD_SLACK (2*win32_stack_guarantee + win32_page_size)
-    void *stack_guard_start = CONTROL_STACK_GUARD_PAGE(self);
+    char *stack_guard_start = CONTROL_STACK_GUARD_PAGE(self);
     fprintf(stderr, "INFO: Reprotecting control stack guard (0x%p+0x%x)\n",
             stack_guard_start, WIN32_STACK_GUARD_SLACK);
     fflush(stderr);

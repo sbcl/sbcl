@@ -31,7 +31,14 @@
 
 #include "pthreads_win32.h"
 
+#ifdef LISP_FEATURE_64_BIT
+/* LPVOID can't be legally used in pointer arithmetic.
+ * (so all the arithmetic in 'validate.h' is technically illegal).
+ * But I can't test 32-bit so let it stay as was */
+typedef char* os_vm_address_t;
+#else
 typedef LPVOID os_vm_address_t;
+#endif
 typedef uword_t os_vm_size_t;
 typedef intptr_t os_vm_offset_t;
 typedef int os_vm_prot_t;
