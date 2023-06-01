@@ -71,60 +71,9 @@
 
 ;;; Build the unicode database now. It depends on nothing in the cross-compiler
 ;;; (and let's keep it that way). This code is slow to run, so compile it.
-(let ((inputs '("tools-for-build/ucd.lisp"
-                "tools-for-build/UnicodeData.txt"
-                "tools-for-build/NormalizationCorrections.txt"
-                "tools-for-build/CompositionExclusions.txt"
-                "tools-for-build/SpecialCasing.txt"
-                "tools-for-build/EastAsianWidth.txt"
-                "tools-for-build/Scripts.txt"
-                "tools-for-build/LineBreak.txt"
-                "tools-for-build/DerivedAge.txt"
-                "tools-for-build/allkeys.txt"
-                "tools-for-build/emoji-data.txt"
-                "tools-for-build/confusables.txt"
-                "tools-for-build/BidiMirroring.txt"
-                "tools-for-build/Blocks.txt"
-                "tools-for-build/Jamo.txt"
-                "tools-for-build/CaseFolding.txt"
-                "tools-for-build/PropList.txt"
-                "tools-for-build/DerivedNormalizationProps.txt"
-                "tools-for-build/more-ucd-consts.lisp-expr"))
-      (outputs '("output/bidi-mirrors.lisp-expr"
-                 "output/BidiMirroring.txt"
-                 "output/block-names.lisp-expr"
-                 "output/block-ranges.lisp-expr"
-                 "output/Blocks.txt"
-                 "output/case.dat"
-                 "output/CaseFolding.txt"
-                 "output/casepages.dat"
-                 "output/casepages.lisp-expr"
-                 "output/collation.lisp-expr"
-                 "output/comp.lisp-expr"
-                 "output/CompositionExclusions.txt"
-                 "output/confusables.lisp-expr"
-                 "output/decomp.dat"
-                 "output/DerivedAge.txt"
-                 "output/DerivedNormalizationProps.txt"
-                 "output/EastAsianWidth.txt"
-                 "output/emoji-data.txt"
-                 "output/confusables.txt"
-                 "output/foldcases.lisp-expr"
-                 "output/Jamo.txt"
-                 "output/LineBreak.txt"
-                 "output/misc-properties.lisp-expr"
-                 "output/NormalizationCorrections.txt"
-                 "output/numerics.lisp-expr"
-                 "output/other-collation-info.lisp-expr"
-                 "output/PropList.txt"
-                 "output/Scripts.txt"
-                 "output/SpecialCasing.txt"
-                 "output/titlecases.lisp-expr"
-                 "output/ucd1-names.lisp-expr"
-                 "output/ucdhigh.dat"
-                 "output/ucdlow.dat"
-                 "output/ucdmisc.dat"
-                 "output/ucd-names.lisp-expr")))
+(multiple-value-bind (inputs outputs)
+    (with-open-file (stream "src/cold/ucd-filespecs.lisp-expr")
+      (values (read stream) (read stream)))
   (unless (outputs-up-to-date inputs outputs)
     (format t "~&; Building Unicode data~%")
     (let ((*ucd-inputs* (make-hash-table :test 'equal))
