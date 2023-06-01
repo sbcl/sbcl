@@ -11,7 +11,7 @@
 
 (enable-test-parallelism)
 
-(defun test-ops (ops types arguments &optional (result-types types))
+(defun test-ops (ops types arguments &key (result-types types) (b-arguments arguments))
   (flet ((normalize-type (type)
            (sb-kernel:type-specifier (sb-kernel:specifier-type type))))
     (let ((types (mapcar #'normalize-type types))
@@ -29,7 +29,7 @@
                               (loop for a in arguments
                                     when (typep a a-type)
                                     do
-                                    (loop for b in arguments
+                                    (loop for b in b-arguments
                                           for result = (funcall op a b)
                                           when (typep b b-type)
                                           do
@@ -112,10 +112,19 @@
                          ,(1- sb-vm:n-word-bits))
                 (integer 0
                          ,(1- sb-vm:n-word-bits)))
-            (list 0 1 3 4 -1 -3 -4
-                  sb-vm:n-word-bits (- sb-vm:n-word-bits)
-                  (- 1 sb-vm:n-word-bits) (1- sb-vm:n-word-bits)
-                  300 -300)))
+            (list* most-positive-fixnum
+                   (1- most-positive-fixnum)
+                   (1+ most-positive-fixnum)
+                   #1=(list 0 1 3 4 -1 -3 -4
+                            most-negative-fixnum
+                            (1+ most-negative-fixnum)
+                            (1- most-negative-fixnum)
+                            (- (expt 2 (1- sb-vm:n-word-bits)))
+                            (- 1 (expt 2 (1- sb-vm:n-word-bits)))
+                            (- -1 (expt 2 (1- sb-vm:n-word-bits)))))
+            :b-arguments (list* sb-vm:n-word-bits (- sb-vm:n-word-bits)
+                                (- 1 sb-vm:n-word-bits) (1- sb-vm:n-word-bits)
+                                300 -300 #1#)))
 
 (with-test (:name :fixnum-integer-cmp)
   (test-ops '(> <)
@@ -142,7 +151,7 @@
                   (1+ most-negative-fixnum)
                   (floor most-positive-fixnum 2)
                   (floor most-negative-fixnum 2))
-            '(t)))
+            :result-types '(t)))
 
 (with-test (:name :integer-ratio-float-compare)
   (test-ops '(> <)
@@ -169,4 +178,4 @@
                   (1+ most-negative-fixnum)
                   (floor most-positive-fixnum 2)
                   (floor most-negative-fixnum 2))
-            '(t)))
+            :result-types '(t)))
