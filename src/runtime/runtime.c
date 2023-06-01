@@ -323,7 +323,7 @@ parse_size_arg(char *arg, char *arg_name)
 
 char *core_string;
 
-static void print_environment(int argc, char *argv[])
+static void print_environment(int argc, char *argv[], char *envp[])
 {
     int n = 0;
     printf("; Commandline arguments:\n");
@@ -333,8 +333,8 @@ static void print_environment(int argc, char *argv[])
     }
     n = 0;
     printf(";\n; Environment:\n");
-    while (ENVIRON[n]) {
-        printf(";  %2d: \"%s\"\n", n, ENVIRON[n]);
+    while (envp[n]) {
+        printf(";  %2d: \"%s\"\n", n, envp[n]);
         ++n;
     }
 }
@@ -427,7 +427,7 @@ static int is_memsize_arg(char *argv[], int argi, int argc, int *merge_core_page
 
 static struct cmdline_options
 parse_argv(struct memsize_options memsize_options,
-           int argc, char *argv[], char *core)
+           int argc, char *argv[], char *envp[], char *core)
 {
 #ifdef LISP_FEATURE_WIN32
     wchar_t
@@ -596,7 +596,7 @@ parse_argv(struct memsize_options memsize_options,
         }
     }
     if (debug_environment_p) {
-        print_environment(argc, argv);
+        print_environment(argc, argv, envp);
     }
 
     struct cmdline_options o;
@@ -662,7 +662,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
         }
     }
 
-    struct cmdline_options options = parse_argv(memsize_options, argc, argv, core);
+    struct cmdline_options options = parse_argv(memsize_options, argc, argv, envp, core);
 
     /* Align down to multiple of page_table page size, and to the appropriate
      * stack alignment. */

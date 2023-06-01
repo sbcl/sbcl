@@ -276,6 +276,7 @@ void os_init()
 # define ALLOW_PERSONALITY_CHANGE 0
 #endif
 
+extern char **environ;
 int os_preinit(char *argv[], char *envp[])
 {
 #ifdef LISP_FEATURE_RISCV
@@ -347,6 +348,7 @@ int os_preinit(char *argv[], char *envp[])
             char runtime[PATH_MAX+1];
             int i = readlink("/proc/self/exe", runtime, PATH_MAX);
             if (i != -1) {
+                // Why is this needed? env surely was initialized from environ wasn't it?
                 environ = envp;
                 setenv("SBCL_IS_RESTARTING", "T", 1);
                 runtime[i] = '\0';

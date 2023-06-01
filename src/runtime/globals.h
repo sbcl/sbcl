@@ -72,13 +72,6 @@ extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
 
 extern lispobj arena_chain;
 
-#ifdef LISP_FEATURE_WIN32
-#define ENVIRON _environ
-#else
-#define ENVIRON environ
-#endif
-extern char **ENVIRON;
-
 #if !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_control_stack_pointer;
 #endif
