@@ -2634,18 +2634,28 @@
     (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right)))
 
 (defmacro combination-typed-p (node name &rest types)
-  `(and (combination-p ,node)
-        (eql (lvar-fun-name (combination-fun ,node)) ',name)
-        (let ((args (combination-args ,node)))
-          ,@(loop for type in types
-                  collect
-                  `(let ((arg (pop args)))
-                     (and arg
-                          ,(if (typep type '(cons (eql :or)))
-                               `(or ,@(loop for type in (cdr type)
-                                            collect
-                                            `(csubtypep (lvar-type arg) (specifier-type ',type))))
-                               `(csubtypep (lvar-type arg) (specifier-type ',type)))))))))
+  (labels ((gen (type)
+             (typecase type
+               ((cons (eql :or))
+                `(or ,@(loop for type in (cdr type)
+                             collect
+                             (gen type))))
+               ((cons (eql :and))
+                `(and ,@(loop for type in (cdr type)
+                              collect
+                              (gen type))))
+               ((cons (eql :not))
+                `(not ,(gen (cadr type))))
+               (t
+                `(csubtypep (lvar-type arg) (specifier-type ',type))))))
+    `(and (combination-p ,node)
+          (eql (lvar-fun-name (combination-fun ,node)) ',name)
+          (let ((args (combination-args ,node)))
+            ,@(loop for type in types
+                    collect
+                    `(let ((arg (pop args)))
+                       (and arg
+                            ,(gen type))))))))
 
 (when-vop-existsp (:translate ash-inverted)
   (defun ash-inverted (integer amount)
@@ -2666,8 +2676,9 @@
                (setf truly-type t))
               (t
                (give-up-ir1-transform))))
-      (cond ((combination-typed-p use %negate (:or word
-                                                   sb-vm:signed-word))
+      (cond ((combination-typed-p use %negate (:and (:not (integer * 0))
+                                                    (:or word
+                                                         sb-vm:signed-word)))
              (splice-fun-args amount '%negate 1)
              (if truly-type
                  `(truly-the word (ash-inverted integer amount))
@@ -2690,8 +2701,9 @@
                (setf truly-type t))
               (t
                (give-up-ir1-transform))))
-      (cond ((combination-typed-p use %negate (:or word
-                                                   sb-vm:signed-word))
+      (cond ((combination-typed-p use %negate (:and (:not (integer * 0))
+                                                    (:or word
+                                                         sb-vm:signed-word)))
              (splice-fun-args amount '%negate 1)
              (if truly-type
                  `(truly-the sb-vm:signed-word (ash-inverted integer amount))
