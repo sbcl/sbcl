@@ -36,7 +36,7 @@
 (defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
   (when (sc-is object constant immediate)
     (aver (symbolp (tn-value object))))
-  (when (require-gc-store-barrier-p object value-tn-ref value-tn)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn)
     (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
         (inst lea scratch-reg cell-address)
         ;; OBJECT could be a symbol in immobile space

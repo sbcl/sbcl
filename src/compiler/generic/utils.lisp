@@ -314,11 +314,11 @@
 (define-load-time-global *store-barriers-potentially-emitted* 0)
 (define-load-time-global *store-barriers-emitted* 0)
 
-(defun require-gc-store-barrier-p (object value-tn-ref value-tn)
+(defun require-gengc-barrier-p (object value-tn-ref value-tn)
   (incf *store-barriers-potentially-emitted*)
   ;; If OBJECT is stack-allocated, elide the barrier
   (when (stack-consed-p object)
-    (return-from require-gc-store-barrier-p nil))
+    (return-from require-gengc-barrier-p nil))
   (flet ((potential-heap-pointer-p (tn tn-ref)
            (when (sc-is tn any-reg) ; must be fixnum
              (return-from potential-heap-pointer-p nil))
@@ -343,7 +343,7 @@
            (unless (eq (tn-ref-tn value-tn-ref) value-tn)
              (aver (eq (tn-ref-load-tn value-tn-ref) value-tn)))
            (unless (potential-heap-pointer-p value-tn value-tn-ref)
-             (return-from require-gc-store-barrier-p nil)))
+             (return-from require-gengc-barrier-p nil)))
           (value-tn-ref ; a list of refs linked through TN-REF-ACROSS
            ;; (presumably from INSTANCE-SET-MULTIPLE)
            (let ((any-pointer
@@ -352,7 +352,7 @@
                     (when (potential-heap-pointer-p (tn-ref-tn ref) ref)
                       (return t)))))
              (unless any-pointer
-               (return-from require-gc-store-barrier-p nil))))))
+               (return-from require-gengc-barrier-p nil))))))
   (incf *store-barriers-emitted*)
   t)
 

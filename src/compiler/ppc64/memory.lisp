@@ -14,7 +14,7 @@
 
 (defun emit-gengc-barrier (object cell-address temps &optional value-tn-ref value-tn)
   (aver (neq (car temps) cell-address)) ; LD would clobber the cell-address
-  (when (require-gc-store-barrier-p object value-tn-ref value-tn)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn)
     ;; (inst ld (car temps) thread-base-tn (ash thread-card-table-slot word-shift))
     ;; RLIDCL dest, source, (64-rightshift), (64-indexbits)
     (inst rldicl (car temps) (or cell-address object) (- 64 gencgc-card-shift)
