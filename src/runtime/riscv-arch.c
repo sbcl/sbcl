@@ -159,7 +159,7 @@ arch_install_interrupt_handlers(void)
  * Linkage entry size is 8 or 20, because we need 2 instructions for the 32-bit case and we need 3 instructions and an 8 byte address in the 64-bit case.
  */
 
-#define LINKAGE_TEMP_REG reg_NL3
+#define LINKAGE_TEMP_REG reg_LIP // Lisp needs to save before entry.
 
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
