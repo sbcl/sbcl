@@ -26,7 +26,7 @@
 #ifndef LISP_FEATURE_WIN32
 #define HAVE_GETRUSAGE 1
 #endif
-#if HAVE_GETRUSAGE
+#ifdef HAVE_GETRUSAGE
 #include <sys/resource.h> // for getrusage()
 #endif
 
@@ -926,14 +926,14 @@ static void* compute_heap_inverse(boolean keep_leaves,
     if (heap_trace_verbose) {
         fprintf(stderr, "Scratchpad: %lu bytes\n", (long unsigned)scratchpad_size);
     }
-#if HAVE_GETRUSAGE
+#ifdef HAVE_GETRUSAGE
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
 #endif
     ss.record_ptrs = 1;
     scan_spaces(&ss);
     *scratchpad = ss.scratchpad;
-#if HAVE_GETRUSAGE
+#ifdef HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
     // We're done building the necessary structure. Show some memory stats.
     if (heap_trace_verbose) {

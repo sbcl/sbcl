@@ -394,7 +394,7 @@ void prepare_for_full_mark_phase()
 
 void execute_full_mark_phase()
 {
-#if HAVE_GETRUSAGE
+#ifdef HAVE_GETRUSAGE
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
 #endif
@@ -423,7 +423,7 @@ void execute_full_mark_phase()
               scav_queue.head_block->count));
     stray_pointer_source_obj = 0;
 
-#if HAVE_GETRUSAGE
+#ifdef HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
 #define timediff(b,a,field) \
     (double)((a.field.tv_sec-b.field.tv_sec)*1000000 + \
