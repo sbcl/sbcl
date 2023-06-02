@@ -245,10 +245,13 @@
                               '(%%primitive))
                  (destructuring-bind (vop &rest args) (combination-args dest)
                    (and (constant-lvar-p vop)
-                        (memq (vop-info-name (lvar-value vop)) '(sb-vm::overflow+t
-                                                                 sb-vm::overflow-t
-                                                                 sb-vm::overflow*t))
-                        (eq lvar (car args)))))
+                        (let ((name (vop-info-name (lvar-value vop))))
+                          (or (and (memq name '(sb-vm::overflow+t
+                                                sb-vm::overflow-t
+                                                sb-vm::overflow*t))
+                                   (eq lvar (car args)))
+                              (and (memq name '(sb-vm::overflow-t-y))
+                                   (eq lvar (cadr args))))))))
                 (t
                  (values-subtypep (lvar-externally-checkable-type lvar)
                                   (cast-type-to-check cast))))))))
