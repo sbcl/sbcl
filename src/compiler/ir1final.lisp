@@ -296,13 +296,21 @@
               (setf (getf (functional-plist (ref-leaf ref)) 'verify-arg-count)
                     nil))))))))
 
+(defun change-full-call (combination new-fun-name)
+  (let ((ref (lvar-uses (combination-fun combination))))
+    (when (ref-p ref)
+      (setf (combination-fun-info combination)
+            (fun-info-or-lose new-fun-name))
+      (change-ref-leaf
+       ref
+       (find-free-fun new-fun-name ""))
+      t)))
+
 (defun rewrite-full-call (combination)
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (let ((two-arg (assoc combination-name *two-arg-functions*))
-          (ref (lvar-uses (combination-fun combination))))
+    (let ((two-arg (assoc combination-name *two-arg-functions*)))
       (when (and two-arg
-                 (ref-p ref)
                  (= (length args) 2)
                  (not (fun-lexically-notinline-p combination-name
                                                  (node-lexenv combination))))
@@ -313,11 +321,7 @@
                            for type in types
                            always (csubtypep (lvar-type arg) type)))
             (setf two-arg typed-two-arg))
-          (setf (combination-fun-info combination)
-                (fun-info-or-lose two-arg))
-          (change-ref-leaf
-           ref
-           (find-free-fun two-arg "rewrite-full-call")))))))
+          (change-full-call combination two-arg))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:

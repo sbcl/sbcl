@@ -322,6 +322,12 @@
       ;; fdefn pointers in the core. A couple others were high on the list as well.
       hairy-data-vector-set
       hairy-data-vector-ref
+      vector-hairy-data-vector-set
+      vector-hairy-data-vector-ref
+      hairy-data-vector-set/check-bounds
+      hairy-data-vector-ref/check-bounds
+      vector-hairy-data-vector-set/check-bounds
+      vector-hairy-data-vector-ref/check-bounds
       %ldb
       sb-kernel:vector-unsigned-byte-8-p)
   #'equalp)

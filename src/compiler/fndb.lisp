@@ -1953,6 +1953,12 @@
 (defknown hairy-data-vector-set (array index t) t (no-verify-arg-count))
 (defknown hairy-data-vector-ref/check-bounds (array index) t (foldable no-verify-arg-count))
 (defknown hairy-data-vector-set/check-bounds (array index t) t (no-verify-arg-count))
+
+(defknown vector-hairy-data-vector-ref (vector index) t (foldable flushable no-verify-arg-count))
+(defknown vector-hairy-data-vector-set (vector index t) t (no-verify-arg-count))
+(defknown vector-hairy-data-vector-ref/check-bounds (vector index) t (foldable no-verify-arg-count))
+(defknown vector-hairy-data-vector-set/check-bounds (vector index t) t (no-verify-arg-count))
+
 (defknown %caller-frame () t (flushable))
 (defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
