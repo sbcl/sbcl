@@ -370,7 +370,8 @@
                            (hash-table 1))))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
 
-(with-test (:name :aref-full-call-no-type-check)
+(with-test (:name :aref-full-call-no-type-check
+            :fails-on :sbcl)
   (assert (not (find 'sb-c::%type-check-error/c
                      (ir-calls
                       `(lambda (x)

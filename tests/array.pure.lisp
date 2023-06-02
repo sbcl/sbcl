@@ -722,3 +722,10 @@
                                                        x))
                                              (length x)))))
                  `(values (integer 11 12) &optional))))
+
+(with-test (:name :aref-dimension-checking)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (x)
+         (aref x 0))
+    ((#2A((1 2) (3 4))) (condition 'type-error))))

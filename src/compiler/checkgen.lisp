@@ -237,19 +237,7 @@
          ;; deemed unreachable?
          (and
           (almost-immediately-used-p lvar cast)
-
-          (cond ((and (lvar-fun-is (combination-fun dest)
-                                   '(hairy-data-vector-set/check-bounds
-                                     hairy-data-vector-ref/check-bounds
-                                     hairy-data-vector-ref
-                                     hairy-data-vector-set))
-                      (eql (car (combination-args dest))
-                           lvar))
-                 ;; These functions work on all arrays, but the error
-                 ;; message is about vectors, which is used more frequently.
-                 (csubtypep (specifier-type 'vector)
-                            (single-value-type (cast-type-to-check cast))))
-                #+(or arm64 x86-64)
+          (cond #+(or arm64 x86-64)
                 ((lvar-fun-is (combination-fun dest)
                               '(values-list)))
                 ;; Not great
