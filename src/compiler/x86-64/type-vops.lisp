@@ -932,15 +932,14 @@
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))
   (:arg-refs args)
-  (:info not-other-pointer-label null-label)
+  (:info not-other-pointer-label null-label zero-extend)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    ;; FIXME: can we pass T as the 2nd arg to OTHER-POINTER-TN-REF-P here?
-    ;; I'm confused as to the intent of NULL-LABEL.
-    ;; Must branching occur if nil, or _may_ branching occur?
-    (cond ((other-pointer-tn-ref-p args)
-           (inst mov :byte r (ea (- other-pointer-lowtag) value)))
+    (cond ((other-pointer-tn-ref-p args (not null-label))
+           (if zero-extend
+               (inst movzx '(:byte :dword) r (ea (- other-pointer-lowtag) value))
+               (inst mov :byte r (ea (- other-pointer-lowtag) value))))
           (t
            (when null-label
              (inst cmp value nil-value)
@@ -948,7 +947,9 @@
            (%lea-for-lowtag-test r value other-pointer-lowtag :qword)
            (inst test :byte r lowtag-mask)
            (inst jmp :nz not-other-pointer-label)
-           (inst mov :byte r (ea r))))))
+           (if zero-extend
+               (inst movzx '(:byte :dword) r (ea r))
+               (inst mov :byte r (ea r)))))))
 
 (define-vop (test-widetag)
   (:args (value :scs (unsigned-reg) :target temp))

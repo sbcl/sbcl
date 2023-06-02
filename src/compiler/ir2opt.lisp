@@ -1047,11 +1047,14 @@
     (let (vops
           stop
           null
-          (value (tn-ref-tn (vop-args vop))))
+          (value (tn-ref-tn (vop-args vop)))
+          zero-extend)
       (labels ((good-vop-p (vop)
                  (and (singleton-p (ir2block-predecessors (vop-block vop)))
                       (or (getf sb-vm::*other-pointer-type-vops* (vop-name vop))
-                          (eq (vop-name vop) '%other-pointer-subtype-p))
+                          (eq (vop-name vop) '%other-pointer-subtype-p)
+                          (and (eq (vop-name vop) '%other-pointer-widetag)
+                               (setf zero-extend t)))
                       (eq (tn-ref-tn (vop-args vop)) value)))
                (chain (vop &optional (collect t))
                  (let ((next (branch-destination vop nil)))
@@ -1090,7 +1093,8 @@
                                  vop
                                  (list (ir2-block-label stop)
                                        (and null
-                                            (ir2-block-label (vop-block null)))))
+                                            (ir2-block-label (vop-block null)))
+                                       #+x86-64 zero-extend))
             (update-block-succ block
                                (cons stop
                                      (ir2block-successors block)))
@@ -1102,18 +1106,25 @@
                                    (third info)
                                    (getf sb-vm::*other-pointer-type-vops* (vop-name vop)))
                     do
-                    (let ((next (vop-next vop)))
-                      (when (and next
-                                 (eq (vop-name next) 'branch-if))
-                        (setf info (vop-codegen-info next))
-                        (delete-vop next))
-                      (emit-and-insert-vop (vop-node vop)
-                                           (vop-block vop)
-                                           test-vop
-                                           (reference-tn widetag nil)
-                                           nil
-                                           vop
-                                           (list (first info) (second info) tags)))
+                    (if (eq (vop-name vop) '%other-pointer-widetag)
+                        (emit-and-insert-vop (vop-node vop)
+                                             (vop-block vop)
+                                             (template-or-lose 'move)
+                                             (reference-tn widetag nil)
+                                             (reference-tn (tn-ref-tn (vop-results vop )) t)
+                                             vop)
+                        (let ((next (vop-next vop)))
+                          (when (and next
+                                     (eq (vop-name next) 'branch-if))
+                            (setf info (vop-codegen-info next))
+                            (delete-vop next))
+                          (emit-and-insert-vop (vop-node vop)
+                                               (vop-block vop)
+                                               test-vop
+                                               (reference-tn widetag nil)
+                                               nil
+                                               vop
+                                               (list (first info) (second info) tags))))
                     (delete-vop vop)))))))
     nil)
 
