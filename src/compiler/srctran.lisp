@@ -2425,13 +2425,12 @@
     (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (let ((size (lvar-type size)))
-    (if (and (numeric-type-p size)
-             (csubtypep size (specifier-type 'integer)))
-        (let ((size-high (numeric-type-high size)))
-          (if (and size-high (<= size-high sb-vm:n-word-bits))
-              (specifier-type `(unsigned-byte* ,size-high))
-              (specifier-type 'unsigned-byte)))
+  (let* ((size (lvar-type size))
+         (size-high (nth-value 1 (integer-type-numeric-bounds size))))
+    (if size-high
+        (if (<= size-high sb-vm:n-word-bits)
+            (specifier-type `(unsigned-byte* ,size-high))
+            (specifier-type 'unsigned-byte))
         *universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
