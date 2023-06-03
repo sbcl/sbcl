@@ -263,7 +263,9 @@
                                    (eql package (find-package "CL"))
                                    (eql package (find-package "KEYWORD")))
                                x (copy-symbol x))))
-                 (integer x))))
+                 (integer x)
+                 (character `(code-char ,(char-code x)))
+                 (string x))))
   (cond
     ((broken-p broken-on)
      `(progn
