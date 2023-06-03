@@ -88,7 +88,7 @@ and will refer to the new function, bound to FOO.")
     (if (> debug (max speed space compilation-speed))
         debug
         0)
-  ("no" "no" "partial" "full")
+  ("no" "no" "no" "yes")
   "Control instrumentation of code, enabling single-stepping through
 it in the debugger.
 
