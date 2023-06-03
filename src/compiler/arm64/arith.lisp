@@ -551,26 +551,17 @@
   (:variant-vars variant)
   (:generator 5
     (let ((positive (csubtypep (tn-ref-type amount-ref)
-                               (specifier-type '(integer 0))))
-          (negative (csubtypep (tn-ref-type amount-ref)
-                               (specifier-type '(integer * 0)))))
+                               (specifier-type '(integer 0)))))
       (cond
         ((csubtypep (tn-ref-type amount-ref)
                     (specifier-type `(integer -63 63)))
-         (unless negative
-           (ecase variant
-             (:signed (inst asr result number amount))
-             (:unsigned (inst lsr result number amount))))
+         (ecase variant
+           (:signed (inst asr result number amount))
+           (:unsigned (inst lsr result number amount)))
          (unless positive
-           (unless negative
-             (inst tbz amount 63 done))
+           (inst tbz amount 63 done)
            (inst neg temp amount)
            (inst lsl result number amount)))
-        (negative
-         (inst neg temp amount)
-         (inst cmp temp n-word-bits)
-         (inst csinv temp temp zr-tn :lo)
-         (inst lsl result number temp))
         (positive
          (inst cmp amount n-word-bits)
          (inst csinv temp amount zr-tn :lo)
@@ -2230,26 +2221,6 @@
             (inst b :cc error)
             done)))))
 
-(define-vop (overflow+t)
-  (:translate overflow+)
-  (:args (x :scs (descriptor-reg))
-         (y :scs (any-reg signed-reg)))
-  (:arg-types t tagged-num)
-  (:info type)
-  (:results (r :scs (any-reg) :from :load))
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 2
-    (let* ((*location-context* (unless (eq type 'fixnum)
-                                 type))
-           (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
-      (inst tbnz x 0 error)
-      (inst adds r x (if (sc-is y any-reg)
-                         y
-                         (lsl y n-fixnum-tag-bits)))
-      (inst b :vs error))))
-
 (define-vop (overflow-ash-signed)
   (:translate overflow-ash)
   (:args (number :scs (signed-reg))
@@ -2489,11 +2460,32 @@
   (:variant t)
   (:variant-cost 4))
 
+(define-vop (overflow+t)
+  (:translate overflow+)
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg signed-reg)))
+  (:arg-types (:or t tagged-num) tagged-num)
+  (:info type)
+  (:results (r :scs (any-reg) :from :load))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 2
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
+      (unless (sc-is x any-reg)
+        (inst tbnz x 0 error))
+      (inst adds r x (if (sc-is y any-reg)
+                         y
+                         (lsl y n-fixnum-tag-bits)))
+      (inst b :vs error))))
+
 (define-vop (overflow-t)
   (:translate overflow-)
-  (:args (x :scs (descriptor-reg))
+  (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg signed-reg)))
-  (:arg-types t tagged-num)
+  (:arg-types (:or t tagged-num) tagged-num)
   (:info type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -2503,7 +2495,8 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (inst tbnz x 0 error)
+      (unless (sc-is x any-reg)
+        (inst tbnz x 0 error))
       (inst subs r x (if (sc-is y any-reg)
                          y
                          (lsl y n-fixnum-tag-bits)))
@@ -2512,8 +2505,8 @@
 (define-vop (overflow-t-y)
   (:translate overflow-)
   (:args (x :scs (any-reg))
-         (y :scs (descriptor-reg)))
-  (:arg-types tagged-num t)
+         (y :scs (any-reg descriptor-reg)))
+  (:arg-types tagged-num (:or t tagged-num))
   (:info type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -2523,15 +2516,16 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (inst tbnz y 0 error)
+      (unless (sc-is y any-reg)
+        (inst tbnz y 0 error))
       (inst subs r x y)
       (inst b :vs error))))
 
 (define-vop (overflow*t)
   (:translate overflow*)
-  (:args (x :scs (descriptor-reg))
+  (:args (x :scs (any-reg descriptor-reg))
          (y :scs (signed-reg immediate)))
-  (:arg-types t tagged-num)
+  (:arg-types (:or t tagged-num) tagged-num)
   (:info type)
   (:temporary (:sc signed-reg
                :unused-if
@@ -2562,7 +2556,8 @@
                                                nil))
                                         vop
                                         'sb-kernel::mul-overflow2-error x y)))
-      (inst tbnz x 0 error)
+      (unless (sc-is x any-reg)
+        (inst tbnz x 0 error))
       (cond ((eql shift 0)
              (move r x))
             (shift
