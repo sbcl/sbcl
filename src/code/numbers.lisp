@@ -1159,15 +1159,17 @@ and the number of 0 bits if INTEGER is negative."
   (deposit-field newbyte bytespec integer))
 
 (defun %ldb (size posn integer)
-  (declare (type bit-index size posn) (explicit-check))
   ;; The naive algorithm is horrible in the general case.
   ;; Consider (LDB (BYTE 1 2) (SOME-GIANT-BIGNUM)) which has to shift the
   ;; input rightward 2 bits, consing a new bignum just to read 1 bit.
-  (if (and (<= 0 size sb-vm:n-positive-fixnum-bits)
-           (typep integer 'bignum))
-      (sb-bignum::ldb-bignum=>fixnum size posn integer)
-      (logand (ash integer (- posn))
-              (1- (ash 1 size)))))
+  (cond ((<= 0 size sb-vm:n-positive-fixnum-bits)
+         (if (fixnump integer)
+             (logand (ash integer (- posn))
+                     (1- (ash 1 size)))
+             (sb-bignum::ldb-bignum=>fixnum size posn integer)))
+        (t
+         (logand (ash integer (- posn))
+                 (1- (ash 1 size))))))
 
 (defun %mask-field (size posn integer)
   (declare (type bit-index size posn) (explicit-check))

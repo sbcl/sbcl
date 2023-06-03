@@ -2486,7 +2486,7 @@
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
   (%deposit-field-derive-type-aux size posn int))
 
-(deftransform %ldb ((size posn int) (fixnum fixnum integer) word)
+(deftransform %ldb ((size posn int) (fixnum fixnum integer) word :node node)
   "convert to inline logical operations"
   (let ((width (and (constant-lvar-p size)
                     (constant-lvar-p posn)
@@ -2503,6 +2503,10 @@
                  (posn (lvar-value posn)))
              `(logand (ash (logand int most-positive-word) ,(- posn))
                       ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
+          ((and (not (or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
+                         (csubtypep (lvar-type int) (specifier-type 'word)))))
+           (delay-ir1-transform node :ir1-phases)
+           (give-up-ir1-transform "not a word-sized integer"))
           (t
            `(logand (ash int (- posn))
                     (ash ,most-positive-word (- size ,sb-vm:n-word-bits)))))))
