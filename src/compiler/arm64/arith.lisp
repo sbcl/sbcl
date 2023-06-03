@@ -2465,6 +2465,7 @@
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg signed-reg)))
   (:arg-types (:or t tagged-num) tagged-num)
+  (:arg-refs x-ref)
   (:info type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -2474,7 +2475,7 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
-      (unless (sc-is x any-reg)
+      (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
         (inst tbnz x 0 error))
       (inst adds r x (if (sc-is y any-reg)
                          y
@@ -2486,6 +2487,7 @@
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg signed-reg)))
   (:arg-types (:or t tagged-num) tagged-num)
+  (:arg-refs x-ref)
   (:info type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -2495,7 +2497,7 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (unless (sc-is x any-reg)
+      (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
         (inst tbnz x 0 error))
       (inst subs r x (if (sc-is y any-reg)
                          y
@@ -2507,6 +2509,7 @@
   (:args (x :scs (any-reg))
          (y :scs (any-reg descriptor-reg)))
   (:arg-types tagged-num (:or t tagged-num))
+  (:arg-refs nil y-ref)
   (:info type)
   (:results (r :scs (any-reg) :from :load))
   (:result-types tagged-num)
@@ -2516,7 +2519,7 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (unless (sc-is y any-reg)
+      (unless (csubtypep (tn-ref-type y-ref) (specifier-type 'fixnum))
         (inst tbnz y 0 error))
       (inst subs r x y)
       (inst b :vs error))))
@@ -2526,6 +2529,7 @@
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (signed-reg immediate)))
   (:arg-types (:or t tagged-num) tagged-num)
+  (:arg-refs x-ref)
   (:info type)
   (:temporary (:sc signed-reg
                :unused-if
@@ -2556,7 +2560,7 @@
                                                nil))
                                         vop
                                         'sb-kernel::mul-overflow2-error x y)))
-      (unless (sc-is x any-reg)
+      (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
         (inst tbnz x 0 error))
       (cond ((eql shift 0)
              (move r x))
