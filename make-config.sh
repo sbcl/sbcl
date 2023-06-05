@@ -737,8 +737,15 @@ case "$sbcl_arch" in
 	$GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
 	tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
     elif [ "$sbcl_os" = "darwin" ]; then
-	echo "Unsupported configuration"
-	exit 1
+        # We provide a dlopen shim, so a little lie won't hurt
+ 	printf ' :os-provides-dlopen' >> $ltf
+        # The default stack ulimit under darwin is too small to run PURIFY.
+        # Best we can do is complain and exit at this stage
+        if [ "`ulimit -s`" = "512" ]; then
+            echo "Your stack size limit is too small to build SBCL."
+            echo "See the limit(1) or ulimit(1) commands and the README file."
+            exit 1
+        fi
     fi
     ;;
   ppc64)
