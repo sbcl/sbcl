@@ -20,7 +20,7 @@
 #include "os.h"
 #include "arch.h"
 #include "lispregs.h"
-#include "signal.h"
+#include <signal.h>
 #include "alloc.h"
 #include "interrupt.h"
 #include "interr.h"

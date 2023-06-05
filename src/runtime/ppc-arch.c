@@ -18,7 +18,7 @@
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
-#include "signal.h"
+#include <signal.h>
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"

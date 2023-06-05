@@ -24,7 +24,6 @@
 #include <sys/param.h>
 #include <sys/file.h>
 #include "sbcl.h"
-#include "./signal.h"
 #include "os.h"
 #include "arch.h"
 #include "globals.h"

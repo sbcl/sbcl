@@ -43,7 +43,7 @@
 #include <time.h>
 
 #ifndef LISP_FEATURE_WIN32
-#include "signal.h"
+#include <signal.h>
 #endif
 
 #include "runtime.h"

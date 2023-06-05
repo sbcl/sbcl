@@ -26,7 +26,6 @@
 
 #include <sys/ucontext.h>
 
-#include "./signal.h"
 #include "os.h"
 #include "arch.h"
 #include "globals.h"
