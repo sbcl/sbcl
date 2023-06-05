@@ -2441,35 +2441,29 @@
         (specifier-type 'unsigned-byte))))
 
 (defun %deposit-field-derive-type-aux (size posn int)
-  (let ((size (lvar-type size))
-        (posn (lvar-type posn))
+  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
+        (posn-high (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
         (int (lvar-type int)))
-    (when (and (numeric-type-p size)
-               (numeric-type-p posn)
-               (numeric-type-p int))
-      (let ((size-high (numeric-type-high size))
-            (posn-high (numeric-type-high posn))
-            (high (numeric-type-high int))
-            (low (numeric-type-low int)))
-        (when (and size-high posn-high high low
-                   ;; KLUDGE: we need this cutoff here, otherwise we
-                   ;; will merrily derive the type of %DPB as
-                   ;; (UNSIGNED-BYTE 1073741822), and then attempt to
-                   ;; canonicalize this type to (INTEGER 0 (1- (ASH 1
-                   ;; 1073741822))), with hilarious consequences.  We
-                   ;; cutoff at 4*SB-VM:N-WORD-BITS to allow inference
-                   ;; over a reasonable amount of shifting, even on
-                   ;; the alpha/32 port, where N-WORD-BITS is 32 but
-                   ;; machine integers are 64-bits.  -- CSR,
-                   ;; 2003-09-12
-                   (<= (+ size-high posn-high) (* 4 sb-vm:n-word-bits)))
-          (let ((raw-bit-count (max (integer-length high)
-                                    (integer-length low)
-                                    (+ size-high posn-high))))
-            (specifier-type
-             (if (minusp low)
-                 `(signed-byte ,(1+ raw-bit-count))
-                 `(unsigned-byte* ,raw-bit-count)))))))))
+    (multiple-value-bind (low high) (integer-type-numeric-bounds int)
+      (when (and size-high posn-high high low
+                 ;; KLUDGE: we need this cutoff here, otherwise we
+                 ;; will merrily derive the type of %DPB as
+                 ;; (UNSIGNED-BYTE 1073741822), and then attempt to
+                 ;; canonicalize this type to (INTEGER 0 (1- (ASH 1
+                 ;; 1073741822))), with hilarious consequences.  We
+                 ;; cutoff at 4*SB-VM:N-WORD-BITS to allow inference
+                 ;; over a reasonable amount of shifting, even on
+                 ;; the alpha/32 port, where N-WORD-BITS is 32 but
+                 ;; machine integers are 64-bits.  -- CSR,
+                 ;; 2003-09-12
+                 (<= (+ size-high posn-high) (* 4 sb-vm:n-word-bits)))
+        (let ((raw-bit-count (max (integer-length high)
+                                  (integer-length low)
+                                  (+ size-high posn-high))))
+          (specifier-type
+           (if (minusp low)
+               `(signed-byte ,(1+ raw-bit-count))
+               `(unsigned-byte* ,raw-bit-count))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
   (%deposit-field-derive-type-aux size posn int))
