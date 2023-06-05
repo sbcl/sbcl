@@ -2425,8 +2425,7 @@
     (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (let* ((size (lvar-type size))
-         (size-high (nth-value 1 (integer-type-numeric-bounds size))))
+  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size)))))
     (if size-high
         (if (<= size-high sb-vm:n-word-bits)
             (specifier-type `(unsigned-byte* ,size-high))
@@ -2434,19 +2433,12 @@
         *universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
-  (let ((size (lvar-type size))
-        (posn (lvar-type posn)))
-    (if (and (numeric-type-p size)
-             (csubtypep size (specifier-type 'integer))
-             (numeric-type-p posn)
-             (csubtypep posn (specifier-type 'integer)))
-        (let ((size-high (numeric-type-high size))
-              (posn-high (numeric-type-high posn)))
-          (if (and size-high posn-high
-                   (<= (+ size-high posn-high) sb-vm:n-word-bits))
-              (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
-              (specifier-type 'unsigned-byte)))
-        *universal-type*)))
+  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
+        (posn-high (nth-value 1 (integer-type-numeric-bounds (lvar-type posn)))))
+    (if (and size-high posn-high
+             (<= (+ size-high posn-high) sb-vm:n-word-bits))
+        (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
+        (specifier-type 'unsigned-byte))))
 
 (defun %deposit-field-derive-type-aux (size posn int)
   (let ((size (lvar-type size))
