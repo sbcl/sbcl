@@ -14,6 +14,7 @@ args=
 case "$platform" in
     Darwin-X86-64) args="-arch x86_64" ;;
     Darwin-X86)    args="-arch i386" ;;
+    Darwin-PowerPC) args="-arch ppc" ;;
     SunOS-X86-64)  args=-m64 ;;
     Linux-X86)     args="-m32" ;;
     Linux-PowerPC) args="-m32" ;;
