@@ -3295,8 +3295,10 @@
                                 (constant-arg sb-vm:signed-word))
                          *
                          :policy (and (> speed compilation-speed)
-                                      (> speed space)))
+                                      (> speed space))
+                         :node node)
    "convert integer division to multiplication"
+   (delay-ir1-transform node :ir1-phases)
    (let* ((y      (lvar-value y))
           (abs-y  (abs y))
           (x-type (lvar-type x)))
@@ -3356,8 +3358,10 @@
 (deftransform truncate ((x y) (word (constant-arg word))
                         *
                         :policy (and (> speed compilation-speed)
-                                     (> speed space)))
+                                     (> speed space))
+                        :node node)
   "convert integer division to multiplication"
+  (delay-ir1-transform node :ir1-phases)
   (let* ((y      (lvar-value y))
          (x-type (lvar-type x))
          (max-x  (or (and (numeric-type-p x-type)

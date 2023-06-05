@@ -3396,7 +3396,8 @@
                               -913097464
                               5)))
            39)))))
-    '(values (or (integer -21 -20) bit) (integer -38 0) &optional)))
+    '(values (or (integer -21 -21) (integer 0 0)) (integer -38 0)
+      &optional)))
   (assert
    (type-specifiers-equal
     (caddr
