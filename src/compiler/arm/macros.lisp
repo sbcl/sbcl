@@ -236,7 +236,7 @@
          (storew null-tn result-tn -1 0 :ne)
          (inst orr result-tn result-tn lowtag))
         (t
-         (let ((region-disp (- mixed-region nil-value))
+         (let ((region-disp (- mixed-region-offset nil-value-offset))
                (alloc (gen-label))
                (back-from-alloc (gen-label)))
            (inst ldr result-tn (@ null-tn region-disp)) ; free ptr

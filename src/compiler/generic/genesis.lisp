@@ -1706,11 +1706,10 @@ core and return a descriptor to it."
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor ()
-  ;; 10 words prior to NIL is an array of three 'struct alloc_region'.
-  ;; The lisp objects begin at STATIC_SPACE_OBJECTS_START.
-  ;; See also (DEFCONSTANT NIL-VALUE) in early-objdef.
-  #+(and gencgc (not sb-thread)) (gspace-claim-n-words *static* 10)
-  #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
+  (gspace-claim-n-words *static* (/ (- sb-vm::nil-value-offset
+                                       (* 2 sb-vm:n-word-bytes)
+                                       sb-vm:list-pointer-lowtag)
+                                    sb-vm:n-word-bytes))
   (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                       (* 2 sb-vm:n-word-bytes)
@@ -3092,6 +3091,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    ;; but one's a vector header bit, the other a layout flag bit.
                    sb-vm::+vector-alloc-mixed-region-bit+
                    sb-kernel::+strictly-boxed-flag+
+                   #-sb-thread sb-vm::mixed-region-offset
+                   #-sb-thread sb-vm::cons-region-offset
+                   #-sb-thread sb-vm::boxed-region-offset
                    sb-vm::nil-symbol-slots-start
                    sb-vm::nil-symbol-slots-end
                    sb-vm::static-space-objects-start))

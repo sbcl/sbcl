@@ -19,14 +19,16 @@
         (t
          (let ((end-addr (car temps))
                (new-freeptr (cadr temps))
-               (region (if (eq type 'list) cons-region mixed-region)))
+               (region-offset (if (eq type 'list)
+                                  cons-region-offset
+                                  mixed-region-offset)))
            (without-scheduling ()
-             (inst lw result null-tn (- region nil-value))
-             (inst lw end-addr null-tn (+ 4 (- region nil-value)))
+             (inst lw result null-tn (- region-offset nil-value-offset))
+             (inst lw end-addr null-tn (+ 4 (- region-offset nil-value-offset)))
              (inst add new-freeptr result size)
              (inst tltu end-addr new-freeptr
                    (logior (if (eq type 'list) #x100 0) (reg-tn-encoding result)))
-             (inst sw new-freeptr null-tn (- region nil-value))
+             (inst sw new-freeptr null-tn (- region-offset nil-value-offset))
              (unless (= lowtag 0)
                (inst or result lowtag)))))))
 

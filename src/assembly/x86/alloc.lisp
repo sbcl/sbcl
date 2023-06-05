@@ -57,7 +57,8 @@
                                            (make-ea :dword :disp (ash thread-mixed-tlab-slot 2))
                                            :fs)
                          #-sb-thread (inst sub ,reg
-                                           (make-ea :dword :disp mixed-region))))))
+                                           (make-ea :dword :disp
+                                                    (+ static-space-start mixed-region-offset)))))))
              (case reg
                ;; Now that we're using lisp asm code instead of a .S file
                ;; this could be done more intelligently - the macro can decide

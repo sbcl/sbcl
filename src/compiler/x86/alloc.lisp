@@ -81,7 +81,7 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes thread-mixed-tlab-slot)
-                    #-sb-thread mixed-region))
+                    #-sb-thread (+ static-space-start mixed-region-offset)))
          (end-addr
             ;; thread->mixed_tlab.end_addr
            (make-ea :dword
@@ -89,7 +89,7 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes (1+ thread-mixed-tlab-slot))
-                    #-sb-thread (+ mixed-region n-word-bytes))))
+                    #-sb-thread (+ static-space-start mixed-region-offset n-word-bytes))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #+(and sb-thread win32)

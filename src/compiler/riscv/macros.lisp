@@ -606,19 +606,19 @@ and
 
 (defun load-alloc-free-pointer (reg)
   #-sb-thread
-  (loadw reg null-tn 0 (- nil-value mixed-region))
+  (loadw reg null-tn 0 (- nil-value-offset mixed-region-offset))
   #+sb-thread
   (loadw reg thread-base-tn thread-mixed-tlab-slot))
 
 (defun load-alloc-end-addr (reg)
   #-sb-thread
-  (loadw reg null-tn 1 (- nil-value mixed-region))
+  (loadw reg null-tn 1 (- nil-value-offset mixed-region-offset))
   #+sb-thread
   (loadw reg thread-base-tn (+ thread-mixed-tlab-slot 1)))
 
 (defun store-alloc-free-pointer (reg)
   #-sb-thread
-  (storew reg null-tn 0 (- nil-value mixed-region))
+  (storew reg null-tn 0 (- nil-value-offset mixed-region-offset))
   #+sb-thread
   (storew reg thread-base-tn thread-mixed-tlab-slot))
 

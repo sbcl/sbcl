@@ -183,20 +183,20 @@
         (inst add result-tn tmp-tn lowtag))
       (let ((alloc (gen-label))
             #+sb-thread (tlab (if (eq type 'list) thread-cons-tlab-slot thread-mixed-tlab-slot))
-            #-sb-thread (region (if (eq type 'list) cons-region mixed-region))
+            #-sb-thread (region-offset (if (eq type 'list)
+                                           cons-region-offset
+                                           mixed-region-offset))
             (back-from-alloc (gen-label)))
         #-sb-thread
         (progn
-          ;; load-pair can't base off null-tn because the displacement
-          ;; has to be a multiple of 8
-          (load-immediate-word flag-tn region)
-          (inst ldp result-tn flag-tn (@ flag-tn 0)))
+          (loadw result-tn null-tn 0 (- nil-value-offset region-offset))
+          (loadw flag-tn null-tn 1 (- nil-value-offset region-offset)))
         #+sb-thread
         (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes tlab)))
         (inst add result-tn tmp-tn (add-sub-immediate size result-tn))
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
-        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- region nil-value))))
+        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- region-offset nil-value-offset))))
         #+sb-thread (storew result-tn thread-tn tlab)
 
         (emit-label BACK-FROM-ALLOC)

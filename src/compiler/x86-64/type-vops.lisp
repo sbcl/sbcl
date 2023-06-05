@@ -366,7 +366,11 @@
 ;; the header of which must not overlap the static alloc regions
 #-sb-thread
 (aver (>= (- non-negative-fixnum-mask-constant-wired-address (* 2 n-word-bytes))
-          (+ (max boxed-region cons-region mixed-region) (* 3 n-word-bytes))))
+          (+ static-space-start
+             (max boxed-region-offset
+                  cons-region-offset
+                  mixed-region-offset)
+             (* 3 n-word-bytes))))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with

@@ -230,8 +230,11 @@
                                              thread-cons-tlab-slot
                                              thread-mixed-tlab-slot))))
                            (thread-slot-ea slot #+gs-seg thread-temp))
-                         #-sb-thread (ea (if (eql type +cons-primtype+)
-                                             cons-region mixed-region)))
+                         #-sb-thread
+                         (ea (+ static-space-start
+                                (if (eql type +cons-primtype+)
+                                    cons-region-offset
+                                    mixed-region-offset))))
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))

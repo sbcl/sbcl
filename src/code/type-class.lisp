@@ -223,7 +223,9 @@
          ;; dynamic-space-free-pointer increments only when a page is full.
          ;; Using mixed_region directly is finer-grained.
          #+(and (not sb-thread) gencgc)
-         (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm::mixed-region) 0)))
+         (sb-sys:sap-ref-word (sb-sys:int-sap (+ sb-vm::static-space-start
+                                                 sb-vm::mixed-region-offset))
+                              0)))
     ;; counter should increase by 1 for each cons cell allocated
     (ash word (- (1+ sb-vm:word-shift)))))
 ;;; Return some bits that are dependent on the next address that will be

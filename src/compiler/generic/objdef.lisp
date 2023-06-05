@@ -676,25 +676,26 @@ during backtrace.
 
 ) ; end PROGN
 
+;;; The offset of NIL in static space, including the tag.
+(defconstant nil-value-offset
+  (+ ;; Make space for the different regions, if they exist.
+     ;; If you change this, then also change zero_all_free_ranges() in
+     ;; gencgc.
+     #+(and gencgc (not sb-thread) (not 64-bit))
+     (* 10 n-word-bytes)
+     ;; This offset of #x100 has to do with some edge cases where a vop
+     ;; might treat UNBOUND-MARKER as a pointer. So it has an address
+     ;; that is somewhere near NIL which makes it sort of "work"
+     ;; to dereference it. See git rev f1a956a6a771 for more info.
+     #+64-bit #x100
+     ;; magic padding because of NIL's symbol/cons-like duality
+     (* 2 n-word-bytes)
+     list-pointer-lowtag))
+
 ;;; The definitions below want to use ALIGN-UP, which is not defined
 ;;; in time to put these in early-objdef, but it turns out that we don't
 ;;; need them there.
-(defconstant nil-value
-    (+ static-space-start
-       ;; mixed_region precedes NIL
-       ;; 10 is the number of words to reserve at the beginning of static space
-       ;; prior to the words of NIL.
-       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis,
-       ;; and zero_all_free_ranges() in gencgc.
-       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 10 word-shift)
-       ;; This offset of #x100 has to do with some edge cases where a vop
-       ;; might treat UNBOUND-MARKER as a pointer. So it has an address
-       ;; that is somewhere near NIL which makes it sort of "work"
-       ;; to dereference it. See git rev f1a956a6a771 for more info.
-       #+64-bit #x100
-       ;; magic padding because of NIL's symbol/cons-like duality
-       (* 2 n-word-bytes)
-       list-pointer-lowtag))
+(defconstant nil-value (+ static-space-start nil-value-offset))
 
 #+sb-xc-host (defun get-nil-taggedptr () nil-value)
 

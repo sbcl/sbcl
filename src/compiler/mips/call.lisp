@@ -1180,8 +1180,8 @@ default-value-8
                      (new-freeptr temp)
                      (continue (gen-label)))
                  (without-scheduling ()
-                   (inst lw result null-tn (- cons-region nil-value))
-                   (inst lw end-addr null-tn (+ 4 (- cons-region nil-value)))
+                   (inst lw result null-tn (- cons-region-offset nil-value-offset))
+                   (inst lw end-addr null-tn (+ 4 (- cons-region-offset nil-value-offset)))
                    (inst add new-freeptr result count)
                    ;; Use a different 'code' field for listify. Technically there are enough
                    ;; bits in the code field to indicate how many bytes to skip to branch out
@@ -1196,7 +1196,7 @@ default-value-8
                    (inst beq zero-tn leave-pa)
                    (inst nop)
                    (emit-label continue)
-                   (inst sw new-freeptr null-tn (- cons-region nil-value))
+                   (inst sw new-freeptr null-tn (- cons-region-offset nil-value-offset))
                    (inst or result list-pointer-lowtag)))))
 
         (move dst result)
