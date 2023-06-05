@@ -9,33 +9,36 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -Wall -O2 -fdollars-in-identifiers -mmacosx-version-min=10.4
-LINKFLAGS += -mmacosx-version-min=10.4
+CFLAGS = -arch ppc -g -Wall -O2 -fdollars-in-identifiers -D_XOPEN_SOURCE
+DEPEND_FLAGS += -D_XOPEN_SOURCE
+LINKFLAGS = -arch ppc
+
+ifdef SBCL_MACOSX_VERSION_MIN
+  CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
+  LINKFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
+else
+  ifdef LISP_FEATURE_DARWIN9_OR_BETTER
+    CFLAGS += -mmacosx-version-min=10.5
+    LINKFLAGS += -mmacosx-version-min=10.5
+  else
+    CFLAGS += -mmacosx-version-min=10.4
+    LINKFLAGS += -mmacosx-version-min=10.4
+  endif
+endif
 
 OS_SRC = bsd-os.c darwin-os.c ppc-darwin-os.c
 
 OS_LIBS = -lSystem -lc
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+  OS_LIBS += -lzstd
 endif
-
-CC = gcc
 
 ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
-CPPFLAGS += -no-cpp-precomp
-
-ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c traceroot.c
-endif
+GC_SRC = fullcgc.c gencgc.c traceroot.c
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
   USE_LIBSBCL = -Wl,-force_load libsbcl.a
 endif
-
-.PHONY: after-grovel-headers
-
-# Nothing to do.
-after-grovel-headers:
