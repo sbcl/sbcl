@@ -676,16 +676,15 @@
                     (do-next-filler)
                     (insert-step-instrumenting function)))
                  (:direct
-                  `((let ((offset (static-fun-offset fun)))
-                       (cond ((typep offset 'short-immediate)
-                              (inst #-64-bit lw #+64-bit ld function null-tn offset))
-                             ((typep (+ nil-value offset) 'u+i-immediate)
-                              (multiple-value-bind (u i)
-                                  (u-and-i-inst-immediate (+ nil-value offset))
-                                (inst lui function u)
-                                (inst #-64-bit lw #+64-bit ld function function i)))
-                             (t
-                              (error "Static function offset for ~a too far." fun)))))))
+                  `((etypecase (static-fun-offset fun)
+                      (short-immediate
+                       (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
+                      (u+i-immediate
+                       (multiple-value-bind (u i)
+                           (u-and-i-inst-immediate (static-fun-offset fun))
+                         (inst lui function u)
+                         (inst add function null-tn function)
+                         (inst #-64-bit lw #+64-bit ld function function i)))))))
              (loop
                (if filler
                    (do-next-filler)
