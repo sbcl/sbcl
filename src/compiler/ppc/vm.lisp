@@ -20,7 +20,8 @@
 ;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
 ;;;
 (defconstant number-stack-displacement
-  (* 2
+  (* #-darwin 2
+     #+darwin 8
      n-word-bytes))
 
 ;;;; Define the registers
@@ -52,8 +53,13 @@
   (defreg nl6 9)
   (defreg fdefn 10)
   (defreg nargs 11)
-  (defreg nfp 12)
-  (defreg cfunc 13)
+  ;; FIXME: some kind of comment here would be nice.
+  ;;
+  ;; FIXME II: this also reveals the need to autogenerate lispregs.h
+  #+darwin  (defreg cfunc 12)
+  #-darwin  (defreg nfp 12)
+  #+darwin  (defreg nfp 13)
+  #-darwin  (defreg cfunc 13)
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)
