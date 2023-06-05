@@ -117,6 +117,8 @@ in effect."
       (setf (ldb float-precision-control modes)
             (or (cdr (assoc precision +precision-mode-alist+))
                 (error "unknown precision mode: ~S" precision))))
+    ;; FIXME: This apparently doesn't work on Darwin
+    #-(and darwin ppc)
     (setf (floating-point-modes) modes))
   (values))
 

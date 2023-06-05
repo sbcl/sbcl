@@ -136,6 +136,7 @@
             :fails-on (or (and :arm64 (not :darwin))
                           :arm
                           (and :ppc :openbsd)
+                          (and :ppc :darwin)
                           (and :x86 :netbsd)))
   (assert-error
    (sb-sys:without-interrupts
@@ -157,6 +158,7 @@
             :fails-on (or (and :arm64 (not :darwin))
                           :arm
                           (and :ppc :openbsd)
+                          (and :ppc :darwin)
                           (and :x86 :netbsd)))
   (assert-error
    (sb-sys:without-interrupts

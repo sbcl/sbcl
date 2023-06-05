@@ -19,14 +19,19 @@
 
 (defconstant +stack-alignment-bytes+
   ;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.
-  7)
+  #-darwin 7
+  ;; But Darwin doesn't
+  #+darwin 15)
 
 (defstruct arg-state
   (gpr-args 0)
   (fpr-args 0)
   ;; SVR4 [a]abi wants two words on stack (callee saved lr,
   ;; backpointer).
-  (stack-frame-size 2))
+  #-darwin (stack-frame-size 2)
+  ;; PowerOpen ABI wants 8 words on the stack corresponding to GPR3-10
+  ;; in addition to the 6 words of link area (see number-stack-displacement)
+  #+darwin (stack-frame-size (+ 8 6)))
 
 (defun int-arg (state prim-type reg-sc stack-sc)
   (let ((reg-args (arg-state-gpr-args state)))
@@ -57,6 +62,7 @@
 ;;;   Excess floats stored on the stack are stored as floats.
 ;;;
 ;;; We follow gcc.
+#-darwin
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((fprs (arg-state-fpr-args state)))
@@ -69,6 +75,31 @@
              (setf (arg-state-stack-frame-size state) (+ stack-offset 1))
              (make-wired-tn* 'single-float single-stack-sc-number stack-offset))))))
 
+;;; If a single-float arg has to go on the stack, it's promoted to
+;;; double.  That way, C programs can get subtle rounding errors when
+;;; unrelated arguments are introduced.
+#+darwin
+(define-alien-type-method (single-float :arg-tn) (type state)
+  (declare (ignore type))
+  (let* ((fprs (arg-state-fpr-args state))
+         (gprs (arg-state-gpr-args state)))
+    (cond ((< gprs 8) ; and by implication also (< fprs 13)
+           (incf (arg-state-fpr-args state))
+           ;; Assign outgoing FPRs starting at FP1
+           (list (make-wired-tn* 'single-float single-reg-sc-number (1+ fprs))
+                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)))
+          ((< fprs 13)
+           ;; See comments below for double-float.
+           (incf (arg-state-fpr-args state))
+           (incf (arg-state-stack-frame-size state))
+           (make-wired-tn* 'single-float single-reg-sc-number (1+ fprs)))
+          (t
+           ;; Pass on stack only
+           (let ((stack-offset (arg-state-stack-frame-size state)))
+             (incf (arg-state-stack-frame-size state))
+             (make-wired-tn* 'single-float single-stack-sc-number stack-offset))))))
+
+#-darwin
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((fprs (arg-state-fpr-args state)))
@@ -83,6 +114,35 @@
              (setf (arg-state-stack-frame-size state) (+ stack-offset 2))
              (make-wired-tn* 'double-float double-stack-sc-number stack-offset))))))
 
+#+darwin
+(define-alien-type-method (double-float :arg-tn) (type state)
+  (declare (ignore type))
+  (let ((fprs (arg-state-fpr-args state))
+        (gprs (arg-state-gpr-args state)))
+    (cond ((< gprs 8) ; and by implication also (< fprs 13)
+           (incf (arg-state-fpr-args state))
+           ;; Assign outgoing FPRs starting at FP1
+           ;;
+           ;; The PowerOpen ABI says float values are stored in float
+           ;; regs.  But if we're calling a varargs function, we also
+           ;; need to put the float into some gprs.  We indicate this
+           ;; to %alien-funcall ir2-convert by making a list of the
+           ;; TNs for the float reg and for the int regs.
+           ;;
+           (list (make-wired-tn* 'double-float double-reg-sc-number (1+ fprs))
+                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
+                 (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+          ((< fprs 13)
+           (incf (arg-state-fpr-args state))
+           (list (make-wired-tn* 'double-float double-reg-sc-number (1+ fprs))
+                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
+                 (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+          (t
+           ;; Pass on stack only
+           (let ((stack-offset (arg-state-stack-frame-size state)))
+             (incf (arg-state-stack-frame-size state) 2)
+             (make-wired-tn* 'double-float double-stack-sc-number stack-offset))))))
+
 ;;; Result state handling
 
 (defstruct result-state
@@ -92,6 +152,11 @@
   (ecase slot
     (0 nl0-offset)
     (1 nl1-offset)))
+
+;;; FIXME: These #-DARWIN methods should be adjusted to take a state
+;;; argument, firstly because that's our "official" API (see
+;;; src/code/host-alieneval) and secondly because that way we can
+;;; probably have less duplication of code.  -- CSR, 2003-07-29
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type))
@@ -143,6 +208,7 @@
 ;;; Sort out long longs, by splitting them up.  However, need to take
 ;;; care about register/stack alignment and whether they will fully
 ;;; fit into registers or must go on the stack.
+#-darwin
 (deftransform %alien-funcall ((function type &rest args))
   (aver (sb-c:constant-lvar-p type))
   (let* ((type (sb-c:lvar-value type))
@@ -210,6 +276,67 @@
                          (incf stack 1))
                      (new-args arg)
                      (new-arg-types type)))))
+                 (cond ((and (alien-integer-type-p result-type)
+                             (> (sb-alien::alien-integer-type-bits result-type) 32))
+                        (let ((new-result-type
+                               (let ((sb-alien::*values-type-okay* t))
+                                 (parse-alien-type
+                                  (if (alien-integer-type-signed result-type)
+                                      '(values (signed 32) (unsigned 32))
+                                      '(values (unsigned 32) (unsigned 32)))
+                                  nil))))
+                          `(lambda (function type ,@(lambda-vars))
+                            (declare (ignore type))
+                            (multiple-value-bind (high low)
+                                (%alien-funcall function
+                                                ',(make-alien-fun-type
+                                                   :arg-types (new-arg-types)
+                                                   :result-type new-result-type)
+                                                ,@(new-args))
+                              (logior low (ash high 32))))))
+                       (t
+                        `(lambda (function type ,@(lambda-vars))
+                          (declare (ignore type))
+                          (%alien-funcall function
+                           ',(make-alien-fun-type
+                              :arg-types (new-arg-types)
+                              :result-type result-type)
+                           ,@(new-args))))))
+        (sb-c::give-up-ir1-transform))))
+
+#+darwin
+(deftransform %alien-funcall ((function type &rest args))
+  (aver (sb-c:constant-lvar-p type))
+  (let* ((type (sb-c:lvar-value type))
+         (arg-types (alien-fun-type-arg-types type))
+         (result-type (alien-fun-type-result-type type)))
+    (aver (= (length arg-types) (length args)))
+    ;; We need to do something special for 64-bit integer arguments
+    ;; and results.
+    (if (or (some #'(lambda (type)
+                      (and (alien-integer-type-p type)
+                           (> (sb-alien::alien-integer-type-bits type) 32)))
+                  arg-types)
+            (and (alien-integer-type-p result-type)
+                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
+        (collect ((new-args) (lambda-vars) (new-arg-types))
+                 (dolist (type arg-types)
+                   (let ((arg (gensym)))
+                     (lambda-vars arg)
+                     (cond ((and (alien-integer-type-p type)
+                                 (> (sb-alien::alien-integer-type-bits type) 32))
+                            ;; 64-bit long long types are stored in
+                            ;; consecutive locations, most significant word
+                            ;; first (big-endian).
+                            (new-args `(ash ,arg -32))
+                            (new-args `(logand ,arg #xffffffff))
+                            (if (alien-integer-type-signed type)
+                                (new-arg-types (parse-alien-type '(signed 32) nil))
+                                (new-arg-types (parse-alien-type '(unsigned 32) nil)))
+                            (new-arg-types (parse-alien-type '(unsigned 32) nil)))
+                           (t
+                            (new-args arg)
+                            (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
                              (> (sb-alien::alien-integer-type-bits result-type) 32))
                         (let ((new-result-type
@@ -341,12 +468,20 @@
             (t
              `(deref (sap-alien (sap+ ,sap ,offset) (* ,type)))))))
 
+  ;;; The "Mach-O Runtime Conventions" document for OS X almost
+  ;;; specifies the calling convention (it neglects to mention that
+  ;;; the linkage area is 24 bytes).
+  #+darwin
+  (defconstant n-foreign-linkage-area-bytes 24)
+
   ;;; On linux only use 8 bytes for LR and Back chain.  JRXR
   ;;; 2006/11/10.
+  #-darwin
   (defconstant n-foreign-linkage-area-bytes 8)
 
   ;;; Returns a vector in static space containing machine code for the
   ;;; callback wrapper.  Linux version.  JRXR.  2006/11/13
+  #-darwin
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
              (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
@@ -561,4 +696,145 @@
                                             unsigned-long))
            sap (length buffer))
           vector))))
-)
+
+  ;;; Returns a vector in static space containing machine code for the
+  ;;; callback wrapper
+  #+darwin
+  (defun alien-callback-assembler-wrapper (index result-type argument-types)
+    (flet ((make-gpr (n)
+             (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+           (make-fpr (n)
+             (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg) :offset n)))
+      (let* ((segment (make-segment)))
+        (assemble (segment)
+          ;; To save our arguments, we follow the algorithm sketched in the
+          ;; "PowerPC Calling Conventions" section of that document.
+          ;;
+          ;; CLH: There are a couple problems here. First, we bail if
+          ;; we run out of registers. AIUI, we can just ignore the extra
+          ;; args here and we will be ok...
+          (let ((words-processed 0)
+                (gprs (mapcar #'make-gpr '(3 4 5 6 7 8 9 10)))
+                (fprs (mapcar #'make-fpr '(1 2 3 4 5 6 7 8 9 10 11 12 13)))
+                (stack-pointer (make-gpr 1)))
+            (labels ((save-arg (type words)
+                       (let ((integerp (not (alien-float-type-p type)))
+                             (offset (+ (* words-processed n-word-bytes)
+                                        n-foreign-linkage-area-bytes)))
+                         (cond (integerp
+                                (dotimes (k words)
+                                  (let ((gpr (pop gprs)))
+                                    (when gpr
+                                      (inst stw gpr stack-pointer offset))
+                                    (incf words-processed)
+                                    (incf offset n-word-bytes))))
+                               ;; The handling of floats is a little ugly
+                               ;; because we hard-code the number of words
+                               ;; for single- and double-floats.
+                               ((alien-single-float-type-p type)
+                                (pop gprs)
+                                (let ((fpr (pop fprs)))
+                                  (when fpr
+                                    (inst stfs fpr stack-pointer offset)))
+                                (incf words-processed))
+                               ((alien-double-float-type-p type)
+                                (setf gprs (cddr gprs))
+                                (let ((fpr (pop fprs)))
+                                  (when fpr
+                                    (inst stfd fpr stack-pointer offset)))
+                                (incf words-processed 2))
+                               (t
+                                (bug "Unknown alien floating point type: ~S" type))))))
+              (mapc #'save-arg
+                    argument-types
+                    (mapcar (lambda (arg)
+                              (ceiling (alien-type-bits arg) n-word-bits))
+                            argument-types))))
+          ;; Set aside room for the return area just below sp, then
+          ;; actually call funcall3: funcall3 (call-alien-function,
+          ;; index, args, return-area)
+          ;;
+          ;; INDEX is fixnumized, ARGS and RETURN-AREA don't need to be
+          ;; because they're word-aligned. Kinda gross, but hey ...
+          (let* ((n-return-area-words
+                  (ceiling (or (alien-type-bits result-type) 0) n-word-bits))
+                 (n-return-area-bytes (* n-return-area-words n-word-bytes))
+                 ;; FIXME: magic constant, and probably n-args-bytes
+                 (args-size (* 3 n-word-bytes))
+                 ;; FIXME: n-frame-bytes?
+                 (frame-size (logandc2 (+ n-foreign-linkage-area-bytes
+                                          n-return-area-bytes
+                                          args-size
+                                          +stack-alignment-bytes+)
+                                       +stack-alignment-bytes+)))
+            (destructuring-bind (sp r0 arg1 arg2 arg3 arg4)
+                (mapcar #'make-gpr '(1 0 3 4 5 6))
+              ;; FIXME: This is essentially the same code as LR in
+              ;; insts.lisp, but attempting to use (INST LR ...) instead
+              ;; of this function results in callbacks not working.  Why?
+              ;;   --njf, 2006-01-04
+              (flet ((load-address-into (reg addr)
+                       (let ((high (ldb (byte 16 16) addr))
+                             (low (ldb (byte 16 0) addr)))
+                         (inst lis reg high)
+                         (inst ori reg reg low))))
+                ;; Setup the args
+                (load-address-into arg1 (static-fdefn-fun-addr 'enter-alien-callback))
+                (loadw arg1 arg1)
+                (inst li arg2 (fixnumize index))
+                (inst addi arg3 sp n-foreign-linkage-area-bytes)
+                ;; FIXME: This was (- (* RETURN-AREA-SIZE N-WORD-BYTES)), while
+                ;; RETURN-AREA-SIZE was (* N-RETURN-AREA-WORDS N-WORD-BYTES):
+                ;; I assume the intention was (- N-RETURN-AREA-BYTES), but who knows?
+                ;; --NS 2005-06-11
+                (inst addi arg4 sp (- n-return-area-bytes))
+                ;; FIXME! FIXME FIXME: What does this FIXME refer to?
+                ;; Save sp, setup the frame
+                (inst mflr r0)
+                (inst stw r0 sp (* 2 n-word-bytes)) ; FIXME: magic constant
+                (inst stwu sp sp (- frame-size))
+                ;; Make the call
+                (load-address-into r0 (foreign-symbol-address "funcall3"))
+                (inst mtlr r0)
+                (inst blrl))
+              ;; We're back!  Restore sp and lr, load the return value from just
+              ;; under sp, and return.
+              (inst lwz sp sp 0)
+              (inst lwz r0 sp (* 2 n-word-bytes))
+              (inst mtlr r0)
+              (cond
+                ((sb-alien::alien-single-float-type-p result-type)
+                 (let ((f1 (make-fpr 1)))
+                   (inst lfs f1 sp (- (* n-return-area-words n-word-bytes)))))
+                ((sb-alien::alien-double-float-type-p result-type)
+                 (let ((f1 (make-fpr 1)))
+                   (inst lfd f1 sp (- (* n-return-area-words n-word-bytes)))))
+                ((sb-alien::alien-void-type-p result-type)
+                 ;; Nothing to do
+                 )
+                (t
+                 (loop with gprs = (mapcar #'make-gpr '(3 4))
+                    repeat n-return-area-words
+                    for gpr = (pop gprs)
+                    for offset from (- (* n-return-area-words n-word-bytes))
+                    by n-word-bytes
+                    do
+                      (unless gpr
+                        (bug "Out of return registers in alien-callback trampoline."))
+                      (inst lwz gpr sp offset))))
+              (inst blr))))
+        (finalize-segment segment)
+        ;; Now that the segment is done, convert it to a static
+        ;; vector we can point foreign code to.
+        (let* ((buffer (sb-assem:segment-buffer segment))
+               (vector (make-static-vector (length buffer)
+                                           :element-type '(unsigned-byte 8)
+                                           :initial-contents buffer))
+               (sap (vector-sap vector)))
+          (alien-funcall
+           (extern-alien "ppc_flush_icache"
+                         (function void
+                                   system-area-pointer
+                                   unsigned-long))
+           sap (length buffer))
+          vector)))))

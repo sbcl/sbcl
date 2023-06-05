@@ -849,3 +849,68 @@
   (:translate imagpart)
   (:note "complex double float imagpart")
   (:variant :imag))
+
+;; This vop and the next are intended to be used only for moving a
+;; float to an integer arg location (register or stack) for C callout.
+;; See %alien-funcall ir2convert in aliencomp.lisp.
+
+#+darwin
+(define-vop (move-double-to-int-arg)
+  (:args (float :scs (double-reg)))
+  (:results (hi-bits :scs (signed-reg signed-stack))
+            (lo-bits :scs (unsigned-reg unsigned-stack)))
+  (:temporary (:scs (double-stack)) stack-temp)
+  (:temporary (:scs (signed-reg)) temp)
+  (:arg-types double-float)
+  (:result-types signed-num unsigned-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 5
+    (sc-case float
+      (double-reg
+       (inst stfd float (current-nfp-tn vop)
+             (tn-byte-offset stack-temp))
+       (sc-case hi-bits
+         (signed-reg
+          (inst lwz hi-bits (current-nfp-tn vop)
+                (tn-byte-offset stack-temp)))
+         (signed-stack
+          (inst lwz temp (current-nfp-tn vop)
+                (tn-byte-offset stack-temp))
+          (inst stw temp nsp-tn
+                (tn-byte-offset hi-bits))))
+       (sc-case lo-bits
+         (unsigned-reg
+          (inst lwz lo-bits (current-nfp-tn vop)
+                (* (1+ (tn-offset stack-temp)) n-word-bytes)))
+         (unsigned-stack
+          (inst lwz temp (current-nfp-tn vop)
+                (* (1+ (tn-offset stack-temp)) n-word-bytes))
+          (inst stw temp nsp-tn
+                (tn-byte-offset lo-bits))))))))
+
+#+darwin
+(define-vop (move-single-to-int-arg)
+  (:args (float :scs (single-reg)))
+  (:results (bits :scs (signed-reg signed-stack)))
+  (:temporary (:scs (double-stack)) stack-temp)
+  (:temporary (:scs (signed-reg)) temp)
+  (:arg-types single-float)
+  (:result-types signed-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 5
+    (sc-case float
+      (single-reg
+       (inst stfs float (current-nfp-tn vop)
+             (tn-byte-offset stack-temp))
+       (sc-case bits
+         (signed-reg
+          (inst lwz bits (current-nfp-tn vop)
+                (tn-byte-offset stack-temp)))
+         (signed-stack
+          (inst lwz temp (current-nfp-tn vop)
+                (tn-byte-offset stack-temp))
+          (inst stw temp nsp-tn
+                (tn-byte-offset bits))))))))
+

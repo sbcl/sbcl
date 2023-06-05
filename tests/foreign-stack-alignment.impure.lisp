@@ -34,7 +34,8 @@
 (defvar *required-alignment*
   (or #+arm 8
       #+mips 8
-      #+ppc 8
+      #+(and ppc darwin) 16
+      #+(and ppc (not darwin)) 8
       #+(or arm64 x86 x86-64 riscv ppc64) 16
       #+sparc 8
       (error "Unknown platform")))
