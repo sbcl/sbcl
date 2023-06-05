@@ -339,11 +339,13 @@ x:
 
 	/* Call out to obtain our TLS block. */
 	load(reg_NL0,CSYMBOL(current_thread))
-	/* This won't work on darwin: wrong fixup style.  And is it
-	 * supposed to be lis/ori or lis/addi?  Or does it differ
-	 * between darwin and everything else again? */
-	lis reg_CFUNC,CSYMBOL(pthread_getspecific)@h
-	ori reg_CFUNC,reg_CFUNC,CSYMBOL(pthread_getspecific)@l
+#ifdef LISP_FEATURE_DARWIN /* FIXME: should it be lis/ori or lis/addi? */
+	lis reg_CFUNC,hi16(CSYMBOL(pthread_getspecific))
+	ori reg_CFUNC,reg_CFUNC,lo16(CSYMBOL(pthread_getspecific))
+#else
+ 	lis reg_CFUNC,CSYMBOL(pthread_getspecific)@h
+ 	ori reg_CFUNC,reg_CFUNC,CSYMBOL(pthread_getspecific)@l
+#endif
 	mtctr reg_CFUNC
 	bctrl
 	mr reg_THREAD, reg_NL0
