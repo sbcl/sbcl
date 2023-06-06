@@ -145,10 +145,6 @@ void arch_install_interrupt_handlers()
     ll_install_handler(SIGILL, sigill_handler);
 }
 
-lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs) {
-    extern lispobj call_into_lisp_(lispobj, lispobj *, int, struct thread *);
-    return call_into_lisp_(fun, args, nargs, get_sb_vm_thread());
-}
 
 /* Linkage tables
  *
