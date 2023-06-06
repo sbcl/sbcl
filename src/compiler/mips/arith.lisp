@@ -802,16 +802,6 @@
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
 
-(define-vop (fixnum-to-digit)
-  (:translate sb-bignum:%fixnum-to-digit)
-  (:policy :fast-safe)
-  (:args (fixnum :scs (any-reg)))
-  (:arg-types tagged-num)
-  (:results (digit :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 1
-    (inst sra digit fixnum n-fixnum-tag-bits)))
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)

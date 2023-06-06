@@ -1024,16 +1024,6 @@
 (define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
 
-(define-vop (fixnum-to-digit)
-  (:translate sb-bignum:%fixnum-to-digit)
-  (:policy :fast-safe)
-  (:args (fixnum :scs (any-reg)))
-  (:arg-types tagged-num)
-  (:results (digit :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 1
-    (inst sradi digit fixnum n-fixnum-tag-bits)))
-
 ;;; Algorithm from page 74 of of Power ISA version 2.07
 ;;; under "Programming Note" for the divweu instruction
 ;;; with modifications as described at the divdeu instruction.

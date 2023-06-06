@@ -28,7 +28,7 @@
 ;;;       %bignum-length %bignum-set-length %bignum-ref %bignum-set
 ;;;       %digit-0-or-plusp %add-with-carry %subtract-with-borrow
 ;;;       %multiply-and-add %multiply %lognot %logand %logior %logxor
-;;;       %fixnum-to-digit %bigfloor %fixnum-digit-with-correct-sign %ashl
+;;;       %bigfloor %fixnum-digit-with-correct-sign %ashl
 ;;;       %ashr %digit-logical-shift-right))
 
 ;;; The following interfaces will either be assembler routines or code
@@ -61,8 +61,6 @@
 ;;;       %LOGAND
 ;;;       %LOGIOR
 ;;;       %LOGXOR
-;;;    LDB
-;;;       %FIXNUM-TO-DIGIT
 ;;;    TRUNCATE
 ;;;       %BIGFLOOR
 ;;;
@@ -238,14 +236,6 @@
 (defun %logxor (a b)
   (declare (type bignum-element-type a b))
   (logxor a b))
-
-;;; This takes a fixnum and sets it up as an unsigned digit-size
-;;; quantity.
-;;; The stub function is needed for constant-folding, or where vops don't exist
-(defun %fixnum-to-digit (x)
-  (declare (fixnum x))
-  #+(or arm arm64) (logand x (1- (ash 1 digit-size))) ; missing the vops
-  #-(or arm arm64) (%fixnum-to-digit x))
 
 ;;; This returns 0 or "-1" depending on whether the bignum is positive. This
 ;;; is suitable for infinite sign extension to complete additions,
@@ -765,7 +755,8 @@
 (declaim (inline make-small-bignum))
 (defun make-small-bignum (fixnum)
   (let ((res (%allocate-bignum 1)))
-    (setf (%bignum-ref res 0) (%fixnum-to-digit fixnum))
+    (setf (%bignum-ref res 0)
+          (ldb (byte digit-size 0) (truly-the fixnum fixnum)))
     res))
 
 ;; When the larger number is less than this many bignum digits long, revert
