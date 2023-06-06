@@ -383,7 +383,7 @@
                              character-widetag))
           (structure-object
            (if (eq val sb-lockless:+tail+)
-               sb-vm::lockfree-list-tail-value
+               (+ static-space-start lockfree-list-tail-value-offset)
                (bug "immediate structure-object ~S" val)))))
       tn))
 

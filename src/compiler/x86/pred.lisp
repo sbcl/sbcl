@@ -135,7 +135,7 @@
                        (inst mov sc-reg (char-code val)))))
                    (structure-object
                     (aver (eq val sb-lockless:+tail+))
-                    sb-vm::lockfree-list-tail-value)))))
+                    (+ static-space-start lockfree-list-tail-value-offset))))))
         (aver (null (rest flags)))
         (if (sc-is else immediate)
             (load-immediate res else)

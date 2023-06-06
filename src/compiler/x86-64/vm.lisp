@@ -532,7 +532,7 @@
                  bits)))
           (structure-object
            (if (eq val sb-lockless:+tail+)
-               (progn (aver tag) sb-vm::lockfree-list-tail-value)
+               (progn (aver tag) (+ static-space-start lockfree-list-tail-value-offset))
                (bug "immediate structure-object ~S" val)))))
       tn))
 

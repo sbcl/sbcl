@@ -3094,9 +3094,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    #-sb-thread sb-vm::mixed-region-offset
                    #-sb-thread sb-vm::cons-region-offset
                    #-sb-thread sb-vm::boxed-region-offset
-                   sb-vm::nil-symbol-slots-start
-                   sb-vm::nil-symbol-slots-end
-                   sb-vm::static-space-objects-start))
+                   sb-vm::nil-symbol-slots-offset
+                   sb-vm::nil-symbol-slots-end-offset
+                   sb-vm::static-space-objects-offset))
         (record (c-symbol-name c) 7 #| arb |# c +c-literal-64bit+)))
     ;; Sort by <priority, value, alpha> which is TOO COMPLICATED imho.
     ;; Priority and then alphabetical would suffice.

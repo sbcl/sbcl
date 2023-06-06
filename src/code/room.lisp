@@ -294,7 +294,7 @@ We could try a few things to mitigate this:
              ;; Static space starts with NIL, which requires special
              ;; handling, as the header and alignment are slightly off.
              (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
-             (let ((start (%make-lisp-obj static-space-objects-start))
+             (let ((start (%make-lisp-obj (+ static-space-start static-space-objects-offset)))
                    (end (%make-lisp-obj (sap-int *static-space-free-pointer*))))
                (map-objects-in-range fun start end)))
             ((:read-only #-gencgc :dynamic)
@@ -685,7 +685,7 @@ We could try a few things to mitigate this:
            (type (or index null) type larger smaller count))
   (multiple-value-bind (start end) (%space-bounds space)
     (when (eq space :static)
-      (setq start (%make-lisp-obj static-space-objects-start)))
+      (setq start (%make-lisp-obj (+ static-space-start static-space-objects-offset))))
     (let* ((space-start (ash start n-fixnum-tag-bits))
            (space-end (ash end n-fixnum-tag-bits))
            (space-size (- space-end space-start))

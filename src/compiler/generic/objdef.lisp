@@ -724,8 +724,8 @@ during backtrace.
 ;;; nil-as-a-list. So subtract the lowtag and then go back one more word.
 ;;; This address is NOT double-lispword-aligned, but the scavenge method
 ;;; does not assert that.
-(defconstant nil-symbol-slots-start
-  (- nil-value list-pointer-lowtag n-word-bytes))
+(defconstant nil-symbol-slots-offset
+  (- nil-value-offset list-pointer-lowtag n-word-bytes))
 
 ;;; NIL as a symbol contains the usual number of words for a symbol,
 ;;; aligned to a double-lispword. This will NOT end at a double-lispword boundary.
@@ -736,8 +736,9 @@ during backtrace.
 ;;; count because of the assertion in heap_scavenge that the scan ends as expected,
 ;;; and scavenge methods must return an even number because nothing can be smaller
 ;;; than 1 cons cell or not a multiple thereof.
-(defconstant nil-symbol-slots-end
-  (+ nil-symbol-slots-start (ash (align-up symbol-size 2) word-shift)))
+(defconstant nil-symbol-slots-end-offset
+  (+ nil-symbol-slots-offset
+     (ash (align-up symbol-size 2) word-shift)))
 
 ;;; This constant is the number of words to report that NIL consumes
 ;;; when Lisp asks for its primitive-object-size. So we say that it consumes
@@ -748,10 +749,11 @@ during backtrace.
 ;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.
 ;;; Or: go to NIL's header word, subtract 1 word, and add in the physical
 ;;; size of NIL in bytes that we report for primitive-object-size.
-(defconstant static-space-objects-start
-  (+ nil-symbol-slots-start (ash (1- sizeof-nil-in-words) word-shift)))
+(defconstant static-space-objects-offset
+  (+ nil-symbol-slots-offset
+     (ash (1- sizeof-nil-in-words) word-shift)))
 
-(defconstant lockfree-list-tail-value
-  (+ static-space-objects-start
+(defconstant lockfree-list-tail-value-offset
+  (+ static-space-objects-offset
      (* (length +static-symbols+) (ash (align-up symbol-size 2) word-shift))
      instance-pointer-lowtag))

@@ -63,7 +63,8 @@
            ;; same comment as for LOAD-SYMBOL - how is this guaranteed
            ;; to be GC-safe ? Because we always ignore static-space pointers ?
            (composite-immediate-instruction add y null-tn
-             (- sb-vm::lockfree-list-tail-value sb-vm:nil-value))
+             (- lockfree-list-tail-value-offset
+                nil-value-offset))
            (bug "immediate structure-object ~S" val))))))
 
 (define-move-fun (load-number 1) (vop x y)
