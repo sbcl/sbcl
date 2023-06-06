@@ -89,7 +89,7 @@ int arch_os_thread_init(struct thread *thread) {
      * we've exhausted it */
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
-    sigstack.ss_size  = calc_altstack_size(thread;
+    sigstack.ss_size  = calc_altstack_size(thread);
     sigaltstack(&sigstack,0);
 #endif
     return 1;                  /* success */
@@ -121,5 +121,3 @@ os_restore_fp_control(os_context_t *context)
     /* reset exception flags and restore control flags on x87 FPU */
     asm ("fldcw %0" : : "m" (fpu_control_word));
 }
-
-#endif
