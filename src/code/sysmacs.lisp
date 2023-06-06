@@ -164,7 +164,7 @@ maintained."
 (defmacro fast-read-char (&optional (eof-error-p t) (eof-value ()))
   (let ((result
          `(if (not %frc-buffer%)
-              (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value)
+              (values (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
               (block nil
                 (when (= %frc-index% +ansi-stream-in-buffer-length+)
                   (let ((index-or-nil

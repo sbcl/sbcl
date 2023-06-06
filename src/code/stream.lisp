@@ -614,25 +614,27 @@
            ;; function, because near the end of a real file that can
            ;; legitimately bounce us to the IN function.  So we have
            ;; to call ANSI-STREAM-IN.
-           (let* ((index (1- +ansi-stream-in-buffer-length+))
-                  (value (funcall (ansi-stream-in stream) stream nil :eof)))
-             (cond
-               ;; When not signaling an error, it is important that IN-INDEX
-               ;; be set to +ANSI-STREAM-IN-BUFFER-LENGTH+ here, even though
-               ;; DONE-WITH-FAST-READ-CHAR will do the same, thereby writing
-               ;; the caller's %FRC-INDEX% (= +ANSI-STREAM-IN-BUFFER-LENGTH+)
-               ;; into the slot. But because we've already bumped INPUT-CHAR-POS
-               ;; and scanned characters between the original %FRC-INDEX%
-               ;; and the buffer end (above), we must *not* do that again.
-               ((eql value :eof)
-                ;; definitely EOF now
-                (setf (ansi-stream-in-index stream)
-                      +ansi-stream-in-buffer-length+)
-                (eof-or-lose stream eof-error-p nil))
-               ;; we resynced or were given something instead
-               (t
-                (setf (aref ibuf index) value)
-                (setf (ansi-stream-in-index stream) index)))))
+           (let ((index (1- +ansi-stream-in-buffer-length+)))
+             (multiple-value-bind (value size)
+                 (funcall (ansi-stream-in stream) stream nil :eof)
+               (cond
+                 ;; When not signaling an error, it is important that IN-INDEX
+                 ;; be set to +ANSI-STREAM-IN-BUFFER-LENGTH+ here, even though
+                 ;; DONE-WITH-FAST-READ-CHAR will do the same, thereby writing
+                 ;; the caller's %FRC-INDEX% (= +ANSI-STREAM-IN-BUFFER-LENGTH+)
+                 ;; into the slot. But because we've already bumped INPUT-CHAR-POS
+                 ;; and scanned characters between the original %FRC-INDEX%
+                 ;; and the buffer end (above), we must *not* do that again.
+                 ((eql value :eof)
+                  ;; definitely EOF now
+                  (setf (ansi-stream-in-index stream)
+                        +ansi-stream-in-buffer-length+)
+                  (eof-or-lose stream eof-error-p nil))
+                 ;; we resynced or were given something instead
+                 (t
+                  (setf (aref ibuf index) value)
+                  (setf (aref sizebuf index) size)
+                  (setf (ansi-stream-in-index stream) index))))))
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
              (#.(let* ((n-character-array-bits

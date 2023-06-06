@@ -1107,7 +1107,7 @@
                         (pointer (fill-pointer instead)))
                    (when (= pointer 0)
                      (setf (fd-stream-listen ,stream-var) nil))
-                   (return-from use-instead result))
+                   (return-from use-instead (values result 0)))
                  (unless
                      (catch 'eof-input-catcher
                        (setf decode-break-reason
@@ -1149,7 +1149,7 @@
                        (setq ,retry-var nil))))))
            (cond (,element-var
                   (incf (buffer-head ibuf) size)
-                  ,element-var)
+                  (values ,element-var size))
                  (t
                   (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
 
