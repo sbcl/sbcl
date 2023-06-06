@@ -697,10 +697,6 @@ fi
 
 case "$sbcl_arch" in
   x86)
-    if [ "$sbcl_os" = "darwin" ]; then
-        echo "Unsupported configuration"
-        exit 1
-    fi
     if [ "$sbcl_os" = "win32" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
