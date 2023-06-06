@@ -310,7 +310,7 @@
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
           (push :compact-symbol sb-xc:*features*))
-        (when (target-featurep '(:and :sb-thread (:or :darwin :openbsd)))
+        (when (target-featurep '(:and :sb-thread (:or (:and :darwin (:not :x86)) :openbsd)))
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
           ;; 0xCE is a perfectly good 32-bit instruction,
