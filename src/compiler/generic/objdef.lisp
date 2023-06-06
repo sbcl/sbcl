@@ -499,7 +499,16 @@ during backtrace.
   (assign-header-slot-indices))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defconstant histogram-small-bins 32)) ; for consing size histogram
+  ;; allocator histogram capacity
+  (defconstant n-histogram-bins-small 32)
+  (defconstant n-histogram-bins-large 32))
+;;; the #+allocation-size-histogram has an exact count of objects allocated
+;;; for all sizes up to (* cons-size n-word-bytes n-histogram-bins-small).
+;;; Larger allocations are grouped by the binary log of the size.
+;;; It seems that 99.5% of all allocations are less than the small bucket limit,
+;;; making the histogram exact except for the tail.
+(defconstant first-large-histogram-bin-log2size
+  (integer-length (* n-histogram-bins-small cons-size n-word-bytes)))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -610,8 +619,11 @@ during backtrace.
   (et-allocator-mutex-acq) ; elapsed times
   (et-find-freeish-page)
   (et-bzeroing)
-  (obj-size-histo :c-type "size_histogram"
-                  :length #.(+ histogram-small-bins n-word-bits))
+  (allocator-histogram :c-type "size_histogram"
+                       ;; small bins store just a count
+                       ;; large bins store a count and size
+                       :length #.(+ (* 2 n-histogram-bins-large)
+                                    n-histogram-bins-small))
 
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.

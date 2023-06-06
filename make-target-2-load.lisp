@@ -72,7 +72,7 @@
            ;; I would argue that this should not be exposed,
            ;; but I would also anticipate blowback from removing it.
            :CHENEYGC :GENCGC ; GC: pick one and only one
-           :ARENA-ALLOCATOR
+           :ARENA-ALLOCATOR :ALLOCATION-SIZE-HISTOGRAM
            ;; Can't use s-l-a-d :compression safely without it
            :SB-CORE-COMPRESSION
            ;; Features that are also in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*

@@ -52,17 +52,6 @@
   (aver (= thread-tot-bytes-alloc-unboxed-slot
            (1+ thread-tot-bytes-alloc-boxed-slot))))
 
-;;; the #+allocator metrics histogram contains an exact count
-;;; for all sizes up to (* cons-size n-word-bytes histogram-small-bins).
-;;; Larger allocations are grouped by the binary log of the size.
-;;; It seems that 99.5% of all allocations are less than the small bucket limit,
-;;; making the histogram fairly exact except for the tail.
-(defparameter *consing-histo* nil)
-(defconstant non-small-bucket-offset
-  (+ histogram-small-bins
-     (- (integer-length (* sb-vm::histogram-small-bins
-                           sb-vm:cons-size sb-vm:n-word-bytes)))))
-
 ;;; Emit counter increments for SB-APROF. SCRATCH-REGISTERS is either a TN
 ;;; or list of TNs that can be used to store into the profiling data.
 ;;; We pick one of the available TNs to use for addressing the data buffer.
@@ -85,51 +74,66 @@
   ;; so we may as well take advantage of this fact to load the temp reg
   ;; here, if provided, rather than spewing more #+gs-seg tests around.
   #+gs-seg (when thread-temp (inst rdgsbase thread-temp))
-  #+allocator-metrics
-  (let ((use-size-temp (not (typep size '(or (signed-byte 32) tn))))
-        (tally (gen-label))
-        (inexact (gen-label)))
-    (cond ((tn-p type) ; from ALLOCATE-VECTOR-ON-HEAP
-           ;; Constant huge size + unknown type can't occur.
-           (aver (not use-size-temp))
-           (inst cmp :byte type simple-vector-widetag)
-           (inst set :ne temp)
-           (inst and :dword temp 1)
-           (inst add :qword
-                 (ea thread-segment-reg
-                     (ash thread-tot-bytes-alloc-boxed-slot word-shift)
-                     thread-tn temp 8)
-                 size))
-          (t
-           (inst add :qword
-                 (thread-slot-ea (if (alloc-unboxed-p type)
-                                     thread-tot-bytes-alloc-unboxed-slot
-                                     thread-tot-bytes-alloc-boxed-slot))
-                 (cond (use-size-temp (inst mov temp size) temp)
-                       (t size)))))
-    (cond ((tn-p size)
-           (inst cmp size (* histogram-small-bins 16))
-           (inst jmp :g inexact)
-           (inst mov :dword temp size)
-           (inst shr :dword temp (1+ word-shift))
-           (inst dec :dword temp)
-           (inst jmp tally)
-           (emit-label inexact)
-           (inst bsr temp size)
-           ;; bsr returns 1 less than INTEGER-LENGTH
-           (inst add :dword temp (1+ non-small-bucket-offset))
-           (emit-label tally)
-           (inst inc :qword (ea thread-segment-reg
-                                (ash thread-obj-size-histo-slot word-shift)
-                                thread-tn temp 8)))
-          (t
-           (let* ((n-conses (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))
-                  (bucket (if (<= n-conses histogram-small-bins)
-                              (1- n-conses)
-                              (+ (integer-length size)
-                                 non-small-bucket-offset))))
-             (inst inc :qword
-                   (thread-slot-ea (+ thread-obj-size-histo-slot bucket)))))))
+  (when (member :allocation-size-histogram sb-xc:*features*)
+    (let ((use-size-temp (not (typep size '(or (signed-byte 32) tn)))))
+      ;; Sum up the sizes of boxed vs unboxed allocations.
+      (cond ((tn-p type) ; from ALLOCATE-VECTOR-ON-HEAP
+             ;; Constant huge size + unknown type can't occur.
+             (aver (not use-size-temp))
+             (inst cmp :byte type simple-vector-widetag)
+             (inst set :ne temp)
+             (inst and :dword temp 1)
+             (inst add :qword
+                   (ea thread-segment-reg
+                       (ash thread-tot-bytes-alloc-boxed-slot word-shift)
+                       thread-tn temp 8)
+                   size))
+            (t
+             (inst add :qword
+                   (thread-slot-ea (if (alloc-unboxed-p type)
+                                       thread-tot-bytes-alloc-unboxed-slot
+                                       thread-tot-bytes-alloc-boxed-slot))
+                   (cond (use-size-temp (inst mov temp size) temp)
+                         (t size)))))
+      (cond ((tn-p size)
+             (assemble ()
+               ;; optimistically assume it's a small object, so just divide
+               ;; the size by the size of a cons to get a (1-based) index.
+               (inst mov :dword temp size)
+               (inst shr :dword temp (1+ word-shift))
+               ;; now see if the computed index is in range
+               (inst cmp size (* n-histogram-bins-small 16))
+               (inst jmp :le OK)
+               ;; oversized. Compute the log2 of the size
+               (inst bsr :dword temp size)
+               ;; array of counts ... | array of sizes ...
+               (inst add :qword (ea (ash (+ thread-allocator-histogram-slot
+                                            1
+                                            (- first-large-histogram-bin-log2size)
+                                            n-histogram-bins-small
+                                            n-histogram-bins-large)
+                                         word-shift)
+                                    thread-tn temp 8)
+                     size)
+               ;; not sure why this is "2" and not "1" in the fudge factor!!
+               ;; (but the assertions come out right)
+               (inst add :dword temp
+                     (+ (- first-large-histogram-bin-log2size) n-histogram-bins-small 2))
+               OK
+               (inst inc :qword (ea thread-segment-reg
+                                    (ash (1- thread-allocator-histogram-slot) word-shift)
+                                    thread-tn temp 8))))
+            ((<= size (* sb-vm:cons-size sb-vm:n-word-bytes n-histogram-bins-small))
+             (let ((index (1- (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))))
+               (inst inc :qword (thread-slot-ea (+ thread-allocator-histogram-slot index)))))
+            (t
+             (let ((index (- (integer-length size) first-large-histogram-bin-log2size)))
+               (inst add :qword (thread-slot-ea (+ thread-allocator-histogram-slot
+                                                   n-histogram-bins-small
+                                                   n-histogram-bins-large index))
+                     size)
+               (inst inc :qword (thread-slot-ea (+ thread-allocator-histogram-slot
+                                                   n-histogram-bins-small index))))))))
   (when (policy node (> sb-c::instrument-consing 1))
     (when (tn-p size)
       (aver (not (location= size temp))))

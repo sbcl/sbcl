@@ -278,20 +278,22 @@ an error in that case."
          ;; indicating that you observed a value of %OWNER which no longer exists.
          (t :thread-dead)))
 
-(defun list-all-threads ()
-  "Return a list of the live threads. Note that the return value is
-potentially stale even before the function returns, as new threads may be
-created and old ones may exit at any time."
+(defun %list-all-threads ()
   ;; No lock needed, just an atomic read, since tree mutations can't happen.
   ;; Of course by the time we're done collecting nodes, the tree can have
   ;; been replaced by a different tree.
   (barrier (:read))
   (avltree-filter (lambda (node)
                     (let ((thread (avlnode-data node)))
-                      (when (and (= (thread-%visible thread) 1)
-                                 (neq thread sb-impl::*finalizer-thread*))
+                      (when (= (thread-%visible thread) 1)
                         thread)))
                   *all-threads*))
+
+(defun list-all-threads ()
+  "Return a list of the live threads. Note that the return value is
+potentially stale even before the function returns, as new threads may be
+created and old ones may exit at any time."
+  (delete sb-impl::*finalizer-thread* (%list-all-threads)))
 
 ;;; used by debug-int.lisp to access interrupt contexts
 
@@ -2595,9 +2597,9 @@ mechanism for inter-thread communication."
             #-sb-thread (ash thread-obj-len sb-vm:word-shift)
             by sb-vm:n-word-bytes
             do
-         (unless (<= sb-vm::thread-obj-size-histo-slot
+         (unless (<= sb-vm::thread-allocator-histogram-slot
                      (ash tlsindex (- sb-vm:word-shift))
-                     (+ sb-vm::thread-obj-size-histo-slot (1- sb-vm:n-word-bits)))
+                     (1- sb-vm::thread-lisp-thread-slot))
            (let ((thread-slot-name
                   (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
                            (aref names (ash tlsindex (- sb-vm:word-shift))))))
@@ -2619,78 +2621,94 @@ mechanism for inter-thread communication."
             (show sym val))
           (setq from (sap+ from (* sb-vm:binding-size sb-vm:n-word-bytes))))))))
 
-#+allocator-metrics
 (macrolet ((histogram-value (c-thread index)
              `(sap-ref-word (int-sap ,c-thread)
-                            (ash (+ sb-vm::thread-obj-size-histo-slot ,index)
+                            (ash (+ sb-vm::thread-allocator-histogram-slot ,index)
                                  sb-vm:word-shift)))
            (metric (c-thread slot)
              `(sap-ref-word (int-sap ,c-thread)
-                            (ash ,slot sb-vm:word-shift))))
-(export '(print-allocator-histogram reset-allocator-histogram))
+                            (ash ,slot sb-vm:word-shift)))
+           (histogram-array-length ()
+             (+ sb-vm::n-histogram-bins-small
+                (* 2 sb-vm::n-histogram-bins-large))))
+
+(export '(allocator-histogram print-allocator-histogram reset-allocator-histogram))
 (defun allocator-histogram (&optional (thread *current-thread*))
   (if (eq thread :all)
       (labels ((vector-sum (a b)
-                 (let ((result (make-array (max (length a) (length b))
-                                           :element-type 'fixnum)))
+                 (let ((result (make-array (length a) :element-type 'fixnum)))
                    (dotimes (i (length result) result)
-                     (setf (aref result i)
-                           (+ (if (< i (length a)) (aref a i) 0)
-                              (if (< i (length b)) (aref b i) 0))))))
+                     (setf (aref result i) (+ (aref a i) (aref b i))))))
                (sum (a b)
-                 (cond ((null a) b)
-                       ((null b) a)
-                       (t (cons (vector-sum (car a) (car b))
-                                (mapcar #'+ (cdr a) (cdr b)))))))
-        (reduce #'sum
-                ;; what about the finalizer thread?
-                (mapcar 'allocator-histogram (list-all-threads))))
+                 (list (vector-sum (first a) (first b)) ; bin counts
+                       (vector-sum (second a) (second b)) ; nbytes in large bins
+                       (+ (third a) (third b)) ; unboxed total
+                       (+ (fourth a) (fourth b))))) ; boxed total
+        ;; can get a NIL if a thread exited by the time we got to asking for its data
+        (reduce #'sum (delete nil
+                              (mapcar 'allocator-histogram (%list-all-threads)))))
       (with-deathlok (thread c-thread)
         (unless (= c-thread 0)
-          (dx-let ((a (make-array (+ sb-vm::histogram-small-bins sb-vm:n-word-bits)
-                                  :element-type 'fixnum)))
+          (let ((a (make-array (histogram-array-length) :element-type 'fixnum))
+                (boxed (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot))
+                (unboxed (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot)))
+            (declare (truly-dynamic-extent a))
             (dotimes (i (length a))
               (setf (aref a i) (histogram-value c-thread i)))
-            (list (subseq a 0 (1+ (or (position 0 a :from-end t :test #'/=) -1)))
-                  (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot)
-                  (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot)
-                  (metric c-thread sb-vm::thread-slow-path-allocs-slot)
-                  (metric c-thread sb-vm::thread-et-allocator-mutex-acq-slot)
-                  (metric c-thread sb-vm::thread-et-find-freeish-page-slot)
-                  (metric c-thread sb-vm::thread-et-bzeroing-slot)))))))
+            (list (subseq a 0 (+ sb-vm::n-histogram-bins-small
+                                 sb-vm::n-histogram-bins-large))
+                  (subseq a (+ sb-vm::n-histogram-bins-small
+                               sb-vm::n-histogram-bins-large))
+                  unboxed
+                  boxed))))))
 
 (defun reset-allocator-histogram (&optional (thread *current-thread*))
-  (with-deathlok (thread c-thread)
-    (unless (= c-thread 0)
-      (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
-            (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0
-            (metric c-thread sb-vm::thread-slow-path-allocs-slot) 0)
-      (dotimes (i (+ sb-vm::histogram-small-bins sb-vm:n-word-bits))
-        (setf (histogram-value c-thread i) 0)))))
+  (if (eq thread :all)
+      (mapc #'reset-allocator-histogram (%list-all-threads))
+      (with-deathlok (thread c-thread)
+        (unless (= c-thread 0)
+          (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
+                (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0
+                (metric c-thread sb-vm::thread-slow-path-allocs-slot) 0)
+          (dotimes (i (histogram-array-length))
+            (setf (histogram-value c-thread i) 0)))))))
 
-(defun print-allocator-histogram (&optional (thread *current-thread*))
-  (destructuring-bind (bins tot-bytes-boxed tot-bytes-unboxed n-slow-path lock find clear)
-      (allocator-histogram thread)
-    (let ((total-objects (reduce #'+ bins))
-          (cumulative 0))
-      (format t "~&       Size      Count    Cum%~%")
-      (loop for index from 0
-            for count across bins
-            for size-exact-p = (< index sb-vm::histogram-small-bins)
-            for size = (if size-exact-p
-                           (* (1+ index) 2 sb-vm:n-word-bytes)
-                           (ash 1 (+ (- index sb-vm::histogram-small-bins) 10)))
-        do
-        (incf cumulative count)
-        (format t "~& ~10@a : ~8d  ~6,2,2f~%"
-                (cond (size-exact-p size)
-                      ((< size 1048576) (format nil "< ~d" size))
-                      (t (format nil "< 2^~d" (1- (integer-length size)))))
-                count (/ cumulative total-objects))
-        (setq size (* size 2)))
-      (when (plusp total-objects)
-        (format t "Total: ~D+~D bytes, ~D objects, ~,2,2f% fast path~%"
-                tot-bytes-boxed tot-bytes-unboxed total-objects
-                (/ (- total-objects n-slow-path) total-objects)))
-      (format t "Times (sec): lock=~,,-9f find=~,,-9f clear=~,,-9f~%"
-              lock find clear)))))
+(defun print-allocator-histogram (&optional (thread-or-values *current-thread*))
+  (destructuring-bind (counts large-allocated tot-bytes-unboxed tot-bytes-boxed)
+      (if (listp thread-or-values)
+          thread-or-values ; histogram was already gathered, just print it
+          (allocator-histogram thread-or-values))
+    (let* ((tot-bins (length counts))
+           (tot-objects (reduce #'+ counts))
+           (bin-label (make-array tot-bins))
+           (bin-nbytes (make-array tot-bins))
+           (cumulative 0))
+      (dotimes (i sb-vm::n-histogram-bins-small)
+        (setf (aref bin-label i) (* (1+ i) sb-vm:cons-size sb-vm:n-word-bytes)
+              (aref bin-nbytes i) (* (aref counts i) (aref bin-label i))))
+      (dotimes (i sb-vm::n-histogram-bins-small)
+        (let ((bin-index (+ sb-vm::n-histogram-bins-small i))
+              (size-max (ash 1 (+ i sb-vm::first-large-histogram-bin-log2size)))
+              (allocated (aref large-allocated i)))
+          (setf (aref bin-label bin-index)
+                (if (< size-max 1048576)
+                    (format nil "< ~d" size-max)
+                    (format nil "< 2^~d" (1- (integer-length size-max))))
+                (aref bin-nbytes bin-index) allocated)))
+      (format t "~& Bin      Size     Allocated     Count    Cum%~%")
+      (dotimes (i tot-bins)
+        (let ((count (aref counts i)))
+          (incf cumulative count)
+          (format t "~& ~2d ~10@a ~13d ~9d ~7,2,2f~%"
+                  i
+                  (aref bin-label i)
+                  (aref bin-nbytes i)
+                  count
+                  (when (plusp tot-objects) (/ cumulative tot-objects)))))
+      (let ((tot-bytes (+ tot-bytes-unboxed tot-bytes-boxed)))
+        (format t "~& Tot ~23d ~9d~%" tot-bytes tot-objects)
+        (when (plusp tot-bytes)
+          (format t "; ~D unboxed + ~D boxed bytes (~,1,2F% + ~,1,2F%)~%"
+                  tot-bytes-unboxed tot-bytes-boxed
+                  (/ tot-bytes-unboxed tot-bytes)
+                  (/ tot-bytes-boxed tot-bytes)))))))

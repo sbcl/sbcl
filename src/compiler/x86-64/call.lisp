@@ -1293,7 +1293,11 @@
           (inst lea :dword rcx (ea nil count (ash 1 shift)))))
     ;; Setup for the CDR of the last cons (or the entire result) being NIL.
     (inst mov result nil-value)
-    (inst jrcxz DONE)
+    (cond ((not (member :allocation-size-histogram sb-xc:*features*))
+           (inst jrcxz DONE))
+          (t ; jumps too far for JRCXZ sometimes
+           (inst test rcx rcx)
+           (inst jmp :z done)))
     (unless (node-stack-allocate-p node)
       (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
     (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
