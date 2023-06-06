@@ -1552,6 +1552,7 @@ extern int *os_context_flags_addr(os_context_t *context);
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
+extern void call_into_lisp_tramp(void);
 
 void
 arrange_return_to_c_function(os_context_t *context,
@@ -1738,7 +1739,13 @@ arrange_return_to_c_function(os_context_t *context,
 void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    arrange_return_to_c_function(context,
+                                 (call_into_lisp_lookalike)call_into_lisp_tramp,
+                                 function);
+#else
     arrange_return_to_c_function(context, call_into_lisp, function);
+#endif
 }
 
 // These have undefined_alien_function tramp in x-assem.S

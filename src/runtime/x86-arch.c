@@ -80,6 +80,8 @@ os_context_flags_addr(os_context_t *context)
     return &context->uc_mcontext.mc_eflags;
 #elif defined __OpenBSD__
     return &context->sc_eflags;
+#elif defined LISP_FEATURE_DARWIN
+    return (int *)(&context->uc_mcontext->SS.EFLAGS);
 #elif defined __NetBSD__
     return &(context->uc_mcontext.__gregs[_REG_EFL]);
 #elif defined LISP_FEATURE_WIN32
