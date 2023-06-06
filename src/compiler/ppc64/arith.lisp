@@ -170,6 +170,11 @@
 (!define-var-binop lognand 2 nand nil t)
 (!define-var-binop lognor 2 nor nil t)
 
+(define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
+  (:args (x :scs (signed-reg) :target r)
+         (y :scs (unsigned-reg) :target r))
+  (:arg-types signed-num unsigned-num))
+
 (defun generate-fast-+-c (r x y)
   (cond ((typep y '(signed-byte 16))
          (inst addi r x y))

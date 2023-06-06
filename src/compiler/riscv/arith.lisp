@@ -141,6 +141,11 @@
 (define-binop logxor 1 3 xor xori)
 (define-binop logand 1 3 and andi)
 
+(define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
+  (:args (x :scs (signed-reg) :target r)
+         (y :scs (unsigned-reg) :target r))
+  (:arg-types signed-num unsigned-num))
+
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
       `(logxor ,@args)
