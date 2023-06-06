@@ -20,6 +20,8 @@
                         sb-vm:*read-only-space-free-pointer*)
     system-area-pointer)
 
+#+relocatable-static-space
+(define-alien-variable ("STATIC_SPACE_START" sb-vm:static-space-start) sb-kernel::os-vm-size-t)
 ;;; STATIC-SPACE-START is a constant from genesis
 (define-alien-variable ("static_space_free_pointer" sb-vm:*static-space-free-pointer*)
   system-area-pointer)

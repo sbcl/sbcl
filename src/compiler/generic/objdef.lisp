@@ -384,7 +384,10 @@ during backtrace.
   ;; regardless of whether the object being tested is known to be a symbol.
   ;; Accessing the hash requires masking off bits to yield a fixnum result,
   ;; all the more so if the object is any random type.
+  #-relocatable-static-space
   (hash :set-trans %set-symbol-hash)
+  #+relocatable-static-space
+  unused
   (value :init :unbound
          :set-trans %set-symbol-global-value
          :set-known ())
@@ -412,6 +415,8 @@ during backtrace.
         :type (or instance list)
         :init :null)
   (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
+  #+relocatable-static-space
+  (hash :set-trans %set-symbol-hash)
   #-compact-symbol
   (package-id :type index ; actually 16 bits. (Could go in the header)
               :ref-trans symbol-package-id
@@ -695,7 +700,7 @@ during backtrace.
 ;;; The definitions below want to use ALIGN-UP, which is not defined
 ;;; in time to put these in early-objdef, but it turns out that we don't
 ;;; need them there.
-(defconstant nil-value (+ static-space-start nil-value-offset))
+(#-relocatable-static-space defconstant #+relocatable-static-space define-symbol-macro nil-value (+ static-space-start nil-value-offset))
 
 #+sb-xc-host (defun get-nil-taggedptr () nil-value)
 

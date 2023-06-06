@@ -103,7 +103,7 @@
                  appending
                  (let* ((relocatable
                           ;; READONLY is usually movable now.
-                          (member space '(fixedobj text
+                          (member space '(fixedobj text #+relocatable-static-space static
                                           #+immobile-space alien-linkage-table
                                           #-darwin-jit read-only)))
                         (start ptr)

@@ -32,6 +32,9 @@ uword_t DYNAMIC_SPACE_START;
 #ifndef LISP_FEATURE_DARWIN_JIT
 uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
 #endif
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+uword_t STATIC_SPACE_START, STATIC_SPACE_END;
+#endif
 
 uword_t asm_routines_start, asm_routines_end;
 

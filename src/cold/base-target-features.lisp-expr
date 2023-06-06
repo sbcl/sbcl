@@ -277,6 +277,9 @@
  ;; foreign code that uses a 32-bit off_t.
  ; :largefile
 
+ ;; This feature allows static space to be relocatable on start-up.
+ ; :relocatable-static-space
+
  ;; SBCL has optional support for zstd-based compressed core files.  Enable
  ;; this feature to compile it in.  Obviously, doing so adds a dependency
  ;; on zstd.

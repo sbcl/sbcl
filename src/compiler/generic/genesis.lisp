@@ -1752,6 +1752,8 @@ core and return a descriptor to it."
         (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
                                                                   sb-vm:symbol-widetag))
         (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
+        #+relocatable-static-space
+        (write-wordindexed des (+ 1 sb-vm::symbol-unused-slot) nil-val)
         (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
@@ -2940,7 +2942,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    (error "Space overlap: ~A with ~A" space (car other))))
                (push (cons space type) types))))
       (check sb-vm:read-only-space-start sb-vm:read-only-space-end :read-only)
+      #-relocatable-static-space
       (check sb-vm:static-space-start sb-vm:static-space-end :static)
+      #+relocatable-static-space
+      (check sb-vm:static-space-start (+ sb-vm:static-space-start sb-vm::static-space-size) :static)
       #+gencgc
       (check sb-vm:dynamic-space-start
              (+ sb-vm:dynamic-space-start sb-vm::default-dynamic-space-size)
@@ -3083,7 +3088,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    sb-vm:dsd-raw-type-mask
                    sb-vm:short-header-max-words
                    sb-vm:array-flags-position
-                   sb-vm:array-rank-position))
+                   sb-vm:array-rank-position
+                   sb-vm::nil-value-offset))
         (record (c-symbol-name c) -1 c ""))
       ;; More symbols that doesn't fit into the pattern above.
       (dolist (c '(sb-impl::+magic-hash-vector-value+
@@ -3435,19 +3441,28 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
             (let ((val (if (listp binding) (second binding))))
               (if (eq val 't) "LISP_T" val)))))
 
+(defun maybe-relativize (value)
+  #-relocatable-static-space value
+  #+relocatable-static-space (- value sb-vm:static-space-start))
+
 (defun write-static-symbols (stream)
   (dolist (symbol (cons nil (coerce sb-vm:+static-symbols+ 'list)))
-    (format stream "#define ~A LISPOBJ(0x~X)~%"
+    (format stream "#define ~A LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
             ;; FIXME: It would be nice not to need to strip anything
             ;; that doesn't get stripped always by C-SYMBOL-NAME.
             (if (eq symbol 't) "LISP_T" (c-symbol-name symbol "%*.!"))
-            (if *static*                ; if we ran GENESIS
-              ;; We actually ran GENESIS, use the real value.
-              (descriptor-bits (cold-intern symbol))
-              (+ sb-vm:nil-value
-                 (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
-  (format stream "#define LFLIST_TAIL_ATOM LISPOBJ(0x~X)~%"
-          (descriptor-bits *lflist-tail-atom*))
+            #-relocatable-static-space nil
+            #+relocatable-static-space t
+            (maybe-relativize
+             (if *static*               ; if we ran GENESIS
+                 ;; We actually ran GENESIS, use the real value.
+                 (descriptor-bits (cold-intern symbol))
+                 (+ sb-vm:nil-value
+                    (if symbol (sb-vm:static-symbol-offset symbol) 0))))))
+  (format stream "#define LFLIST_TAIL_ATOM LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
+          #-relocatable-static-space nil
+          #+relocatable-static-space t
+          (maybe-relativize (descriptor-bits *lflist-tail-atom*)))
   #+sb-thread
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))
@@ -3463,7 +3478,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
           "FUNCTION"
           "FIXEDOBJ"
           (- (cold-layout-descriptor-bits 'function)
-                        (gspace-byte-address (symbol-value *cold-layout-gspace*))))
+             (gspace-byte-address (symbol-value *cold-layout-gspace*))))
   ;; For immobile code on x86-64, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
   #+(and x86-64 immobile-code)
@@ -3480,16 +3495,19 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
   (loop for symbol in sb-vm::+c-callable-fdefns+
         for index from 0
         do
-    (format stream "#define ~A_FDEFN LISPOBJ(0x~X)~%"
+    (format stream "#define ~A_FDEFN LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
             (c-symbol-name symbol)
-            (if *static*                ; if we ran GENESIS
-              ;; We actually ran GENESIS, use the real value.
-              (descriptor-bits (ensure-cold-fdefn symbol))
-              ;; We didn't run GENESIS, so guess at the address.
-              (+ sb-vm:nil-value
-                 (* (length sb-vm:+static-symbols+)
-                    (sb-vm:pad-data-block sb-vm:symbol-size))
-                 (* index (sb-vm:pad-data-block sb-vm:fdefn-size)))))))
+            #-relocatable-static-space nil
+            #+relocatable-static-space t
+            (maybe-relativize
+             (if *static*               ; if we ran GENESIS
+                 ;; We actually ran GENESIS, use the real value.
+                 (descriptor-bits (ensure-cold-fdefn symbol))
+                 ;; We didn't run GENESIS, so guess at the address.
+                 (+ sb-vm:nil-value
+                    (* (length sb-vm:+static-symbols+)
+                       (sb-vm:pad-data-block sb-vm:symbol-size))
+                    (* index (sb-vm:pad-data-block sb-vm:fdefn-size))))))))
 
 (defun init-runtime-routines ()
   (dolist (symbol sb-vm::*runtime-asm-routines*)

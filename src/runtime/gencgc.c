@@ -5525,7 +5525,11 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
             boolean save_runtime_options, boolean compressed,
             int compression_level, int application_type)
 {
-#if defined LISP_FEATURE_SPARC && defined LISP_FEATURE_LINUX
+    // FIXME: Instead of disabling purify for static space relocation,
+    // we should make r/o space read-only after fixing up pointers to
+    // static space instead.
+#if ((defined LISP_FEATURE_SPARC && defined LISP_FEATURE_LINUX) || \
+     (defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE))
     /* OS says it'll give you the memory where you want, then it says
      * it won't map over it from the core file.  That's news to me.
      * Fragment of output from 'strace -e mmap2 src/runtime/sbcl --core output/sbcl.core':
