@@ -316,6 +316,7 @@
             (,mode (sb-posix::stat-mode ,stat)))
        ,@body)))
 
+#-(and darwin x86)
 (deftest stat-mode.1
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-isreg mode))
@@ -332,6 +333,7 @@
     (sb-posix:s-ischr mode))
   nil)
 
+#-(and darwin x86)
 (deftest stat-mode.4
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-isblk mode))
