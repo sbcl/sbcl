@@ -844,10 +844,13 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
         if (len != 0) {
             spaces[id].len = len;
-            // Try to map at address requested by the core file.
             size_t request = spaces[id].desired_size;
             int sub_2gb_flag = (request & 1);
             request &= ~(size_t)1;
+            // Try to map at address requested by the core file unless ASLR.
+#ifdef LISP_FEATURE_ASLR
+            addr = 0;
+#endif
             addr = (uword_t)reserve_space(id, sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                           (os_vm_address_t)addr, request);
             switch (id) {
