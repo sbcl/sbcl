@@ -98,15 +98,14 @@ GNAME(funcall1_switching_stack):
 
 
 	.align 2
-	.global	GNAME(call_into_lisp)
-	TYPE(call_into_lisp)
-GNAME(call_into_lisp):
+	.global	GNAME(call_into_lisp_)
+	TYPE(call_into_lisp_)
+GNAME(call_into_lisp_):
 	// At this point, we have:
 	// X0 - function
 	// X1 - pointer to args
 	// X2 - number of args (unboxed)
-	// There will be no more than three args, so we don't need to
-	// worry about parameters to be passed on the stack.
+        // X3 - thread reg
 
 	// X19-X28 are callee-saved registers.
 
@@ -135,25 +134,7 @@ GNAME(call_into_lisp):
 	mov	reg_LEXENV, x0
 
 #ifdef LISP_FEATURE_SB_THREAD
-#ifdef LISP_FEATURE_GCC_TLS
-#ifdef LISP_FEATURE_DARWIN
-
-        adrp    x0, _current_thread@TLVPPAGE
-        ldr     x0, [x0, _current_thread@TLVPPAGEOFF]
-        ldr     x8, [x0]
-        blr     x8
-        ldr     reg_THREAD, [x0]
-#else
-	adrp	x0, :gottprel:current_thread
-	ldr	x0, [x0, #:gottprel_lo12:current_thread]
-	mrs	reg_THREAD, tpidr_el0
-	ldr	reg_THREAD, [reg_THREAD,x0]
-#endif
-#else
-        ldr	x0, current_thread
-        bl      pthread_getspecific
-        mov     reg_THREAD, x0
-#endif
+        mov     reg_THREAD, x3
 #else
         mov     reg_R10, #0
 #endif
@@ -267,7 +248,7 @@ no_args:
         ldp     x19,x20, [sp],#160
 
 	ret
-	SIZE(call_into_lisp)
+	SIZE(call_into_lisp_)
 
 #ifdef LISP_FEATURE_SB_THREAD
 	.align 2
