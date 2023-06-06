@@ -295,9 +295,16 @@ x:
 
 	/* store old SP and switch to new stack */
         lwz     REG(10),THREAD_ALIEN_STACK_START_OFFSET(REG(3))
+#ifdef LISP_FEATURE_DARWIN /* FIXME: is this correct? */
+        addis   REG(10),REG(10),ha16(ALIEN_STACK_SIZE)
+#if ALIEN_STACK_SIZE % 65536 != 0
+        addi    REG(10),REG(10),lo16(ALIEN_STACK_SIZE)
+#endif
+#else
         addis   REG(10),REG(10),ALIEN_STACK_SIZE@ha
 #if ALIEN_STACK_SIZE % 65536 != 0
         addi    REG(10),REG(10),ALIEN_STACK_SIZE@l
+#endif
 #endif
 	stwu	REG(1),-16(REG(10))
 	mr	REG(1),REG(10)
