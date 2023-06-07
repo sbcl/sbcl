@@ -1774,9 +1774,6 @@ constant shift greater than word length")))
     (move hi edx)
     (inst and hi (lognot fixnum-tag-mask))))
 
-(define-vop (bignum-lognot lognot-mod32/word=>unsigned)
-  (:translate sb-bignum:%lognot))
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)

@@ -1468,9 +1468,6 @@
   (:generator 20
     (inst smulh hi x y)))
 
-(define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
-  (:translate sb-bignum:%lognot))
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)

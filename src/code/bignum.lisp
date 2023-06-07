@@ -27,7 +27,7 @@
 ;;;       bignum-element-type bignum-index %allocate-bignum
 ;;;       %bignum-length %bignum-set-length %bignum-ref %bignum-set
 ;;;       %digit-0-or-plusp %add-with-carry %subtract-with-borrow
-;;;       %multiply-and-add %multiply %lognot
+;;;       %multiply-and-add %multiply
 ;;;       %bigfloor %fixnum-digit-with-correct-sign %ashl
 ;;;       %ashr %digit-logical-shift-right))
 
@@ -235,6 +235,9 @@
 (defun (setf %bignum-ref) (val bignum index)
   (%bignum-set bignum index val) ; valueless
   val)
+
+(defmacro %lognot (x)
+  `(ldb (byte digit-size 0) (lognot ,x)))
 
 (declaim (optimize (speed 3) (safety 0)))
 

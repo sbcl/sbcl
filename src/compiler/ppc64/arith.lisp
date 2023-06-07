@@ -1029,9 +1029,6 @@
     (inst mulhdu temp x y)
     (inst clrrdi hi temp n-fixnum-tag-bits)))
 
-(define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
-  (:translate sb-bignum:%lognot))
-
 ;;; Algorithm from page 74 of of Power ISA version 2.07
 ;;; under "Programming Note" for the divweu instruction
 ;;; with modifications as described at the divdeu instruction.

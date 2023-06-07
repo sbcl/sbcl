@@ -1160,9 +1160,6 @@
     (inst lr mask fixnum-tag-mask)
     (inst andc hi temp mask)))
 
-(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
-  (:translate sb-bignum:%lognot))
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)

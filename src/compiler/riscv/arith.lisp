@@ -810,10 +810,6 @@
     (inst mulhu temp x y)
     (inst andi hi temp (lognot fixnum-tag-mask))))
 
-(define-vop (bignum-lognot #-64-bit lognot-mod32/unsigned=>unsigned
-                           #+64-bit lognot-mod64/unsigned=>unsigned)
-  (:translate sb-bignum:%lognot))
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)
