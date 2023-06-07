@@ -146,6 +146,13 @@
          (y :scs (unsigned-reg) :target r))
   (:arg-types signed-num unsigned-num))
 
+(define-vop (fast-logand-c/signed-unsigned=>unsigned fast-logand-c/unsigned=>unsigned)
+  (:args (x :scs (signed-reg) :target r))
+  (:arg-types signed-num (:constant (eql #.most-positive-word)))
+  (:ignore y)
+  (:generator 1
+    (move r x)))
+
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
       `(logxor ,@args)

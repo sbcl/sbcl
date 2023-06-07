@@ -179,6 +179,13 @@
   (:arg-types signed-num unsigned-num)
   (:translate logand))
 
+(define-vop (fast-logand-c/signed-unsigned=>unsigned fast-logand-c/unsigned=>unsigned)
+  (:args (x :scs (signed-reg) :target r))
+  (:arg-types signed-num (:constant (eql #.most-positive-word)))
+  (:ignore y)
+  (:generator 1
+    (move r x)))
+
 ;;; Truncate
 
 ;; This doesn't work for some reason.
