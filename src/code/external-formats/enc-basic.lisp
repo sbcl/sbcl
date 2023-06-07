@@ -169,6 +169,7 @@
      &optional invalid-bytes-p)
   `(progn
      (define-unibyte-external-format ,name ,other-names
+       (,code->-name (char-code |ch|))
        (let ((byte (,code->-name bits)))
          (if byte
              (setf (sap-ref-8 sap tail) byte)
@@ -195,6 +196,7 @@
                 '(if (= code 13) #\Newline (code-char code))))
          ,->string/cr-name
          ,string/cr->name
+         :char-encodable-p (,code->-name (char-code |ch|))
          :newline-variant :cr)
      (define-external-format/variable-width (,name)
          t #\?
@@ -224,6 +226,7 @@
                     '(code-char code))))
          ,->string/crlf-name
          ,string/crlf->name
+         :char-encodable-p (,code->-name (char-code |ch|))
          :newline-variant :crlf)))
 
 ;;; ASCII
@@ -778,7 +781,8 @@
   utf8->string-aref
   string->utf8
   #+sb-unicode :base-string-direct-mapping #+sb-unicode t
-  :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8)
+  :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
+  :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff))))
 
 (define-external-format/variable-width (:utf-8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -833,6 +837,7 @@
                               (dpb byte3 (byte 6 6) byte4)))))))
   utf8->string/cr-aref
   string/cr->utf8
+  :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :newline-variant :cr)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
@@ -897,4 +902,5 @@
                               (dpb byte3 (byte 6 6) byte4)))))))
   utf8->string/crlf-aref
   string/crlf->utf8
+  :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :newline-variant :crlf)

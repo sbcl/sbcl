@@ -288,7 +288,8 @@
                (code-char (+ #x10000 code))))))
       (t (code-char bits))))
   utf-16le->string-aref
-  string->utf-16le)
+  string->utf-16le
+  :char-encodable-p (not (utf-noncharacter-code-p (char-code |ch|))))
 
 (define-external-format/variable-width (:utf-16be :utf16be) t
   (code-char #xfffd)
@@ -323,7 +324,8 @@
                (code-char (+ #x10000 code))))))
       (t (code-char bits))))
   utf-16be->string-aref
-  string->utf-16be)
+  string->utf-16be
+  :char-encodable-p (not (utf-noncharacter-code-p (char-code |ch|))))
 
 (declaim (inline char->utf-32le))
 (defun char->utf-32le (char dest string pos)
@@ -508,7 +510,8 @@
         (code-char code)
         (return-from decode-break-reason 4)))
   utf-32le->string-aref
-  string->utf-32le)
+  string->utf-32le
+  :char-encodable-p (not (utf-noncharacter-code-p (char-code |ch|))))
 
 (define-external-format/variable-width (:utf-32be :utf32be) t
   (code-char #xfffd)
@@ -523,4 +526,5 @@
         (code-char code)
         (return-from decode-break-reason 4)))
   utf-32be->string-aref
-  string->utf-32be)
+  string->utf-32be
+  :char-encodable-p (not (utf-noncharacter-code-p (char-code |ch|))))

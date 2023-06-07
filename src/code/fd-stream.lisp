@@ -1363,7 +1363,10 @@
 (defun fd-stream-string-size (stream string)
   (let ((sizer (get-fd-stream-character-sizer stream)))
     (when sizer
-      (loop for char across string summing (funcall sizer char)))))
+      (loop for char across string
+            for size = (funcall sizer char)
+            when (null size) do (return nil)
+            summing size))))
 
 (defun find-external-format (external-format)
   (when external-format
@@ -1402,14 +1405,15 @@
 
 (defmacro define-unibyte-external-format
     (canonical-name (&rest other-names)
-     out-form in-form octets-to-string-symbol string-to-octets-symbol)
+     char-encodable-p out-form in-form octets-to-string-symbol string-to-octets-symbol)
   `(define-external-format/variable-width (,canonical-name ,@other-names)
      t #\? 1
      ,out-form
      1
      ,in-form
      ,octets-to-string-symbol
-     ,string-to-octets-symbol))
+     ,string-to-octets-symbol
+     :char-encodable-p ,char-encodable-p))
 
 (defmacro define-external-format/variable-width
     (external-format output-restart replacement-character
@@ -1417,7 +1421,8 @@
      octets-to-string-sym string-to-octets-sym
      &key base-string-direct-mapping
           fd-stream-read-n-characters
-          (newline-variant :lf))
+          (newline-variant :lf)
+          (char-encodable-p t))
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
          (out-function (symbolicate "OUTPUT-BYTES/" suffix))
@@ -1433,7 +1438,7 @@
     `(progn
        (defun ,size-function (|ch|)
          (declare (ignorable |ch|))
-         ,out-size-expr)
+         (and ,char-encodable-p ,out-size-expr))
        (defun ,out-function (stream string flush-p start end)
          (let ((start (or start 0))
                (end (or end (length string))))

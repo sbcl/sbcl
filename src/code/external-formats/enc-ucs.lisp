@@ -244,7 +244,8 @@
   2
   (code-char (sap-ref-16le sap head))
   ucs-2le->string-aref
-  string->ucs-2le)
+  string->ucs-2le
+  :char-encodable-p (< (char-code |ch|) #x10000))
 
 (define-external-format/variable-width (:ucs-2be :ucs2be) t
   (code-char #xfffd)
@@ -255,7 +256,8 @@
   2
   (code-char (sap-ref-16be sap head))
   ucs-2be->string-aref
-  string->ucs-2be)
+  string->ucs-2be
+ :char-encodable-p (< (char-code |ch|) #x10000))
 
 (declaim (inline char->ucs-4le))
 (defun char->ucs-4le (char dest string pos)

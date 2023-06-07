@@ -280,4 +280,53 @@
     (test (:iso-8859-3 :newline :cr :replacement "??")  '(0 1 2 3 4 4 5 6 6 7 8) '(0 1 2 4 4 4 6 6 6 7 8))
     (test (:iso-8859-3 :newline :crlf :replacement "??") '(0 1 3 4 4 5 6 6 8) '(0 1 4 4 4 6 6 6 8))))
 
+(macrolet ((output-test (chars outxf expected &environment env)
+             `(progn
+                (with-test (:name (,(macroexpand 'name env) file-string-length ,outxf))
+                  (let ((string (coerce ,chars 'string)))
+                    (with-open-file (s *test-path* :element-type 'character
+                                       :external-format ',outxf
+                                       :direction :output :if-exists :supersede)
+                      (handler-bind ((sb-int:character-encoding-error
+                                      (lambda (c)
+                                        (let ((restart (find-restart 'sb-impl::output-nothing c)))
+                                          (invoke-restart restart)))))
+                        (let ((pos (file-position s))
+                              (len (file-string-length s string)))
+                          (let ((actual
+                                 (loop for index from 0 below (length string)
+                                       for char = (char string index)
+                                       for thislen = (file-string-length s char)
+                                       for thisstringlen = (file-string-length s (subseq string index))
+                                       if (null thisstringlen) do (assert (some 'null (subseq ,expected index))) else do (assert (notany 'null (subseq ,expected index)))
+                                       collect thislen
+                                       if (and (null len) thisstringlen) do (setf len (+ pos thisstringlen))
+                                       if thisstringlen do (assert (= (+ pos thisstringlen) len))
+                                       do (write-char char s)
+                                       if thislen do (assert (= (+ pos thislen) (file-position s)))
+                                       do (setf pos (file-position s)))))
+                            (assert (equal actual ,expected))))))))))
+           (with-output-characters ((id chars) &body body)
+             `(let ((chars ,chars))
+                (symbol-macrolet ((name ,id))
+                  (macrolet ((test (outxf expected)
+                               `(output-test chars ,outxf ,expected)))
+                    ,@body)))))
+  (with-output-characters ((:output :lf) (list #\5 #\Linefeed #\7))
+    (test :iso-8859-3 '(1 1 1))
+    (test (:iso-8859-3 :newline :lf) '(1 1 1))
+    (test (:iso-8859-3 :newline :cr) '(1 1 1))
+    (test (:iso-8859-3 :newline :crlf) '(1 2 1)))
+  (with-output-characters ((:output :invalid :lf) (list #\5 (code-char #xa1) #\Linefeed #\7))
+    ;; A sufficiently-smart streams implementation could statically determine the lengths
+    ;; of replacement characters given as part of the external format
+    (test :iso-8859-3 '(1 nil 1 1))
+    (test (:iso-8859-3 :replacement #\?) '(1 nil 1 1))
+    (test (:iso-8859-3 :newline :lf) '(1 nil 1 1))
+    (test (:iso-8859-3 :newline :lf :replacement #\?) '(1 nil 1 1))
+    (test (:iso-8859-3 :newline :cr) '(1 nil 1 1))
+    (test (:iso-8859-3 :newline :cr :replacement #\?) '(1 nil 1 1))
+    (test (:iso-8859-3 :newline :crlf) '(1 nil 2 1))
+    (test (:iso-8859-3 :newline :crlf :replacement #\?) '(1 nil 2 1))))
+
 (delete-file *test-path*)

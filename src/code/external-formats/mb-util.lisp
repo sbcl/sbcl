@@ -291,4 +291,5 @@
                (return-from decode-break-reason 1)
                (code-char ucs)))
          ,(make-od-name format '>string-aref)
-         ,string->mb))))
+         ,string->mb
+         :char-encodable-p (,ucs-to-mb (char-code |ch|))))))
