@@ -612,16 +612,14 @@
 ;;; target compiler, it can deduce the return type fine, but without
 ;;; it, we pay a heavy price in BIGNUM-GCD when compiled by the
 ;;; cross-compiler. -- CSR, 2004-07-19
-(declaim (ftype (sfunction (bignum bignum-length bignum bignum-length)
+(declaim (ftype (sfunction (bignum bignum)
                            (and unsigned-byte fixnum))
                 bignum-factors-of-two))
-(defun bignum-factors-of-two (a len-a b len-b)
-  (declare (type bignum-length len-a len-b) (type bignum a b))
-  (do ((i 0 (1+ i))
-       (end (min len-a len-b)))
-      ((= i end) (error "Unexpected zero bignums?"))
-    (declare (type bignum-index i)
-             (type bignum-length end))
+(defun bignum-factors-of-two (a b)
+  (declare (type bignum a b))
+  (do ((i 0 (1+ i)))
+      (())
+    (declare (type bignum-index i))
     (let ((or-digits (%logior (%bignum-ref a i) (%bignum-ref b i))))
       (unless (zerop or-digits)
         (return (do ((j 0 (1+ j))
@@ -797,8 +795,7 @@
            (tmp2 (%allocate-bignum buffer-len))
            (tmp2-len 0)
            (factors-of-two
-            (bignum-factors-of-two u1 (%bignum-length u1)
-                                   v1 (%bignum-length v1))))
+            (bignum-factors-of-two u1 v1)))
       (declare (type (or null bignum-length)
                      buffer-len u-len v-len tmp1-len tmp2-len))
       (bignum-replace u u1)
@@ -895,8 +892,7 @@
                           (b-buffer len-b b)
                           (res-buffer (max len-a len-b)))
       (let* ((factors-of-two
-              (bignum-factors-of-two a-buffer len-a
-                                     b-buffer len-b))
+              (bignum-factors-of-two a-buffer b-buffer))
              (len-a (make-gcd-bignum-odd
                      a-buffer
                      (bignum-buffer-ashift-right a-buffer len-a
