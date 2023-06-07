@@ -145,7 +145,7 @@
                     (xset-every #'cl:symbol-package
                                 (sb-kernel::member-type-xset (lvar-type x))))))
          `(symbol-hash x)) ; Never need to lazily compute and memoize
-        ((gethash 'ensure-symbol-hash *backend-parsed-vops*)
+        ((vop-existsp :translate ensure-symbol-hash)
          ;; A vop might emit slightly better code than the expression below
          `(ensure-symbol-hash x))
         (t

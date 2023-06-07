@@ -533,17 +533,17 @@
                  ;; then snarf out the string and use it as the funarg
                  ;; unless the backend lacks the CALL-OUT-NAMED vop.
                  `(%alien-funcall
-                   ,(or (when (and (gethash 'call-out-named *backend-parsed-vops*)
-                                   (lvar-matches function :fun-names '(%sap-alien)
-                                                          :arg-count 2))
-                          (let ((sap (first (combination-args (lvar-use function)))))
-                            (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
-                                                    :arg-count 1)
-                              (let ((sym (first (combination-args (lvar-use sap)))))
-                                (when (and (constant-lvar-p sym)
-                                           (stringp (lvar-value sym)))
-                                  (setq ignore-fun t)
-                                  (lvar-value sym))))))
+                   ,(or (when-vop-existsp (:named call-out-named)
+                          (when (lvar-matches function :fun-names '(%sap-alien)
+                                                       :arg-count 2)
+                            (let ((sap (first (combination-args (lvar-use function)))))
+                              (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
+                                                      :arg-count 1)
+                                (let ((sym (first (combination-args (lvar-use sap)))))
+                                  (when (and (constant-lvar-p sym)
+                                             (stringp (lvar-value sym)))
+                                    (setq ignore-fun t)
+                                    (lvar-value sym)))))))
                         `(deport function ',alien-type))
                    ',alien-type
                    ,@(deports))))

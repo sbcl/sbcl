@@ -1868,9 +1868,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     ;; If only one exists, it's DYNBIND.
     ;; Even if the backend supports load-time TLS index assignment,
     ;; there might be only one vop.
-    (macrolet ((doit (bind dynbind)
-                 (if (gethash 'bind *backend-parsed-vops*) bind dynbind)))
-      (doit
+    (if-vop-existsp (:named bind)
        (progn
          ;; Inform later SYMBOL-VALUE calls that they can
          ;; assume a nonzero tls-index.
@@ -1883,7 +1881,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
          (emit-constant name)
          (vop bind node block (lvar-tn node block value) name))
        (vop dynbind node block (lvar-tn node block value)
-            (emit-constant name))))))
+            (emit-constant name)))))
 
 (defoptimizer (%special-unbind ir2-convert) ((&rest symbols) node block)
   (if-vop-existsp (:named sb-c:unbind-n)
