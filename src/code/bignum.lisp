@@ -761,7 +761,7 @@
 
 ;; When the larger number is less than this many bignum digits long, revert
 ;; to old algorithm.
-(define-load-time-global *accelerated-gcd-cutoff* 3)
+(defconstant accelerated-gcd-cutoff 3)
 
 ;;; Alternate between k-ary reduction with the help of
 ;;; REDUCED-RATIO-MOD and digit modulus reduction via DMOD. Once the
@@ -778,18 +778,15 @@
          (v1 (if (bignum-plus-p v0)
                  v0
                  (negate-bignum v0 nil))))
-    (if (zerop v1)
-        (return-from bignum-gcd u1))
-    (when (> u1 v1)
+    (when (plusp (bignum-compare u1 v1))
       (rotatef u1 v1))
-    (let ((n (mod v1 u1)))
+    (let ((n (rem v1 u1)))
+      (when (eql n 0)
+        (return-from bignum-gcd (%normalize-bignum u1
+                                                   (%bignum-length u1))))
       (setf v1 (if (fixnump n)
                    (make-small-bignum n)
                    n)))
-    (if (and (= 1 (%bignum-length v1))
-             (zerop (%bignum-ref v1 0)))
-        (return-from bignum-gcd (%normalize-bignum u1
-                                                   (%bignum-length u1))))
     (let* ((buffer-len (+ 2 (%bignum-length u1)))
            (u (%allocate-bignum buffer-len))
            (u-len (%bignum-length u1))
@@ -814,7 +811,7 @@
             (make-gcd-bignum-odd v
                                  (bignum-buffer-ashift-right v v-len
                                                              factors-of-two)))
-      (loop until (or (< u-len *accelerated-gcd-cutoff*)
+      (loop until (or (< u-len accelerated-gcd-cutoff)
                       (not v-len)
                       (zerop v-len)
                       (and (= 1 v-len)
