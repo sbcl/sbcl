@@ -508,7 +508,7 @@
       (negate-bignum-in-place result))
     (%normalize-bignum result (1+ bignum-len))))
 
-(sb-c::unless-vop-existsp (:translate sb-c::fixnum*)
+(sb-c::unless-vop-existsp (:named sb-vm::*/signed=>integer)
   (defun multiply-fixnums (a b)
     (declare (fixnum a b))
     (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.

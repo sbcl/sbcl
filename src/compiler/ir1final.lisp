@@ -144,7 +144,7 @@
 
 (defglobal *two-arg-functions*
     `((* two-arg-*
-         ,@(sb-c::unless-vop-existsp (:translate sb-c::fixnum*)
+         ,@(sb-c::unless-vop-existsp (:named sb-vm::*/signed=>integer)
              `((,(specifier-type 'fixnum) ,(specifier-type 'fixnum))
                multiply-fixnums)))
       (+ two-arg-+)
