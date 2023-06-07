@@ -56,9 +56,9 @@
           (setf (%bignum-ref bignum n-random-digits) random-chunk)
           (progn
             (setf (%bignum-ref bignum n-random-digits)
-                  (%logior (random-bignum-partial-digit n-random-bits
-                                                        state)
-                           (%ashl random-chunk n-random-bits)))
+                  (logior (random-bignum-partial-digit n-random-bits
+                                                       state)
+                          (%ashl random-chunk n-random-bits)))
             (let ((shift (- digit-size n-random-bits)))
               (when (< shift n-random-chunk-bits)
                 (setf (%bignum-ref bignum (1+ n-random-digits))

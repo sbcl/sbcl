@@ -27,7 +27,7 @@
 ;;;       bignum-element-type bignum-index %allocate-bignum
 ;;;       %bignum-length %bignum-set-length %bignum-ref %bignum-set
 ;;;       %digit-0-or-plusp %add-with-carry %subtract-with-borrow
-;;;       %multiply-and-add %multiply %lognot %logand %logior %logxor
+;;;       %multiply-and-add %multiply %lognot
 ;;;       %bigfloor %fixnum-digit-with-correct-sign %ashl
 ;;;       %ashr %digit-logical-shift-right))
 
@@ -57,10 +57,6 @@
 ;;;       %LOGNOT
 ;;;    Shifting (in place)
 ;;;       %NORMALIZE-BIGNUM-BUFFER
-;;;    Relational operators:
-;;;       %LOGAND
-;;;       %LOGIOR
-;;;       %LOGXOR
 ;;;    TRUNCATE
 ;;;       %BIGFLOOR
 ;;;
@@ -224,18 +220,6 @@
 (defun bignum-plus-p (bignum)
   (declare (type bignum bignum))
   (%bignum-0-or-plusp bignum (%bignum-length bignum)))
-
-;;; Each of these does the digit-size unsigned op.
-(declaim (inline %logand %logior %logxor))
-(defun %logand (a b)
-  (declare (type bignum-element-type a b))
-  (logand a b))
-(defun %logior (a b)
-  (declare (type bignum-element-type a b))
-  (logior a b))
-(defun %logxor (a b)
-  (declare (type bignum-element-type a b))
-  (logxor a b))
 
 ;;; This returns 0 or "-1" depending on whether the bignum is positive. This
 ;;; is suitable for infinite sign extension to complete additions,
@@ -620,7 +604,7 @@
   (do ((i 0 (1+ i)))
       (())
     (declare (type bignum-index i))
-    (let ((or-digits (%logior (%bignum-ref a i) (%bignum-ref b i))))
+    (let ((or-digits (logior (%bignum-ref a i) (%bignum-ref b i))))
       (unless (zerop or-digits)
         (return (do ((j 0 (1+ j))
                      (or-digits or-digits (%ashr or-digits 1)))
@@ -1063,7 +1047,7 @@
          ,termination
        (declare (type bignum-index i j))
        (setf (%bignum-ref ,(if result result source) j)
-             (%logior (%digit-logical-shift-right (%bignum-ref ,source i)
+             (logior (%digit-logical-shift-right (%bignum-ref ,source i)
                                                   ,start-pos)
                       (%ashl (%bignum-ref ,source (1+ i))
                              high-bits-in-first-digit))))))
@@ -1199,7 +1183,7 @@
              (%normalize-bignum res res-len)))
       (declare (type bignum-index i j))
       (setf (%bignum-ref res j)
-            (%logior (%digit-logical-shift-right (%bignum-ref bignum i)
+            (logior (%digit-logical-shift-right (%bignum-ref bignum i)
                                                  remaining-bits)
                      (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
 
@@ -1456,7 +1440,7 @@
   (dotimes (i len-a)
     (declare (type bignum-index i))
     (setf (%bignum-ref res i)
-          (%logand (%bignum-ref a i) (%bignum-ref b i))))
+          (logand (%bignum-ref a i) (%bignum-ref b i))))
   (%normalize-bignum res len-a))
 
 ;;; This takes a shorter bignum, a and len-a, that is negative. Because this
@@ -1468,7 +1452,7 @@
   (dotimes (i len-a)
     (declare (type bignum-index i))
     (setf (%bignum-ref res i)
-          (%logand (%bignum-ref a i) (%bignum-ref b i))))
+          (logand (%bignum-ref a i) (%bignum-ref b i))))
   (do ((i len-a (1+ i)))
       ((= i len-b))
     (declare (type bignum-index i))
@@ -1505,7 +1489,7 @@
   (dotimes (i len-a)
     (declare (type bignum-index i))
     (setf (%bignum-ref res i)
-          (%logior (%bignum-ref a i) (%bignum-ref b i))))
+          (logior (%bignum-ref a i) (%bignum-ref b i))))
   (do ((i len-a (1+ i)))
       ((= i len-b))
     (declare (type bignum-index i))
@@ -1521,7 +1505,7 @@
   (dotimes (i len-a)
     (declare (type bignum-index i))
     (setf (%bignum-ref res i)
-          (%logior (%bignum-ref a i) (%bignum-ref b i))))
+          (logior (%bignum-ref a i) (%bignum-ref b i))))
   (do ((i len-a (1+ i))
        (sign (%sign-digit a len-a)))
       ((= i len-b))
@@ -1548,12 +1532,12 @@
   (dotimes (i len-a)
     (declare (type bignum-index i))
     (setf (%bignum-ref res i)
-          (%logxor (%bignum-ref a i) (%bignum-ref b i))))
+          (logxor (%bignum-ref a i) (%bignum-ref b i))))
   (do ((i len-a (1+ i))
        (sign (%sign-digit a len-a)))
       ((= i len-b))
     (declare (type bignum-index i))
-    (setf (%bignum-ref res i) (%logxor sign (%bignum-ref b i))))
+    (setf (%bignum-ref res i) (logxor sign (%bignum-ref b i))))
   (%normalize-bignum res len-b))
 
 ;;;; There used to be a bunch of code to implement "efficient" versions of LDB

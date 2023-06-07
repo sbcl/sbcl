@@ -609,10 +609,6 @@
 (defknown %lognot (bignum-element-type) bignum-element-type
     (foldable flushable movable always-translatable))
 
-(defknown (%logand %logior %logxor) (bignum-element-type bignum-element-type)
-  bignum-element-type
-  (foldable flushable movable))
-
 ;;; This takes three digits and returns the FLOOR'ed result of
 ;;; dividing the first two as a 2*digit-size integer by the third.
 (defknown %bigfloor (bignum-element-type bignum-element-type bignum-element-type)
