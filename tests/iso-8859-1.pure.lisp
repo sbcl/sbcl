@@ -220,4 +220,38 @@
     (test (:iso-8859-1 :newline :cr) (loop for i from 0 to 12 collect i))
     (test (:iso-8859-1 :newline :crlf) '(0 1 3 4 5 7 8 9 11 12))))
 
+(macrolet ((output-test (chars outxf expected &environment env)
+             `(progn
+                (with-test (:name (,(macroexpand 'name env) write-string string ,outxf))
+                  (with-open-file (s *test-path* :element-type 'character
+                                     :external-format ',outxf
+                                     :direction :output :if-exists :supersede)
+                    (let ((string (coerce ,chars 'string)))
+                      (write-string string s)))
+                  (with-open-file (s *test-path* :element-type '(unsigned-byte 8))
+                    (let* ((vector (make-array 20 :element-type '(unsigned-byte 8)))
+                           (count (read-sequence vector s)))
+                      (assert (equal (map 'list 'identity (subseq vector 0 count)) ,expected)))))
+                (with-test (:name (,(macroexpand 'name env) write-string base-string ,outxf))
+                  (with-open-file (s *test-path* :element-type 'character
+                                     :external-format ',outxf
+                                     :direction :output :if-exists :supersede)
+                    (let ((string (coerce ,chars 'base-string)))
+                      (write-string string s)))
+                  (with-open-file (s *test-path* :element-type '(unsigned-byte 8))
+                    (let* ((vector (make-array 20 :element-type '(unsigned-byte 8)))
+                           (count (read-sequence vector s)))
+                      (assert (equal (map 'list 'identity (subseq vector 0 count)) ,expected)))))))
+           (with-output-characters ((id chars) &body body)
+             `(let ((chars ,chars))
+                (symbol-macrolet ((name ,id))
+                  (macrolet ((test (outxf expected)
+                               `(output-test chars ,outxf ,expected)))
+                    ,@body)))))
+  (with-output-characters ((:output :lf) '(#\5 #\Newline #\7))
+    (test :iso-8859-1 '(#x35 #x0a #x37))
+    (test (:iso-8859-1 :newline :lf) '(#x35 #x0a #x37))
+    (test (:iso-8859-1 :newline :cr) '(#x35 #x0d #x37))
+    (test (:iso-8859-1 :newline :crlf) '(#x35 #x0d #x0a #x37))))
+
 (delete-file *test-path*)

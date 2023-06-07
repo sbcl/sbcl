@@ -798,7 +798,10 @@
              (position #\newline thing :from-end t
                        :start start :end end))))
       (if (and (typep thing 'base-string)
-               (eq (fd-stream-external-format-keyword stream) :latin-1))
+               (let ((external-format (fd-stream-external-format stream)))
+                 (and (eq (external-format-keyword external-format) :latin-1)
+                      (or (null last-newline)
+                          (eq (external-format-newline-variant external-format) :lf)))))
           (ecase (fd-stream-buffering stream)
             (:full
              (buffer-output stream thing start end))
@@ -874,8 +877,10 @@
     (keyword external-format)
     ((cons keyword) (car external-format))))
 
-(defun fd-stream-external-format-keyword (stream)
-  (external-format-keyword (fd-stream-external-format stream)))
+(defun external-format-newline-variant (external-format)
+  (typecase external-format
+    (keyword :lf)
+    ((cons keyword) (getf (cdr external-format) :newline :lf))))
 
 (defun canonize-external-format (external-format entry)
   (typecase external-format
