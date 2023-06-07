@@ -334,16 +334,23 @@
 ;;; N'th argument. If arg is a list, result is a list. If arg is a
 ;;; vector, result is a vector with the same element type.
 (defun sequence-result-nth-arg (n &key preserve-dimensions
-                                       preserve-vector-type)
+                                       preserve-vector-type
+                                       string-designator)
   (lambda (call)
     (declare (type combination call))
     (let ((lvar (nth n (combination-args call))))
       (when lvar
         (let ((type (lvar-type lvar)))
-          (cond ((simplify-list-type type
-                                     :preserve-dimensions preserve-dimensions))
+          (cond ((and (not string-designator)
+                      (simplify-list-type type
+                                          :preserve-dimensions preserve-dimensions)))
                 ((not (csubtypep type (specifier-type 'vector)))
-                 nil)
+                 (cond ((not string-designator) nil)
+                       ((csubtypep type (specifier-type 'character))
+                        (specifier-type `(simple-string 1)))
+                       ((and (constant-lvar-p lvar)
+                             (symbolp (lvar-value lvar)))
+                        (ctype-of (symbol-name (lvar-value lvar))))))
                 (preserve-vector-type
                  type)
                 (t

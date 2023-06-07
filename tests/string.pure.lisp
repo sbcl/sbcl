@@ -355,3 +355,22 @@ claim that any particular result from these edge cases constitutes a bug.
     (assert (if (sb-kernel:dynamic-space-obj-p str)
                 (eq res str)
                 (not (eq res str))))))
+
+(with-test (:name :string-case-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (type-specifiers-equal
+            (second
+             (third
+              (sb-kernel:%simple-fun-type
+               (checked-compile '(lambda (x)
+                                  (declare (ignorable x))
+                                  ,fun)))))
+            ',expected))))
+    (check (string-upcase nil)
+           (simple-base-string 3))
+    (check (string-upcase (the symbol x))
+           simple-string)
+    (check (string-upcase (the character x))
+           (simple-string 1))))
