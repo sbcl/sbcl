@@ -1,5 +1,5 @@
 
-#-x86-64 (invoke-restart 'run-tests::skip-file)
+#-(and x86-64 system-tlabs) (invoke-restart 'run-tests::skip-file)
 
 (defvar *print-histogram* nil)
 (defun check-histogram (bin-index count kind)
