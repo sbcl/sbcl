@@ -45,7 +45,8 @@
   (sap (missing-arg) :type system-area-pointer :read-only t)
   (length (missing-arg) :type index :read-only t)
   (head 0 :type index)
-  (tail 0 :type index))
+  (tail 0 :type index)
+  (prev-head 0 :type index))
 (declaim (freeze-type buffer))
 
 (define-load-time-global *available-buffers* ()
@@ -1112,6 +1113,7 @@
                         (pointer (fill-pointer instead)))
                    (when (= pointer 0)
                      (setf (fd-stream-listen ,stream-var) nil))
+                   (setf (buffer-prev-head ibuf) (buffer-head ibuf))
                    (return-from use-instead (values result 0)))
                  (unless
                      (catch 'eof-input-catcher
@@ -1153,6 +1155,7 @@
                                      stream octet-count)))
                        (setq ,retry-var nil))))))
            (cond (,element-var
+                  (setf (buffer-prev-head ibuf) (buffer-head ibuf))
                   (incf (buffer-head ibuf) size)
                   (values ,element-var size))
                  (t
@@ -1373,6 +1376,7 @@
     (get-external-format external-format)))
 
 (defun variable-width-external-format-p (ef-entry)
+  ;; TODO: I'm pretty sure this is always true
   (and ef-entry (not (null (ef-resync-fun ef-entry)))))
 
 (defun bytes-for-char-fun (ef-entry)
@@ -2022,8 +2026,16 @@
                                  (do-listen)))))))
        (do-listen)))
     (:unread
-     (decf (buffer-head (fd-stream-ibuf fd-stream))
-           (fd-stream-character-size fd-stream arg1)))
+     (let* ((ibuf (fd-stream-ibuf fd-stream))
+            (head (buffer-head ibuf))
+            (prev (buffer-prev-head ibuf)))
+       (if (= head prev)
+           ;; we are unreading a character which we previously pulled
+           ;; from INSTEAD; push it back there.
+           (vector-push-extend arg1 (fd-stream-instead fd-stream))
+           ;; reset the buffer position to where it was before we read
+           ;; the previous character.
+           (setf (buffer-head ibuf) (buffer-prev-head ibuf)))))
     (:close
      ;; Drop input buffers
      (setf (ansi-stream-in-index fd-stream) +ansi-stream-in-buffer-length+

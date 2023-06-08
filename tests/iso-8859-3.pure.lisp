@@ -240,6 +240,19 @@
                       (assert (equal actual ,expected)))))
                 (with-test (:name (,(macroexpand 'name env) unread-char ,inxf))
                   (with-open-file (s *test-path* :external-format ',inxf)
+                    (assert (sb-impl::ansi-stream-cin-buffer s))
+                    (let ((actual (loop for char = (read-char s nil nil)
+                                        if (null char) collect (file-position s) and do (loop-finish)
+                                        do (unread-char char s)
+                                        collect (file-position s)
+                                        do (read-char s))))
+                      (assert (equal actual ,unread-expected)))))
+                (with-test (:name (,(macroexpand 'name env) unread-char :io ,inxf))
+                  (with-open-file (s *test-path* :external-format ',inxf
+                                     :direction :io :if-exists :overwrite)
+                    ;; if we reinstate in character buffers for :io character streams,
+                    ;; make a stream that is unbuffered some other way
+                    (assert (not (sb-impl::ansi-stream-cin-buffer s)))
                     (let ((actual (loop for char = (read-char s nil nil)
                                         if (null char) collect (file-position s) and do (loop-finish)
                                         do (unread-char char s)
