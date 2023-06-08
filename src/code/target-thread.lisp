@@ -1454,7 +1454,7 @@ on this semaphore, then N of them is woken up."
 
 (defmacro with-new-session (args &body forms)
   (declare (ignore args))               ;for extensibility
-  `(call-with-new-session (lambda (), @forms)))
+  `(call-with-new-session (lambda () ,@forms)))
 
 ;;; WITH-DEATHLOK ensures that the 'struct thread' and/or OS thread won't go away
 ;;; by synchronizing with HANDLE-THREAD-EXIT.
