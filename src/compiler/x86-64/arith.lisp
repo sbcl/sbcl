@@ -1218,6 +1218,10 @@
                      (lambda ()
                        (inst mov temp amount)))
                    vop 'sb-kernel::ash-overflow2-error number amount-error))
+           (amount-width (if (csubtypep (tn-ref-type amount-ref)
+                                        (specifier-type `(signed-byte 32)))
+                             :dword
+                             :qword))
            (fits (csubtypep (tn-ref-type amount-ref)
                             (specifier-type `(integer -63 63)))))
       (when signed
@@ -1247,15 +1251,15 @@
             (t
              (assemble ()
                (move result number)
-               (move ecx amount)
+               (move ecx amount amount-width)
                (unless (csubtypep (tn-ref-type amount-ref)
                                   (specifier-type 'unsigned-byte))
                  (assemble ()
-                   (inst test ecx ecx)
+                   (inst test amount-width ecx ecx)
                    (inst jmp :ns POSITIVE)
-                   (inst neg ecx)
+                   (inst neg amount-width ecx)
                    (unless fits
-                     (inst cmp ecx 63)
+                     (inst cmp amount-width ecx 63)
                      (inst jmp :be OKAY)
                      (zeroize result))
                    OKAY
@@ -1265,10 +1269,10 @@
                (unless fits
                  (inst test number number)
                  (inst jmp :z done)
-                 (inst cmp ecx n-word-bits)
+                 (inst cmp amount-width ecx n-word-bits)
                  (inst jmp :ge error))
                (inst shl result :cl)
-               (inst neg :byte ecx)
+               (inst neg :dword ecx)
                (move temp number)
                (inst shr temp :cl)
                (inst jmp :nz error)))))
@@ -1311,6 +1315,10 @@
                      (lambda ()
                        (inst mov temp amount)))
                    vop 'sb-kernel::ash-overflow2-error number amount-error))
+           (amount-width (if (csubtypep (tn-ref-type amount-ref)
+                                        (specifier-type `(signed-byte 32)))
+                             :dword
+                             :qword))
            (fits (csubtypep (tn-ref-type amount-ref)
                             (specifier-type `(integer -63 63)))))
       (cond ((numberp amount)
@@ -1338,17 +1346,17 @@
             (t
              (assemble ()
                (move result number)
-               (move ecx amount)
-               (inst test ecx ecx)
+               (move ecx amount amount-width)
+               (inst test amount-width ecx ecx)
                (unless (csubtypep (tn-ref-type amount-ref)
                                   (specifier-type 'unsigned-byte))
                  (assemble ()
                    (inst jmp :ns POSITIVE)
-                   (inst neg ecx)
+                   (inst neg amount-width ecx)
                    (unless fits
-                     (inst cmp ecx 63)
+                     (inst cmp amount-width ecx 63)
                      (inst jmp :be OKAY)
-                     (inst or ecx 63))
+                     (inst or amount-width ecx 63))
                    OKAY
                    (inst sar result :cl)
                    (inst jmp DONE)))
@@ -1360,7 +1368,7 @@
                  (inst cmp ecx n-word-bits)
                  (inst jmp :ge error))
                (inst shl result :cl)
-               (inst neg :byte ecx)
+               (inst neg :dword ecx)
                (move temp number)
                (inst sar temp :cl)
                (move ecx result)
@@ -1877,36 +1885,41 @@
   (:variant-vars check-amount signed)
   (:note "inline ASH")
   (:generator 5
-    (move result number)
-    (move ecx amount)
-    (inst test ecx ecx)
-    (inst jmp :ns POSITIVE)
-    (inst neg ecx)
-    (unless (csubtypep (tn-ref-type amount-ref)
-                       (specifier-type `(integer -63 *)))
-      (inst cmp ecx 63)
-      (inst jmp :be OKAY)
-      (cond (signed
-             (inst or ecx 63))
-            (t
-             (zeroize result))))
-    OKAY
-    (if signed
-        (inst sar result :cl)
-        (inst shr result :cl))
-    (inst jmp DONE)
+    (let ((amount-width (if (csubtypep (tn-ref-type amount-ref)
+                                       (specifier-type `(signed-byte 32)))
+                            :dword
+                            :qword)))
+      (assemble ()
+        (move result number)
+        (move ecx amount amount-width)
+        (inst test amount-width ecx ecx)
+        (inst jmp :ns POSITIVE)
+        (inst neg amount-width ecx)
+        (unless (csubtypep (tn-ref-type amount-ref)
+                           (specifier-type `(integer -63 *)))
+          (inst cmp amount-width ecx 63)
+          (inst jmp :be OKAY)
+          (cond (signed
+                 (inst or amount-width ecx 63))
+                (t
+                 (zeroize result))))
+        OKAY
+        (if signed
+            (inst sar result :cl)
+            (inst shr result :cl))
+        (inst jmp DONE)
 
-    POSITIVE
-    (unless (or (not check-amount) ;; The result-type ensures us that this shift will not overflow.
-                (csubtypep (tn-ref-type amount-ref)
-                           (specifier-type `(integer * 63))))
-      (inst cmp ecx 63)
-      (inst jmp :be STILL-OKAY)
-      (zeroize result))
-    STILL-OKAY
-    (inst shl result :cl)
+        POSITIVE
+        (unless (or (not check-amount) ;; The result-type ensures us that this shift will not overflow.
+                    (csubtypep (tn-ref-type amount-ref)
+                               (specifier-type `(integer * 63))))
+          (inst cmp amount-width ecx 63)
+          (inst jmp :be STILL-OKAY)
+          (zeroize result))
+        STILL-OKAY
+        (inst shl result :cl)
 
-    DONE))
+        DONE))))
 
 (define-vop (fast-ash/signed=>signed
              fast-ash/unsigned=>unsigned)
