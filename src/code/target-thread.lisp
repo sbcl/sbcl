@@ -494,6 +494,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 ;;; Signals an error if owner of LOCK is waiting on a lock whose release
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
+#+sb-thread
 (defun check-deadlock ()
   (let* ((self *current-thread*)
          (origin (progn
@@ -1468,113 +1469,6 @@ on this semaphore, then N of them is woken up."
 #+allocator-metrics
 (sb-ext:define-load-time-global *allocator-metrics* nil)
 
-#+sb-thread
-(progn
-;;; Remove thread from its session, if it has one, and from *all-threads*.
-;;; Also clobber the pointer to the primitive thread
-;;; which makes THREAD-ALIVE-P return false hereafter.
-(defmacro handle-thread-exit ()
-  '(let* ((thread *current-thread*)
-           ;; use the "funny fixnum" representation
-           (c-thread (%make-lisp-obj (thread-primitive-thread thread)))
-           (sem (thread-semaphore thread)))
-      ;; System threads exit peacefully when asked, and they don't bother anyone.
-      ;; They must not participate in shutting other threads down.
-      (when (and *exit-in-progress* (not (thread-ephemeral-p thread)))
-        (%exit))
-      ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
-      ;; That in turn caused a failure in GC because a fixnum is not a legal value
-      ;; for the startup info when observed by GC.
-      (aver (not (memq thread *starting-threads*)))
-      ;; If collecting allocator metrics, transfer them to the global list
-      ;; so that we can summarize over exited threads.
-      #+allocator-metrics
-      (let ((metrics (cons (thread-name thread) (allocator-histogram))))
-        (sb-ext:atomic-push metrics *allocator-metrics*))
-      ;; Stash the primitive thread SAP for reuse, but clobber the PRIMITIVE-THREAD
-      ;; slot which makes ALIVE-P return NIL.
-      ;; A minor TODO: can this lock acquire/release be moved to where we actually
-      ;; unmap the memory an do a pthread_join()? I would think so, because until then,
-      ;; there is no real harm in reading the memory.  In this state the pthread library
-      ;; will usually return ESRCH if you try to use the pthread id - it's a valid
-      ;; pointer, but it knows that it has no underlying OS thread.
-      (with-deathlok (thread)
-        (when sem ; ordinary lisp thread, not FOREIGN-THREAD
-          (setf (thread-startup-info thread) c-thread))
-        ;; Accept no further interruptions. Other threads can't add new ones to the queue
-        ;; as doing so requires grabbing the per-thread mutex which we currently own.
-        ;; Deferrable signals are masked at this point, but it is best to tidy up
-        ;; any stray data such as captured closure values.
-        (setf (thread-interruptions thread) nil
-              (thread-primitive-thread thread) 0)
-        (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
-                         (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
-              0)
-        ;; Take ownership of our statistical profiling data and transfer the results to
-        ;; the global pool. This doesn't need to synchronize with the signal handler,
-        ;; which is effectively disabled now, but does synchronize via the interruptions
-        ;; mutex with any other thread trying to read this thread's data.
-        (let ((sprof-data (sb-vm::current-thread-offset-sap sb-vm:thread-sprof-data-slot)))
-          (unless (= (sap-int sprof-data) 0)
-            (setf (sap-ref-word (descriptor-sap c-thread)
-                                (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
-                  0)
-            ;; Operation on the global list must be atomic.
-            (sb-ext:atomic-push (cons sprof-data thread) *sprof-data*)))
-        (barrier (:write)))
-      ;; After making the thread dead, remove from session. If this were done first,
-      ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
-      ;; only to remove it right away.
-      (when *session*
-        (%delete-thread-from-session thread))
-      (cond
-        ;; If possible, logically remove from *ALL-THREADS* by flipping a bit.
-        ;; Foreign threads remove themselves. They don't have an exit semaphore,
-        ;; so that's how we know which is which.
-        (sem
-         ;; Tree pruning is the responsibility of thread creators, not dying threads.
-         ;; Creators have to manipulate the tree anyway, and they need access to the old
-         ;; structure to grab the memory.
-         (let ((old (sb-ext:cas (thread-%visible thread) 1 -1)))
-           ;; now (LIST-ALL-THREADS) won't see it
-           (aver (eql old 1)))
-         (locally (declare (sb-c::tlab :system))
-           (sb-ext:atomic-push thread *joinable-threads*)))
-        (t ; otherwise, physically remove from *ALL-THREADS*
-         ;; The memory allocation/deallocation is handled in C.
-         ;; I would like to combine the recycle bin for foreign and lisp threads though.
-         (delete-from-all-threads (get-lisp-obj-address c-thread))))
-      (when sem
-        (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
-        ;;
-        ;; We go out of our way to support something pthreads don't:
-        ;;  "The results of multiple simultaneous calls to pthread_join()
-        ;;   specifying the same target thread are undefined."
-        ;;   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html
-        ;; and for std::thread
-        ;;   "No synchronization is performed on *this itself. Concurrently calling join()
-        ;;    on the same thread object from multiple threads constitutes a data race
-        ;;    that results in undefined behavior."
-        ;;   - https://en.cppreference.com/w/cpp/thread/thread/join
-        ;; That's because (among other reasons), pthread_join deallocates memory.
-        ;; But in so far as our join does not equate to resource freeing, and our exit flag is
-        ;; our own kind of semaphore, we simply signal it using an arbitrarily huge count.
-        ;; See the comment in 'thread-structs.lisp' about why this isn't CONDITION-BROADCAST
-        ;; on a condition var. (Good luck trying to make this many threads)
-        (signal-semaphore sem 1000000))))
-
-;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
-;;; expect normal happy lisp integers, even if a bignum.
-(defun delete-from-all-threads (addr)
-  (declare (type sb-vm:word addr))
-  (barrier (:read))
-  (let ((old *all-threads*))
-    (loop
-      (aver (avl-find addr old))
-      (let ((new (avl-delete addr old)))
-        (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
-          (return)))))))
-
 (defvar sb-ext:*invoke-debugger-hook* nil
   "This is either NIL or a designator for a function of two arguments,
    to be run when the debugger is about to be entered.  The function is
@@ -1812,6 +1706,18 @@ session."
   `(alien-funcall (extern-alien "free_thread_struct" (function void system-area-pointer))
                  ,memory))
 
+;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
+;;; expect normal happy lisp integers, even if a bignum.
+(defun delete-from-all-threads (addr)
+  (declare (type sb-vm:word addr))
+  (barrier (:read))
+  (let ((old *all-threads*))
+    (loop
+      (aver (avl-find addr old))
+      (let ((new (avl-delete addr old)))
+        (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
+          (return))))))
+
 (defun primitive-join (thread dispose)
   ;; It's safe to read from the other thread's memory, because the current thread
   ;; has ownership of that memory now. And we can't call this on a FOREIGN-THREAD.
@@ -1887,6 +1793,99 @@ session."
           (prot "protect_binding_stack_guard_page")
           (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
+
+;;; Remove thread from its session, if it has one, and from *all-threads*.
+;;; Also clobber the pointer to the primitive thread
+;;; which makes THREAD-ALIVE-P return false hereafter.
+(defmacro handle-thread-exit ()
+  '(let* ((thread *current-thread*)
+           ;; use the "funny fixnum" representation
+           (c-thread (%make-lisp-obj (thread-primitive-thread thread)))
+           (sem (thread-semaphore thread)))
+      ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
+      ;; That in turn caused a failure in GC because a fixnum is not a legal value
+      ;; for the startup info when observed by GC.
+      (aver (not (memq thread *starting-threads*)))
+      ;; System threads exit peacefully when asked, and they don't bother anyone.
+      ;; They must not participate in shutting other threads down.
+      (when (and *exit-in-progress* (not (thread-ephemeral-p thread)))
+        (%exit))
+      ;; If collecting allocator metrics, transfer them to the global list
+      ;; so that we can summarize over exited threads.
+      #+allocator-metrics
+      (let ((metrics (cons (thread-name thread) (allocator-histogram))))
+        (sb-ext:atomic-push metrics *allocator-metrics*))
+      ;; Stash the primitive thread SAP for reuse, but clobber the PRIMITIVE-THREAD
+      ;; slot which makes ALIVE-P return NIL.
+      ;; A minor TODO: can this lock acquire/release be moved to where we actually
+      ;; unmap the memory an do a pthread_join()? I would think so, because until then,
+      ;; there is no real harm in reading the memory.  In this state the pthread library
+      ;; will usually return ESRCH if you try to use the pthread id - it's a valid
+      ;; pointer, but it knows that it has no underlying OS thread.
+      (with-deathlok (thread)
+        (when sem ; ordinary lisp thread, not FOREIGN-THREAD
+          (setf (thread-startup-info thread) c-thread))
+        ;; Accept no further interruptions. Other threads can't add new ones to the queue
+        ;; as doing so requires grabbing the per-thread mutex which we currently own.
+        ;; Deferrable signals are masked at this point, but it is best to tidy up
+        ;; any stray data such as captured closure values.
+        (setf (thread-interruptions thread) nil
+              (thread-primitive-thread thread) 0)
+        (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
+                         (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
+              0)
+        ;; Take ownership of our statistical profiling data and transfer the results to
+        ;; the global pool. This doesn't need to synchronize with the signal handler,
+        ;; which is effectively disabled now, but does synchronize via the interruptions
+        ;; mutex with any other thread trying to read this thread's data.
+        (let ((sprof-data (sb-vm::current-thread-offset-sap sb-vm:thread-sprof-data-slot)))
+          (unless (= (sap-int sprof-data) 0)
+            (setf (sap-ref-word (descriptor-sap c-thread)
+                                (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
+                  0)
+            ;; Operation on the global list must be atomic.
+            (sb-ext:atomic-push (cons sprof-data thread) *sprof-data*)))
+        (barrier (:write)))
+      ;; After making the thread dead, remove from session. If this were done first,
+      ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
+      ;; only to remove it right away.
+      (when *session*
+        (%delete-thread-from-session thread))
+      (cond
+        ;; If possible, logically remove from *ALL-THREADS* by flipping a bit.
+        ;; Foreign threads remove themselves. They don't have an exit semaphore,
+        ;; so that's how we know which is which.
+        (sem
+         ;; Tree pruning is the responsibility of thread creators, not dying threads.
+         ;; Creators have to manipulate the tree anyway, and they need access to the old
+         ;; structure to grab the memory.
+         (let ((old (sb-ext:cas (thread-%visible thread) 1 -1)))
+           ;; now (LIST-ALL-THREADS) won't see it
+           (aver (eql old 1)))
+         (locally (declare (sb-c::tlab :system))
+           (sb-ext:atomic-push thread *joinable-threads*)))
+        (t ; otherwise, physically remove from *ALL-THREADS*
+         ;; The memory allocation/deallocation is handled in C.
+         ;; I would like to combine the recycle bin for foreign and lisp threads though.
+         (delete-from-all-threads (get-lisp-obj-address c-thread))))
+      (when sem
+        (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
+        ;;
+        ;; We go out of our way to support something pthreads don't:
+        ;;  "The results of multiple simultaneous calls to pthread_join()
+        ;;   specifying the same target thread are undefined."
+        ;;   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html
+        ;; and for std::thread
+        ;;   "No synchronization is performed on *this itself. Concurrently calling join()
+        ;;    on the same thread object from multiple threads constitutes a data race
+        ;;    that results in undefined behavior."
+        ;;   - https://en.cppreference.com/w/cpp/thread/thread/join
+        ;; That's because (among other reasons), pthread_join deallocates memory.
+        ;; But in so far as our join does not equate to resource freeing, and our exit flag is
+        ;; our own kind of semaphore, we simply signal it using an arbitrarily huge count.
+        ;; See the comment in 'thread-structs.lisp' about why this isn't CONDITION-BROADCAST
+        ;; on a condition var. (Good luck trying to make this many threads)
+        (signal-semaphore sem 1000000))))
 
 (defun run (); All threads other than the initial thread start via this function.
   (set-thread-control-stack-slots *current-thread*)

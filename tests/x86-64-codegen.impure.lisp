@@ -1224,7 +1224,7 @@
              (let ((neg (- val))) (make-point neg))))))
     (assert (equal vops-with-barrier '("SET-SLOT")))))
 
-(with-test (:name :system-tlabs)
+(with-test (:name :system-tlabs :skipped-on (not :sb-thread))
   (when (find-symbol "SYS-ALLOC-TRAMP" "SB-VM")
     (assert (loop for line in (disassembly-lines 'sb-impl:test-make-packed-info)
                   thereis (search "SYS-ALLOC-TRAMP" line)))
