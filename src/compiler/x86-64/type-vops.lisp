@@ -376,17 +376,22 @@
   (:generator 10
     (let ((not-target (gen-label))
           (single-word (gen-label))
-          (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+          (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+          (unsigned-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1))))))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
         (when fixnum-p
-          ;; Is it a fixnum with the sign bit clear?
-          (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
-          (inst jmp :z yep))
+          (cond (unsigned-p
+                 (inst test :byte value fixnum-tag-mask)
+                 (inst jmp :z yep))
+                (t ;; Is it a fixnum with the sign bit clear?
+                 (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+                 (inst jmp :z yep))))
         (cond ((fixnum-or-other-pointer-tn-ref-p args t)
-               (when fixnum-p
+               (when (and fixnum-p
+                          (not unsigned-p))
                  (inst test :byte value fixnum-tag-mask)
                  (inst jmp :z nope)))
               (t
@@ -397,7 +402,9 @@
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
         (inst cmp temp (bignum-header-for-length 1))
-        (inst jmp :e single-word)
+        (inst jmp :e (if unsigned-p
+                         yep
+                         single-word))
         ;; If it's other than two, we can't be an (unsigned-byte 64)
         ;: Leave TEMP holding 0 in the affirmative case.
         (inst sub temp (bignum-header-for-length 2))
@@ -405,15 +412,19 @@
         ;; Compare the second digit to zero (in TEMP).
         (inst cmp (object-slot-ea value (1+ bignum-digits-offset) other-pointer-lowtag)
               temp)
-        (inst jmp :z yep) ; All zeros, its an (unsigned-byte 64).
-        (inst jmp nope)
+        (cond (unsigned-p
+               (inst jmp (if not-p :nz :z) target))
+              (t
+               (inst jmp :z yep) ; All zeros, its an (unsigned-byte 64).
+               (inst jmp nope)))
 
-        (emit-label single-word)
-        ;; Get the single digit.
-        (loadw temp value bignum-digits-offset other-pointer-lowtag)
-        ;; positive implies (unsigned-byte 64).
-        (inst test temp temp)
-        (inst jmp (if not-p :s :ns) target)
+        (unless unsigned-p
+          (emit-label single-word)
+          ;; Get the single digit.
+          (loadw temp value bignum-digits-offset other-pointer-lowtag)
+          ;; positive implies (unsigned-byte 64).
+          (inst test temp temp)
+          (inst jmp (if not-p :s :ns) target))
 
         (emit-label not-target)))))
 
