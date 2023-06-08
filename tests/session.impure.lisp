@@ -114,7 +114,7 @@
 
 ;;; On termination, interactive (including foreground) threads remove
 ;;; themselves from the list of interactive threads in their
-;;; session. However, this did not previously include broadcasting the
+;;; session. However, this did not previously include notifying the
 ;;; interactive threads waitqueue, resulting in GET-FOREGROUND hanging
 ;;; after termination of the previous foreground thread.
 (with-test (:name (sb-thread::get-foreground :hang :missing-broadcast))
@@ -134,3 +134,14 @@
     (sb-thread:join-thread thread)
     (sb-thread:release-foreground thread)
     (get-foreground-quietly)))
+
+(with-test (:name :new-session)
+  (let ((old-session sb-thread::*session*))
+    (sb-thread:with-new-session ()
+      (let ((new-session sb-thread::*session*))
+        (assert (not (eq old-session new-session)))
+        ;; this thread should not be in session-threads of the old session
+        (assert (not (member sb-thread:*current-thread*
+                             (sb-thread::session-threads old-session))))
+        (assert (member sb-thread:*current-thread*
+                        (sb-thread::session-threads new-session)))))))

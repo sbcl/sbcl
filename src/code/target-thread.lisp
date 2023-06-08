@@ -1441,14 +1441,11 @@ on this semaphore, then N of them is woken up."
     ;; SESSION-NEW-ENROLLEES but not the push into THREADS, because anyone manipulating
     ;; the THREADS list must be holding the session lock.
     (let ((was-foreground (eq thread (foreground-thread session))))
-      (setf (session-threads session)
-            ;; FIXME: I assume these could use DELQ1.
-            ;; DELQ never conses, but DELETE does. (FIXME)
-            (delq thread (session-threads session))
+      (setf (session-threads session) (delq1 thread (session-threads session))
             (session-interactive-threads session)
-            (delq thread (session-interactive-threads session)))
+            (delq1 thread (session-interactive-threads session)))
       (when was-foreground
-        (condition-broadcast (session-interactive-threads-queue session))))))
+        (condition-notify (session-interactive-threads-queue session))))))
 
 (defun call-with-new-session (fn)
   (%delete-thread-from-session *current-thread*)
@@ -1457,9 +1454,7 @@ on this semaphore, then N of them is woken up."
 
 (defmacro with-new-session (args &body forms)
   (declare (ignore args))               ;for extensibility
-  (with-unique-names (fb-name) ; FIXME: what's the significance of "fb-" ?
-    `(labels ((,fb-name () ,@forms))
-      (call-with-new-session (function ,fb-name)))))
+  `(call-with-new-session (lambda (), @forms)))
 
 ;;; WITH-DEATHLOK ensures that the 'struct thread' and/or OS thread won't go away
 ;;; by synchronizing with HANDLE-THREAD-EXIT.
@@ -1719,7 +1714,7 @@ have the foreground next."
         (when (and next (thread-alive-p next))
           (setf interactive-threads
                 (list* next (delete next interactive-threads))))
-        (condition-broadcast (session-interactive-threads-queue session))))))
+        (condition-notify (session-interactive-threads-queue session))))))
 
 (defun interactive-threads (&optional (session *session*))
   "Return the interactive threads of SESSION defaulting to the current
