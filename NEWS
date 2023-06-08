@@ -1,5 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes in the external-format-line-endings branch:
+  * enhancement: external formats now support newline variants.
+  * enhancement: character decoding and encoding errors signalled by stream or
+    octet functions now provide a USE-VALUE restart for handlers to provide
+    replacement input or output.
+  * bug fix: OCTETS-TO-STRING using unibyte external formats with unallocated
+    codepoints (e.g. iso-8859-3) correctly signal or use replacements rather
+    than taking bits from NIL and converting them to characters.
+  * bug fix: FILE-STRING-LENGTH now returns NIL if the input datum is not
+    encodable in the stream's external format.
+  * bug fix: table-based multibyte external formats (EUC-JP, Shift-JIS, GBK)
+    now honour a replacement character (in the external format or through
+    restarts) when encoding to octets.
+  * optimization: external formats with :REPLACEMENT no longer bind handlers
+    for coding errors around conversion functions, and so should cons less and
+    be faster.
+
 changes relative to sbcl-2.3.10:
   * enhancement: During generic function dispatch, for a generic function
     using standard- or short-method-combination, if there are no applicable
