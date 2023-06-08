@@ -2,6 +2,8 @@
 
 changes relative to sbcl-2.3.5:
   * bug fix: riscv can build contribs again.
+  * optimization: better (the word-sized-type (ASH word-sized word-sized))
+    when the result can overflow. For arm64 and x86-64.
 
 changes in sbcl-2.3.5 relative to sbcl-2.3.4:
   * enhancement: Unicode support has been updated to support version 15.0.0 of

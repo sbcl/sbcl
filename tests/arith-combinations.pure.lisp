@@ -115,6 +115,7 @@
             (list* most-positive-fixnum
                    (1- most-positive-fixnum)
                    (1+ most-positive-fixnum)
+                   (1- (expt 2 sb-vm:n-word-bits))
                    #1=(list 0 1 3 4 -1 -3 -4
                             most-negative-fixnum
                             (1+ most-negative-fixnum)
