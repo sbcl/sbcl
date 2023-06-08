@@ -2328,7 +2328,8 @@
                     (inst asr tmp-tn number (- 64 amount))
                     (inst cmp tmp-tn (asr r 63))
                     (inst b :ne error))))
-            ((sc-is amount unsigned-reg)
+            ((csubtypep (tn-ref-type amount-ref)
+                        (specifier-type 'unsigned-byte))
              (unless fits
                (move r number)
                (inst cbz number done)
@@ -2419,7 +2420,7 @@
                            (inst cmp zr-tn (lsr number (- 64 amount)))
                            (inst b :ne error))))))
             ((csubtypep (tn-ref-type amount-ref)
-                              (specifier-type 'unsigned-byte))
+                        (specifier-type 'unsigned-byte))
              (unless fits
                (move r number)
                (inst cbz number done)
