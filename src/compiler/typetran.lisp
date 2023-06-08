@@ -340,6 +340,9 @@
                     `(and (not (eq ,object 0))
                           ,mod-p)
                     mod-p)))
+             ((type= type (specifier-type '(or word sb-vm:signed-word)))
+              `(or (typep ,object 'sb-vm:signed-word)
+                   (typep ,object 'word)))
              (t
               `(and (typep ,object ',base)
                     ,(transform-numeric-bound-test object type base)))))
