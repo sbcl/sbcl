@@ -374,10 +374,12 @@
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
   (:generator 10
-    (let ((not-target (gen-label))
-          (single-word (gen-label))
-          (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
-          (unsigned-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1))))))
+    (let* ((not-target (gen-label))
+           (single-word (gen-label))
+           (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+           (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
+           (unsigned-p (or not-signed-byte-64-p
+                           (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1)))))))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
@@ -400,11 +402,12 @@
                (inst jmp :ne nope)))
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
-        ;; Is it one?
-        (inst cmp temp (bignum-header-for-length 1))
-        (inst jmp :e (if unsigned-p
-                         yep
-                         single-word))
+        (unless not-signed-byte-64-p
+          ;; Is it one?
+          (inst cmp temp (bignum-header-for-length 1))
+          (inst jmp :e (if unsigned-p
+                           yep
+                           single-word)))
         ;; If it's other than two, we can't be an (unsigned-byte 64)
         ;: Leave TEMP holding 0 in the affirmative case.
         (inst sub temp (bignum-header-for-length 2))

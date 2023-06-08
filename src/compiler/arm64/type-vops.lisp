@@ -195,9 +195,11 @@
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
   (:generator 10
-    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
-          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
-          (unsigned-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1))))))
+    (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
+           (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
+           (unsigned-p (or not-signed-byte-64-p
+                           (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1)))))))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
@@ -219,11 +221,12 @@
             (inst b :ne nope))
           ;; Get the header.
           (loadw temp value 0 other-pointer-lowtag)
-          ;; Is it one?
-          (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-          (inst b :eq (if unsigned-p
-                          yep
-                          single-word))
+          (unless not-signed-byte-64-p
+            ;; Is it one?
+            (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+            (inst b :eq (if unsigned-p
+                            yep
+                            single-word)))
           ;; If it's other than two, it can't be an (unsigned-byte 64)
           (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
           (inst b :ne nope)
@@ -246,9 +249,9 @@
           ;; positive implies (unsigned-byte 64).
           fixnum
           (unless unsigned-p
-           (if not-p
-               (inst tbnz* temp (1- n-word-bits) target)
-               (inst tbz* temp (1- n-word-bits) target)))))
+            (if not-p
+                (inst tbnz* temp (1- n-word-bits) target)
+                (inst tbz* temp (1- n-word-bits) target)))))
       (values))
     NOT-TARGET))
 
