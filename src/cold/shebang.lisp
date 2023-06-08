@@ -34,7 +34,9 @@
 (defun compatible-vector-raw-bits () ; T if the host and target match on word size and endianness
   (flet ((endianness (features)
            (let ((result (intersection '(:little-endian :big-endian) features)))
-             (assert (and result (not (cdr result))))
+             ;; some lisp implementation may not have little-endian / big-endian
+             ;; features which shouldn't trigger that assert
+             (assert (or (not result) (and result (not (cdr result)))))
              (car result)))
          (wordsize (features)
            (if (member :64-bit features) 64 32)))
