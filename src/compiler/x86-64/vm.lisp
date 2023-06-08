@@ -617,9 +617,6 @@
 
 (defvar *register-names* +qword-register-names+)
 
-(defmacro unbound-marker-bits ()
-  (logior (+ sb-vm:static-space-start #x100) unbound-marker-widetag))
-
 ;;; See WRITE-FUNINSTANCE-PROLOGUE in x86-64-vm.
 ;;; There are 4 bytes available in the imm32 operand of a dummy MOV instruction.
 ;;; (It's a valid instruction on the theory that illegal opcodes might cause
