@@ -5087,7 +5087,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
     sword_t nbytes = total_words * N_WORD_BYTES;
     /* Allocations of code are all serialized. We might also acquire
      * free_pages_lock depending on availability of space in the region */
-    int result = mutex_acquire(&code_allocator_lock);
+    __attribute__((unused)) int result = mutex_acquire(&code_allocator_lock);
     gc_assert(result);
     struct code *code =
         (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, code_region, nbytes, PAGE_TYPE_CODE, th);
@@ -5131,7 +5131,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI alloc_funinstance(sword_t nbytes)
 {
     struct thread *th = get_sb_vm_thread();
-    int result = mutex_acquire(&code_allocator_lock);
+    __attribute__((unused)) int result = mutex_acquire(&code_allocator_lock);
     gc_assert(result);
     void* mem = lisp_alloc(0, code_region, nbytes, PAGE_TYPE_CODE, th);
     result = mutex_release(&code_allocator_lock);

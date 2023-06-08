@@ -429,8 +429,6 @@ init_new_thread(struct thread *th,
                 init_thread_data __attribute__((unused)) *scribble,
                 int guardp)
 {
-    int lock_ret;
-
     ASSIGN_CURRENT_THREAD(th);
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
@@ -457,7 +455,7 @@ init_new_thread(struct thread *th,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     csp_around_foreign_call(th) = (lispobj)scribble;
 #endif
-    lock_ret = mutex_acquire(&all_threads_lock);
+    __attribute__((unused)) int lock_ret = mutex_acquire(&all_threads_lock);
     gc_assert(lock_ret);
     link_thread(th);
     ignore_value(mutex_release(&all_threads_lock));
@@ -477,8 +475,6 @@ static void
 unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
 {
-    int lock_ret;
-
     block_blockable_signals(0);
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
@@ -492,7 +488,7 @@ unregister_thread(struct thread *th,
      * thread, but since we are either exiting lisp code as a lisp
      * thread that is dying, or exiting lisp code to return to
      * former status as a C thread, it won't wait long. */
-    lock_ret = mutex_acquire(&all_threads_lock);
+    __attribute__((unused)) int lock_ret = mutex_acquire(&all_threads_lock);
     gc_assert(lock_ret);
     unlink_thread(th);
     lock_ret = mutex_release(&all_threads_lock);
@@ -652,8 +648,7 @@ static struct thread* recyclebin_threads;
 static struct thread* get_recyclebin_item()
 {
     struct thread* result = 0;
-    int rc;
-    rc = mutex_acquire(&recyclebin_lock);
+    __attribute__((unused)) int rc = mutex_acquire(&recyclebin_lock);
     gc_assert(rc);
     if (recyclebin_threads) {
         result = recyclebin_threads;
@@ -664,8 +659,7 @@ static struct thread* get_recyclebin_item()
 }
 static void put_recyclebin_item(struct thread* th)
 {
-    int rc;
-    rc = mutex_acquire(&recyclebin_lock);
+    __attribute__((unused)) int rc = mutex_acquire(&recyclebin_lock);
     gc_assert(rc);
     th->next = recyclebin_threads;
     recyclebin_threads = th;
@@ -1231,7 +1225,7 @@ void gc_start_the_world()
     }
 #endif
     struct thread *th, *me = get_sb_vm_thread();
-    int lock_ret;
+    __attribute__((unused)) int lock_ret;
     /* if a resumed thread creates a new thread before we're done with
      * this loop, the new thread will be suspended waiting to acquire
      * the all_threads lock */
