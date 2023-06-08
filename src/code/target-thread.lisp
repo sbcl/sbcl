@@ -2532,12 +2532,7 @@ mechanism for inter-thread communication."
                         ,@(loop for (var form) in (cdr *thread-local-specials*)
                                 for index = (info :variable :wired-tls var)
                                 append
-                                (cond ((equal form '(sb-kernel:make-unbound-marker))
-                                       `((sap-ref-word sap ,index) ,(sb-vm::unbound-marker-bits)))
-                                      ((eq form nil)
-                                       `((sap-ref-word sap ,index) ,sb-vm:nil-value))
-                                      (t
-                                       `((sap-ref-lispobj sap ,index) ,form)))))))
+                                `((sap-ref-lispobj sap ,index) ,form)))))
       (expand)))
   thread)
 
