@@ -20,7 +20,7 @@ jobs:
     - name: install host sbcl
       shell: pwsh
       run: |
-        cinst sbcl -source tools-for-build
+        choco install sbcl -source tools-for-build
     - name: build
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
