@@ -25,11 +25,14 @@ do
   echo '(lambda (features) (union features (list :os-provides-dlopen ' > $ltf
   echo ":$arch" >> $ltf
   # x86 and x86-64 are tested as if #+win32. Unix is otherwise plenty tested.
-  if [ $arch = x86 -o $arch = x86-64 ]; then
-    echo ':win32 :sb-thread :sb-safepoint' >> $ltf
-  else
-    echo ':unix :linux :elf' >> $ltf
-  fi
+  case $arch in
+  x86 | x86-64)
+    echo ':win32 :sb-thread :sb-safepoint' >> $ltf ;;
+  sparc)
+    echo ':unix :sunos :elf' >> $ltf ;;
+  *)
+    echo ':unix :linux :elf' >> $ltf ;;
+  esac
   cat crossbuild-runner/backends/$arch/features >> $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf
   echo ')))' >> $ltf
