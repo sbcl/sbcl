@@ -485,6 +485,7 @@ has written, having proved that it is unreachable."))
 ;;; it needs to be reprinted, and we also FORCE-OUTPUT so that the
 ;;; message gets seen right away.
 (defun compiler-mumble (control &rest args)
+  (declare (explicit-check))
   (let ((stream *standard-output*))
     (note-message-repeats stream)
     (setq *last-error-context* nil)

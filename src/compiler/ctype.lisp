@@ -58,11 +58,13 @@
 
 ;;; Signal a warning if appropriate and set *FOO-DETECTED*.
 (defun note-lossage (format-string &rest format-args)
+  (declare (explicit-check))
   (setq *lossage-detected* t)
   (when *lossage-fun*
     (apply *lossage-fun* format-string format-args))
   (values))
 (defun note-unwinnage (format-string &rest format-args)
+  (declare (explicit-check))
   (setq *unwinnage-detected* t)
   (when *unwinnage-fun*
     (apply *unwinnage-fun* format-string format-args))

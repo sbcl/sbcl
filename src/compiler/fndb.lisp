@@ -2114,7 +2114,7 @@
 (defknown %program-error (&optional t &rest t) nil ())
 (defknown compiler-error (t &rest t) nil ())
 (defknown (compiler-warn compiler-style-warn) (t &rest t) (values) ())
-(defknown (compiler-mumble note-lossage note-unwinnage) (string &rest t) (values) ())
+(defknown (compiler-mumble note-lossage note-unwinnage) (format-control &rest t) (values) ())
 (defknown (compiler-notify maybe-compiler-notify) ((or format-control symbol) &rest t)
   (values)
   ())
