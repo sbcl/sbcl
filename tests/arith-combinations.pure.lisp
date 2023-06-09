@@ -111,7 +111,8 @@
                 (integer ,(- 1 sb-vm:n-word-bits)
                          ,(1- sb-vm:n-word-bits))
                 (integer 0
-                         ,(1- sb-vm:n-word-bits)))
+                         ,(1- sb-vm:n-word-bits))
+                (and fixnum unsigned-byte))
             (list* most-positive-fixnum
                    (1- most-positive-fixnum)
                    (1+ most-positive-fixnum)

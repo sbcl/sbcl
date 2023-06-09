@@ -2361,14 +2361,7 @@
              (inst b :ne error))))
     done))
 
-(define-vop (overflow-ash-fixnum overflow-ash-signed)
-  (:translate overflow-ash)
-  (:args (number :scs (any-reg))
-         (amount :scs (unsigned-reg immediate)))
-  (:arg-types tagged-num unsigned-num)
-  (:results (r :scs (any-reg) :from :load))
-  (:result-types tagged-num)
-  (:variant-cost 2))
+
 
 (define-vop (overflow-ash-unsigned)
   (:translate overflow-ash)
@@ -2381,7 +2374,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:variant-vars signed)
+  (:variant-vars signed fixnum)
   (:generator 3
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
@@ -2415,9 +2408,14 @@
                    (t
                     (inst lsl r number amount)
                     (cond ((= amount 1)
-                           (inst tbnz* number 63 error))
+                           (inst tbnz* number (if fixnum
+                                                  62
+                                                  63) error))
                           (t
-                           (inst cmp zr-tn (lsr number (- 64 amount)))
+                           (inst cmp zr-tn (lsr number (- (if fixnum
+                                                              n-fixnum-bits
+                                                              64)
+                                                          amount)))
                            (inst b :ne error))))))
             ((csubtypep (tn-ref-type amount-ref)
                         (specifier-type 'unsigned-byte))
@@ -2426,9 +2424,12 @@
                (inst cbz number done)
                (inst cmp amount n-word-bits)
                (inst b :ge error))
-             (inst neg tmp-tn amount)
+             (if fixnum
+                 (inst mvn tmp-tn amount)  ; (- 63 amount)
+                 (inst neg tmp-tn amount)) ; (- 64 amount)
              (inst lsl r number amount)
-             (inst cbz amount done)
+             (unless fixnum
+               (inst cbz amount done))
              (inst asr tmp-tn number tmp-tn)
              (inst cbnz tmp-tn error))
             (t
@@ -2450,12 +2451,28 @@
              (inst cbnz tmp-tn error))))
     done))
 
+(define-vop (overflow-ash-fixnum overflow-ash-signed)
+  (:args (number :scs (any-reg))
+         (amount :scs (unsigned-reg immediate)))
+  (:arg-types tagged-num unsigned-num)
+  (:results (r :scs (any-reg) :from :load))
+  (:result-types tagged-num)
+  (:variant-cost 2))
+
+(define-vop (overflow-ash-unsigned-fixnum overflow-ash-unsigned)
+  (:args (number :scs (any-reg))
+         (amount :scs (unsigned-reg immediate)))
+  (:arg-types positive-fixnum unsigned-num)
+  (:results (r :scs (any-reg) :from :load))
+  (:result-types positive-fixnum)
+  (:variant nil t)
+  (:variant-cost 1))
+
 (define-vop (overflow-ash-signed=>unsigned overflow-ash-unsigned)
-  (:translate overflow-ash)
   (:args (number :scs (signed-reg))
          (amount :scs (unsigned-reg signed-reg immediate)))
   (:arg-types signed-num untagged-num)
-  (:variant t)
+  (:variant t nil)
   (:variant-cost 4))
 
 (define-vop (overflow+t)
