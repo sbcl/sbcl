@@ -410,7 +410,7 @@
   (let* ((types '(sb-vm:word sb-vm:signed-word))
          (the-types `(fixnum (unsigned-byte 16) (signed-byte 16) ,@types)))
     (loop
-      for op in '(+ - *)
+      for op in '(+ - * negate)
       do
       (loop
         for a-type in types
@@ -419,10 +419,14 @@
           for b-type in types
           do
           (loop for the-type in the-types
-                for lambda = `(lambda (a b)
-                                (declare (,a-type a)
-                                         (,b-type b))
-                                (the ,the-type (,op a b)))
+                for lambda = (if (eq op 'negate)
+                                 `(lambda (a)
+                                    (declare (,a-type a))
+                                    (the ,the-type (- a)))
+                                 `(lambda (a b)
+                                    (declare (,a-type a)
+                                             (,b-type b))
+                                    (the ,the-type (,op a b))))
                 do (unless (find-if (lambda (x)
                                       (eql (search "OVERFLOW" (string x)) 0))
                                     (ir2-vops lambda))
