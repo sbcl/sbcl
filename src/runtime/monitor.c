@@ -489,7 +489,7 @@ pte_cmd(char **ptr)
 static int
 regs_cmd(char __attribute__((unused)) **ptr)
 {
-    struct thread __attribute__((unused)) *thread=get_sb_vm_thread();
+    struct thread __attribute__((unused)) *thread = get_sb_vm_thread();
 
     printf("CSP\t=\t%p   ", access_control_stack_pointer(thread));
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
@@ -649,7 +649,7 @@ static int
 print_context_cmd(char **ptr)
 {
     int free_ici;
-    struct thread *thread=get_sb_vm_thread();
+    struct thread *thread = get_sb_vm_thread();
 
     free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 

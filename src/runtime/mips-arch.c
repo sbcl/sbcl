@@ -249,16 +249,16 @@ arch_internal_error_arguments(os_context_t *context)
         return (unsigned char *)((unsigned)OS_CONTEXT_PC(context) + INSN_LEN);
 }
 
-boolean arch_pseudo_atomic_atomic(__attribute((unused)) os_context_t *context) {
-    return get_pseudo_atomic_atomic(get_sb_vm_thread());
+boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+    return get_pseudo_atomic_atomic(thread);
 }
 
-void arch_set_pseudo_atomic_interrupted(__attribute__((unused)) os_context_t *context) {
-    set_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_set_pseudo_atomic_interrupted(struct thread *thread) {
+    set_pseudo_atomic_interrupted(thread);
 }
 
-void arch_clear_pseudo_atomic_interrupted(__attribute__((unused)) os_context_t *context) {
-    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
+    clear_pseudo_atomic_interrupted(thread);
 }
 
 unsigned int
@@ -450,7 +450,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
     case 0x36: // #b110110 = TNE
         switch (code) {
         case 0: // FIXME: why is this not trap_PendingInterrupt ?
-          arch_clear_pseudo_atomic_interrupted(context);
+          arch_clear_pseudo_atomic_interrupted(get_sb_vm_thread());
           OS_CONTEXT_PC(context) += 4;
           return interrupt_handle_pending(context);
         case trap_InvalidArgCount:

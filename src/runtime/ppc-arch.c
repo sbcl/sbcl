@@ -88,22 +88,16 @@ arch_internal_error_arguments(os_context_t *context)
 }
 
 
-boolean
-arch_pseudo_atomic_atomic(os_context_t *context)
-{
-    return get_pseudo_atomic_atomic(get_sb_vm_thread());
+boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+    return get_pseudo_atomic_atomic(thread);
 }
 
-void
-arch_set_pseudo_atomic_interrupted(os_context_t *context)
-{
-    set_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_set_pseudo_atomic_interrupted(struct thread *thread) {
+    set_pseudo_atomic_interrupted(thread);
 }
 
-void
-arch_clear_pseudo_atomic_interrupted(os_context_t *context)
-{
-    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
+    clear_pseudo_atomic_interrupted(thread);
 }
 
 unsigned int
@@ -516,7 +510,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
             if (handle_allocation_trap(context)) return;
         }
         if (code == 0x7C2002A6) { // pending interrupt
-            arch_clear_pseudo_atomic_interrupted(context);
+            arch_clear_pseudo_atomic_interrupted(get_sb_vm_thread());
             arch_skip_instruction(context);
             interrupt_handle_pending(context);
             return;
@@ -533,7 +527,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))|| // TWI NE,$NL3,0
         /* trap instruction from do_pending_interrupt */
         code == 0x7fe00008) { // TW T,0,0
-        arch_clear_pseudo_atomic_interrupted(context);
+        arch_clear_pseudo_atomic_interrupted(get_sb_vm_thread());
         arch_skip_instruction(context);
         /* interrupt or GC was requested in PA; now we're done with the
            PA section we may as well get around to it */

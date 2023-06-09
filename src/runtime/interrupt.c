@@ -688,10 +688,10 @@ they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
 inline static void
 check_interrupts_enabled_or_lose(os_context_t *context)
 {
-    __attribute__((unused)) struct thread *thread = get_sb_vm_thread();
+    struct thread *thread = get_sb_vm_thread();
     if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL)
         lose("interrupts not enabled");
-    if (arch_pseudo_atomic_atomic(context))
+    if (arch_pseudo_atomic_atomic(thread))
         lose ("in pseudo atomic section");
 }
 
@@ -935,7 +935,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 void fake_foreign_function_call_noassert(os_context_t *context)
 {
     int context_index;
-    struct thread *thread=get_sb_vm_thread();
+    struct thread *thread = get_sb_vm_thread();
 
 #ifdef reg_BSP
     set_binding_stack_pointer(thread,
@@ -990,7 +990,7 @@ void fake_foreign_function_call(os_context_t *context)
 void
 undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 {
-    struct thread *thread=get_sb_vm_thread();
+    struct thread *thread = get_sb_vm_thread();
     /* Block all blockable signals. */
     block_blockable_signals(0);
 
@@ -1088,7 +1088,7 @@ interrupt_handle_pending(os_context_t *context)
     struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
 
-    if (arch_pseudo_atomic_atomic(context)) {
+    if (arch_pseudo_atomic_atomic(thread)) {
         lose("Handling pending interrupt in pseudo atomic.");
     }
 
@@ -1138,7 +1138,7 @@ interrupt_handle_pending(os_context_t *context)
         if (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
              * the signal handler if it actually stops us. */
-            arch_clear_pseudo_atomic_interrupted(context);
+            arch_clear_pseudo_atomic_interrupted(thread);
             sig_stop_for_gc_handler(SIG_STOP_FOR_GC,NULL,context);
         } else
 #endif
@@ -1159,7 +1159,7 @@ interrupt_handle_pending(os_context_t *context)
                 bind_variable(INTERRUPTS_ENABLED, NIL, thread);
             }
 
-            arch_clear_pseudo_atomic_interrupted(context);
+            arch_clear_pseudo_atomic_interrupted(thread);
 
             /* GC_PENDING is cleared in SUB-GC, or if another thread
              * is doing a gc already we will get a SIG_STOP_FOR_GC and
@@ -1215,7 +1215,7 @@ interrupt_handle_pending(os_context_t *context)
          * INTERRUPT_PENDING and pseudo atomic interrupted. It's safe
          * because we checked above that there is no GC pending. */
         write_TLS(INTERRUPT_PENDING, NIL, thread);
-        arch_clear_pseudo_atomic_interrupted(context);
+        arch_clear_pseudo_atomic_interrupted(thread);
         /* Restore the sigmask in the context. */
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
         run_deferred_handler(data, context);
@@ -1395,10 +1395,10 @@ can_handle_now(void *handler, struct interrupt_data *data,
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
-    else if (arch_pseudo_atomic_atomic(context)) {
+    else if (arch_pseudo_atomic_atomic(thread)) {
         event2("can_handle_now(%p,%d): deferred (PA)", handler, signal);
         store_signal_data_for_later(data,handler,signal,info,context);
-        arch_set_pseudo_atomic_interrupted(context);
+        arch_set_pseudo_atomic_interrupted(thread);
         answer = 0;
     }
 
@@ -1432,7 +1432,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
                         siginfo_t __attribute__((unused)) *info,
                         os_context_t *context)
 {
-    struct thread *thread=get_sb_vm_thread();
+    struct thread *thread = get_sb_vm_thread();
     boolean was_in_lisp;
 
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
@@ -1441,10 +1441,10 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         event0("stop_for_gc deferred for *GC-INHIBIT*");
         write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         return;
-    } else if (arch_pseudo_atomic_atomic(context)) {
+    } else if (arch_pseudo_atomic_atomic(thread)) {
         event0("stop_for_gc deferred for PA");
         write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
-        arch_set_pseudo_atomic_interrupted(context);
+        arch_set_pseudo_atomic_interrupted(thread);
         maybe_save_gc_mask_and_block_deferrables(context);
         return;
     }
@@ -1710,7 +1710,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_register_addr(context,reg_RSI) = 0;        /* arg. array */
     *os_context_register_addr(context,reg_RDX) = 0;        /* no. args */
 #else
-    struct thread *th=get_sb_vm_thread();
+    struct thread *th = get_sb_vm_thread();
     build_fake_control_stack_frames(th,context);
 #endif
 
@@ -1799,7 +1799,7 @@ void reset_thread_control_stack_guard_page(struct thread *th)
 boolean
 handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
-    struct thread *th=get_sb_vm_thread();
+    struct thread *th = get_sb_vm_thread();
 
 #ifndef LISP_FEATURE_WIN32
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
@@ -1819,7 +1819,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             lose("Control stack exhausted with gc_active_p, fault: %p, PC: %p",
                  addr, (void*)os_context_pc(context));
         }
-        if (arch_pseudo_atomic_atomic(context)) {
+        if (arch_pseudo_atomic_atomic(th)) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted while pseudo-atomic, fault: %p, PC: %p",
                  addr, (void*)os_context_pc(context));

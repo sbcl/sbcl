@@ -41,33 +41,17 @@ unsigned char *arch_internal_error_arguments(os_context_t *context)
     return (unsigned char *)(OS_CONTEXT_PC(context) + 5);
 }
 
-boolean arch_pseudo_atomic_atomic(os_context_t *context)
-{
-    /* FIXME: this foreign_function_call_active test is dubious at
-     * best. If a foreign call is made in a pseudo atomic section
-     * (?) or more likely a pseudo atomic section is in a foreign
-     * call then an interrupt is executed immediately. Maybe it
-     * has to do with C code not maintaining pseudo atomic
-     * properly. MG - 2005-08-10
-     *
-     * The foreign_function_call_active used to live at each call-site
-     * to arch_pseudo_atomic_atomic, but this seems clearer.
-     * --NS 2007-05-15 */
-#ifdef LISP_FEATURE_GENCGC
+boolean arch_pseudo_atomic_atomic(struct thread *thread) {
     return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
-#else
-    return (!foreign_function_call_active)
-        && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
-#endif
 }
 
-void arch_set_pseudo_atomic_interrupted(os_context_t *context)
+void arch_set_pseudo_atomic_interrupted(struct thread *thread)
 {
     extern void do_pending_interrupt();
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
 }
 
-void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+void arch_clear_pseudo_atomic_interrupted(struct thread *thread)
 {
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
 }

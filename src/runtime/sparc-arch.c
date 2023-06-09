@@ -45,19 +45,16 @@ unsigned char *arch_internal_error_arguments(os_context_t *context)
     return (unsigned char *)(OS_CONTEXT_PC(context) + 4);
 }
 
-boolean arch_pseudo_atomic_atomic(os_context_t *context)
-{
-    return get_pseudo_atomic_atomic(get_sb_vm_thread());
+boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+    return get_pseudo_atomic_atomic(thread);
 }
 
-void arch_set_pseudo_atomic_interrupted(os_context_t *context)
-{
-    set_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_set_pseudo_atomic_interrupted(struct thread *thread) {
+    set_pseudo_atomic_interrupted(thread);
 }
 
-void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
-{
-    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
+void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
+    clear_pseudo_atomic_interrupted(thread);
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -254,7 +251,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
     else if (siginfo->si_code == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {
             /* A trap instruction from a pseudo-atomic. */
-            arch_clear_pseudo_atomic_interrupted(context);
+            arch_clear_pseudo_atomic_interrupted(get_sb_vm_thread());
             arch_skip_instruction(context);
             interrupt_handle_pending(context);
         }

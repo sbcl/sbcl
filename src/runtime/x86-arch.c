@@ -137,23 +137,15 @@ arch_internal_error_arguments(os_context_t *context)
     return 1 + (unsigned char *)(OS_CONTEXT_PC(context));
 }
 
-boolean
-arch_pseudo_atomic_atomic(os_context_t *context)
-{
-    return get_pseudo_atomic_atomic(get_sb_vm_thread());
+boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+    return get_pseudo_atomic_atomic(thread);
 }
 
-void
-arch_set_pseudo_atomic_interrupted(os_context_t *context)
-{
-    struct thread *thread = get_sb_vm_thread();
+void arch_set_pseudo_atomic_interrupted(struct thread *thread) {
     set_pseudo_atomic_interrupted(thread);
 }
 
-void
-arch_clear_pseudo_atomic_interrupted(os_context_t *context)
-{
-    struct thread *thread = get_sb_vm_thread();
+void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
     clear_pseudo_atomic_interrupted(thread);
 }
 
