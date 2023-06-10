@@ -919,7 +919,10 @@
   (:node-var node)
   (:generator 10
     (let ((data (if (sc-is value immediate)
-                    (constantize (encode-value-if-immediate value))
+                    (let ((bits (encode-value-if-immediate value)))
+                      (if (integerp bits)
+                          (constantize bits)
+                          bits)) ; could be a fixup
                     value)))
       (cond (stack-allocate-p
              ;; No regression test got here. Therefore I think there's no such thing as a
