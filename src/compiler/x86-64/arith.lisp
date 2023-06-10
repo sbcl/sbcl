@@ -2640,26 +2640,10 @@
 ;;; E1:       25FE0F0000       AND EAX, 4094
 ;;; E6:       4885C0           TEST RAX, RAX
 ;;; E9:       74C9             JEQ L2
-
-;;; %LOGBITP has the same argument order as ordinary LOGBITP which is * backwards *
-;;; relative to every other architecture.
-;;; I suspect the others have a predilection for placing codegen info args last.
-(defknown %logbitp ((mod 64) (or signed-word word)) boolean
-  (movable foldable flushable always-translatable))
-
-;;; only for constant folding within the compiler
-(defun %logbitp (index integer)
-  (declare (notinline logbitp))
-  ;; Normally an "intepreter stub" is implemented in terms of itself, not in terms
-  ;; of the public function. But this has to work in the cross-compiler too.
-  ;; A way to do that is define a version of %LOGBITP in cross-misc.
-  ;; Then brings a new problem: inconsistent argument order across the architectures.
-  (logbitp index integer))
-
 ;;; Normally we define a spectrum of vops to handle {unsigned,signed,any}-reg and
 ;;; constant/non-constant operands. That's often unnecessary. Certainly for this vop.
-(define-vop (%logbitp fast-safe-arith-op)
-  (:translate %logbitp)
+(define-vop (logbitp fast-safe-arith-op)
+  (:translate logbitp)
   (:conditional :c)
   (:args (bit :scs (signed-reg signed-stack unsigned-reg unsigned-stack
                     any-reg control-stack) :load-if nil)
@@ -2682,8 +2666,8 @@
                         temp))))
       (inst bt word bit))))
 
-(define-vop (%logbitp/c fast-safe-arith-op)
-  (:translate %logbitp)
+(define-vop (logbitp/c fast-safe-arith-op)
+  (:translate logbitp)
   (:conditional :c)
   (:info bit)
   (:args (int :scs (signed-reg signed-stack unsigned-reg unsigned-stack
@@ -2706,18 +2690,18 @@
                       ((extra-disp bit-shift) (floor bit 8)))
              (inst test :byte (ea (+ frame-disp extra-disp) rbp-tn) (ash 1 bit-shift)))
            (change-vop-flags vop '(:ne))
-           (return-from %logbitp/c))
+           (return-from logbitp/c))
           ((= bit 31)       ; test the sign bit of the 32-bit register
            (inst test :dword int int)
            (change-vop-flags vop '(:s))
-           (return-from %logbitp/c))
+           (return-from logbitp/c))
           ((< bit 32)
            (inst test (if (< bit 8) :byte :dword) int (ash 1 bit))
            (change-vop-flags vop '(:ne))
-           (return-from %logbitp/c)))
+           (return-from logbitp/c)))
     (inst bt (if (<= bit 31) :dword :qword) int bit)))
 
-(define-vop (%logbitp-memref fast-conditional)
+(define-vop (logbitp-memref fast-conditional)
   (:args (x :scs (descriptor-reg)))
   (:arg-types (:constant (mod 64)) *)
   (:info bit)
@@ -2731,7 +2715,7 @@
                ((extra-disp bit-shift) (floor bit 8)))
       (inst test :byte (ea (+ slot-disp extra-disp) x) (ash 1 bit-shift)))))
 
-(defoptimizer (sb-c::vop-optimize %logbitp/c) (vop)
+(defoptimizer (sb-c::vop-optimize logbitp/c) (vop)
   (unless (tn-ref-memory-access (vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  ;; TODO: missing data-vector-ref/simple-vector-c and SLOT
@@ -2758,7 +2742,7 @@
                             bit))
                        (new (sb-c::emit-and-insert-vop
                              (sb-c::vop-node vop) (vop-block vop)
-                             (template-or-lose '%logbitp-memref)
+                             (template-or-lose 'logbitp-memref)
                              arg-ref nil prev (list info))))
               (setf (tn-ref-memory-access arg-ref) `(:read . ,disp))
               (change-vop-flags vop '(:ne))

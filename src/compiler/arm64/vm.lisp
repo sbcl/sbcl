@@ -329,8 +329,7 @@
        (cond
          ((or (valid-funtype `((constant-arg (mod ,n-word-bits)) signed-word) '*)
               (valid-funtype `((constant-arg (mod ,n-word-bits)) word) '*))
-          (values :transform '(lambda (index integer)
-                               (%logbitp integer index))))
+          (values :direct nil))
          (t (values :default nil))))
       (%ldb
        (flet ((validp (type)
@@ -348,8 +347,7 @@
                                     n-word-bits)))))))
          (if (or (validp 'word)
                  (validp 'signed-word))
-             (values :transform '(lambda (size posn integer)
-                                  (%%ldb integer size posn)))
+             (values :direct nil)
              (values :default nil))))
       (%dpb
        (flet ((validp (type result-type)
@@ -360,8 +358,7 @@
                                result-type)))
          (if (or (validp 'signed-word 'signed-word)
                  (validp 'word 'word))
-             (values :transform '(lambda (newbyte size posn integer)
-                                  (%%dpb newbyte size posn integer)))
+             (values :direct nil)
              (values :default nil))))
       (signum
        (if (or (valid-funtype '(signed-word) '*)

@@ -899,32 +899,11 @@
     (:variant t)
     (:variant-cost 30))
 
-(defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
-  (movable foldable flushable always-translatable))
-
-(defknown %%dpb (integer unsigned-byte unsigned-byte integer) integer
-  (movable foldable flushable always-translatable))
-
-;;; Constant folding
-(defun %%ldb (integer size posn)
-  (%ldb size posn integer))
-
-(deftransform %%ldb ((integer size posn) (unsigned-byte t (constant-arg (integer #.n-word-bits))) *
-                     :important nil)
-  0)
-
-(deftransform %%ldb ((integer size posn) ((integer * -1) t (constant-arg (integer #.n-word-bits))) *
-                     :important nil)
-  1)
-
-(defun %%dpb (newbyte size posn integer)
-  (%dpb newbyte size posn integer))
 
 (define-vop (ldb-c/fixnum)
-  (:translate %%ldb)
+  (:translate %ldb)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num
-              (:constant integer) (:constant integer))
+  (:arg-types (:constant integer) (:constant integer) tagged-num)
   (:info size posn)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -941,10 +920,9 @@
            (inst and res res (ash most-positive-word (- size sb-vm:n-word-bits)))))))
 
 (define-vop (ldb-c)
-  (:translate %%ldb)
+  (:translate %ldb)
   (:args (x :scs (unsigned-reg signed-reg)))
-  (:arg-types (:or unsigned-num signed-num)
-              (:constant integer) (:constant integer))
+  (:arg-types (:constant integer) (:constant integer) (:or unsigned-num signed-num))
   (:info size posn)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -956,7 +934,7 @@
         (inst ubfm res x posn (+ posn size -1)))))
 
 (define-vop (dpb-c/fixnum)
-  (:translate %%dpb)
+  (:translate %dpb)
   (:args (x :scs (signed-reg) :to :save)
          (y :scs (any-reg)))
   (:arg-types signed-num
@@ -971,7 +949,7 @@
     (inst bfm res x (- (1- n-word-bits) posn) (1- size))))
 
 (define-vop (dpb-c/signed)
-  (:translate %%dpb)
+  (:translate %dpb)
   (:args (x :scs (signed-reg) :to :save)
          (y :scs (signed-reg)))
   (:arg-types signed-num
@@ -988,7 +966,7 @@
                         (- n-word-bits posn)) (1- size))))
 
 (define-vop (dpb-c/unsigned)
-  (:translate %%dpb)
+  (:translate %dpb)
   (:args (x :scs (unsigned-reg) :to :save)
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num
@@ -1279,19 +1257,12 @@
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
 
-(defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable always-translatable))
-
-;;; For constant folding
-(defun %logbitp (integer index)
-  (logbitp index integer))
-
 (define-vop ()
-  (:translate %logbitp)
+  (:translate logbitp)
   (:policy :fast-safe)
   (:args (x :scs (any-reg signed-reg unsigned-reg)))
   (:info y)
-  (:arg-types (:or tagged-num signed-num unsigned-num) (:constant (mod #.n-word-bits)))
+  (:arg-types (:constant (mod #.n-word-bits)) (:or tagged-num signed-num unsigned-num))
   (:conditional :ne)
   (:generator 2
     (inst tst x (ash 1 (min (if (sc-is x any-reg)

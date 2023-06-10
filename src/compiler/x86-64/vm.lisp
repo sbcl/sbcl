@@ -610,7 +610,7 @@
        (if (or
             (valid-funtype '((mod 64) word) '*)
             (valid-funtype '((mod 64) signed-word) '*))
-           (values :transform '(lambda (index integer) (%logbitp index integer)))
+           (values :direct nil)
            (values :default nil)))
       (truncate
        (destructuring-bind (n &optional d) (sb-c::basic-combination-args node)
