@@ -641,3 +641,7 @@
     ;; By design they are also (i.e. must be) nonvolatile aross C call.
     (aver (not (logbitp 12 locs)))
     #-gs-seg (aver (not (logbitp 13 locs)))))
+
+#+sb-xc-host
+(setq *backend-cross-foldable-predicates*
+      '(power-of-two-p))
