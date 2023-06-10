@@ -1166,4 +1166,6 @@
     (test `(truncate (the fixnum a) (the (integer 0 20) b))
           '(integer -19 19))
     (test `(truncate (the (unsigned-byte 32) a) (the (integer 0 20) b))
-          '(integer 0 19))))
+          '(integer 0 19))
+    (test `(truncate (the (signed-byte 32) a) (the (unsigned-byte 32) b))
+          '(signed-byte 32))))

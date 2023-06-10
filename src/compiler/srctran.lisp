@@ -1097,6 +1097,13 @@
          (if (consp high)
              (<= (car high) n)
              (< high n)))))
+
+(defun interval>n (interval n)
+  (let ((low (interval-low interval)))
+    (and low
+         (if (consp low)
+             (> (car low) n)
+             (>= low n)))))
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -1957,7 +1964,7 @@
          ((and (eq (interval-range-info num) '-)
                (numberp (interval-low num))
                (or (not (interval-low rem))
-                   (interval<n rem (interval-low num))))
+                   (not (interval>n rem (interval-low num)))))
           (setf (interval-low rem) (interval-low num)))
          ((numberp (interval-low rem))
           ;; The remainder never contains the lower bound.
@@ -2046,7 +2053,7 @@
        (cond ((and (eq (interval-range-info num) '-)
                    (numberp (interval-low num))
                    (or (not (interval-low rem))
-                       (interval<n rem (interval-low num))))
+                       (not (interval>n rem (interval-low num)))))
               (setf (interval-low rem) (interval-low num)))
              ((and (numberp (interval-low rem))
                    (not (zerop (interval-low rem))))

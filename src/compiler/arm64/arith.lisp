@@ -387,7 +387,7 @@
   (:note "inline (unsigned-byte 64) arithmetic")
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 33
+  (:generator 34
     (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
       (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
