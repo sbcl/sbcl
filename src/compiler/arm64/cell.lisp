@@ -33,8 +33,8 @@
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg))
-         (old :scs (descriptor-reg any-reg))
-         (new :scs (descriptor-reg any-reg)))
+         (old :scs (descriptor-reg any-reg zero))
+         (new :scs (descriptor-reg any-reg zero)))
   (:info name offset lowtag)
   (:ignore name)
   (:temporary (:sc non-descriptor-reg) lip)
@@ -247,8 +247,8 @@
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
   (:args (symbol :scs (descriptor-reg))
-         (old :scs (descriptor-reg any-reg))
-         (new :scs (descriptor-reg any-reg)))
+         (old :scs (descriptor-reg any-reg zero))
+         (new :scs (descriptor-reg any-reg zero)))
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   #+sb-thread
   (:temporary (:sc any-reg) tls-index)

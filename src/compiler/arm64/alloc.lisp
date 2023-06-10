@@ -112,7 +112,7 @@
 ;;; The compiler likes to be able to directly make value cells.
 ;;;
 (define-vop (make-value-cell)
-  (:args (value :to :save :scs (descriptor-reg any-reg)))
+  (:args (value :to :save :scs (descriptor-reg any-reg zero)))
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
@@ -148,7 +148,7 @@
                             :stack-allocate-p stack-allocate-p))))
 
 (define-vop (var-alloc)
-  (:args (extra :scs (any-reg)))
+  (:args (extra :scs (any-reg) :target bytes))
   (:arg-types positive-fixnum)
   (:info name words type lowtag stack-allocate-p)
   (:ignore name stack-allocate-p)
@@ -160,7 +160,9 @@
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
     (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))
-    (inst add bytes bytes (add-sub-immediate (* (1- words) n-word-bytes)))
+    (let ((words (add-sub-immediate (* (1- words) n-word-bytes))))
+      (unless (eql words 0)
+        (inst add bytes bytes words)))
     (inst lsl header bytes (- (length-field-shift type) word-shift))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
