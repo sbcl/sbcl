@@ -1151,7 +1151,7 @@
       (the (unsigned-byte 64) (+ (the (or null (unsigned-byte 64)) u) (the fixnum s))))
    ((1 2) 3)))
 
-(with-test (:name :truncate-rem-derive-type)
+(with-test (:name :rem-derive-type)
   (flet ((test (form type)
            (assert
             (type-specifiers-equal
@@ -1159,13 +1159,15 @@
               (sb-kernel:%simple-fun-type
                (checked-compile
                 `(lambda (a b)
-                   (nth-value 1 ,form)))))
+                   ,form))))
              `(values ,type &optional)))))
-    (test `(truncate (the fixnum a) (the integer b))
+    (test `(rem (the fixnum a) (the integer b))
           'fixnum)
-    (test `(truncate (the fixnum a) (the (integer 0 20) b))
+    (test `(rem (the fixnum a) (the (integer 0 20) b))
           '(integer -19 19))
-    (test `(truncate (the (unsigned-byte 32) a) (the (integer 0 20) b))
+    (test `(rem (the (unsigned-byte 32) a) (the (integer 0 20) b))
           '(integer 0 19))
-    (test `(truncate (the (signed-byte 32) a) (the (unsigned-byte 32) b))
-          '(signed-byte 32))))
+    (test `(rem (the (signed-byte 32) a) (the (unsigned-byte 32) b))
+          '(signed-byte 32))
+    (test `(rem (the (signed-byte 8) a) (the (unsigned-byte 7) b))
+          '(integer -126 126))))

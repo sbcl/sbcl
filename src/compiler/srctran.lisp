@@ -685,13 +685,13 @@
 
 ;;; See whether the interval X contains the number P, taking into
 ;;; account that the interval might not be closed.
-(defun interval-contains-p (p x)
+(defun interval-contains-p (p interval)
   (declare (type number p)
-           (type interval x))
-  ;; Does the interval X contain the number P?  This would be a lot
+           (type interval interval))
+  ;; Does the interval INTERVAL contain the number P?  This would be a lot
   ;; easier if all intervals were closed!
-  (let ((lo (interval-low x))
-        (hi (interval-high x)))
+  (let ((lo (interval-low interval))
+        (hi (interval-high interval)))
     (cond ((and lo hi)
            ;; The interval is bounded
            (if (and (sb-xc:<= (type-bound-number lo) p)
@@ -1097,13 +1097,6 @@
          (if (consp high)
              (<= (car high) n)
              (< high n)))))
-
-(defun interval>n (interval n)
-  (let ((low (interval-low interval)))
-    (and low
-         (if (consp low)
-             (> (car low) n)
-             (>= low n)))))
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -1945,30 +1938,31 @@
      ;; The divisor is always positive.
      (let ((rem (interval-abs div)))
        (setf (interval-low rem) 0)
-       (cond ((and (eq (interval-range-info num) '+)
-                   (numberp (interval-high num))
-                   (or (not (interval-high rem))
-                       (not (interval<n rem (interval-high num)))))
-              (setf (interval-high rem) (interval-high num)))
-             ((and (numberp (interval-high rem))
-                   (not (zerop (interval-high rem))))
-              ;; The remainder never contains the upper bound. However,
-              ;; watch out for the case where the high limit is zero!
-              (setf (interval-high rem) (list (interval-high rem)))))
+       (when (and (numberp (interval-high rem))
+                  (not (zerop (interval-high rem))))
+         ;; The remainder never contains the upper bound. However,
+         ;; watch out for the case where the high limit is zero!
+         (setf (interval-high rem) (list (interval-high rem))))
+       ;; The remainder can't be greater than the number
+       ;; if it's getting truncated towards zero.
+       (when (and (eq (interval-range-info num) '+)
+                  (numberp (interval-high num))
+                  (interval-contains-p (interval-high num) rem))
+         (setf (interval-high rem) (interval-high num)))
        rem))
     (-
      ;; The divisor is always negative.
      (let ((rem (interval-neg (interval-abs div))))
        (setf (interval-high rem) 0)
-       (cond
-         ((and (eq (interval-range-info num) '-)
-               (numberp (interval-low num))
-               (or (not (interval-low rem))
-                   (not (interval>n rem (interval-low num)))))
-          (setf (interval-low rem) (interval-low num)))
-         ((numberp (interval-low rem))
-          ;; The remainder never contains the lower bound.
-          (setf (interval-low rem) (list (interval-low rem)))))
+       (when (numberp (interval-low rem))
+         ;; The remainder never contains the lower bound.
+         (setf (interval-low rem) (list (interval-low rem))))
+       ;; The remainder can't be greater than the number
+       ;; if it's getting truncated towards zero.
+       (when (and (eq (interval-range-info num) '-)
+                  (numberp (interval-low num))
+                  (interval-contains-p (interval-low num) rem))
+         (setf (interval-low rem) (interval-low num)))
        rem))
     (otherwise
      ;; The divisor can be positive or negative. All bets off. The
@@ -2050,30 +2044,32 @@
      ;; Divisor is always positive. The remainder is negative.
      (let ((rem (interval-neg (interval-abs div))))
        (setf (interval-high rem) 0)
-       (cond ((and (eq (interval-range-info num) '-)
-                   (numberp (interval-low num))
-                   (or (not (interval-low rem))
-                       (not (interval>n rem (interval-low num)))))
-              (setf (interval-low rem) (interval-low num)))
-             ((and (numberp (interval-low rem))
-                   (not (zerop (interval-low rem))))
-              ;; The remainder never contains the upper bound. However,
-              ;; watch out for the case when the upper bound is zero!
-              (setf (interval-low rem) (list (interval-low rem)))))
+       (when (and (numberp (interval-low rem))
+                  (not (zerop (interval-low rem))))
+         ;; The remainder never contains the upper bound. However,
+         ;; watch out for the case when the upper bound is zero!
+         (setf (interval-low rem) (list (interval-low rem))))
+       ;; The remainder can't be greater than the number
+       ;; if it's getting truncated towards zero.
+       (when (and (eq (interval-range-info num) '-)
+                  (numberp (interval-low num))
+                  (interval-contains-p (interval-low num) rem))
+         (setf (interval-low rem) (interval-low num)))
        rem))
     (-
      (let ((rem (interval-abs div)))
        ;; Divisor is always negative. The remainder is positive
        (setf (interval-low rem) 0)
-       (cond ((and (eq (interval-range-info num) '+)
-                   (numberp (interval-high num))
-                   (or (not (interval-high rem))
-                       (not (interval<n rem (interval-high num)))))
-              (setf (interval-high rem) (interval-high num)))
-             ((numberp (interval-high rem))
-              ;; The remainder never contains the lower bound.
-              (setf (interval-high rem)
-                    (list (interval-high rem)))))
+       (when (numberp (interval-high rem))
+         ;; The remainder never contains the lower bound.
+         (setf (interval-high rem)
+               (list (interval-high rem))))
+       ;; The remainder can't be greater than the number
+       ;; if it's getting truncated towards zero.
+       (when (and (eq (interval-range-info num) '+)
+                  (numberp (interval-high num))
+                  (interval-contains-p (interval-high num) rem))
+         (setf (interval-high rem) (interval-high num)))
        rem))
     (otherwise
      ;; The divisor can be positive or negative. All bets off. The
