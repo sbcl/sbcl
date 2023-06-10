@@ -3313,7 +3313,7 @@
              (values (1- sb-vm:n-word-bits)
                      (expt 2 (1- sb-vm:n-word-bits))))
          ;; Division by zero, one or powers of two is handled elsewhere.
-         (when (or (zerop (logand y (1- y)))
+         (when (or (zerop (logand abs-y (1- abs-y)))
                    ;; Leave it for the unsigned transform
                    (and (plusp y)
                         (not (types-equal-or-intersect x-type

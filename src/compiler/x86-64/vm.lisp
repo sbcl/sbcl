@@ -612,6 +612,15 @@
             (valid-funtype '((mod 64) signed-word) '*))
            (values :transform '(lambda (index integer) (%logbitp index integer)))
            (values :default nil)))
+      (truncate
+       (destructuring-bind (n &optional d) (sb-c::basic-combination-args node)
+         (if (and d
+                  (constant-lvar-p d)
+                  (power-of-two-p (lvar-value d))
+                  (and (csubtypep (sb-c::lvar-type n) (specifier-type 'signed-word))
+                       (not (csubtypep (sb-c::lvar-type n) (specifier-type 'word)))))
+             (values :direct nil)
+             (values :default nil))))
       (t
        (values :default nil)))))
 
