@@ -569,7 +569,7 @@ information."
                      escaped)))))
 
 (defun frame-args-as-list (frame limit)
-  (declare (unsigned-byte limit))
+  (declare (type frame frame) (type (and unsigned-byte fixnum) limit))
   ;;; All args are available if the function has not proceeded beyond its external
   ;;; entry point, so every imcoming value is in its argument-passing location.
   (when (sb-di::all-args-available-p frame)
