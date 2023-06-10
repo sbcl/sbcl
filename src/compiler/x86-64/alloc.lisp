@@ -358,25 +358,50 @@
   (:args (car :scs (any-reg descriptor-reg constant immediate))
          (cdr :scs (any-reg descriptor-reg constant immediate)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
-  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0)
+               :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
+              temp)
   (:results (result :scs (descriptor-reg)))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:vop-var vop)
   (:node-var node)
   (:generator 10
-    (let ((stack-allocate-p (node-stack-allocate-p node))
-          (nbytes (* cons-size n-word-bytes))
-          (prev-constant temp)) ;; a non-eq initial value
-      (unless stack-allocate-p
-        (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-        (if stack-allocate-p
-            (stack-allocation nbytes 0 alloc)
-            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn))
-        (store-slot car alloc cons-car-slot 0)
-        (store-slot cdr alloc cons-cdr-slot 0)
-        (if (location= alloc result)
-            (inst or :byte alloc list-pointer-lowtag)
-            (inst lea result (ea list-pointer-lowtag alloc)))))))
+    (cond
+      ((node-stack-allocate-p node)
+       (inst and rsp-tn (lognot lowtag-mask))
+       (cond ((and (sc-is car immediate) (sc-is cdr immediate)
+                   (typep (encode-value-if-immediate car) '(signed-byte 8))
+                   (typep (encode-value-if-immediate cdr) '(signed-byte 8)))
+              ;; (CONS 0 0) takes just 4 bytes to encode the PUSHes (for example)
+              (inst push (encode-value-if-immediate cdr))
+              (inst push (encode-value-if-immediate car)))
+             ((and (sc-is car immediate) (sc-is cdr immediate)
+                   (eql (encode-value-if-immediate car) (encode-value-if-immediate cdr)))
+              (inst mov alloc (encode-value-if-immediate cdr))
+              (inst push alloc)
+              (inst push alloc))
+             (t
+              (dolist (item (list cdr car))
+                (inst push
+                      (sc-case item
+                       (constant item)
+                       (immediate
+                        (let ((bits (encode-value-if-immediate item)))
+                          (or (plausible-signed-imm32-operand-p bits)
+                              (progn (inst mov alloc bits) alloc))))
+                       (t item))))))
+       (inst lea result (ea list-pointer-lowtag rsp-tn)))
+      (t
+       (let ((nbytes (* cons-size n-word-bytes))
+             (prev-constant temp)) ;; a non-eq initial value
+         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
+         (pseudo-atomic (:thread-tn thread-tn)
+           (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           (store-slot car alloc cons-car-slot 0)
+           (store-slot cdr alloc cons-cdr-slot 0)
+           (if (location= alloc result)
+               (inst or :byte alloc list-pointer-lowtag)
+               (inst lea result (ea list-pointer-lowtag alloc)))))))))
 
 (define-vop (acons)
   (:args (key :scs (any-reg descriptor-reg constant immediate))
