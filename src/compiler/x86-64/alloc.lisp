@@ -321,6 +321,13 @@
       (when init
         (funcall init)))))
 
+(defun list-ctor-push-elt (x scratch)
+  (inst push (if (sc-is x immediate)
+                 (let ((bits (encode-value-if-immediate x)))
+                   (or (plausible-signed-imm32-operand-p bits)
+                       (progn (inst mov scratch bits) scratch)))
+                 x)))
+
 ;;;; CONS, ACONS, LIST and LIST*
 (macrolet ((pop-arg (ref)
              `(prog1 (tn-ref-tn ,ref) (setf ,ref (tn-ref-across ,ref))))
@@ -355,8 +362,8 @@
                   (setf prev-constant immediate-value)))))
 
 (define-vop (cons)
-  (:args (car :scs (any-reg descriptor-reg constant immediate))
-         (cdr :scs (any-reg descriptor-reg constant immediate)))
+  (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
+         (cdr :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
   (:temporary (:sc unsigned-reg :to (:result 0)
                :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
@@ -381,15 +388,8 @@
               (inst push alloc)
               (inst push alloc))
              (t
-              (dolist (item (list cdr car))
-                (inst push
-                      (sc-case item
-                       (constant item)
-                       (immediate
-                        (let ((bits (encode-value-if-immediate item)))
-                          (or (plausible-signed-imm32-operand-p bits)
-                              (progn (inst mov alloc bits) alloc))))
-                       (t item))))))
+              (list-ctor-push-elt cdr alloc)
+              (list-ctor-push-elt car alloc)))
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size n-word-bytes))
@@ -404,9 +404,9 @@
                (inst lea result (ea list-pointer-lowtag alloc)))))))))
 
 (define-vop (acons)
-  (:args (key :scs (any-reg descriptor-reg constant immediate))
-         (val :scs (any-reg descriptor-reg constant immediate))
-         (tail :scs (any-reg descriptor-reg constant immediate)))
+  (:args (key :scs (any-reg descriptor-reg constant immediate control-stack))
+         (val :scs (any-reg descriptor-reg constant immediate control-stack))
+         (tail :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0)) alloc)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) temp)
   (:results (result :scs (descriptor-reg)))
@@ -436,32 +436,41 @@
 ;;; CONS-2 is similar to ACONS, except that instead of producing
 ;;;  ((X . Y) . Z) it produces (X Y . Z)
 (define-vop (cons-2)
-  (:args (car :scs (any-reg descriptor-reg constant immediate))
-         (cadr :scs (any-reg descriptor-reg constant immediate))
-         (cddr :scs (any-reg descriptor-reg constant immediate)))
+  (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
+         (cadr :scs (any-reg descriptor-reg constant immediate control-stack))
+         (cddr :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
-  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0)
+               :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
+              temp)
   (:results (result :scs (descriptor-reg)))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:vop-var vop)
   (:node-var node)
   (:generator 10
-    (let ((stack-allocate-p (node-stack-allocate-p node))
-          (nbytes (* cons-size 2 n-word-bytes))
-          (prev-constant temp))
-      (unless stack-allocate-p
-        (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-        (if stack-allocate-p
-            (stack-allocation nbytes 0 alloc)
-            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn))
-        (store-slot car alloc cons-car-slot 0)
-        (store-slot cadr alloc (+ 2 cons-car-slot) 0)
-        (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
-        (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
-        (store-slot temp alloc cons-cdr-slot 0)
-        (if (location= alloc result)
-            (inst or :byte alloc list-pointer-lowtag)
-            (inst lea result (ea list-pointer-lowtag alloc)))))))
+    (cond
+      ((node-stack-allocate-p node)
+       (inst and rsp-tn (lognot lowtag-mask))
+       (list-ctor-push-elt cddr alloc)
+       (list-ctor-push-elt cadr alloc)
+       (inst lea alloc (ea list-pointer-lowtag rsp-tn))
+       (inst push alloc) ; cdr of the first cons
+       (list-ctor-push-elt car alloc)
+       (inst lea result (ea list-pointer-lowtag rsp-tn)))
+      (t
+       (let ((nbytes (* cons-size 2 n-word-bytes))
+             (prev-constant temp))
+         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
+         (pseudo-atomic (:thread-tn thread-tn)
+           (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           (store-slot car alloc cons-car-slot 0)
+           (store-slot cadr alloc (+ 2 cons-car-slot) 0)
+           (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
+           (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
+           (store-slot temp alloc cons-cdr-slot 0)
+           (if (location= alloc result)
+               (inst or :byte alloc list-pointer-lowtag)
+               (inst lea result (ea list-pointer-lowtag alloc)))))))))
 
 (define-vop (list)
   (:args (things :more t :scs (descriptor-reg any-reg constant immediate)))
