@@ -340,9 +340,9 @@ x:
 
 	/* Call out to obtain our TLS block. */
 	load(reg_NL0,CSYMBOL(current_thread))
-#ifdef LISP_FEATURE_DARWIN /* FIXME: should it be lis/ori or lis/addi? */
-	lis reg_CFUNC,hi16(CSYMBOL(pthread_getspecific))
-	ori reg_CFUNC,reg_CFUNC,lo16(CSYMBOL(pthread_getspecific))
+#ifdef LISP_FEATURE_DARWIN
+	lis reg_CFUNC,hi16(CSYMBOL(arch_os_thread_getspecific))
+	ori reg_CFUNC,reg_CFUNC,lo16(CSYMBOL(arch_os_thread_getspecific))
 #else
  	lis reg_CFUNC,CSYMBOL(pthread_getspecific)@h
  	ori reg_CFUNC,reg_CFUNC,CSYMBOL(pthread_getspecific)@l
