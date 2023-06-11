@@ -42,6 +42,10 @@ extern int arch_os_thread_init(struct thread *thread);
 #if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
 extern void arch_os_load_ldt(struct thread *thread);
 #endif
+#if defined(LISP_FEATURE_PPC) && defined(LISP_FEATURE_SB_THREAD)
+/* pthread_key_t is always unsigned long on PPC/Darwin */
+extern void *arch_os_thread_getspecific(unsigned long key);
+#endif
 extern int arch_os_thread_cleanup(struct thread *thread);
 
 extern lispobj funcall0(lispobj function);
