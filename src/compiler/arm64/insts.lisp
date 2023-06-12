@@ -3735,6 +3735,9 @@
         (delete-stmt stmt)
         next))))
 
+;;; Fused multiply-accumulate will give different results as it
+;;; performs a single rounding.
+#+(or)
 (defpattern "fmul + fsub -> fmsub" ((fmul) (fsub)) (stmt next)
   (destructuring-bind (dst1 srcn1 srcm1) (stmt-operands stmt)
     (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
