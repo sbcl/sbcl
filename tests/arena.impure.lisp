@@ -149,6 +149,24 @@
   (let ((finder-result (c-find-heap->arena)))
     (assert (null finder-result))))
 
+(defun decode-all-debug-data ()
+  (dolist (code (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+    (let ((info (sb-kernel:%code-debug-info code)))
+      (when (typep info 'sb-c::compiled-debug-info)
+        (do ((cdf (sb-c::compiled-debug-info-fun-map info)
+                  (sb-c::compiled-debug-fun-next cdf)))
+            ((null cdf))
+          (test-util:opaque-identity
+           (sb-di::debug-fun-lambda-list
+            (sb-di::make-compiled-debug-fun cdf code))))))))
+
+(test-util:with-test (:name :debug-data-force-to-heap)
+  (let ((a (sb-vm:new-arena (* 1024 1024 1024))))
+    (sb-vm:with-arena (a)
+      (decode-all-debug-data))
+    (assert (null (sb-vm:c-find-heap->arena a)))
+    (sb-vm:destroy-arena a)))
+
 (defun test-with-open-file ()
   ;; Force allocation of a new BUFFER containing a new SAP,
   ;; and thereby a new finalizer (a closure) so that the test can

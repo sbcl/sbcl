@@ -1661,7 +1661,7 @@ register."
       ((not args)
        (values nil nil))
       ((eq args :minimal)
-       (values (coerce (debug-fun-debug-vars debug-fun) 'list)
+       (values (ensure-heap-list (coerce (debug-fun-debug-vars debug-fun) 'list))
                t))
       (t
        (values (parse-compiled-debug-fun-lambda-list/args-available
