@@ -1678,7 +1678,7 @@
                                                (values-type-p result-type))
                                            (not (type-single-value-p result-type)))))
                     (if (or (not y)
-                            (and (constant-lvar-p y) (= 1 (lvar-value y))))
+                            (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))
                         (if compute-all
                             `(unary-truncate x)
                             `(let ((res (,',unary x)))

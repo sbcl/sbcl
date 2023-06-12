@@ -179,7 +179,8 @@
                  (the (rational (1) (2)) y)))
    ((0 3/2) (values 0 0))))
 
-(with-test (:name :float-quotient-rounding-errors)
+(with-test (:name :float-quotient-rounding-errors
+            :skipped-on :x86) ;; x87 has different precision loss
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (floor -114658225103614 84619.58))

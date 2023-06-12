@@ -386,17 +386,144 @@
   (declare (type word x y))
   (%multiply-high x y))
 
+;; (defun floor (number &optional (divisor 1))
+;;   "Return the greatest integer not greater than number, or number/divisor.
+;;   The second returned value is (mod number divisor)."
+;;   (declare (explicit-check))
+;;   (floor number divisor))
+
+;; (defun ceiling (number &optional (divisor 1))
+;;   "Return the smallest integer not less than number, or number/divisor.
+;;   The second returned value is the remainder."
+;;   (declare (explicit-check))
+;;   (ceiling number divisor))
+
 (defun floor (number &optional (divisor 1))
   "Return the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
   (declare (explicit-check))
-  (floor number divisor))
+  (macrolet ((truncate-float (rtype)
+               `(floor (coerce number ',rtype) (coerce divisor ',rtype)))
+             (single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1)))))))
+             (fixup (form)
+               `(multiple-value-bind (tru rem) ,form
+                  (if (if (minusp divisor)
+                          (> rem 0)
+                          (< rem 0))
+                      (values (1- tru) (+ rem divisor))
+                      (values tru rem)))))
+    (number-dispatch ((number real) (divisor real))
+      ((fixnum fixnum) (floor number divisor))
+      (((foreach fixnum bignum) ratio)
+       (multiple-value-bind (quot rem)
+           (truncate (* number (denominator divisor))
+                     (numerator divisor))
+         (fixup (values quot (/ rem (denominator divisor))))))
+      ((fixnum bignum)
+       (fixup
+        (if (single-digit-bignum-p divisor)
+            (bignum-truncate-single-digit (make-small-bignum number) divisor)
+            (bignum-truncate (make-small-bignum number) divisor))))
+      ((ratio (or float rational))
+       (let ((q (truncate (numerator number)
+                          (* (denominator number) divisor))))
+         (fixup (values q (- number (* q divisor))))))
+      ((bignum fixnum)
+       (fixup (bignum-truncate-single-digit number divisor)))
+      ((bignum bignum)
+       (fixup (if (single-digit-bignum-p divisor)
+                  (bignum-truncate-single-digit number divisor)
+                  (bignum-truncate number divisor))))
+      (((foreach single-float double-float #+long-float long-float)
+        (or rational single-float))
+       (truncate-float (dispatch-type number)))
+      #+long-float
+      ((long-float (or single-float double-float long-float))
+       (truncate-float long-float))
+      #+long-float
+      (((foreach double-float single-float) long-float)
+       (truncate-float long-float))
+      ((double-float (or single-float double-float))
+       (truncate-float double-float))
+      ((single-float double-float)
+       (truncate-float double-float))
+      (((foreach fixnum bignum ratio)
+        (foreach single-float double-float #+long-float long-float))
+       (truncate-float (dispatch-type divisor))))))
 
 (defun ceiling (number &optional (divisor 1))
-  "Return the smallest integer not less than number, or number/divisor.
+  "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
   (declare (explicit-check))
-  (ceiling number divisor))
+  (macrolet ((truncate-float (rtype)
+               `(ceiling (coerce number ',rtype) (coerce divisor ',rtype)))
+             (single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1)))))))
+             (fixup (form)
+               `(multiple-value-bind (tru rem) ,form
+                  (if (if (minusp divisor)
+                          (< rem 0)
+                          (> rem 0))
+                      (values (+ tru 1) (- rem divisor))
+                      (values tru rem)))))
+    (number-dispatch ((number real) (divisor real))
+      ((fixnum fixnum) (ceiling number divisor))
+      (((foreach fixnum bignum) ratio)
+       (multiple-value-bind (quot rem)
+           (truncate (* number (denominator divisor))
+                     (numerator divisor))
+         (fixup (values quot (/ rem (denominator divisor))))))
+      ((fixnum bignum)
+       (fixup
+        (if (single-digit-bignum-p divisor)
+            (bignum-truncate-single-digit (make-small-bignum number) divisor)
+            (bignum-truncate (make-small-bignum number) divisor))))
+      ((ratio (or float rational))
+       (let ((q (truncate (numerator number)
+                          (* (denominator number) divisor))))
+         (fixup (values q (- number (* q divisor))))))
+      ((bignum fixnum)
+       (fixup (bignum-truncate-single-digit number divisor)))
+      ((bignum bignum)
+       (fixup
+        (if (single-digit-bignum-p divisor)
+            (bignum-truncate-single-digit number divisor)
+            (bignum-truncate number divisor))))
+      (((foreach single-float double-float #+long-float long-float)
+        (or rational single-float))
+       (truncate-float (dispatch-type number)))
+      #+long-float
+      ((long-float (or single-float double-float long-float))
+       (truncate-float long-float))
+      #+long-float
+      (((foreach double-float single-float) long-float)
+       (truncate-float long-float))
+      ((double-float (or single-float double-float))
+       (truncate-float double-float))
+      ((single-float double-float)
+       (truncate-float double-float))
+      (((foreach fixnum bignum ratio)
+        (foreach single-float double-float #+long-float long-float))
+        (truncate-float (dispatch-type divisor))))))
 
 (defun rem (number divisor)
   "Return second result of TRUNCATE."
