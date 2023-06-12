@@ -628,9 +628,9 @@ case "$sbcl_os" in
         ;;
     darwin)
         printf ' :unix :bsd :darwin :mach-o' >> $ltf
+        darwin_version=`uname -r`
+        darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
         if [ $sbcl_arch = "x86-64" ]; then
-            darwin_version=`uname -r`
-            darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
 
             if (( 8 < $darwin_version_major )); then
 	        printf ' :inode64' >> $ltf
@@ -638,6 +638,9 @@ case "$sbcl_os" in
         fi
         if [ $sbcl_arch = "arm64" ]; then
             printf ' :darwin-jit :gcc-tls' >> $ltf
+            if (( 20 < $darwin_version_major )); then
+	        printf ' :sb-futex' >> $ltf
+            fi
         fi
         if $android; then
             echo "Android build is unsupported on darwin"
