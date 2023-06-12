@@ -1206,16 +1206,25 @@
   (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
+           (unboxed-return (let ((info (combination-fun-info node)))
+                             (and info
+                                  (ir1-attributep (fun-info-attributes info) unboxed-return))))
            (locs (and lvar
-                      (loop for loc in (ir2-lvar-locs (lvar-info lvar))
-                            for i from 0
-                            collect (cond ((eql (tn-kind loc) :unused)
-                                           loc)
-                                          #+(or x86-64 arm64) ;; needs default-unknown-values support
-                                          ((>= i sb-vm::register-arg-count)
-                                           (make-normal-tn *backend-t-primitive-type*))
-                                          (t
-                                           (standard-arg-location i))))))
+                      (if unboxed-return
+                          (let ((state (sb-vm::make-fixed-call-args-state))
+                                (returns (fun-type-returns (info :function :type
+                                                                 (combination-fun-source-name node)))))
+                            (loop for type in (values-type-required returns)
+                                  collect (sb-vm::fixed-call-arg-location type state)))
+                          (loop for loc in (ir2-lvar-locs (lvar-info lvar))
+                                for i from 0
+                                collect (cond ((eql (tn-kind loc) :unused)
+                                               loc)
+                                              #+(or x86-64 arm64) ;; needs default-unknown-values support
+                                              ((>= i sb-vm::register-arg-count)
+                                               (make-normal-tn *backend-t-primitive-type*))
+                                              (t
+                                               (standard-arg-location i)))))))
            (loc-refs (reference-tn-list locs t))
            (nvals (length locs))
            (fun-lvar (basic-combination-fun node))
@@ -1224,7 +1233,20 @@
                       (list nargs))))
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block fun-lvar)
-        (cond ((not named)
+        (cond (unboxed-return
+               (when-vop-existsp (:named sb-vm::unboxed-call-named)
+                 (if fixed-args-p
+                     (vop* sb-vm::fixed-unboxed-call-named node block
+                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (loc-refs)
+                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           (emit-step-p node))
+                     (vop* sb-vm::unboxed-call-named node block
+                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (loc-refs)
+                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           (emit-step-p node)))))
+              ((not named)
                (vop* call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs nvals (emit-step-p node)
                      #+call-symbol
@@ -1601,35 +1623,36 @@
          (return-pc (ir2-environment-return-pc env))
          (returns (tail-set-info (lambda-tail-set fun))))
     (cond
-     ((and (eq (return-info-kind returns) :fixed)
-           (not (xep-p fun)))
-      (let ((locs (lvar-tns node block lvar
-                                    (return-info-primitive-types returns))))
-        (vop* known-return node block
-              (old-fp return-pc (reference-tn-list locs nil))
-              (nil)
-              (return-info-locations returns))))
-     ((eq lvar-kind :fixed)
-      (let* ((types (mapcar #'tn-primitive-type (ir2-lvar-locs 2lvar)))
-             (lvar-locs (lvar-tns node block lvar types))
-             (nvals (length lvar-locs))
-             (locs (make-standard-value-tns nvals)))
-        (mapc (lambda (val loc)
-                (emit-move node block val loc))
-              lvar-locs
-              locs)
-        (if (= nvals 1)
-            (vop return-single node block old-fp return-pc (car locs))
-            (vop* return node block
-                  (old-fp return-pc (reference-tn-list locs nil))
-                  (nil)
-                  nvals))))
-     (t
-      (aver (eq lvar-kind :unknown))
-      (vop* return-multiple node block
-            (old-fp return-pc
-                    (reference-tn-list (ir2-lvar-locs 2lvar) nil))
-            (nil)))))
+      ((or (eq (return-info-kind returns) :unboxed)
+           (and (eq (return-info-kind returns) :fixed)
+                (not (xep-p fun))))
+       (let ((locs (lvar-tns node block lvar
+                             (return-info-primitive-types returns))))
+         (vop* known-return node block
+               (old-fp return-pc (reference-tn-list locs nil))
+               (nil)
+               (return-info-locations returns))))
+      ((eq lvar-kind :fixed)
+       (let* ((types (mapcar #'tn-primitive-type (ir2-lvar-locs 2lvar)))
+              (lvar-locs (lvar-tns node block lvar types))
+              (nvals (length lvar-locs))
+              (locs (make-standard-value-tns nvals)))
+         (mapc (lambda (val loc)
+                 (emit-move node block val loc))
+               lvar-locs
+               locs)
+         (if (= nvals 1)
+             (vop return-single node block old-fp return-pc (car locs))
+             (vop* return node block
+                   (old-fp return-pc (reference-tn-list locs nil))
+                   (nil)
+                   nvals))))
+      (t
+       (aver (eq lvar-kind :unknown))
+       (vop* return-multiple node block
+             (old-fp return-pc
+                     (reference-tn-list (ir2-lvar-locs 2lvar) nil))
+             (nil)))))
 
   (values))
 

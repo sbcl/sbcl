@@ -448,7 +448,7 @@
   ;; The return convention used:
   ;; -- If :UNKNOWN, we use the standard return convention.
   ;; -- If :FIXED, we use the known-values convention.
-  (kind (missing-arg) :type (member :fixed :unknown))
+  (kind (missing-arg) :type (member :fixed :unknown :unboxed))
   ;; the number of values returned, or :UNKNOWN if we don't know.
   ;; COUNT may be known when KIND is :UNKNOWN, since we may choose the
   ;; standard return convention for other reasons.

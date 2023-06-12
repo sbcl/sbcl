@@ -197,9 +197,15 @@
 (defun flush-full-call-tail-transfer (call)
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
-                    (lambda-tail-set (node-home-lambda call)))))
+                    (lambda-tail-set (node-home-lambda call))))
+        (unboxed-return (let ((info (basic-combination-fun-info call)))
+                          (and info
+                               (ir1-attributep (fun-info-attributes info) unboxed-return)))))
     (cond ((not tails))
-          ((eq (return-info-kind (tail-set-info tails)) :unknown)
+          ((eq (return-info-kind (tail-set-info tails))
+               (if unboxed-return
+                   :unboxed
+                   :unknown))
            (ir2-change-node-successor call
                                       (component-tail (block-component (node-block call)))))
           (t

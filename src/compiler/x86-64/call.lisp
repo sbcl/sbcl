@@ -613,7 +613,7 @@
                    `((args :more t ,@(unless (eq args :fixed)
                                        '(:scs (descriptor-reg control-stack)))))))
 
-               ,@(when (eq return :fixed)
+               ,@(when (memq return '(:fixed :unboxed))
                    '((:results (values :more t))))
 
                (:save-p ,(if (eq return :tail) :compute-only t))
@@ -638,8 +638,10 @@
                    '(fun-type)))
 
                (:ignore
-               ,@(unless (or variable (eq return :tail)) '(arg-locs))
-               ,@(unless variable '(args)))
+                ,@(unless (or variable (eq return :tail)) '(arg-locs))
+                ,@(unless variable '(args))
+                ,@(when (eq return :unboxed)
+                    '(values)))
 
                ;; We pass either the fdefn object (for named call) or
                ;; the actual function object (for unnamed call) in
@@ -817,7 +819,7 @@
                     '((note-this-location vop :unknown-return)
                       (receive-unknown-values values-start nvals start count
                                               node)))
-                   (:tail))))))
+                   ((:tail :unboxed)))))))
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
@@ -835,7 +837,10 @@
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t)
   (define-full-call fixed-call-named t :fixed nil :fixed)
-  (define-full-call fixed-tail-call-named t :tail nil :fixed))
+  (define-full-call fixed-tail-call-named t :tail nil :fixed)
+
+  (define-full-call unboxed-call-named t :unboxed nil)
+  (define-full-call fixed-unboxed-call-named t :unboxed nil :fixed))
 
 ;;; Call NAME "directly" meaning in a single JMP or CALL instruction,
 ;;; if possible (without loading RAX)

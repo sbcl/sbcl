@@ -137,7 +137,9 @@
           #-c-stack-is-control-stack *non-descriptor-args*))
 
 (defun fixed-call-arg-location (type state)
-  (let* ((primtype (primitive-type type))
+  (let* ((primtype (if (typep type 'primitive-type)
+                       type
+                       (primitive-type type)))
          (sc (find descriptor-reg-sc-number (sb-c::primitive-type-scs primtype) :test-not #'eql)))
     (case (primitive-type-name primtype)
       ((double-float single-float)

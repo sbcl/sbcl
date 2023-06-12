@@ -1741,7 +1741,10 @@
                            (resolve-key-args args type)
                            args)))
           (args (mapcar #'value lvar-args)))
-     (multiple-value-bind (values win) (careful-call fun-name args)
+     (multiple-value-bind (values win) (careful-call (or (and (combination-fun-info call)
+                                                              (fun-info-folder (combination-fun-info call)))
+                                                         fun-name)
+                                                     args)
        (cond ((not win)
               (setf (combination-kind call) :error
                     (combination-info call)

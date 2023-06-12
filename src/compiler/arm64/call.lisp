@@ -899,7 +899,7 @@
       ,@(unless variable `((args :more t ,@(unless (eq args :fixed)
                                              '(:scs (descriptor-reg control-stack)))))))
 
-     ,@(when (eq return :fixed)
+     ,@(when (memq return '(:fixed :unboxed))
          '((:results (values :more t))))
 
      (:save-p ,(if (eq return :tail) :compute-only t))
@@ -926,6 +926,7 @@
       ,@(unless variable '(args))
       ,@(ecase return
           (:fixed '(ocfp-temp))
+          (:unboxed '(ocfp-temp node values))
           (:tail '(old-fp return-pc node))
           (:unknown '(r0-temp))))
 
@@ -951,137 +952,141 @@
      ,@(when (eq return :fixed)
          '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
            (:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
-
+     ,@(when (eq return :unboxed)
+         '((:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
      ,@(unless (eq return :tail)
          '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
      (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
 
      (:generator ,(+ (if named 5 0)
-                     (if variable 19 1)
-                     (if (eq return :tail) 0 10)
-                     15
-                     (if (eq return :unknown) 25 0))
-                 (let* ((cur-nfp (current-nfp-tn vop))
-                        (filler
-                          (remove nil
-                                  (list ,@(if (eq return :tail)
-                                              '(:load-nargs
-                                                (when cur-nfp
-                                                  :frob-nfp))
-                                              '(:load-nargs
-                                                (when cur-nfp
-                                                  :frob-nfp)
-                                                :load-fp))))))
-                   (flet ((do-next-filler ()
-                            (let* ((next (pop filler))
-                                   (what (if (consp next) (car next) next)))
-                              (ecase what
-                                (:load-nargs
-                                 ,@(if variable
-                                       `((inst sub nargs-pass csp-tn new-fp)
-                                         (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
-                                         ,@(do ((arg *register-arg-names* (cddr arg))
-                                                (i 0 (+ i 2))
-                                                (insts))
-                                               ((null arg) (nreverse insts))
-                                             #.(assert (evenp register-arg-count))
-                                             (push `(inst ldp ,(first arg) ,(second arg)
-                                                          (@ new-fp ,(* i n-word-bytes)))
-                                                   insts))
-                                         (storew cfp-tn new-fp ocfp-save-offset))
-                                       '((unless (consp nargs)
-                                           (load-immediate-word nargs-pass (fixnumize nargs))))))
-                                ,@(if (eq return :tail)
-                                      '((:frob-nfp
-                                         (inst add nsp-tn cur-nfp (add-sub-immediate
-                                                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-                                      `((:frob-nfp
-                                         (store-stack-tn nfp-save cur-nfp))
-                                        (:load-fp
-                                         (move cfp-tn (cond ,@(and
-                                                               (not variable)
-                                                               '(((<= (if (consp nargs)
-                                                                          (car nargs)
-                                                                          nargs) register-arg-count)
-                                                                  csp-tn)))
-                                                            (t
-                                                             new-fp))))))
-                                ((nil)))))
-                          (insert-step-instrumenting ()
-                            ;; Conditionally insert a conditional trap:
-                            (when step-instrumenting
-                              (assemble ()
-                                #-sb-thread
-                                (load-symbol-value tmp-tn sb-impl::*stepping*)
-                                #+sb-thread
-                                (loadw tmp-tn thread-tn thread-stepping-slot)
-                                (inst cbz tmp-tn step-done-label)
-                                ;; CONTEXT-PC will be pointing here when the
-                                ;; interrupt is handled, not after the
-                                ;; DEBUG-TRAP.
-                                (note-this-location vop :internal-error)
-                                (inst brk single-step-around-trap)
-                                STEP-DONE-LABEL))))
-                     (declare (ignorable #'insert-step-instrumenting))
-                     ,@(case named
-                         ((t)
-                          `((sc-case name
-                              (descriptor-reg (move name-pass name))
-                              (control-stack
-                               (load-stack-tn name-pass name)
-                               (do-next-filler))
-                              (constant
-                               (load-constant vop name name-pass)
-                               (do-next-filler)))
-                            (do-next-filler)
-                            (insert-step-instrumenting)))
-                         ((nil)
-                          `((sc-case arg-fun
-                              (descriptor-reg (move lexenv arg-fun))
-                              (control-stack
-                               (load-stack-tn lexenv arg-fun)
-                               (do-next-filler))
-                              (constant
-                               (load-constant vop arg-fun lexenv)
-                               (do-next-filler)))
-                            (insert-step-instrumenting)
-                            (do-next-filler))))
-                     (loop
-                      (if filler
-                          (do-next-filler)
-                          (return)))
-                     ,@(case named
-                         ((t)
-                          `((loadw lr name-pass fdefn-raw-addr-slot other-pointer-lowtag)
-                            ,(if (eq return :tail)
-                                 `(inst add lr lr 4))))
-                         (:direct
-                          `((inst ldr lr (@ null-tn (load-store-offset (static-fun-offset fun))))
-                            ,(if (eq return :tail)
-                                 `(inst add lr lr 4)))))
+                    (if variable 19 1)
+                    (if (eq return :tail) 0 10)
+                    15
+                    (if (eq return :unknown) 25 0))
+       (let* ((cur-nfp (current-nfp-tn vop))
+              (filler
+                (remove nil
+                        (list ,@(if (eq return :tail)
+                                    '(:load-nargs
+                                      (when cur-nfp
+                                        :frob-nfp))
+                                    '(:load-nargs
+                                      (when cur-nfp
+                                        :frob-nfp)
+                                      :load-fp))))))
+         (flet ((do-next-filler ()
+                  (let* ((next (pop filler))
+                         (what (if (consp next) (car next) next)))
+                    (ecase what
+                      (:load-nargs
+                       ,@(if variable
+                             `((inst sub nargs-pass csp-tn new-fp)
+                               (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
+                               ,@(do ((arg *register-arg-names* (cddr arg))
+                                      (i 0 (+ i 2))
+                                      (insts))
+                                     ((null arg) (nreverse insts))
+                                   #.(assert (evenp register-arg-count))
+                                   (push `(inst ldp ,(first arg) ,(second arg)
+                                                (@ new-fp ,(* i n-word-bytes)))
+                                         insts))
+                               (storew cfp-tn new-fp ocfp-save-offset))
+                             '((unless (consp nargs)
+                                 (load-immediate-word nargs-pass (fixnumize nargs))))))
+                      ,@(if (eq return :tail)
+                            '((:frob-nfp
+                               (inst add nsp-tn cur-nfp (add-sub-immediate
+                                                         (bytes-needed-for-non-descriptor-stack-frame)))))
+                            `((:frob-nfp
+                               (store-stack-tn nfp-save cur-nfp))
+                              (:load-fp
+                               (move cfp-tn (cond ,@(and
+                                                     (not variable)
+                                                     '(((<= (if (consp nargs)
+                                                                (car nargs)
+                                                                nargs) register-arg-count)
+                                                        csp-tn)))
+                                                  (t
+                                                   new-fp))))))
+                      ((nil)))))
+                (insert-step-instrumenting ()
+                  ;; Conditionally insert a conditional trap:
+                  (when step-instrumenting
+                    (assemble ()
+                      #-sb-thread
+                      (load-symbol-value tmp-tn sb-impl::*stepping*)
+                      #+sb-thread
+                      (loadw tmp-tn thread-tn thread-stepping-slot)
+                      (inst cbz tmp-tn step-done-label)
+                      ;; CONTEXT-PC will be pointing here when the
+                      ;; interrupt is handled, not after the
+                      ;; DEBUG-TRAP.
+                      (note-this-location vop :internal-error)
+                      (inst brk single-step-around-trap)
+                      STEP-DONE-LABEL))))
+           (declare (ignorable #'insert-step-instrumenting))
+           ,@(case named
+               ((t)
+                `((sc-case name
+                    (descriptor-reg (move name-pass name))
+                    (control-stack
+                     (load-stack-tn name-pass name)
+                     (do-next-filler))
+                    (constant
+                     (load-constant vop name name-pass)
+                     (do-next-filler)))
+                  (do-next-filler)
+                  (insert-step-instrumenting)))
+               ((nil)
+                `((sc-case arg-fun
+                    (descriptor-reg (move lexenv arg-fun))
+                    (control-stack
+                     (load-stack-tn lexenv arg-fun)
+                     (do-next-filler))
+                    (constant
+                     (load-constant vop arg-fun lexenv)
+                     (do-next-filler)))
+                  (insert-step-instrumenting)
+                  (do-next-filler))))
+           (loop
+            (if filler
+                (do-next-filler)
+                (return)))
+           ,@(case named
+               ((t)
+                `((loadw lr name-pass fdefn-raw-addr-slot other-pointer-lowtag)
+                  ,(if (eq return :tail)
+                       `(inst add lr lr 4))))
+               (:direct
+                `((inst ldr lr (@ null-tn (load-store-offset (static-fun-offset fun))))
+                  ,(if (eq return :tail)
+                       `(inst add lr lr 4)))))
 
-                     (note-this-location vop :call-site)
+           (note-this-location vop :call-site)
 
-                     ,(if named
-                          (if (eq return :tail)
-                              `(inst br lr)
-                              `(inst blr lr))
-                          (if (eq return :tail)
-                              `(tail-call-unnamed lexenv lr fun-type)
-                              `(call-unnamed lexenv lr fun-type))))
+           ,(if named
+                (if (eq return :tail)
+                    `(inst br lr)
+                    `(inst blr lr))
+                (if (eq return :tail)
+                    `(tail-call-unnamed lexenv lr fun-type)
+                    `(call-unnamed lexenv lr fun-type))))
 
-                   ,@(ecase return
-                       (:fixed
-                        '((default-unknown-values vop values nvals move-temp node)
-                          (when cur-nfp
-                            (load-stack-tn cur-nfp nfp-save))))
-                       (:unknown
-                        '((note-this-location vop :unknown-return)
-                          (receive-unknown-values node values-start nvals start count)
-                          (when cur-nfp
-                            (load-stack-tn cur-nfp nfp-save))))
-                       (:tail))))))
+         ,@(ecase return
+             (:fixed
+              '((default-unknown-values vop values nvals move-temp node)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             (:unknown
+              '((note-this-location vop :unknown-return)
+                (receive-unknown-values node values-start nvals start count)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             ((:unboxed)
+              '((when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             ((:tail)))))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -1098,6 +1103,10 @@
 
 (define-full-call fixed-call-named t :fixed nil :fixed)
 (define-full-call fixed-tail-call-named t :tail nil :fixed)
+
+(define-full-call unboxed-call-named t :unboxed nil)
+(define-full-call fixed-unboxed-call-named t :unboxed nil :fixed)
+
 ;;; Defined separately, since needs special code that BLT's the
 ;;; arguments down.
 (define-vop (tail-call-variable)

@@ -153,7 +153,13 @@
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
-    (or (find-if #'xep-p funs)
+    (or (loop for fun in funs
+              for fun-info = (info :function :info (functional-%source-name fun))
+              when
+              (and fun-info
+                   (ir1-attributep (fun-info-attributes fun-info) unboxed-return))
+              return :unboxed)
+        (find-if #'xep-p funs)
         (some (lambda (fun) (policy fun (>= insert-debug-catch 2))) funs)
         (block punt
           (dolist (fun funs t)
@@ -168,12 +174,12 @@
                                (unless (and (basic-combination-p node)
                                             (eq (basic-combination-info node) :full))
                                  (return)))))))
-                 (when (and (basic-combination-p dest)
-                            (not (node-tail-p dest))
-                            (eq (basic-combination-fun dest) lvar)
-                            (eq (basic-combination-kind dest) :local)
-                            (not (all-returns-tail-calls-p dest)))
-                   (return-from punt nil))))))))))
+                  (when (and (basic-combination-p dest)
+                             (not (node-tail-p dest))
+                             (eq (basic-combination-fun dest) lvar)
+                             (eq (basic-combination-kind dest) :local)
+                             (not (all-returns-tail-calls-p dest)))
+                    (return-from punt nil))))))))))
 
 ;;; If policy indicates, give an efficiency note about our inability to
 ;;; use the known return convention. We try to find a function in the
@@ -220,16 +226,26 @@
       (when (and (eq count :unknown) (not use-standard)
                  (not (eq (tail-set-type tails) *empty-type*)))
         (return-value-efficiency-note tails))
-      (if (or (eq count :unknown) use-standard)
-          (make-return-info :kind :unknown
-                            :count count
-                            :primitive-types ptypes
-                            :types types)
-          (make-return-info :kind :fixed
-                            :count count
-                            :primitive-types ptypes
-                            :types types
-                            :locations (mapcar #'make-normal-tn ptypes))))))
+      (cond ((eq use-standard :unboxed)
+             (make-return-info :kind :unboxed
+                               :count count
+                               :primitive-types ptypes
+                               :types types
+                               :locations
+                               (let ((state (sb-vm::make-fixed-call-args-state)))
+                                 (loop for type in ptypes
+                                       collect (sb-vm::fixed-call-arg-location type state)))))
+            ((or (eq count :unknown) use-standard)
+             (make-return-info :kind :unknown
+                               :count count
+                               :primitive-types ptypes
+                               :types types))
+            (t
+             (make-return-info :kind :fixed
+                               :count count
+                               :primitive-types ptypes
+                               :types types
+                               :locations (mapcar #'make-normal-tn ptypes)))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
 (defun assign-return-locations (fun)
@@ -241,7 +257,7 @@
          (return (lambda-return fun)))
     (when (and return
                (xep-p fun))
-      (aver (eq (return-info-kind returns) :unknown))))
+      (aver (memq (return-info-kind returns) '(:unknown :unboxed)))))
   (values))
 
 ;;; Make an IR2-NLX-INFO structure for each NLX entry point recorded.

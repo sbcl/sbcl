@@ -775,6 +775,7 @@
             (cond ((eq (return-info-kind info) :unknown)
                    (setf (compiled-debug-fun-returns dfun)
                          :standard))
+                  ((eq (return-info-kind info) :unboxed))
                   ((/= level 0)
                    (setf (compiled-debug-fun-returns dfun)
                          (compute-debug-returns fun)))))))
