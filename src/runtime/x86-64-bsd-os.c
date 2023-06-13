@@ -1,7 +1,9 @@
 #include <signal.h>
+#include <errno.h>
 #include "sbcl.h"
 #include "runtime.h"
 #include "thread.h"
+#include "interr.h"
 #include "lispregs.h"
 
 #if defined(LISP_FEATURE_FREEBSD)
@@ -125,7 +127,8 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
-    sigaltstack(&sigstack,0);
+    if (sigaltstack(&sigstack,0)<0)
+        lose("Cannot sigaltstack: %s",strerror(errno));
     return 1;                  /* success */
 }
 
