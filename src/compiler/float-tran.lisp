@@ -29,20 +29,14 @@
 (deftransform %single-float ((n) (single-float) *)
   'n)
 
-(deftransform %single-float ((n) (ratio) *)
-  '(sb-kernel::float-ratio n 'single-float))
-
-(deftransform %single-float ((n) (bignum) *)
-  '(bignum-to-float n 'single-float))
-
 (deftransform %double-float ((n) (double-float) *)
   'n)
 
-(deftransform %double-float ((n) (ratio) *)
-  '(sb-kernel::float-ratio n 'double-float))
+(deftransform %single-float ((n) (ratio) *)
+  '(sb-kernel::single-float-ratio n))
 
-(deftransform %double-float ((n) (bignum) *)
-  '(bignum-to-float n 'double-float))
+(deftransform %double-float ((n) (ratio) *)
+  '(sb-kernel::double-float-ratio n))
 
 ;;; RANDOM
 (macrolet ((frob (fun type)
@@ -215,10 +209,22 @@
   (movable foldable flushable))
 
 (defknown scale-single-float (single-float integer) single-float
-  (movable foldable flushable))
-
+  (movable foldable flushable fixed-args unboxed-return))
 (defknown scale-double-float (double-float integer) double-float
-  (movable foldable flushable))
+    (movable foldable flushable fixed-args unboxed-return))
+
+(defknown sb-kernel::scale-single-float-maybe-overflow
+    (single-float integer) single-float
+    (movable foldable flushable fixed-args unboxed-return))
+(defknown sb-kernel::scale-single-float-maybe-underflow
+    (single-float integer) single-float
+  (movable foldable flushable fixed-args unboxed-return))
+(defknown sb-kernel::scale-double-float-maybe-overflow
+    (double-float integer) double-float
+    (movable foldable flushable fixed-args unboxed-return))
+(defknown sb-kernel::scale-double-float-maybe-underflow
+    (double-float integer) double-float
+    (movable foldable flushable fixed-args unboxed-return))
 
 (deftransform decode-float ((x) (single-float) *)
   '(decode-single-float x))
@@ -233,7 +239,7 @@
   '(integer-decode-double-float x))
 
 (deftransform scale-float ((f ex) (single-float t) *)
-  (cond #+x86
+  (cond #+(and x86 ()) ;; this producess different results based on whether it's inlined or not
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
          '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float))
@@ -241,7 +247,7 @@
          '(scale-single-float f ex))))
 
 (deftransform scale-float ((f ex) (double-float t) *)
-  (cond #+x86
+  (cond #+(and x86 ())
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
          '(%scalbn f ex))

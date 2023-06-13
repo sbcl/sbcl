@@ -1251,6 +1251,7 @@
 ;;; Make a single or double float with the specified significand,
 ;;; exponent and sign.
 ;;; FIXME: how are these not the same as {SINGLE,DOUBLE}-FROM-BITS ???
+(declaim (inline single-float-from-bits double-float-from-bits))
 (defun single-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"
@@ -1291,72 +1292,75 @@
 
 ;;; Convert Bignum to a float in the specified Format, rounding to the best
 ;;; approximation.
-(defun bignum-to-float (bignum format)
-  (let* ((plusp (bignum-plus-p bignum))
-         (x (if plusp bignum (negate-bignum bignum)))
-         (len (bignum-integer-length x))
-         (digits (float-format-digits format))
-         (keep (+ digits digit-size))
-         (shift (- keep len))
-         (shifted (if (minusp shift)
-                      (bignum-ashift-right x (- shift))
-                      (bignum-ashift-left x shift)))
-         (low (%bignum-ref shifted 0))
-         (round-bit (ash 1 (1- digit-size))))
-    (declare (type bignum-length len digits keep) (fixnum shift))
-    (labels ((round-up ()
-               (let ((rounded (add-bignums shifted round-bit)))
-                 (if (> (integer-length rounded) keep)
-                     (float-from-bits (bignum-ashift-right rounded 1)
-                                      (1+ len))
-                     (float-from-bits rounded len))))
-             (float-from-bits (bits len)
-               (declare (type bignum-length len))
-               (ecase format
-                 (single-float
-                  (single-float-from-bits
-                   bits
-                   (check-exponent len sb-vm:single-float-bias
-                                   sb-vm:single-float-normal-exponent-max)
-                   plusp))
-                 (double-float
-                  (double-float-from-bits
-                   bits
-                   (check-exponent len sb-vm:double-float-bias
-                                   sb-vm:double-float-normal-exponent-max)
-                   plusp))
-                 #+long-float
-                 (long-float
-                  (long-float-from-bits
-                   bits
-                   (check-exponent len sb-vm:long-float-bias
-                                   sb-vm:long-float-normal-exponent-max)
-                   plusp))))
-             (check-exponent (exp bias max)
-               (declare (type bignum-length len))
-               (let ((exp (+ exp bias)))
-                 (when (> exp max)
-                   (error 'floating-point-overflow
-                          :operation 'float
-                          :operands (list x format)))
-                 exp)))
+(macrolet ((def (type)
+             `(defun ,(symbolicate 'bignum-to- type) (bignum)
+               (let* ((plusp (bignum-plus-p bignum))
+                      (x (if plusp bignum (negate-bignum bignum)))
+                      (len (bignum-integer-length x))
+                      (digits ,(package-symbolicate :sb-vm type '-digits))
+                      (keep (+ digits digit-size))
+                      (shift (- keep len))
+                      (shifted (if (minusp shift)
+                                   (bignum-ashift-right x (- shift))
+                                   (bignum-ashift-left x shift)))
+                      (low (%bignum-ref shifted 0))
+                      (round-bit (ash 1 (1- digit-size))))
+                 (declare (type bignum-length len digits keep) (fixnum shift))
+                 (labels ((round-up ()
+                            (let ((rounded (add-bignums shifted round-bit)))
+                              (if (> (integer-length rounded) keep)
+                                  (float-from-bits (bignum-ashift-right rounded 1)
+                                                   (1+ len))
+                                  (float-from-bits rounded len))))
+                          (float-from-bits (bits len)
+                            (declare (type bignum-length len))
+                            ,(case type
+                               (single-float
+                                `(single-float-from-bits
+                                  bits
+                                  (check-exponent len sb-vm:single-float-bias
+                                                  sb-vm:single-float-normal-exponent-max)
+                                  plusp))
+                               (double-float
+                                `(double-float-from-bits
+                                  bits
+                                  (check-exponent len sb-vm:double-float-bias
+                                                  sb-vm:double-float-normal-exponent-max)
+                                  plusp))
+                               #+long-float
+                               (long-float
+                                `(long-float-from-bits
+                                 bits
+                                 (check-exponent len sb-vm:long-float-bias
+                                                 sb-vm:long-float-normal-exponent-max)
+                                 plusp))))
+                          (check-exponent (exp bias max)
+                            (declare (type bignum-length len))
+                            (let ((exp (+ exp bias)))
+                              (when (> exp max)
+                                (error 'floating-point-overflow
+                                       :operation 'float
+                                       :operands (list x ',type)))
+                              exp)))
 
-    (cond
-     ;; Round down if round bit is 0.
-     ((not (logtest round-bit low))
-      (float-from-bits shifted len))
-     ;; If only round bit is set, then round to even.
-     ((and (= low round-bit)
-           (dotimes (i (- (%bignum-length x) (ceiling keep digit-size))
-                       t)
-             (unless (zerop (%bignum-ref x i)) (return nil))))
-      (let ((next (%bignum-ref shifted 1)))
-        (if (oddp next)
-            (round-up)
-            (float-from-bits shifted len))))
-     ;; Otherwise, round up.
-     (t
-      (round-up))))))
+                   (cond
+                     ;; Round down if round bit is 0.
+                     ((not (logtest round-bit low))
+                      (float-from-bits shifted len))
+                     ;; If only round bit is set, then round to even.
+                     ((and (= low round-bit)
+                           (dotimes (i (- (%bignum-length x) (ceiling keep digit-size))
+                                       t)
+                             (unless (zerop (%bignum-ref x i)) (return nil))))
+                      (let ((next (%bignum-ref shifted 1)))
+                        (if (oddp next)
+                            (round-up)
+                            (float-from-bits shifted len))))
+                     ;; Otherwise, round up.
+                     (t
+                      (round-up))))))))
+  (def single-float)
+  (def double-float))
 
 ;;;; integer length and logbitp/logcount
 

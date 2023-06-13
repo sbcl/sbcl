@@ -16,14 +16,14 @@
 (in-package "SB-KERNEL")
 
 ;;;; utilities
-
 ;;; Don't need to define it in the host in both passes
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 ;;; These functions let us create floats from bits with the
 ;;; significand uniformly represented as an integer. This is less
 ;;; efficient for double floats, but is more convenient when making
 ;;; special values, etc.
+(declaim (inline single-from-bits double-from-bits))
+
 (defun single-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 24) sig)
            (type (unsigned-byte 8) exp))
@@ -48,6 +48,9 @@
                    (ldb (byte 32 0) sig)))
 
 ) ; EVAL-WHEN
+
+;;; cross-float doesn't like constructig floats at compile-time
+(declaim (notinline single-from-bits double-from-bits))
 
 ;;;; float parameters
 (defconstant most-positive-single-float #.most-positive-single-float)
@@ -166,3 +169,5 @@
 
 (defconstant most-negative-fixnum-double-float
   (double-from-bits 1 (+ sb-vm:n-fixnum-bits sb-vm:double-float-bias) 0))
+
+(declaim (inline single-from-bits double-from-bits))

@@ -852,6 +852,16 @@
              nil)
             ((two-zeros-p) t) ; signed zeros are equal
             ((same-sign-infinities-p) t) ; infinities are =
+            ((eq (flonum-%value (car args)) :+infinity)
+             t)
+            ((and (cdr args)
+                  (eq (flonum-%value (cadr args)) :+infinity))
+             nil)
+            ((eq (flonum-%value (car args)) :-infinity)
+             nil)
+            ((and (cdr args)
+                  (eq (flonum-%value (cadr args)) :-infinity))
+             t)
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
              (if (rationalp (car args))
@@ -881,6 +891,16 @@
                    (error "Unhandled"))))
             ((two-zeros-p) t) ; signed zeros are equal
             ((same-sign-infinities-p) t) ; infinities are =
+            ((eq (flonum-%value (car args)) :+infinity)
+             nil)
+            ((and (cdr args)
+                  (eq (flonum-%value (cadr args)) :+infinity))
+             t)
+            ((eq (flonum-%value (car args)) :-infinity)
+             t)
+            ((and (cdr args)
+                  (eq (flonum-%value (cadr args)) :-infinity))
+             nil)
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
              (if (floatp (car args))
