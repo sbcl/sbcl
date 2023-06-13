@@ -131,19 +131,21 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
     int protection;
     int flags = 0;
 
-#if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
-        /* OpenBSD requires MAP_STACK for pages used as stack.
-         * Note that FreeBSD has a MAP_STACK with different behavior. */
-    if (space_id == THREAD_STRUCT_CORE_SPACE_ID) flags |= MAP_STACK;
-#endif
-
     // FIXME: This probaby needs to use MAP_TRYFIXED
     if (attributes & IS_GUARD_PAGE)
         protection = OS_VM_PROT_NONE;
     else
-#ifndef LISP_FEATURE_DARWIN_JIT
+#if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
+    /* OpenBSD requires MAP_STACK for pages used as stack (and RW protection).
+     * Note that FreeBSD has a MAP_STACK with different behavior. */
+    if (space_id == THREAD_STRUCT_CORE_SPACE_ID) {
+        protection = OS_VM_PROT_READ | OS_VM_PROT_WRITE;
+        flags |= MAP_STACK;
+    } else {
         protection = OS_VM_PROT_ALL;
-#else
+    }
+
+#elif defined(LISP_FEATURE_DARWIN_JIT)
     if (jit) {
         if (jit == 2)
             protection = OS_VM_PROT_ALL;
@@ -157,6 +159,9 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
     else {
         protection = OS_VM_PROT_READ | OS_VM_PROT_WRITE;
     }
+
+#else
+        protection = OS_VM_PROT_ALL;
 #endif
 
     attributes &= ~IS_GUARD_PAGE;
