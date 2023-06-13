@@ -134,7 +134,7 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
 #if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
         /* OpenBSD requires MAP_STACK for pages used as stack.
          * Note that FreeBSD has a MAP_STACK with different behavior. */
-    if (space_id == THREAD_STRUCT_CORE_SPACE_ID) flags = MAP_STACK;
+    if (space_id == THREAD_STRUCT_CORE_SPACE_ID) flags |= MAP_STACK;
 #endif
 
     // FIXME: This probaby needs to use MAP_TRYFIXED
@@ -149,7 +149,7 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
             protection = OS_VM_PROT_ALL;
         else
             protection = OS_VM_PROT_READ | OS_VM_PROT_WRITE;
-        flags = MAP_JIT;
+        flags |= MAP_JIT;
     }
     else if (executable) {
         protection = OS_VM_PROT_READ | OS_VM_PROT_EXECUTE;
@@ -189,7 +189,7 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
     // ALLOCATE_LOW seems never to get what we want
-    if (!(attributes & MOVABLE) || (attributes & ALLOCATE_LOW)) flags = MAP_FIXED;
+    if (!(attributes & MOVABLE) || (attributes & ALLOCATE_LOW)) flags |= MAP_FIXED;
 #endif
 
 #ifdef MAP_EXCL // not defined in OpenBSD, NetBSD, DragonFlyBSD
