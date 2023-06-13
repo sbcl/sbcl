@@ -629,10 +629,12 @@ case "$sbcl_os" in
         ;;
     darwin)
         printf ' :unix :bsd :darwin :mach-o' >> $ltf
+        darwin_version=`uname -r`
+        darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
+        if (( 10 > $darwin_version_major )) || [ $sbcl_arch = "ppc" ]; then
+            printf ' :use-darwin-posix-semaphores' >> $ltf
+        fi
         if [ $sbcl_arch = "x86-64" ]; then
-            darwin_version=`uname -r`
-            darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
-
             if (( 8 < $darwin_version_major )); then
 	        printf ' :inode64' >> $ltf
             fi

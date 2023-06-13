@@ -55,6 +55,8 @@
           ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
           ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP
+          ;;; Enforce using of posix semaphores on Darwin instead of dispatch.
+          :USE-DARWIN-POSIX-SEMAPHORES
           ;; only for 'src/runtime/wrap.h'
           :OS-PROVIDES-BLKSIZE-T
           ;; only for src/runtime/run-program.c
