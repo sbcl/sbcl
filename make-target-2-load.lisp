@@ -55,6 +55,8 @@
           ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
           ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP
+          ;;; Enforce using of libc nanosleep on Darwin.
+          :USE-DARWIN-NANOSLEEP
           ;; only for 'src/runtime/wrap.h'
           :OS-PROVIDES-BLKSIZE-T
           ;; only for src/runtime/run-program.c
