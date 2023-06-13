@@ -195,7 +195,7 @@
               (setq start (sap+ start size)))))))
     (when strict-bound
      ;; If START is not eq to END, then we have blown past our endpoint.
-      #+sb-devel
+     #+sb-devel
      (unless (sap= start end)
        ;; don't make things go more wrong than they already are.
        (alien-funcall (extern-alien "printf" (function void system-area-pointer))
