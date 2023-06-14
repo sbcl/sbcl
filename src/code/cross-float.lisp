@@ -768,7 +768,11 @@
                    (floatp (car args))
                    (floatp (cadr args))
                    (member (flonum-%value (car args)) '(:-infinity :+infinity))
-                   (eq (flonum-%value (cadr args)) (flonum-%value (car args))))))
+                   (eq (flonum-%value (cadr args)) (flonum-%value (car args)))))
+           (infinity-p (n kind)
+             `(let ((arg (nth ,n args)))
+                (and (floatp arg)
+                     (eq (flonum-%value arg) ,kind)))))
 
   ;; Simple case of using the interceptor to return a boolean.  If
   ;; infinity leaks in, the host will choke since those are
@@ -778,10 +782,16 @@
 
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
-  (intercept (max min + acos acosh asin asinh atan atanh conjugate cos cosh fceiling ffloor fround ftruncate phase sin sinh tan tanh) (&rest args)
+  (intercept (max min + acos acosh asin asinh atan atanh conjugate cos cosh phase sin sinh tan tanh) (&rest args)
     (dispatch :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-result-format args))))
+  (intercept (fceiling ffloor fround ftruncate) (&rest args)
+             (dispatch :me
+                       (multiple-value-bind (a b) (apply #':me (realnumify* args))
+                         (let ((format (apply #'pick-result-format args)))
+                          (values (make-flonum a format)
+                                  (make-flonum b format))))))
 
   (intercept (sqrt) (&rest args)
     (destructuring-bind (x) args
@@ -852,15 +862,17 @@
              nil)
             ((two-zeros-p) t) ; signed zeros are equal
             ((same-sign-infinities-p) t) ; infinities are =
-            ((eq (flonum-%value (car args)) :+infinity)
+            ((and (eql nargs 2)
+                  (infinity-p 0 :+infinity))
              t)
-            ((and (cdr args)
-                  (eq (flonum-%value (cadr args)) :+infinity))
+            ((and (eql nargs 2)
+                  (infinity-p 1 :+infinity))
              nil)
-            ((eq (flonum-%value (car args)) :-infinity)
+            ((and (eql nargs 2)
+                  (infinity-p 0 :-infinity))
              nil)
-            ((and (cdr args)
-                  (eq (flonum-%value (cadr args)) :-infinity))
+            ((and (eql nargs 2)
+                  (infinity-p 1 :-infinity))
              t)
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
@@ -891,15 +903,17 @@
                    (error "Unhandled"))))
             ((two-zeros-p) t) ; signed zeros are equal
             ((same-sign-infinities-p) t) ; infinities are =
-            ((eq (flonum-%value (car args)) :+infinity)
+            ((and (eql nargs 2)
+                  (infinity-p 0 :+infinity))
              nil)
-            ((and (cdr args)
-                  (eq (flonum-%value (cadr args)) :+infinity))
+            ((and (eql nargs 2)
+                  (infinity-p 1 :+infinity))
              t)
-            ((eq (flonum-%value (car args)) :-infinity)
+            ((and (eql nargs 2)
+                  (infinity-p 0 :-infinity))
              t)
-            ((and (cdr args)
-                  (eq (flonum-%value (cadr args)) :-infinity))
+            ((and (eql nargs 2)
+                  (infinity-p 1 :-infinity))
              nil)
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits

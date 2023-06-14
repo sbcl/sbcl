@@ -3082,30 +3082,6 @@
                (values tru rem)))
         (give-up-ir1-transform))))
 
-(macrolet ((def (number-type divisor-type)
-             `(progn
-                (deftransform floor ((number divisor) (,number-type ,divisor-type) * :node node)
-                  `(let ((divisor (coerce divisor ',',number-type)))
-                     (multiple-value-bind (tru rem) (truncate number divisor)
-                       (if (and (not (zerop rem))
-                                (if (minusp divisor)
-                                    (plusp number)
-                                    (minusp number)))
-                           (values (1- tru) (+ rem divisor))
-                           (values tru rem)))))
-
-                (deftransform ceiling ((number divisor) (,number-type ,divisor-type) * :node node)
-                  `(let ((divisor (coerce divisor ',',number-type)))
-                     (multiple-value-bind (tru rem) (truncate number divisor)
-                       (if (and (not (zerop rem))
-                                (if (minusp divisor)
-                                    (minusp number)
-                                    (plusp number)))
-                           (values (+ tru 1) (- rem divisor))
-                           (values tru rem))))))))
-  (def double-float (or float integer))
-  (def single-float (or single-float integer)))
-
 (deftransform rem ((number divisor))
   `(nth-value 1 (truncate number divisor)))
 

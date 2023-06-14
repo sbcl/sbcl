@@ -1712,6 +1712,87 @@
   (def single-float ())
   (def double-float (single-float)))
 
+;;; truncate on bignum floats will always have a remainder of zero
+;;; on 64-bit, so ceiling and floor are the same as truncate.
+#+64-bit
+(macrolet ((def (name type other-float-arg-types
+                 fixup)
+             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
+                    (unary-to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
+                    (coerce (symbolicate "%" type)))
+               `(deftransform ,name ((number &optional divisor)
+                                     (,type
+                                      &optional (or ,type ,@other-float-arg-types integer))
+                                     *)
+                  (let ((one-p (or (not divisor)
+                                   (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
+                    `(let* ,(if one-p
+                                `((f-divisor 1)
+                                  (div number))
+                                `((f-divisor (,',coerce divisor))
+                                  (div (/ number f-divisor))))
+                       (if (typep div
+                                  '(,',type
+                                    ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                                    ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                           (let* ((tru (truly-the fixnum (,',unary div)))
+                                  (rem (- number (* ,@(unless one-p
+                                                        '(f-divisor))
+                                                    #+round-float
+                                                    (,',(ecase type
+                                                          (double-float 'round-double)
+                                                          (single-float 'round-single))
+                                                     div :truncate)
+                                                    #-round-float
+                                                    (locally
+                                                        (declare (flushable ,',coerce))
+                                                      (,',coerce tru))))))
+                             ,',fixup)
+                           (,',unary-to-bignum div))))))))
+  (def floor single-float ()
+    #1=(if (and (not (zerop rem))
+                (if (minusp f-divisor)
+                    (plusp number)
+                    (minusp number)))
+           (values (1- tru) (+ rem divisor))
+           (values tru rem)))
+  (def floor double-float (single-float)
+    #1#)
+  (def ceiling single-float ()
+    #2=(if (and (not (zerop rem))
+                (if (minusp f-divisor)
+                    (minusp number)
+                    (plusp number)))
+           (values (+ tru 1) (- rem divisor))
+           (values tru rem)))
+  (def ceiling double-float (single-float)
+    #2#))
+
+#-64-bit
+(macrolet ((def (number-type divisor-type)
+             `(progn
+                (deftransform floor ((number divisor) (,number-type ,divisor-type) * :node node)
+                  `(let ((divisor (coerce divisor ',',number-type)))
+                     (multiple-value-bind (tru rem) (truncate number divisor)
+                       (if (and (not (zerop rem))
+                                (if (minusp divisor)
+                                    (plusp number)
+                                    (minusp number)))
+                           (values (1- tru) (+ rem divisor))
+                           (values tru rem)))))
+
+                (deftransform ceiling ((number divisor) (,number-type ,divisor-type) * :node node)
+                  `(let ((divisor (coerce divisor ',',number-type)))
+                     (multiple-value-bind (tru rem) (truncate number divisor)
+                       (if (and (not (zerop rem))
+                                (if (minusp divisor)
+                                    (minusp number)
+                                    (plusp number)))
+                           (values (+ tru 1) (- rem divisor))
+                           (values tru rem))))))))
+  (def double-float (or float integer))
+  (def single-float (or single-float integer)))
+
 #-round-float
 (progn
   (defknown %unary-ftruncate (real) float (movable foldable flushable))
