@@ -710,6 +710,11 @@
   #+long-float
   (def double-float %unary-truncate/long-float))
 
+(defun %unary-ceiling (m)
+  (values (ceiling m)))
+(defun %unary-floor (m)
+  (values (floor m)))
+
 ;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
 ;;; can't use the round primitive, then we do our own round-to-nearest on the
 ;;; result of i-d-f. [Note that this rounding will really only happen

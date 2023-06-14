@@ -1724,31 +1724,47 @@
                                      (,type
                                       &optional (or ,type ,@other-float-arg-types integer))
                                      *)
-                  (let ((one-p (or (not divisor)
-                                   (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
-                    `(let* ,(if one-p
-                                `((f-divisor 1)
-                                  (div number))
-                                `((f-divisor (,',coerce divisor))
-                                  (div (/ number f-divisor))))
-                       (if (typep div
-                                  '(,',type
-                                    ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
-                                    ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                           (let* ((tru (truly-the fixnum (,',unary div)))
-                                  (rem (- number (* ,@(unless one-p
-                                                        '(f-divisor))
-                                                    #+round-float
-                                                    (,',(ecase type
-                                                          (double-float 'round-double)
-                                                          (single-float 'round-single))
-                                                     div :truncate)
-                                                    #-round-float
-                                                    (locally
-                                                        (declare (flushable ,',coerce))
-                                                      (,',coerce tru))))))
-                             ,',fixup)
-                           (,',unary-to-bignum div))))))))
+                  (block nil
+                    (let ((one-p (or (not divisor)
+                                     (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
+                      #+round-float
+                      (when-vop-existsp (:translate %unary-ceiling)
+                        (when one-p
+                          (return
+                            `(if (typep number
+                                        '(,',type
+                                          ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                                          ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                                 (values (truly-the fixnum (,',(symbolicate '%unary- name) number))
+                                         (- number
+                                            (,',(ecase type
+                                                  (double-float 'round-double)
+                                                  (single-float 'round-single))
+                                             number ,,(keywordicate name))))
+                                 (,',unary-to-bignum number)))))
+                      `(let* ,(if one-p
+                                  `((f-divisor 1)
+                                    (div number))
+                                  `((f-divisor (,',coerce divisor))
+                                    (div (/ number f-divisor))))
+                         (if (typep div
+                                    '(,',type
+                                      ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                                      ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                             (let* ((tru (truly-the fixnum (,',unary div)))
+                                    (rem (- number (* ,@(unless one-p
+                                                          '(f-divisor))
+                                                      #+round-float
+                                                      (,',(ecase type
+                                                            (double-float 'round-double)
+                                                            (single-float 'round-single))
+                                                       div :truncate)
+                                                      #-round-float
+                                                      (locally
+                                                          (declare (flushable ,',coerce))
+                                                        (,',coerce tru))))))
+                               ,',fixup)
+                             (,',unary-to-bignum div)))))))))
   (def floor single-float ()
     #1=(if (and (not (zerop rem))
                 (if (minusp f-divisor)
