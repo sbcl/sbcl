@@ -2858,6 +2858,8 @@
                (specifier-type 'sb-vm:signed-word))))))
 
 (defun overflow-transform (name x y node &optional (swap t))
+  (unless (node-lvar node)
+    (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node))))
     (when (or (csubtypep type (specifier-type 'word))
@@ -2920,6 +2922,8 @@
   (overflow-transform 'overflow-ash x y node nil))
 
 (defun overflow-transform-unknown-x (name x y node &optional swap)
+  (unless (node-lvar node)
+    (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node)))
         (x-type (lvar-type x))
@@ -3013,6 +3017,8 @@
   (overflow-transform-unknown-x 'overflow- x y node t))
 
 (defun overflow-transform-1 (name x node)
+  (unless (node-lvar node)
+    (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node))))
     (when (or (csubtypep type (specifier-type 'word))
