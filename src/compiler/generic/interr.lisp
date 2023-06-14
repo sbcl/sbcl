@@ -107,7 +107,7 @@
    ("An attempt was made to use an undefined SYMBOL-VALUE." unbound-symbol 1)
    ("attempt to RETURN-FROM a block that no longer exists" invalid-unwind 0)
    ("attempt to THROW to a non-existent tag" unseen-throw-tag 1)
-   ("division by zero" division-by-zero 2)
+   ("division by zero" division-by-zero 1)
    ("Object is of the wrong type." object-not-type 2)
    ("ECASE failure" ecase-failure 2)
    ("ETYPECASE failure" etypecase-failure 2)

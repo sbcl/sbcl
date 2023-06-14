@@ -302,10 +302,10 @@
   (error 'nil-array-accessed-error
          :datum array :expected-type '(not (array nil))))
 
-(deferr division-by-zero-error (this that)
+(deferr division-by-zero-error (number)
   (error 'division-by-zero
          :operation '/
-         :operands (list this that)))
+         :operands (list number 0)))
 
 (defun restart-type-error (type condition &optional pc-offset)
   (let ((tn-offset (car *current-internal-error-args*)))

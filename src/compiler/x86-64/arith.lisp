@@ -1568,7 +1568,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (inst cqo)
     (inst idiv y)
@@ -1629,7 +1629,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (zeroize edx)
     (inst div y)
@@ -1682,7 +1682,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (inst cqo)
     (inst idiv y)

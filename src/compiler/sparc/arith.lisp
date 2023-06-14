@@ -208,7 +208,7 @@
               (and (member :sparc-v9 *backend-subfeatures*)
                    (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst cmp y zero-tn)
       (inst b :eq zero)
       ;; Extend the sign of X into the Y register
@@ -243,7 +243,7 @@
               (and (member :sparc-v9 *backend-subfeatures*)
                    (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst cmp y zero-tn)
       (if (member :sparc-v9 *backend-subfeatures*)
           (inst b :eq zero :pn)
@@ -279,7 +279,7 @@
               (and (member :sparc-v9 *backend-subfeatures*)
                    (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 8
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst cmp y zero-tn)
       (if (member :sparc-v9 *backend-subfeatures*)
           (inst b :eq zero :pn)
@@ -311,7 +311,7 @@
   (:save-p :compute-only)
   (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 8
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst cmp y zero-tn)
       (inst b :eq zero :pn)
       ;; Sign extend the numbers, just in case.
@@ -339,7 +339,7 @@
   (:save-p :compute-only)
   (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 8
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst cmp y zero-tn)
       (inst b :eq zero :pn)
       ;; Zap the higher 32 bits, just in case

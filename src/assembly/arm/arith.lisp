@@ -35,8 +35,7 @@
   (inst mov rem 0)
 
   (inst tst divisor divisor)
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst b :eq error))
   (inst rsb :mi divisor divisor 0)
   (inst tst dividend dividend)

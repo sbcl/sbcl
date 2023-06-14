@@ -392,7 +392,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 11
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero))
     (inst nop)
     (inst div x y)
@@ -408,7 +408,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 12
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero))
     (inst nop)
     (inst divu x y)
@@ -423,7 +423,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 12
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero))
     (inst nop)
     (inst div x y)

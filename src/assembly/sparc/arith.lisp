@@ -283,8 +283,7 @@
                           (:res quo any-reg nl2-offset)
                           (:res rem any-reg nl0-offset))
 
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmp divisor)
     (inst b :eq error))
 
@@ -308,8 +307,7 @@
                           (:temp quo-sign any-reg nl5-offset)
                           (:temp rem-sign any-reg nargs-offset))
 
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmp divisor)
     (inst b :eq error))
 
@@ -358,8 +356,7 @@
                           (:temp quo-sign signed-reg nl5-offset)
                           (:temp rem-sign signed-reg nargs-offset))
 
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmp divisor)
     (inst b :eq error))
 

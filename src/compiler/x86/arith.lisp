@@ -510,7 +510,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 31
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (if (sc-is y any-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))
@@ -566,7 +566,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (if (sc-is y unsigned-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))
@@ -616,7 +616,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (if (sc-is y signed-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))

@@ -346,7 +346,7 @@
   (:generator 33
     (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
-      (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
         (inst cbz y zero)))
     (inst sdiv quo x y)
     (unless (eq (tn-kind rem) :unused)
@@ -368,7 +368,7 @@
   (:generator 33
     (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
-      (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
         (inst cbz y zero)))
     (inst udiv quo x y)
     (unless (eq (tn-kind rem) :unused)
@@ -390,7 +390,7 @@
   (:generator 34
     (when (types-equal-or-intersect (tn-ref-type y-ref)
                                     (specifier-type '(eql 0)))
-      (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
         (inst cbz y zero)))
     (inst cmp x 0)
     (inst csneg tmp-tn x x :ge)

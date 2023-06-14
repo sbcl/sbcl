@@ -237,8 +237,7 @@
 
                           (:res quo any-reg nl2-offset)
                           (:res rem any-reg nl3-offset))
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst beq divisor error)
     (inst nop))
 
@@ -260,8 +259,7 @@
 
                           (:res quo any-reg nl2-offset)
                           (:res rem any-reg nl3-offset))
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst beq divisor error)
     (inst nop))
 
@@ -284,8 +282,7 @@
 
                           (:res quo signed-reg nl2-offset)
                           (:res rem signed-reg nl3-offset))
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst beq divisor error)
     (inst nop))
 

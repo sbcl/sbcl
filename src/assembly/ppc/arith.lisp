@@ -223,8 +223,7 @@
                           (:res quo any-reg nl2-offset)
                           (:res rem any-reg nl0-offset))
   (aver (location= rem dividend))
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmpwi divisor 0)
     (inst beq error))
     (inst divwu quo dividend divisor)
@@ -248,8 +247,7 @@
                           (:res rem any-reg nl0-offset))
 
   (aver (location= rem dividend))
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmpwi divisor 0)
     (inst beq error))
 
@@ -273,8 +271,7 @@
                           (:res quo signed-reg nl2-offset)
                           (:res rem signed-reg nl0-offset))
 
-  (let ((error (generate-error-code nil 'division-by-zero-error
-                                    dividend divisor)))
+  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
     (inst cmpwi divisor 0)
     (inst beq error))
 

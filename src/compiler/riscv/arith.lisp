@@ -428,7 +428,7 @@
     (inst rem r x y)
     ;; Division by zero check performed after division per the ISA
     ;; documentation recommendation.
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero-tn zero))
     (inst slli q temp n-fixnum-tag-bits)))
 
@@ -444,7 +444,7 @@
   (:generator 12
     (inst divu q x y)
     (inst remu r x y)
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero-tn zero))))
 
 (define-vop (fast-truncate/signed fast-signed-binop)
@@ -459,7 +459,7 @@
   (:generator 12
     (inst div q x y)
     (inst rem r x y)
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x)))
       (inst beq y zero-tn zero))))
 
 
