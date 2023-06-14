@@ -1880,6 +1880,20 @@ variable: an unreadable object representing the error is printed instead.")
          (print-unreadable-object (sap stream)
            (format stream "system area pointer: #X~8,'0X" (sap-int sap))))))
 
+#+weak-vector-readbarrier
+(defmethod print-object ((self weak-pointer) stream)
+  (let ((vectorp (weak-vector-p self)))
+    (print-unreadable-object (self stream :identity vectorp)
+      (if vectorp
+          (format stream "weak array [~d]" (weak-vector-len self))
+          (multiple-value-bind (value validp) (weak-pointer-value self)
+            (cond (validp
+                   (write-string "weak pointer: " stream)
+                   (write value :stream stream))
+                  (t
+                   (write-string "broken weak pointer" stream))))))))
+
+#-weak-vector-readbarrier
 (defmethod print-object ((weak-pointer weak-pointer) stream)
   (print-unreadable-object (weak-pointer stream)
     (multiple-value-bind (value validp) (weak-pointer-value weak-pointer)

@@ -124,6 +124,7 @@
                   (%closure-index-set object i newval)))))
            (ratio :override)
            ((complex rational) :override)
+           (weak-pointer :override)
            (t
             :extend
             (case widetag

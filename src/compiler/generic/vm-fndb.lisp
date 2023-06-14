@@ -321,12 +321,16 @@
 (defknown make-weak-pointer (t) weak-pointer
   (flushable))
 
+;; This used to have a :derive-type but it can't now. Even though a weak vector
+;; happens to be a simple-vector (by default anyway), I don't plan to enable
+;; the "new" weak vector type (which is not an array) to be operated on by
+;; sequence functions. Maybe LENGTH and ELT but that's about it.
 (defknown make-weak-vector (index &key (:initial-element t)
                                        (:initial-contents t))
-  simple-vector (flushable)
-  :derive-type (lambda (call)
-                 (derive-make-array-type (first (combination-args call))
-                                         't nil nil nil call)))
+  weak-vector
+  (flushable))
+
+(defknown weak-vector-len (weak-vector) index (flushable))
 
 (defknown %make-complex (real real) complex
   (flushable movable))
@@ -839,3 +843,6 @@
 #+(or arm mips ppc sparc)
 (defknown sb-vm::+-modfx (integer integer) fixnum
           (movable foldable flushable always-translatable))
+
+(defknown sb-vm::%weakvec-ref (weak-pointer index) t (flushable))
+(defknown sb-vm::%weakvec-set (weak-pointer index t) (values) ())

@@ -90,16 +90,16 @@
 (defun package-local-nickname-alist (pkgnicks use-ids &aux result)
   (when pkgnicks
     (let ((strings (the simple-vector (car pkgnicks)))
-          (packages (the simple-vector (cdr pkgnicks))))
+          (packages (the weak-vector (cdr pkgnicks))))
       ;; Scan backwards so that pushing preserves order
       (loop for i downfrom (1- (length strings)) to 1 by 2
-            do (let* ((token (aref packages (1- (aref strings i))))
-                      (package (aref packages (aref strings i)))
+            do (let* ((token (weak-vector-ref packages (1- (aref strings i))))
+                      (package (weak-vector-ref packages (aref strings i)))
                       (id (ash token (- pkgnick-index-bits))))
                  (aver (= (ldb (byte pkgnick-index-bits 0) token) (ash i -1)))
                  ;; cull deleted entries
                  (when (and (packagep package) (package-%name package))
-                   (let ((pair (cons (aref strings (1- i)) package)))
+                   (let ((pair (cons (svref strings (1- i)) package)))
                      (push (if use-ids (cons id pair) pair) result)))))
       result)))
 
@@ -142,8 +142,8 @@
                                  (string-num (position id alist :key #'car))
                                  (token (logior (ash id pkgnick-index-bits) string-num)))
                             (setf (aref strings (1+ (ash string-num 1))) (1+ i)
-                                  (aref packages i) token
-                                  (aref packages (1+ i)) (cddr item))))
+                                  (weak-vector-ref packages i) token
+                                  (weak-vector-ref packages (1+ i)) (cddr item))))
                  (cons strings packages)))))
        (when (eq old (setf old (cas (package-%local-nicknames this-package) old new)))
          (return nil))))))
@@ -151,16 +151,16 @@
 ;;; A macro to help search the nickname vectors.
 ;;; Return the logical index of KEY in VECTOR (in which each two
 ;;; elements comprise a key/value pair)
-(macrolet ((bsearch (key vector)
-             `(let ((v (the simple-vector ,vector)))
+(macrolet ((bsearch (key vector len accessfn)
+             `(let ((v ,vector))
                 ;; The search operates on a logical index, which is half the physical
                 ;; index. The returned value is a physical index.
-                (named-let recurse ((start 0) (end (ash (length v) -1)))
+                (named-let recurse ((start 0) (end (ash ,len -1)))
                   (declare (type (unsigned-byte 9) start end)
                            (optimize (sb-c:insert-array-bounds-checks 0)))
                   (when (< start end)
                     (let* ((i (ash (+ start end) -1))
-                           (elt (keyfn (aref v (ash i 1)))))
+                           (elt (keyfn (,accessfn v (ash i 1)))))
                       (case (compare ,key elt)
                        (-1 (recurse start i))
                        (+1 (recurse (1+ i) end))
@@ -178,18 +178,20 @@
                        (t +1)))))
       (declare (inline safe-char))
       (binding* ((nicks (package-%local-nicknames base-package) :exit-if-null)
-                 (string->id (car nicks))
-                 (found (bsearch string string->id) :exit-if-null)
-                 (package (svref (cdr nicks) (svref string->id found))))
+                 (string->id (the simple-vector (car nicks)))
+                 (found (bsearch string string->id (length string->id) svref) :exit-if-null)
+                 (package (weak-vector-ref (cdr nicks) (svref string->id found))))
         (cond ((and package (package-%name package)) package)
               (t (pkgnick-update base-package nil nil))))))
 
   (defun pkgnick-search-by-id (id base-package)
     (flet ((keyfn (x) (ash x (- pkgnick-index-bits)))
            (compare (a b) (signum (- a b))))
-      (binding* ((id->obj (cdr (package-%local-nicknames base-package)) :exit-if-null)
-                 (found (bsearch id id->obj) :exit-if-null)
-                 (package (svref id->obj found)))
+      (binding* ((nicks (package-%local-nicknames base-package) :exit-if-null)
+                 (id->obj (the weak-vector (cdr nicks)))
+                 (found (bsearch id id->obj (weak-vector-len id->obj) weak-vector-ref)
+                        :exit-if-null)
+                 (package (weak-vector-ref id->obj found)))
         (cond ((and package (package-%name package)) package)
               (t (pkgnick-update base-package nil nil)))))))
 
@@ -203,11 +205,11 @@
 ;;; or whichever nickname was added most recently.
 (defun package-local-nickname (package current)
   (binding* ((nicks (package-%local-nicknames current) :exit-if-null)
-             (vector (the simple-vector (cdr nicks))))
-    (loop for i downfrom (1- (length vector)) to 1 by 2
-          when (eq package (aref vector i))
-          return (aref (car nicks)
-                       (let ((token (aref vector (1- i))))
+             (vector (the weak-vector (cdr nicks))))
+    (loop for i downfrom (1- (weak-vector-len vector)) to 1 by 2
+          when (eq package (weak-vector-ref vector i))
+          return (svref (car nicks)
+                        (let ((token (weak-vector-ref vector (1- i))))
                          (ash (ldb (byte pkgnick-index-bits 0) token) 1))))))
 
 ;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
@@ -928,8 +930,9 @@ Experimental: interface subject to change."
     (do-packages (namer)
       ;; NAMER will be added once only to the result if there is more
       ;; than one nickname for designee.
-      (when (find designee (cdr (package-%local-nicknames namer)))
-        (push namer result)))
+      (let ((nicks (cdr (package-%local-nicknames namer))))
+        (when (and nicks (weak-vector-find/eq designee nicks))
+          (push namer result))))
     result))
 
 (defun add-package-local-nickname (local-nickname actual-package
@@ -2158,23 +2161,25 @@ PACKAGE."
                 (declare (optimize speed))
                 (declare (sb-c::tlab :system))
                 (let ((memo (cdr cell)))
-                  (declare (type (simple-vector 3) memo)) ; weak vector: #(cookie nick-id #<pkg>)
-                  (when (eq (aref memo 0) *package-names-cookie*) ; valid cache entry
-                    (binding* ((nick-id (aref memo 1) :exit-if-null)
+                  ;; weak vector: #(cookie nick-id #<pkg>)
+                  #-weak-vector-readbarrier (declare (type (simple-vector 3) memo))
+                  #+weak-vector-readbarrier (declare (weak-vector memo))
+                  (when (eq (weak-vector-ref memo 0) *package-names-cookie*) ; valid cache entry
+                    (binding* ((nick-id (weak-vector-ref memo 1) :exit-if-null)
                                (current-package *package*)
                                (pkg (and (package-%local-nicknames current-package)
                                          (pkgnick-search-by-id nick-id current-package))
                                     :exit-if-null))
                       (return-from ,name pkg))
-                    (let ((pkg (aref memo 2)))
+                    (let ((pkg (weak-vector-ref memo 2)))
                       (when ,validp
                         (return-from ,name pkg))))
                   (let* ((string (car cell))
                          (pkg (,sub-finder string))
                          (new (sb-c::allocate-weak-vector 3)))
-                    (setf (elt new 0) *package-names-cookie*
-                          (elt new 1) (info-gethash string (car *package-nickname-ids*))
-                          (elt new 2) pkg)
+                    (setf (weak-vector-ref new 0) *package-names-cookie*
+                          (weak-vector-ref new 1) (info-gethash string (car *package-nickname-ids*))
+                          (weak-vector-ref new 2) pkg)
                     (sb-thread:barrier (:write))
                     (setf (cdr cell) new)
                     pkg)))))
@@ -2273,7 +2278,7 @@ PACKAGE."
     ;; package, otherwise this form is an argument to the finding function.
     (if std-pkg
         (values `(load-time-value (find-undeleted-package-or-lose ,std-pkg) t) t)
-        (values `(load-time-value (cons ,string (vector nil nil nil))) nil))))
+        (values `(load-time-value (cons ,string (make-weak-vector 3))) nil))))
 
 (deftransform intern ((name package-name) (t (constant-arg string-designator)))
   `(sb-impl::intern2 name ,(find-package-xform package-name)))

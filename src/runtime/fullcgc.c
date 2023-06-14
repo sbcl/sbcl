@@ -347,7 +347,9 @@ static void trace_object(lispobj* where)
         {
         struct weak_pointer *weakptr = (void*)where;
         if (stray_pointer_detector_fn) gc_mark_obj(weakptr->value);
-        else if (is_lisp_pointer(weakptr->value) && interesting_pointer_p(weakptr->value))
+        else if (!WEAKPTR_PAYLOAD_WORDS(where)) { // vectorlike
+            add_to_weak_vector_list(where, header);
+        } else if (is_lisp_pointer(weakptr->value) && interesting_pointer_p(weakptr->value))
             add_to_weak_pointer_chain(weakptr);
         }
         return;

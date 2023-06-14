@@ -122,7 +122,7 @@
   ;; redundancy now that each package gets an integer ID (to compresss the backlinks
   ;; from symbols to packages). Nickname IDs were invented first, and it is certainly
   ;; confusing that there are 2 distinct spaces of small integer IDs.
-  (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
+  (%local-nicknames nil :type (or null (cons simple-vector weak-vector)))
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
 (proclaim '(freeze-type symbol-hashset package))

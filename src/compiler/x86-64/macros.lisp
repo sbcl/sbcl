@@ -429,6 +429,6 @@
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index)))))
-           ,@(when (member name '(instance-index-set %closure-index-set))
+           ,@(when (member name '(instance-index-set %closure-index-set %weakvec-set))
                '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
            (emit-store ea value val-temp)))))

@@ -1066,8 +1066,8 @@ if a restart was invoked."
   ;; It wouldn't be the worst thing, but I opted not to store a reverse lookup)
   ;; Rather interestingly, this operation overwrites a words of the control stack
   ;; that might otherwise randomly contain the very package that got deleted.
-  (assert (= (length (cdr (sb-impl::package-%local-nicknames
-                           (find-package "MYPKG"))))
+  (assert (= (sb-int:weak-vector-len
+              (cdr (sb-impl::package-%local-nicknames (find-package "MYPKG"))))
              2))
   (sb-sys:scrub-control-stack)
   (gc :full t)

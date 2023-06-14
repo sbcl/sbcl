@@ -1919,25 +1919,45 @@ function to be removed without further warning."
 ;;; which uses an internal symbol in SB-IMPL.
 (import '%vector-widetag-and-n-bits-shift 'sb-impl)
 
+;; "new" weak vectors satisfy weak-pointer-p, not simple-vector-p
+#+weak-vector-readbarrier
+(progn
+  (defun weak-vector-p (x)
+    (and (weak-pointer-p x)
+         (= (logand (get-header-data x) #xFF) 0)))
+  (defun weak-vector-len (thing)
+    ;; FIXME: assert that it's a vector-like weak pointer, otherwise it'll see
+    ;; the weak-pointer-value slot.
+    (%array-fill-pointer thing))
+  (defun weak-vector-ref (vector index) ; TODO: needs dimension check and read barrier
+    (sb-vm::%weakvec-ref vector index))
+  (defun (setf weak-vector-ref) (newval vector index)
+    (sb-vm::%weakvec-set vector index newval)
+    newval))
+#-weak-vector-readbarrier
+;; legacy implementation of weak vector is basically SIMPLE-VECTOR
+(defun weak-vector-p (x)
+  (and (simple-vector-p x)
+       (test-header-data-bit x (ash vector-weak-flag array-flags-data-position))))
+
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
   (declare (index length))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
-    ;; These allocation calls are the transforms of MAKE-ARRAY for a vector with
-    ;; the respective initializing keyword arg. This is badly OAOO-violating and
-    ;; almost makes me want to cry, but not quite enough for me to improve it.
-  (if contents-p
-        (let ((contents-length (length initial-contents)))
-          (if (= length contents-length)
-              (replace (sb-c::allocate-weak-vector length) initial-contents)
-              (error "~S has ~D elements, vector length is ~D."
-                     :initial-contents contents-length length)))
-        (fill (sb-c::allocate-weak-vector length)
-              ;; 0 is the usual default, but NIL makes more sense for weak vectors
-              ;; as it is the value assigned to broken hearts.
-              (if element-p initial-element nil))))
-
-(defun weak-vector-p (x)
-  (and (simple-vector-p x)
-       (test-header-data-bit x (ash vector-weak-flag array-flags-data-position))))
+  ;; Since weak vectors are not in theory merely arrays any more, but potentially
+  ;; some kind of weak pointers with a varing enumber of slots, this isn't badly
+  ;; OAOO-violating in regard to make-array transforms.
+  (when contents-p
+    (let ((contents-length (length initial-contents)))
+      (unless (eql length contents-length)
+        (error "~S has ~D elements, vector length is ~D."
+               :initial-contents contents-length length))))
+  (let ((v (sb-c::allocate-weak-vector length)))
+    (if initial-contents
+        (dotimes (i length)
+          (setf (weak-vector-ref v i) (elt initial-contents i)))
+          ;; 0 is the usual default initial element for arrays, but all weak objects use NIL
+        (dotimes (i length)
+          (setf (weak-vector-ref v i) initial-element)))
+    v))

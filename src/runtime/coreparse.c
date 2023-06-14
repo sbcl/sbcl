@@ -1187,16 +1187,14 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
         case SYMBOL_WIDETAG:
             trace_sym(ptr, SYMBOL(ptr), context);
             break;
-        case WEAK_POINTER_WIDETAG:
-            nwords = TINY_BOXED_NWORDS(*obj);
-            for(i=1; i<=nwords; ++i) RECURSE(obj[i]);
-            break;
         case FDEFN_WIDETAG:
             RECURSE(obj[1]);
             RECURSE(obj[2]);
             RECURSE(decode_fdefn_rawfun((struct fdefn*)obj));
             break;
         default:
+            // weak-pointer can be considered an ordinary boxed object.
+            // the 'next' link looks like a fixnum.
             if (!leaf_obj_widetag_p(widetag_of(obj))) {
                 sword_t size = headerobj_size(obj);
                 for(i=1; i<size; ++i) RECURSE(obj[i]);

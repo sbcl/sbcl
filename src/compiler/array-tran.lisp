@@ -2057,12 +2057,31 @@
 ;;; iterate over the vector and enliven everything.
 ;;; A possible solution: weak pointers may need to become interned so any object has at
 ;;; most 1 weak referer. Also weak hash-tables need a good amount of thought.
-;;;
+;;; Moreover, there needs to be a read barrier on any weak object to eliminate a race between
+;;; GC clearing it (supposing that GC decided the referent was otherwise unreachable) and any
+;;; mutator seeing it. So SVREF is out of the question because to implement the read barrier
+;;; in SVREF would pessimize every piece of code that uses SIMPLE-VECTOR for performance.
+
 ;;; But we need this macro in order for some internal code such as a FIND-PACKAGE
 ;;; inline cache (from the optimizer) to inline the vector allocation without it
 ;;; having to know how to call ALLOCATE-VECTOR.
 (sb-xc:defmacro allocate-weak-vector (n)
+  ;; The "new" weak vector is incompatible with SIMPLE-VECTOR.
+  ;; Developers working on new algorithms involving weakness will need to enable this feature.
+  #+weak-vector-readbarrier
+  `(truly-the weak-pointer
+              ;; the defknown for ALLOCATE-VECTOR says it returns a vector
+              ;; but we can use its translator regardless of that!
+              (%primitive sb-vm::allocate-vector-on-heap
+                          #+ubsan nil ,sb-vm:weak-pointer-widetag ,n ,n))
+  #-weak-vector-readbarrier
   ;; Explicitly compute a widetag with the weakness bit ORed in.
   (let ((type (logior (ash sb-vm:vector-weak-flag sb-vm:array-flags-position)
                       sb-vm:simple-vector-widetag)))
     `(truly-the simple-vector (allocate-vector #+ubsan nil ,type ,n ,n))))
+
+#-weak-vector-readbarrier
+(progn
+  (sb-xc:defmacro weak-vector-ref (vector index) `(svref ,vector ,index))
+  (define-source-transform weak-vector-len (thing)
+    `(length (the simple-vector ,thing))))

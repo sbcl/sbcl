@@ -387,6 +387,8 @@
           ":SYSTEM-TLABS requires SB-THREAD")
          ("(and sb-futex (not sb-thread))"
           "Can't enable SB-FUTEX on platforms lacking thread support")
+         ("(and weak-vector-readbarrier (not x86-64))"
+          "Weak vector read-barrier requires x86-64")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))

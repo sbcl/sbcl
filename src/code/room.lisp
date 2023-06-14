@@ -970,7 +970,14 @@ We could try a few things to mitigate this:
                            #+sb-simd-pack simd-pack
                            #+sb-simd-pack-256 simd-pack-256
                            system-area-pointer)) ; nothing to do
-            ,.(make-case 'weak-pointer `(weak-pointer-value ,obj))
+            ,.(make-case 'weak-pointer
+                 #+weak-vector-readbarrier
+                 `(if (weak-vector-p ,obj)
+                      (dotimes (.i. (weak-vector-len ,obj))
+                        (,functoid (weak-vector-ref ,obj .i.) ,@more))
+                      (weak-pointer-value ,obj))
+                 #-weak-vector-readbarrier
+                 `(weak-pointer-value ,obj))
             ,.(make-case 'ratio `(%numerator ,obj) `(%denominator ,obj))
             ;; Visitor won't be invoked on (COMPLEX float)
             ,.(make-case '(complex rational) `(%realpart ,obj) `(%imagpart ,obj))
@@ -1250,13 +1257,11 @@ We could try a few things to mitigate this:
 
 ;;; Make sure that every KEY-INFO is in the hashset.
 ;;; We don't dump any from genesis, which is a good thing.
-(let ((cache
-       (sb-impl::hss-cells
-        (sb-impl::hashset-storage sb-kernel::*key-info-hashset*)))
+(let ((cache (sb-impl::hashset-storage sb-kernel::*key-info-hashset*))
       (list
        (list-allocated-objects :all :type instance-widetag
                                     :test #'sb-kernel:key-info-p)))
-  (dolist (x list) (aver (find x cache))))
+  (dolist (x list) (aver (sb-impl::weak-hashset-linear-find/eq x cache))))
 
 #+sb-thread
 (defun show-tls-map ()

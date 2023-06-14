@@ -273,4 +273,11 @@
 (sb-xc:deftype extended-function-designator ()
                '(satisfies extended-function-designator-p))
 
+(sb-xc:deftype weak-vector ()
+  #-weak-vector-readbarrier 'simple-vector
+  ;; New way: A weak vector is a weak-pointer with more than one payload word.
+  ;; So an array of weak words is the lower-level primitive, and a weak-pointer
+  ;; of the old kind is a weak-pointer with only 1 word of payload.
+  #+weak-vector-readbarrier 'weak-pointer)
+
 (/show0 "deftypes-for-target.lisp end of file")

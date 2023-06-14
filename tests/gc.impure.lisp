@@ -14,27 +14,32 @@
 (in-package :cl-user)
 
 (defvar *weak-vect* (make-weak-vector 8))
+(defmacro wvref (v i) `(sb-int:weak-vector-ref ,v ,i))
 (with-test (:name :weak-vector)
   (let ((a *weak-vect*)
         (random-symbol (make-symbol "FRED")))
     (flet ((x ()
-             (setf (aref a 0) (cons 'foo 'bar)
-                   (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
-                   (aref a 2) 'interned-symbol
-                   (aref a 3) random-symbol
-                   (aref a 4) 18
-                   (aref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
-                   (aref a 6) (make-hash-table))))
+             (setf (wvref a 0) (cons 'foo 'bar)
+                   (wvref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
+                   (wvref a 2) 'interned-symbol
+                   (wvref a 3) random-symbol
+                   (wvref a 4) 18
+                   (wvref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
+                   (wvref a 6) (make-hash-table))))
       (declare (notinline x)) ;; Leave all the values below the stack pointer for
       (x))                    ;; scrub-control-stack to work
     (assert (weak-vector-p a))
     (sb-sys:scrub-control-stack)
     (gc)
-    (assert (eq (aref a 2) 'interned-symbol))
-    (assert (eq (aref a 3) random-symbol))
-    (assert (= (aref a 4) 18))
+    (assert (eq (wvref a 2) 'interned-symbol))
+    (assert (eq (wvref a 3) random-symbol))
+    (assert (= (wvref a 4) 18))
     ;; broken cells are the cons, string, bignum, hash-table, plus one NIL
     ;; cell that was never assigned into
+    (assert (null (wvref a 0)))
+    (assert (null (wvref a 1)))
+    (assert (null (wvref a 5)))
+    (assert (null (wvref a 6)))
     *weak-vect*))
 
 ;; Assert something about *CURRENT-THREAD* seeing objects that it just consed.
@@ -105,7 +110,7 @@
     ;; but seems like it'll be OK for a while.
     ;; I see only 4 weak pointers in the baseline image.
     ;; Really we could just assert /= 1000.
-    (assert (< (length l) 60))))
+    (assert (< (length l) 80))))
 
 ;; check that WITHOUT-INTERRUPTS doesn't block SIG_STOP_FOR_GC
 (with-test (:name :gc-without-interrupts

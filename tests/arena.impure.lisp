@@ -58,7 +58,8 @@
                                            "NOSUCHPKG"))
                         return (code-header-ref code i))))
          (elements (cdr cache)))
-    (assert (equalp (cdr cache) #(NIL NIL NIL)))
+    (assert (or (equalp (cdr cache) #(NIL NIL NIL))
+                (search "#<weak array [3]" (write-to-string (cdr cache)))))
     (let* ((a (new-arena 1048576))
            (pkg (with-arena (a) (find-some-pkg))))
       (assert (not pkg)) ; no package was found of course
