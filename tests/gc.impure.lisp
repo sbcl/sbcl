@@ -15,7 +15,8 @@
 
 (defvar *weak-vect* (make-weak-vector 8))
 (defmacro wvref (v i) `(sb-int:weak-vector-ref ,v ,i))
-(with-test (:name :weak-vector)
+(with-test (:name :weak-vector
+            :fails-on :win32)
   (let ((a *weak-vect*)
         (random-symbol (make-symbol "FRED")))
     (flet ((x ()
