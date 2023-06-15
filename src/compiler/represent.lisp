@@ -676,6 +676,42 @@
              (setf (ir2-block-%label next) (gen-label)))
            next))))
 
+(defun split-ir2-block-before (vop)
+  (cond ((vop-prev vop)
+         (with-ir1-environment-from-node (vop-node vop)
+           (let* ((2block (vop-block vop))
+                  (block (ir2-block-block 2block))
+                  (start (make-ctran))
+                  (new-block (ctran-starts-block start))
+                  (no-op-node (make-exit))
+                  (new-2block (make-ir2-block new-block))
+                  (vop-prev (vop-prev vop)))
+             (setf (block-number new-block)
+                   (incf (component-max-block-number (block-component new-block))))
+             (link-node-to-previous-ctran no-op-node start)
+             (setf (block-info new-block) new-2block)
+             (add-to-emit-order new-2block 2block)
+             (setf (block-last new-block) no-op-node)
+             (setf (ir2-block-start-vop new-2block) vop
+                   (ir2-block-last-vop new-2block) (ir2-block-last-vop 2block)
+                   (ir2-block-last-vop 2block) vop-prev
+                   (ir2-block-%label new-2block) (gen-label))
+             (loop for cvop = vop then (vop-next cvop)
+                   while cvop
+                   do (setf (vop-block cvop) new-2block)
+              (setf (vop-prev vop) nil
+                    (vop-next vop-prev) nil))
+             (loop for succ in (block-succ block)
+                   do (unlink-blocks block succ)
+                      (link-blocks new-block succ))
+             (link-blocks block new-block)
+             new-2block)))
+        (t
+         (let ((2block (vop-block vop)))
+           (unless (ir2-block-%label 2block)
+             (setf (ir2-block-%label 2block) (gen-label)))
+           2block))))
+
 ;;; If a MOVE about to be coerced is going to another MOVE, the
 ;;; result of which is compatible with the original TN, jump directly
 ;;; after that move without performing any coercions.
@@ -719,6 +755,59 @@
                                     (ir2-block-block new-block))
             t))))))
 
+;;; If there's already a move VOP that does the same job
+;;; jump to it instead.
+(defun reuse-move-coercion (vop coerce x y block)
+  (when (>= (vop-info-cost coerce) *efficiency-note-cost-threshold*)
+    (let* ((branch (vop-next vop))
+           (dest (cond ((not branch)
+                        (ir2-block-%label (ir2-block-next block)))
+                       ((eq (vop-name branch) 'branch)
+                        (car (vop-codegen-info branch))))))
+      (when (and dest
+                 (not (tn-ref-next (tn-reads y))))
+        (do* ((writes (tn-writes y) (tn-ref-next writes)))
+             ((null writes))
+          (when (eq (vop-info (tn-ref-vop writes)) coerce)
+            (let* ((existing-vop (tn-ref-vop writes))
+                   (existing-branch (vop-next existing-vop))
+                   (existing-dest (cond ((not existing-branch)
+                                         (ir2-block-%label (ir2-block-next (vop-block existing-vop))))
+                                        ((eq (vop-name existing-vop) 'branch)
+                                         (car (vop-codegen-info existing-branch)))))
+                   (new-y (tn-ref-tn (vop-args existing-vop)))
+                   move)
+              (when (and (eq dest existing-dest)
+                         (setf move
+                               (find-move-vop x nil (tn-sc new-y) (tn-primitive-type new-y) #'sc-move-vops)))
+                (let* ((temp-p (tn-ref-next (tn-reads new-y)))
+                       (temp (if temp-p
+                                 (make-representation-tn (tn-primitive-type new-y)
+                                                         (sc-number (tn-sc new-y)))
+                                 ;; Reuse if nothing else reads from it
+                                 new-y)))
+                  (when temp-p
+                    (emit-move-template (vop-node existing-vop) (vop-block existing-vop) move new-y temp existing-vop)
+                    (change-tn-ref-tn (vop-args existing-vop) temp))
+                  (let* ((new-block (split-ir2-block-before existing-vop))
+                         (1block (ir2-block-block block)))
+
+                    (if branch
+                        (setf (vop-codegen-info branch) (list (ir2-block-%label new-block)))
+                        (emit-and-insert-vop (vop-node vop)
+                                             block
+                                             (template-or-lose 'branch)
+                                             nil
+                                             nil
+                                             nil
+                                             (list (ir2-block-%label new-block))))
+                    (change-block-successor 1block (car (block-succ 1block))
+                                            (ir2-block-block new-block))
+
+                    (emit-move-template (vop-node vop) (vop-block vop) move x temp vop)
+                    (delete-vop vop)
+                    (return t)))))))))))
+
 ;;; Scan the IR2 looking for move operations that need to be replaced
 ;;; with special-case VOPs and emitting coercion VOPs for operands of
 ;;; normal VOPs. We delete moves to TNs that are never read at this
@@ -750,11 +839,13 @@
                    (let ((res (or (maybe-move-from-fixnum+-1 x y
                                                              args)
                                   res)))
-                     (when (>= (vop-info-cost res)
-                               *efficiency-note-cost-threshold*)
-                       (maybe-emit-coerce-efficiency-note res args y))
-                     (emit-move-template node (vop-block vop) res x y vop)
-                     (delete-vop vop))))
+                     (unless (reuse-move-coercion vop res x y block)
+                       (when (>= (vop-info-cost res)
+                                 *efficiency-note-cost-threshold*)
+                         (maybe-emit-coerce-efficiency-note res args y))
+
+                       (emit-move-template node (vop-block vop) res x y vop)
+                       (delete-vop vop)))))
                  (t
                   (coerce-vop-operands vop)))))
         ((vop-info-move-args info)
