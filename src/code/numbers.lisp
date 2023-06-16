@@ -307,6 +307,11 @@
      (%make-ratio (- (numerator n)) (denominator n)))
     ((complex)
      (complex (- (realpart n)) (- (imagpart n))))))
+
+(defun %multiply-high (x y)
+  (declare (type word x y))
+  (%multiply-high x y))
+
 
 ;;;; TRUNCATE and friends
 
@@ -381,22 +386,6 @@
       (((foreach fixnum bignum ratio)
         (foreach single-float double-float #+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
-
-(defun %multiply-high (x y)
-  (declare (type word x y))
-  (%multiply-high x y))
-
-;; (defun floor (number &optional (divisor 1))
-;;   "Return the greatest integer not greater than number, or number/divisor.
-;;   The second returned value is (mod number divisor)."
-;;   (declare (explicit-check))
-;;   (floor number divisor))
-
-;; (defun ceiling (number &optional (divisor 1))
-;;   "Return the smallest integer not less than number, or number/divisor.
-;;   The second returned value is the remainder."
-;;   (declare (explicit-check))
-;;   (ceiling number divisor))
 
 (defun floor (number &optional (divisor 1))
   "Return the greatest integer not greater than number, or number/divisor.
