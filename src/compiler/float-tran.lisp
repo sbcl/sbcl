@@ -1770,7 +1770,10 @@
                 (if (minusp f-divisor)
                     (plusp number)
                     (minusp number)))
-           (values (1- tru) (+ rem f-divisor))
+           (values
+            ;; the above conditions wouldn't hold when tru is m-n-f
+            (truly-the fixnum (1- tru))
+            (+ rem f-divisor))
            (values tru rem)))
   (def floor double-float (single-float)
     #1#)
