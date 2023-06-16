@@ -432,7 +432,7 @@
 (defknown (float-digits float-precision) (float) float-digits
   (movable foldable unsafely-flushable))
 (defknown integer-decode-float (float)
-    (values integer float-int-exponent (member -1 1))
+    (values double-float-significand float-int-exponent (member -1 1))
     (movable foldable unsafely-flushable))
 
 (defknown single-float-sign (single-float) single-float (movable foldable flushable))
