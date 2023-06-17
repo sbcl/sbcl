@@ -75,21 +75,18 @@
   (declare (ir2-block 2block))
   (member lvar (reverse (ir2-block-pushed 2block))))
 
-;; Blocks are numbered in reverse DFO order, so the "lowest common
-;; dominator" of a set of blocks is the closest dominator of all of
-;; the blocks.
+;;; Find the lowest common ancestor of BLOCKs in the dominator tree.
 (defun find-lowest-common-dominator (blocks)
-  ;; FIXME: NIL is defined as a valid value for BLOCK-DOMINATORS,
-  ;; meaning "all blocks in component".  Actually handle this case.
-  (let ((common-dominators (copy-sset (block-dominators (first blocks)))))
-    (dolist (block (rest blocks))
-      (sset-intersection common-dominators (block-dominators block)))
-    (let ((lowest-dominator))
-      (do-sset-elements (dominator common-dominators lowest-dominator)
-        (when (or (not lowest-dominator)
-                  (< (sset-element-number dominator)
-                     (sset-element-number lowest-dominator)))
-          (setf lowest-dominator dominator))))))
+  (labels ((intersect (block1 block2)
+             (cond ((eq block1 block2) block1)
+                   ((< (block-number block1) (block-number block2))
+                    (intersect (block-dominator block1) block2))
+                   (t
+                    (intersect block1 (block-dominator block2))))))
+    (let ((dominator (block-dominator (first blocks))))
+      (dolist (block (rest blocks))
+        (setq dominator (intersect block dominator)))
+      dominator)))
 
 ;;; Carefully back-propagate DX LVARs from the start of their
 ;;; environment to where they are allocated, along all code paths

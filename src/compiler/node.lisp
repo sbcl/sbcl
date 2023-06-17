@@ -502,9 +502,8 @@
   ;; other sets used in constraint propagation and/or copy propagation
   (in nil)
   (out nil)
-  ;; Set of all blocks that dominate this block. NIL is interpreted
-  ;; as "all blocks in component".
-  (dominators nil :type (or null sset))
+  ;; The immediate dominator of this block.
+  (dominator nil :type (or null cblock))
   ;; the LOOP that this block belongs to
   (loop nil :type (or null cloop))
   ;; next block in the loop.

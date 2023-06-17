@@ -16,47 +16,48 @@
 
 ;;; FIND-DOMINATORS  --  Internal
 ;;;
-;;; Find the set of blocks that dominates each block in COMPONENT.  We
-;;; assume that the DOMINATORS for each block is initially NIL, which
-;;; serves to represent the set of all blocks.  If a block is not
-;;; reachable from an entry point, then its dominators will still be
-;;; NIL when we are done.
+;;; Compute the immediate dominator of each block in COMPONENT. If a
+;;; block is not reachable from an entry point, then its immediate
+;;; dominator will still be NIL when we are done.
 (defun find-dominators (component)
   (let ((head (loop-head (component-outer-loop component)))
         changed)
-    (let ((set (make-sset)))
-      (sset-adjoin head set)
-      (setf (block-dominators head) set))
-    (loop
-     (setq changed nil)
-     (do-blocks (block component :tail)
-       (let ((dom (block-dominators block)))
-         (when dom (sset-delete block dom))
-         (dolist (pred (block-pred block))
-           (let ((pdom (block-dominators pred)))
-             (when pdom
-               (if dom
-                   (when (sset-intersection dom pdom)
-                     (setq changed t))
-                   (setq dom (copy-sset pdom) changed t)))))
-         (setf (block-dominators block) dom)
-         (when dom (sset-adjoin block dom))))
-     (unless changed (return)))
+    (setf (block-dominator head) head)
+    (labels ((intersect (block1 block2)
+               (cond ((eq block1 block2) block1)
+                     ((< (block-number block1) (block-number block2))
+                      (intersect (block-dominator block1) block2))
+                     (t
+                      (intersect block1 (block-dominator block2))))))
+      (loop
+        (setq changed nil)
+        (do-blocks (block component :tail)
+          (let ((dom))
+            (dolist (pred (block-pred block))
+              (unless (null (block-dominator pred))
+                (setq dom (if dom
+                              (intersect pred dom)
+                              pred))))
+            (unless (eq (block-dominator block) dom)
+              (setf (block-dominator block) dom)
+              (setq changed t))))
+        (unless changed (return))))
+    (setf (block-dominator head) nil)
     (setf (component-dominators-computed component) t)))
 
 (defun clear-dominators (component)
   (do-blocks (block component)
-    (setf (block-dominators block) nil))
+    (setf (block-dominator block) nil))
   (setf (component-dominators-computed component) nil))
 
 ;;; DOMINATES-P  --  Internal
 ;;;
 ;;;    Return true if BLOCK1 dominates BLOCK2, false otherwise.
 (defun dominates-p (block1 block2)
-  (let ((set (block-dominators block2)))
-    (if set
-        (sset-member block1 set)
-        t)))
+  (cond ((null block2) nil)
+        ((eq block1 block2) t)
+        (t
+         (dominates-p block1 (block-dominator block2)))))
 
 ;;; LOOP-ANALYZE  --  Interface
 ;;;
