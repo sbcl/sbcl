@@ -89,6 +89,8 @@
            (maphash (lambda (k v)
                       (declare (ignore k))
                       (unless (or (eq v :deprecated)
+                                  (typep v '(cons (eql macro)))
+                                  (heap-alien-info-p v)
                                   (constant-p v)
                                   (and (global-var-p v)
                                        (member (global-var-kind v)
