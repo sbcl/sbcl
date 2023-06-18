@@ -1676,6 +1676,7 @@
            ;; combination.
            (when (and (functional-letlike-p fun)
                       (eq (let-combination fun) node))
+             (unlink-node (first (leaf-refs fun)))
              (delete-lambda fun))))
        (flush-dest (basic-combination-fun node))
        (dolist (arg (basic-combination-args node))

@@ -6354,3 +6354,10 @@
             (let ((oldval (symbol-value symbol)))
               (if (funcall eqx oldval expr) oldval expr))
             expr)))))
+
+(with-test (:name :check-consistency-deleted-let)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     `(lambda ()
+        (let ((x (error "fail")))
+          x)))))
