@@ -16,7 +16,7 @@
 
 ;;; FIND-DOMINATORS  --  Internal
 ;;;
-;;; Compute the immediate dominator of each block in COMPONENT. If a
+;;; Find the immediate dominator of each block in COMPONENT.  If a
 ;;; block is not reachable from an entry point, then its immediate
 ;;; dominator will still be NIL when we are done.
 (defun find-dominators (component)
