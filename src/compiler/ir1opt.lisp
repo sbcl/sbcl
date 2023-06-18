@@ -105,6 +105,9 @@
 ;;; The result value is cached in the LVAR-%DERIVED-TYPE slot. If the
 ;;; slot is true, just return that value, otherwise recompute and
 ;;; stash the value there.
+
+;;; Above comment describes (defun lvar-derived-type ...)
+
 (defmacro lvar-type-using (lvar accessor)
   `(let ((uses (lvar-uses ,lvar)))
      (cond ((null uses) *empty-type*)

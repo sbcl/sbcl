@@ -408,7 +408,6 @@
  ("src/compiler/{arch}/arith")
  ("src/compiler/{arch}/pred")
 
- ;; this file defines the INTERVAL struct which is also used in 'srctran'
  ("src/compiler/float-tran")
  ("src/compiler/array-tran")
  ("src/compiler/ir1final")

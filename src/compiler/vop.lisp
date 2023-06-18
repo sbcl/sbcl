@@ -1143,3 +1143,10 @@
   block
   kind
   (number :test number))
+
+(defstruct (conditional-flags
+            (:constructor make-conditional-flags (flags))
+            (:copier nil))
+  flags)
+
+(declaim (freeze-type conditional-flags))

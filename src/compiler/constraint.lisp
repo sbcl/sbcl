@@ -89,6 +89,14 @@
   ;; does *not* hold.
   (not-p nil :type boolean))
 
+;;; The basic interval type. It can handle open and closed intervals.
+;;; A bound is open if it is a list containing a number, just like
+;;; Lisp says. NIL means unbounded.
+(defstruct (interval (:constructor %make-interval (low high))
+                     (:copier nil))
+  low high)
+(declaim (freeze-type interval))
+
 
 ;;; Historically, CMUCL and SBCL have used a sparse set implementation
 ;;; for which most operations are O(n) (see sset.lisp), but at the
