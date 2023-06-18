@@ -616,13 +616,14 @@
                      (if (template-conditional-p info) 0 (length rtypes))
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
-      (unless (or (= (+ (length (vop-codegen-info vop))
-                        (if (typep (template-result-types info) '(cons (eql :conditional)))
-                            -1
-                            0))
+      (unless (or (= (length (vop-codegen-info vop))
                      (template-info-arg-count info))
                   ;; Allow these 2 allocator vops to take an undeclared info arg
-                  (member (vop-info-name info) '(sb-vm::fixed-alloc sb-vm::var-alloc)))
+                  (member (vop-info-name info) '(sb-vm::fixed-alloc sb-vm::var-alloc))
+                  ;; FIXME: The current representation for conditional
+                  ;; flag setting VOPs makes it difficult to check
+                  ;; agreement between declared and actual info args.
+                  (typep (template-result-types info) '(cons (eql :conditional))))
         (barf "wrong number of codegen info args in ~S" vop))))
   (values))
 

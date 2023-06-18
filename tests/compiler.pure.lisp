@@ -6344,3 +6344,13 @@
     (checked-compile
      `(lambda ()
         (print (lambda (x) (apply (read) x)))))))
+
+(with-test (:name :check-consistency-info-arg-count)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     `(lambda (symbol expr eqx)
+        (declare (type function eqx))
+        (if (boundp symbol)
+            (let ((oldval (symbol-value symbol)))
+              (if (funcall eqx oldval expr) oldval expr))
+            expr)))))
