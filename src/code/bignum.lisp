@@ -1385,7 +1385,7 @@
     (multiple-value-bind (word-index bit-index)
         (floor index digit-size)
       (if (>= word-index len)
-          (not (bignum-plus-p bignum))
+          (not (%bignum-0-or-plusp bignum len))
           (logbitp bit-index (%bignum-ref bignum word-index))))))
 
 (defun bignum-logcount (bignum)
