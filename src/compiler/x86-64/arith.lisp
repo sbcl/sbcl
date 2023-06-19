@@ -3193,7 +3193,15 @@
 
 (define-vop (bignum-length get-header-data)
   (:translate sb-bignum:%bignum-length)
-  (:policy :fast-safe))
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg any-reg)))
+  (:generator 6
+    (loadw res x 0 other-pointer-lowtag)
+    #.(assert (zerop (ash bignum-widetag
+                        (- n-fixnum-tag-bits n-widetag-bits))))
+    (inst shr res (if (sc-is res any-reg)
+                      (- n-widetag-bits n-fixnum-tag-bits)
+                      n-widetag-bits))))
 
 (define-vop (bignum-set-length set-header-data)
   (:translate sb-bignum:%bignum-set-length)
