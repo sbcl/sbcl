@@ -1389,13 +1389,11 @@
           (logbitp bit-index (%bignum-ref bignum word-index))))))
 
 (defun bignum-logcount (bignum)
-  (declare (type bignum bignum)
-           (optimize speed))
-  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
+  (declare (type bignum bignum))
   (let ((length (%bignum-length bignum))
         (result 0))
     (declare (type bignum-length length)
-             (fixnum result))
+             (type (integer 0 #.(* maximum-bignum-length digit-size))  result))
     (do ((index 0 (1+ index)))
         ((= index length)
          (if (%bignum-0-or-plusp bignum length)
