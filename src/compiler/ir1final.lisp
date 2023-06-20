@@ -294,7 +294,9 @@
               ;; It seems impolite (un-debuggable too) to alter the lexenv-policy
               ;; of functional-lexenv, so annotate this differently.
               (setf (getf (functional-plist (ref-leaf ref)) 'verify-arg-count)
-                    nil))))))))
+                    nil))))
+        (when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
+          (reorder-type-tests node))))))
 
 (defun change-full-call (combination new-fun-name)
   (let ((ref (lvar-uses (combination-fun combination))))
@@ -322,6 +324,81 @@
                            always (csubtypep (lvar-type arg) type)))
             (setf two-arg typed-two-arg))
           (change-full-call combination two-arg))))))
+
+;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
+;;; checks for other-pointer into a single widetag load.
+;;; Reorder type tests so that e.g.
+;;; (typecase u
+;;;   (double-float 0)
+;;;   (single-float 1)
+;;;   (bignum 2))
+;;;
+;;; gets turned into
+;;; (typecase u
+;;;  (double-float 0)
+;;;  (bignum 2)
+;;;  (single-float 1))
+;;; for the ir2 optimization to get triggered.
+(defun reorder-type-tests (node)
+  (flet ((other-pointer-type-check-p (node)
+           (getf sb-vm::*other-pointer-type-vops* (combination-fun-source-name node nil)))
+         (not-other-pointer-type-check-p (node)
+           (let ((name (combination-fun-source-name node nil)))
+             (and
+              (gethash name *backend-predicate-types*)
+              (not (getf sb-vm::*other-pointer-type-vops* name)))))
+         (var (pred)
+           (let* ((arg (car (combination-args pred)))
+                  (use (lvar-uses arg)))
+             (and (ref-p use)
+                  (lambda-var-p (ref-leaf use))
+                  (ref-leaf use)))))
+    (when (other-pointer-type-check-p node)
+      (let* ((block (node-block node))
+             (if (block-last block))
+             (var (var node)))
+        (when (and var
+                   (if-p if)
+                   (eq (if-test if) (node-lvar node)))
+          (flet ((if-to-typecheck (if other-pointer-p)
+                   (let* ((block (if-alternative if))
+                          (next-if (block-last block))
+                          arg
+                          result)
+                     (when (and (if-p next-if)
+                                (not (cdr (block-pred block)))
+                                (only-harmless-cleanups (node-block if)
+                                                        block))
+                       (do-nodes (node lvar block)
+                         (typecase node
+                           (ref
+                            (when (or arg
+                                      (neq (ref-leaf node) var))
+                              (setf arg lvar)))
+                           (combination
+                            (unless (and (eq (car (combination-args node)) arg)
+                                         (if other-pointer-p
+                                             (other-pointer-type-check-p node)
+                                             (not-other-pointer-type-check-p node)))
+                              (return-from if-to-typecheck))
+                            (setf result (node-lvar node)))
+                           (cif
+                            (unless (eq (if-test node) result)
+                              (return-from if-to-typecheck)))
+                           (t
+                            (return-from if-to-typecheck))))
+                       (values block)))))
+            (let ((next-block (if-to-typecheck if nil)))
+              (when next-block
+                (let* ((next-if (block-last next-block))
+                       (next-next-block (if-to-typecheck next-if t)))
+                  (when next-next-block
+                    (let* ((next-next-if (block-last next-next-block))
+                           (end (if-alternative next-next-if)))
+                      (when (only-harmless-cleanups next-next-block end)
+                        (change-block-successor block next-block next-next-block)
+                        (change-block-successor next-next-block end next-block)
+                        (change-block-successor next-block next-next-block end)))))))))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:

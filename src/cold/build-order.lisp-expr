@@ -410,11 +410,11 @@
 
  ("src/compiler/float-tran")
  ("src/compiler/array-tran")
- ("src/compiler/ir1final")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/type-vop-macros")
  ("src/compiler/{arch}/type-vops")
  ("src/compiler/generic/type-vops")
+ ("src/compiler/ir1final")
 
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
