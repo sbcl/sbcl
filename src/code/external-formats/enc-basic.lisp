@@ -21,28 +21,28 @@
         (string-to-octets-name/crlf (symbolicate string-to-octets-name '/crlf)))
     `(progn
        (declaim (inline ,get-bytes-name ,get-bytes-name/cr))
-       (defun ,get-bytes-name (string pos)
+       (defun ,get-bytes-name (string pos replacement)
          (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range pos))
-         (get-latin-bytes #',code->-name ',external-format string pos))
-       (defun ,string-to-octets-name (string sstart send null-padding)
+         (get-latin-bytes #',code->-name ',external-format replacement string pos))
+       (defun ,string-to-octets-name (string sstart send null-padding replacement)
          (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range sstart send))
-         (values (string->latin% string sstart send #',get-bytes-name null-padding)))
-       (defun ,get-bytes-name/cr (string pos)
+         (values (string->latin% string sstart send #',get-bytes-name null-padding replacement)))
+       (defun ,get-bytes-name/cr (string pos replacement)
          (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range pos))
          (get-latin-bytes (lambda (code) (,code->-name (if (= code 10) 13 code)))
-                          ',external-format string pos))
-       (defun ,string-to-octets-name/cr (string sstart send null-padding)
+                          '(,external-format :newline :cr) replacement string pos))
+       (defun ,string-to-octets-name/cr (string sstart send null-padding replacement)
          (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range sstart send))
-         (values (string->latin% string sstart send #',get-bytes-name/cr null-padding)))
-       (defun ,string-to-octets-name/crlf (string sstart send null-padding)
+         (values (string->latin% string sstart send #',get-bytes-name/cr null-padding replacement)))
+       (defun ,string-to-octets-name/crlf (string sstart send null-padding replacement)
          (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range sstart send))
@@ -57,7 +57,8 @@
                          (vector-push-extend (,code->-name 13) array)
                          (vector-push-extend byte array))
                         ((null byte)
-                         (let ((replacement (encoding-error ',external-format string i)))
+                         (let ((replacement (encoding-error '(,external-format :newline :crlf)
+                                                            replacement string i)))
                            (declare (type (simple-array (unsigned-byte 8) (*)) replacement))
                            (dotimes (j (length replacement))
                              (vector-push-extend (aref replacement j) array))))
@@ -79,10 +80,11 @@
                           ``((define-condition ,',decoding-condition-name (octet-decoding-error) ())))
                      ,,(if invalid-bytes-p
                            ``(progn
-                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
+                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend replacement)
                                  (declare (optimize speed)
                                           (type ,type array)
-                                          (type array-range astart aend))
+                                          (type array-range astart aend)
+                                          (ignorable replacement))
                                  (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
                                    (loop for apos from astart below aend
                                          do (let* ((byte (,accessor array apos))
@@ -92,6 +94,7 @@
                                                         (code-char code)
                                                         (decoding-error array apos (1+ apos)
                                                                         ,',external-format
+                                                                        replacement
                                                                         ',',decoding-condition-name
                                                                         apos))))
                                               (if (characterp string-content)
@@ -99,10 +102,11 @@
                                                   (loop for c across string-content
                                                         do (vector-push-extend c string))))
                                          finally (return (coerce string 'simple-string)))))
-                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
+                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend replacement)
                                  (declare (optimize speed)
                                           (type ,type array)
-                                          (type array-range astart aend))
+                                          (type array-range astart aend)
+                                          (ignorable replacement))
                                  (let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
                                    (loop for apos from astart below aend
                                          do (let* ((byte (,accessor array apos))
@@ -111,7 +115,8 @@
                                                     (cond
                                                       ((null code)
                                                        (decoding-error array apos (1+ apos)
-                                                                       ,',external-format
+                                                                       '(,',external-format :newline :cr)
+                                                                       replacement
                                                                        ',',decoding-condition-name
                                                                        apos))
                                                       ((= code 13) (code-char 10))
@@ -122,15 +127,18 @@
                                                         do (vector-push-extend c string))))
                                          finally (return (coerce string 'simple-string))))))
                            ``(progn
-                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend)
+                               (defun ,(make-od-name ',octets-to-string-name accessor) (array astart aend replacement)
+                                 (declare (ignore replacement))
                                  (,(make-od-name 'latin->string accessor) array astart aend #',',->code-name))
-                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend)
+                               (defun ,(make-od-name ',octets-to-string-name/cr accessor) (array astart aend replacement)
+                                 (declare (ignore replacement))
                                  (,(make-od-name 'latin->string accessor) array astart aend
                                    (lambda (x) (let ((code (,',->code-name x))) (if (= code 13) 10 code)))))))
-                     (defun ,(make-od-name ',octets-to-string-name/crlf accessor) (array astart aend)
+                     (defun ,(make-od-name ',octets-to-string-name/crlf accessor) (array astart aend replacement)
                        (declare (optimize speed)
                                 (type ,type array)
-                                (type array-range astart aend))
+                                (type array-range astart aend)
+                                (ignorable replacement))
                        (let ((string (make-array (- aend astart) :element-type 'character
                                                  :fill-pointer 0 :adjustable t)))
                          (loop for apos from astart below aend
@@ -141,7 +149,8 @@
                                             ,@',(when invalid-bytes-p
                                                   `(((null code)
                                                      (decoding-error array apos (1+ apos)
-                                                                     ,external-format
+                                                                     '(,external-format :newline :crlf)
+                                                                     replacement
                                                                      ',decoding-condition-name
                                                                      apos))))
                                             ((= code 13)
@@ -331,7 +340,7 @@
                    (add-byte (logior #x80 (ldb (byte 6 6) code)))
                    (add-byte (logior #x80 (ldb (byte 6 0) code))))))
            (def (name newline)
-             `(defun ,name (string sstart send null-padding)
+             `(defun ,name (string sstart send null-padding replacement)
                 (declare (optimize (speed 3) #.*safety-0*)
                          (type simple-string string)
                          (type (integer 0 1) null-padding)
@@ -370,7 +379,11 @@
                                                           :fill-pointer index))
                               (replace new-array array)
                             :error
-                              (let ((replacement (encoding-error :utf-8 string index)))
+                              (let ((replacement (encoding-error
+                                                  ,(if (eql newline :lf)
+                                                       :utf-8
+                                                       `'(:utf-8 :newline ,newline))
+                                                  replacement string index)))
                                 (flet ((add-byte (b) (vector-push-extend b new-array)))
                                   (dotimes (i (length replacement))
                                     (add-byte (aref replacement i)))
@@ -395,7 +408,7 @@
 
 ;;; from UTF-8
 
-(macrolet ((def (crlfp definer-name base-name)
+(macrolet ((def (crlfp newline definer-name base-name)
              `(progn
                 (defmacro ,definer-name (accessor type)
                   (let ((name (make-od-name ',base-name accessor)))
@@ -403,9 +416,9 @@
                        ;;(declaim (inline ,name))
                        (let ((lexically-max
                               (string->utf8 (string (code-char ,(1- char-code-limit)))
-                                            0 1 0)))
+                                            0 1 0 nil)))
                          (declare (type (simple-array (unsigned-byte 8) (#+sb-unicode 4 #-sb-unicode 2)) lexically-max))
-                         (defun ,name (array pos end)
+                         (defun ,name (array pos end replacement)
                            (declare (optimize speed #.*safety-0*)
                                     (type ,type array)
                                     (type array-range pos end))
@@ -523,11 +536,14 @@
                                               (character-out-of-range (+ pos maybe-len))))
                                            (bad-len (- bad-end pos)))
                                       (declare (type array-range bad-end bad-len))
-                                      (let ((replacement (decoding-error array pos bad-end :utf-8 reject-reason reject-position)))
+                                      (let ((replacement (decoding-error array pos bad-end
+                                                                         ,,(if newline ``'(:utf-8 :newline ,,newline) '':utf-8)
+                                                                         replacement reject-reason reject-position)))
                                         (values bad-len replacement)))))))))))))
                 (instantiate-octets-definition ,definer-name))))
-  (def nil define-bytes-per-utf8-character bytes-per-utf8-character)
-  (def t define-bytes-per-utf8-character/crlf bytes-per-utf8-character/crlf))
+  (def nil nil define-bytes-per-utf8-character bytes-per-utf8-character)
+  (def nil :cr define-bytes-per-utf8-character/clr bytes-per-utf8-character/cr)
+  (def t :crlf define-bytes-per-utf8-character/crlf bytes-per-utf8-character/crlf))
 
 (macrolet ((def (newline definer-name base-name)
              `(progn
@@ -574,7 +590,7 @@
                 (defmacro ,definer-name (accessor type)
                   (let ((name (make-od-name ',base-name accessor)))
                     `(progn
-                       (defun ,name (array astart aend)
+                       (defun ,name (array astart aend replacement)
                          (declare (optimize speed #.*safety-0*)
                                   (type ,type array)
                                   (type array-range astart aend))
@@ -582,7 +598,7 @@
                            (loop with pos = astart
                                  while (< pos aend)
                                  do (multiple-value-bind (bytes invalid)
-                                        (,(make-od-name ',bytes-per-base-name accessor) array pos aend)
+                                        (,(make-od-name ',bytes-per-base-name accessor) array pos aend replacement)
                                       (declare (type (or null string) invalid))
                                       (cond
                                         ((null invalid)

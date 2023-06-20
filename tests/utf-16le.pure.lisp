@@ -26,9 +26,7 @@
                                        :external-format ',outxf
                                        :direction :output :if-exists :supersede)
                       (handler-bind ((sb-int:character-encoding-error
-                                      (lambda (c)
-                                        (let ((restart (find-restart 'sb-impl::output-nothing c)))
-                                          (invoke-restart restart)))))
+                                      (lambda (c) (use-value "" c))))
                         (let ((pos (file-position s))
                               (len (file-string-length s string)))
                           (let ((actual

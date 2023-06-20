@@ -36,31 +36,35 @@
                                       (octets-encoding-error-position c)))
                      (octets-encoding-error-external-format c)))))
 
-(declaim (ftype (sfunction (t t t) (simple-array (unsigned-byte 8) 1))
+(defun encoding-replacement-octetify (thing external-format)
+  (etypecase thing
+    ;; TODO: make sure EXTERNAL-FORMAT here does not have a REPLACEMENT, and handle
+    ;; encoding errors explicitly
+    (character
+     (string-to-octets (string thing) :external-format external-format))
+    (string
+     (string-to-octets thing :external-format external-format))
+    ((unsigned-byte 8) (make-array 1 :element-type '(unsigned-byte 8) :initial-element thing))
+    (sequence (coerce thing '(simple-array (unsigned-byte 8) 1)))))
+
+(declaim (ftype (sfunction (t t t t) (simple-array (unsigned-byte 8) 1))
                 encoding-error))
-(defun encoding-error (external-format string pos)
-  (restart-case
-      (error 'octets-encoding-error
-             :external-format external-format
-             :string string
-             :position pos)
-    (use-value (replacement)
-      :report "Supply a set of bytes to use in place of the invalid one."
-      :interactive
-      (lambda ()
-        (read-evaluated-form
-         "Replacement byte, bytes, character, or string (evaluated): "))
-      (typecase replacement
-        ((unsigned-byte 8)
-         (make-array 1 :element-type '(unsigned-byte 8) :initial-element replacement))
-        (character
-         (string-to-octets (string replacement)
-                           :external-format external-format))
-        (string
-         (string-to-octets replacement
-                           :external-format external-format))
-        (t
-         (coerce replacement '(simple-array (unsigned-byte 8) (*))))))))
+(defun encoding-error (external-format replacement string pos)
+  (flet ((replacement (replacement) (encoding-replacement-octetify replacement external-format)))
+    (if replacement
+        (replacement replacement)
+        (restart-case
+            (error 'octets-encoding-error
+                   :external-format external-format
+                   :string string
+                   :position pos)
+          (use-value (replacement)
+            :report "Supply a set of bytes to use in place of the invalid one."
+            :interactive
+            (lambda ()
+              (read-evaluated-form
+               "Replacement byte, bytes, character, or string (evaluated): "))
+            (replacement replacement))))))
 
 ;;; decoding condition
 
@@ -98,21 +102,37 @@
 (define-condition invalid-utf8-continuation-byte (octet-decoding-error) ())
 (define-condition overlong-utf8-sequence (octet-decoding-error) ())
 
-(defun decoding-error (array start end external-format reason pos)
-  (restart-case
-      (error reason
-             :external-format external-format
-             :array array
-             :start start
-             :end end
-             :pos pos)
-    (use-value (s)
-      :report "Supply a replacement string designator."
-      :interactive
-      (lambda ()
-        (read-evaluated-form
-         "Enter a replacement string designator (evaluated): "))
-      (string s))))
+(defun decoding-replacement-stringify (thing external-format)
+  (etypecase thing
+    (character (string thing))
+    (string thing)
+    ;; TODO: make sure EXTERNAL-FORMAT here does not have a REPLACEMENT, and handle
+    ;; decoding errors explicitly
+    ((unsigned-byte 8)
+     (let ((octets (make-array 1 :element-type '(unsigned-byte 8) :initial-element thing)))
+       (octets-to-string octets :external-format external-format)))
+    (sequence
+     (let ((octets (coerce thing '(simple-array (unsigned-byte 8) 1))))
+       (octets-to-string octets :external-format external-format)))))
+
+(defun decoding-error (array start end external-format replacement reason pos)
+  (flet ((replacement (thing) (decoding-replacement-stringify thing external-format)))
+    (if replacement
+        (replacement replacement)
+        (restart-case
+            (error reason
+                   :external-format external-format
+                   :array array
+                   :start start
+                   :end end
+                   :pos pos)
+          (use-value (replacement)
+            :report "Supply a replacement string."
+            :interactive
+            (lambda ()
+              (read-evaluated-form
+               "Replacement byte, bytes, character, or string (evaluated): "))
+            (replacement replacement))))))
 
 ;;; Utilities used in both to-string and to-octet conversions
 
@@ -222,17 +242,17 @@
                                       nil))))))))
 
 (declaim (inline get-latin-bytes))
-(defun get-latin-bytes (mapper external-format string pos)
+(defun get-latin-bytes (mapper external-format replacement string pos)
   (let ((code (funcall mapper (char-code (char string pos)))))
     (declare (type (or null char-code) code))
     (values (cond
               ((and code (< code 256)) code)
               (t
-               (encoding-error external-format string pos)))
+               (encoding-error external-format replacement string pos)))
             1)))
 
 (declaim (inline string->latin%))
-(defun string->latin% (string sstart send get-bytes null-padding)
+(defun string->latin% (string sstart send get-bytes null-padding replacement)
   (declare (optimize speed)
            (type simple-string string)
            (type index sstart send)
@@ -251,7 +271,7 @@
     (tagbody
      :no-error
        (loop for pos of-type index from sstart below send
-          do (let ((byte (funcall get-bytes string pos)))
+          do (let ((byte (funcall get-bytes string pos replacement)))
                (typecase byte
                  ((unsigned-byte 8)
                   (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
@@ -280,7 +300,7 @@
                       (vector-push-extend (aref thing i) new-octets))))))
            (extend error-replacement)
            (loop for pos of-type index from (1+ error-position) below send
-                 do (extend (funcall get-bytes string pos))
+                 do (extend (funcall get-bytes string pos replacement))
                  finally (return-from string->latin%
                            (progn
                              (unless (zerop null-padding)
@@ -365,8 +385,9 @@ subsequence bounded by START and END)."
                     (end end)
                     :check-fill-pointer t)
     (declare (type (simple-array (unsigned-byte 8) (*)) vector))
-    (let ((ef (maybe-defaulted-external-format external-format)))
-      (funcall (ef-octets-to-string-fun ef) vector start end))))
+    (let* ((ef (maybe-defaulted-external-format external-format))
+           (replacement (ef-replacement ef)))
+      (funcall (ef-octets-to-string-fun ef) vector start end replacement))))
 
 (declaim (ftype (sfunction (string &key (:external-format t)
                                    (:start index)
@@ -399,9 +420,10 @@ STRING (or the subsequence bounded by START and END)."
                     (end end)
                     :check-fill-pointer t)
     (declare (type simple-string string))
-    (let ((ef (maybe-defaulted-external-format external-format)))
+    (let* ((ef (maybe-defaulted-external-format external-format))
+           (replacement (ef-replacement ef)))
       (funcall (ef-string-to-octets-fun ef) string start end
-               (if null-terminate 1 0)))))
+               (if null-terminate 1 0) replacement))))
 
 ;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
 ;;; by one or more keyword symbols. The mapping from symbol to index into this
@@ -433,101 +455,64 @@ STRING (or the subsequence bounded by START and END)."
       (setf (get name :external-format) free-index))
     (setf (aref table free-index) ef)))
 
-(defun wrap-external-format-functions (external-format fun)
-  (let ((result (%copy-external-format external-format)))
-    (macrolet ((frob (accessor)
-                 `(setf (,accessor result) (funcall fun (,accessor result)))))
-      (frob ef-read-n-chars-fun)
-      (frob ef-read-char-fun)
-      (frob ef-write-n-bytes-fun)
-      (frob ef-write-char-none-buffered-fun)
-      (frob ef-write-char-line-buffered-fun)
-      (frob ef-write-char-full-buffered-fun)
-      (frob ef-resync-fun)
-      (frob ef-bytes-for-char-fun)
-      (frob ef-read-c-string-fun)
-      (frob ef-write-c-string-fun)
-      (frob ef-octets-to-string-fun)
-      (frob ef-string-to-octets-fun))
-    result))
 ;;; This function was moved from 'fd-stream' because it depends on
 ;;; the various error classes, two of which are defined just above.
 ;;; XXX: Why does this get called with :DEFAULT and NIL when neither is
 ;;; the name  of any format? Shouldn't those be handled higher up,
 ;;; or else this should return the actual default?
 (defun get-external-format (external-format)
-  (flet ((replacement-handlerify (entry replacement)
-           (wrap-external-format-functions
-              entry
-              (lambda (fun)
-                (and fun
-                     (lambda (&rest rest)
-                       (declare (dynamic-extent rest))
-                       (handler-bind
-                           ((stream-decoding-error
-                             (lambda (c)
-                               (declare (ignore c))
-                               (invoke-restart 'input-replacement replacement)))
-                            (stream-encoding-error
-                             (lambda (c)
-                               (declare (ignore c))
-                               (invoke-restart 'output-replacement replacement)))
-                            (octets-encoding-error
-                             (lambda (c) (use-value replacement c)))
-                            (octet-decoding-error
-                             (lambda (c) (use-value replacement c))))
-                         (apply fun rest))))))))
-
-    (binding*
-        (((format-name newline replacement)
-          (etypecase external-format
-            ;; This seem like such an unnecessarily general way to
-            ;; pass optional parameters. What's up with that?  (I
-            ;; think it's because BINDING* uses MULTIPLE-VALUE-BIND
-            ;; but optionals are most easily handled with
-            ;; DESTRUCTURING-BIND)
-            ((cons keyword)
-             (values (car external-format)
-                     (getf (cdr external-format) :newline :lf)
-                     (getf (cdr external-format) :replacement)))
-            (symbol
-             (values external-format :lf nil))))
-         (table-index (get format-name :external-format) :exit-if-null)
-         (formats *external-formats*)
-         (table-entry
-          ;; The table entry can be one of:
-          ;;   1. #<external-format>
-          ;;   2. (#<external-format> ((:crlf #\char) . #<modified-ef>) ...)
-          ;;      for a list of modified formats that alter the
-          ;;      newline encoding and choice of replacement character.
-          ;;   3. "namestring" - to autoload from a fasl containing
-          ;;      the named format.
-          (let ((ef (svref formats table-index)))
-            (etypecase ef
-              ((or instance list) ef)
-              #+nil
-              (string
-               ;; Theoretically allow demand-loading the external-format
-               ;; from a fasl of this name. (Not done yet)
-               ;; (module-provide-contrib ef)
-               (let ((ef (svref formats table-index)))
-                 (aver (external-format-p ef))
-                 ef)))))
-         ((base-format variations)
-          (if (listp table-entry)
-              (values (car table-entry) (cdr table-entry))
-              (values table-entry nil)))
-         (newline-base-format
-          (if (eql newline :lf)
-              base-format
-              (cdr (assoc (list newline) variations :test #'equal)))))
+  (binding*
+      (((format-name newline replacement)
+        (etypecase external-format
+          ;; This seem like such an unnecessarily general way to
+          ;; pass optional parameters. What's up with that?  (I
+          ;; think it's because BINDING* uses MULTIPLE-VALUE-BIND
+          ;; but optionals are most easily handled with
+          ;; DESTRUCTURING-BIND)
+          ((cons keyword)
+           (values (car external-format)
+                   (getf (cdr external-format) :newline :lf)
+                   (getf (cdr external-format) :replacement)))
+          (symbol
+           (values external-format :lf nil))))
+       (table-index (get format-name :external-format) :exit-if-null)
+       (formats *external-formats*)
+       (table-entry
+        ;; The table entry can be one of:
+        ;;   1. #<external-format>
+        ;;   2. (#<external-format> ((:crlf #\char) . #<modified-ef>) ...)
+        ;;      for a list of modified formats that alter the
+        ;;      newline encoding and choice of replacement character.
+        ;;   3. "namestring" - to autoload from a fasl containing
+        ;;      the named format.
+        (let ((ef (svref formats table-index)))
+          (etypecase ef
+            ((or instance list) ef)
+            #+nil
+            (string
+             ;; Theoretically allow demand-loading the external-format
+             ;; from a fasl of this name. (Not done yet)
+             ;; (module-provide-contrib ef)
+             (let ((ef (svref formats table-index)))
+               (aver (external-format-p ef))
+               ef)))))
+       ((base-format variations)
+        (if (listp table-entry)
+            (values (car table-entry) (cdr table-entry))
+            (values table-entry nil)))
+       (newline-base-format
+        (if (eql newline :lf)
+            base-format
+            (cdr (assoc (list newline) variations :test #'equal)))))
       (when (or (not newline-base-format) (not replacement))
         (return-from get-external-format newline-base-format))
       (loop
         (let ((key (cons newline replacement)))
           (awhen (assoc key variations :test #'equal)
             (return (cdr it)))
-          (let* ((new-ef (replacement-handlerify newline-base-format replacement))
+          (let* ((new-ef (let ((copy (copy-structure newline-base-format)))
+                           (setf (ef-replacement copy) replacement)
+                           copy))
                  (new-table-entry
                   (cons base-format (acons key new-ef variations)))
                  (old (cas (svref formats table-index) table-entry new-table-entry)))
@@ -536,7 +521,7 @@ STRING (or the subsequence bounded by START and END)."
             ;; CAS failure -> some other thread added an entry. It's probably
             ;; for the same replacement char which is usually #\ufffd.
             ;; So try again. At worst this conses some more garbage.
-            (setq table-entry old)))))))
+            (setq table-entry old))))))
 
 (push
   `("SB-IMPL"

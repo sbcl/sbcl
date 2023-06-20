@@ -161,6 +161,7 @@
   (external-format :latin-1)
   ;; fixed width, or function to call with a character
   (char-size 1 :type (or fixnum function))
+  (replacement nil :type (or null character string (simple-array (unsigned-byte 8) 1)))
   (output-bytes #'ill-out :type function))
 
 (defun fd-stream-bivalent-p (stream)
@@ -527,62 +528,109 @@
 ;;; Returning true goes into end of file handling, false will enter another
 ;;; round of input buffer filling followed by re-entering character decode.
 (defun stream-decoding-error-and-handle (stream octet-count)
-  (restart-case
-      (error 'stream-decoding-error
-             :external-format (stream-external-format stream)
-             :stream stream
-             :octets (let ((buffer (fd-stream-ibuf stream)))
-                       (sap-ref-octets (buffer-sap buffer)
-                                       (buffer-head buffer)
-                                       octet-count)))
-    (attempt-resync ()
-      :report (lambda (stream)
-                (format stream
-                        "~@<Attempt to resync the stream at a ~
+  (let ((external-format (stream-external-format stream))
+        (replacement (fd-stream-replacement stream)))
+    (labels ((replacement (thing)
+               (let* ((string (decoding-replacement-stringify thing external-format))
+                      (reversed (reverse string))
+                      (instead (fd-stream-instead stream)))
+                 (dotimes (i (length reversed))
+                   (vector-push-extend (char reversed i) instead))
+                 (when (> (length reversed) 0)
+                   (setf (fd-stream-listen stream) t))
+                 (resync)))
+             (resync ()
+               (fd-stream-resync stream)
+               nil))
+      (if replacement
+          (replacement replacement)
+          (restart-case
+              (error 'stream-decoding-error
+                     :external-format external-format
+                     :stream stream
+                     :octets (let ((buffer (fd-stream-ibuf stream)))
+                               (sap-ref-octets (buffer-sap buffer)
+                                               (buffer-head buffer)
+                                               octet-count)))
+            (attempt-resync ()
+              :report (lambda (stream)
+                        (format stream
+                                "~@<Attempt to resync the stream at a ~
                         character boundary and continue.~@:>"))
-      (fd-stream-resync stream)
-      nil)
-    (force-end-of-file ()
-      :report (lambda (stream)
-                (format stream "~@<Force an end of file.~@:>"))
-      (setf (fd-stream-eof-forced-p stream) t))
-    (input-replacement (string)
-      :report (lambda (stream)
-                (format stream "~@<Use string as replacement input, ~
+              (resync))
+            (force-end-of-file ()
+              :report (lambda (stream)
+                        (format stream "~@<Force an end of file.~@:>"))
+              (setf (fd-stream-eof-forced-p stream) t))
+            (use-value (replacement)
+              :report (lambda (stream)
+                        (format stream "~@<Use datum as replacement input, ~
+                                        attempt to resync at a character ~
+                                        boundary and continue.~@:>"))
+              :interactive (lambda ()
+                             (read-evaluated-form
+                              "Replacement byte, bytes, character, or string (evaluated): "))
+              (replacement replacement))
+            (input-replacement (thing)
+              :report (lambda (stream)
+                        (format stream "~@<Use string as replacement input, ~
                                attempt to resync at a character ~
                                boundary and continue.~@:>"))
-      :interactive (lambda ()
-                     (format *query-io* "~@<Enter a string: ~@:>")
-                     (finish-output *query-io*)
-                     (list (read *query-io*)))
-      (let ((string (reverse (string string)))
-            (instead (fd-stream-instead stream)))
-        (dotimes (i (length string))
-          (vector-push-extend (char string i) instead))
-        (fd-stream-resync stream)
-        (when (> (length string) 0)
-          (setf (fd-stream-listen stream) t)))
-      nil)))
+              :interactive (lambda ()
+                             (format *query-io* "~@<Enter a string: ~@:>")
+                             (finish-output *query-io*)
+                             (list (read *query-io*)))
+              (replacement thing)))))))
 ) ; end MACROLET
 
+(defun encoding-replacement-adjust-charpos (replacement stream)
+  (typecase replacement
+    (character (if (char= replacement #\Newline)
+                   (setf (fd-stream-output-column stream) 0)
+                   (incf (fd-stream-output-column stream) 1)))
+    (string (let ((newline-pos (position #\Newline replacement :from-end t)))
+              (if newline-pos
+                  (setf (fd-stream-output-column stream) (- (length replacement) newline-pos 1))
+                  (incf (fd-stream-output-column stream) (length replacement)))))
+    ((unsigned-byte 8))
+    ((simple-array (unsigned-byte 8) 1))))
+
 (defun stream-encoding-error-and-handle (stream code)
-  (restart-case
-      (error 'stream-encoding-error
-             :external-format (stream-external-format stream)
-             :stream stream
-             :code code)
-    (output-nothing ()
-      :report (lambda (stream)
-                (format stream "~@<Skip output of this character.~@:>")))
-    (output-replacement (string)
-      :report (lambda (stream)
-                (format stream "~@<Output replacement string.~@:>"))
-      :interactive (lambda ()
-                     (format *query-io* "~@<Enter a string: ~@:>")
-                     (finish-output *query-io*)
-                     (list (read *query-io*)))
-      (let ((string (string string)))
-        (fd-sout stream (string string) 0 (length string))))))
+  (let ((external-format (stream-external-format stream))
+        (replacement (fd-stream-replacement stream)))
+    (labels ((replacement (thing)
+               (let ((octets (encoding-replacement-octetify thing external-format)))
+                 (ecase (fd-stream-buffering stream)
+                   (:full (buffer-output stream octets 0 (length octets)))
+                   (:line (buffer-output stream octets 0 (length octets)))
+                   (:none (write-or-buffer-output stream octets 0 (length octets))))
+                 (encoding-replacement-adjust-charpos thing stream))))
+      (if replacement
+          (replacement replacement)
+          (restart-case
+              (error 'stream-encoding-error
+                     :external-format external-format
+                     :stream stream
+                     :code code)
+            (output-nothing ()
+              :report (lambda (stream)
+                        (format stream "~@<Skip output of this character.~@:>")))
+            (use-value (replacement)
+              :report (lambda (stream)
+                        (format stream "~@<Use datum as replacement output.~@:>"))
+              :interactive (lambda ()
+                             (read-evaluated-form
+                              "Replacement byte, bytes, character, or string (evaluated): "))
+              (replacement replacement))
+            (output-replacement (string)
+              :report (lambda (stream)
+                        (format stream "~@<Output replacement string.~@:>"))
+              :interactive (lambda ()
+                             (format *query-io* "~@<Enter a string: ~@:>")
+                             (finish-output *query-io*)
+                             (list (read *query-io*)))
+              (let ((string (string string)))
+                (fd-sout stream (string string) 0 (length string)))))))))
 
 (defun %external-format-encoding-error (stream code)
   (if (streamp stream)
@@ -833,6 +881,7 @@
   (names (missing-arg) :type list :read-only t)
   (newline-variant (missing-arg) :type (member :crlf :lf :cr) :read-only t)
   (default-replacement-character (missing-arg) :type character)
+  (replacement nil :type (or null character string (simple-array (unsigned-byte 8) 1)))
   (read-n-chars-fun (missing-arg) :type function)
   (read-char-fun (missing-arg) :type function)
   (write-n-bytes-fun (missing-arg) :type function)
@@ -903,6 +952,7 @@
                 1
                 (ef-write-n-bytes-fun entry)
                 (ef-char-size entry)
+                (ef-replacement entry)
                 (canonize-external-format external-format entry)))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
@@ -1261,6 +1311,7 @@
                 1
                 (ef-read-n-chars-fun entry)
                 (ef-char-size entry)
+                (ef-replacement entry)
                 (canonize-external-format external-format entry)))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
@@ -1777,6 +1828,7 @@
          (bivalent-stream-p (eq element-type :default))
          normalized-external-format
          char-size
+         replacement
          (bin-routine #'ill-bin)
          (bin-type nil)
          (bin-size nil)
@@ -1831,14 +1883,14 @@
                       target-type)))
         (when (or (not character-stream-p) bivalent-stream-p)
           (setf (values bin-routine bin-type bin-size read-n-characters
-                        char-size normalized-external-format)
+                        char-size replacement normalized-external-format)
                 (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
                                         target-type)
                                     external-format))
           (unless bin-routine (no-input-routine)))
         (when character-stream-p
           (setf (values cin-routine cin-type cin-size read-n-characters
-                        char-size normalized-external-format)
+                        char-size replacement normalized-external-format)
                 (pick-input-routine target-type external-format))
           (unless cin-routine (no-input-routine))))
       (setf (fd-stream-in fd-stream) cin-routine
@@ -1848,7 +1900,8 @@
       (setf input-type (or cin-type bin-type))
       (when normalized-external-format
         (setf (fd-stream-external-format fd-stream) normalized-external-format
-              (fd-stream-char-size fd-stream) char-size))
+              (fd-stream-char-size fd-stream) char-size
+              (fd-stream-replacement fd-stream) replacement))
       (when (= (or cin-size 1) (or bin-size 1) 1)
         (setf (fd-stream-n-bin fd-stream) ;XXX
               (if (and character-stream-p (not bivalent-stream-p))
@@ -1879,7 +1932,7 @@
     (when output-p
       (when (or (not character-stream-p) bivalent-stream-p)
         (setf (values bout-routine bout-type bout-size output-bytes
-                      char-size normalized-external-format)
+                      char-size replacement normalized-external-format)
               (let ((buffering (fd-stream-buffering fd-stream)))
                 (if bivalent-stream-p
                     (pick-output-routine '(unsigned-byte 8)
@@ -1894,7 +1947,7 @@
                  target-type)))
       (when character-stream-p
         (setf (values cout-routine cout-type cout-size output-bytes
-                      char-size normalized-external-format)
+                      char-size replacement normalized-external-format)
               (pick-output-routine target-type
                                    (fd-stream-buffering fd-stream)
                                    external-format))
@@ -1904,6 +1957,7 @@
                  target-type)))
       (when normalized-external-format
         (setf (fd-stream-external-format fd-stream) normalized-external-format
+              (fd-stream-replacement fd-stream) replacement
               (fd-stream-char-size fd-stream) char-size))
       (when character-stream-p
         (setf (fd-stream-output-bytes fd-stream) output-bytes))

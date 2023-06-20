@@ -131,9 +131,7 @@
                 (with-test (:name (,(macroexpand 'name env) :file ,inxf))
                   (with-open-file (s *test-path* :external-format ',inxf)
                     (handler-bind ((sb-int:character-decoding-error
-                                    (lambda (c)
-                                      (let ((restart (find-restart 'sb-impl::attempt-resync c)))
-                                        (invoke-restart restart)))))
+                                    (lambda (c) (use-value "" c))))
                       (let* ((string (make-string 20))
                              (count (read-sequence string s)))
                         (assert (equal (map 'list 'identity (subseq string 0 count)) ,expected))))))
@@ -159,9 +157,7 @@
                                    :external-format ',outxf
                                    :direction :output :if-exists :supersede)
                   (handler-bind ((sb-int:character-encoding-error
-                                  (lambda (c)
-                                    (let ((restart (find-restart 'sb-impl::output-nothing c)))
-                                      (invoke-restart restart)))))
+                                  (lambda (c) (use-value "" c))))
                     (write-sequence ,chars s)))
                 (with-test (:name (,(macroexpand 'name env) :file ,outxf))
                   (with-open-file (s *test-path* :element-type '(unsigned-byte 8))
@@ -170,7 +166,7 @@
                       (assert (equal (map 'list 'identity (subseq vector 0 count)) ,expected)))))
                 (with-test (:name (,(macroexpand 'name env) :octets ,outxf))
                   (handler-bind ((sb-int:character-encoding-error
-                                  (lambda (c) (use-value nil c))))
+                                  (lambda (c) (use-value "" c))))
                     (let* ((string (coerce chars 'string))
                            (octets (sb-ext:string-to-octets string :external-format ',outxf)))
                       (assert (typep octets '(simple-array (unsigned-byte 8) 1)))
@@ -336,9 +332,7 @@
                                        :external-format ',outxf
                                        :direction :output :if-exists :supersede)
                       (handler-bind ((sb-int:character-encoding-error
-                                      (lambda (c)
-                                        (let ((restart (find-restart 'sb-impl::output-nothing c)))
-                                          (invoke-restart restart)))))
+                                      (lambda (c) (use-value "" c))))
                         (let ((pos (file-position s))
                               (len (file-string-length s string)))
                           (let ((actual
