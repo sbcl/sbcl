@@ -1565,21 +1565,22 @@
              ;; At least one bit is obtained from each of two words,
              ;; and not more than two words.
              (let* ((low-part-size
-                     (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
-                                (- digit-size bit-index)))
+                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
+                                 (- digit-size bit-index)))
                     (high-part-size
-                     (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
-                                (- byte-size low-part-size))))
-               (logior (truly-the (and fixnum unsigned-byte) ; high part
-                         (let ((word-index (1+ word-index)))
-                           (if (< word-index n-digits) ; next word exists
-                               (ash (ldb (byte high-part-size 0)
-                                         (%bignum-ref bignum word-index))
-                                    low-part-size)
-                               (mask-field (byte high-part-size low-part-size)
-                                           (%sign-digit bignum n-digits)))))
-                       (ldb (byte low-part-size bit-index) ; low part
-                            (%bignum-ref bignum word-index)))))))))
+                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
+                                 (- byte-size low-part-size))))
+               (logior
+                ;; high part
+                (truly-the fixnum
+                           (let ((word-index (1+ word-index)))
+                             (ash (ldb (byte high-part-size 0)
+                                       (if (< word-index n-digits) ; next word exists
+                                           (%bignum-ref bignum word-index)
+                                           (%sign-digit bignum n-digits)))
+                                  low-part-size)))
+                (truly-the fixnum
+                           (ash (%bignum-ref bignum word-index) (- bit-index))))))))))
 
 ;;; Basically shift the bignum right by byte-pos, but assumes it's
 ;;; right at the end of the bignum.
@@ -1589,7 +1590,7 @@
            (optimize speed))
   (let ((n-digits (%bignum-length bignum)))
     (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
-      (cond ((<= (+ bit-index sb-vm:n-fixnum-bits) digit-size) ; contained in one word
+      (cond ((<= bit-index (- digit-size sb-vm:n-fixnum-bits)) ; contained in one word
              (sb-c::mask-signed-field sb-vm:n-fixnum-bits
                                       (ash (%bignum-ref bignum word-index) (- bit-index))))
             (t
@@ -1597,20 +1598,16 @@
              ;; and not more than two words.
              (let* ((low-part-size
                       (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
-                                 (- digit-size bit-index)))
-                    (high-part-size
-                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
-                                 (- sb-vm:n-fixnum-bits low-part-size))))
-               (logior
-                (let ((word-index (1+ word-index)))
-                  (sb-c::mask-signed-field sb-vm:n-fixnum-bits
-                                           (if (< word-index n-digits) ; next word exists
-                                               (ash (%bignum-ref bignum word-index) low-part-size)
-                                               (truly-the word
-                                                          (mask-field (byte high-part-size low-part-size)
-                                                                      (%sign-digit bignum n-digits))))))
-                (ldb (byte low-part-size bit-index)
-                     (%bignum-ref bignum word-index)))))))))
+                                 (- digit-size bit-index))))
+               (sb-c::mask-signed-field sb-vm:n-fixnum-bits
+                                        (logior
+                                         (let ((word-index (1+ word-index)))
+                                           (ash (if (< word-index n-digits) ; next word exists
+                                                    (%bignum-ref bignum word-index)
+                                                    (%sign-digit bignum n-digits))
+                                                low-part-size))
+                                         (ash (%bignum-ref bignum word-index)
+                                              (- bit-index))))))))))
 
 ;;;; TRUNCATE
 
