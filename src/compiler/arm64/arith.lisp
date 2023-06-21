@@ -241,21 +241,11 @@
   (:generator 6
     (inst add r x y)))
 
-(define-binop logandc1 2 bic :swap t
-  :constant-test bic-encode-immediate
-  :constant-fixnum-test bic-fixnum-encode-immediate
-  :constant-op and
-  :constant-transform bic-mask)
 (define-binop logandc2 2 bic
   :constant-test bic-encode-immediate
   :constant-fixnum-test bic-fixnum-encode-immediate
   :constant-op and
   :constant-transform bic-mask)
-
-(define-vop (fast-logandc1/signed-unsigned=>unsigned fast-logandc1/unsigned=>unsigned)
-  (:args (x :scs (signed-reg))
-         (y :scs (unsigned-reg)))
-  (:arg-types signed-num unsigned-num))
 
 (define-vop (fast-logandc2/unsigned-signed=>unsigned fast-logandc2/unsigned=>unsigned)
   (:args (x :scs (unsigned-reg))

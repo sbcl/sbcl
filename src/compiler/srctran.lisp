@@ -4519,6 +4519,8 @@
   (source-transform-transitive 'gcd args 0 'integer '(abs)))
 (define-source-transform lcm (&rest args)
   (source-transform-transitive 'lcm args 1 'integer '(abs)))
+(deftransform logandc1 ((x y))
+  `(logandc2 y x))
 
 (deftransform gcd ((x y) ((and fixnum (not (eql 0)))
                           (and fixnum (not (eql 0)))))

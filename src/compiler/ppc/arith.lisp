@@ -395,7 +395,6 @@
 (!define-var-binop + 4 add)
 (!define-var-binop - 4 sub)
 (!define-var-binop logand 2 and)
-(!define-var-binop logandc1 2 andc t)
 (!define-var-binop logandc2 2 andc)
 (!define-var-binop logior 2 or)
 (!define-var-binop logorc1 2 orc t t)
@@ -416,11 +415,6 @@
 (!define-const-logop logand 2 andi.)
 (!define-const-logop logior 2 ori oris)
 (!define-const-logop logxor 2 xori xoris)
-
-(define-vop (fast-logandc1/signed-unsigned=>unsigned fast-logandc1/unsigned=>unsigned)
-  (:args (x :scs (signed-reg))
-         (y :scs (unsigned-reg)))
-  (:arg-types signed-num unsigned-num))
 
 (define-vop (fast-logandc2/unsigned-signed=>unsigned fast-logandc2/unsigned=>unsigned)
   (:args (x :scs (unsigned-reg))
@@ -752,7 +746,6 @@
   (define-modular-backend logeqv)
   (define-modular-backend lognand)
   (define-modular-backend lognor)
-  (define-modular-backend logandc1)
   (define-modular-backend logandc2)
   (define-modular-backend logorc1)
   (define-modular-backend logorc2))

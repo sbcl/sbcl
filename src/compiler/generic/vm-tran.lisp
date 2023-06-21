@@ -666,7 +666,7 @@
                      (push `(define-good-modular-fun ,fun :untagged t) result)
                      (push `(define-good-modular-fun ,fun :tagged t) result))))))
   (define-good-signed-modular-funs
-      logand logandc1 logandc2 logeqv logior lognand lognor lognot
+      logand logandc2 logeqv logior lognand lognor lognot
       logorc1 logorc2 logxor))
 
 ;;;; word-wise logical operations
@@ -702,7 +702,7 @@
   `(logand (logorc2 x y) ,most-positive-word))
 
 (deftransform word-logical-andc1 ((x y))
-  `(logand (logandc1 x y) ,most-positive-word))
+  `(logand (logandc2 y x) ,most-positive-word))
 
 (deftransform word-logical-andc2 ((x y))
   `(logand (logandc2 x y) ,most-positive-word))

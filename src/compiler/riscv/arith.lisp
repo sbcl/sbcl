@@ -157,8 +157,6 @@
   (if (oddp (length args))
       `(logxor ,@args)
       `(lognot (logxor ,@args))))
-(define-source-transform logandc1 (x y)
-  `(logand (lognot ,x) ,y))
 (define-source-transform logandc2 (x y)
   `(logand ,x (lognot ,y)))
 (define-source-transform logorc1 (x y)
