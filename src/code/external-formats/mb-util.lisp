@@ -219,10 +219,9 @@
                     (add-byte (ldb (byte 8 16) code))
                     (add-byte (ldb (byte 8 8) code))
                     (add-byte (ldb (byte 8 0) code)))))
-               ;; TODO: it looks like this doesn't actually
-               ;; participate in the protocol: we should emit the
-               ;; octets that this returns.
-               (encoding-error ,format replacement string pos))))
+               (let ((octets (encoding-error ,format replacement string pos)))
+                 (dotimes (i (length octets))
+                   (vector-push-extend (aref octets i) dest))))))
 
        (defun ,string->mb (string sstart send additional-space replacement)
          (declare (optimize speed #.*safety-0*)

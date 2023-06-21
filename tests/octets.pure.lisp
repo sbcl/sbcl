@@ -257,6 +257,12 @@
 (assert (equalp #(251) (string-to-octets (string (code-char 369))
                                          :external-format :latin-2)))
 
+(with-test (:name (:euc-jp :encoding-errors) :skipped-on (or (not :sb-unicode) :unicode-lite))
+  (handler-bind ((sb-int:character-encoding-error
+                  (lambda (c) (use-value #\? c))))
+    (assert (equalp (string-to-octets (map 'string 'code-char '(#xb2 #x5e #xb3))
+                                      :external-format :euc-jp)
+                    (vector (char-code #\?) (char-code #\^) (char-code #\?))))))
 (with-test (:name (:euc-jp :decoding-errors) :skipped-on (or (not :sb-unicode) :unicode-lite))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value #\? c))))
