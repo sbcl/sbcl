@@ -393,6 +393,8 @@
                                         ; "don't reoptimize this (LOGAND) node any more".
               )))))))
 
+(setf (fun-info-optimizer (fun-info-or-lose 'logandc2)) #'logand-optimizer-optimizer)
+
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
   (let ((result-type (single-value-type (node-derived-type node))))
     (multiple-value-bind (low high)
