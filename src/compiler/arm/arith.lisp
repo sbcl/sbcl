@@ -172,6 +172,16 @@
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
+(define-vop (fast-logandc1/signed-unsigned=>unsigned fast-logandc1/unsigned=>unsigned)
+  (:args (x :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num))
+
+(define-vop (fast-logandc2/unsigned-signed=>unsigned fast-logandc2/unsigned=>unsigned)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num))
+
 (define-vop (fast-logior-unsigned-signed=>signed fast-safe-arith-op)
   (:args (x :scs (unsigned-reg))
          (y :target r :scs (signed-reg)))

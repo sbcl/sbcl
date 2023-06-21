@@ -240,6 +240,16 @@
   (define-const-logop logior 2 ori oris or)
   (define-const-logop logxor 2 xori xoris xor))
 
+(define-vop (fast-logandc1/signed-unsigned=>unsigned fast-logandc1/unsigned=>unsigned)
+  (:args (x :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num))
+
+(define-vop (fast-logandc2/unsigned-signed=>unsigned fast-logandc2/unsigned=>unsigned)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num))
+
 (define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
   (:args (x :scs (signed-reg) :target r)
          (y :scs (unsigned-reg) :target r))

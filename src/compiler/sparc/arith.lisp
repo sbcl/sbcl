@@ -107,8 +107,6 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 (defmacro define-binop (translate untagged-penalty op
                         &optional arg-swap restore-fixnum-mask)
   `(progn
@@ -160,8 +158,6 @@
              (:generator ,untagged-penalty
                (inst ,op r x y)))))))
 
-); eval-when
-
 (define-binop + 4 add)
 (define-binop - 4 sub)
 (define-binop logand 2 and)
@@ -172,6 +168,16 @@
 (define-binop logorc2 2 orn nil t)
 (define-binop logxor 2 xor)
 (define-binop logeqv 2 xnor nil t)
+
+(define-vop (fast-logandc1/signed-unsigned=>unsigned fast-logandc1/unsigned=>unsigned)
+  (:args (x :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num))
+
+(define-vop (fast-logandc2/unsigned-signed=>unsigned fast-logandc2/unsigned=>unsigned)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num))
 
 (define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
   (:args (x :scs (signed-reg) :target r)
