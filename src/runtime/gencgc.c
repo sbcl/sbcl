@@ -5518,8 +5518,40 @@ char gc_coalesce_string_literals = 0;
 
 extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
 
-/* Do a non-conservative GC, and then save a core with the initial
- * function being set to the value of 'lisp_init_function' */
+/* Do a non-conservative GC twice, and then save a core with the initial
+ * function being set to the value of 'lisp_init_function'.
+ * The first GC is into relatively high page indices, and the 2nd is back
+ * into lower page indices. This compacts the retained data into the lower
+ * pages, minimizing the size of the core file.
+ *
+ * But note: There is no assurance that this technique actually works,
+ * and that the final GC can fit all data below the starting allocation
+ * page in the penultimate GC. If it doesn't fit, things are technically
+ * ok, but horrible in terms of core file size.  Consider:
+ *
+ * Penultimate GC: (moves all objects higher in memory)
+ *   | ... from_space ... |
+ *                        ^--  gencgc_alloc_start_page = next_free_page
+ *                        | ... to_space ... |
+ *                                           ^ new next_free_page
+ *
+ * Utimate GC: (moves all objects lower in memory)
+ *   | ... to_space ...   | ... from_space ...| ... |
+ *                                                  ^ new next_free_page ?
+ * Question:
+ *  In the ultimate GC, can next_free_page actually increase past
+ *  its ending value from the penultimate GC?
+ * Answer:
+ *  Yes- Suppose the sequence of copying is so adversarial to the allocator
+ *  that attempts to fit an object in a region fail often, and require
+ *  frequent opening of new regions. (And/or imagine a particularly bad mix
+ *  of boxed and non-boxed allocations such that the logic for resuming
+ *  at the tail of a partially filled page in gc_find_freeish_pages()
+ *  is seldom applicable)  If this occurs, then some allocation must
+ *  be on a higher page than all of to_space and from_space.
+ *  Then the entire (zeroed) from_space will be present in the saved core
+ *  as empty pages, because we can't represent discontiguous ranges.
+ */
 void
 gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
             boolean save_runtime_options, boolean compressed,
@@ -5565,51 +5597,12 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     }
 #endif
 
-    /* Collect twice: once into relatively high memory, and then back
-     * into low memory. This compacts the retained data into the lower
-     * pages, minimizing the size of the core file.
-     *
-     * But note: There is no assurance that this technique actually works,
-     * and that the final GC can fit all data below the starting allocation
-     * page in the penultimate GC. If it doesn't fit, things are technically
-     * ok, but horrible in terms of core file size.  Consider:
-     *
-     * Penultimate GC: (moves all objects higher in memory)
-     *   | ... from_space ... |
-     *                        ^--  gencgc_alloc_start_page = next_free_page
-     *                        | ... to_space ... |
-     *                                           ^ new next_free_page
-     *
-     * Utimate GC: (moves all objects lower in memory)
-     *   | ... to_space ...   | ... from_space ...| ... |
-     *                                                  ^ new next_free_page ?
-     * Question:
-     *  In the ultimate GC, can next_free_page actually increase past
-     *  its ending value from the penultimate GC?
-     * Answer:
-     *  Yes- Suppose the sequence of copying is so adversarial to the allocator
-     *  that attempts to fit an object in a region fail often, and require
-     *  frequent opening of new regions. (And/or imagine a particularly bad mix
-     *  of boxed and non-boxed allocations such that the logic for resuming
-     *  at the tail of a partially filled page in gc_find_freeish_pages()
-     *  is seldom applicable)  If this occurs, then some allocation must
-     *  be on a higher page than all of to_space and from_space.
-     *  Then the entire (zeroed) from_space will be present in the saved core
-     *  as empty pages, because we can't represent discontiguous ranges.
-     */
     conservative_stack = 0;
     gencgc_oldest_gen_to_gc = 0;
-    // Avoid tenuring of otherwise-dead objects referenced by
-    // dynamic bindings which disappear on image restart.
-    struct thread *thread = get_sb_vm_thread();
-    char *start = (char*)&thread->lisp_thread;
-    char *end = (char*)thread + dynamic_values_bytes;
-    memset(start, 0, end-start);
-    // After zeroing, make sure PINNED_OBJECTS is a list again.
-    write_TLS(PINNED_OBJECTS, NIL, thread);
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
     // Flush regions to ensure heap scan in copy_rospace doesn't miss anything
+    struct thread *thread = get_sb_vm_thread();
     gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
     move_rospace_to_dynamic(0);
@@ -5617,19 +5610,15 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc();
     unwind_binding_stack();
-#ifdef LISP_FEATURE_SB_THREAD
-    /* During save, if the only pointer to a heap object is from a thread, then that
-     * heap object is effectively dead, because the binding stacks and TLS of the main
-     * thread will be recreated on startup and contain no pointers.
-     * Make it as if that already happened, otherwise excess garbage may be retained
-     * (as can be seen if DEBUG_CORE_LOADING is defined).
-     * non-thread builds do not use TLS */
-    {
-    char* from = (char*)&thread->lisp_thread;
-    char* to = SymbolValue(FREE_TLS_INDEX,0) + (char*)thread;
-    memset(from, 0, to-from);
-    }
-#endif
+    // Avoid tenuring of otherwise-dead objects referenced by bindings which
+    // disappear on image restart. This must occcur *after* unwind_binding_stack()
+    // because unwinding moves values from the binding stack into TLS.
+    char *start = (char*)&thread->lisp_thread;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+    // After zeroing, make sure PINNED_OBJECTS is a list again.
+    write_TLS(PINNED_OBJECTS, NIL, thread);
+
     save_lisp_gc_iteration = 1;
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(0);
