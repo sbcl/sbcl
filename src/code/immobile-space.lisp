@@ -21,6 +21,7 @@
           (dstate (make-dstate nil))
           (sap (int-sap 0))
           (seg (sb-disassem::%make-segment :sap-maker (lambda () sap))))
+     (declare (ignorable mov-ea mov-imm-acc))
      (macrolet ((do-functions ((fun-var addr-var) &body body)
                   ;; Loop over all embedded functions
                   `(dotimes (fun-index (code-n-entries ,',code-var))
