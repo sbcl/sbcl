@@ -23,7 +23,7 @@
 (defvar *entry-points-argument*)
 (declaim (type list *entry-points-argument*))
 
-(defvar *check-consistency* nil)
+(defvar *check-consistency* #-arm64 t #+arm64 nil)
 
 ;;; Set to NIL to disable loop analysis for register allocation.
 (defvar *loop-analyze* t)
@@ -701,22 +701,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defvar *compile-component-hook* nil)
 
 (defun compile-component (component)
-
-  ;; miscellaneous sanity checks
-  ;;
-  ;; FIXME: These are basically pretty wimpy compared to the checks done
-  ;; by the old CHECK-IR1-CONSISTENCY code. It would be really nice to
-  ;; make those internal consistency checks work again and use them.
   (aver-live-component component)
-  (do-blocks (block component)
-    (aver (eql (block-component block) component)))
-  (dolist (lambda (component-lambdas component))
-    ;; sanity check to prevent weirdness from propagating insidiously as
-    ;; far from its root cause as it did in bug 138: Make sure that
-    ;; thing-to-COMPONENT links are consistent.
-    (aver (eql (lambda-component lambda) component))
-    (aver (eql (node-component (lambda-bind lambda)) component)))
-
   (let* ((*component-being-compiled* component))
 
     (when *compile-progress*

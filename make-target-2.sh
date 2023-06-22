@@ -67,6 +67,8 @@ echo //doing warm init - load and dump phase
 (setf sb-c::*merge-pathnames* t)
 ;;; and for storing pathname namestrings in fasls too.
 (setq sb-c::*name-context-file-path-selector* 'truename)
+#-sb-devel ; Turn off IR consistency checking in release mode.
+(setq sb-c::*check-consistency* nil)
 (let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF
