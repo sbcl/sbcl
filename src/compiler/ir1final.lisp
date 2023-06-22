@@ -389,23 +389,30 @@
                               (return-from if-to-typecheck)))
                            (t
                             (return-from if-to-typecheck))))
-                       (values block)))))
-            (let ((next-block (if-to-typecheck if nil)))
+                       (values block arg)))))
+            (multiple-value-bind (next-block next-lvar) (if-to-typecheck if nil)
               (when next-block
-                (let* ((next-if (block-last next-block))
-                       (next-next-block (if-to-typecheck next-if t)))
-                  (when next-next-block
-                    (let* ((next-next-if (block-last next-next-block))
-                           (end (if-alternative next-next-if)))
-                      (when (only-harmless-cleanups next-next-block end)
-                        (change-block-successor block next-block next-next-block)
-                        (change-block-successor next-next-block end next-block)
-                        (change-block-successor next-block next-next-block end)
-                        ;; Both branches now might go to the same block
-                        ;; this will delete the IF and the test.
-                        (ir1-optimize-if next-if t)
-                        (when (block-flush-p next-block)
-                          (flush-dead-code next-block))))))))))))))
+                (let ((next-if (block-last next-block)))
+                  (multiple-value-bind (next-next-block next-next-lvar) (if-to-typecheck next-if t)
+                    (when next-next-block
+                      (let* ((next-next-if (block-last next-next-block))
+                             (end (if-alternative next-next-if)))
+                        (when (only-harmless-cleanups next-next-block end)
+                          (change-block-successor block next-block next-next-block)
+                          (change-block-successor next-next-block end next-block)
+                          (change-block-successor next-block next-next-block end)
+                          ;; A different type from constraint propagation.
+                          ;; It's important to change the type if ir2
+                          ;; doesn't optimize these series of type tests
+                          ;; for some reason.
+                          (derive-node-type (lvar-use next-next-lvar)
+                                            (node-derived-type (lvar-use next-lvar))
+                                            :from-scratch t)
+                          ;; Both branches now might go to the same block
+                          ;; this will delete the IF and the test.
+                          (ir1-optimize-if next-if t)
+                          (when (block-flush-p next-block)
+                            (flush-dead-code next-block)))))))))))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
