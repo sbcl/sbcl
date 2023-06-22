@@ -181,7 +181,8 @@
                 ;; bother optimizing it.
                 (not (lvar-value-is-nil fun)))
            (setf (basic-combination-fun dest) fun
-                 (basic-combination-args node) '(nil)
+                 (basic-combination-args node) '()
+                 (lvar-dest fun) dest
                  (node-lvar node) nil
                  (lvar-info fun) (make-ir2-lvar (primitive-type (lvar-type fun))))
            (annotate-1-value-lvar fun))

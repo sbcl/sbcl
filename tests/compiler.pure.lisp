@@ -6338,3 +6338,9 @@
          (values
           5
           6))))))
+
+(with-test (:name :check-consistency-call-symbol)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     `(lambda ()
+        (print (lambda (x) (apply (read) x)))))))
