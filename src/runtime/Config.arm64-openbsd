@@ -12,4 +12,4 @@
 include Config.arm64-bsd
 include Config.generic-openbsd
 
-LINKFLAGS += -Wl,--export-dynamic
+LINKFLAGS += -Wl,--export-dynamic -Wl,--no-execute-only

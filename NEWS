@@ -5,8 +5,10 @@ changes relative to sbcl-2.3.5:
   * optimization: better (the word-sized-type (ASH word-sized word-sized))
     when the result can overflow. For arm64 and x86-64.
   * optimization: better unoptimized calls to CEILING, FLOOR.
-  * optimization: functions that involve coercing floats are now cons less.
+  * optimization: functions that involve coercing floats now cons less.
     For arm64 and x86-64.
+  * platform support:
+    * Restore OpenBSD/arm64 for OpenBSD 7.3
 
 changes in sbcl-2.3.5 relative to sbcl-2.3.4:
   * enhancement: Unicode support has been updated to support version 15.0.0 of
