@@ -393,7 +393,8 @@
 
 ;;;; IR1-OPTIMIZE
 
-(declaim (start-block ir1-optimize ir1-optimize-last-effort))
+(declaim (start-block ir1-optimize ir1-optimize-last-effort
+                      flush-dead-code))
 
 ;;; Do one forward pass over COMPONENT, deleting unreachable blocks
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
