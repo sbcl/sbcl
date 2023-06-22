@@ -4059,3 +4059,33 @@
     (assert (= (funcall fun 2 0d0) 2d0))
     (assert (= (funcall fun 3 0d0) 3d0))
     (assert (null (funcall fun 4 0d0)))))
+
+(with-test (:name :reorder-keywordp)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (cond ((stringp a)
+                1)
+               ((keywordp a)
+                2)
+               ((symbolp a)
+                3)))
+    (("a") 1)
+    ((:a) 2)
+    (('m) 3)
+    ((1) nil)))
+
+(with-test (:name :reorder-same-block)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (typecase a
+           (double-float 1)
+           (fixnum 2)
+           (bignum 3)
+           (t 2)))
+    ((1d0) 1)
+    ((1) 2)
+    (((1+ most-positive-fixnum)) 3)
+    ((t) 2)))
+

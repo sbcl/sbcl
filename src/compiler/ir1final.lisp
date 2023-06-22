@@ -346,7 +346,9 @@
            (let ((name (combination-fun-source-name node nil)))
              (and
               (gethash name *backend-predicate-types*)
-              (not (getf sb-vm::*other-pointer-type-vops* name)))))
+              (not (getf sb-vm::*other-pointer-type-vops* name))
+              ;; has a VOP and is an other-pointer but not in *other-pointer-type-vops*
+              (neq name 'keywordp))))
          (var (pred)
            (let* ((arg (car (combination-args pred)))
                   (use (lvar-uses arg)))
@@ -398,7 +400,12 @@
                       (when (only-harmless-cleanups next-next-block end)
                         (change-block-successor block next-block next-next-block)
                         (change-block-successor next-next-block end next-block)
-                        (change-block-successor next-block next-next-block end)))))))))))))
+                        (change-block-successor next-block next-next-block end)
+                        ;; Both branches now might go to the same block
+                        ;; this will delete the IF and the test.
+                        (ir1-optimize-if next-if t)
+                        (when (block-flush-p next-block)
+                          (flush-dead-code next-block))))))))))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
