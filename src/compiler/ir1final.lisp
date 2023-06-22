@@ -365,6 +365,7 @@
           (flet ((if-to-typecheck (if other-pointer-p)
                    (let* ((block (if-alternative if))
                           (next-if (block-last block))
+                          fun-lvar
                           arg
                           result)
                      (when (and (if-p next-if)
@@ -374,11 +375,16 @@
                        (do-nodes (node lvar block)
                          (typecase node
                            (ref
-                            (when (or arg
-                                      (neq (ref-leaf node) var))
-                              (setf arg lvar)))
+                            (cond ((and (eq (ref-leaf node) var)
+                                        (not arg))
+                                   (setf arg lvar))
+                                  ((not fun-lvar)
+                                   (setf fun-lvar lvar))
+                                  (t
+                                   (return-from if-to-typecheck))))
                            (combination
                             (unless (and (eq (car (combination-args node)) arg)
+                                         (eq (combination-fun node) fun-lvar)
                                          (if other-pointer-p
                                              (other-pointer-type-check-p node)
                                              (not-other-pointer-type-check-p node)))
