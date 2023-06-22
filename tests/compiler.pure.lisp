@@ -6328,3 +6328,13 @@
               (when (string= (format nil "~a" note)
                              "The second argument never returns a value.")
                 (return t))))))
+
+(with-test (:name :check-consistency-mv-call-substitute-single-use-lvar)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     `(lambda (spec)
+       (multiple-value-call #'list
+         (first spec)
+         (values
+          5
+          6))))))

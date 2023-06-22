@@ -13,8 +13,8 @@
 (in-package "SB-C")
 
 ;;; A definite inconsistency has been detected. Signal an error.
-(declaim (ftype (function (string &rest t) (values)) barf))
 (defun barf (string &rest args)
+  (declare (string string))
   (apply #'bug string args))
 
 ;;; *SEEN-BLOCKS* is a hashtable with true values for all blocks which
@@ -29,8 +29,8 @@
 
 ;;; Barf if NODE is in a block which wasn't reached during the graph
 ;;; walk.
-(declaim (ftype (function (node) (values)) check-node-reached))
 (defun check-node-reached (node)
+  (declare (type node node))
   (unless (gethash (ctran-block (node-prev node)) *seen-blocks*)
     (barf "~S was not reached." node))
   (values))
@@ -45,8 +45,8 @@
 ;;; in hashtables. Next, we iterate over the blocks again, looking at
 ;;; the actual code and control flow. Finally, we scan the global leaf
 ;;; hashtables, looking for lossage.
-(declaim (ftype (function (list) (values)) check-ir1-consistency))
 (defun check-ir1-consistency (components &aux (ns *ir1-namespace*))
+  (declare (type list components))
   (let ((*seen-blocks* (make-hash-table :test 'eq))
         (*seen-funs* (make-hash-table :test 'eq)))
     (unwind-protect
@@ -250,8 +250,8 @@
 ;;; and that all blocks in the loops are known blocks. We also mark each block
 ;;; that we see so that we can do a check later to detect blocks that weren't
 ;;; in any loop.
-(declaim (ftype (function (cloop (or cloop null)) (values)) check-loop-consistency))
 (defun check-loop-consistency (loop superior)
+  (declare (type cloop loop) (type (or cloop null) superior))
   (unless (eq (loop-superior loop) superior)
     (barf "wrong superior in ~S, should be ~S" loop superior))
   (when (and superior
@@ -279,8 +279,8 @@
   (values))
 
 ;;; Check that Block is either in Loop or an inferior.
-(declaim (ftype (function (cblock cloop) (values)) check-loop-block))
 (defun check-loop-block (block loop)
+  (declare (type cblock block) (type cloop loop))
   (unless (gethash block *seen-blocks*)
     (barf "unseen block ~S in loop info for ~S" block loop))
   (labels ((walk (l)
@@ -295,9 +295,8 @@
 ;;; Check a block for consistency at the general flow-graph level, and
 ;;; call CHECK-NODE-CONSISTENCY on each node to locally check for
 ;;; semantic consistency.
-(declaim (ftype (function (cblock) (values)) check-block-consistency))
 (defun check-block-consistency (block)
-
+  (declare (type cblock block))
   (dolist (pred (block-pred block))
     (unless (gethash pred *seen-blocks*)
       (barf "unseen predecessor ~S in ~S" pred block))
@@ -366,8 +365,8 @@
 
 ;;; Check that BLOCK is properly terminated. Each successor must be
 ;;; accounted for by the type of the last node.
-(declaim (ftype (function (cblock) (values)) check-block-successors))
 (defun check-block-successors (block)
+  (declare (type cblock block))
   (let ((last (block-last block))
         (succ (block-succ block)))
 
@@ -412,16 +411,13 @@
 
 ;;; Check that the DEST for LVAR is the specified NODE. We also mark
 ;;; the block LVAR is in as SEEN.
-#+nil(declaim (ftype (function (lvar node) (values)) check-dest))
 (defun check-dest (lvar node)
+  (declare (type lvar lvar) (type node node))
   (do-uses (use lvar)
     (unless (gethash (node-block use) *seen-blocks*)
       (barf "Node ~S using ~S is in an unknown block." use lvar)))
   (unless (eq (lvar-dest lvar) node)
     (barf "DEST for ~S should be ~S." lvar node))
-  (unless (find-uses lvar)
-    (barf "Lvar ~S has a destinatin, but no uses."
-          lvar))
   (values))
 
 ;;; This function deals with checking for consistency of the
