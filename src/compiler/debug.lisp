@@ -339,7 +339,8 @@
             (when (singleton-p (lvar-uses lvar))
               (barf "~S has exactly 1 use, but LVAR-USES is a list."
                     lvar))
-            (unless (lvar-dest lvar)
+            (unless (or (lvar-dest lvar)
+                        (enclose-p node))
               (barf "~S does not have dest." lvar))))
 
         (check-node-reached node)
