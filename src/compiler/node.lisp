@@ -565,12 +565,7 @@
 ;;;   component.
 (defstruct (component (:copier nil)
                       (:constructor make-component
-                       (head
-                        tail &aux
-                        (last-block tail)
-                        (outer-loop (make-loop :kind :outer
-                                               :head head
-                                               :tail (list tail))))))
+                       (head tail &aux (last-block tail))))
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -664,7 +659,7 @@
   ;; this is filled by environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.
-  (outer-loop (missing-arg) :type cloop)
+  (outer-loop (make-loop :kind :outer :head head :tail (list tail)) :type cloop)
   (max-block-number 0 :type fixnum)
   (dominators-computed nil))
 
