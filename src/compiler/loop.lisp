@@ -93,7 +93,7 @@
                 (find-strange-loop-segments block component))
               (find-loop-blocks loop)
               ;; Loops with no exits are unreachable by predecessor walk and
-              ;; by definition belong to the component toplevel loop.
+              ;; by definition belong to the component outer loop.
               (when (eq (loop-kind loop) :natural)
                 (unless (or (loop-exits loop)
                             (eq outer-loop loop))
@@ -121,41 +121,14 @@
 ;;; loop heads are necessary because the walks from the tails
 ;;; terminate when they encounter a block in an inferior loop.
 (defun find-loop-blocks (loop)
-  (labels ((find-blocks-from-here (block loop)
-             (when (dominates-p (loop-head loop) block)
-               (cond ((eq (block-loop block) loop))
-                     ((block-loop block)
-                      (let* ((inner (block-loop block))
-                             (inner-superior (loop-superior inner)))
-                        (cond ((not inner-superior)
-                               ;; We've hit a block from an inner loop
-                               ;; that doesn't have a superior loop yet,
-                               ;; so it is a direct inferior.
-                               (setf (loop-superior inner) loop)
-                               (push inner (loop-inferiors loop))
-                               ;; Keep looking for more blocks in the
-                               ;; loop from the inferior head.
-                               (dolist (pred (block-pred (loop-head inner)))
-                                 (find-blocks-from-here pred loop)))
-                              ((not (eq inner-superior loop))
-                               ;; We've hit a block from an inner loop
-                               ;; that has a different superior
-                               ;; loop. Traverse from the superior
-                               ;; loop's head to discover more blocks.
-                               (find-blocks-from-here (loop-head inner-superior) loop)))))
-                     (t
-                      (setf (block-loop block) loop)
-                      (shiftf (block-loop-next block) (loop-blocks loop) block)
-                      (dolist (pred (block-pred block))
-                        (find-blocks-from-here pred loop)))))))
-    (dolist (tail (loop-tail loop))
-      (find-blocks-from-here tail loop))
-    ;; For the outermost loop, new blocks can still be discovered by
-    ;; walking back from natural loops with no exits.
-    (when (eq (loop-kind loop) :outer)
-      (dolist (sub-loop (loop-inferiors loop))
-        (dolist (pred (block-pred (loop-head sub-loop)))
-          (find-blocks-from-here pred loop)))))
+  (dolist (tail (loop-tail loop))
+    (find-blocks-from-here tail loop))
+  ;; For the outermost loop, new blocks can still be discovered by
+  ;; walking back from natural loops with no exits.
+  (when (eq (loop-kind loop) :outer)
+    (dolist (sub-loop (loop-inferiors loop))
+      (dolist (pred (block-pred (loop-head sub-loop)))
+        (find-blocks-from-here pred loop))))
   (collect ((exits))
     (dolist (sub-loop (loop-inferiors loop))
       (dolist (exit (loop-exits sub-loop))
@@ -172,6 +145,38 @@
           (return))))
     (setf (loop-exits loop) (exits))))
 
+
+;;; FIND-BLOCKS-FROM-HERE  --  Internal
+;;;
+;;; This function does a graph walk to find the blocks directly within
+;;; LOOP that can be reached by a backward walk from BLOCK.  If BLOCK
+;;; is already in LOOP or is not dominated by the LOOP-HEAD, then we
+;;; return.  If another loop is already assigned to BLOCK, it must be
+;;; an inferior loop.  If this loop doesn't have a superior yet, we
+;;; record that it must be a direct inferior of LOOP, and recurse on
+;;; the head of this loop's predecessor.  But if BLOCK's loop already
+;;; has a superior, then we can directly recurse on its existing
+;;; superior's head, since all predecessors of the head of BLOCK's
+;;; loop are contained in its superior already.  Otherwise, we add the
+;;; block to the BLOCKS for LOOP and recurse on its predecessors.
+(defun find-blocks-from-here (block loop)
+  (when (and (not (eq (block-loop block) loop))
+             (dominates-p (loop-head loop) block))
+    (cond ((block-loop block)
+           (let* ((inner (block-loop block))
+                  (inner-superior (loop-superior inner)))
+             (cond ((not inner-superior)
+                    (setf (loop-superior inner) loop)
+                    (push inner (loop-inferiors loop))
+                    (dolist (pred (block-pred (loop-head inner)))
+                      (find-blocks-from-here pred loop)))
+                   ((not (eq inner-superior loop))
+                    (find-blocks-from-here (loop-head inner-superior) loop)))))
+          (t
+           (setf (block-loop block) loop)
+           (shiftf (block-loop-next block) (loop-blocks loop) block)
+           (dolist (pred (block-pred block))
+             (find-blocks-from-here pred loop))))))
 
 ;;; NOTE-LOOP-HEAD  --  Internal
 ;;;
