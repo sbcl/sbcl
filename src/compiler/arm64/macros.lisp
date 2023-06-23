@@ -297,14 +297,14 @@
 #+sb-safepoint
 (defun emit-safepoint ()
   (inst ldr zr-tn (@ null-tn
-                     (- (+ gc-safepoint-trap-offset n-word-bytes
-                           other-pointer-lowtag)))))
+                     (load-store-offset
+                      (- (+ nil-value-offset gc-safepoint-trap-offset))))))
 
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn &key elide-if (sync t)) &body forms)
   (declare (ignorable sync))
   #+sb-safepoint
-  `(progn ,@forms (emit-safepoint))
+  `(progn ,flag-tn (assemble () ,@forms) (unless ,elide-if (emit-safepoint)))
   #-sb-safepoint
   `(progn
      (unless ,elide-if

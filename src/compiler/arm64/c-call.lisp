@@ -220,6 +220,9 @@
   (:generator 2
     (load-foreign-symbol res foreign-symbol :dataref t)))
 
+#+sb-safepoint
+(defconstant thread-saved-csp-slot -1) ; sits right before thread struct.
+
 (defun emit-c-call (vop nfp-save temp temp2 cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
@@ -233,6 +236,10 @@
         (inst adr temp2 return)
         (inst stp cfp-tn temp2 (@ csp-tn))
         (storew-pair csp-tn thread-control-frame-pointer-slot temp thread-control-stack-pointer-slot thread-tn)
+        ;; OK to run GC without stopping this thread from this point
+        ;; on.
+        #+sb-safepoint
+        (storew csp-tn thread-tn thread-saved-csp-slot)
         (cond ((stringp function)
                (invoke-foreign-routine function cfunc))
               (t
@@ -251,6 +258,9 @@
                      :sc (sc-or-lose 'descriptor-reg)
                      :offset reg)
                     0))
+        ;; No longer OK to run GC except at safepoints.
+        #+sb-safepoint
+        (storew zr-tn thread-tn thread-saved-csp-slot)
         (storew zr-tn thread-tn thread-control-stack-pointer-slot))
       return
       #-sb-thread
@@ -268,6 +278,12 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun destroyed-c-registers ()
+    ;; Safepoints do not save interrupt contexts to be scanned during
+    ;; GCing, it only looks at the stack, so if a register isn't
+    ;; spilled it won't be visible to the GC.
+    #+sb-safepoint
+    '((:save-p t))
+    #-sb-safepoint
     (let ((gprs (list nl0-offset nl1-offset nl2-offset nl3-offset
                       nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset nl9-offset
                       r0-offset r1-offset r2-offset r3-offset
