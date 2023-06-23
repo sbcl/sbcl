@@ -418,6 +418,7 @@
   (defattr block-type-check)
   (defattr block-delete-p))
 
+;;; The LOOP structure holds information about a loop.
 (defstruct (cloop (:conc-name loop-)
                   (:predicate loop-p)
                   (:constructor make-loop)
@@ -502,12 +503,14 @@
   ;; other sets used in constraint propagation and/or copy propagation
   (in nil)
   (out nil)
+  ;; The Loop structure for the innermost loop that contains this
+  ;; block. Null only temporarily.
+  (loop nil :type (or cloop null))
+  ;; A link that holds together the list of blocks within Loop. Null
+  ;; at the end or when we haven't determined it yet.
+  (loop-next nil :type (or null cblock))
   ;; The immediate dominator of this block.
   (dominator nil :type (or null cblock))
-  ;; the LOOP that this block belongs to
-  (loop nil :type (or null cloop))
-  ;; next block in the loop.
-  (loop-next nil :type (or null cblock))
   ;; the component this block is in, or NIL temporarily during IR1
   ;; conversion and in deleted blocks
   (component (progn
