@@ -102,15 +102,6 @@
             (return)))))
     ;; Remaining blocks belong to the outer loop.
     (find-loop-blocks outer-loop)
-    ;; Special case: Code deletion may cause a graph of only a head
-    ;; and a tail, where the two are disconnected. Assign the
-    ;; component head a loop block for this degenerate case.
-    (let ((head (component-head component)))
-      (unless (block-loop head)
-        (setf (block-loop head) outer-loop)
-        (shiftf (block-loop-next head)
-                (loop-blocks outer-loop)
-                head)))
     (labels ((assign-depth (loop depth)
                (setf (loop-depth loop) depth)
                (dolist (inferior (loop-inferiors loop))
@@ -119,7 +110,7 @@
 
 ;;; FIND-LOOP-BLOCKS  --  Internal
 ;;;
-;;; This function initializes the block lists and inferiors of LOO.
+;;; This function initializes the block lists and inferiors of LOOP.
 ;;; When we are done, we scan the blocks looking for exits.  An exit
 ;;; is always a block that has a successor which doesn't have a LOOP
 ;;; assigned yet, since the target of the exit must be in a superior
