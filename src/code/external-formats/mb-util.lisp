@@ -105,11 +105,10 @@
                                           (end-of-input-in-character
                                            end)
                                           (,invalid-mb-continuation-byte
-                                           reject-position)))
-                               (bad-len (- bad-end pos)))
-                          (declare (type array-range bad-end bad-len))
+                                           reject-position))))
+                          (declare (type array-range bad-end))
                           (let ((replacement (decoding-error array pos bad-end ,format replacement reject-reason reject-position)))
-                            (values bad-len replacement))))))))))))
+                            (values 1 replacement))))))))))))
 
   (defun define-simple-get-mb-char-1 (accessor type format mb-to-ucs)
     (let ((name (make-od-name-list 'simple-get format 'char accessor))

@@ -18,6 +18,36 @@
 
 (defvar *test-path* (scratch-file-name))
 
+(macrolet ((input-test (inxf expected &environment env)
+             `(progn
+                (with-test (:name (,(macroexpand 'name env) :file ,inxf))
+                  (with-open-file (s *test-path* :external-format ',inxf)
+                    (handler-bind ((sb-int:character-decoding-error
+                                    (lambda (c) (use-value "" c))))
+                      (let* ((string (make-string 20))
+                             (count (read-sequence string s)))
+                        (assert (equal (map 'list 'identity (subseq string 0 count)) ,expected))))))
+                (with-test (:name (,(macroexpand 'name env) :octets ,inxf))
+                  (handler-bind ((sb-int:character-decoding-error
+                                  (lambda (c) (use-value "" c))))
+                    (let ((octets (coerce bytes '(simple-array (unsigned-byte 8) 1))))
+                      (assert (equal (sb-ext:octets-to-string octets :external-format ',inxf)
+                                     (coerce ,expected 'string))))))))
+           (with-input-bytes ((id bytes) &body body)
+             `(let ((bytes ,bytes))
+                (with-open-file (s *test-path* :element-type '(unsigned-byte 8)
+                                   :direction :output :if-exists :supersede)
+                  (dolist (byte bytes)
+                    (write-byte byte s)))
+                (symbol-macrolet ((name ,id))
+                  (macrolet ((test (inxf expected)
+                               `(input-test ,inxf ,expected)))
+                    ,@body)))))
+  (with-input-bytes ((:input :invalid-units) (list #x00 #x35
+                                                   #x00))
+    (test :ucs-2be '(#\5))
+    (test (:ucs-2be :replacement #\?) '(#\5 #\?))))
+
 (macrolet ((output-test (chars outxf expected &environment env)
              `(progn
                 (with-test (:name (,(macroexpand 'name env) file-string-length ,outxf))

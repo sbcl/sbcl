@@ -731,7 +731,7 @@
         (setf (buffer-head ibuf) head)
         (when decode-break-reason
           (when (plusp total-copied) (return-from fd-stream-read-n-characters/utf-8 total-copied))
-          (when (stream-decoding-error-and-handle stream decode-break-reason)
+          (when (stream-decoding-error-and-handle stream decode-break-reason 1)
             (if eof-error-p
                 (error 'end-of-file :stream stream)
                 (return-from fd-stream-read-n-characters/utf-8 total-copied)))

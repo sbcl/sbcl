@@ -198,7 +198,7 @@
   (let ((name-le (make-od-name 'ucs-2le->string accessor))
         (name-be (make-od-name 'ucs-2be->string accessor)))
     `(progn
-      (defun ,name-le (array astart aend)
+      (defun ,name-le (array astart aend replacement)
         (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
@@ -209,13 +209,19 @@
                        (,(make-od-name 'bytes-per-ucs-2le-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (vector-push-extend
-                      (,(make-od-name 'simple-get-ucs-2le-char accessor)
-                        array pos bytes)
-                      string)
+                     (if (<= (+ pos bytes) aend)
+                         (vector-push-extend
+                          (,(make-od-name 'simple-get-ucs-2le-char accessor)
+                            array pos bytes)
+                          string)
+                         (let ((instead
+                                (decoding-error array pos aend :ucs-2le replacement
+                                                'octet-decoding-error pos)))
+                           (dotimes (i (length instead))
+                             (vector-push-extend (char instead i) string))))
                      (incf pos bytes)))
           string))
-      (defun ,name-be (array astart aend)
+      (defun ,name-be (array astart aend replacement)
         (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
@@ -226,10 +232,16 @@
                        (,(make-od-name 'bytes-per-ucs-2be-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (vector-push-extend
-                      (,(make-od-name 'simple-get-ucs-2be-char accessor)
-                        array pos bytes)
-                      string)
+                     (if (<= (+ pos bytes) aend)
+                         (vector-push-extend
+                          (,(make-od-name 'simple-get-ucs-2be-char accessor)
+                            array pos bytes)
+                          string)
+                         (let ((instead
+                                (decoding-error array pos aend :ucs-2be replacement
+                                                'octet-decoding-error pos)))
+                           (dotimes (i (length instead))
+                             (vector-push-extend (char instead i) string))))
                      (incf pos bytes)))
           string)))))
 
@@ -394,7 +406,11 @@
                        (,(make-od-name 'bytes-per-ucs-4le-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (let ((thing (,(make-od-name 'simple-get-ucs-4le-char accessor) array pos bytes replacement)))
+                     (let ((thing
+                            (if (<= (+ pos bytes) aend)
+                                (,(make-od-name 'simple-get-ucs-4le-char accessor) array pos bytes replacement)
+                                (decoding-error array pos aend :ucs-4le replacement
+                                                'octet-decoding-error pos))))
                        (typecase thing
                          (character (vector-push-extend thing string))
                          (string (dotimes (i (length thing))
@@ -412,7 +428,11 @@
                        (,(make-od-name 'bytes-per-ucs-4be-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (let ((thing (,(make-od-name 'simple-get-ucs-4be-char accessor) array pos bytes replacement)))
+                     (let ((thing
+                            (if (<= (+ pos bytes) aend)
+                                (,(make-od-name 'simple-get-ucs-4be-char accessor) array pos bytes replacement)
+                                (decoding-error array pos aend :ucs-4be replacement
+                                                'octet-decoding-error pos))))
                        (typecase thing
                          (character (vector-push-extend thing string))
                          (string (dotimes (i (length thing))

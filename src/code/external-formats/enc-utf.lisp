@@ -469,7 +469,11 @@
                        (,(make-od-name 'bytes-per-utf-32le-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (let ((thing (,(make-od-name 'simple-get-utf-32le-char accessor) array pos bytes replacement)))
+                     (let ((thing
+                            (if (<= (+ pos bytes) aend)
+                                (,(make-od-name 'simple-get-utf-32le-char accessor) array pos bytes replacement)
+                                (decoding-error array pos aend :utf-32le replacement
+                                                'octet-decoding-error pos))))
                        (typecase thing
                          (character (vector-push-extend thing string))
                          (string (dotimes (i (length thing))
@@ -487,7 +491,11 @@
                        (,(make-od-name 'bytes-per-utf-32be-character accessor) array pos aend)
                      (declare (type (or null string) invalid))
                      (aver (null invalid))
-                     (let ((thing (,(make-od-name 'simple-get-utf-32be-char accessor) array pos bytes replacement)))
+                     (let ((thing
+                            (if (<= (+ pos bytes) aend)
+                                (,(make-od-name 'simple-get-utf-32be-char accessor) array pos bytes replacement)
+                                (decoding-error array pos aend :utf-32be replacement
+                                                'octet-decoding-error pos))))
                        (typecase thing
                          (character (vector-push-extend thing string))
                          (string (dotimes (i (length thing))

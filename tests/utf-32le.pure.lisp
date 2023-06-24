@@ -1,5 +1,5 @@
 ;;;; This file is for testing external-format functionality for
-;;;; little-endian UTF-16, using test machinery which does not have
+;;;; little-endian UTF-32, using test machinery which does not have
 ;;;; side effects.  Note that the tests here reach into unexported
 ;;;; functionality, and should not be used as a guide for users.
 
@@ -43,18 +43,33 @@
                   (macrolet ((test (inxf expected)
                                `(input-test ,inxf ,expected)))
                     ,@body)))))
-  (with-input-bytes ((:input :invalid) (list #x35 #x00 #xff #xff #x37 #x00))
-    (test :utf-16le '(#\5 #\7))
-    (test (:utf-16le :replacement #\?) '(#\5 #\? #\7)))
-  (with-input-bytes ((:input :multiple-invalid) (list #x35 #x00 #xff #xff #xff #xff #x37 #x00))
-    (test :utf-16le '(#\5 #\7))
-    (test (:utf-16le :replacement #\?) '(#\5 #\? #\? #\7)))
-  (with-input-bytes ((:input :invalid-units) (list #x00 #x35 #x00))
-    (test :utf-16be '(#\5))
-    (test (:utf-16be :replacement #\?) '(#\5 #\?)))
-  (with-input-bytes ((:input :invalid-then-invalid-units) (list #xff #xff #x00))
-    (test :utf-16be '())
-    (test (:utf-16be :replacement #\?) '(#\? #\?))))
+  (with-input-bytes ((:input :invalid) (list #x35 #x00 #x00 #x00
+                                             #xff #xff #x00 #x00
+                                             #x37 #x00 #x00 #x00))
+    (test :utf-32le '(#\5 #\7))
+    (test (:utf-32le :replacement #\?) '(#\5 #\? #\7)))
+  (with-input-bytes ((:input :multiple-invalid) (list #x35 #x00 #x00 #x00
+                                                      #xff #xff #x00 #x00
+                                                      #xff #xff #x00 #x00
+                                                      #x37 #x00 #x00 #x00))
+    (test :utf-32le '(#\5 #\7))
+    (test (:utf-32le :replacement #\?) '(#\5 #\? #\? #\7)))
+  (with-input-bytes ((:input :invalid-units1) (list #x35 #x00 #x00 #x00
+                                                    #x00))
+    (test :utf-32le '(#\5))
+    (test (:utf-32le :replacement #\?) '(#\5 #\?)))
+  (with-input-bytes ((:input :invalid-units2) (list #x35 #x00 #x00 #x00
+                                                    #x00 #x00))
+    (test :utf-32le '(#\5))
+    (test (:utf-32le :replacement #\?) '(#\5 #\?)))
+  (with-input-bytes ((:input :invalid-units3) (list #x35 #x00 #x00 #x00
+                                                    #x00 #x00 #x00))
+    (test :utf-32le '(#\5))
+    (test (:utf-32le :replacement #\?) '(#\5 #\?)))
+  (with-input-bytes ((:input :invalid-then-invalid-units) (list #xff #xff #x00 #x00
+                                                                #x00))
+    (test :utf-32le '())
+    (test (:utf-32le :replacement #\?) '(#\? #\?))))
 
 (macrolet ((output-test (chars outxf expected &environment env)
              `(progn
@@ -87,9 +102,9 @@
                                `(output-test chars ,outxf ,expected)))
                     ,@body)))))
   (with-output-characters ((:output :lf) (list #\5 #\LATIN_SMALL_LETTER_E_WITH_ACUTE #\Linefeed #\7))
-    (test :utf-16le '(2 2 2 2)))
+    (test :utf-32le '(4 4 4 4)))
   (with-output-characters ((:output :invalid :lf) (list #\5 (code-char #xdb00) (code-char #x12345) #\Linefeed #\7))
     ;; A sufficiently-smart streams implementation could statically determine the lengths
     ;; of replacement characters given as part of the external format
-    (test :utf-16le '(2 nil 4 2 2))
-    (test (:utf-16le :replacement #\?) '(2 nil 4 2 2))))
+    (test :utf-32le '(4 nil 4 4 4))
+    (test (:utf-32le :replacement #\?) '(4 nil 4 4 4))))

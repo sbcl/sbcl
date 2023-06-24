@@ -18,6 +18,9 @@ changes in the external-format-line-endings branch:
   * bug fix: table-based multibyte external formats (EUC-JP, Shift-JIS, GBK)
     now honour a replacement character (in the external format or through
     restarts) when encoding to octets.
+  * bug fix: converting from octets using the UCS-2, UCS-4 and UTF-32 external
+    formats no longer reads past the end of an octet array with a non-integral
+    number of two- or four-byte units.
   * optimization: external formats with :REPLACEMENT no longer bind handlers
     for coding errors around conversion functions, and so should cons less and
     be faster.

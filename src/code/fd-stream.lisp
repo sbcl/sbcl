@@ -527,7 +527,7 @@
 
 ;;; Returning true goes into end of file handling, false will enter another
 ;;; round of input buffer filling followed by re-entering character decode.
-(defun stream-decoding-error-and-handle (stream octet-count)
+(defun stream-decoding-error-and-handle (stream octet-count stream-unit-count)
   (let ((external-format (stream-external-format stream))
         (replacement (fd-stream-replacement stream)))
     (labels ((replacement (thing resyncp)
@@ -540,17 +540,12 @@
                    (setf (fd-stream-listen stream) t))
                  (if resyncp
                      (resync)
-                     (let ((buffer (fd-stream-ibuf stream)))
-                       ;; TODO: We need to INCF by the minimum code
-                       ;; unit size of the stream, not 1
-                       ;; unconditionally (e.g. for UTF-16 streams)
-                       ;;
-                       ;; TODO: Not sure what to do about
-                       ;; BUFFER-PREV-HEAD here.
-                       (incf (buffer-head buffer))
-                       nil))))
+                     (advance))))
              (resync ()
                (fd-stream-resync stream)
+               nil)
+             (advance ()
+               (fd-stream-advance stream stream-unit-count)
                nil))
       (if replacement
           (replacement replacement nil)
@@ -1156,7 +1151,13 @@
         (element-var (gensym "ELT")))
     `(let* ((,stream-var ,stream)
             (ibuf (fd-stream-ibuf ,stream-var))
-            (size nil))
+            (size nil)
+            (unit ,(if (consp bytes)
+                       (let ((size-info (car bytes)))
+                         (if (consp size-info)
+                             (cadr size-info)
+                             size-info))
+                       bytes)))
        (block use-instead
          (when (fd-stream-eof-forced-p ,stream-var)
            (setf (fd-stream-eof-forced-p ,stream-var) nil)
@@ -1201,7 +1202,7 @@
                                nil))
                        (when decode-break-reason
                          (when (stream-decoding-error-and-handle
-                                stream decode-break-reason)
+                                stream decode-break-reason unit)
                            (setq ,retry-var nil)
                            (throw 'eof-input-catcher nil)))
                        t)
@@ -1211,7 +1212,7 @@
                                (and (not ,element-var)
                                     (not decode-break-reason)
                                     (stream-decoding-error-and-handle
-                                     stream octet-count)))
+                                     stream octet-count unit)))
                        (setq ,retry-var nil))))))
            (cond (,element-var
                   (setf (buffer-prev-head ibuf) (buffer-head ibuf))
@@ -1408,6 +1409,20 @@
             ;; Otherwise we refilled the stream buffer, so fall
             ;; through into another pass of the loop.
             ))))
+
+(defun fd-stream-advance (stream unit)
+  (let* ((buffer (fd-stream-ibuf stream))
+         (head (buffer-head buffer)))
+    (catch 'eof-input-catcher
+      (input-at-least stream unit)
+      ;; OK: we have another unit
+      (setf (buffer-prev-head buffer) head)
+      (setf (buffer-head buffer) (+ head unit))
+      (return-from fd-stream-advance nil))
+    ;; we do not have enough input: set the HEAD to TAIL and let the next caller
+    ;; deal with EOF.
+    (setf (buffer-head buffer) (buffer-tail buffer))
+    nil))
 
 (defun fd-stream-resync (stream)
   (let ((entry (get-external-format (fd-stream-external-format stream))))
@@ -1608,7 +1623,13 @@
                         (head (buffer-head ibuf))
                         (tail (buffer-tail ibuf))
                         (sap (buffer-sap ibuf))
-                        (decode-break-reason nil))
+                        (decode-break-reason nil)
+                        (unit ,(if (consp in-size-expr)
+                                   (let ((size-info (car in-size-expr)))
+                                     (if (consp size-info)
+                                         (cadr size-info)
+                                         size-info))
+                                   in-size-expr)))
                    (declare (type index head tail))
                    ;; Copy data from stream buffer into user's buffer.
                    (do ((size nil nil))
@@ -1646,7 +1667,7 @@
                        (when (plusp total-copied)
                          (return-from ,in-function total-copied))
                        (when (stream-decoding-error-and-handle
-                              stream decode-break-reason)
+                              stream decode-break-reason unit)
                          (if eof-error-p
                              (error 'end-of-file :stream stream)
                              (return-from ,in-function total-copied)))
@@ -1678,10 +1699,16 @@
                                            ,in-expr))
        (defun ,resync-function (stream)
          (let ((ibuf (fd-stream-ibuf stream))
-               size)
+               size
+               (unit ,(if (consp in-size-expr)
+                          (let ((size-info (car in-size-expr)))
+                            (if (consp size-info)
+                                (cadr size-info)
+                                size-info))
+                          in-size-expr)))
            (catch 'eof-input-catcher
              (loop
-              (incf (buffer-head ibuf))
+              (incf (buffer-head ibuf) unit)
               ,(if (consp in-size-expr)
                    (let ((size-info (car in-size-expr)))
                      (if (consp size-info)
