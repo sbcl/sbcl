@@ -19,7 +19,7 @@
 ;;;; memory. HEAD is inclusive, TAIL is exclusive.
 ;;;;
 ;;;; Buffers get allocated lazily, and are recycled by returning them
-;;;; to the *AVAILABLE-BUFFERS* list. Every buffer has it's own
+;;;; to the *AVAILABLE-BUFFERS* list. Every buffer has its own
 ;;;; finalizer, to take care of releasing the SAP memory when a stream
 ;;;; is not properly closed.
 ;;;;
@@ -530,7 +530,7 @@
 (defun stream-decoding-error-and-handle (stream octet-count)
   (let ((external-format (stream-external-format stream))
         (replacement (fd-stream-replacement stream)))
-    (labels ((replacement (thing)
+    (labels ((replacement (thing resyncp)
                (let* ((string (decoding-replacement-stringify thing external-format))
                       (reversed (reverse string))
                       (instead (fd-stream-instead stream)))
@@ -538,12 +538,22 @@
                    (vector-push-extend (char reversed i) instead))
                  (when (> (length reversed) 0)
                    (setf (fd-stream-listen stream) t))
-                 (resync)))
+                 (if resyncp
+                     (resync)
+                     (let ((buffer (fd-stream-ibuf stream)))
+                       ;; TODO: We need to INCF by the minimum code
+                       ;; unit size of the stream, not 1
+                       ;; unconditionally (e.g. for UTF-16 streams)
+                       ;;
+                       ;; TODO: Not sure what to do about
+                       ;; BUFFER-PREV-HEAD here.
+                       (incf (buffer-head buffer))
+                       nil))))
              (resync ()
                (fd-stream-resync stream)
                nil))
       (if replacement
-          (replacement replacement)
+          (replacement replacement nil)
           (restart-case
               (error 'stream-decoding-error
                      :external-format external-format
@@ -564,13 +574,12 @@
               (setf (fd-stream-eof-forced-p stream) t))
             (use-value (replacement)
               :report (lambda (stream)
-                        (format stream "~@<Use datum as replacement input, ~
-                                        attempt to resync at a character ~
-                                        boundary and continue.~@:>"))
+                        (format stream "~@<Use datum as replacement input ~
+                                        and continue.~@:>"))
               :interactive (lambda ()
                              (read-evaluated-form
                               "Replacement byte, bytes, character, or string (evaluated): "))
-              (replacement replacement))
+              (replacement replacement nil))
             (input-replacement (thing)
               :report (lambda (stream)
                         (format stream "~@<Use string as replacement input, ~
@@ -580,7 +589,7 @@
                              (format *query-io* "~@<Enter a string: ~@:>")
                              (finish-output *query-io*)
                              (list (read *query-io*)))
-              (replacement thing)))))))
+              (replacement thing t)))))))
 ) ; end MACROLET
 
 (defun encoding-replacement-adjust-charpos (replacement stream)

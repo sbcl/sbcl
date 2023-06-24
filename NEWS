@@ -1,6 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes in the external-format-line-endings branch:
+  * minor incompatible change: streams with an external-format specified with
+    :REPLACEMENT will use their replacement data once per stream unit that
+    causes a decoding error (rather than, in some cases, once for a sequence
+    of bytes none of which is a valid character start position for that
+    external-format).
   * enhancement: external formats now support newline variants.
   * enhancement: character decoding and encoding errors signalled by stream or
     octet functions now provide a USE-VALUE restart for handlers to provide
