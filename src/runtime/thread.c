@@ -214,29 +214,8 @@ int sb_GetTID()
     return getthrid();
 }
 #elif defined __APPLE__
-// follows is what the apple pthreads implementation does...
-#define __TSD_MACH_THREAD_SELF 3
-#if defined(__x86_64__)
-__attribute__((always_inline)) static inline uintptr_t _os_tsd_get_direct(unsigned long slot) {
-        uintptr_t ret;
-        __asm__ volatile ("mov %%gs:%1, %0" : "=r" (ret) : "m" (*(void **)(slot * sizeof(void *))));
-        return ret;
-}
-#else // __x86_64__
-__attribute__((always_inline)) static inline uintptr_t _os_tsd_get_direct(unsigned long slot) {
-        uintptr_t *base;
-#if defined(__arm__)
-        __asm__("mrc p15, 0, %0, c13, c0, 3\n"
-                "bic %0, %0, #0x3\n" : "=r" (base));
-#elif defined(__arm64__)
-        __asm__ ("mrs %0, TPIDRRO_EL0" : "=r" (base));
-#endif
-        return base[slot];
-}
-#endif
-uint32_t sb_GetTID(void) {
-        // actually a 32-bit id; truncation is harmless
-        return (uint32_t)_os_tsd_get_direct(__TSD_MACH_THREAD_SELF);
+int sb_GetTID() {
+    return mach_thread_self();
 }
 #else
 #define sb_GetTID() 0

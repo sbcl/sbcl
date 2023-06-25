@@ -2120,6 +2120,7 @@
     (#b1101101000100000 :fpcr)
     (#b1101101000100001 :fpsr)
     (#b1101110011101000 :ccnt)
+    (#b1101111010000010 :tpidr_el0)
     (#b1101111010000011 :tpidrro_el0)))
 
 (defun encode-sys-reg (reg)
@@ -2128,6 +2129,7 @@
     (:fpcr #b1101101000100000)
     (:fpsr #b1101101000100001)
     (:ccnt #b1101110011101000)
+    (:tpidr_el0 #b1101111010000010)
     (:tpidrro_el0 #b1101111010000011)))
 
 (define-instruction msr (segment sys-reg rt)
