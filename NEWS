@@ -1,5 +1,24 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes not yet implemented in the external-format-line-endings branch:
+  * (internal) the positional arguments to define-external-format/variable
+    width have been simplified and converted to keyword arguments
+    - unit size / minimum read size / advance size
+    - character read size
+    - input size expression
+    - ...
+  * (internal) construct strict variants of CR and CRLF external formats:
+    - CR: input of LF signals error, output of #\Return signals error
+    - CRLF: input of LF signals error
+  * bug fix: the character-decoding-error condition signalled by octet
+    conversion routines now provides access to a copy of the subsequence
+    that triggered the error.
+  * enhancement: the character-decoding-error condition has readers for the
+    the number of octets that will be skipped if the USE-VALUE restart is
+    invoked.
+  * minor incompatible change: external-format designators with unsupported or
+    unrecognized options now signal an error when used.
+
 changes in the external-format-line-endings branch:
   * minor incompatible change: streams with an external-format specified with
     :REPLACEMENT will use their replacement data once per stream unit that
