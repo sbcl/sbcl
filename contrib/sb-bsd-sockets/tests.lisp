@@ -170,7 +170,7 @@
                (socket-error ()
                  ;; This may mean no IPv6 support, can't fail a test
                  ;; because of that (address-family-not-supported doesn't catch that)
-                 t)
+                 (setf notsupp t))
                (:no-error (x)
                  (declare (ignore x))
                  (handler-case
