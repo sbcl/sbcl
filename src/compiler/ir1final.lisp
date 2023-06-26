@@ -340,22 +340,19 @@
 ;;;  (single-float 1))
 ;;; for the ir2 optimization to get triggered.
 (defun reorder-type-tests (node)
-  (flet ((other-pointer-type-check-p (node)
-           (getf sb-vm::*other-pointer-type-vops* (combination-fun-source-name node nil)))
-         (not-other-pointer-type-check-p (node)
+  (flet ((type-check-p (node other-pointer-p)
            (let ((name (combination-fun-source-name node nil)))
              (and
-              (gethash name *backend-predicate-types*)
-              (not (getf sb-vm::*other-pointer-type-vops* name))
-              ;; has a VOP and is an other-pointer but not in *other-pointer-type-vops*
-              (neq name 'keywordp))))
+              (eq (and (getf sb-vm::*other-pointer-type-vops* name) t)
+                  other-pointer-p)
+              (gethash name *backend-predicate-types*))))
          (var (pred)
            (let* ((arg (car (combination-args pred)))
                   (use (lvar-uses arg)))
              (and (ref-p use)
                   (lambda-var-p (ref-leaf use))
                   (ref-leaf use)))))
-    (when (other-pointer-type-check-p node)
+    (when (type-check-p node t)
       (let* ((block (node-block node))
              (if (block-last block))
              (var (var node)))
@@ -367,7 +364,8 @@
                           (next-if (block-last block))
                           fun-lvar
                           arg
-                          result)
+                          result
+                          type)
                      (when (and (if-p next-if)
                                 (not (cdr (block-pred block)))
                                 (only-harmless-cleanups (node-block if)
@@ -385,9 +383,7 @@
                            (combination
                             (unless (and (eq (car (combination-args node)) arg)
                                          (eq (combination-fun node) fun-lvar)
-                                         (if other-pointer-p
-                                             (other-pointer-type-check-p node)
-                                             (not-other-pointer-type-check-p node)))
+                                         (setf type (type-check-p node other-pointer-p)))
                               (return-from if-to-typecheck))
                             (setf result (node-lvar node)))
                            (cif
@@ -395,12 +391,13 @@
                               (return-from if-to-typecheck)))
                            (t
                             (return-from if-to-typecheck))))
-                       (values block arg)))))
-            (multiple-value-bind (next-block next-lvar) (if-to-typecheck if nil)
+                       (values block arg type)))))
+            (multiple-value-bind (next-block next-lvar next-type) (if-to-typecheck if nil)
               (when next-block
                 (let ((next-if (block-last next-block)))
-                  (multiple-value-bind (next-next-block next-next-lvar) (if-to-typecheck next-if t)
-                    (when next-next-block
+                  (multiple-value-bind (next-next-block next-next-lvar next-next-type) (if-to-typecheck next-if t)
+                    (when (and next-next-block
+                               (not (types-equal-or-intersect next-type next-next-type)))
                       (let* ((next-next-if (block-last next-next-block))
                              (end (if-alternative next-next-if)))
                         (when (only-harmless-cleanups next-next-block end)
