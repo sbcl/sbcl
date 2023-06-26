@@ -16,8 +16,6 @@ changes not yet implemented in the external-format-line-endings branch:
   * enhancement: the character-decoding-error condition has readers for the
     the number of octets that will be skipped if the USE-VALUE restart is
     invoked.
-  * minor incompatible change: external-format designators with unsupported or
-    unrecognized options now signal an error when used.
 
 changes in the external-format-line-endings branch:
   * minor incompatible change: streams with an external-format specified with
@@ -25,6 +23,8 @@ changes in the external-format-line-endings branch:
     causes a decoding error (rather than, in some cases, once for a sequence
     of bytes none of which is a valid character start position for that
     external-format).
+  * minor incompatible change: external-format designators with unsupported or
+    unrecognized options now signal an error when used.
   * enhancement: external formats now support newline variants.
   * enhancement: character decoding and encoding errors signalled by stream or
     octet functions now provide a USE-VALUE restart for handlers to provide

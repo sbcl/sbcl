@@ -48,15 +48,265 @@
         `(with-test ,options ,@rest)
         `(format t "::: INFO: no external format named ~S~%" ',ef-name))))
 
-(defun try-delete-file (x) (when (probe-file x) (delete-file x)))
-
 (defvar *test-path* (scratch-file-name))
+
+#+nil
+(flet ((s2o-file (string &key external-format)
+         (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                            :external-format external-format)
+           (write-sequence string s))
+         (with-open-file (s *test-path* :direction :input :element-type '(unsigned-byte 8))
+           (let* ((vector (make-array 10 :initial-element 0))
+                  (count (read-sequence vector s)))
+             (subseq vector 0 count))))
+       (o2s-file (vector &key external-format)
+         (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                            :element-type '(unsigned-byte 8))
+           (write-sequence vector s))
+         (with-open-file (s *test-path* :direction :input :external-format external-format)
+           (let* ((string (make-string 10))
+                  (count (read-sequence string s)))
+             (subseq string 0 count)))))
+(with-test (:name (:external-format-options :ascii :file))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (s2o-file string :external-format :ascii) #(63)))
+    (assert (equalp (o2s-file octets :external-format :ascii) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:ascii :replacement "?"))
+                    #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:ascii :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:ascii :newline :lf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:ascii :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:ascii :newline :crlf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:ascii :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (s2o-file string :external-format '(:ascii :replacment "?")))
+    (assert-error (o2s-file octets :external-format '(:ascii :replacment "?")))
+    (assert-error (s2o-file string :external-format '(:ascii :replacement #p"~")))
+    (assert-error (o2s-file octets :external-format '(:ascii :replacement #p"~")))
+    (assert-error (s2o-file string :external-format '(:ascii :nelwine :crlf)))
+    (assert-error (o2s-file octets :external-format '(:ascii :nelwine :crlf)))
+    (assert-error (s2o-file string :external-format '(:ascii :newline :clrf)))
+    (assert-error (o2s-file octets :external-format '(:ascii :newline :clrf)))))
+(with-test (:name (:external-format-options :ascii :octets))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (string-to-octets string :external-format :ascii) #(63)))
+    (assert (equalp (octets-to-string octets :external-format :ascii) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:ascii :replacement "?"))
+                    #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:ascii :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:ascii :newline :lf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:ascii :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:ascii :newline :crlf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:ascii :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (string-to-octets string :external-format '(:ascii :replacment "?")))
+    (assert-error (octets-to-string octets :external-format '(:ascii :replacment "?")))
+    (assert-error (string-to-octets string :external-format '(:ascii :replacement #p"~")))
+    (assert-error (octets-to-string octets :external-format '(:ascii :replacement #p"~")))
+    (assert-error (string-to-octets string :external-format '(:ascii :nelwine :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:ascii :nelwine :crlf)))
+    (assert-error (string-to-octets string :external-format '(:ascii :newline :clrf)))
+    (assert-error (octets-to-string octets :external-format '(:ascii :newline :clrf)))))
+
+(with-test (:name (:external-format-options :latin-1 :file))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (s2o-file string :external-format :latin-1) #(63)))
+    (assert (equalp (o2s-file octets :external-format :latin-1) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:latin-1 :replacement "?"))
+                    #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:latin-1 :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:latin-1 :newline :lf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:latin-1 :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:latin-1 :newline :crlf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:latin-1 :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (s2o-file string :external-format '(:latin-1 :replacment "?")))
+    (assert-error (o2s-file octets :external-format '(:latin-1 :replacment "?")))
+    (assert-error (s2o-file string :external-format '(:latin-1 :replacement #p"~")))
+    (assert-error (o2s-file octets :external-format '(:latin-1 :replacement #p"~")))
+    (assert-error (s2o-file string :external-format '(:latin-1 :nelwine :crlf)))
+    (assert-error (o2s-file octets :external-format '(:latin-1 :nelwine :crlf)))
+    (assert-error (s2o-file string :external-format '(:latin-1 :newline :clrf)))
+    (assert-error (o2s-file octets :external-format '(:latin-1 :newline :clrf)))))
+(with-test (:name (:external-format-options :latin-1 :octets))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (string-to-octets string :external-format :latin-1) #(63)))
+    (assert (equalp (octets-to-string octets :external-format :latin-1) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:latin-1 :replacement "?"))
+                    #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:latin-1 :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:latin-1 :newline :lf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:latin-1 :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:latin-1 :newline :crlf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:latin-1 :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (string-to-octets string :external-format '(:latin-1 :replacment "?")))
+    (assert-error (octets-to-string octets :external-format '(:latin-1 :replacment "?")))
+    (assert-error (string-to-octets string :external-format '(:latin-1 :replacement #p"~")))
+    (assert-error (octets-to-string octets :external-format '(:latin-1 :replacement #p"~")))
+    (assert-error (string-to-octets string :external-format '(:latin-1 :nelwine :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:latin-1 :nelwine :crlf)))
+    (assert-error (string-to-octets string :external-format '(:latin-1 :newline :clrf)))
+    (assert-error (octets-to-string octets :external-format '(:latin-1 :newline :clrf)))))
+
+(with-test (:name (:external-format-options :utf-8 :file))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (s2o-file string :external-format :utf-8) #(63)))
+    (assert (equalp (o2s-file octets :external-format :utf-8) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:utf-8 :replacement "?"))
+                    #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:utf-8 :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:utf-8 :newline :lf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:utf-8 :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:utf-8 :newline :crlf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:utf-8 :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (s2o-file string :external-format '(:utf-8 :replacment "?")))
+    (assert-error (o2s-file octets :external-format '(:utf-8 :replacment "?")))
+    (assert-error (s2o-file string :external-format '(:utf-8 :replacement #p"~")))
+    (assert-error (o2s-file octets :external-format '(:utf-8 :replacement #p"~")))
+    (assert-error (s2o-file string :external-format '(:utf-8 :nelwine :crlf)))
+    (assert-error (o2s-file octets :external-format '(:utf-8 :nelwine :crlf)))
+    (assert-error (s2o-file string :external-format '(:utf-8 :newline :clrf)))
+    (assert-error (o2s-file octets :external-format '(:utf-8 :newline :clrf)))))
+(with-test (:name (:external-format-options :utf-8 :octets))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (string-to-octets string :external-format :utf-8) #(63)))
+    (assert (equalp (octets-to-string octets :external-format :utf-8) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:utf-8 :replacement "?"))
+                    #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:utf-8 :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:utf-8 :newline :lf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:utf-8 :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:utf-8 :newline :crlf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:utf-8 :newline :crlf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (string-to-octets string :external-format '(:utf-8 :replacment "?")))
+    (assert-error (octets-to-string octets :external-format '(:utf-8 :replacment "?")))
+    (assert-error (string-to-octets string :external-format '(:utf-8 :replacement #p"~")))
+    (assert-error (octets-to-string octets :external-format '(:utf-8 :replacement #p"~")))
+    (assert-error (string-to-octets string :external-format '(:utf-8 :nelwine :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:utf-8 :nelwine :crlf)))
+    (assert-error (string-to-octets string :external-format '(:utf-8 :newline :clrf)))
+    (assert-error (octets-to-string octets :external-format '(:utf-8 :newline :clrf)))))
+
+(with-test (:name (:external-format-options :gbk :file)
+                  :skipped-on (or (not :sb-unicode) :unicode-lite))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (s2o-file string :external-format :gbk) #(63)))
+    (assert (equalp (o2s-file octets :external-format :gbk) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:gbk :replacement "?"))
+                    #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:gbk :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:gbk :newline :lf)) #(63)))
+    (assert (equalp (o2s-file octets :external-format '(:gbk :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (s2o-file string :external-format '(:gbk :newline :crlf)))
+    (assert-error (o2s-file octets :external-format '(:gbk :newline :crlf)))
+    (assert-error (s2o-file string :external-format '(:gbk :replacment "?")))
+    (assert-error (o2s-file octets :external-format '(:gbk :replacment "?")))
+    (assert-error (s2o-file string :external-format '(:gbk :replacement #p"~")))
+    (assert-error (o2s-file octets :external-format '(:gbk :replacement #p"~")))
+    (assert-error (s2o-file string :external-format '(:gbk :nelwine :crlf)))
+    (assert-error (o2s-file octets :external-format '(:gbk :nelwine :crlf)))
+    (assert-error (s2o-file string :external-format '(:gbk :newline :clrf)))
+    (assert-error (o2s-file octets :external-format '(:gbk :newline :clrf)))))
+(with-test (:name (:external-format-options :gbk :octets)
+                  :skipped-on (or (not :sb-unicode) :unicode-lite))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (string-to-octets string :external-format :gbk) #(63)))
+    (assert (equalp (octets-to-string octets :external-format :gbk) #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:gbk :replacement "?"))
+                    #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:gbk :replacement "?"))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:gbk :newline :lf)) #(63)))
+    (assert (equalp (octets-to-string octets :external-format '(:gbk :newline :lf))
+                    #(#\Nul #\Nul #\Nul #\Nul)))
+    (assert-error (string-to-octets string :external-format '(:gbk :newline :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:gbk :newline :crlf)))
+    (assert-error (string-to-octets string :external-format '(:gbk :replacment "?")))
+    (assert-error (octets-to-string octets :external-format '(:gbk :replacment "?")))
+    (assert-error (string-to-octets string :external-format '(:gbk :replacement #p"~")))
+    (assert-error (octets-to-string octets :external-format '(:gbk :replacement #p"~")))
+    (assert-error (string-to-octets string :external-format '(:gbk :nelwine :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:gbk :nelwine :crlf)))
+    (assert-error (string-to-octets string :external-format '(:gbk :newline :clrf)))
+    (assert-error (octets-to-string octets :external-format '(:gbk :newline :clrf)))))
+
+(with-test (:name (:external-format-options :ucs-2le :file)
+                  :skipped-on (not :sb-unicode))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (s2o-file string :external-format :ucs-2le) #(63 0)))
+    (assert (equalp (o2s-file octets :external-format :ucs-2le) #(#\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:ucs-2le :replacement "?"))
+                    #(63 0)))
+    (assert (equalp (o2s-file octets :external-format '(:ucs-2le :replacement "?"))
+                    #(#\Nul #\Nul)))
+    (assert (equalp (s2o-file string :external-format '(:ucs-2le :newline :lf)) #(63 0)))
+    (assert (equalp (o2s-file octets :external-format '(:ucs-2le :newline :lf))
+                    #(#\Nul #\Nul)))
+    (assert-error (s2o-file string :external-format '(:ucs-2le :newline :crlf)))
+    (assert-error (o2s-file octets :external-format '(:ucs-2le :newline :crlf)))
+    (assert-error (s2o-file string :external-format '(:ucs-2le :replacment "?")))
+    (assert-error (o2s-file octets :external-format '(:ucs-2le :replacment "?")))
+    (assert-error (s2o-file string :external-format '(:ucs-2le :replacement #p"~")))
+    (assert-error (o2s-file octets :external-format '(:ucs-2le :replacement #p"~")))
+    (assert-error (s2o-file string :external-format '(:ucs-2le :nelwine :crlf)))
+    (assert-error (o2s-file octets :external-format '(:ucs-2le :nelwine :crlf)))
+    (assert-error (s2o-file string :external-format '(:ucs-2le :newline :clrf)))
+    (assert-error (o2s-file octets :external-format '(:ucs-2le :newline :clrf)))))
+(with-test (:name (:external-format-options :ucs-2le :octets)
+                  :skipped-on (not :sb-unicode))
+  (let ((string "?")
+        (octets (coerce '(0 0 0 0) '(vector (unsigned-byte 8)))))
+    (assert (equalp (string-to-octets string :external-format :ucs-2le) #(63 0)))
+    (assert (equalp (octets-to-string octets :external-format :ucs-2le) #(#\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:ucs-2le :replacement "?"))
+                    #(63 0)))
+    (assert (equalp (octets-to-string octets :external-format '(:ucs-2le :replacement "?"))
+                    #(#\Nul #\Nul)))
+    (assert (equalp (string-to-octets string :external-format '(:ucs-2le :newline :lf)) #(63 0)))
+    (assert (equalp (octets-to-string octets :external-format '(:ucs-2le :newline :lf))
+                    #(#\Nul #\Nul)))
+    (assert-error (string-to-octets string :external-format '(:ucs-2le :newline :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:ucs-2le :newline :crlf)))
+    (assert-error (string-to-octets string :external-format '(:ucs-2le :replacment "?")))
+    (assert-error (octets-to-string octets :external-format '(:ucs-2le :replacment "?")))
+    (assert-error (string-to-octets string :external-format '(:ucs-2le :replacement #p"~")))
+    (assert-error (octets-to-string octets :external-format '(:ucs-2le :replacement #p"~")))
+    (assert-error (string-to-octets string :external-format '(:ucs-2le :nelwine :crlf)))
+    (assert-error (octets-to-string octets :external-format '(:ucs-2le :nelwine :crlf)))
+    (assert-error (string-to-octets string :external-format '(:ucs-2le :newline :clrf)))
+    (assert-error (octets-to-string octets :external-format '(:ucs-2le :newline :clrf)))))
+) ; FLET
 
 (with-test (:name :end-of-file)
   (do-external-formats (xf)
     (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
       (assert (eq (read-char s nil s) s)))))
-
 
 ;; Output routines must return the written element
 (with-test (:name :output-routine-retval :skipped-on :win32)
@@ -87,9 +337,9 @@
          `(progn ,@tests))))
   (frob))
 
-(delete-file *test-path*)
 #-sb-unicode
 (progn
+  (delete-file *test-path*)
   (test-util:report-test-status)
   (invoke-restart 'run-tests::skip-file))
 
@@ -293,13 +543,12 @@
   (assert (equalp (string-to-octets (map 'string #'code-char uni-codes) :external-format :koi8-r)
                   koi8-r-codes)))
 )
-(try-delete-file *test-path*)
 
 
 ;;; tests of FILE-STRING-LENGTH
 (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
   (do-external-formats (xf)
-    (with-open-file (s *test-path* :direction :output
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
                        :external-format xf)
       (loop for x across standard-characters
             for position = (file-position s)
@@ -309,13 +558,12 @@
       (let ((position (file-position s))
             (string-length (file-string-length s standard-characters)))
         (write-string standard-characters s)
-        (assert (= (file-position s) (+ position string-length)))))
-    (delete-file *test-path*)))
+        (assert (= (file-position s) (+ position string-length)))))))
 
 (let ((char-codes '(0 1 255 256 511 512 1023 1024 2047 2048 4095 4096
                     8191 8192 16383 16384 32767 32768 65535 65536 131071
                     131072 262143 262144)))
-  (with-open-file (s *test-path* :direction :output
+  (with-open-file (s *test-path* :direction :output :if-exists :supersede
                      :external-format :utf-8)
     (dolist (code char-codes)
       (let* ((char (code-char code))
@@ -355,7 +603,6 @@
         (let ((new-char (read-char s)))
           (assert (char= char new-char)))))
     (values)))
-(delete-file *test-path*)
 
 ;;; We used to call STREAM-EXTERNAL-FORMAT on the stream in the error
 ;;; when printing a coding error, but that didn't work if the stream
@@ -372,7 +619,6 @@
                             :element-type '(unsigned-byte 8))
       (write-byte 192 stream))
     (princ-to-string (nth-value 1 (ignore-errors (first-file-character))))))
-(delete-file *test-path*)
 
 ;;; External format support in SB-ALIEN
 
@@ -445,7 +691,6 @@
       (handler-case (read-char s)
         (error () (assert (member i '(#xd5 #xe7 #xf2))))
         (:no-error (char) char (assert (not (member i '(#xd5 #xe7 #xf2)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-input-replacement :cp857))
   (dotimes (i 256)
@@ -457,7 +702,6 @@
           ((eq char #\?)
            (assert (member i `(,(char-code #\?) #xd5 #xe7 #xf2))))
           (t (assert (not (member i `(,(char-code #\?) #xd5 #xe7 #xf2))))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :cp857))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:cp857 :replacement #\?))
@@ -469,7 +713,6 @@
       (dotimes (i 128)
         (assert (= (char-code (char string i)) i)))
       (assert (= 38 (count #\? string :start 128))))))
-(try-delete-file *test-path*)
 
 (with-test (:name (:unibyte-input-replacement :ascii))
   (dotimes (i 256)
@@ -481,7 +724,6 @@
           ((eq char #\?)
            (assert (or (= i (char-code #\?)) (> i 127))))
           (t (assert (and (< i 128) (not (= i (char-code #\?)))))))))))
-(delete-file *test-path*)
 
 (with-test (:name (:unibyte-output-replacement :ascii))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:ascii :replacement #\?))
@@ -493,7 +735,6 @@
       (dotimes (i 128)
         (assert (= (char-code (char string i)) i)))
       (assert (= 128 (count #\? string :start 128))))))
-(delete-file *test-path*)
 
 (with-test (:name (:unibyte-input-replacement :latin-1))
   (dotimes (i 256)
@@ -502,7 +743,6 @@
     (with-open-file (s *test-path* :external-format '(:latin-1 :replacement #\?))
       (let ((char (read-char s)))
         (assert (= (char-code char) i))))))
-(delete-file *test-path*)
 
 (with-test (:name (:unibyte-output-replacement :latin-1))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-1 :replacement #\?))
@@ -514,7 +754,6 @@
       (dotimes (i 256)
         (assert (= (char-code (char string i)) i)))
       (assert (char= #\? (char string 256))))))
-(delete-file *test-path*)
 
 ;;; latin-2 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-2))
@@ -527,7 +766,6 @@
           ((< i #xa1) (assert (= (char-code char) i)))
           ;; FIXME: more tests
           )))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-2))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-2 :replacement #\?))
@@ -539,7 +777,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 57 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-3 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-3))
@@ -553,7 +790,6 @@
            (assert #1=(or (= i (char-code #\?))
                           (member i '(#xa5 #xae #xbe #xc3 #xd0 #xe3 #xf0)))))
           (t (assert (not #1#))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-3))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-3 :replacement #\?))
@@ -565,7 +801,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 35 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-4 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-4))
@@ -578,7 +813,6 @@
           ((< i #xa1) (assert (= (char-code char) i)))
           ;; FIXME: more tests
           )))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-4))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-4 :replacement #\?))
@@ -590,7 +824,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 50 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; iso-8859-5 tests
 (with-ef-test (:name (:unibyte-input-replacement :iso-8859-5))
@@ -603,7 +836,6 @@
           ((= (char-code char) i)
            (assert (or (< i #xa1) (= i #xad))))
           (t (assert (and (>= i #xa1) (/= i #xad)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :iso-8859-5))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-5 :replacement #\?))
@@ -615,7 +847,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 93 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; iso-8859-6 tests
 (with-ef-test (:name (:unibyte-input-replacement :iso-8859-6))
@@ -631,7 +862,6 @@
                           (<= #xbc i #xbe) (= i #xc0) (<= #xdb i #xdf)
                           (<= #xf3 i))))
           (t (assert (not #1#))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :iso-8859-6))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-6 :replacement #\?))
@@ -643,7 +873,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 93 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; iso-8859-7 tests
 (with-ef-test (:name (:unibyte-input-replacement :iso-8859-7))
@@ -657,7 +886,6 @@
            (assert #1=(or (= i (char-code #\?))
                           (member i '(#xa4 #xa5 #xaa #xae #xd2 #xff)))))
           (t (assert (not #1#))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :iso-8859-7))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-7 :replacement #\?))
@@ -669,7 +897,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 80 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; iso-8859-8 tests
 (with-ef-test (:name (:unibyte-input-replacement :iso-8859-8))
@@ -683,7 +910,6 @@
            (assert #1=(or (= i (char-code #\?))
                           (= i #xa1) (<= #xbf i #xde) (>= i #xfb))))
           (t (assert (not  #1#))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :iso-8859-8))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-8 :replacement #\?))
@@ -695,7 +921,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 67 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-5 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-5))
@@ -708,7 +933,6 @@
                          (not (member i '(#xd0 #xdd #xde #xf0 #xfd #xfe))))
                     (and (member i '(#xd0 #xdd #xde #xf0 #xfd #xfe))
                          (not (char= char #\?)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-5))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-5 :replacement #\?))
@@ -720,7 +944,6 @@
       (dotimes (i #xd0)
         (assert (= (char-code (char string i)) i)))
       (assert (= 6 (count #\? string :start #xd0))))))
-(try-delete-file *test-path*)
 
 ;;; latin-6 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-6))
@@ -732,7 +955,6 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xff)
                          (not (char= char #\?)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-6))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-6 :replacement #\?))
@@ -744,7 +966,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 46 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; iso-8859-11 tests
 (with-ef-test (:name (:unibyte-input-replacement :iso-8859-11))
@@ -757,7 +978,6 @@
           ((eq char #\?)
            (assert (member i #1=`(,(char-code #\?) #xdb #xdc #xdd #xde #xfc #xfd #xfe #xff))))
           (t (assert (not (member i #1#)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :iso-8859-11))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-11 :replacement #\?))
@@ -769,7 +989,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 95 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-7 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-7))
@@ -781,7 +1000,6 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xff)
                          (not (char= char #\?)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-7))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-7 :replacement #\?))
@@ -795,7 +1013,6 @@
       (dolist (i '(#xd8 #xc6 #xf8 #xe6))
         (assert (char/= (char string i) #\?)))
       (assert (= 52 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-8 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-8))
@@ -807,7 +1024,6 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xfe)
                          (not (char= char #\?)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-8))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-8 :replacement #\?))
@@ -819,7 +1035,6 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 31 (count #\? string :start #xa1))))))
-(try-delete-file *test-path*)
 
 ;;; latin-9 tests
 (with-ef-test (:name (:unibyte-input-replacement :latin-9))
@@ -832,7 +1047,6 @@
                          (not (member i '(#xa4 #xa6 #xa8 #xb4 #xb8 #xbc #xbd #xbe))))
                     (and (member i '(#xa4 #xa6 #xa8 #xb4 #xb8 #xbc #xbd #xbe))
                          (not (char= char #\?)))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :latin-9))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-9 :replacement #\?))
@@ -844,7 +1058,6 @@
       (dotimes (i #xa4)
         (assert (= (char-code (char string i)) i)))
       (assert (= 8 (count #\? string :start #xa4))))))
-(try-delete-file *test-path*)
 
 ;;; koi8-r tests
 (with-ef-test (:name (:unibyte-input-replacement :koi8-r)
@@ -857,7 +1070,6 @@
         (cond ((= (char-code char) i)
                (assert (< i 128)))
               (t (assert (> i 127))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :koi8-r))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:koi8-r :replacement #\?))
@@ -869,7 +1081,6 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 122 (count #\? string :start #x80))))))
-(try-delete-file *test-path*)
 
 ;;; koi8-u tests
 (with-ef-test (:name (:unibyte-input-replacement :koi8-u))
@@ -881,7 +1092,6 @@
         (cond ((= (char-code char) i)
                (assert (< i 128)))
               (t (assert (> i 127))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :koi8-u))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:koi8-u :replacement #\?))
@@ -893,7 +1103,6 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 122 (count #\? string :start #x80))))))
-(try-delete-file *test-path*)
 
 ;;; x-mac-cyrillic tests
 (with-ef-test (:name (:unibyte-input-replacement :x-mac-cyrillic))
@@ -906,7 +1115,6 @@
                (assert (or (< i 128) (member i '(#xa2 #xa3 #xa9 #xb1 #xb5)))))
               (t (assert (and (> i 127)
                               (not (member i '(#xa2 #xa3 #xa9 #xb1 #xb5)))))))))))
-(try-delete-file *test-path*)
 
 (with-ef-test (:name (:unibyte-output-replacement :x-mac-cyrillic))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:x-mac-cyrillic :replacement #\?))
@@ -918,7 +1126,6 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 113 (count #\? string :start #x80))))))
-(try-delete-file *test-path*)
 
 ;;; ucs-2 tests
 (with-test (:name (:multibyte :ucs2le))
@@ -1095,8 +1302,7 @@
                  (with-open-file (f *test-path*
                                     :direction :input
                                     :external-format :euc-jp)
-                   (read-line f))))
-  (delete-file *test-path*))
+                   (read-line f)))))
 
 ;; test for lp#659107
 (with-test (:name :cmdline-setq-external-format
@@ -1118,3 +1324,5 @@
                           "--load" script)
                     :error t)))
         (assert (zerop (process-exit-code process))))))
+
+(delete-file *test-path*)

@@ -885,7 +885,7 @@
   (names (missing-arg) :type list :read-only t)
   (newline-variant (missing-arg) :type (member :crlf :lf :cr) :read-only t)
   (default-replacement-character (missing-arg) :type character)
-  (replacement nil :type (or null character string (simple-array (unsigned-byte 8) 1)))
+  (replacement nil :type (or null character string (unsigned-byte 8) (simple-array (unsigned-byte 8) 1)))
   (read-n-chars-fun (missing-arg) :type function)
   (read-char-fun (missing-arg) :type function)
   (write-n-bytes-fun (missing-arg) :type function)

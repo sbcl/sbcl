@@ -458,52 +458,51 @@ STRING (or the subsequence bounded by START and END)."
 ;;; This function was moved from 'fd-stream' because it depends on
 ;;; the various error classes, two of which are defined just above.
 ;;; XXX: Why does this get called with :DEFAULT and NIL when neither is
-;;; the name  of any format? Shouldn't those be handled higher up,
+;;; the name of any format? Shouldn't those be handled higher up,
 ;;; or else this should return the actual default?
 (defun get-external-format (external-format)
-  (binding*
-      (((format-name newline replacement)
-        (etypecase external-format
-          ;; This seem like such an unnecessarily general way to
-          ;; pass optional parameters. What's up with that?  (I
-          ;; think it's because BINDING* uses MULTIPLE-VALUE-BIND
-          ;; but optionals are most easily handled with
-          ;; DESTRUCTURING-BIND)
-          ((cons keyword)
-           (values (car external-format)
-                   (getf (cdr external-format) :newline :lf)
-                   (getf (cdr external-format) :replacement)))
-          (symbol
-           (values external-format :lf nil))))
-       (table-index (get format-name :external-format) :exit-if-null)
-       (formats *external-formats*)
-       (table-entry
-        ;; The table entry can be one of:
-        ;;   1. #<external-format>
-        ;;   2. (#<external-format> ((:crlf #\char) . #<modified-ef>) ...)
-        ;;      for a list of modified formats that alter the
-        ;;      newline encoding and choice of replacement character.
-        ;;   3. "namestring" - to autoload from a fasl containing
-        ;;      the named format.
-        (let ((ef (svref formats table-index)))
-          (etypecase ef
-            ((or instance list) ef)
-            #+nil
-            (string
-             ;; Theoretically allow demand-loading the external-format
-             ;; from a fasl of this name. (Not done yet)
-             ;; (module-provide-contrib ef)
-             (let ((ef (svref formats table-index)))
-               (aver (external-format-p ef))
-               ef)))))
-       ((base-format variations)
-        (if (listp table-entry)
-            (values (car table-entry) (cdr table-entry))
-            (values table-entry nil)))
-       (newline-base-format
-        (if (eql newline :lf)
-            base-format
-            (cdr (assoc (list newline) variations :test #'equal)))))
+  (let* ((external-format (ensure-list external-format))
+         (options (cdr external-format)))
+    (loop for (option value) on options by 'cddr
+          unless (or (eql option :newline) (eql option :replacement))
+          do (return-from get-external-format nil))
+    (binding*
+        (((format-name newline replacement)
+          (values (car external-format)
+                  (getf options :newline :lf)
+                  (getf options :replacement)))
+         (table-index (get format-name :external-format) :exit-if-null)
+         (formats *external-formats*)
+         (table-entry
+          ;; The table entry can be one of:
+          ;;   1. #<external-format>
+          ;;   2. (#<external-format> ((:crlf #\char) . #<modified-ef>) ...)
+          ;;      for a list of modified formats that alter the
+          ;;      newline encoding and choice of replacement character.
+          ;;   3. "namestring" - to autoload from a fasl containing
+          ;;      the named format.
+          (let ((ef (svref formats table-index)))
+            (etypecase ef
+              ((or instance list) ef)
+              #+nil
+              (string
+               ;; Theoretically allow demand-loading the external-format
+               ;; from a fasl of this name. (Not done yet)
+               ;; (module-provide-contrib ef)
+               (let ((ef (svref formats table-index)))
+                 (aver (external-format-p ef))
+                 ef)))))
+         ((base-format variations)
+          (if (listp table-entry)
+              (values (car table-entry) (cdr table-entry))
+              (values table-entry nil)))
+         (newline-base-format
+          (if (eql newline :lf)
+              base-format
+              (cdr (assoc (list newline) variations :test #'equal)))
+          :exit-if-null))
+      (unless (typep replacement '(or null character string (unsigned-byte 8) (simple-array (unsigned-byte 8) 1)))
+        (return-from get-external-format nil))
       (when (or (not newline-base-format) (not replacement))
         (return-from get-external-format newline-base-format))
       (loop
@@ -521,7 +520,7 @@ STRING (or the subsequence bounded by START and END)."
             ;; CAS failure -> some other thread added an entry. It's probably
             ;; for the same replacement char which is usually #\ufffd.
             ;; So try again. At worst this conses some more garbage.
-            (setq table-entry old))))))
+            (setq table-entry old)))))))
 
 (push
   `("SB-IMPL"
