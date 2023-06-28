@@ -1572,7 +1572,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     boolean eql_hashing = 0; // whether this table is an EQL table
     if (instancep(kv_supplement)) {
         struct hash_table* ht = (struct hash_table*)native_pointer(kv_supplement);
-        eql_hashing = hashtable_kind(ht) == 1;
+        eql_hashing = hashtable_kind(ht) == HASHTABLE_KIND_EQL;
         kv_supplement = ht->hash_vector;
     } else if (kv_supplement == LISP_T) { // EQL hashing on a non-weak table
         eql_hashing = 1;
@@ -1610,7 +1610,7 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
     gc_assert(2 * vector_len(VECTOR(hash_table->next_vector)) + 1 == kv_length);
 
     int weakness = hashtable_weakness(hash_table);
-    boolean eql_hashing = hashtable_kind(hash_table) == 1;
+    boolean eql_hashing = hashtable_kind(hash_table) == HASHTABLE_KIND_EQL;
     /* Work through the KV vector. */
     SCAV_ENTRIES(predicate(key, value), add_kv_triggers(&data[2*i], weakness));
     if (!any_deferred && debug_weak_ht)
@@ -1648,7 +1648,8 @@ scav_vector_t(lispobj *where, lispobj header)
     // Verify that the rehash stamp is a fixnum
     gc_assert(fixnump(data[1]));
 
-    /* Scavenge element (length-1), which may be a hash-table structure. */
+    /* Scavenge element (length-1), which may be a hash-table structure
+     * or a vector of hashes, depending on the table kind/weakness */
     scavenge(&data[length-1], 1);
     if (!vector_flagp(header, VectorWeak)) {
         scan_nonweak_kv_vector((struct vector*)where, gc_scav_pair);
@@ -1688,7 +1689,7 @@ scav_vector_t(lispobj *where, lispobj header)
     if (where != native_pointer(hash_table->pairs))
         lose("hash_table table!=this table %"OBJ_FMTX, hash_table->pairs);
 
-    if (hash_table->next_weak_hash_table == NIL) {
+    if ((lispobj)hash_table->next_weak_hash_table == NIL) {
         int weakness = hashtable_weakness(hash_table);
         boolean defer = 1;
         /* Key-AND-Value means that no scavenging can/will be performed as
@@ -1708,8 +1709,7 @@ scav_vector_t(lispobj *where, lispobj header)
          * then we don't know that we already did it, and we'll do it again.
          * This is the same as occurs on all other objects */
         if (defer) {
-            NON_FAULTING_STORE(hash_table->next_weak_hash_table
-                               = (lispobj)weak_hash_tables,
+            NON_FAULTING_STORE(hash_table->next_weak_hash_table = weak_hash_tables,
                                &hash_table->next_weak_hash_table);
             weak_hash_tables = hash_table;
         }
@@ -1748,7 +1748,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             boolean rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
-    int eql_hashing = hashtable_kind(hash_table) == 1;
+    int eql_hashing = hashtable_kind(hash_table) == HASHTABLE_KIND_EQL;
     for ( ; index ; index = next_vector[index] ) {
         lispobj key = kv_vector[2 * index];
         lispobj value = kv_vector[2 * index + 1];
@@ -1875,8 +1875,8 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
     struct hash_table *table, *next;
 
     for (table = weak_hash_tables; table != NULL; table = next) {
-        next = (struct hash_table *)table->next_weak_hash_table;
-        NON_FAULTING_STORE(table->next_weak_hash_table = NIL,
+        next = table->next_weak_hash_table;
+        NON_FAULTING_STORE(table->next_weak_hash_table = (void*)NIL,
                            &table->next_weak_hash_table);
         int weakness = hashtable_weakness(table);
         gc_assert((weakness & ~3) == 0);

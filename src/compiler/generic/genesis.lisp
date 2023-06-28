@@ -3394,6 +3394,16 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       (output-c)
       (format t "~%#endif /* __ASSEMBLER__ */~%"))))
 
+(defun write-hash-table-flag-extractors ()
+  ;; 'flags' is a packed integer.
+  ;; See PACK-HT-FLAGS-WEAKNESS and PACK-HT-FLAGS-KIND in hash-table.lisp
+  (format t "
+#define hashtable_kind(ht) ((ht->uw_flags >> 4) & 3)
+#define hashtable_weakp(ht) (ht->uw_flags & 8)
+#define hashtable_weakness(ht) (ht->uw_flags >> 6)
+#define HASHTABLE_KIND_EQL 1
+~%"))
+
 (defun write-structure-object (dd *standard-output* &optional structure-tag)
   (labels
       ((cstring (designator) (c-name (string-downcase designator)))
@@ -3419,14 +3429,23 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
                  (sb-vm:signed-word (rplaca cell (format nil "sw_~a" name)))
                  (sb-vm:word (rplaca cell (format nil "uw_~a" name)))
                  (t (rplacd cell name)))))
+           ;; The reason this loops over NAMES instead of DD-SLOTS is that one slot
+           ;; could output more than one lispword. This would happen with a DOUBLE-FLOAT
+           ;; on 32-bit machines.
            (loop for slot across names
-                 do (format t "    lispobj ~A;~@[ // ~A~]~%"
-                            ;; reserved word
-                            (if (string= (car slot) "default") "_default" (car slot))
-                            (cdr slot))))
+                 do
+                 (format t "    ~A ~A;~@[ // ~A~]~%"
+                         (cond ((string= (car slot) "next_weak_hash_table")
+                                "struct hash_table*")
+                               (t "lispobj"))
+                         ;; reserved word
+                         (if (string= (car slot) "default") "_default" (car slot))
+                         (cdr slot))))
          (format t "};~%")))
   (format t "#ifndef __ASSEMBLER__~2%")
   (format t "#include ~S~%" (lispobj-dot-h))
+  (when (eq (dd-name dd) 'sb-impl::general-hash-table)
+    (write-hash-table-flag-extractors))
   (output dd (or structure-tag (cstring (dd-name dd))))
   (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
     (terpri)

@@ -293,14 +293,14 @@ static void trace_object(lispobj* where)
             gc_assert(hashtable_weakp(hash_table));
             // An object can only be removed from the queue once.
             // Therefore the 'next' pointer has got to be nil.
-            gc_assert(hash_table->next_weak_hash_table == NIL);
+            gc_assert((lispobj)hash_table->next_weak_hash_table == NIL);
             int weakness = hashtable_weakness(hash_table);
             boolean defer = 1;
             if (weakness != WEAKNESS_KEY_AND_VALUE)
                 defer = scan_weak_hashtable(hash_table, alivep_funs[weakness],
                                             mark_pair);
             if (defer) {
-                hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
+                hash_table->next_weak_hash_table = weak_hash_tables;
                 weak_hash_tables = hash_table;
             }
             return;
