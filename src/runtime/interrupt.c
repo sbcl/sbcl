@@ -1948,7 +1948,9 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     } else {
         lose("Can't handle sig%d in non-lisp thread %p at @ %p",
              signal,
-             pthread_self(), (void*)os_context_pc(context));
+             // Casting to void* is a kludge - "technically" you can't assume that
+             // pthread_t is integer-sized. It could be a struct.
+             (void*)pthread_self(), (void*)os_context_pc(context));
     }
     errno = saved_errno;
 }
