@@ -1017,7 +1017,7 @@
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
-(defun make-restricted-lexenv (lexenv)
+(defun make-restricted-lexenv (lexenv &optional (policy (lexenv-policy lexenv)))
   (flet ((fun-good-p (fun)
            (destructuring-bind (name . thing) fun
              (declare (ignore name))
@@ -1048,7 +1048,7 @@
      nil
      (lexenv-handled-conditions lexenv)
      (lexenv-disabled-package-locks lexenv)
-     (lexenv-policy lexenv)
+     policy
      (lexenv-user-data lexenv)
      lexenv)))
 

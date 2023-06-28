@@ -337,7 +337,13 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
-   (macrolet-definitionize-fun context (make-restricted-lexenv *lexenv*))
+   (macrolet-definitionize-fun
+    context
+    (make-restricted-lexenv *lexenv*
+                            ;; Avoid efficiency notes
+                            ;; and in general there's no need to optimizes macrolets
+                            (augment-policy speed 1
+                                            (lexenv-policy *lexenv*))))
    :funs
    definitions
    fun))
