@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.5:
+changes in sbcl-2.3.6 relative to sbcl-2.3.5:
   * platform support:
     ** restore building contribs on riscv; (lp#2002930)
     ** shorter constant-loading sequences on riscv;
