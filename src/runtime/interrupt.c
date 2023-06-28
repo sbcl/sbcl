@@ -122,6 +122,7 @@ boolean internal_errors_enabled = 0;
 #ifndef LISP_FEATURE_WIN32
 static
 void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
+struct sigaction old_ll_sigactions[NSIG];
 #endif
 lispobj lisp_sig_handlers[NSIG];
 
@@ -1924,9 +1925,26 @@ extern void restore_sbcl_signals () {
 static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(signal,context,void_context);
-    (*interrupt_low_level_handlers[signal])(signal, info, context);
-    RESTORE_ERRNO;
+    /* We forgo SAVE_ERRNO / RESTORE_ERRNO here because those can resignal to a
+     * different thread. It never makes sense with synchronous signals such as SIGILL,
+     * SIGTRAP, SIGFPE, SIGSEGV which are necessarily thread-specifi; nor SIGABRT
+     * when raised by assert(). Some cases might warrant trying both the "old"
+     * and "our" handler, but the handler does not return an indicator of whether
+     * it did anything, which makes handler chaining impractical */
+    int saved_errno = errno;
+    RECORD_SIGNAL(signal,void_context);
+    UNBLOCK_SIGSEGV();
+    RESTORE_FP_CONTROL_WORD(context,void_context);
+    if (lisp_thread_p(void_context)) {
+        interrupt_low_level_handlers[signal](signal, info, context);
+    } else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
+        // drop it
+    } else if (old_ll_sigactions[signal].sa_handler != SIG_DFL) {
+        (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
+    } else {
+        lose("Can't handle sig%d in non-lisp at @ %p", signal, (void*)os_context_pc(context));
+    }
+    errno = saved_errno;
 }
 
 /* Install a handler for a synchronous signal. These are predominantly
@@ -1964,7 +1982,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
     if (signal==SIG_MEMORY_FAULT) sa.sa_flags |= SA_ONSTACK;
 #endif
 
-    sigaction(signal, &sa, NULL);
+    sigaction(signal, &sa, &old_ll_sigactions[signal]);
     interrupt_low_level_handlers[signal] = handler;
 }
 #endif
