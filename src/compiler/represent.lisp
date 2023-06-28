@@ -765,6 +765,7 @@
                        ((eq (vop-name branch) 'branch)
                         (car (vop-codegen-info branch))))))
       (when (and dest
+                 (tn-reads y)
                  (not (tn-ref-next (tn-reads y))))
         (do* ((writes (tn-writes y) (tn-ref-next writes)))
              ((null writes))
