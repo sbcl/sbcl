@@ -348,6 +348,7 @@
 (defvar *default-external-format* :utf-8)
 
 (defun default-external-format ()
+  (/show0 "/getting default external format")
   *default-external-format*)
 
 

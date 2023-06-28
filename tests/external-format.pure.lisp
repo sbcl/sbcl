@@ -50,7 +50,6 @@
 
 (defvar *test-path* (scratch-file-name))
 
-#+nil
 (flet ((s2o-file (string &key external-format)
          (with-open-file (s *test-path* :direction :output :if-exists :supersede
                             :external-format external-format)
