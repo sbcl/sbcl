@@ -93,7 +93,7 @@ lispobj sbcl_new_arena(size_t size)
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
 }
 
-static inline void* arena_mutex(struct arena* a) {
+static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
     return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
 }
 
