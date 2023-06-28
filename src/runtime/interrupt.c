@@ -201,18 +201,6 @@ int sigwait_bug_mitigation_count;
 static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
-#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-    if (signal == SIG_STOP_FOR_GC && pthread_getspecific(foreign_thread_ever_lispified)) {
-        // This may be error-prone, I'm not sure.  Suppose there is a lingering
-        // stop-for-gc signal after we've demoted a lisp thread back to being
-        // a foreign thread. Suppose that thread then calls into lisp again so it re-promoted
-        // to a lisp thread. Is the next stop-for-gc signal real, or to be ignored?
-        // It'll be treated as real even if it was the lingering signal which ought to have
-        // been ignored. That probably won't happen, but "probably" is not a guarantee.
-        __sync_fetch_and_add(&sigwait_bug_mitigation_count, 1);
-        return;
-    }
-#endif
     if (!sigismember(&deferrable_sigset,signal)) {
         corruption_warning_and_maybe_lose
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1927,7 +1915,7 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     /* We forgo SAVE_ERRNO / RESTORE_ERRNO here because those can resignal to a
      * different thread. It never makes sense with synchronous signals such as SIGILL,
-     * SIGTRAP, SIGFPE, SIGSEGV which are necessarily thread-specifi; nor SIGABRT
+     * SIGTRAP, SIGFPE, SIGSEGV which are necessarily thread-specific; nor SIGABRT
      * when raised by assert(). Some cases might warrant trying both the "old"
      * and "our" handler, but the handler does not return an indicator of whether
      * it did anything, which makes handler chaining impractical */
@@ -1937,12 +1925,30 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     RESTORE_FP_CONTROL_WORD(context,void_context);
     if (lisp_thread_p(void_context)) {
         interrupt_low_level_handlers[signal](signal, info, context);
-    } else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
+    }
+#ifdef LISP_FEATURE_DARWIN
+    else if (signal == SIG_STOP_FOR_GC && pthread_getspecific(foreign_thread_ever_lispified)) {
+        /* we can't always successfully clear a pending stop-for-GC using sigwait()
+         * on macOS - not sure why - so we have to assume that if the thread
+         * was ever a Lisp thread, it can handle stop-for-GC.
+         * This may be error-prone, I'm not sure.  Suppose there is a lingering
+         * stop-for-gc signal after we've demoted a lisp thread back to being
+         * a foreign thread. Suppose that thread then calls into lisp again so it re-promoted
+         * to a lisp thread. Is the next stop-for-gc signal real, or to be ignored?
+         * It'll be treated as real even if it was the lingering signal which ought to have
+         * been ignored. That probably won't happen, but "probably" is not a guarantee. */
+        __sync_fetch_and_add(&sigwait_bug_mitigation_count, 1);
+        return;
+    }
+#endif
+      else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
         // drop it
     } else if (old_ll_sigactions[signal].sa_handler != SIG_DFL) {
         (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
     } else {
-        lose("Can't handle sig%d in non-lisp at @ %p", signal, (void*)os_context_pc(context));
+        lose("Can't handle sig%d in non-lisp thread %p at @ %p",
+             signal,
+             pthread_self(), (void*)os_context_pc(context));
     }
     errno = saved_errno;
 }
