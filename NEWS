@@ -1,14 +1,29 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.5:
-  * bug fix: riscv can build contribs again.
+  * platform support:
+    ** restore building contribs on riscv; (lp#2002930)
+    ** shorter constant-loading sequences on riscv;
+    ** on OpenBSD, map the stack without executable permission (thanks to
+       Sébastien Marie)
+    ** Restore OpenBSD/arm64 for OpenBSD 7.3 (lp#2024003, reported by Robert
+       Palm)
+  * bug fix: AREF on multidimensional arrays with the wrong number of indices
+    now signals an error.  (lp#2022327, reported by EU)
+  * bug fix: the nature of NIL as both STRING and SEQUENCE is correctly handled
+    in the compiler's handling of string functions.  (lp#2023118, reported by
+    Patrick Poitras)
+  * bug fix: the sb-bsd-sockets tests no longer fail on systems configured
+    without IPv6.  (reported by Will Senn)
+  * bug fix: the compiler no longer transforms into incompletely-known functions
+    (lp#1824351)
   * optimization: better (the word-sized-type (ASH word-sized word-sized))
     when the result can overflow. For arm64 and x86-64.
   * optimization: better unoptimized calls to CEILING, FLOOR.
   * optimization: functions that involve coercing floats now cons less.
     For arm64 and x86-64.
-  * platform support:
-    * Restore OpenBSD/arm64 for OpenBSD 7.3
+  * optimization: array displacement to simple arrays is slightly faster.
+    (reported by Shubhamkar Ayare)
 
 changes in sbcl-2.3.5 relative to sbcl-2.3.4:
   * enhancement: Unicode support has been updated to support version 15.0.0 of
