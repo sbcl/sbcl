@@ -685,16 +685,6 @@ they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
 }
 
 
-inline static void
-check_interrupts_enabled_or_lose(os_context_t *context)
-{
-    struct thread *thread = get_sb_vm_thread();
-    if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL)
-        lose("interrupts not enabled");
-    if (arch_pseudo_atomic_atomic(thread))
-        lose ("in pseudo atomic section");
-}
-
 /* Note that the comment from rev aa0ed5a420 seems back-ass-wards.
  * "if there is no pending signal .. because that means deferrable are blocked"?
  * How would NO pending signal imply that deferrables are blocked? */
@@ -1252,10 +1242,13 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
     assert_blockables_blocked();
 
-    if (sigismember(&deferrable_sigset,signal))
-        check_interrupts_enabled_or_lose(context);
+    struct thread* thread = get_sb_vm_thread();
+    if (sigismember(&deferrable_sigset,signal)) {
+        if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL) lose("interrupts not enabled");
+        if (arch_pseudo_atomic_atomic(thread)) lose ("in pseudo atomic section");
+    }
 
-    were_in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
+    were_in_lisp = !foreign_function_call_active_p(thread);
     if (were_in_lisp)
     {
         // Use the variant of fake_ffc that doesn't do another pthread_sigmask syscall,
