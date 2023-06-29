@@ -23,7 +23,9 @@
                                            headers &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     #.(assert (= fixnum-tag-mask 1))
-    (inst tbz* value 0 (if not-p drop-through target))
+    (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                    (specifier-type 'fixnum))
+      (inst tbz* value 0 (if not-p drop-through target)))
     (%test-immediate-and-headers value temp target not-p immediate headers
                                  :drop-through drop-through
                                  :value-tn-ref value-tn-ref
@@ -34,7 +36,9 @@
                                          value-tn-ref
                                          immediate-tested)
   (cond ((= immediate single-float-widetag)
-         (inst cmp (32-bit-reg value) single-float-widetag))
+         (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                         (specifier-type 'single-float))
+           (inst cmp (32-bit-reg value) single-float-widetag)))
         (t
          (inst mov temp immediate)
          (inst cmp temp (extend value :uxtb))))
