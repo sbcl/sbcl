@@ -3328,6 +3328,22 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       "length_"
       (c-name (string-downcase slot-name))))
 
+(defun write-weak-pointer-manipulators ()
+  #+64-bit
+  (format t "static inline void set_weak_pointer_next(struct weak_pointer *wp, void *next) {
+    wp->header = ((uword_t)next << 16) | (wp->header & 0xffff);
+}
+static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp) {
+    // extract a 48-bit pointer from the header
+    return (void*)(wp->header >> 16);
+}~%")
+  #-64-bit
+  (format t "#define set_weak_pointer_next(wp, x) wp->next = x
+#define get_weak_pointer_next(wp) wp->next~%")
+  (format t "#define WEAK_POINTER_CHAIN_END (void*)(intptr_t)1
+#define reset_weak_pointer_next(wp) set_weak_pointer_next(wp,0)
+#define in_weak_pointer_list(wp) (get_weak_pointer_next(wp)!=0)~%"))
+
 (defun write-primitive-object (obj *standard-output*)
   (let* ((name (sb-vm:primitive-object-name obj))
          (c-name (c-name (string-downcase name)))
@@ -3369,6 +3385,8 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
                                      (+ 32 sb-vm:n-fixnum-tag-bits))
                #-ubsan (format t "  return v->length_ >> ~d; }~%"
                                      sb-vm:n-fixnum-tag-bits))
+             (when (eq name 'weak-pointer)
+               (write-weak-pointer-manipulators))
              (when (member name '(cons vector symbol fdefn instance))
                (write-cast-operator name c-name lowtag *standard-output*)))
            (output-asm ()

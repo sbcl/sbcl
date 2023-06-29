@@ -221,31 +221,6 @@ static inline void assign_generation(lispobj* obj, generation_index_t gen)
 
 #endif /* immobile space */
 
-#ifdef LISP_FEATURE_64_BIT
-#define WEAK_POINTER_CHAIN_END (void*)(intptr_t)1
-#define in_weak_pointer_list(wp) ((wp->header>>16)!=0)
-static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp) {
-    // 6 bytes to encode 'next' is way more than enough
-    uword_t offset = wp->header >> 16;
-    if (offset <= 1) return (void*)offset;
-    return (void*)((lispobj*)DYNAMIC_SPACE_START + offset);
-}
-static inline void reset_weak_pointer_next(struct weak_pointer *wp) {
-    wp->header = wp->header & 0xffff;
-}
-static inline lispobj encode_weakptr_next(void* x) {
-    if ((uword_t)x <= 1) return (uword_t)x;
-    sword_t wordindex = (lispobj*)x - (lispobj*)DYNAMIC_SPACE_START;
-    gc_assert(wordindex != 0); // wp can't be the first object in dynamic space
-    return wordindex;
-}
-#else
-#define WEAK_POINTER_CHAIN_END (void*)(intptr_t)-1
-#define in_weak_pointer_list(wp) (wp->next)
-#define get_weak_pointer_next(wp) wp->next
-#define reset_weak_pointer_next(wp) wp->next = 0
-#endif
-
 static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     // Better already be fixed in position or we're in trouble
     gc_dcheck(!compacting_p() || !from_space_p(make_lispobj(wp,OTHER_POINTER_LOWTAG)));
@@ -255,11 +230,7 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
      * is denoted by WEAK_POINTER_CHAIN_END which is distinct from NULL.
      * The test of whether the weak pointer has been placed in the chain
      * is performed in 'scav_weak_pointer' */
-#ifdef LISP_FEATURE_64_BIT
-    wp->header = (encode_weakptr_next(weak_pointer_chain)<<16) | (wp->header & 0xffff);
-#else
-    wp->next = weak_pointer_chain;
-#endif
+    set_weak_pointer_next(wp, weak_pointer_chain);
     weak_pointer_chain = wp;
 }
 
