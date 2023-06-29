@@ -191,8 +191,7 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
  * maybe all deferrables. */
 
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-pthread_key_t foreign_thread_ever_lispified;
-int sigwait_bug_mitigation_count;
+pthread_key_t ignore_stop_for_gc;
 #endif
 
 #ifdef LISP_FEATURE_WIN32
@@ -1927,17 +1926,9 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         interrupt_low_level_handlers[signal](signal, info, context);
     }
 #ifdef LISP_FEATURE_DARWIN
-    else if (signal == SIG_STOP_FOR_GC && pthread_getspecific(foreign_thread_ever_lispified)) {
-        /* we can't always successfully clear a pending stop-for-GC using sigwait()
-         * on macOS - not sure why - so we have to assume that if the thread
-         * was ever a Lisp thread, it can handle stop-for-GC.
-         * This may be error-prone, I'm not sure.  Suppose there is a lingering
-         * stop-for-gc signal after we've demoted a lisp thread back to being
-         * a foreign thread. Suppose that thread then calls into lisp again so it re-promoted
-         * to a lisp thread. Is the next stop-for-gc signal real, or to be ignored?
-         * It'll be treated as real even if it was the lingering signal which ought to have
-         * been ignored. That probably won't happen, but "probably" is not a guarantee. */
-        __sync_fetch_and_add(&sigwait_bug_mitigation_count, 1);
+    else if (signal == SIG_STOP_FOR_GC && pthread_getspecific(ignore_stop_for_gc)) {
+        /* Clearing stop-for-GC on macOS seems to require that the signal
+         * be delivered and then ignored in code. */
         return;
     }
 #endif

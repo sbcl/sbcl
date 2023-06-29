@@ -125,11 +125,6 @@
       (setq *keepon* nil)
       (sb-thread:barrier (:write))
       (let ((stop (get-internal-real-time)))
-        #+darwin
-        (with-alien ((count int :extern "sigwait_bug_mitigation_count"))
-          (when (plusp count)
-            (format t "Bug mitigation strategy applied ~D time~:P~%" count)
-            (setf count 0)))
         (sb-thread:join-thread watchdog-thread)
         (when gc-thr
           (sb-thread:join-thread gc-thr)
