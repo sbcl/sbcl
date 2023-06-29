@@ -106,8 +106,8 @@ const char* gc_phase_names[GC_NPHASES] = {
 #define SET_THREAD_STOP_PENDING(th,state) \
     write_TLS(STOP_FOR_GC_PENDING,state,th)
 #define WITH_ALL_THREADS_LOCK \
-    mutex_acquire(&all_threads_lock); \
-    RUN_BODY_ONCE(all_threads_lock, mutex_release(&all_threads_lock))
+    ignore_value(mutex_acquire(&all_threads_lock)); \
+    RUN_BODY_ONCE(all_threads_lock, ignore_value(mutex_release(&all_threads_lock)))
 
 #if !defined(LISP_FEATURE_WIN32)
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
