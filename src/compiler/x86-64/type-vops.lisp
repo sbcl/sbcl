@@ -46,13 +46,16 @@
                                  &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
-     (1 (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+     (1
+      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+      (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                      (specifier-type 'fixnum))
         (inst test :byte temp 1)
-        (inst jmp :nz (if not-p drop-through target)) ; inverted
-        (%test-headers value temp target not-p nil headers
-                       :drop-through drop-through :compute-temp nil
-                       :value-tn-ref value-tn-ref
-                       :immediate-tested immediate-tested))
+        (inst jmp :nz (if not-p drop-through target))) ; inverted
+      (%test-headers value temp target not-p nil headers
+                     :drop-through drop-through :compute-temp nil
+                     :value-tn-ref value-tn-ref
+                     :immediate-tested immediate-tested))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))

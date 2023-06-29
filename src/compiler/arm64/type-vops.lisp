@@ -54,7 +54,9 @@
   (let ((drop-through (gen-label)))
     (assemble ()
       #.(assert (= fixnum-tag-mask 1))
-      (inst tbz* value 0 (if not-p drop-through target)))
+      (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                      (specifier-type 'fixnum))
+        (inst tbz* value 0 (if not-p drop-through target))))
     (%test-headers value temp target not-p nil headers
                    :drop-through drop-through
                    :value-tn-ref value-tn-ref
