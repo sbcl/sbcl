@@ -3307,19 +3307,23 @@ lispobj symbol_function(struct symbol* symbol);
 #include \"~A/vector.h\"
 struct vector *symbol_name(struct symbol*);~%
 lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
-     (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
-            #+compact-symbol (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
-            #-compact-symbol "fixnum_value(s->package_id)")
-     #+compact-symbol
-     (progn (format stream "#define decode_symbol_name(ptr) (ptr & (uword_t)0x~X)~%"
-                    (mask-field (byte sb-impl::symbol-name-bits 0) -1))
-            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
-  s->name = (s->name & (uword_t)0x~X) | name;~%}~%"
-                    (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1)))
-     #-compact-symbol
-     (progn (format stream "#define decode_symbol_name(ptr) ptr~%")
-            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
-  s->name = name;~%}~%")))))
+     (multiple-value-bind (package-id-getter name-bits-extractor name-assigner)
+         #-compact-symbol
+         (values (format nil "s->package_id >> ~D" sb-vm:n-fixnum-tag-bits)
+                 "ptr" ; no decoder
+                 "name") ; no encoder
+         #+compact-symbol ; NAME slot is PACKAGE-ID [16 bits] | STRING [48 bits]
+         (values (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
+                 (format nil "(ptr & (uword_t)0x~X)"
+                         (mask-field (byte sb-impl::symbol-name-bits 0) -1))
+                 (format nil "(s->name & (uword_t)0x~X) | name"
+                         (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits)
+                                     -1)))
+       (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
+               package-id-getter)
+       (format stream "#define decode_symbol_name(ptr) ~A~%" name-bits-extractor)
+       (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
+  s->name = ~A;~%}~%" name-assigner)))))
 
 (defun mangle-c-slot-name (obj-name slot-name)
   ;; For data hiding purposes, change the name of vector->length to vector->length_.
