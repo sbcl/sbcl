@@ -4089,3 +4089,16 @@
     (((1+ most-positive-fixnum)) 3)
     ((t) 2)))
 
+(with-test (:name :unlink-node-in-delete-block)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (tagbody
+         ((lambda (v6)
+            ((lambda (a b &rest c)
+               a b c
+               (go 7))
+             (catch 'ct8 0)
+             (case b ((-424 -278) b) (t 0))))
+          ((lambda () (go 7))))
+       7))))

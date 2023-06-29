@@ -23,7 +23,7 @@
 (defvar *entry-points-argument*)
 (declaim (type list *entry-points-argument*))
 
-(defvar *check-consistency* #-arm64 t #+arm64 nil)
+(defvar *check-consistency* nil)
 
 ;;; Set to NIL to disable loop analysis for register allocation.
 (defvar *loop-analyze* t)
