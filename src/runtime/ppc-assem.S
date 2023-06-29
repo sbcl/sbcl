@@ -234,7 +234,7 @@ x:
 
 	BEGIN_PSEUDO_ATOMIC
 #if defined(LISP_FEATURE_SB_THREAD)
-	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	stw reg_ZERO,THREAD_FFCALL_ACTIVE_P_OFFSET(reg_THREAD)
 	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	lwz reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	lwz reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
@@ -291,7 +291,7 @@ lra:
 	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 
 	/* No longer in Lisp. */
-	stw reg_THREAD,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	stw reg_THREAD,THREAD_FFCALL_ACTIVE_P_OFFSET(reg_THREAD)
 #else
 	/* Store lisp state */
 	store(reg_BSP,reg_NL2,CSYMBOL(current_binding_stack_pointer))
@@ -347,7 +347,7 @@ lra:
 	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 
 	/* No longer in Lisp. */
-	stw reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	stw reg_CSP,THREAD_FFCALL_ACTIVE_P_OFFSET(reg_THREAD)
 #else
 	/* Store Lisp state */
 	/* load(reg_CFUNC,current_thread) */
@@ -397,7 +397,7 @@ lra:
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* No longer in foreign function call. */
-	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	stw reg_ZERO,THREAD_FFCALL_ACTIVE_P_OFFSET(reg_THREAD)
 
 	/* The binding stack pointer isn't preserved by C. */
 	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)

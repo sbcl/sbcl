@@ -1035,9 +1035,9 @@ alloc_thread_struct(void* spaces) {
      * single-threaded foreign_function_call_active, KLUDGE and
      * all. */
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    th->foreign_function_call_active = 0;
+    th->ffcall_active_p = 0;
 #elif !defined(LISP_FEATURE_ARM64) // uses control_stack_start
-    th->foreign_function_call_active = 1;
+    th->ffcall_active_p = 1;
 #endif
 #endif
 

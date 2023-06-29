@@ -600,8 +600,11 @@ during backtrace.
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in
   ;; the runtime, but it's clearly a per-thread value.
-  #+(and sb-thread (not arm64))
-  (foreign-function-call-active :c-type "boolean")
+  ;; This is a true/false flag. Since there are about 47 different competing
+  ;; definitions of the C type "boolean", just use "lispobj" for its known size.
+  ;; The name is visually distinct from the global flag of similar purpose
+  ;; so that 'grep' can find the one you want more easily.
+  #+(and sb-thread (not arm64)) (ffcall-active-p)
   ;; Same as above for the location of the current control stack frame.
   #+(and sb-thread (not (or x86 x86-64)))
   (control-frame-pointer :c-type "lispobj *")

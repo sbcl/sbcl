@@ -29,11 +29,9 @@ extern sword_t next_free_page;
 #ifdef LISP_FEATURE_SB_THREAD
 
 #ifdef LISP_FEATURE_ARM64
-#define foreign_function_call_active_p(thread) \
-    (thread->control_stack_pointer)
+#define foreign_function_call_active_p(thread) (thread->control_stack_pointer)
 #else
-#define foreign_function_call_active_p(thread) \
-    (thread->foreign_function_call_active)
+#define foreign_function_call_active_p(thread) (thread->ffcall_active_p)
 #endif
 
 #else

@@ -230,7 +230,7 @@
   (progn
     (loadw stack-pointer thread-base-tn thread-control-stack-pointer-slot)
     (loadw frame-pointer thread-base-tn thread-control-frame-pointer-slot)
-    (storew zero-tn thread-base-tn thread-foreign-function-call-active-slot))
+    (storew zero-tn thread-base-tn thread-ffcall-active-p-slot))
   #-sb-thread
   (progn
     (load-foreign-symbol-value stack-pointer "current_control_stack_pointer" temp)
@@ -244,7 +244,7 @@
   (progn
     (storew stack-pointer thread-base-tn thread-control-stack-pointer-slot)
     (storew frame-pointer thread-base-tn thread-control-frame-pointer-slot)
-    (storew null-tn thread-base-tn thread-foreign-function-call-active-slot))
+    (storew null-tn thread-base-tn thread-ffcall-active-p-slot))
   #-sb-thread
   (progn
     (store-foreign-symbol-value stack-pointer "current_control_stack_pointer" temp)
