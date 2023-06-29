@@ -1925,7 +1925,7 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     if (lisp_thread_p(void_context)) {
         interrupt_low_level_handlers[signal](signal, info, context);
     }
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     else if (signal == SIG_STOP_FOR_GC && pthread_getspecific(ignore_stop_for_gc)) {
         /* Clearing stop-for-GC on macOS seems to require that the signal
          * be delivered and then ignored in code. */
@@ -1937,11 +1937,13 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     } else if (old_ll_sigactions[signal].sa_handler != SIG_DFL) {
         (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
     } else {
+#ifdef LISP_FEATURE_SB_THREAD
         lose("Can't handle sig%d in non-lisp thread %p at @ %p",
              signal,
              // Casting to void* is a kludge - "technically" you can't assume that
              // pthread_t is integer-sized. It could be a struct.
              (void*)pthread_self(), (void*)os_context_pc(context));
+#endif
     }
     errno = saved_errno;
 }
