@@ -481,3 +481,15 @@
                (error ""))))
     (((expt 2 80)) t)
     (:return-type (values (member t) &optional))))
+
+(with-test (:name :array-has-fill-pointer-p-constraint)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (s)
+          (if (array-has-fill-pointer-p s)
+              (error "")
+              s)))))
+    '(values array &optional))))

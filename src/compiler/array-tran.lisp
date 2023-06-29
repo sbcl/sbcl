@@ -2043,7 +2043,11 @@
 ;;; is of the specified type.
 (defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
     ((array))
-  (values array (specifier-type '(and vector (not simple-array)))))
+  (values array (specifier-type '(and vector (not simple-array)))
+          nil nil
+          ;; Do not add a complementary type, not all non-simple
+          ;; vectors have fill-pointers.
+          t))
 
 ;;; I am highly reluctant to add a transform on MAKE-WEAK-VECTOR which allows it to inline,
 ;;; because frankly we may need to cease supporting weak-vectors as they currently exist.

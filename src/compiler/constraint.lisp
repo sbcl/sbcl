@@ -639,12 +639,18 @@
                                          consequent-constraints
                                          alternative-constraints
                                          quick-p)
-  (flet ((add (fun x y not-p)
-           (add-complement-constraints quick-p
-                                       fun x y not-p
-                                       constraints
-                                       consequent-constraints
-                                       alternative-constraints))
+  (flet ((add (fun x y &optional no-complement)
+           (if no-complement
+               (when x
+                 (add-test-constraint quick-p
+                                      fun x y nil
+                                      constraints
+                                      consequent-constraints))
+               (add-complement-constraints quick-p
+                                           fun x y nil
+                                           constraints
+                                           consequent-constraints
+                                           alternative-constraints)))
          (prop (triples target)
            (map nil (lambda (constraint)
                       (destructuring-bind (kind x y &optional not-p)
@@ -660,13 +666,13 @@
                  (propagate (fun-info-constraint-propagate-if
                              info)
                             :exit-if-null))
-        (multiple-value-bind (lvar type if else)
+        (multiple-value-bind (lvar type if else no-complement)
             (funcall propagate use constraints)
           (prop if consequent-constraints)
           (prop else alternative-constraints)
           (when (and lvar type)
             (add 'typep (ok-lvar-lambda-var lvar constraints)
-                 type nil)
+                 type no-complement)
             (return-from add-combination-test-constraints)))))
     (let* ((name (lvar-fun-name
                   (basic-combination-fun use)))
@@ -675,7 +681,7 @@
       (when ptype
         (add 'typep (ok-lvar-lambda-var (first args)
                                         constraints)
-             ptype nil)))))
+             ptype)))))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
