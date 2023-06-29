@@ -16,14 +16,16 @@
     (inst andi. temp value fixnum-tag-mask)
     (inst b? (if not-p :ne :eq) target)))
 
-(defun %test-fixnum-and-headers (value temp target not-p headers &key value-tn-ref)
+(defun %test-fixnum-and-headers (value temp target not-p headers
+                                 &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     (assemble ()
       (inst andi. temp value fixnum-tag-mask)
       (inst beq (if not-p drop-through target)))
     (%test-headers value temp target not-p nil headers
                    :drop-through drop-through
-                   :value-tn-ref value-tn-ref)))
+                   :value-tn-ref value-tn-ref
+                   :immediate-tested immediate-tested)))
 
 (defun %test-immediate (value temp target not-p immediate)
   (assemble ()
@@ -38,8 +40,8 @@
     (inst b? (if not-p :ne :eq) target)))
 
 (defun %test-headers (value temp target not-p function-p headers
-                      &key (drop-through (gen-label)) value-tn-ref)
-  (declare (ignore value-tn-ref))
+                      &key (drop-through (gen-label)) value-tn-ref immediate-tested)
+  (declare (ignore value-tn-ref immediate-tested))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (when-true when-false)
         (if not-p

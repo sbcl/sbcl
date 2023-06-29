@@ -170,6 +170,7 @@
                                                ,(car immediates)
                                                ',(canonicalize-widetags
                                                   headers)
+                                               :immediate-tested '(fixnum ,(car immediates))
                                                ,@other-args))
          (immediates
           (if (= n-word-bits 64)
@@ -180,6 +181,7 @@
          (headers
           `(%test-fixnum-and-headers ,value ,temp ,target ,not-p
                                      ',(canonicalize-widetags headers)
+                                     :immediate-tested '(fixnum)
                                      ,@other-args))
          (t
           `(%test-fixnum ,value ,temp ,target ,not-p
@@ -191,6 +193,7 @@
               `(%test-immediate-and-headers ,value ,temp ,target ,not-p
                                             ,(car immediates)
                                             ',(canonicalize-widetags headers)
+                                            :immediate-tested '(,(car immediates))
                                             ,@other-args)
               (error "can't mix testing of immediates with testing of headers")))
          (lowtags

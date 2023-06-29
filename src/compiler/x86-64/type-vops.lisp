@@ -43,7 +43,7 @@
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value temp target not-p headers
-                                 &key value-tn-ref)
+                                 &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
@@ -51,12 +51,14 @@
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-temp nil
-                       :value-tn-ref value-tn-ref))
+                       :value-tn-ref value-tn-ref
+                       :immediate-tested immediate-tested))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))
       (%test-headers value temp target not-p nil headers
-                     :drop-through drop-through)))))
+                     :drop-through drop-through
+                     :immediate-tested immediate-tested)))))
 
 ;; I can see no reason this would ever be used.
 ;; (or fixnum character|unbound-marker) is implausible.
@@ -69,7 +71,7 @@
 
 ;; Numerics
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers
-                                           &key value-tn-ref)
+                                           &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
@@ -79,11 +81,13 @@
         (inst jmp :e (if not-p drop-through target))
         (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-temp nil
-                       :value-tn-ref value-tn-ref))
+                       :value-tn-ref value-tn-ref
+                       :immediate-tested immediate-tested))
      (t (generate-fixnum-test value)
         (inst jmp :z (if not-p drop-through target))
         (%test-immediate-and-headers value temp target not-p immediate headers
-                                     :drop-through drop-through)))))
+                                     :drop-through drop-through
+                                     :immediate-tested immediate-tested)))))
 
 (defun %test-immediate (value temp target not-p immediate
                         &optional (drop-through (gen-label)))
@@ -95,7 +99,8 @@
 ;; Numerics including short-float, excluding fixnum
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &key (drop-through (gen-label))
-                                         value-tn-ref)
+                                         value-tn-ref
+                                         immediate-tested)
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
          (inst cmp :byte value immediate))
@@ -105,7 +110,8 @@
   (inst jmp :e (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
-                 :value-tn-ref value-tn-ref))
+                 :value-tn-ref value-tn-ref
+                 :immediate-tested immediate-tested))
 
 (defun %test-lowtag (value temp target not-p lowtag)
   (%lea-for-lowtag-test temp value lowtag)
@@ -117,7 +123,8 @@
                            (drop-through (gen-label))
                            (load-widetag t)
                            (compute-temp load-widetag)
-                           value-tn-ref)
+                           value-tn-ref
+                           immediate-tested)
   (let* ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
          ;; It is preferable (smaller and faster code) to directly
          ;; compare the value in memory instead of loading it into
@@ -149,7 +156,7 @@
       (cond ((not load-widetag))
             ((and value-tn-ref
                   (eq lowtag other-pointer-lowtag)
-                  (other-pointer-tn-ref-p value-tn-ref t))) ; best case: lowtag is right
+                  (other-pointer-tn-ref-p value-tn-ref t immediate-tested))) ; best case: lowtag is right
             ((and value-tn-ref
                   ;; If HEADERS contains a range, then list pointers have to be
                   ;; disallowed - consider a list whose CAR has a fixnum that

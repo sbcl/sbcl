@@ -20,17 +20,19 @@
         (inst tbz* value 0 target))))
 
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate
-                                           headers &key value-tn-ref)
+                                           headers &key value-tn-ref immediate-tested)
   (let ((drop-through (gen-label)))
     #.(assert (= fixnum-tag-mask 1))
     (inst tbz* value 0 (if not-p drop-through target))
     (%test-immediate-and-headers value temp target not-p immediate headers
                                  :drop-through drop-through
-                                 :value-tn-ref value-tn-ref)))
+                                 :value-tn-ref value-tn-ref
+                                 :immediate-tested immediate-tested)))
 
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &key (drop-through (gen-label))
-                                         value-tn-ref)
+                                         value-tn-ref
+                                         immediate-tested)
   (cond ((= immediate single-float-widetag)
          (inst cmp (32-bit-reg value) single-float-widetag))
         (t
@@ -39,17 +41,20 @@
   (inst b :eq (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
-                 :value-tn-ref value-tn-ref))
+                 :value-tn-ref value-tn-ref
+                 :immediate-tested immediate-tested))
 
 (defun %test-fixnum-and-headers (value temp target not-p headers
-                                 &key value-tn-ref)
+                                 &key value-tn-ref
+                                      immediate-tested)
   (let ((drop-through (gen-label)))
     (assemble ()
       #.(assert (= fixnum-tag-mask 1))
       (inst tbz* value 0 (if not-p drop-through target)))
     (%test-headers value temp target not-p nil headers
                    :drop-through drop-through
-                   :value-tn-ref value-tn-ref)))
+                   :value-tn-ref value-tn-ref
+                   :immediate-tested immediate-tested)))
 
 (defun %test-immediate (value temp target not-p immediate)
   (cond ((= immediate unbound-marker-widetag)
@@ -68,6 +73,7 @@
 (defun %test-headers (value widetag target not-p function-p headers
                       &key (drop-through (gen-label))
                            value-tn-ref
+                           immediate-tested
                            (nil-in-other-pointers t))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
         (temp widetag))
@@ -90,7 +96,7 @@
           (cond (widetag
                  (unless (and value-tn-ref
                               (eq lowtag other-pointer-lowtag)
-                              (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers))
+                              (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers immediate-tested))
                    (%test-lowtag value widetag when-false t lowtag))
                  (load-type widetag value (- lowtag)))
                 (t
