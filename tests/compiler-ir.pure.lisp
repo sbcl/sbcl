@@ -433,7 +433,8 @@
                      (cerror "" "~s" lambda))))))))
 
 (with-test (:name :type-diff-testing)
-  (assert (not (find 'sb-int:double-float-p
-                     (ir2-vops '(lambda (x)
-                                 (declare (float x))
-                                 (typep x 'double-float)))))))
+  (= (count 'sb-int:double-float-p
+            (ir2-vops '(lambda (x)
+                        (declare ((or fixnum double-float) x))
+                        (typep x 'double-float))))
+     1))
