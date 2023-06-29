@@ -1,12 +1,6 @@
 #ifndef _GENCGC_ALLOC_REGION_H_
 #define _GENCGC_ALLOC_REGION_H_
 
-#include "gc.h"
-
-#ifndef LISP_FEATURE_GENCGC
-#error "gencgc-alloc-region.h included, but LISP_FEATURE_GENCGC not defined"
-#endif
-
 /* Abstract out the data for an allocation region allowing a single
  * routine to be used for allocation and closing. */
 /* Caution: if you change this, you may have to change compiler/generic/objdef
@@ -27,9 +21,6 @@ typedef struct {
     uword_t token;
 } arena_state;
 
-// Macro to statically initialize instead of using set_region_empty()
-#define ALLOC_REGION_INITIALIZER {(void*)0x1000, (void*)1000, 0}
-
 // One region for each of page type.
 // These indices have no correlation to PAGE_TYPE constants.
 // MIXED has to always be at array index 0 because lisp accesses
@@ -49,7 +40,6 @@ extern struct alloc_region  gc_alloc_region[6];
                |(uintptr_t)gc_alloc_region[4].start_addr \
                |(uintptr_t)gc_alloc_region[5].start_addr))
 
-extern generation_index_t from_space, new_space;
 extern int gencgc_alloc_profiler;
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */

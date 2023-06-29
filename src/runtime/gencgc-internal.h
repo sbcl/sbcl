@@ -323,6 +323,7 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
     return (pins & (1<<subpage)) && hopscotch_containsp(&pinned_objects, obj);
 }
 
+extern generation_index_t from_space, new_space;
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
 // Pretend pinned objects are not in oldspace so that they don't get moved.

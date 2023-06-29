@@ -3328,6 +3328,32 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       "length_"
       (c-name (string-downcase slot-name))))
 
+(defun write-genesis-thread-h-requisites ()
+  (format t "
+#include \"genesis/config.h\"
+#ifndef LISP_FEATURE_WIN32
+#include <pthread.h>
+#endif
+#include \"gencgc-alloc-region.h\"
+
+#define N_HISTOGRAM_BINS_LARGE 32
+#define N_HISTOGRAM_BINS_SMALL 32
+typedef lispobj size_histogram[2*N_HISTOGRAM_BINS_LARGE+N_HISTOGRAM_BINS_SMALL];
+
+struct thread_state_word {
+  // - control_stack_guard_page_protected is referenced from
+  //   hand-written assembly code. (grep 'THREAD_STATE_WORD_OFFSET')
+  // - sprof_enable is referenced with SAPs.
+  //   (grep 'sb-vm:thread-state-word-slot')
+  char control_stack_guard_page_protected;
+  char sprof_enable; // statistical CPU profiler switch
+  char state;
+  char user_thread_p; // opposite of lisp's ephemeral-p
+#ifdef LISP_FEATURE_64_BIT
+  char padding[4];
+#endif
+};~%"))
+
 (defun write-weak-pointer-manipulators ()
   #+64-bit
   (format t "static inline void set_weak_pointer_next(struct weak_pointer *wp, void *next) {
@@ -3355,6 +3381,7 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
                (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d~2%"
                        sb-vm:code-slots-per-simple-fun))
              (when (eq name 'sb-vm::thread)
+               (write-genesis-thread-h-requisites)
                (format t "#define INIT_THREAD_REGIONS(x) \\~%")
                (let ((tlabs (map 'list
                                  (lambda (x) (c-name (string-downcase (second x))))
@@ -4075,16 +4102,35 @@ III. initially undefined function references (alphabetically):
 
 #+gencgc
 (defun write-mark-array-operators (stream &optional (ncards sb-vm::cards-per-page))
+  (format stream "#include ~S
+extern unsigned char *gc_card_mark;~%" (lispobj-dot-h))
+
   #-soft-card-marks
   (progn
     (aver (= ncards 1))
-    (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
+    #+nil ; we take these from gc-private.h. Is that right?
+    (progn
+      (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
     return gc_card_mark[card] == CARD_MARKED;~%}~%")
-    (format stream "static inline int cardseq_any_marked(long card) {
+      (format stream "static inline int cardseq_any_marked(long card) {
     return gc_card_mark[card] != CARD_UNMARKED;~%}~%")
-    (format stream "static inline int cardseq_any_sticky_mark(long card) {
+      (format stream "static inline int cardseq_any_sticky_mark(long card) {
     return gc_card_mark[card] == STICKY_MARK;~%}~%"))
-  #+soft-card-marks
+    (return-from write-mark-array-operators))
+
+  ;; This string has a ~s and ~w so don't use FORMAT on it
+  (write-string "
+/* SIMD-within-a-register algorithms
+ *
+ * from https://graphics.stanford.edu/~seander/bithacks.html
+ */
+static inline uword_t word_haszero(uword_t word) {
+  return ((word - 0x0101010101010101LL) & ~word & 0x8080808080808080LL) != 0;
+}
+static inline uword_t word_has_stickymark(uword_t word) {
+  return word_haszero(word ^ 0x0202020202020202LL);
+}
+" stream)
   ;; In general we have to be wary of wraparound of the card index bits
   ;; - see example in comment above the definition of addr_to_card_index() -
   ;; but it's OK to treat marks as linearly addressable within a page.
@@ -4146,7 +4192,6 @@ III. initially undefined function references (alphabetically):
         (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))
-        #+soft-card-marks
         (out-to "cardmarks" (write-mark-array-operators stream))
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))

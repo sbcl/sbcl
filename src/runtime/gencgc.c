@@ -226,18 +226,9 @@ static inline void reset_page_flags(page_index_t page) {
     assign_page_card_marks(page, CARD_MARKED);
 }
 
-/* SIMD-within-a-register algorithms
- *
- * from https://graphics.stanford.edu/~seander/bithacks.html
- */
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-static inline uword_t word_haszero(uword_t word) {
-  return ((word - 0x0101010101010101LL) & ~word & 0x8080808080808080LL) != 0;
-}
-static inline uword_t word_has_stickymark(uword_t word) {
-  return word_haszero(word ^ 0x0202020202020202LL);
-}
 #include "genesis/cardmarks.h"
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+// This is a macro from gc-private.h otherwise
 int page_cards_all_marked_nonsticky(page_index_t page) {
     return cardseq_all_marked_nonsticky(page_to_card_index(page));
 }

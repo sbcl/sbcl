@@ -8,36 +8,15 @@
 #include "globals.h"
 #include "runtime.h"
 #include "os.h"
-#ifdef LISP_FEATURE_GENCGC
-#include "gencgc-alloc-region.h"
-#endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
-
-struct thread_state_word {
-  // - control_stack_guard_page_protected is referenced from
-  //   hand-written assembly code. (grep "THREAD_STATE_WORD_OFFSET")
-  // - sprof_enable is referenced with SAPs.
-  //   (grep "sb-vm:thread-state-word-slot")
-  char control_stack_guard_page_protected;
-  char sprof_enable; // statistical CPU profiler switch
-  char state;
-  char user_thread_p; // opposite of lisp's ephemeral-p
-#ifdef LISP_FEATURE_64_BIT
-  char padding[4];
-#endif
-};
-
-#define N_HISTOGRAM_BINS_LARGE 32
-#define N_HISTOGRAM_BINS_SMALL 32
-typedef lispobj size_histogram[2*N_HISTOGRAM_BINS_LARGE+N_HISTOGRAM_BINS_SMALL];
-
 #include "genesis/thread.h"
 #include "genesis/thread-instance.h"
 #include "genesis/fdefn.h"
 #include "genesis/vector.h"
 #include "interrupt.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
+#include "gc.h" // for page_index_t
 
 enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 
