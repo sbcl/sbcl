@@ -1757,7 +1757,7 @@
             (temps)
             (results)
             (result-types))
-    (flet ((sc-to-type (sc)
+    (flet ((sc-to-primtype (sc)
              (case sc
                (sb-vm::any-reg
                 'fixnum)
@@ -1770,62 +1770,65 @@
                (sb-vm::descriptor-reg
                 t)
                (t
-                '*))))
-     (loop for (var arg) in vars
-           for (name this-sc) = var
-           for (nil sc type . rest) = (if this-sc
-                                          var
-                                          prev)
-           for prev = (if this-sc
-                          var
-                          prev)
-           do (cond ((eq name :info)
-                     (infos this-sc)
-                     (input arg))
-                    (arg
-                     (args (list* name :scs (list sc) rest))
-                     (let ((type (or type (sc-to-type sc))))
-                       (arg-types type)
-                       (input `(the ,(case type
-                                       (sb-vm::unsigned-num
-                                        'word)
-                                       (sb-vm::signed-num
-                                        'sb-vm:signed-word)
-                                       (sb-vm::tagged-num
-                                        'fixnum)
-                                       (* t)
-                                       (t (primitive-type-specifier (primitive-type-or-lose type))))
-                                    ,arg))))
-                    (t
-                     (temps `(:temporary (:sc ,sc ,@rest)
-                                         ,name)))))
-     (loop for result in results
-           for (name this-sc) = result
-           for (nil sc type . rest) = (if this-sc
-                                          result
-                                          prev)
-           for prev = (if this-sc
-                          result
-                          prev)
-           do (results (list* name :scs (list sc) rest))
-              (result-types (or type (sc-to-type sc)))))
-    `(inline-%primitive
-      ,(eval (%define-vop nil nil
-                          (delete nil
-                                  (list* (and (args)
-                                              (list* :args (args)))
-                                         (and (arg-types)
-                                              (list* :arg-types (arg-types)))
-                                         (and (results)
-                                              (list* :results (results)))
-                                         (and (result-types)
-                                              (list* :result-types (result-types)))
-                                         (and (infos)
-                                              (list* :info (infos)))
-                                         (list* :generator 0 body)
-                                         (temps)))
-                          nil))
-      ,@(input))))
+                '*)))
+           (primtype-to-type (type)
+             (case type
+               (sb-vm::unsigned-num
+                'word)
+               (sb-vm::signed-num
+                'sb-vm:signed-word)
+               (sb-vm::tagged-num
+                'fixnum)
+               (* t)
+               (t (primitive-type-specifier (primitive-type-or-lose type))))))
+      (loop for (var arg) in vars
+            for (name this-sc) = var
+            for (nil sc type . rest) = (if this-sc
+                                           var
+                                           prev)
+            for prev = (if this-sc
+                           var
+                           prev)
+            do (cond ((eq name :info)
+                      (infos this-sc)
+                      (input arg))
+                     (arg
+                      (args (list* name :scs (list sc) rest))
+                      (let ((type (or type (sc-to-primtype sc))))
+                        (arg-types type)
+                        (input `(the ,(primtype-to-type type) ,arg))))
+                     (t
+                      (temps `(:temporary (:sc ,sc ,@rest)
+                                          ,name)))))
+      (loop for result in results
+            for (name this-sc) = result
+            for (nil sc type . rest) = (if this-sc
+                                           result
+                                           prev)
+            for prev = (if this-sc
+                           result
+                           prev)
+            do (results (list* name :scs (list sc) rest))
+               (result-types (or type (sc-to-primtype sc))))
+      `(truly-the
+        (values ,@(mapcar #'primtype-to-type (result-types)) &optional)
+        (inline-%primitive
+         ,(eval (%define-vop nil nil
+                             (delete nil
+                                     (list* (and (args)
+                                                 (list* :args (args)))
+                                            (and (arg-types)
+                                                 (list* :arg-types (arg-types)))
+                                            (and (results)
+                                                 (list* :results (results)))
+                                            (and (result-types)
+                                                 (list* :result-types (result-types)))
+                                            (and (infos)
+                                                 (list* :info (infos)))
+                                            (list* :generator 0 body)
+                                            (temps)))
+                             nil))
+         ,@(input))))))
 
 (macrolet
     ((def ()
