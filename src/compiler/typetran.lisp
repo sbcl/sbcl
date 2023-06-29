@@ -265,6 +265,9 @@
 (deftransform consp ((x) ((not null)) * :important nil)
   '(listp x))
 
+;;; If X is known non-nil, then testing SYMBOLP can skip the "= NIL" part.
+(deftransform symbolp ((x) ((not null)) * :important nil)
+  '(non-null-symbol-p x))
 (deftransform non-null-symbol-p ((object) (symbol) * :important nil)
   `(not (eq object nil)))
 ;;; CLHS: http://www.lispworks.com/documentation/HyperSpec/Body/t_symbol.htm#symbol
