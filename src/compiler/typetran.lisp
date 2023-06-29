@@ -79,7 +79,7 @@
            (return-from ir1-transform-type-predicate t))
           ((eq type *empty-type*)
            (return-from ir1-transform-type-predicate nil)))
-    (let ((intersect (type-intersection2 type otype)))
+    (let ((intersect (type-intersection type otype)))
       ;; I guess the theory here is that an intersection type
       ;; is never a singleton, because if we could see that it was
       ;; a singleton, it wouldn't be an intersection.
@@ -102,36 +102,37 @@
                 type
                 (specifier-type
                  '(not (or fixnum #+64-bit single-float
-                           boolean character
-                           function list))))))
-       (cond ((typep type 'alien-type-type)
-              ;; We don't transform alien type tests until here, because
-              ;; once we do that the rest of the type system can no longer
-              ;; reason about them properly -- so we'd miss out on type
-              ;; derivation, etc.
-              (delay-ir1-transform node :ir1-phases)
-              (let ((alien-type (alien-type-type-alien-type type)))
-                ;; If it's a lisp-rep-type, the CTYPE should be one already.
-                (aver (not (compute-lisp-rep-type alien-type)))
-                `(sb-alien::alien-value-typep object ',alien-type)))
-             ;; (typep (the (or list fixnum) x) 'integer) =>
-             ;; (typep x 'fixnum)
-             ((let ((intersect (type-intersection otype type))
-                    (fixnum (specifier-type 'fixnum)))
-                (when (and (csubtypep intersect fixnum)
-                           (not (csubtypep type fixnum)))
-                  `(typep object ',(type-specifier intersect)))))
-             ;; (typep (the float x) 'double-float) =>
-             ;; (typep x 'single-float)
-             ((and (memory-type-test-p type)
-                   (let* ((diff (type-difference otype type))
-                          (pred (and (not (memory-type-test-p diff))
-                                     (backend-type-predicate diff))))
-                     (when pred
-                       `(not (,pred object))))))
-
-             (t
-              (give-up-ir1-transform)))))))
+                                  boolean character
+                        function list))))))
+        (cond ((typep type 'alien-type-type)
+               ;; We don't transform alien type tests until here, because
+               ;; once we do that the rest of the type system can no longer
+               ;; reason about them properly -- so we'd miss out on type
+               ;; derivation, etc.
+               (delay-ir1-transform node :ir1-phases)
+               (let ((alien-type (alien-type-type-alien-type type)))
+                 ;; If it's a lisp-rep-type, the CTYPE should be one already.
+                 (aver (not (compute-lisp-rep-type alien-type)))
+                 `(sb-alien::alien-value-typep object ',alien-type)))
+              ;; (typep (the (or list fixnum) x) 'integer) =>
+              ;; (typep x 'fixnum)
+              ((let ((new-predicate (backend-type-predicate intersect))
+                     (current (combination-fun-source-name node)))
+                 (when (and new-predicate
+                            (neq new-predicate current)
+                            (not (and (eq current 'listp)
+                                      (eq new-predicate 'consp))))
+                   `(,new-predicate object))))
+              ;; (typep (the float x) 'double-float) =>
+              ;; (typep x 'single-float)
+              ((and (memory-type-test-p type)
+                    (let* ((diff (type-difference otype type))
+                           (pred (and (not (memory-type-test-p diff))
+                                      (backend-type-predicate diff))))
+                      (when pred
+                        `(not (,pred object))))))
+              (t
+               (give-up-ir1-transform)))))))
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type) * * :node node)
@@ -264,9 +265,6 @@
 (deftransform consp ((x) ((not null)) * :important nil)
   '(listp x))
 
-;;; If X is known non-nil, then testing SYMBOLP can skip the "= NIL" part.
-(deftransform symbolp ((x) ((not null)) * :important nil)
-  '(non-null-symbol-p x))
 (deftransform non-null-symbol-p ((object) (symbol) * :important nil)
   `(not (eq object nil)))
 ;;; CLHS: http://www.lispworks.com/documentation/HyperSpec/Body/t_symbol.htm#symbol
