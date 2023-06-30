@@ -1584,3 +1584,23 @@
     (if pred
         `(not (,pred object))
         (give-up-ir1-transform))))
+
+(when-vop-existsp (:translate fixnum-mod-p)
+  (deftransform fixnum-mod-p ((x mod) (t (constant-arg fixnum)) * :important nil)
+    (let* ((type (lvar-type x))
+           (mod (lvar-value mod))
+           (intersect (type-intersection type (specifier-type 'fixnum)))
+           (mod-type (specifier-type `(mod ,(1+ mod)))))
+      (cond ((csubtypep intersect mod-type)
+             `(fixnump x))
+            ((and (csubtypep type (specifier-type 'fixnum))
+                  (csubtypep (type-intersection type (specifier-type 'unsigned-byte))
+                             mod-type))
+             `(>= x 0))
+            ((let ((int (type-approximate-interval intersect)))
+               (when int
+                 (let ((power-of-two (1- (ash 1 (integer-length (interval-high int))))))
+                   (when (< 0 power-of-two mod)
+                     `(fixnum-mod-p x ,power-of-two))))))
+            (t
+             (give-up-ir1-transform))))))
