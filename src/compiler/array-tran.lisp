@@ -2089,3 +2089,8 @@
   (sb-xc:defmacro weak-vector-ref (vector index) `(svref ,vector ,index))
   (define-source-transform weak-vector-len (thing)
     `(length (the simple-vector ,thing))))
+
+(defoptimizer (allocate-vector derive-type) ((widetag length words))
+  (when (constant-lvar-p length)
+    (make-array-type (list (lvar-value length))
+                     :complexp nil :element-type *wild-type*)))
