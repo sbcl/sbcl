@@ -38,11 +38,12 @@
   (cond ((= immediate single-float-widetag)
          (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
                                          (specifier-type 'single-float))
-           (inst cmp (32-bit-reg value) single-float-widetag)))
+           (inst cmp (32-bit-reg value) single-float-widetag)
+           (inst b :eq (if not-p drop-through target))))
         (t
          (inst mov temp immediate)
-         (inst cmp temp (extend value :uxtb))))
-  (inst b :eq (if not-p drop-through target))
+         (inst cmp temp (extend value :uxtb))
+         (inst b :eq (if not-p drop-through target))))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
                  :value-tn-ref value-tn-ref

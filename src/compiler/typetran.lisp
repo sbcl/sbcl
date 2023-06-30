@@ -120,8 +120,16 @@
                      (current (combination-fun-source-name node)))
                  (when (and new-predicate
                             (neq new-predicate current)
+                            ;; Some subtypes are more expensive to check
                             (not (and (eq current 'listp)
-                                      (eq new-predicate 'consp))))
+                                      (eq new-predicate 'consp)))
+                            (not (and (eq current 'functionp)
+                                      (eq new-predicate 'compiled-function-p)))
+                            (not (eq current 'characterp))
+                            (not (eq new-predicate #+64-bit 'signed-byte-64-p
+                                                   #-64-bit 'signed-byte-32-p))
+                            (not (eq new-predicate #+64-bit 'unsigned-byte-64-p
+                                                   #-64-bit 'unsigned-byte-32-p)))
                    `(,new-predicate object))))
               ;; (typep (the float x) 'double-float) =>
               ;; (typep x 'single-float)
