@@ -221,7 +221,7 @@
     (load-foreign-symbol res foreign-symbol :dataref t)))
 
 #+sb-safepoint
-(defconstant thread-saved-csp-slot -1) ; sits right before thread struct.
+(defconstant thread-saved-csp-slot (- (1+ sb-vm::thread-header-slots)))
 
 (defun emit-c-call (vop nfp-save temp temp2 cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))

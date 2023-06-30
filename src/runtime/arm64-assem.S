@@ -64,8 +64,7 @@
 1:
 #endif
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-/* the CSP page sits right before the thread */
-# define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
+# define THREAD_SAVED_CSP_OFFSET (- (THREAD_HEADER_SLOTS + 1) * N_WORD_BYTES)
 #endif
 
 
