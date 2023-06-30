@@ -375,11 +375,13 @@
   (when refs
     (let* ((first (reference-tn (tn-ref-tn refs) write-p))
            (prev first))
+      (setf (tn-ref-type first) (tn-ref-type refs))
       (loop for tn-ref = (tn-ref-across refs) then (tn-ref-across tn-ref)
             while tn-ref
             do
-            (let ((ref (reference-tn  (tn-ref-tn tn-ref) write-p)))
-              (setf (tn-ref-across prev) ref)
+            (let ((ref (reference-tn (tn-ref-tn tn-ref) write-p)))
+              (setf (tn-ref-across prev) ref
+                    (tn-ref-type ref) (tn-ref-type tn-ref))
               (setq prev ref)))
       first)))
 

@@ -193,6 +193,28 @@
           (inst b (if not-p :ne :eq) target))))
     not-target))
 
+(define-vop (signed-byte-64-p-move-to-word signed-byte-64-p)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate)
+  (:generator 10
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (inst asr r value n-fixnum-tag-bits)
+          (when fixnum-p
+            (inst tbz* value 0 yep))
+          (unless (fixnum-or-other-pointer-tn-ref-p args t)
+            (test-type value temp nope t (other-pointer-lowtag)))
+          (loadw temp value 0 other-pointer-lowtag)
+          (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (loadw r value bignum-digits-offset other-pointer-lowtag)
+          (inst b (if not-p :ne :eq) target))))
+    not-target))
+
 (define-vop (signed-byte-64-p/unsigned)
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
@@ -265,6 +287,70 @@
             (if not-p
                 (inst tbnz* temp (1- n-word-bits) target)
                 (inst tbz* temp (1- n-word-bits) target)))))
+      (values))
+    NOT-TARGET))
+
+(define-vop (unsigned-byte-64-p-move-to-word unsigned-byte-64-p)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate)
+  (:generator 10
+    (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
+           (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
+           (unsigned-p (or not-signed-byte-64-p
+                           (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1)))))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (cond ((not other-pointer-p)
+                 ;; Move to a temporary and mask off the lowtag,
+                 ;; but leave the sign bit for testing for positive fixnums.
+                 ;; When using 32-bit registers that bit will not be visible.
+                 (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask)))
+                (fixnum-p
+                 (move temp value)))
+          (when fixnum-p
+            (inst asr r value n-fixnum-tag-bits)
+            (%test-fixnum temp nil (if unsigned-p
+                                       yep
+                                       fixnum) nil))
+          (unless other-pointer-p
+            (inst cmp (32-bit-reg temp) other-pointer-lowtag)
+            (inst b :ne nope))
+          ;; Get the header.
+          (loadw temp value 0 other-pointer-lowtag)
+          (loadw r value bignum-digits-offset other-pointer-lowtag)
+          (unless not-signed-byte-64-p
+            ;; Is it one?
+            (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+            (inst b :eq (if unsigned-p
+                            yep
+                            single-word)))
+          ;; If it's other than two, it can't be an (unsigned-byte 64)
+          (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+          (inst b :ne nope)
+          ;; Get the second digit.
+          (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+          ;; All zeros, it's an (unsigned-byte 64).
+          (cond (unsigned-p
+                 (if not-p
+                     (inst cbnz temp target)
+                     (inst cbz temp target)))
+                (t
+                 (inst cbz temp yep)
+                 (inst b nope)))
+
+          single-word
+
+          ;; positive implies (unsigned-byte 64).
+          fixnum
+          (unless unsigned-p
+            (if not-p
+                (inst tbnz* r (1- n-word-bits) target)
+                (inst tbz* r (1- n-word-bits) target)))))
       (values))
     NOT-TARGET))
 

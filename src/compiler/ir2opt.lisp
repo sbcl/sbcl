@@ -1297,6 +1297,30 @@
                 (unless pairs (return)))
           new)))))
 
+(when-vop-existsp (:named sb-vm::signed-byte-64-p-move-to-word)
+  (flet ((opt (vop new-vop)
+           (let ((dest (branch-destination vop)))
+             (when dest
+               (vop-bind (in) () vop
+                 (when (and dest
+                            (singleton-p (ir2block-predecessors (vop-block dest)))
+                            (eq (vop-name dest) 'sb-vm::move-to-word/integer))
+                   (vop-bind (in2) () dest
+                     (when (eq in in2)
+                       (emit-and-insert-vop
+                        (vop-node vop) (vop-block vop)
+                        (template-or-lose new-vop)
+                        (reference-tn-refs (vop-args vop) nil)
+                        (reference-tn-refs (vop-results dest) t)
+                        vop (vop-codegen-info vop))
+                       (delete-vop vop)
+                       (delete-vop dest)))))))
+           nil))
+    (defoptimizer (vop-optimize signed-byte-64-p select-representations) (vop)
+      (opt vop 'sb-vm::signed-byte-64-p-move-to-word))
+    (defoptimizer (vop-optimize unsigned-byte-64-p select-representations) (vop)
+      (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))
