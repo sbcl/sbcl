@@ -176,8 +176,10 @@ print_entry_name (lispobj name, FILE *f)
             if (prefix) fputs(prefix, f); else {
                 struct package *pkg
                     = (struct package *)native_pointer(symbol_package(symbol));
-                struct vector *pkg_name = VECTOR(follow_maybe_fp(pkg->_name));
-                print_string(pkg_name, f);
+                lispobj name_ptr = follow_maybe_fp(pkg->_name);
+                if (name_ptr) {
+                    print_string(VECTOR(name_ptr), f);
+                }
                 fputs("::", f);
             }
             print_string(symbol_name(symbol), f);
