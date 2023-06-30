@@ -1805,12 +1805,6 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
-  #+hash-table-simulate
-  (let ((cell (assoc key (hash-table-%alist hash-table)
-                     :test (hash-table-test-fun hash-table))))
-    (if cell
-        (rplacd cell value)
-        (push (cons key value) (hash-table-%alist hash-table))))
   (funcall (hash-table-puthash-impl hash-table) key hash-table value))
 
 (defmacro define-remhash (name std-fn)
@@ -1959,11 +1953,6 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defun remhash (key hash-table)
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
 there was such an entry, or NIL if not."
-  #+hash-table-simulate
-  (let ((cell (assoc key (hash-table-%alist hash-table)
-                     :test (hash-table-test-fun hash-table))))
-    (when cell
-      (setf (hash-table-%alist hash-table) (delq1 cell (hash-table-%alist hash-table)))))
   (funcall (hash-table-remhash-impl hash-table) key hash-table))
 
 (defun clrhash (hash-table)
@@ -1986,7 +1975,6 @@ table itself."
   ;; [Reusing those elements would be a two-step process: set them to 0,
   ;; bump the HWM, set them to desired values - because you can't let GC
   ;; observe junk, but you can't put good value at higher than the HWM]
-  #+hash-table-simulate (setf (hash-table-%alist hash-table) nil)
   (when (plusp (kv-vector-high-water-mark (hash-table-pairs hash-table)))
     (dx-flet ((clear ()
                 (let* ((kv-vector (hash-table-pairs hash-table))

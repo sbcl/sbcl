@@ -168,10 +168,7 @@
   ;; this counter is incremented if the fast-read-lock (implicit in the
   ;; 'stamp' field) implies that there was an inconsistent view of the table
   #+hash-table-metrics (n-stamp-change 0 :type word)
-
-  ;; only for debugging system bootstrap when hash-tables are completely
-  ;; broken (which seems to be quite often as I optimize them)
-  #+hash-table-simulate (%alist))
+  )
 
 (sb-xc:defstruct (general-hash-table (:copier nil)
                              (:conc-name hash-table-)
