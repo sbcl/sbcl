@@ -444,4 +444,10 @@
              (ir2-vops '(lambda (x)
                          (declare ((or double-float array) x))
                          (typep x 'number))))
+      0))
+  (assert
+   (= (count 'integerp
+             (ir2-vops '(lambda (x)
+                         (declare ((or array (signed-byte 8)) x))
+                         (typep x 'integer))))
       0)))

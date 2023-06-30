@@ -116,8 +116,25 @@
                  `(sb-alien::alien-value-typep object ',alien-type)))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
-              ((let ((new-predicate (backend-type-predicate intersect))
-                     (current (combination-fun-source-name node)))
+              ((let ((current (combination-fun-source-name node))
+                     (new-predicate
+                       (or
+                        (backend-type-predicate intersect)
+                        ;; Remove bounds from numeric types
+                        (and (csubtypep intersect (specifier-type 'real))
+                             (macrolet ((up (&rest types)
+                                          `(cond ,@(loop for (type predicate) on types by #'cddr
+                                                         collect
+                                                         `((and (csubtypep intersect (specifier-type ',type))
+                                                                (csubtypep (specifier-type ',type) type))
+                                                           ',predicate)))))
+                               (up fixnum fixnump
+                                   integer integerp
+                                   rational rationalp
+                                   single-float single-float-p
+                                   double-float double-float-p
+                                   float floatp
+                                   real realp))))))
                  (when (and new-predicate
                             (neq new-predicate current)
                             ;; Some subtypes are more expensive to check
