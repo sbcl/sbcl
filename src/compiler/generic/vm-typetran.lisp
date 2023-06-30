@@ -32,7 +32,6 @@
 #+long-float
 (define-type-predicate long-float-p long-float)
 (define-type-predicate ratiop ratio)
-(define-type-predicate short-float-p short-float)
 (define-type-predicate single-float-p single-float)
 (define-type-predicate simple-array-p simple-array)
 (define-type-predicate simple-array-nil-p (simple-array nil (*)))
@@ -117,7 +116,7 @@
 (define-type-predicate simd-pack-256-p simd-pack-256)
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
-#-(or x86 x86-64) (define-type-predicate lra-p lra)
+#-(or x86 x86-64 arm64) (define-type-predicate lra-p lra)
 (define-type-predicate fdefn-p fdefn)
 (macrolet
     ((def ()
