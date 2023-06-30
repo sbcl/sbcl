@@ -1929,10 +1929,9 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     else if (signal == SIG_STOP_FOR_GC && pthread_getspecific(ignore_stop_for_gc)) {
         /* Clearing stop-for-GC on macOS seems to require that the signal
          * be delivered and then ignored in code. */
-        return;
     }
 #endif
-      else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
+    else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
         // drop it
     } else if (old_ll_sigactions[signal].sa_handler != SIG_DFL) {
         (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
