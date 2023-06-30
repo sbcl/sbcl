@@ -14,7 +14,6 @@
 ;;; We need to define these predicates, since the TYPEP source
 ;;; transform picks whichever predicate was defined last when there
 ;;; are multiple predicates for equivalent types.
-(define-source-transform short-float-p (x) `(single-float-p ,x))
 #-long-float
 (define-source-transform long-float-p (x) `(double-float-p ,x))
 

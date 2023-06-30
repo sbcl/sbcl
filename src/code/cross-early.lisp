@@ -49,13 +49,11 @@
 (declaim (inline realp))
 (defun realp (x) (cl:typep x 'real))
 
-(declaim (inline short-float-p single-float-p double-float-p long-float-p))
+(declaim (inline single-float-p double-float-p long-float-p))
 (defun single-float-p (x) (and (floatp x) (eq (flonum-format x) 'single-float)))
 (defun double-float-p (x) (and (floatp x) (eq (flonum-format x) 'double-float)))
-(defun short-float-p  (x) (single-float-p x))
 (defun long-float-p   (x) (double-float-p x))
 
-(deftype short-float  () '(satisfies short-float-p))
 (deftype single-float () '(satisfies single-float-p))
 (deftype double-float () '(satisfies double-float-p))
 (deftype long-float   () '(satisfies long-float-p))

@@ -16,7 +16,7 @@
 ;;; Simple TYPEP uses that don't have any standard predicate are
 ;;; translated into non-standard unary predicates.
 (defknown (fixnump bignump ratiop
-           short-float-p single-float-p double-float-p long-float-p
+           single-float-p double-float-p long-float-p
            complex-rational-p complex-float-p complex-single-float-p
            complex-double-float-p #+long-float complex-long-float-p
            complex-vector-p

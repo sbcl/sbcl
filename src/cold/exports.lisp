@@ -3254,7 +3254,6 @@ possibly temporarily, because it might be used internally.")
            "DOUBLE-FLOAT-P"
            "LOGICAL-PATHNAME-P"
            "LONG-FLOAT-P"
-           "SHORT-FLOAT-P"
            "SINGLE-FLOAT-P"
            "FIXNUMP"
            "BIGNUMP"

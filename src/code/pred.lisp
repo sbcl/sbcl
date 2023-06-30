@@ -114,7 +114,6 @@
   (def-type-predicate-wrapper rationalp)
   (def-type-predicate-wrapper ratiop)
   (def-type-predicate-wrapper realp)
-  (def-type-predicate-wrapper short-float-p)
   (def-type-predicate-wrapper single-float-p)
   #+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
   #+sb-simd-pack-256 (def-type-predicate-wrapper simd-pack-256-p)
