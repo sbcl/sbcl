@@ -354,6 +354,50 @@
       (values))
     NOT-TARGET))
 
+(define-vop (un/signed-byte-64-p-move-to-word signed-byte-64-p)
+  ;; Ideally, this would a single register but the rest of the stuff
+  ;; depends on their storage class.
+  (:results (rs :scs (signed-reg))
+            (ru :scs (unsigned-reg)))
+  (:info target not-p target-unsigned not-p-unsigned unsigned-fall-through)
+  (:result-types signed-num unsigned-num)
+  (:translate)
+  (:generator 10
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+      (assemble ()
+        (when fixnum-p
+          (inst asr rs value n-fixnum-tag-bits)
+          (inst tbz* value 0 (if not-p
+                                 not-target
+                                 target)))
+        (unless (fixnum-or-other-pointer-tn-ref-p args t)
+          (test-type value temp
+              (cond (not-p-unsigned
+                     unsigned-fall-through)
+                    (t
+                     not-target))
+              t (other-pointer-lowtag)))
+        (loadw temp value 0 other-pointer-lowtag)
+        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (loadw rs value bignum-digits-offset other-pointer-lowtag)
+        ;; Single digit bignum is always signed-byte-64
+        (inst b :eq (if not-p
+                        target
+                        not-target))
+        (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst b :ne (cond (not-p-unsigned
+                           unsigned-fall-through)
+                          (t
+                           not-target)))
+        (move ru rs)
+        ;; If the second digit is zero then this is an unsigned-byte-64
+        (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+        (cond ((and (not not-p) not-p-unsigned)
+               (inst cbnz temp target-unsigned))
+              (t
+               (inst cbz temp target-unsigned)))))
+    not-target))
+
 (define-vop (fixnump/unsigned)
   (:policy :fast-safe)
   (:args (value :scs (unsigned-reg)))
