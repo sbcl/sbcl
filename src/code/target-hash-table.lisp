@@ -717,7 +717,6 @@ multiple threads accessing the same hash-table without locking."
   (declare (simple-vector kv-vector)
            (type (simple-array hash-table-index (*)) next-vector index-vector)
            (type (or null (simple-array hash-table-index (*))) hash-vector))
-  (declare (ignorable table))
   (macrolet ((with-key ((key-var) &body body)
                ;; If KEY-VAR is empty, then push I onto the freelist, otherwise invoke BODY
                `(let* ((key-index (* 2 i))
@@ -1423,10 +1422,14 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                          ((zerop next) (values +empty-ht-slot+ 0 0 0))
                        (declare (type index/2 next))
                        (let* ((physical-index (truly-the index (* next 2)))
-                              (probed-val (svref kv-vector (1+ physical-index)))
                               (probed-key (svref kv-vector physical-index)))
                          (when ,comparison-expr
-                           (return (values probed-val probed-key physical-index predecessor)))
+                           ;; Delay fetching the value until a key match. There's a race here
+                           ;; in a weak value table. If the key is reachable but the value is
+                           ;; otherwise unreachable, the GC might win and clear the value.
+                           ;; So GETHASH has to check for that anyway.
+                           (let ((probed-val (svref kv-vector (1+ physical-index))))
+                             (return (values probed-val probed-key physical-index predecessor))))
                          (check-excessive-probes 1)
                          (setq predecessor next)))))
                (cond
