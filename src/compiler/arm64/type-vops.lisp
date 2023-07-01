@@ -382,8 +382,8 @@
         (loadw rs value bignum-digits-offset other-pointer-lowtag)
         ;; Single digit bignum is always signed-byte-64
         (inst b :eq (if not-p
-                        target
-                        not-target))
+                        not-target
+                        target))
         (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
         (inst b :ne (cond (not-p-unsigned
                            unsigned-fall-through)
