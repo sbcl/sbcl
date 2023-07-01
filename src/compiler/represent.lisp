@@ -774,7 +774,7 @@
                    (existing-branch (vop-next existing-vop))
                    (existing-dest (cond ((not existing-branch)
                                          (ir2-block-%label (ir2-block-next (vop-block existing-vop))))
-                                        ((eq (vop-name existing-vop) 'branch)
+                                        ((eq (vop-name existing-branch) 'branch)
                                          (car (vop-codegen-info existing-branch)))))
                    (new-y (tn-ref-tn (vop-args existing-vop)))
                    move)
