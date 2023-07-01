@@ -1933,7 +1933,19 @@ function to be removed without further warning."
     (sb-vm::%weakvec-ref vector index))
   (defun (setf weak-vector-ref) (newval vector index)
     (sb-vm::%weakvec-set vector index newval)
-    newval))
+    newval)
+  ;; A weak key/value-vector is primitive type SIMPLE-VECTOR based on its widetag,
+  ;; but requires a read barrier to ensure that access does not race with GC
+  ;; while GC is trying to clear the otherwise-unreachable references.
+  ;; These are stubs. The real implementation needs a mutex, thought better
+  ;; would be a reader/writer lock, since several threads may all read.
+  ;; On the other hand, our weak tables are always synchronized by a lisp mutex
+  ;; now and I don't plan to change that any time soon.
+  (defun sb-impl::weak-kvv-ref (vector index)
+    (svref vector index))
+  (defun (cas sb-impl::weak-kvv-ref) (old new vector index)
+    (funcall #'(cas svref) old new vector index)))
+
 #-weak-vector-readbarrier
 ;; legacy implementation of weak vector is basically SIMPLE-VECTOR
 (defun weak-vector-p (x)

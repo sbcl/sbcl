@@ -102,7 +102,7 @@
   #-untagged-fdefns (def code-header-ref (code-obj index))
   (def %vector-raw-bits (object offset))
   (def %set-vector-raw-bits (object offset value))
-  (def weak-vector-len)
+  #-weak-vector-readbarrier (def weak-vector-len)
   (def single-float-bits)
   (def double-float-high-bits)
   #+64-bit

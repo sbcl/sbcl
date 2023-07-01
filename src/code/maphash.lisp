@@ -31,6 +31,22 @@
 (defmacro kv-vector-high-water-mark (pairs)
   `(truly-the index/2 (data-vector-ref ,pairs 0)))
 
+;;; When a weak table's backing storage is iterated over, theoretically a read barrier would
+;;; be needed for each <k,v> pair. This is especially bad because each access would additionally
+;;; have to decide if the table is weak in the first place.
+;;; The performance loss can be mitigated by a simple strategy: act as if the vector is
+;;; strong. There is a header flag bit that could be toggled for that, but we don't want to
+;;; manipulate it from multiple threads. (Concurrent iterating is perfectly legal of course,
+;;; subject to the rules about modification during traversal)
+;;; Using a technique like *PINNED-OBJECTS* we can inform GC that a vector merits unusual
+;;; treatment for the lifetime of the iteration. Binding a special var says to ignore the
+;;; weakness bit. GC would only have to read the special when considering whether the bit
+;;; value of 1 should be respected. And that in itself is rare since most tables aren't weak.
+;;; GC would have to read the TLS of each thread which is still better than requiring
+;;; the mutator to strengthen each cell ref one pair at a time. Presuming the iterator doesn't
+;;; exit early (most calls to MAPHASH don't), then it's equivalent.
+(defvar *unweakened-vectors* nil)
+
 ;;; Hash table iteration does not need to perform bounds checks on access to the
 ;;; k/v pair vector.  We used to reload the local variable holding the k/v vector
 ;;; on each loop iteration because PUTHASH could assign a new vector at any time.
@@ -46,9 +62,12 @@
   (with-unique-names (fun limit i kv-vector key value)
     `(let* ((,fun (%coerce-callable-to-fun ,function-designator))
             (,kv-vector (hash-table-pairs ,hash-table))
+            #+weak-vector-readbarrier (*unweakened-vectors*
+                                       (cons ,kv-vector *unweakened-vectors*))
             ;; The high water mark needs to be loaded only once due to the
             ;; prohibition against adding keys during traversal.
             (,limit (1+ (* 2 (kv-vector-high-water-mark ,kv-vector)))))
+       #+weak-vector-readbarrier (declare (truly-dynamic-extent *unweakened-vectors*))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
        ;; However, for all intents and purposes, it is an INDEX because if not,
@@ -107,8 +126,11 @@ for."
         (ind (make-symbol "INDEX"))
         (step (make-symbol "THUNK")))
     `(let* ((,kvv (hash-table-pairs ,hash-table))
+            #+weak-vector-readbarrier (*unweakened-vectors*
+                                       (cons ,kvv *unweakened-vectors*))
             (,lim (1+ (* 2 (kv-vector-high-water-mark ,kvv))))
             (,ind 3))
+       #+weak-vector-readbarrier (declare (truly-dynamic-extent *unweakened-vectors*))
        (declare (fixnum ,ind))
        (dx-flet ((,step ()
                    (loop

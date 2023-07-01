@@ -197,6 +197,7 @@
     *gc-pending*
     #+sb-safepoint sb-impl::*in-safepoint*
     #+sb-thread *stop-for-gc-pending*
+    sb-impl::*unweakened-vectors*
     *pinned-objects*
     #+gencgc (*gc-pin-code-pages* 0)
     ;; things needed for non-local-exit

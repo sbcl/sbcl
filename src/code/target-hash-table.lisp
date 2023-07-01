@@ -355,7 +355,10 @@ Examples:
 ;;; The 'supplement' points to the hash-table if the table is weak,
 ;;; or to the hash vector if the table is not weak.
 ;;; Other possible values are NIL for an EQ table, or T for an EQL table.
-(defmacro kv-vector-supplement (pairs) `(svref ,pairs (1- (length ,pairs))))
+;;; For a concurrent GC, this element will not require a read barrier because
+;;; it must be treated as a strong reference even if the vector is weak.
+(defmacro kv-vector-supplement (pairs)
+  `(svref ,pairs (1- (length ,pairs))))
 
 (declaim (inline set-kv-hwm)) ; can't setf data-vector-ref
 (defun set-kv-hwm (vector hwm) (setf (svref vector 0) hwm))
@@ -704,6 +707,13 @@ multiple threads accessing the same hash-table without locking."
          ;; Bump the count field, but leave the least-significant bit on.
          (aver (eq old (cas (svref ,kv-vector rehash-stamp-elt) old (logior new-stamp 1))))))))
 
+;;; Rehash in one of two scenarios:
+;;; - up-sizing a table, be it weak or not
+;;; - rehashing a weak table due to  key movement
+;;; Absent is the case of rehashing a non-weak table due to key movement.
+;;; That is special-cased in %REHASH-AND-FIND which does both at once as its name implies.
+;;; Note that this will never be called on a KV-VECTOR with the weakness bit set.
+;;; Therefore we can use SVREF in lieu of WEAK-KVV-REF for weak tables.
 (macrolet
     ((push-in-chain (bucket-index-expr)
        `(let ((bucket (the index ,bucket-index-expr)))
@@ -1395,6 +1405,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 
 ;;;; Weak table variant.
 
+#-weak-vector-readbarrier (defmacro weak-kvv-ref (v i) `(svref ,v ,i))
+
 ;;; A single function acts as the core of all operations on weak tables.
 ;;; The advantage is that we could simulate lazy weak lists by removing smashed
 ;;; pairs while doing any table operation, with no GC support beyond the ability
@@ -1421,14 +1433,18 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                     `(do ((next index (aref next-vector next)))
                          ((zerop next) (values +empty-ht-slot+ 0 0 0))
                        (declare (type index/2 next))
+                       ;; An unfortunate aspect of this code is that it will liven
+                       ;; passed over keys in the case of a probe miss. It should be
+                       ;; possible to come up with a way to _conditionally_ strengthen
+                       ;; the ref to the key, i.e. only when we actually have a hit.
                        (let* ((physical-index (truly-the index (* next 2)))
-                              (probed-key (svref kv-vector physical-index)))
+                              (probed-key (weak-kvv-ref kv-vector physical-index)))
                          (when ,comparison-expr
                            ;; Delay fetching the value until a key match. There's a race here
                            ;; in a weak value table. If the key is reachable but the value is
                            ;; otherwise unreachable, the GC might win and clear the value.
                            ;; So GETHASH has to check for that anyway.
-                           (let ((probed-val (svref kv-vector (1+ physical-index))))
+                           (let ((probed-val (weak-kvv-ref kv-vector (1+ physical-index))))
                              (return (values probed-val probed-key physical-index predecessor))))
                          (check-excessive-probes 1)
                          (setq predecessor next)))))
@@ -1795,9 +1811,9 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
              (insert-at (or (hash-table-next-smashed-kv hash-table)
                             (hash-table-next-free-kv hash-table))
                         hash-table key hash address-sensitive-p value))
-            ((or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
+            ((or (empty-ht-slot-p (cas (weak-kvv-ref kv-vector (1+ physical-index))
                                        probed-value value))
-                 (neq (svref kv-vector physical-index) probed-key))
+                 (neq (weak-kvv-ref kv-vector physical-index) probed-key))
              (signal-corrupt-hash-table hash-table))
             (t value))))
   (define-ht-setter puthash/eq eq)
@@ -1860,9 +1876,9 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
   (with-weak-hash-table-entry
         (unless (eql physical-index 0)
           ;; Mark slot as empty.
-          (if (or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
+          (if (or (empty-ht-slot-p (cas (weak-kvv-ref kv-vector (1+ physical-index))
                                         probed-value +empty-ht-slot+))
-                  (neq (cas (svref kv-vector physical-index)
+                  (neq (cas (weak-kvv-ref kv-vector physical-index)
                             probed-key +empty-ht-slot+)
                        probed-key))
               (signal-corrupt-hash-table hash-table)
