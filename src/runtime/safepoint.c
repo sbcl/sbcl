@@ -612,7 +612,7 @@ static bool can_invoke_post_gc(struct thread* th)
 }
 
 // returns 0 if skipped, 1 otherwise
-int check_pending_gc(__attribute((unused)) os_context_t *ctx)
+int check_pending_gc()
 {
     odxprint(misc, "check_pending_gc");
     struct thread * self = get_sb_vm_thread();
@@ -720,7 +720,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     /* If we still need to GC, and it's not inhibited, call into
      * SUB-GC.  Phase is either GC_QUIET or GC_NONE. */
     if (check_gc_and_thruptions) {
-        check_pending_gc(ctxptr);
+        check_pending_gc();
 #ifdef LISP_FEATURE_SB_SAFEPOINT
         while(check_pending_thruptions(ctxptr));
 #endif
@@ -806,7 +806,7 @@ void thread_interrupted(os_context_t *ctxptr)
             thread_in_lisp_raised(ctxptr);
         }
     }
-    check_pending_gc(ctxptr);
+    check_pending_gc();
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     while(check_pending_thruptions(ctxptr));
 #endif
