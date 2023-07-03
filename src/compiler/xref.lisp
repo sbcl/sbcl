@@ -16,19 +16,15 @@
 
 (defun record-component-xrefs (component)
   (declare (type component component))
-  (when (policy *lexenv* (zerop store-xref-data))
-    (return-from record-component-xrefs))
-  (do ((block (block-next (component-head component)) (block-next block)))
-      ((null (block-next block)))
-    (let ((start (block-start block)))
+  (unless (policy *lexenv* (zerop store-xref-data))
+    (do-blocks (block component)
       (flet ((handle-node (functional)
                ;; Record xref information for all nodes in the block.
                ;; Note that this code can get executed several times
                ;; for the same block, if the functional is referenced
                ;; from multiple XEPs.
-               (loop for ctran = start then (node-next (ctran-next ctran))
-                     while ctran
-                     do (record-node-xrefs (ctran-next ctran) functional))
+               (do-nodes (node nil block)
+                 (record-node-xrefs node functional))
                ;; Properly record the deferred macroexpansion and source
                ;; transform information that's been stored in the block.
                (loop for (kind what path) in (block-xrefs block)
