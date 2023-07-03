@@ -4,12 +4,51 @@ freebsd_build_task:
     matrix:
       image_family: freebsd-12-3
       image_family: freebsd-13-0
-      image_family: freebsd-14-0-snap
+      # image_family: freebsd-14-0-snap
     cpu: 1
     memory: 1G
 
   prepare_script:
     - pkg install -y sbcl gmake git
+
+  build_script:
+    - echo '"1.9.99.999"' > version.lisp-expr
+    - ./make.sh
+
+  test_script:
+    - cd tests; ./run-tests.sh
+
+  ansi_test_script:
+    - cd tests; ./ansi-tests.sh
+
+task:
+  name: Linux arm64
+  arm_container:
+    image: gcc:latest
+    cpu: 2
+    memory: 1G
+  install_script:
+    - apt-get -qq update
+    - apt-get -qq -y install sbcl strace
+  build_script:
+    - echo '"1.9.99.999"' > version.lisp-expr
+    - ./make.sh    
+
+  test_script:
+    - cd tests; ./run-tests.sh
+
+  ansi_test_script:
+    - cd tests; ./ansi-tests.sh
+
+task:
+  name: macOS arm64
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-ventura-base:latest
+    cpu: 2
+    memory: 1G
+
+  prepare_script:
+    - brew install sbcl
 
   build_script:
     - echo '"1.9.99.999"' > version.lisp-expr
