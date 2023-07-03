@@ -1136,28 +1136,24 @@
   (reoptimize-lvar (node-lvar call))
   (values))
 
-;;; Are there any declarations in force to say CLAMBDA shouldn't be
-;;; LET converted?
-(defun declarations-suppress-let-conversion-p (clambda)
-  ;; From the user's point of view, LET-converting something that
-  ;; has a name is inlining it. (The user can't see what we're doing
-  ;; with anonymous things, and suppressing inlining
-  ;; for such things can easily give Python acute indigestion, so
-  ;; we don't.)
-  ;;
-  ;; A functional that is already inline-expanded in this componsne definitely
-  ;; deserves let-conversion -- and in case of main entry points for inline
-  ;; expanded optional dispatch, the main-etry isn't explicitly marked INLINE
-  ;; even if the function really is.
-  (when (and (leaf-has-source-name-p clambda)
-             (not (functional-inline-expanded clambda)))
-    ;; ANSI requires that explicit NOTINLINE be respected.
-    (or (eq (lambda-inlinep clambda) 'notinline)
-        ;; If (= LET-CONVERSION 0) or (= DEBUG 3) we can guess that inlining
-        ;; generally won't be appreciated, but if the user specifically requests
-        ;; inlining, that takes precedence over our general guess.
-        (and (or (policy clambda (or (= let-conversion 0) (= debug 3))))
-             (not (eq (lambda-inlinep clambda) 'inline))))))
+;;; Are there any declarations in force to say FUN shouldn't be LET
+;;; converted?
+(defun declarations-suppress-let-conversion-p (fun)
+  (declare (type clambda fun))
+  ;; From the user's point of view, LET-converting something that has
+  ;; a name is inlining it. (The user can't see what we're doing with
+  ;; anonymous things, and suppressing inlining for such things can
+  ;; easily give Python acute indigestion, so we don't.)
+  (and (leaf-has-source-name-p fun)
+       ;; If FUN is/was an entry point for an OPTIONAL-DISPATCH, then
+       ;; INLINEP information is only recorded on the optional dispatch.
+       (case (functional-inlinep (or (lambda-optional-dispatch fun) fun))
+         ;; If the user specifically requests inlining, that takes
+         ;; precedence over our general guess.
+         (inline nil)
+         ;; ANSI requires that explicit NOTINLINE be respected.
+         (notinline t)
+         (t (policy fun (or (= let-conversion 0) (= debug 3)))))))
 
 ;;; We also don't convert calls to named functions which appear in the
 ;;; initial component, delaying this until optimization. This

@@ -1291,27 +1291,6 @@
       (setf (functional-inlinep fun) inlinep)
       (assert-new-definition var fun)
       (setf (defined-fun-inline-expansion var) var-expansion)
-      ;; Associate VAR with the FUN -- and in case of an optional dispatch
-      ;; with the various entry-points. This allows XREF to know where the
-      ;; inline CLAMBDA comes from.
-      (flet ((note-inlining (f)
-               (typecase f
-                 (functional
-                  (setf (functional-inline-expanded f) var))
-                 (cons
-                  ;; Delayed entry-point.
-                  (if (car f)
-                      (setf (functional-inline-expanded (cdr f)) var)
-                      (let ((old-thunk (cdr f)))
-                        (setf (cdr f) (lambda ()
-                                        (let ((g (funcall old-thunk)))
-                                          (setf (functional-inline-expanded g) var)
-                                          g)))))))))
-        (note-inlining fun)
-        (when (optional-dispatch-p fun)
-          (note-inlining (optional-dispatch-main-entry fun))
-          (note-inlining (optional-dispatch-more-entry fun))
-          (mapc #'note-inlining (optional-dispatch-entry-points fun))))
       ;;
       ;; If definitely not an interpreter stub, then substitute for any
       ;; old references.

@@ -1118,9 +1118,8 @@
   ;; xref information for this functional (only used for functions with an
   ;; XEP)
   (xref () :type list)
-  ;; True if this functional was created from an inline expansion. This
-  ;; is either T, or the GLOBAL-VAR for which it is an expansion.
-  (inline-expanded nil)
+  ;; True if this functional was created from an inline expansion.
+  (inline-expanded nil :type boolean)
   ;; Is it coming from a top-level NAMED-LAMBDA?
   (top-level-defun-p nil)
   (ignore nil))

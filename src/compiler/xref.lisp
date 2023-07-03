@@ -90,10 +90,11 @@
                (record-xref :calls name context node nil)))))
          ;; Inlined global function
          (clambda
-          (let ((inline-var (functional-inline-expanded leaf)))
-            (when (global-var-p inline-var)
+          (let ((fun (or (lambda-optional-dispatch leaf) leaf)))
+            (when (and (leaf-has-source-name-p fun)
+                       (functional-inline-expanded fun))
               ;; TODO: a WHO-INLINES xref-kind could be useful
-              (record-xref :calls (leaf-debug-name inline-var) context node nil))))
+              (record-xref :calls (leaf-source-name fun) context node nil))))
          ;; Reading a constant
          (constant
           (record-xref :references (leaf-%source-name leaf) context node nil)))))

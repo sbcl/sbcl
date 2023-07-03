@@ -713,7 +713,9 @@
                          (tail-set-type (lambda-tail-set lambda)) type)
                    (do-uses (use lvar)
                      (reoptimize-node use))
-                   (let ((defined-fun (functional-inline-expanded lambda)))
+                   (let ((defined-fun (and (functional-inline-expanded lambda)
+                                           (gethash (leaf-source-name lambda)
+                                                    (free-funs *ir1-namespace*)))))
                      (when (defined-fun-p defined-fun)
                        (setf (defined-fun-functional defined-fun) nil)))))
           (cond ((do-uses (node lvar)
@@ -2287,7 +2289,9 @@
           ;; incompatible argument types, so don't allow reuse of this
           ;; functional during future inline expansion to prevent
           ;; spurious type conflicts.
-          (let ((defined-fun (functional-inline-expanded fun)))
+          (let ((defined-fun (and (functional-inline-expanded fun)
+                                  (gethash (leaf-source-name fun)
+                                           (free-funs *ir1-namespace*)))))
             (when (defined-fun-p defined-fun)
               (do ((args (basic-combination-args call) (cdr args))
                    (vars vars (cdr vars)))
