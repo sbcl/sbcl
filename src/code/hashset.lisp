@@ -474,8 +474,11 @@
         (dovect))))
 
 (defun hashset-count (hashset &aux (cells (hss-cells (hashset-storage hashset))))
-  (count-if (lambda (x) (and x (not (hs-chain-terminator-p x))))
-            cells :end (hs-cells-capacity cells)))
+  (let ((n 0))
+    (dotimes (i (hs-cells-capacity cells) n)
+      (let ((x (hs-cell-ref cells i)))
+        (when (and x (not (hs-chain-terminator-p x)))
+          (incf n))))))
 (defmethod print-object ((self robinhood-hashset) stream)
   (print-unreadable-object (self stream :type t :identity t)
     (let ((cells (hss-cells (hashset-storage self))))
