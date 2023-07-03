@@ -51,7 +51,7 @@ typedef struct hopscotch_table* inverted_heap_t;
 
 int heap_trace_verbose = 0;
 
-#ifdef LISP_FEATURE_DARWIN_JIT
+#ifdef LISP_FEATURE_ARM64
 typedef uint64_t traceroot_pointer;
 #else
 typedef uint32_t traceroot_pointer;
@@ -411,7 +411,7 @@ static struct node* find_node(struct layer* layer, lispobj ptr)
     return 0;
 }
 
-#ifdef LISP_FEATURE_DARWIN_JIT
+#ifdef LISP_FEATURE_ARM64
 static inline traceroot_pointer encode_pointer(lispobj pointer)
 {
     return pointer;
