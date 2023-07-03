@@ -47,14 +47,6 @@
   ;; better not to add a new lazy stable hash slot to instances as a
   ;; side-effect of compiling.
   (instance-id-table (make-hash-table :test 'eq) :type hash-table :read-only t)
-  ;; the CONS table is an additional EQ table, used for storing CDRs
-  ;; of dumped lists which will not have their own direct identity as
-  ;; a dumped constant, but which might nevertheless be EQ to some
-  ;; other dumped object (and require that EQness to be preserved).
-  ;; The hash table entry, if present, is a reference to its parent
-  ;; list object (which will have a direct entity as a dumped
-  ;; constant) along with an index of how many CDRs to take.
-  (cons-table (make-hash-table :test 'eq) :type hash-table :read-only t)
   ;; Hashtable mapping a string to a list of fop-table indices of
   ;; symbols whose name is that string. For any name as compared
   ;; by STRING= there can be a symbol whose name is a base string
@@ -322,13 +314,24 @@
     (dump-fop 'fop-move-to-table fasl-output)
     (incf (fasl-output-table-free fasl-output))))
 
+(defun cdr-similarity-p (index fasl-output)
+  (when (consp index)
+    (destructuring-bind (list . nthcdr) index
+      (let ((index (gethash list (fasl-output-eq-table fasl-output))))
+        (when (fixnump index)
+          (dump-push index fasl-output)
+          (dump-fop 'fop-nthcdr fasl-output nthcdr)
+          t)))))
+
 ;;; If X is in File's SIMILAR-TABLE, then push the object and return T,
 ;;; otherwise NIL.
 (defun similar-check-table (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (awhen (get-similar x (fasl-output-similar-table fasl-output))
-    (dump-push it fasl-output)
-    t))
+  (let ((index (get-similar x (fasl-output-similar-table fasl-output))))
+    (cond ((fixnump index)
+           (dump-push index fasl-output)
+           t)
+          ((cdr-similarity-p index fasl-output)))))
 
 ;;; These functions are called after dumping an object to save the
 ;;; object in the table. The object (also passed in as X) must already
@@ -444,8 +447,9 @@
 ;;; When we go to dump the object, we enter it in the CIRCULARITY-TABLE.
 (defun dump-non-immediate-object (x file)
   (let ((index (gethash x (fasl-output-eq-table file))))
-    (cond (index
+    (cond ((fixnump index)
            (dump-push index file))
+          ((cdr-similarity-p index file))
           (t
            (typecase x
              (symbol (dump-symbol x file))
@@ -779,28 +783,25 @@
 
         ;; if this CONS is EQ to some other object we have already
         ;; dumped, dump a reference to that instead.
-        (let ((index (gethash l (fasl-output-eq-table file))))
-          (when index
-            (dump-push index file)
-            (terminate-dotted-list n file)
-            (return)))
+        (let* ((table (if coalesce
+                          (fasl-output-similar-table file)
+                          (fasl-output-eq-table file)))
+               (index (gethash l table)))
+          (cond ((fixnump index)
+                 (dump-push index file)
+                 (terminate-dotted-list n file)
+                 (return))
+                ((cdr-similarity-p index file)
+                 (when (> n 0)
+                   (terminate-dotted-list n file))
+                 (return)))
 
-        ;; if this CONS is EQ to the Ith CDR of some other list we have
-        ;; already dumped, dump a reference to that instead.
-        (let ((list+i (gethash l (fasl-output-cons-table file))))
-          (when list+i
-            (destructuring-bind (list i) list+i
-              (aver (consp list))
-              (let ((index (gethash list (fasl-output-eq-table file))))
-                (dump-push index file)
-                (dump-fop 'fop-nthcdr file i)
-                (when (> n 0)
-                  (terminate-dotted-list n file))
-                (return)))))
-
-        ;; put an entry for this cons into the fasl output cons table,
-        ;; for the benefit of dumping later constants
-        (setf (gethash l (fasl-output-cons-table file)) (list list n))
+          ;; put an entry for this cons into the fasl output cons table,
+          ;; for the benefit of dumping later constants
+          (let ((index (cons list n)))
+            (setf (gethash l (fasl-output-eq-table file)) index)
+            (when coalesce
+              (setf (gethash l (fasl-output-similar-table file)) index))))
 
         (setf (gethash l circ) list)
 
@@ -819,8 +820,9 @@
                  ;; This is the same as DUMP-NON-IMMEDIATE-OBJECT but
                  ;; without calling COALESCE-TREE-P again.
                  (let ((index (gethash obj (fasl-output-eq-table file))))
-                   (cond (index
+                   (cond ((fixnump index)
                           (dump-push index file))
+                         ((cdr-similarity-p index file))
                          ((not coalesce)
                           (dump-list obj file)
                           (eq-save-object obj file))
