@@ -162,19 +162,6 @@
           (setf (car cache) fun)
           (funcall fun cache object)))))
 
-;;; Do a type test from a class cell, allowing forward reference and
-;;; redefinition.
-(defun classoid-cell-typep (cell object)
-  (let ((layout (typecase object
-                  (instance (%instance-layout object))
-                  (funcallable-instance (%fun-layout object))
-                  (t (return-from classoid-cell-typep))))
-        (classoid (classoid-cell-classoid cell)))
-    (unless classoid
-      (error "The class ~S has not yet been defined."
-             (classoid-cell-name cell)))
-    (classoid-typep layout classoid object)))
-
 ;;; Return true of any object which is either a funcallable-instance,
 ;;; or an ordinary instance that is not a structure-object.
 (declaim (inline %pcl-instance-p))
@@ -261,6 +248,19 @@
           (dotimes (i (length obj-inherits) nil)
             (when (eq (svref obj-inherits i) layout)
               (return t)))))))
+
+;;; Do a type test from a class cell, allowing forward reference and
+;;; redefinition.
+(defun classoid-cell-typep (cell object)
+  (let ((layout (typecase object
+                  (instance (%instance-layout object))
+                  (funcallable-instance (%fun-layout object))
+                  (t (return-from classoid-cell-typep))))
+        (classoid (classoid-cell-classoid (truly-the classoid-cell cell))))
+    (unless classoid
+      (error "The class ~S has not yet been defined."
+             (classoid-cell-name cell)))
+    (classoid-typep layout classoid object)))
 
 (declaim (end-block))
 
