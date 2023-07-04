@@ -3989,10 +3989,6 @@ gc_init(void)
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&free_pages_lock);
 #endif
-#if defined(LISP_FEATURE_SB_SAFEPOINT)
-    extern void safepoint_init(void);
-    safepoint_init();
-#endif
 }
 
 int gc_card_table_nbits;

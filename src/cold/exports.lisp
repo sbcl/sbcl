@@ -601,7 +601,6 @@ structure representations")
            "ALIEN-LINKAGE-TABLE-SPACE-START"
            "ALIEN-LINKAGE-TABLE-SPACE-SIZE"
            "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
-           #+sb-safepoint "GC-SAFEPOINT-PAGE-ADDR"
            #+sb-safepoint "GC-SAFEPOINT-TRAP-OFFSET"
            "THREAD-STATE-WORD-SLOT"
            "THREAD-SPROF-DATA-SLOT"

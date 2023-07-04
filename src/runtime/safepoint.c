@@ -170,7 +170,7 @@ void safepoint_init()
     for (i=GC_NONE; i<GC_NPHASES; ++i)
         InitializeConditionVariable(&gc_state.phase_cond[i]);
     InitializeCriticalSection(&gc_state.lock);
-#elif !defined LISP_FEATURE_X86_64
+#elif !defined LISP_FEATURE_X86_64 && !defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE
     // 64-bit already allocated a trap page when the GC card mark table was made
     os_alloc_gc_space(0, NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
 #endif

@@ -90,7 +90,7 @@
                            ;; table, which works nicely assuming a register is wired to the card table
                            #+(and sb-safepoint (not x86-64))
                            ;; Must be just before NIL.
-                           (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
+                           (safepoint ,(symbol-value '+backend-page-bytes+))
                            (static ,small-space-size)
                            #+darwin-jit
                            (static-code ,small-space-size))
@@ -103,7 +103,9 @@
            (loop for (space size var-name) in spaces
                  appending
                  (let* ((relocatable
-                          (member space '(fixedobj text #+relocatable-static-space static
+                          (member space '(fixedobj text
+                                          #+relocatable-static-space safepoint
+                                          #+relocatable-static-space static
                                           #+immobile-space alien-linkage-table
                                           read-only)))
                         (start ptr)

@@ -3209,12 +3209,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (terpri))
   #+(and sb-safepoint (not x86-64))
   (progn
-  (format t "#define GC_SAFEPOINT_PAGE_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
-            sb-vm:gc-safepoint-page-addr)
-  (format t "#define GC_SAFEPOINT_TRAP_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
-            (+ sb-vm:gc-safepoint-page-addr
-               sb-c:+backend-page-bytes+
-               (- sb-vm:gc-safepoint-trap-offset))))
+  (format t "#define GC_SAFEPOINT_PAGE_ADDR (void*)((char*)STATIC_SPACE_START - ~d)~%"
+          +backend-page-bytes+)
+  (format t "#define GC_SAFEPOINT_TRAP_ADDR (void*)((char*)STATIC_SPACE_START - ~d)~%"
+          sb-vm:gc-safepoint-trap-offset))
 
   (dolist (symbol '(sb-vm:float-traps-byte
                     sb-vm::float-exceptions-byte

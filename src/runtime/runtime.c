@@ -781,6 +781,12 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     write_protect_immobile_space();
 #endif
 
+    /* Requires STATIC_SPACE_START to have been calculated. */
+#if defined(LISP_FEATURE_SB_SAFEPOINT)
+    extern void safepoint_init(void);
+    safepoint_init();
+#endif
+
     arch_install_interrupt_handlers();
 #ifndef LISP_FEATURE_WIN32
     os_install_interrupt_handlers();

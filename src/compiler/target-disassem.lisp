@@ -2228,9 +2228,7 @@
           (setf (gethash address addr->name) name))))
     ;; Not really a routine, but it uses the similar logic for annotations
     #+(and sb-safepoint (not x86-64))
-    (setf (gethash (+ sb-vm:gc-safepoint-page-addr
-                      sb-c:+backend-page-bytes+
-                      (- sb-vm:gc-safepoint-trap-offset)) addr->name)
+    (setf (gethash (- sb-vm:static-space-start sb-vm:gc-safepoint-trap-offset) addr->name)
           "safepoint"))
   (let ((found (gethash address addr->name)))
     (cond (found

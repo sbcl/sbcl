@@ -688,7 +688,15 @@ static os_vm_address_t reserve_space(int space_id, int attr,
     }
 #endif
     if (size == 0) return addr;
-    addr = os_alloc_gc_space(space_id, attr, addr, size);
+    // 64-bit already allocated a trap page when the GC card mark table was made
+#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_X86_64)
+    if (space_id == STATIC_CORE_SPACE_ID) {
+        // Allocate space for the safepoint page.
+        addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, size + BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES;
+    }
+    else
+#endif
+        addr = os_alloc_gc_space(space_id, attr, addr, size);
     if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
     return addr;
 }
