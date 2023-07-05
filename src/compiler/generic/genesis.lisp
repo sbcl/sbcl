@@ -3293,9 +3293,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (format out "static void (*~a_fns[])(lispobj obj) = {~
 ~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
-(defun write-cast-operator (operator-name c-name lowtag stream)
+(defun write-cast-operator (operator-name c-type-name lowtag stream)
   (format stream "static inline struct ~A* ~A(lispobj obj) {
-  return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag)
+  return (struct ~A*)(obj - ~D);~%}~%" c-type-name operator-name c-type-name lowtag)
   (case operator-name
     (fdefn
      (format stream "#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
@@ -3382,9 +3382,6 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
   ;; writing primitive object layouts
     (flet ((output-c ()
-             (when (eq name 'sb-vm::code)
-               (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d~2%"
-                       sb-vm:code-slots-per-simple-fun))
              (when (eq name 'sb-vm::thread)
                (write-genesis-thread-h-requisites)
                (format t "#define INIT_THREAD_REGIONS(x) \\~%")
@@ -3408,6 +3405,13 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
                        (and (primitive-object-variable-length-p obj)
                             (eq slot (aref slots (1- (length slots)))))))
              (format t "};~%")
+             (when (eq name 'sb-vm::code)
+               (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d
+static inline struct code* fun_code_header(struct simple_fun* fun) {
+  return (struct code*)((lispobj*)fun - ((uint32_t)fun->header >> 8));
+}~%" sb-vm:code-slots-per-simple-fun)
+               (write-cast-operator 'function "simple_fun" sb-vm:fun-pointer-lowtag
+                                    *standard-output*))
              (when (eq name 'vector)
                ;; This is 'sword_t' because we formerly would call fixnum_value() which
                ;; is a signed int, but it isn't really; except that I made all C vars
@@ -4201,10 +4205,15 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
         (let ((structs (sort (copy-list sb-vm:*primitive-objects*) #'string<
-                             :key #'sb-vm:primitive-object-name)))
+                             :key #'sb-vm:primitive-object-name))
+              (code (find 'sb-vm::code sb-vm:*primitive-objects*
+                          :key #'sb-vm:primitive-object-name)))
           (dolist (obj structs)
-            (out-to (string-downcase (sb-vm:primitive-object-name obj))
-              (write-primitive-object obj stream)))
+            (unless (eq obj code)
+              (out-to (string-downcase (sb-vm:primitive-object-name obj))
+                (write-primitive-object obj stream)
+                (when (eq (sb-vm:primitive-object-name obj) 'sb-kernel:simple-fun)
+                  (write-primitive-object code stream)))))
           (out-to "primitive-objects"
             (dolist (obj structs)
               (format stream "~&#include \"~A.h\"~%"

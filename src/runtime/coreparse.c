@@ -1137,7 +1137,7 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
 #define ILLEGAL_WORD 0xFFFFFFFFDEADBEEF
     if (ptr == ILLEGAL_WORD) lose("object %"OBJ_FMTX" contains a garbage word", referer);
     if (lowtag_of(ptr) == FUN_POINTER_LOWTAG
-        && widetag_of(FUNCTION(ptr)) == SIMPLE_FUN_WIDETAG)
+        && widetag_of((lispobj*)FUNCTION(ptr)) == SIMPLE_FUN_WIDETAG)
         ptr = fun_code_tagged(FUNCTION(ptr));
     if (hopscotch_get(context->seen, ptr, 0)) return;
     if (++context->depth > context->maxdepth) context->maxdepth = context->depth;

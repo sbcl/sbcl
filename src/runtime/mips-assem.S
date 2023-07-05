@@ -23,7 +23,6 @@
 #include "globals.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
-#include "genesis/code.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"

@@ -2723,7 +2723,8 @@ static void pin_exact_root(lispobj obj)
 #ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:
 #endif
-        obj = make_lispobj(fun_code_header(object_start), OTHER_POINTER_LOWTAG);
+        obj = make_lispobj(fun_code_header((struct simple_fun*)object_start),
+                           OTHER_POINTER_LOWTAG);
     }
     pin_object(obj);
 }
@@ -2767,7 +2768,7 @@ static boolean ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
             switch (header_widetag(header)) {
             case SIMPLE_FUN_WIDETAG:
                 if (functionp(ptr)) {
-                    lispobj* code = fun_code_header(FUNCTION(ptr));
+                    lispobj* code = (lispobj*)fun_code_header(FUNCTION(ptr));
                     // This is a heuristic, since we're not actually looking for
                     // an object boundary. Precise scanning of 'page' would obviate
                     // the guard conditions here.

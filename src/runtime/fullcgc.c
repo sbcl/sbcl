@@ -195,8 +195,8 @@ static void __mark_obj(lispobj pointer)
     uword_t bit = (uword_t)1 << (mark_index % N_WORD_BITS);
     if (fullcgcmarks[wordindex] & bit) return; // already marked
     if (lowtag_of(pointer) == FUN_POINTER_LOWTAG
-        && embedded_obj_p(widetag_of(FUNCTION(pointer)))) {
-        lispobj* code = fun_code_header(FUNCTION(pointer));
+        && embedded_obj_p(widetag_of((lispobj*)FUNCTION(pointer)))) {
+        lispobj* code = (void*)fun_code_header(FUNCTION(pointer));
         mark_index -= ((char*)FUNCTION(pointer) - (char*)code) >> (1+WORD_SHIFT);
         pointer = make_lispobj(code, OTHER_POINTER_LOWTAG);
         base = code;

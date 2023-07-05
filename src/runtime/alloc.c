@@ -17,7 +17,7 @@
 #include "alloc.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
-#include "genesis/code.h"
+#include "genesis/simple-fun.h"
 
 lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 {

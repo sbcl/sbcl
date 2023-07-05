@@ -12,7 +12,7 @@
 #ifndef _CODE_H_
 #define _CODE_H_
 
-#include "genesis/code.h"
+#include "genesis/simple-fun.h"
 #include "gc-assert.h"
 
 static inline int code_total_nwords(struct code* c) {
@@ -138,14 +138,7 @@ static inline int instruction_ptr_p(char *pointer, lispobj *start_addr)
 /// This is not technically a restriction on the code size.
 #define FUN_HEADER_NWORDS_MASK 0xFFFFFF
 
-static inline lispobj* FUNCTION(lispobj obj) {
-  return (lispobj*)(obj - FUN_POINTER_LOWTAG);
-}
-
-static inline lispobj* fun_code_header(lispobj* fun) {
-    return fun - (HeaderValue(*fun) & FUN_HEADER_NWORDS_MASK);
-}
-static inline lispobj fun_code_tagged(lispobj* fun) {
+static inline lispobj fun_code_tagged(void* fun) {
     return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
 }
 
@@ -161,7 +154,7 @@ base_pointer(lispobj ptr)
 {
     lispobj *obj = native_pointer(ptr);
     int widetag = widetag_of(obj);
-    return embedded_obj_p(widetag) ? fun_code_header(obj) : obj;
+    return embedded_obj_p(widetag) ? (lispobj*)fun_code_header((struct simple_fun*)obj) : obj;
 }
 
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64

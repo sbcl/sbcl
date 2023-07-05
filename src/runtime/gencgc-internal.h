@@ -22,7 +22,7 @@
 #include <limits.h>
 #include "gc.h"
 #include "gencgc-alloc-region.h"
-#include "genesis/code.h"
+#include "genesis/simple-fun.h"
 #include "hopscotch.h"
 
 #ifndef GENCGC_IS_PRECISE
@@ -309,7 +309,7 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
     // for a simple-fun, or map LRAs to the code base address.
     if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
         // The hash-table stores tagged pointers.
-        obj = make_lispobj(fun_code_header(native_pointer(obj)),
+        obj = make_lispobj(fun_code_header((struct simple_fun*)native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
         page = find_page_index((void*)obj);
     }

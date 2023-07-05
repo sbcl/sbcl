@@ -2063,7 +2063,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
     // It would be wrong to read garbage bytes from the simple-fun table.
     if (widetag == CODE_HEADER_WIDETAG && ((struct code*)start_addr)->debug_info) {
         if (functionp(pointer)) {
-            lispobj* potential_fun = FUNCTION(pointer);
+            lispobj* potential_fun = (void*)FUNCTION(pointer);
             if (widetag_of(potential_fun) == SIMPLE_FUN_WIDETAG &&
                 simple_fun_index((struct code*)start_addr,
                                  (struct simple_fun*)potential_fun) >= 0)

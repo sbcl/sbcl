@@ -23,7 +23,6 @@
 #ifndef _GC_INTERNAL_H_
 #define _GC_INTERNAL_H_
 
-#include "genesis/code.h"
 #include "genesis/simple-fun.h"
 #include "thread.h"
 #include "interr.h" /* for lose() */
