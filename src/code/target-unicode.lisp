@@ -522,7 +522,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun normalize-string (string &optional (form :nfd)
                                           filter)
-  "Normalize STRING to the Unicode normalization form form.
+  "Normalize STRING to the Unicode normalization form FORM.
 Acceptable values for form are :NFD, :NFC, :NFKD, and :NFKC.
 If FILTER is a function it is called on each decomposed character and
 only characters for which it returns T are collected."

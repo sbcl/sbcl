@@ -324,28 +324,30 @@
 ;;; and also sets its high bit if the decompositions are compatibility
 ;;; decompositions. The other flags byte encodes boolean properties. Bit 7 is
 ;;; set if the entry's characters are BOTH-CASE-P in the Common Lisp sense. Bit
-;;; 6 is set if the entry's characters hav a defined case transformation in
+;;; 6 is set if the entry's characters have a defined case transformation in
 ;;; Unicode. Bit 5 is set if the characters have the property BIDI_Mirrored=Y.
 ;;; Bits 3-0 encode the entry's East Asian Width. Bit 4 is unused. Age stores
 ;;; the minor version in bits 0-2, and the major version in the remaining 5
 ;;; bits.
 ;;;
-;;; To find which entry in +CHARACTER-MISC-DATABASE+ encodes a character's
-;;; attributes, first index +CHARACTER-HIGH-PAGES+ (an array of 16-bit
-;;; values) with the high 13 bits of the character's codepoint. If the result
-;;; value has its high bit set, the character is in a "compressed page". To
-;;; find the misc entry number, simply clear the high bit. If the high bit is
-;;; not set, the misc entry number must be looked up in
-;;; +CHARACTER-LOW-PAGES+, which is an array of 16-bit values. Each entry in
-;;; the array consists of two such values, the misc entry number and the
-;;; decomposition index. To find the misc entry number, index into
-;;; +CHARACTER-LOW-PAGES+ using the value retreived from
-;;; +CHARACTER-HIGH-PAGES+ (shifted left 8 bits) plus the low 8 bits of the
-;;; codepoint, all times two to account for the widtth of the entries. The
-;;; value in +CHARACTER-LOW-PAGES+ at this point is the misc entry number. To
-;;; transform a misc entry number into an index into
-;;; +CHARACTER-MISC-DATABASE+, multiply it by +MISC-WIDTH+. This gives the
-;;; index of the start of the charater's misc entry in
+;;; To find which entry in +CHARACTER-MISC-DATABASE+ encodes a
+;;; character's attributes, first index +CHARACTER-HIGH-PAGES+ (an
+;;; array of 16-bit values) with the high 13 bits of the character's
+;;; codepoint. If the result value has its high bit set, the character
+;;; is in a "compressed page", where all characters on that
+;;; 256-character page have the same misc entry. To find the misc
+;;; entry number, simply clear the high bit. If the high bit is not
+;;; set, the misc entry number must be looked up in
+;;; +CHARACTER-LOW-PAGES+, which is an array of 16-bit values. Each
+;;; entry in the array consists of two such values, the misc entry
+;;; number and the decomposition index. To find the misc entry number,
+;;; index into +CHARACTER-LOW-PAGES+ using the value retreived from
+;;; +CHARACTER-HIGH-PAGES+ (shifted left 8 bits) plus the low 8 bits
+;;; of the codepoint, all times two to account for the widtth of the
+;;; entries. The value in +CHARACTER-LOW-PAGES+ at this point is the
+;;; misc entry number. To transform a misc entry number into an index
+;;; into +CHARACTER-MISC-DATABASE+, multiply it by +MISC-WIDTH+. This
+;;; gives the index of the start of the charater's misc entry in
 ;;; +CHARACTER-MISC-DATABASE+.
 ;;;
 ;;; To look up a character's decomposition, first retreive its
@@ -372,9 +374,9 @@
 ;;; a flat array twice as large, and it includes only the standard casing rules,
 ;;; so there's always just two characters.
 ;;;
-;;; Similarly, composition information is stored in **CHARACTER-COMPOSITIONS**,
-;;; which is a hash table of codepoints indexed by (+ (ash codepoint1 21)
-;;; codepoint2).
+;;; Primary composition information is stored in a hash table local to
+;;; PRIMARY-COMPOSITION, with (+ (ash codepoint1 21) codepoint2) as
+;;; keys and the composition as the value
 
 (declaim (ftype (sfunction (t) (unsigned-byte 16)) misc-index))
 (defun misc-index (char)
