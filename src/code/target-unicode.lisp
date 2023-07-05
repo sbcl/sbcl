@@ -457,10 +457,10 @@ disappears when accents are placed on top of it. and NIL otherwise"
   (declare (ignore char1 char2))
   #-sb-unicode
   #.(let* ((data (sb-cold:read-from-file "output/comp.lisp-expr"))
-           (key (car pair))
-           (c1 (ldb (byte 21 21) key))
-           (c2 (ldb (byte 21 0) key))
            (entries (loop for pair across data
+                          for key = (car pair)
+                          for c1 = (ldb (byte 21 21) key)
+                          for c2 = (ldb (byte 21 0) key)
                           when (and (< c1 sb-xc:char-code-limit)
                                     (< c2 sb-xc:char-code-limit))
                           collect pair)))
