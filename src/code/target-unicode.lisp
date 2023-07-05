@@ -453,6 +453,20 @@ disappears when accents are placed on top of it. and NIL otherwise"
       (nreverse chars))))
 
 (defun primary-composition (char1 char2)
+  #-sb-unicode
+  (declare (ignore char1 char2))
+  #-sb-unicode
+  #.(let* ((data (sb-cold:read-from-file "output/comp.lisp-expr"))
+           (key (car pair))
+           (c1 (ldb (byte 21 21) key))
+           (c2 (ldb (byte 21 0) key))
+           (entries (loop for pair across data
+                          when (and (< c1 sb-xc:char-code-limit)
+                                    (< c2 sb-xc:char-code-limit))
+                          collect pair)))
+      (aver (null entries))
+      nil)
+  #+sb-unicode
   (flet ((composition-hangul-syllable-type (cp)
            (cond
              ((and (<= #x1100 cp) (<= cp #x1112)) :L)
@@ -470,7 +484,6 @@ disappears when accents are placed on top of it. and NIL otherwise"
                       (sb-impl::%stuff-hash-table
                        (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
                        (loop for pair across data
-                             when (< (cdr pair) char-code-limit) ; Why is this even defined if #-sb-unicode?
                              collect (cons (car pair) (code-char (cdr pair))))
                        t))
                     t)))
