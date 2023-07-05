@@ -34,7 +34,7 @@
 ;;;
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg immediate))
          (old-value :scs (any-reg descriptor-reg zero))
          (new-value :scs (any-reg descriptor-reg zero)))
   (:arg-types * tagged-num * *)
@@ -44,24 +44,47 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 5
-    (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
-    (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))
-    (cond ((member :arm-v8.1 *backend-subfeatures*)
-           (move result old-value)
-           (inst casal result new-value lip))
-          (t
-           (assemble ()
-             (inst dsb)
-             LOOP
-             ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
-             (inst ldxr result lip)
-             (inst cmp result old-value)
-             (inst b :ne EXIT)
-             (inst stlxr tmp-tn new-value lip)
-             (inst cbnz (32-bit-reg tmp-tn) LOOP)
-             EXIT
-             (inst clrex)
-             (inst dmb))))))
+    (cond
+      ((sc-is index immediate)
+       (inst add-sub lip object (+ (ash (tn-value index) n-fixnum-tag-bits)
+                                   (- (* offset n-word-bytes) lowtag))))
+      (t
+       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+       (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
+    (inst dsb)
+    LOOP
+    ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
+    (inst ldxr result lip)
+    (inst cmp result old-value)
+    (inst b :ne EXIT)
+    (inst stlxr tmp-tn new-value lip)
+    (inst cbnz (32-bit-reg tmp-tn) LOOP)
+    EXIT
+    (inst clrex)
+    (inst dmb)))
+
+(define-vop (word-index-cas-v8.1)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg immediate))
+         (old-value :scs (any-reg descriptor-reg) :target result)
+         (new-value :scs (any-reg descriptor-reg zero)))
+  (:arg-types * tagged-num * *)
+  (:temporary (:sc non-descriptor-reg) lip)
+  (:results (result :scs (any-reg descriptor-reg) :from (:argument 2)))
+  (:result-types *)
+  (:variant-vars offset lowtag)
+  (:policy :fast-safe)
+  (:guard (member :arm-v8.1 *backend-subfeatures*))
+  (:generator 3
+    (cond
+      ((sc-is index immediate)
+       (inst add-sub lip object (+ (ash (tn-value index) word-shift)
+                                   (- (* offset n-word-bytes) lowtag))))
+      (t
+       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+       (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
+    (move result old-value)
+    (inst casal result new-value lip)))
 
 (define-vop (set-instance-hashed)
   (:args (object :scs (descriptor-reg)))

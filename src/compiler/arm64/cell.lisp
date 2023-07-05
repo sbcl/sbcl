@@ -592,7 +592,7 @@
   (:args (object)
          (index)
          (old-value :scs (unsigned-reg))
-         (new-value :scs (unsigned-reg)))
+         (new-value :scs (unsigned-reg zero)))
   (:arg-types * tagged-num unsigned-num unsigned-num)
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
@@ -602,12 +602,37 @@
   (:args (object)
          (index)
          (old-value :scs (signed-reg))
-         (new-value :scs (signed-reg)))
+         (new-value :scs (signed-reg zero)))
   (:arg-types * tagged-num signed-num signed-num)
   (:results (result :scs (signed-reg) :from :load))
   (:result-types signed-num)
   (:translate %raw-instance-cas/signed-word))
 
+(define-vop (%instance-cas-v8.1 word-index-cas-v8.1)
+  (:policy :fast-safe)
+  (:translate %instance-cas)
+  (:variant instance-slots-offset instance-pointer-lowtag)
+  (:arg-types instance tagged-num * *))
+
+(define-vop (%raw-instance-cas/word-v8.1 %instance-cas-v8.1)
+  (:args (object)
+         (index)
+         (old-value :scs (unsigned-reg) :target result)
+         (new-value :scs (unsigned-reg zero)))
+  (:arg-types * tagged-num unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 2)))
+  (:result-types unsigned-num)
+  (:translate %raw-instance-cas/word))
+
+(define-vop (%raw-instance-cas/signed-word-v8.1 %instance-cas-v8.1)
+  (:args (object)
+         (index)
+         (old-value :scs (signed-reg) :target result)
+         (new-value :scs (signed-reg zero)))
+  (:arg-types * tagged-num signed-num signed-num)
+  (:results (result :scs (signed-reg) :from (:argument 2)))
+  (:result-types signed-num)
+  (:translate %raw-instance-cas/signed-word))
 
 ;;;; Code object frobbing.
 

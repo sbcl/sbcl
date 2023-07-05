@@ -676,11 +676,12 @@ returns NIL each time."
   (cond #+sb-futex
         (t
          ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-         (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
-                (setf (mutex-%owner mutex) (current-vmthread-id))
-                t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
-               ((= (mutex-%owner mutex) (current-vmthread-id))
-                (error "Recursive lock attempt ~S." mutex))))
+         (let ((id (current-vmthread-id)))
+           (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
+                  (setf (mutex-%owner mutex) id)
+                  t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
+                 ((= (mutex-%owner mutex) id)
+                  (error "Recursive lock attempt ~S." mutex)))))
         #-sb-futex
         (t
          (barrier (:read))

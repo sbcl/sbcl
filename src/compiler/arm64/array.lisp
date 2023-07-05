@@ -481,6 +481,13 @@
   (:translate %compare-and-swap-svref)
   (:arg-types simple-vector positive-fixnum * *))
 
+(define-vop (%compare-and-swap-svref-v8.1 word-index-cas-v8.1)
+  (:note "inline array compare-and-swap")
+  (:policy :fast-safe)
+  (:variant vector-data-offset other-pointer-lowtag)
+  (:translate %compare-and-swap-svref)
+  (:arg-types simple-vector positive-fixnum * *))
+
 (define-vop (array-atomic-incf/word)
   (:translate %array-atomic-incf/word)
   (:policy :fast-safe)
