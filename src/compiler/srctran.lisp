@@ -4366,7 +4366,7 @@
   (def <= < ceiling)
   (def >= > floor))
 
-(macrolet ((def (name x y type-x type-y)
+(macrolet ((def (name x y type-x type-y &optional non-fixnum)
              `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node :important nil)
                 (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
                            (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
@@ -4374,15 +4374,22 @@
                       (t
                        ;; Give the range-transform optimizers a chance to trigger.
                        (delay-ir1-transform node :ir1-phases)
-                       `(and (fixnump i)
-                             (let ((i (truly-the fixnum i)))
-                               (,',name ,',x ,',y))))))))
+                       `(if (fixnump i)
+                            (let ((i (truly-the fixnum i)))
+                              (,',name ,',x ,',y))
+                            ,,non-fixnum))))))
 
   (def < i f (integer #.most-negative-fixnum) fixnum)
   (def > f i fixnum (integer #.most-negative-fixnum))
 
   (def > i f (integer * #.most-positive-fixnum) fixnum)
-  (def < f i fixnum (integer * #.most-positive-fixnum)))
+  (def < f i fixnum (integer * #.most-positive-fixnum))
+
+  (def > i f (integer #.most-negative-fixnum) fixnum t)
+  (def < f i fixnum (integer #.most-negative-fixnum) t)
+
+  (def < i f (integer * #.most-positive-fixnum) fixnum t)
+  (def > f i fixnum (integer * #.most-positive-fixnum) t))
 
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))
