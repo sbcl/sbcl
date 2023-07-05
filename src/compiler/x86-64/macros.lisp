@@ -271,7 +271,7 @@
               (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
                                '(immediate))
                            any-reg signed-reg unsigned-reg) :to :eval)
-              (old-value :scs ,scs #|:target rax|#)
+              (old-value :scs (,@scs immediate) #|:target rax|#)
               (new-value :scs ,scs))
        (:vop-var vop)
        (:arg-types ,type tagged-num ,el-type ,el-type)
@@ -297,7 +297,7 @@
                 ;; store barrier affects only the object's base address
                 '((emit-gengc-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
                ((%raw-instance-cas/word %raw-instance-cas/signed-word)))
-           (move rax old-value)
+           (move-immediate rax (encode-value-if-immediate old-value ,(and (memq 'any-reg scs) t)))
            (inst cmpxchg :lock ea new-value)
            (move value rax))))))
 
