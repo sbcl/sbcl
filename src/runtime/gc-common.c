@@ -1177,14 +1177,11 @@ DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE)
  * (https://en.wikipedia.org/wiki/Ephemeron)
  * that otherwise can only be simulated very inefficiently in SBCL as a weak hash-table
  * containing a single key */
-#define WEAKPTR_FIXED_NWORDS (sizeof (struct weak_pointer)/sizeof (lispobj))
 static sword_t scav_weakptr(lispobj *where, lispobj __attribute__((unused)) object)
 {
-    int size = WEAKPTR_PAYLOAD_WORDS(where);
-    if (!size) { // treat it like a vector
-        add_to_weak_vector_list(where, *where);
-        int nelements = fixnum_value(where[1]);
-        return ALIGN_UP(nelements, 2) + 2;
+    if (weakptr_vectorp((struct weak_pointer*)where)) {
+        add_to_weak_vector_list(where, *where); // treat it like weak simple-vector
+        return size_vector_t(where);
     }
     struct weak_pointer * wp = (struct weak_pointer*)where;
     /* If wp->next is non-NULL then it's already in the weak pointer chain.
@@ -1209,27 +1206,22 @@ static sword_t scav_weakptr(lispobj *where, lispobj __attribute__((unused)) obje
                 add_to_weak_pointer_chain(wp);
         }
     }
-    return ALIGN_UP(WEAKPTR_FIXED_NWORDS, 2);
+    return ALIGN_UP(WEAK_POINTER_SIZE, 2);
 }
 static lispobj trans_weakptr(lispobj object) {
     lispobj* where = (lispobj*)(object - OTHER_POINTER_LOWTAG);
-    int size = WEAKPTR_PAYLOAD_WORDS(where);
-    if (size)
+    if (weakptr_vectorp((struct weak_pointer*)where)) // See trans_vector_t
+        return copy_potential_large_object(object,
+                                           size_vector_t(where),
+                                           small_mixed_region, PAGE_TYPE_SMALL_MIXED);
+    else
         return gc_copy_object(object,
-                              ALIGN_UP(WEAKPTR_FIXED_NWORDS, 2),
+                              ALIGN_UP(WEAK_POINTER_SIZE, 2),
                               small_mixed_region, PAGE_TYPE_SMALL_MIXED);
-    // treat it like a vector. See trans_vector_t
-    int nelements = fixnum_value(where[1]);
-    return copy_potential_large_object(object,
-                                       ALIGN_UP(nelements + 2, 2),
-                                       small_mixed_region, PAGE_TYPE_SMALL_MIXED);
 }
 static sword_t size_weakptr(lispobj *where) {
-    int size = WEAKPTR_PAYLOAD_WORDS(where);
-    if (size) return ALIGN_UP(WEAKPTR_FIXED_NWORDS, 2);
-    // treat it like a vector
-    int nelements = fixnum_value(where[1]);
-    return ALIGN_UP(nelements, 2) + 2;
+    return weakptr_vectorp((struct weak_pointer*)where) ? size_vector_t(where)
+      : ALIGN_UP(WEAK_POINTER_SIZE, 2);
 }
 
 void smash_weak_pointers(void)

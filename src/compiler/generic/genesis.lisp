@@ -3360,6 +3360,10 @@ struct thread_state_word {
           #+64-bit "  char padding[4];" #-64-bit ""))
 
 (defun write-weak-pointer-manipulators ()
+  ;; weak pointer with no payload size in the header instead has a vector length slot
+  (format t "static inline int weakptr_vectorp(struct weak_pointer* wp) { ~
+return !(wp->header & 0x~X); }~%"
+          (ash (1- sb-vm:weak-pointer-size) sb-vm:n-widetag-bits))
   #+64-bit
   (format t "static inline void set_weak_pointer_next(struct weak_pointer *wp, void *next) {
     wp->header = ((uword_t)next << 16) | (wp->header & 0xffff);
