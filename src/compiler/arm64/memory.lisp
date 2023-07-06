@@ -64,7 +64,7 @@
     (inst dmb)))
 
 (define-vop (word-index-cas-v8.1)
-  (:args (object :scs (descriptor-reg))
+  (:args (object :scs (descriptor-reg) :to :save)
          (index :scs (any-reg immediate))
          (old-value :scs (any-reg descriptor-reg) :target result)
          (new-value :scs (any-reg descriptor-reg zero)))
