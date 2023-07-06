@@ -139,10 +139,7 @@
 
 (defun hashset-weakp (hashset)
   #+sb-xc-host (declare (ignore hashset))
-  #-sb-xc-host
-  (let* ((storage (hashset-storage hashset))
-         (cells (hss-cells storage)))
-    (weak-vector-p cells)))
+  #-sb-xc-host (weak-vector-p (hss-cells (hashset-storage hashset))))
 
 (defun make-hashset (estimated-count test-function hash-function &key weakness synchronized)
   (declare (boolean weakness synchronized))
@@ -276,16 +273,24 @@
             (incf sum-psl psl)
             (incf n-keys)))))))
 
-(defun hs-cells-count-live (cells limit)
-  (flet ((validp (x) (and (not (hs-chain-terminator-p x)) x)))
-    #+(or (not weak-vector-readbarrier) sb-xc-host) (count-if #'validp cells :end limit)
-    #+(and weak-vector-readbarrier (not sb-xc-host))
-    (if (simple-vector-p cells)
-        (count-if #'validp cells :end limit)
-        (let ((n 0))
-          (declare (index n))
-          (dotimes (i limit n)
-            (when (validp (weak-vector-ref cells i)) (incf n)))))))
+;;; Return count of occupied cells, NILs, 0s, and unbound markers.
+;;; [Sidebar: I may need to change the tombstone and/or unassigned value.
+;;; Currently these hashsets can't represent 0 or NIL as a key per se]
+(defun hs-cells-occupancy (cells limit)
+  (declare (type (or simple-vector #-sb-xc-host weak-vector) cells)
+           (index limit))
+  (let ((count-live 0)
+        (count-nil 0) ; GC smashes to NIL, so these are tombstones
+        (count-0 0) ; cells are 0-initialized, so this indicates never used
+        (count-ubm 0))
+    (declare (fixnum count-live count-0 count-NIL count-ubm))
+    (dotimes (i limit)
+      (let ((val (hs-cell-ref cells i)))
+        (cond ((eql val nil) (incf count-nil))
+              ((eql val 0) (incf count-0))
+              #-sb-xc-host ((unbound-marker-p val) (incf count-ubm))
+              (t (incf count-live)))))
+    (values count-live count-nil count-0 count-ubm)))
 
 (defun hashset-rehash (hashset count)
   (declare (type (or index null) count))
@@ -296,7 +301,7 @@
            (old-cells (hss-cells old-storage))
            (old-capacity (hs-cells-capacity old-cells))
            (count (or count ; count is already known if just GC'ed
-                      (hs-cells-count-live old-cells old-capacity)))
+                      (hs-cells-occupancy old-cells old-capacity)))
            (new-capacity (max 64 (power-of-two-ceiling (* count 2))))
            (new-storage
             (allocate-hashset-storage new-capacity (hashset-weakp hashset))))
@@ -345,7 +350,7 @@
                    (n-live))
                ;; First decide if the table occupancy needs to be recomputed after GC
                (unless (eq (hs-cells-gc-epoch cells) current-epoch)
-                 (setf n-live (hs-cells-count-live cells capacity)
+                 (setf n-live (hs-cells-occupancy cells capacity)
                        (hs-cells-n-avail cells) (- capacity n-live)
                        (hs-cells-gc-epoch cells) current-epoch))
                ;; Next decide if rehash should occur (LF exceeds 75%)
