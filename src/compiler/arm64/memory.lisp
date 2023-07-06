@@ -46,8 +46,8 @@
   (:generator 5
     (cond
       ((sc-is index immediate)
-       (inst add-sub lip object (+ (ash (tn-value index) n-fixnum-tag-bits)
-                                   (- (* offset n-word-bytes) lowtag))))
+       (inst add-sub lip object (- (ash (+ (tn-value index) offset) word-shift)
+                                   lowtag)))
       (t
        (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
@@ -78,8 +78,8 @@
   (:generator 3
     (cond
       ((sc-is index immediate)
-       (inst add-sub lip object (+ (ash (tn-value index) word-shift)
-                                   (- (* offset n-word-bytes) lowtag))))
+       (inst add-sub lip object (- (ash (+ (tn-value index) offset) word-shift)
+                                   lowtag)))
       (t
        (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
