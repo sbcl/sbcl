@@ -39,13 +39,8 @@ if [ -r $TEST_DIRECTORY/array.h ]
 then
     for i in $TEST_DIRECTORY/*.h
     do
-        case $i in
-        */gc-tables.h) ;; # fails to compile by itself (FIXME)
-        *)
           echo "#include \"$i\"" > ${src}
           ./run-compiler.sh -I../src/runtime -c -o ${obj} ${src}
-          ;;
-        esac
     done
 fi
 

@@ -149,8 +149,6 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #define gencgc_apply_code_fixups(ignore1,ignore2)
 #endif
 
-#include "fixnump.h"
-
 #if N_WORD_BITS == 32
 # define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG
 #elif N_WORD_BITS == 64
