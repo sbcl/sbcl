@@ -93,7 +93,7 @@ static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { re
 #define immobile_obj_gen_bits(dummy) 0
 #define prepare_immobile_space_for_final_gc()
 #define prepare_immobile_space_for_save(dummy)
-#define immobile_space_preserve_pointer(dummy) 0
+static inline int immobile_space_preserve_pointer(__attribute__((unused)) void* p) { return  0; }
 #define scavenge_immobile_roots(dummy1,dummy2)
 #define scavenge_immobile_newspace(dummy)
 #define sweep_immobile_space(dummy)

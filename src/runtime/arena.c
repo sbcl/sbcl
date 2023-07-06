@@ -270,7 +270,7 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                     ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: won't add arena %s block. Length=%lx request=%lx max=%lx",
                          oversized ? "huge-object" : "extension",
-                         a->uw_length, request, a->uw_size_limit);
+                         (long)a->uw_length, (long)request, (long)a->uw_size_limit);
                 }
                 // For a huge object, ensure that there will be adequate space after aligning
                 // the bounds. Don't worry about it for a regular extension block though

@@ -564,7 +564,7 @@ static lispobj trace1(lispobj object,
                         fprintf(stderr, "%p ", ptr);
                     else {
                         sword_t nwords = object_size(ptr);
-                        fprintf(stderr, "%p+%ld ", ptr, nwords);
+                        fprintf(stderr, "%p+%d ", ptr, (int)nwords);
                     }
                     list1 = cell[1];
                 }
