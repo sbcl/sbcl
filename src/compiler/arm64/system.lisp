@@ -264,7 +264,9 @@
     (:arg-types (:constant (satisfies ldr-str-word-offset-encodable)))
     (:policy :fast-safe)
     (:generator 1
-      (inst ldr sap (@ thread-tn (ash n word-shift)))))
+      (if (= n thread-this-slot)
+          (move sap thread-tn)
+          (inst ldr sap (@ thread-tn (ash n word-shift))))))
 
   (define-vop (current-thread-offset-sap)
     (:results (sap :scs (sap-reg)))
