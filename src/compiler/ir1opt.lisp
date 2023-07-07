@@ -1155,7 +1155,7 @@
          (aver info)
          (clear-reoptimize-args)
          (process-info)
-         (unless (eq (combination-kind node) :error) ;; casued by derive-type
+         (unless (eq (combination-kind node) :error) ;; caused by derive-type
            (let ((attr (fun-info-attributes info)))
              (when (constant-fold-call-p node)
                (constant-fold-call node)
@@ -2859,3 +2859,4 @@
                               (cast-type-to-check cast)))
         (setf (cast-%type-check cast) nil)
         check)))
+
