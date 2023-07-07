@@ -113,7 +113,7 @@
 ;;; have cycles and isn't too large.
 (defun coalesce-tree-p (x)
   (let ((depth-limit 12)
-        (size-limit (expt 2 25)))
+        (size-limit (expt 2 12)))
     (declare (fixnum size-limit))
     (and (consp x)
          (labels ((safe-cddr (cons)
