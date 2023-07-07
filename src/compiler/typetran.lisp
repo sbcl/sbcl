@@ -90,7 +90,7 @@
       ;; If the object type is known to be (OR NULL <type>),
       ;; it is almost always cheaper to test for not EQ to NIL.
       ;; There is one exception:
-      ;;  - FIXNUMP is possibly cheapear than comparison to NIL, or definitely
+      ;;  - FIXNUMP is possibly cheaper than comparison to NIL, or definitely
       ;;    not worse. For x86, NIL is a 4-byte immediate operand,
       ;;    for lack of a null-tn register. FIXNUM-TAG-MASK is only 1 byte.
       (when (type= otype (type-union (specifier-type 'null) type))
