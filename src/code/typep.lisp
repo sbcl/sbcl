@@ -455,7 +455,13 @@ Experimental."
               (dotimes (i rank)
                 (setf (nth i dims) (array-dimension x i)))
            (%make-array-type dims complexp etype etype))))))
-      (cons (specifier-type 'cons))
+      (cons
+       (make-cons-type (if (eq (car x) x)
+                           (specifier-type 'cons)
+                           (ctype-of (car x)))
+                       (if (consp (cdr x))
+                           (specifier-type 'cons)
+                           (ctype-of (cdr x)))))
       (character ; Why not return an EQL type?
        (typecase x
          (standard-char (specifier-type 'standard-char))
