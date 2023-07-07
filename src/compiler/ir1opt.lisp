@@ -2239,7 +2239,7 @@
 ;;;
 ;;; If the function is an optional-entry-point, we will just make sure
 ;;; &REST lists are known to be lists. Doing the regular rigamarole
-;;; can erronously propagate too strict types into refs: see
+;;; can erroneously propagate too strict types into refs: see
 ;;; BUG-655203-REGRESSION in tests/compiler.pure.lisp.
 ;;;
 ;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
@@ -2290,7 +2290,7 @@
           ;; functional during future inline expansion to prevent
           ;; spurious type conflicts.
           (let ((defined-fun (and (functional-inline-expanded fun)
-                                  (gethash (leaf-source-name fun)
+                                  (gethash (leaf-%source-name fun)
                                            (free-funs *ir1-namespace*)))))
             (when (defined-fun-p defined-fun)
               (do ((args (basic-combination-args call) (cdr args))
