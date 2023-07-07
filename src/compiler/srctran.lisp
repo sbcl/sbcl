@@ -232,6 +232,38 @@
   (deftransform nconc ((&rest args))
     (remove-nil 'nconc args)))
 
+(flet ((remove-nil (fun args &rest prefix)
+         (let ((remove
+                 (loop for arg in args
+                       when (or (eq (lvar-type arg) (specifier-type 'null))
+                                (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
+                       collect arg)))
+           (if remove
+               (let ((vars (make-gensym-list (length args))))
+                 `(lambda ,(append prefix vars)
+                    (declare (ignorable ,@vars))
+                    (,fun ,@prefix ,@(loop for var in vars
+                                           for arg in args
+                                           unless (memq arg remove)
+                                           collect var))))
+               (give-up-ir1-transform)))))
+  (deftransform %concatenate-to-list ((&rest args))
+    (remove-nil '%concatenate-to-list args))
+
+  (deftransform %concatenate-to-string ((&rest args))
+    (remove-nil '%concatenate-to-string args))
+
+  (deftransform %concatenate-to-base-string ((&rest args))
+    (remove-nil '%concatenate-to-base-string args))
+
+  (deftransform %concatenate-to-vector ((widetag &rest args))
+    (remove-nil '%concatenate-to-vector args widetag))
+
+  (deftransform %concatenate-to-simple-vector ((&rest args))
+    (remove-nil '%concatenate-to-simple-vector args))
+  (deftransform concatenate ((type &rest args))
+    (remove-nil 'concatenate args 'type)))
+
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
   (once-only ((n-x x))
