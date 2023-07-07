@@ -209,6 +209,25 @@
 (defoptimizer (nconc derive-type) ((&rest args))
   (derive-append-type args))
 
+(deftransform sb-impl::append2 ((x y) (null t))
+  'y)
+
+(deftransform append ((&rest args))
+  (let ((remove
+          (loop for (arg . rest) on args
+                when (and rest
+                          (eq (lvar-type arg) (specifier-type 'null)))
+                collect arg)))
+    (if remove
+        (let ((vars (make-gensym-list (length args))))
+          `(lambda ,vars
+             (declare (ignorable ,@vars))
+             (append ,@(loop for var in vars
+                             for arg in args
+                             unless (memq arg remove)
+                             collect var))))
+        (give-up-ir1-transform))))
+
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
   (once-only ((n-x x))
