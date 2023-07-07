@@ -257,7 +257,7 @@
     (remove-nil '%concatenate-to-base-string args))
 
   (deftransform %concatenate-to-vector ((widetag &rest args))
-    (remove-nil '%concatenate-to-vector args widetag))
+    (remove-nil '%concatenate-to-vector args 'widetag))
 
   (deftransform %concatenate-to-simple-vector ((&rest args))
     (remove-nil '%concatenate-to-simple-vector args))
