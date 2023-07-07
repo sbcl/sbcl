@@ -2421,7 +2421,7 @@
         (check-mv-call-arguments node)))
   (values))
 
-;;; m-v-bind with where the form's lvar has multiple uses cannot be
+;;; m-v-bind where the form's lvar has multiple uses cannot be
 ;;; converted to LET in general, see SUBSTITUTE-SINGLE-USE-LVAR for an
 ;;; example why.
 ;;; But removing unused variables allows some optimizations to proceed.
@@ -2527,9 +2527,10 @@
                              ;; otherwise there's nothing to remove.
                           finally (return known-values))
                     (loop for use in uses
-                          always (and (combination-p use)
-                                      (eq (lvar-fun-name (combination-fun use))
-                                          'values)))))
+                          always (or (and (combination-p use)
+                                          (eq (lvar-fun-name (combination-fun use))
+                                              'values))
+                                     (type-single-value-p (node-derived-type use))))))
                ;; TODO: make mv-combination functions handle replacing
                ;; unused variables with NIL and then this can work
                ;; properly.
@@ -2556,43 +2557,47 @@
                (cond (multiple-uses
                       (remove-unused-vars-in-mv-bind uses fun)
                       (substitute-lvar-uses (car new-lvars) (car args) nil))
-                     (t
-                      (loop for use in uses
-                            for args = (combination-args use)
-                            for types = (values-type-types (node-derived-type use))
-                            for lvars = new-lvars
-                            do
-                            (loop while (and args lvars)
-                                  do
-                                  (let ((arg (pop args))
-                                        (new-lvar (pop lvars))
-                                        (type (pop types)))
-                                    (when (and type
-                                               (not (type-asserted-p arg type)))
-                                      ;; Propagate derived types from the VALUES call to its args:
-                                      ;; transforms can leave the VALUES call with a better type
-                                      ;; than its args have, so make sure not to throw that away.
-                                      (do-uses (node arg)
-                                        (derive-node-type node type)))
-                                    (substitute-lvar-uses new-lvar arg nil)))
-                            ;; Discard unused arguments
-                            (loop for arg in args
-                                  do (flush-dest arg))
-                            ;; Reference NIL for unsupplied arguments
-                            (when lvars
-                              (with-ir1-environment-from-node use
-                                (let ((node-prev (node-prev use)))
-                                  (setf (node-prev use) nil)
-                                  (setf (ctran-next node-prev) nil)
-                                  (loop for lvar in lvars
-                                        for prev = node-prev then ctran
-                                        for ctran = (make-ctran)
-                                        do
-                                        (reference-constant prev ctran lvar nil)
-                                        finally
-                                        (link-node-to-previous-ctran use ctran)))))
-                            (flush-dest (combination-fun use))
-                            (unlink-node use))))
+                     ((flet ((handle (use args types)
+                               (let ((lvars new-lvars))
+                                 (loop while (and args lvars)
+                                       do
+                                       (let ((arg (pop args))
+                                             (new-lvar (pop lvars))
+                                             (type (pop types)))
+                                         (when (and type
+                                                    (not (type-asserted-p arg type)))
+                                           ;; Propagate derived types from the VALUES call to its args:
+                                           ;; transforms can leave the VALUES call with a better type
+                                           ;; than its args have, so make sure not to throw that away.
+                                           (do-uses (node arg)
+                                             (derive-node-type node type)))
+                                         (substitute-lvar-uses new-lvar arg nil)))
+                                 ;; Discard unused arguments
+                                 (loop for arg in args
+                                       do (flush-dest arg))
+                                 ;; Reference NIL for unsupplied arguments
+                                 (when lvars
+                                   (let ((node-prev (node-prev use)))
+                                     (setf (node-prev use) nil)
+                                     (setf (ctran-next node-prev) nil)
+                                     (loop for lvar in lvars
+                                           for prev = node-prev then ctran
+                                           for ctran = (make-ctran)
+                                           do
+                                           (reference-constant prev ctran lvar nil)
+                                           finally
+                                           (link-node-to-previous-ctran use ctran)))))))
+                        (loop for use in uses
+                              do
+                              (cond ((and (combination-p use)
+                                        (eq (lvar-fun-name (combination-fun use))
+                                            'values))
+                                   (handle use (combination-args use)
+                                           (values-type-types (node-derived-type use)))
+                                   (flush-dest (combination-fun use))
+                                   (unlink-node use))
+                                    (t
+                                     (handle use args nil)))))))
                (propagate-to-args new-call fun)
                (reoptimize-call new-call)))
            t))))
@@ -2859,4 +2864,3 @@
                               (cast-type-to-check cast)))
         (setf (cast-%type-check cast) nil)
         check)))
-
