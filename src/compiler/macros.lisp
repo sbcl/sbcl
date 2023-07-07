@@ -189,22 +189,22 @@
                          keys))
            final-mandatory-arg)
       (collect ((binds))
-        (binds `(,tail (basic-combination-args ,node-var)))
+        (binds `(,tail (basic-combination-args (truly-the basic-combination ,node-var))))
         ;; The way this code checks for mandatory args is to verify that
         ;; the last positional arg is not null (it should be an LVAR).
         ;; But somebody could pedantically declare IGNORE on the last arg
         ;; so bind a dummy for it and then bind from the dummy.
         (mapl (lambda (args)
                 (cond ((cdr args)
-                       (binds `(,(car args) (pop ,tail))))
+                       (binds `(,(car args) (pop (truly-the list ,tail)))))
                       (t
                        (setq final-mandatory-arg (pop dummies))
-                       (binds `(,final-mandatory-arg (pop ,tail))
+                       (binds `(,final-mandatory-arg (pop (truly-the list ,tail)))
                               `(,(car args) ,final-mandatory-arg)))))
               req)
         ;; Optionals are pretty easy.
         (dolist (arg opt)
-          (binds `(,(if (atom arg) arg (car arg)) (pop ,tail))))
+          (binds `(,(if (atom arg) arg (car arg)) (pop (truly-the list ,tail)))))
         ;; Now if min or max # of args is incorrect,
         ;; or there are unacceptable keywords, bail out
         (when (or req keyp (not rest))
