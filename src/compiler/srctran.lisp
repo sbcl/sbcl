@@ -212,21 +212,25 @@
 (deftransform sb-impl::append2 ((x y) (null t))
   'y)
 
-(deftransform append ((&rest args))
-  (let ((remove
-          (loop for (arg . rest) on args
-                when (and rest
-                          (eq (lvar-type arg) (specifier-type 'null)))
-                collect arg)))
-    (if remove
-        (let ((vars (make-gensym-list (length args))))
-          `(lambda ,vars
-             (declare (ignorable ,@vars))
-             (append ,@(loop for var in vars
-                             for arg in args
-                             unless (memq arg remove)
-                             collect var))))
-        (give-up-ir1-transform))))
+(flet ((remove-nil (fun args)
+         (let ((remove
+                 (loop for (arg . rest) on args
+                       when (and rest
+                                 (eq (lvar-type arg) (specifier-type 'null)))
+                       collect arg)))
+           (if remove
+               (let ((vars (make-gensym-list (length args))))
+                 `(lambda ,vars
+                    (declare (ignorable ,@vars))
+                    (,fun ,@(loop for var in vars
+                                  for arg in args
+                                  unless (memq arg remove)
+                                  collect var))))
+               (give-up-ir1-transform)))))
+  (deftransform append ((&rest args))
+    (remove-nil 'append args))
+  (deftransform nconc ((&rest args))
+    (remove-nil 'nconc args)))
 
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
