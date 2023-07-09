@@ -1277,32 +1277,36 @@
 ;;; Do full call when unknown values are desired.
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (multiple-value-bind (fp args arg-locs nargs)
-      (ir2-convert-full-call-args node block)
-    (let* ((lvar (node-lvar node))
-           (locs (ir2-lvar-locs (lvar-info lvar)))
-           (loc-refs (reference-tn-list locs t))
-           (fun-lvar (basic-combination-fun node)))
-      (multiple-value-bind (fun-tn named)
-          (fun-lvar-tn node block fun-lvar)
-        (cond ((not named)
-               (vop* multiple-call node block (fp fun-tn args) (loc-refs)
-                     arg-locs nargs (emit-step-p node)
-                     #+call-symbol
-                     (fun-tn-type fun-lvar fun-tn)))
-              #-(and x86-64 immobile-code)
-              ((eq fun-tn named)
-               (vop* static-multiple-call-named node block
-                  (fp args)
-                  (loc-refs)
-                  arg-locs nargs named
-                  (emit-step-p node)))
-              (t
-               (vop* multiple-call-named node block
-                  (fp #-(and x86-64 immobile-code) fun-tn args)     ; args
-                  (loc-refs)                                        ; results
-                  arg-locs nargs #+(and x86-64 immobile-code) named ; info
-                  (emit-step-p node)))))))
+  (let ((info (combination-fun-info node)))
+    (if (and info
+             (ir1-attributep (fun-info-attributes info) unboxed-return fixed-args))
+        (ir2-convert-fixed-full-call node block)
+        (multiple-value-bind (fp args arg-locs nargs)
+            (ir2-convert-full-call-args node block)
+          (let* ((lvar (node-lvar node))
+                 (locs (ir2-lvar-locs (lvar-info lvar)))
+                 (loc-refs (reference-tn-list locs t))
+                 (fun-lvar (basic-combination-fun node)))
+            (multiple-value-bind (fun-tn named)
+                (fun-lvar-tn node block fun-lvar)
+              (cond ((not named)
+                     (vop* multiple-call node block (fp fun-tn args) (loc-refs)
+                           arg-locs nargs (emit-step-p node)
+                           #+call-symbol
+                           (fun-tn-type fun-lvar fun-tn)))
+                    #-(and x86-64 immobile-code)
+                    ((eq fun-tn named)
+                     (vop* static-multiple-call-named node block
+                           (fp args)
+                           (loc-refs)
+                           arg-locs nargs named
+                           (emit-step-p node)))
+                    (t
+                     (vop* multiple-call-named node block
+                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (loc-refs)   ; results
+                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           (emit-step-p node)))))))))
   (values))
 
 ;;; stuff to check in PONDER-FULL-CALL

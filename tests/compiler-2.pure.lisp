@@ -4102,3 +4102,34 @@
              (case b ((-424 -278) b) (t 0))))
           ((lambda () (go 7))))
        7))))
+
+(with-test (:name :multiple-call-unboxed-calls)
+  (checked-compile-and-assert
+   ()
+   `(lambda (m j)
+      (declare (double-float m))
+      (let (*)
+        (if j
+            (funcall j)
+            (truncate m))))
+   ((1d0 nil) (values 1 0d0))
+   ((4d38 nil) (values 399999999999999990995239293824136118272 0d0)))
+  (checked-compile-and-assert
+   ()
+   `(lambda (m j)
+      (declare (ratio m))
+      (let (*)
+        (if j
+            (funcall j)
+            (coerce m 'double-float))))
+   ((1/2 nil) 0.5d0))
+  (checked-compile-and-assert
+   ()
+   `(lambda (m j)
+      (declare (double-float m))
+      (let (*)
+        (if j
+            (funcall j)
+            (scale-float m 2))))
+   ((1d0 nil) 4d0)
+   ((2d0 nil) 8d0)))
