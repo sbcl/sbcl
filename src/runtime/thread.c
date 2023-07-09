@@ -213,7 +213,7 @@ int sb_GetTID()
 {
     return getthrid();
 }
-#elif defined __APPLE__
+#elif defined __APPLE__ && defined LISP_FEATURE_SB_THREAD
 int sb_GetTID() {
     return pthread_mach_thread_np(pthread_self());
 }
