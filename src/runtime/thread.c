@@ -215,7 +215,7 @@ int sb_GetTID()
 }
 #elif defined __APPLE__
 int sb_GetTID() {
-    return mach_thread_self();
+    return pthread_mach_thread_np(pthread_self());
 }
 #else
 #define sb_GetTID() 0
