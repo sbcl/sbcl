@@ -714,7 +714,7 @@
                    (do-uses (use lvar)
                      (reoptimize-node use))
                    (let ((defined-fun (and (functional-inline-expanded lambda)
-                                           (gethash (leaf-source-name lambda)
+                                           (gethash (leaf-%source-name lambda)
                                                     (free-funs *ir1-namespace*)))))
                      (when (defined-fun-p defined-fun)
                        (setf (defined-fun-functional defined-fun) nil)))))
