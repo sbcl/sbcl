@@ -117,7 +117,6 @@ dyndebug_init()
 #undef DYNDEBUG_NFLAGS
 }
 
-#include "monitor.h"
 #include "vars.h"
 #include "os.h"
 #ifdef LISP_FEATURE_GENCGC

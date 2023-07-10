@@ -797,13 +797,6 @@ ldb_monitor(void)
     }
 }
 
-/* what we do when things go badly wrong at a low level */
-void
-monitor_or_something()
-{
-    ldb_monitor();
-}
-
 #ifdef STANDALONE_LDB
 void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing

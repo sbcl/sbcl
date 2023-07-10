@@ -29,7 +29,6 @@
 #include "genesis/vector.h"
 #include "code.h"
 #include "thread.h"
-#include "monitor.h"
 #include "breakpoint.h"
 #include "var-io.h"
 #include "sc-offset.h"
@@ -37,6 +36,7 @@
 
 /* the way that we shut down the system on a fatal error */
 void lisp_backtrace(int frames);
+extern void ldb_monitor(void);
 
 static void
 default_lossage_handler(void)
@@ -79,7 +79,7 @@ configurable_lossage_handler()
 #         endif
     }
 
-    monitor_or_something();
+    ldb_monitor();
 }
 #endif
 
@@ -88,7 +88,7 @@ void enable_lossage_handler(void)
 #if QSHOW
     lossage_handler = configurable_lossage_handler;
 #else
-    lossage_handler = monitor_or_something;
+    lossage_handler = ldb_monitor;
 #endif
 }
 void disable_lossage_handler(void)
