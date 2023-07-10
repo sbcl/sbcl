@@ -21,7 +21,6 @@
 #include "arch.h"
 #include "lispregs.h"
 #include <signal.h>
-#include "alloc.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"

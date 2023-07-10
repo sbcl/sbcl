@@ -22,7 +22,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "alloc.h"
 #include "pseudo-atomic.h"
 
 #if defined(LISP_FEATURE_GENCGC)

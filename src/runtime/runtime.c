@@ -51,7 +51,6 @@
 #include "globals.h"
 #include "os.h"
 #include "interr.h"
-#include "alloc.h"
 #include "interrupt.h"
 #include "arch.h"
 #include "gc.h"

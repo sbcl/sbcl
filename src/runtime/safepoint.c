@@ -36,7 +36,7 @@
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"
 #include "interr.h"
-#include "alloc.h"
+#include "genesis/sap.h"
 #include "gc-internal.h"
 #include "interrupt.h"
 #include "lispregs.h"

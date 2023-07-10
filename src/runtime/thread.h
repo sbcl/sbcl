@@ -108,7 +108,6 @@ struct extra_thread_data
 #define nth_interrupt_context(n,thread) thread_extra_data(thread)->sigcontexts[n]
 #define thread_interrupt_data(thread) thread_extra_data(thread)->interrupt_data
 
-extern struct thread *all_threads;
 extern int dynamic_values_bytes;
 
 #define THREAD_ALIGNMENT_BYTES BACKEND_PAGE_BYTES

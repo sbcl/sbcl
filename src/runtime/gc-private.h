@@ -19,7 +19,7 @@
 #include "genesis/funcallable-instance.h"
 #include "genesis/weak-pointer.h"
 #include "immobile-space.h"
-#include "code.h"
+#include "gencgc-internal.h"
 
 #ifdef LISP_FEATURE_GENCGC
 void *collector_alloc_fallback(struct alloc_region*,sword_t,int);

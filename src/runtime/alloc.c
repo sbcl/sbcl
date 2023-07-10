@@ -14,7 +14,7 @@
  */
 
 #include "sbcl.h"
-#include "alloc.h"
+#include "gc-assert.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "genesis/simple-fun.h"

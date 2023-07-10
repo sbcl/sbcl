@@ -29,7 +29,6 @@
 #include "gc-assert.h"
 #include "code.h"
 extern const char *widetag_names[];
-extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"

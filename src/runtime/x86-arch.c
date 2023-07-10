@@ -18,7 +18,6 @@
 #include "os.h"
 #include "arch.h"
 #include "lispregs.h"
-#include "alloc.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"

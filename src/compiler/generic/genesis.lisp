@@ -3360,6 +3360,7 @@ struct thread_state_word {
           #+64-bit "  char padding[4];" #-64-bit ""))
 
 (defun write-weak-pointer-manipulators ()
+  (format t "extern struct weak_pointer *weak_pointer_chain;~%")
   ;; weak pointer with no payload size in the header instead has a vector length slot
   (format t "static inline int weakptr_vectorp(struct weak_pointer* wp) { ~
 return !(wp->header & 0x~X); }~%"
@@ -3378,6 +3379,20 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
   (format t "#define WEAK_POINTER_CHAIN_END (void*)(intptr_t)1
 #define reset_weak_pointer_next(wp) set_weak_pointer_next(wp,0)
 #define in_weak_pointer_list(wp) (get_weak_pointer_next(wp)!=0)~%"))
+
+(defun write-sap-initializer ()
+  (let ((sap-align #+riscv 32 ; not sure why this is larger than normal
+                   #-riscv (* 2 sb-vm:n-word-bytes)))
+    (format t "
+#define DX_ALLOC_SAP(var_name, ptr)                                 \\
+lispobj var_name;                                                   \\
+struct sap _dx_##var_name __attribute__ ((aligned (~D)));           \\
+do {                                                                \\
+    _dx_##var_name.header = (1 << 8) | SAP_WIDETAG;                 \\
+    _dx_##var_name.pointer = (char *)(ptr);                         \\
+    var_name = make_lispobj(&_dx_##var_name, OTHER_POINTER_LOWTAG); \\
+} while (0)~%"
+            sap-align)))
 
 (defun write-primitive-object (obj *standard-output*)
   (let* ((name (sb-vm:primitive-object-name obj))
@@ -3398,7 +3413,8 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
                (when (find 'sb-vm::pseudo-atomic-bits slots :key #'sb-vm:slot-name)
                  (format t "#define HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT 1~2%")
                  #+(or sparc ppc ppc64) (format t "typedef char pa_bits_t[~d];~2%" sb-vm:n-word-bytes)
-                 #-(or sparc ppc ppc64) (format t "typedef lispobj pa_bits_t;~2%")))
+                 #-(or sparc ppc ppc64) (format t "typedef lispobj pa_bits_t;~2%"))
+               (format t "extern struct thread *all_threads;~%"))
              (format t "struct ~A {~%" c-name)
              (when (sb-vm:primitive-object-widetag obj)
                (format t "    lispobj header;~%"))
@@ -3427,6 +3443,8 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
                                      sb-vm:n-fixnum-tag-bits))
              (when (eq name 'weak-pointer)
                (write-weak-pointer-manipulators))
+             (when (eq name 'sb-vm::sap)
+               (write-sap-initializer))
              (when (member name '(cons vector symbol fdefn instance))
                (write-cast-operator name c-name lowtag *standard-output*)))
            (output-asm ()

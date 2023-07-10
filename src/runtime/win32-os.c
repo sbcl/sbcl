@@ -40,7 +40,6 @@
 #include "interr.h"
 #include "lispregs.h"
 #include "runtime.h"
-#include "alloc.h"
 #include "genesis/primitive-objects.h"
 #include "dynbind.h"
 

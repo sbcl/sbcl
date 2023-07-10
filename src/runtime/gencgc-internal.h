@@ -21,6 +21,7 @@
 
 #include <limits.h>
 #include "gc.h"
+#include "gc-assert.h"
 #include "gencgc-alloc-region.h"
 #include "genesis/simple-fun.h"
 #include "hopscotch.h"
