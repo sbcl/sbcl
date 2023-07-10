@@ -12,11 +12,6 @@
 #if !defined(_INCLUDE_VALIDATE_H_)
 #define _INCLUDE_VALIDATE_H_
 
-#ifndef LISP_FEATURE_GENCGC
-/* FIXME: genesis/constants.h also defines this with a constant value */
-#define DYNAMIC_SPACE_START current_dynamic_space
-#endif
-
 #define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
 #define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
 
