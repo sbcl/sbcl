@@ -189,11 +189,6 @@ extern char *copied_string (char *string);
 
 void *os_dlsym_default(char *name);
 
-struct lisp_startup_options {
-    boolean noinform;
-};
-extern struct lisp_startup_options lisp_startup_options;
-
 /* Even with just -O1, gcc optimizes the jumps in this "loop" away
  * entirely, giving the ability to define WITH-FOO-style macros. */
 #define RUN_BODY_ONCE(prefix, finally_do)               \

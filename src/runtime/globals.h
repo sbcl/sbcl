@@ -23,6 +23,11 @@
 
 #ifndef __ASSEMBLER__
 
+struct lisp_startup_options {
+    char noinform; // read from Lisp by (at least) src/code/cold-init
+};
+extern struct lisp_startup_options lisp_startup_options;
+
 extern sword_t next_free_page;
 #define dynamic_space_highwatermark() (next_free_page*GENCGC_PAGE_BYTES+DYNAMIC_SPACE_START)
 
