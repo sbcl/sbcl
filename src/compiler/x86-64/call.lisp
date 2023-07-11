@@ -732,7 +732,7 @@
                           ;; (without-interrupts ...)
                           ;;
                           ;; dtc; Could be doing a tail call from a
-                          ;; known-local-call etc in which the old-fp
+                          ;; known-call-local etc in which the old-fp
                           ;; or ret-pc are in regs or in non-standard
                           ;; places. If the passing location were
                           ;; wired to the stack in standard locations

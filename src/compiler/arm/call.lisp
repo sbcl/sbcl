@@ -127,15 +127,16 @@
   (:results (res :scs (any-reg))
             (nfp :scs (any-reg)))
   (:info callee)
+  (:temporary (:sc any-reg) temp)
   (:generator 2
     (load-csp res)
     (composite-immediate-instruction
-     add nfp res
-     (* (max 1 (sb-allocated-size 'control-stack))
+      add temp res
+      (* (max 1 (sb-allocated-size 'control-stack))
         n-word-bytes))
-    (store-csp nfp)
+    (store-csp temp)
     (when (ir2-environment-number-stack-p callee)
-      (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+      (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
         (inst sub nfp nsp-tn nbytes)
         (inst mov nsp-tn nfp)))))
 

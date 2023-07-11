@@ -179,7 +179,7 @@
 
 (defun make-number-stack-pointer-tn ()
   #+c-stack-is-control-stack
-  (make-restricted-tn *fixnum-primitive-type* any-reg-sc-number)
+  (sb-c::make-unused-tn)
   #-c-stack-is-control-stack
   (make-normal-tn *fixnum-primitive-type*))
 

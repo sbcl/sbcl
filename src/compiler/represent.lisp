@@ -961,7 +961,7 @@
 ;;; nfp-save-offset, but don't use it if there's no nfp-tn in the
 ;;; current frame, but the stack space is still allocated.
 #-c-stack-is-control-stack
-(defun unwire-nfp-save-tn (2comp)
+(defun unwire-nfp-save-tn (2comp component)
   (unless (ir2-component-nfp 2comp)
     (do ((prev)
          (tn (ir2-component-wired-tns 2comp) (tn-next tn)))
@@ -973,7 +973,15 @@
                  (setf (tn-next prev) (tn-next tn))
                  (setf (ir2-component-wired-tns 2comp) (tn-next tn))))
             (t
-             (setf prev tn))))))
+             (setf prev tn))))
+    (do-ir2-blocks (block component)
+      (do ((vop (ir2-block-start-vop block)
+                (vop-next vop)))
+          ((null vop))
+        (let ((info (vop-info vop)))
+          (when (eq (vop-info-move-args info) :local-call)
+            (setf (tn-kind (tn-ref-tn (tn-ref-across (vop-args vop))))
+                  :unused)))))))
 
 ;;; This is the entry to representation selection. First we select the
 ;;; representation for all normal TNs, setting the TN-SC. After
@@ -1051,5 +1059,5 @@
       (frob ir2-component-normal-tns nil)
       (frob ir2-component-wired-tns t)
       (frob ir2-component-restricted-tns t)
-      (unwire-nfp-save-tn 2comp)))
+      (unwire-nfp-save-tn 2comp component)))
   (values))
