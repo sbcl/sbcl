@@ -45,7 +45,7 @@ static void skip_ws(char **ptr)
         (*ptr)++;
 }
 
-static boolean string_to_long(char *token, uword_t *value)
+static bool string_to_long(char *token, uword_t *value)
 {
     int base, digit;
     uword_t num;
@@ -104,7 +104,7 @@ static boolean string_to_long(char *token, uword_t *value)
     return 1;
 }
 
-static boolean lookup_variable(char *name, lispobj *result)
+static bool lookup_variable(char *name, lispobj *result)
 {
     struct var *var = lookup_by_name(name);
 
@@ -117,7 +117,7 @@ static boolean lookup_variable(char *name, lispobj *result)
 }
 
 
-boolean more_p(char **ptr)
+bool more_p(char **ptr)
 {
     skip_ws(ptr);
 
@@ -170,7 +170,7 @@ int parse_number(char **ptr, int *output)
     return 0;
 }
 
-int parse_addr(char **ptr, boolean safely, char **output)
+int parse_addr(char **ptr, bool safely, char **output)
 {
     char *token = parse_token(ptr);
     lispobj result;

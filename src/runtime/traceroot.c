@@ -232,7 +232,7 @@ static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
     }
 }
 
-static struct { void* pointer; boolean found; } pin_seek_state;
+static struct { void* pointer; bool found; } pin_seek_state;
 static void compare_pointer(void *addr) {
     if (addr == pin_seek_state.pointer)
         pin_seek_state.found = 1;
@@ -367,7 +367,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
     for (i=n_pins-1; i>=0; --i)
         // Bypass interestingp() to avoid one test - pins are known pointers.
         if (hopscotch_containsp(targets, pin = pins[i])) {
-            boolean world_stopped = context_scanner != 0;
+            bool world_stopped = context_scanner != 0;
             if (world_stopped) {
                 *root_thread = deduce_thread(context_scanner, pin, thread_pc);
             } else {
@@ -484,7 +484,7 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
         }
 }
 
-static boolean root_p(lispobj ptr, int criterion)
+static bool root_p(lispobj ptr, int criterion)
 {
     if (ptr <= STATIC_SPACE_END) return 1; // always a root
     // 0 to 2 are in order of weakest to strongest condition for stopping,
@@ -705,8 +705,7 @@ static lispobj trace1(lispobj object,
 // Pointer compression is used: the linked list of source objects
 // is built using offsets into the scratchpad rather than absolute addresses.
 // Return 1 if and only if 'target' was actually added to the graph.
-static boolean record_ptr(lispobj* source, lispobj target,
-                          struct scan_state* ss)
+static bool record_ptr(lispobj* source, lispobj target, struct scan_state* ss)
 {
     if (!ss->keep_leaves) { // expected case
         if (!listp(target) &&
@@ -736,8 +735,7 @@ static boolean record_ptr(lispobj* source, lispobj target,
     if (count_only) COUNT_POINTER(x) \
     else if (is_lisp_pointer(x) && relevant_ptr_p(x)) record_ptr(where,x,ss); }
 
-static boolean ignorep(lispobj* base_ptr,
-                       lispobj ignored_objects)
+static bool ignorep(lispobj* base_ptr, lispobj ignored_objects)
 {
     int i;
     for (i = vector_len(VECTOR(ignored_objects))-1; i >= 0; --i)
@@ -754,7 +752,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
 
-    boolean count_only = !ss->record_ptrs;
+    bool count_only = !ss->record_ptrs;
     for ( ; where < end ; where += nwords ) {
         if (ss->ignored_objects && ignorep(where, ss->ignored_objects)) {
             nwords = object_size(where);
@@ -889,7 +887,7 @@ static void scan_spaces(struct scan_state* ss)
 
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
 
-static void* compute_heap_inverse(boolean keep_leaves,
+static void* compute_heap_inverse(bool keep_leaves,
                                   lispobj ignored_objects,
                                   struct scratchpad* scratchpad)
 {
@@ -961,7 +959,7 @@ static void* compute_heap_inverse(boolean keep_leaves,
 /* Return true if the user wants to find a leaf object.
  * If not, then we can omit all leaf objects from the inverted heap
  * because no leaf object can point to anything */
-static boolean finding_leaf_p(lispobj weak_pointers)
+static bool finding_leaf_p(lispobj weak_pointers)
 {
     do {
         lispobj car = CONS(weak_pointers)->car;

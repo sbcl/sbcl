@@ -14,6 +14,7 @@
 
 #include "os.h"
 #include <signal.h>
+#include <stdbool.h>
 #include "thread.h"
 
 /* Do anything we need to do when starting up the runtime environment
@@ -26,7 +27,7 @@ extern void asm_routine_poke(const char*, int, char);
 /* FIXME: It would be good to document these too! */
 extern void arch_skip_instruction(os_context_t*);
 extern void arch_handle_allocation_trap(os_context_t*);
-extern boolean arch_pseudo_atomic_atomic(struct thread *thread);
+extern bool arch_pseudo_atomic_atomic(struct thread *thread);
 extern void arch_set_pseudo_atomic_interrupted(struct thread *thread);
 extern void arch_clear_pseudo_atomic_interrupted(struct thread *thread);
 extern os_vm_address_t arch_get_bad_addr(int, siginfo_t*, os_context_t*);

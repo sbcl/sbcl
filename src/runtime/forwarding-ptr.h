@@ -1,8 +1,9 @@
 #ifndef _FORWARDING_PTR_H_
 #define _FORWARDING_PTR_H_
 
+#include <stdbool.h>
 #ifndef LISP_FEATURE_GENCGC
-inline static boolean
+inline static bool
 in_gc_p(void) {
     return current_dynamic_space == from_space;
 }
@@ -10,7 +11,7 @@ in_gc_p(void) {
 
 #define FORWARDING_HEADER 1
 
-inline static boolean
+inline static bool
 forwarding_pointer_p(lispobj *pointer) {
 #if defined LISP_FEATURE_64_BIT && defined LISP_FEATURE_LITTLE_ENDIAN
     /* Read exactly 1 byte. The upper bytes can store the original object size.

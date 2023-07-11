@@ -13,6 +13,7 @@
 #define _INCLUDED_GLOBALS_H_
 
 #ifndef __ASSEMBLER__
+# include <stdbool.h>
 # include <sys/types.h>
 # include <unistd.h>
 # include "runtime.h"
@@ -91,7 +92,7 @@ extern lispobj *current_binding_stack_pointer;
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
 
-static inline boolean readonly_space_p(lispobj ptr) {
+static inline bool readonly_space_p(lispobj ptr) {
     return ptr >= READ_ONLY_SPACE_START && (lispobj*)ptr < read_only_space_free_pointer;
 }
 

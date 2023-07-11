@@ -18,6 +18,7 @@
 
 #include "sbcl.h"
 #include "os.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef intptr_t page_index_t;
@@ -32,9 +33,9 @@ extern void collect_garbage(generation_index_t last_gen);
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
 
-extern boolean maybe_gc(os_context_t *context);
+extern bool maybe_gc(os_context_t *context);
 
-extern boolean gc_active_p;
+extern bool gc_active_p;
 extern int sb_sprof_enabled;
 
 extern os_vm_size_t bytes_consed_between_gcs;

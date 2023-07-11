@@ -525,7 +525,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
               lispobj* data = (lispobj*)v->data;
               adjust_pointers(&data[vector_len(v)-1], 1, adj);
               int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
-              boolean needs_rehash = 0;
+              bool needs_rehash = 0;
               lispobj *where = &data[2], *end = &data[2*(hwm+1)];
               // Adjust the elements, checking for need to rehash.
               for ( ; where < end ; where += 2) {
@@ -772,7 +772,7 @@ process_directory(int count, struct ndir_entry *entry,
         extern int alien_linkage_table_n_prelinked;
         count = alien_linkage_table_n_prelinked = *ptr++;
         for ( ; count-- ; entry_index++ ) {
-            boolean datap = *ptr == (lispobj)-1; // -1 can't be a function address
+            bool datap = *ptr == (lispobj)-1; // -1 can't be a function address
             if (datap)
                 ++ptr;
             arch_write_linkage_table_entry(entry_index, (void*)*ptr++, datap);

@@ -145,11 +145,11 @@ generation_index_t from_space;
 generation_index_t new_space;
 
 /* Set to 1 when in GC */
-boolean gc_active_p = 0;
+bool gc_active_p = 0;
 
 /* should the GC be conservative on stack. If false (only right before
  * saving a core), don't scan the stack / mark pages pinned. */
-static boolean conservative_stack = 1;
+static bool conservative_stack = 1;
 int save_lisp_gc_iteration;
 
 /* An array of page structures is allocated on gc initialization.
@@ -171,18 +171,18 @@ struct hopscotch_table pinned_objects;
 /* This is always 0 except during gc_and_save() */
 lispobj lisp_init_function;
 
-static inline boolean page_free_p(page_index_t page) {
+static inline bool page_free_p(page_index_t page) {
     return (page_table[page].type == FREE_PAGE_FLAG);
 }
 
-static inline boolean boxed_type_p(int type) { return type > 1; }
-static inline boolean page_boxed_p(page_index_t page) {
+static inline bool boxed_type_p(int type) { return type > 1; }
+static inline bool page_boxed_p(page_index_t page) {
     // ignore SINGLE_OBJECT_FLAG and OPEN_REGION_PAGE_FLAG
     return boxed_type_p(page_table[page].type & PAGE_TYPE_MASK);
 }
 
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-static inline boolean protect_page_p(page_index_t page, generation_index_t generation) {
+static inline bool protect_page_p(page_index_t page, generation_index_t generation) {
     return (page_boxed_p(page)
             && !(page_table[page].type & OPEN_REGION_PAGE_FLAG)
             && (page_words_used(page) != 0)
@@ -764,7 +764,7 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
     page_index_t i;
 #ifdef LISP_FEATURE_DARWIN_JIT
     /* Must always zero, as it may need changing the protection bits. */
-    boolean any_need_to_zero = 0;
+    bool any_need_to_zero = 0;
     for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
     if (any_need_to_zero) {
         zero_pages(start, end);
@@ -785,7 +785,7 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
         set_page_need_to_zero(i, 0);
     }
 #else
-    boolean usable_by_lisp =
+    bool usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
     if ((page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0) {
@@ -943,7 +943,7 @@ set_alloc_start_page(unsigned int page_type, page_index_t page)
 /* Test whether page 'index' can continue a non-large-object region
  * having specified 'gen' and 'type' values. It must not be pinned
  * and must be marked but not referenced from the stack */
-static inline boolean
+static inline bool
 page_extensible_p(page_index_t index, generation_index_t gen, int type) {
 #ifdef LISP_FEATURE_BIG_ENDIAN /* TODO: implement this as single comparison */
     int attributes_match =
@@ -1021,7 +1021,7 @@ static inline void ensure_cons_markbits_clear(page_index_t page)
 }
 
 #if 0
-boolean page_is_zeroed(page_index_t page)
+bool page_is_zeroed(page_index_t page)
 {
     int nwords_per_page = GENCGC_PAGE_BYTES/N_WORD_BYTES;
     uword_t *pagebase = (void*)page_address(page);
@@ -1277,7 +1277,7 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         /* Calculate the number of bytes used in this page. This is not
          * always the number of new bytes, unless it was free. */
         os_vm_size_t bytes_used = addr_diff(free_pointer, page_base);
-        boolean more;
+        bool more;
         if ((more = (bytes_used > GENCGC_PAGE_BYTES)))
             bytes_used = GENCGC_PAGE_BYTES;
         set_page_bytes_used(first_page, bytes_used);
@@ -1992,7 +1992,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
-    boolean enforce_lowtag = !is_code(page->type);
+    bool enforce_lowtag = !is_code(page->type);
 
     if ((addr & (GENCGC_PAGE_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
         (!is_lisp_pointer(addr) && enforce_lowtag) ||
@@ -2590,7 +2590,7 @@ static void pin_object(lispobj object)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
+static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
 {
     page_index_t page = find_page_index((void*)word);
     if (page < 0) {
@@ -2734,7 +2734,7 @@ static void pin_exact_root(lispobj obj)
  * Note: 'ptr' is _sometimes_ an ambiguous pointer - we do not utilize the layout bitmap
  * when scanning instances for pointers, so we will occasionally see a raw word for 'ptr'.
  * Also, 'ptr might not have a lowtag (such as lockfree list node successor), */
-static boolean ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
+static bool ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
 {
     page_index_t index;
     lispobj __attribute__((unused)) header;
@@ -2936,7 +2936,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
 
 /* Decide if this single-object page holds a normal simple-vector.
  * "Normal" now includes non-weak address-insensitive k/v vectors */
-static inline boolean large_scannable_vector_p(page_index_t page) {
+static inline bool large_scannable_vector_p(page_index_t page) {
     lispobj header = *(lispobj *)page_address(page);
     if (header_widetag(header) == SIMPLE_VECTOR_WIDETAG) {
         int mask = (flag_VectorWeak | flag_VectorAddrHashing) << ARRAY_FLAGS_POSITION;
@@ -4448,7 +4448,7 @@ collect_garbage(generation_index_t last_gen)
     ++n_gcs;
     THREAD_JIT(0);
     generation_index_t gen = 0, i;
-    boolean gc_mark_only = 0;
+    bool gc_mark_only = 0;
     int raise, more = 0;
     int gen_to_wp;
     /* The largest value of next_free_page seen since the time
@@ -5367,11 +5367,11 @@ void unhandled_sigmemoryfault(void* addr);
  * on unprotected pages completely, and the second complains to stderr
  * but allows us to continue without losing.
  */
-extern boolean ignore_memoryfaults_on_unprotected_pages;
-boolean ignore_memoryfaults_on_unprotected_pages = 0;
+extern bool ignore_memoryfaults_on_unprotected_pages;
+bool ignore_memoryfaults_on_unprotected_pages = 0;
 
-extern boolean continue_after_memoryfault_on_unprotected_pages;
-boolean continue_after_memoryfault_on_unprotected_pages = 0;
+extern bool continue_after_memoryfault_on_unprotected_pages;
+bool continue_after_memoryfault_on_unprotected_pages = 0;
 
 int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* fault_addr)
 {
@@ -5544,8 +5544,8 @@ extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
  *  as empty pages, because we can't represent discontiguous ranges.
  */
 void
-gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
-            boolean save_runtime_options, boolean compressed,
+gc_and_save(char *filename, bool prepend_runtime, bool purify,
+            bool save_runtime_options, bool compressed,
             int compression_level, int application_type)
 {
     // FIXME: Instead of disabling purify for static space relocation,
@@ -5566,7 +5566,7 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     void *runtime_bytes = NULL;
     size_t runtime_size;
     extern void coalesce_similar_objects();
-    boolean verbose = !lisp_startup_options.noinform;
+    bool verbose = !lisp_startup_options.noinform;
 
     file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
                            &runtime_size);
@@ -5835,7 +5835,7 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
  * called after scavenging the header. So if something didn't get moved
  * out of from_space, then it must have been pinned.
  * So don't call this for anything except that use-case. */
-static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
+static inline bool obj_gen_lessp(lispobj obj, generation_index_t b)
 {
     generation_index_t a = gc_gen_of(obj, ARTIFICIALLY_HIGH_GEN);
     if (a == from_space) {

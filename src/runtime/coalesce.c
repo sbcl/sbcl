@@ -13,6 +13,7 @@
  * files for more information.
  */
 
+#include <stdbool.h>
 #include "sbcl.h"
 #include "gc.h"
 #include "gc-internal.h"
@@ -27,7 +28,7 @@
 #include "hopscotch.h"
 #include "code.h"
 
-static boolean gcable_pointer_p(lispobj pointer)
+static bool gcable_pointer_p(lispobj pointer)
 {
 #ifdef LISP_FEATURE_CHENEYGC
    return pointer >= (lispobj)current_dynamic_space
@@ -38,7 +39,7 @@ static boolean gcable_pointer_p(lispobj pointer)
 #endif
 }
 
-static boolean coalescible_number_p(lispobj* where)
+static bool coalescible_number_p(lispobj* where)
 {
     int widetag = widetag_of(where);
     return widetag == BIGNUM_WIDETAG
@@ -56,7 +57,7 @@ static boolean coalescible_number_p(lispobj* where)
 /// Return true of fixnums, bignums, strings, symbols.
 /// Strings are considered eql-comparable,
 /// because they're coalesced before comparing.
-static boolean eql_comparable_p(lispobj obj)
+static bool eql_comparable_p(lispobj obj)
 {
     if (fixnump(obj) || obj == NIL) return 1;
     if (lowtag_of(obj) != OTHER_POINTER_LOWTAG) return 0;
@@ -69,7 +70,7 @@ static boolean eql_comparable_p(lispobj obj)
         || widetag == SIMPLE_BASE_STRING_WIDETAG;
 }
 
-static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
+static bool vector_isevery(bool (*pred)(lispobj), struct vector* v)
 {
     int i;
     for (i = vector_len(v)-1; i >= 0; --i)

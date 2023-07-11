@@ -60,7 +60,7 @@ lispobj *search_all_gc_spaces(void *pointer)
 }
 
 static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char* b,
-                                                     boolean ignore_case)
+                                                     bool ignore_case)
 {
     int i = 0;
 
@@ -85,14 +85,14 @@ static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char*
 
 struct symbol_search {
     char *name;
-    boolean ignore_case;
+    bool ignore_case;
 };
 static uword_t search_symbol_aux(lispobj* start, lispobj* end, uword_t arg)
 {
     struct symbol_search* ss = (struct symbol_search*)arg;
     return (uword_t)search_for_symbol(ss->name, (lispobj)start, (lispobj)end, ss->ignore_case);
 }
-lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignore_case)
+lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool ignore_case)
 {
     lispobj* where = (lispobj*)start;
     lispobj* limit = (lispobj*)end;
@@ -158,7 +158,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 }
 #endif
 
-static boolean sym_stringeq(lispobj sym, const char *string, int len)
+static bool sym_stringeq(lispobj sym, const char *string, int len)
 {
     struct vector* name = symbol_name(SYMBOL(sym));
     return widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG
@@ -207,7 +207,7 @@ lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
     return package ? search_package_symbols(package, symbol_name, hint) : 0;
 }
 
-static inline boolean fringe_node_p(struct binary_node* node)
+static inline bool fringe_node_p(struct binary_node* node)
 {
     int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
     return len <= (int)(1+INSTANCE_DATA_START);

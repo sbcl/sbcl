@@ -12,7 +12,8 @@
 #ifndef _LISPSTRING_H_
 #define _LISPSTRING_H_
 
-static inline boolean string_widetag_p(int widetag)
+#include <stdbool.h>
+static inline bool string_widetag_p(int widetag)
 {
     // element type of NIL can just go to hell
     return widetag == SIMPLE_BASE_STRING_WIDETAG

@@ -41,7 +41,7 @@ int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
 sword_t hopscotch_get(struct hopscotch_table*,uword_t,sword_t);
 void* hopscotch_get_ref(struct hopscotch_table*,uword_t);
 int hopscotch_containsp(struct hopscotch_table*,uword_t);
-boolean hopscotch_delete(struct hopscotch_table*,uword_t);
+int hopscotch_delete(struct hopscotch_table*,uword_t);
 void hopscotch_reset(struct hopscotch_table*);
 void hopscotch_log_stats(struct hopscotch_table*,char*);
 

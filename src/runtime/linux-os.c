@@ -163,7 +163,7 @@ void lisp_mutex_done_eventrecording() {
 #define FUTEX_WAKE_PRIVATE (1+128)
 
 /* Not static so that Lisp may query it. */
-boolean futex_private_supported_p;
+bool futex_private_supported_p;
 
 static inline int
 futex_wait_op()

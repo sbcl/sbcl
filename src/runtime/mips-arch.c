@@ -48,7 +48,7 @@ os_context_insn(os_context_t *context)
         return *(unsigned int *)((unsigned)OS_CONTEXT_PC(context));
 }
 
-boolean
+bool
 arch_insn_with_bdelay_p(unsigned int insn)
 {
     switch (insn >> 26) {
@@ -249,7 +249,7 @@ arch_internal_error_arguments(os_context_t *context)
         return (unsigned char *)((unsigned)OS_CONTEXT_PC(context) + INSN_LEN);
 }
 
-boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+bool arch_pseudo_atomic_atomic(struct thread *thread) {
     return get_pseudo_atomic_atomic(thread);
 }
 

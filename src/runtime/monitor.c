@@ -358,7 +358,7 @@ visible(unsigned char c)
         return c;
 }
 
-static boolean valid_widetag_p(unsigned char widetag) {
+static bool valid_widetag_p(unsigned char widetag) {
     // TODO: ensure that widetag is defined (not "unused") and is for a headered object
     // (i.e. is not CHARACTER_WIDETAG and not some other things)
     return other_immediate_lowtag_p(widetag);
@@ -402,7 +402,7 @@ dump_cmd(char **ptr)
         count = -count;
     }
 
-    boolean aligned = ((uword_t)addr & LOWTAG_MASK) == 0;
+    bool aligned = ((uword_t)addr & LOWTAG_MASK) == 0;
     if (decode && (!aligned || displacement < 0)) {
         printf("Sorry, can only decode if aligned and stepping forward\n");
         decode = 0;
@@ -732,7 +732,6 @@ catchers_cmd(char __attribute__((unused)) **ptr)
     return 0;
 }
 
-extern boolean gc_active_p;
 extern FILE *gc_activitylog_file;
 void
 ldb_monitor(void)
@@ -806,23 +805,23 @@ struct lisp_startup_options lisp_startup_options;
 
 void unwind_binding_stack() { lose("Can't unwind binding stack"); }
 FILE *prepare_to_save(__attribute__((unused)) char *filename,
-                      __attribute__((unused)) boolean prepend_runtime,
+                      __attribute__((unused)) bool prepend_runtime,
                       __attribute__((unused)) void **runtime_bytes,
                       __attribute__((unused)) size_t *runtime_size) {
     lose("Can't prepare_to_save");
 }
-boolean save_runtime_to_filehandle(__attribute__((unused)) FILE *output,
-                                   __attribute__((unused)) void *runtime,
-                                   __attribute__((unused)) size_t runtime_size,
-                                   __attribute__((unused)) int application_type) {
+bool save_runtime_to_filehandle(__attribute__((unused)) FILE *output,
+                                __attribute__((unused)) void *runtime,
+                                __attribute__((unused)) size_t runtime_size,
+                                __attribute__((unused)) int application_type) {
     lose("Can't save_runtime_to_filehandle");
 }
-boolean save_to_filehandle(__attribute__((unused)) FILE *file,
-                           __attribute__((unused)) char *filename,
-                           __attribute__((unused)) lispobj init_function,
-                           __attribute__((unused)) boolean make_executable,
-                           __attribute__((unused)) boolean save_runtime_options,
-                           __attribute__((unused)) int core_compression_level) {
+bool save_to_filehandle(__attribute__((unused)) FILE *file,
+                        __attribute__((unused)) char *filename,
+                        __attribute__((unused)) lispobj init_function,
+                        __attribute__((unused)) bool make_executable,
+                        __attribute__((unused)) bool save_runtime_options,
+                        __attribute__((unused)) int core_compression_level) {
     lose("Can't save_to_filehandle");
 }
 
@@ -1041,7 +1040,7 @@ int main(int argc, char *argv[], char **envp)
         fprintf(stderr, "Usage: ldb crashdump\n");
         return 1;
     }
-    boolean have_hardwired_spaces = os_preinit(argv, envp);
+    bool have_hardwired_spaces = os_preinit(argv, envp);
     allocate_lisp_dynamic_space(have_hardwired_spaces);
     gc_init();
     load_gc_crashdump(argv[1]);

@@ -489,9 +489,9 @@ struct {
     CONDITION_VARIABLE cond_has_data;
     CONDITION_VARIABLE cond_has_client;
     HANDLE thread;
-    boolean initialized;
+    bool initialized;
     HANDLE handle;
-    boolean in_progress;
+    bool in_progress;
 } ttyinput;
 
 #ifdef LISP_FEATURE_64_BIT
@@ -912,7 +912,7 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 }
 
 /* A tiny bit of interrupt.c state we want our paws on. */
-extern boolean internal_errors_enabled;
+extern int internal_errors_enabled;
 
 extern void exception_handler_wrapper();
 
@@ -1412,8 +1412,7 @@ socket_input_available(HANDLE socket, long time, long utime)
  * on handle, if no cancellation is requested yet (and return TRUE),
  * otherwise clear thread's I/O cancellation flag and return false.
  */
-static
-boolean io_begin_interruptible(HANDLE handle)
+static bool io_begin_interruptible(HANDLE handle)
 {
     /* No point in doing it unless OS supports cancellation from other
      * threads */
@@ -1551,8 +1550,7 @@ static __stdcall unsigned int tty_read_line_server(LPVOID arg)
     return 0;
 }
 
-static boolean
-tty_maybe_initialize_unlocked(HANDLE handle)
+static bool tty_maybe_initialize_unlocked(HANDLE handle)
 {
     if (!ttyinput.initialized) {
         if (!DuplicateHandle(GetCurrentProcess(),handle,
@@ -1572,10 +1570,9 @@ tty_maybe_initialize_unlocked(HANDLE handle)
     return 1;
 }
 
-boolean
-win32_tty_listen(HANDLE handle)
+bool win32_tty_listen(HANDLE handle)
 {
-    boolean result = 0;
+    bool result = 0;
     INPUT_RECORD ir;
     DWORD nevents;
     EnterCriticalSection(&ttyinput.lock);
@@ -1671,11 +1668,10 @@ unlock:
     return result;
 }
 
-boolean
-win32_maybe_interrupt_io(void* thread)
+bool win32_maybe_interrupt_io(void* thread)
 {
     struct thread *th = thread;
-    boolean done = 0;
+    bool done = 0;
 
 #ifdef LISP_FEATURE_SB_FUTEX
     if (thread_extra_data(th)->waiting_on_address)

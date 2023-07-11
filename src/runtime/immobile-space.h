@@ -12,6 +12,7 @@
 #ifndef _IMMOBILE_SPACE_H_
 #define _IMMOBILE_SPACE_H_
 
+#include <stdbool.h>
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #include <limits.h>
 #include "core.h"
@@ -21,8 +22,8 @@
 #define FIXEDOBJ_RESERVED_PAGES 1
 
 extern void prepare_immobile_space_for_final_gc(void);
-extern void prepare_immobile_space_for_save(boolean verbose);
-extern boolean immobile_space_preserve_pointer(void*);
+extern void prepare_immobile_space_for_save(bool verbose);
+extern bool immobile_space_preserve_pointer(void*);
 extern void scavenge_immobile_roots(generation_index_t,generation_index_t);
 extern void scavenge_immobile_newspace(void);
 extern void sweep_immobile_space(int raise);
@@ -72,7 +73,7 @@ static inline low_page_index_t find_text_page_index(void *addr)
   return -1;
 }
 
-static inline boolean immobile_space_p(lispobj obj)
+static inline bool immobile_space_p(lispobj obj)
 {
 /* To test the two immobile ranges, we first check that a pointer is within
  * the outer bounds, and then that is not in the excluded middle (if any).
@@ -85,11 +86,11 @@ static inline boolean immobile_space_p(lispobj obj)
              && offset < immobile_range_2_min_offset);
 }
 
-extern boolean immobile_card_protected_p(void*);
+extern bool immobile_card_protected_p(void*);
 
 #else
 
-static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { return 0; }
+static inline bool immobile_space_p(lispobj __attribute__((unused)) obj) { return 0; }
 #define immobile_obj_gen_bits(dummy) 0
 #define prepare_immobile_space_for_final_gc()
 #define prepare_immobile_space_for_save(dummy)

@@ -295,7 +295,7 @@ static inline page_index_t find_page_index(void *addr)
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
 extern unsigned char* gc_page_pins;
-static inline boolean pinned_p(lispobj obj, page_index_t page)
+static inline bool pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     // Single-object pages can be pinned, but the object doesn't go
@@ -328,7 +328,7 @@ extern generation_index_t from_space, new_space;
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
 // Pretend pinned objects are not in oldspace so that they don't get moved.
-static boolean __attribute__((unused))
+static bool __attribute__((unused))
 from_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
@@ -338,7 +338,7 @@ from_space_p(lispobj obj)
     return page_table[page_index].gen == from_space && !pinned_p(obj, page_index);
 }
 
-static boolean __attribute__((unused)) new_space_p(lispobj obj)
+static bool __attribute__((unused)) new_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);

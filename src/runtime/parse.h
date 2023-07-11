@@ -9,8 +9,9 @@
  * files for more information.
  */
 
-extern boolean more_p(char **ptr);
+#include <stdbool.h>
+extern bool more_p(char **ptr);
 extern char *parse_token(char **ptr);
 extern int parse_lispobj(char **ptr, lispobj *output);
-extern int parse_addr(char **ptr, boolean safely, char **output);
+extern int parse_addr(char **ptr, bool safely, char **output);
 extern int parse_number(char **ptr, int *output);

@@ -82,7 +82,7 @@ FILE * logfile;
 #  define dprintf(arg)
 #endif
 
-static void defrag_immobile_space(boolean verbose);
+static void defrag_immobile_space(bool verbose);
 
 uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 uword_t immobile_space_lower_bound, immobile_space_max_offset;
@@ -143,7 +143,7 @@ static int n_bitmap_elts; // length of array measured in 'int's
 // chained through the word after their header.
 lispobj codeblob_freelist;
 
-boolean immobile_card_protected_p(void* addr)
+bool immobile_card_protected_p(void* addr)
 {
     low_page_index_t page;
     page = find_text_page_index(addr);
@@ -448,7 +448,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
         bits |= OBJ_WRITTEN_FLAG;
     assign_generation(ptr, bits | new_space);
     low_page_index_t page_index = find_fixedobj_page_index(ptr);
-    boolean is_text = 0;
+    bool is_text = 0;
 
     if (page_index < 0) {
         page_index = find_text_page_index(ptr);
@@ -531,7 +531,7 @@ lispobj* search_immobile_code(char* ptr) {
 /* If 'addr' points to an immobile object, then make the object
    live by promotion. But if the object is not in the generation
    being collected, do nothing */
-boolean immobile_space_preserve_pointer(void* addr)
+bool immobile_space_preserve_pointer(void* addr)
 {
     unsigned char genmask = compacting_p() ? 1<<from_space : 0xff;
     lispobj* object_start;
@@ -825,7 +825,7 @@ range_points_to_younger_p(lispobj* obj, lispobj* end,
 // Scan a fixed-size object for old-to-young pointers.
 // Since fixed-size objects are boxed and on known boundaries,
 // we never start in the middle of random bytes, so the answer is exact.
-static boolean
+static bool
 fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
@@ -867,7 +867,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
 // to younger generations, which we detect by a cleared WP status bit.
 // The bit is cleared on any write, though, even of a non-pointer,
 // so this unfortunately has to be tested much more often than we'd like.
-static inline boolean can_wp_fixedobj_page(page_index_t page, int keep_gen, int new_gen)
+static inline bool can_wp_fixedobj_page(page_index_t page, int keep_gen, int new_gen)
 {
     int obj_spacing = fixedobj_page_obj_align(page);
     lispobj* obj = fixedobj_page_address(page);
@@ -884,7 +884,7 @@ static inline boolean can_wp_fixedobj_page(page_index_t page, int keep_gen, int 
 }
 
 // Return 1 if any header on 'page' is in the remembered set.
-static inline boolean can_wp_text_page(page_index_t page)
+static inline bool can_wp_text_page(page_index_t page)
 {
     lispobj *begin = text_page_address(page);
     lispobj *end   = begin + WORDS_PER_PAGE;
@@ -1304,7 +1304,7 @@ int compute_codeblob_offsets_nwords(int* pcount)
  * 'coreparse' causes all pages in dynamic space to be pseudo-static, but
  * each immobile object stores its own generation, so this must be done at
  * save time, or else it would require touching every object on startup */
-void prepare_immobile_space_for_save(boolean verbose)
+void prepare_immobile_space_for_save(bool verbose)
 {
     if (verbose) {
         printf("[defragmenting immobile space... ");
@@ -1462,21 +1462,21 @@ static void copy_back(uword_t space_start, struct tempspace* tempspace,
     *pfree_ptr = (lispobj*)end;
 }
 
-static inline boolean tempspace_p(char* addr)
+static inline bool tempspace_p(char* addr)
 {
     return (addr >= fixedobj_tempspace.start &&
             addr < fixedobj_tempspace.start + fixedobj_tempspace.n_bytes)
         || (addr >= text_tempspace.start &&
             addr < text_tempspace.start + text_tempspace.n_bytes);
 }
-static inline boolean known_space_p(lispobj ptr)
+static inline bool known_space_p(lispobj ptr)
 {
     return find_page_index((char*)ptr) >= 0
         || tempspace_p((char*)ptr)
         || immobile_space_p(ptr)
         || (STATIC_SPACE_OBJECTS_START <= ptr && ptr < STATIC_SPACE_END);
 }
-static boolean forwardable_ptr_p(lispobj ptr)
+static bool forwardable_ptr_p(lispobj ptr)
 {
     return is_lisp_pointer(ptr) &&
            known_space_p(ptr) &&
@@ -1599,7 +1599,7 @@ static void fixup_space(lispobj* where, size_t n_words)
               struct vector* kv_vector = (struct vector*)where;
               lispobj* data = kv_vector->data;
               gc_assert(vector_len(kv_vector) >= 5);
-              boolean needs_rehash = 0;
+              bool needs_rehash = 0;
               unsigned int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
               unsigned int i;
               // FIXME: we're disregarding the hash vector.
@@ -1767,7 +1767,7 @@ static void place_layout(lispobj* obj,
         layout_size_class_nwords(size_class_index) << WORD_SHIFT;
 }
 
-static void defrag_immobile_space(boolean verbose)
+static void defrag_immobile_space(bool verbose)
 {
     int i;
 

@@ -88,7 +88,7 @@ arch_internal_error_arguments(os_context_t *context)
 }
 
 
-boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+bool arch_pseudo_atomic_atomic(struct thread *thread) {
     return get_pseudo_atomic_atomic(thread);
 }
 
@@ -137,7 +137,7 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
-static boolean
+static bool
 should_branch(os_context_t *context, unsigned int orig_inst)
 {
     /* orig_inst is a conditional branch instruction.  We need to
@@ -373,7 +373,7 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
      *
      */
 
-    boolean handle_it = 0;
+    bool handle_it = 0;
     unsigned prev_inst;
     if ((code & ~(31 << 16)) == ((3<<26)|(4<<21))) { // mask out RA for test
         prev_inst= ((uint32_t*)pc)[-1];

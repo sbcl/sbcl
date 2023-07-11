@@ -17,6 +17,7 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <signal.h>
 #include "sbcl.h"
 #include "runtime.h"
@@ -249,7 +250,7 @@ code_pointer(lispobj object)
     return (struct code *) headerp;
 }
 
-static boolean
+static bool
 cs_valid_pointer_p(struct thread *thread, struct call_frame *pointer)
 {
     return (((char *) thread->control_stack_start <= (char *) pointer) &&
@@ -660,7 +661,7 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
     return -1;
 }
 
-static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
+static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
 {
   struct code* code;
   if (gc_managed_heap_space_p((uword_t)pc) &&

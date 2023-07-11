@@ -48,7 +48,7 @@ static page_index_t free_page;
  * If it collides with 'next_free_page', then you lose.
  * TODO: It would be reasonably simple to have this request more memory from
  * the OS instead of failing on overflow */
-static void* get_free_page(boolean prezero) {
+static void* get_free_page(bool prezero) {
     --free_page;
     if (free_page < next_free_page)
         lose("Needed more space to GC");
@@ -295,7 +295,7 @@ static void trace_object(lispobj* where)
             // Therefore the 'next' pointer has got to be nil.
             gc_assert((lispobj)hash_table->next_weak_hash_table == NIL);
             int weakness = hashtable_weakness(hash_table);
-            boolean defer = 1;
+            bool defer = 1;
             if (weakness != WEAKNESS_KEY_AND_VALUE)
                 defer = scan_weak_hashtable(hash_table, alivep_funs[weakness],
                                             mark_pair);

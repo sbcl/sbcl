@@ -114,7 +114,7 @@ unlink_thread(struct thread *th)
 void
 set_thread_state(struct thread *thread,
                  char state,
-                 boolean signals_already_blocked) // for foreign thread
+                 bool signals_already_blocked) // for foreign thread
 {
     struct extra_thread_data *semaphores = thread_extra_data(thread);
     int i, waitcount = 0;
@@ -890,7 +890,7 @@ alloc_thread_struct(void* spaces) {
      * from failing to obtain contiguous memory. Note that the OS may have a smaller
      * alignment granularity than BACKEND_PAGE_BYTES so we may have to adjust the
      * result to make it conform to our guard page alignment requirement. */
-    boolean zeroize_stack = 0;
+    bool zeroize_stack = 0;
     if (spaces) {
         // If reusing memory from a previously exited thread, start by removing
         // some old junk from the stack. This is imperfect since we only clear a little
@@ -1108,7 +1108,7 @@ uword_t create_thread(struct thread* th)
     th->os_thread =
       _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
                      CREATE_SUSPENDED | STACK_SIZE_PARAM_IS_A_RESERVATION, &tid);
-    boolean success = th->os_thread != 0;
+    bool success = th->os_thread != 0;
     if (success) {
         th->os_kernel_tid = tid;
         ResumeThread((HANDLE)th->os_thread);

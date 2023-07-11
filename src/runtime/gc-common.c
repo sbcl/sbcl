@@ -1389,7 +1389,7 @@ static inline void add_kv_triggers(lispobj* pair, int weakness)
 
 /* Call 'predicate' on each triggering object, and if it returns 1, then call
  * 'mark' on each livened object, or use scav1() if 'mark' is null */
-boolean test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
+bool test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
 {
     extern void gc_private_free(struct cons*);
     int old_count = weak_objects.count;
@@ -1484,7 +1484,7 @@ void gc_common_init()
                      32 /* logical bin count */, 0 /* default range */);
 }
 
-static inline boolean stable_eql_hash_p(lispobj obj)
+static inline bool stable_eql_hash_p(lispobj obj)
 {
     return lowtag_of(obj) == OTHER_POINTER_LOWTAG
         && widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) <= SYMBOL_WIDETAG;
@@ -1528,8 +1528,8 @@ static inline boolean stable_eql_hash_p(lispobj obj)
  * more efficient.
  */
 #define SCAV_ENTRIES(entry_alivep, defer)                                      \
-    boolean __attribute__((unused)) any_deferred = 0;                          \
-    boolean rehash = 0;                                                        \
+    bool __attribute__((unused)) any_deferred = 0;                             \
+    bool rehash = 0;                                                           \
     unsigned hwm = KV_PAIRS_HIGH_WATER_MARK(data);                             \
     unsigned i;                                                                \
     for (i = 1; i <= hwm; i++) {                                               \
@@ -1561,7 +1561,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     // its last element points to the hash-vector as for any strong KV vector.
     sword_t kv_length = vector_len(kv_vector);
     lispobj kv_supplement = data[kv_length-1];
-    boolean eql_hashing = 0; // whether this table is an EQL table
+    bool eql_hashing = 0; // whether this table is an EQL table
     if (instancep(kv_supplement)) {
         struct hash_table* ht = (struct hash_table*)native_pointer(kv_supplement);
         eql_hashing = hashtable_kind(ht) == HASHTABLE_KIND_EQL;
@@ -1578,7 +1578,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     SCAV_ENTRIES(1, );
 }
 
-boolean scan_weak_hashtable(struct hash_table *hash_table,
+bool scan_weak_hashtable(struct hash_table *hash_table,
                             int (*predicate)(lispobj,lispobj),
                             void (*scav_entry)(lispobj*))
 {
@@ -1602,7 +1602,7 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
     gc_assert(2 * vector_len(VECTOR(hash_table->next_vector)) + 1 == kv_length);
 
     int weakness = hashtable_weakness(hash_table);
-    boolean eql_hashing = hashtable_kind(hash_table) == HASHTABLE_KIND_EQL;
+    bool eql_hashing = hashtable_kind(hash_table) == HASHTABLE_KIND_EQL;
     /* Work through the KV vector. */
     SCAV_ENTRIES(predicate(key, value), add_kv_triggers(&data[2*i], weakness));
     if (!any_deferred && debug_weak_ht)
@@ -1683,7 +1683,7 @@ scav_vector_t(lispobj *where, lispobj header)
 
     if ((lispobj)hash_table->next_weak_hash_table == NIL) {
         int weakness = hashtable_weakness(hash_table);
-        boolean defer = 1;
+        bool defer = 1;
         /* Key-AND-Value means that no scavenging can/will be performed as
          * a consequence of visiting the table. Each entry is looked at once
          * only, after _all_ other work is done, and then it's either live
@@ -1730,14 +1730,14 @@ scav_vector_t(lispobj *where, lispobj header)
  * except that it's potentially a lot more unprotects and reprotects.
  * Better to just get it done once.
  */
-static inline boolean
+static inline bool
 cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             uint32_t bucket, uint32_t index,
                             lispobj *kv_vector,
                             uint32_t *next_vector, uint32_t *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
-                            boolean rehash)
+                            bool rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
     int eql_hashing = hashtable_kind(hash_table) == HASHTABLE_KIND_EQL;
@@ -1816,7 +1816,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
         hash_vector = get_array_data(hash_table->hash_vector,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
 
-    boolean rehash = 0;
+    bool rehash = 0;
     // I'm slightly confused as to why we can't (or don't) compute the
     // 'should rehash' flag while scavenging the weak k/v vector.
     // I believe the explanation is this: for weak-key-AND-value tables, the vector
@@ -2119,7 +2119,7 @@ valid_lisp_pointer_p(lispobj pointer)
     return 0;
 }
 
-static boolean can_invoke_post_gc(__attribute__((unused)) struct thread* th,
+static bool can_invoke_post_gc(__attribute__((unused)) struct thread* th,
                                   sigset_t *context_sigmask)
 {
 #ifdef LISP_FEATURE_SB_THREAD
@@ -2146,12 +2146,11 @@ static boolean can_invoke_post_gc(__attribute__((unused)) struct thread* th,
     return !deferrables_blocked_p(context_sigmask);
 }
 
-boolean
-maybe_gc(os_context_t *context)
+bool maybe_gc(os_context_t *context)
 {
     lispobj gc_happened;
     __attribute__((unused)) struct thread *thread = get_sb_vm_thread();
-    boolean were_in_lisp = !foreign_function_call_active_p(thread);
+    bool were_in_lisp = !foreign_function_call_active_p(thread);
 
     if (were_in_lisp) {
         fake_foreign_function_call(context);

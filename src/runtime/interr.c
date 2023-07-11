@@ -167,7 +167,7 @@ void tprintf(char *fmt, ...)
 }
 #endif
 
-boolean lose_on_corruption_p = 0;
+bool lose_on_corruption_p = 0;
 
 void
 corruption_warning_and_maybe_lose(char *fmt, ...)

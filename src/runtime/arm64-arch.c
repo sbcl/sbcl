@@ -48,7 +48,7 @@ unsigned char *arch_internal_error_arguments(os_context_t *context)
     return (unsigned char *)OS_CONTEXT_PC(context);
 }
 
-boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+bool arch_pseudo_atomic_atomic(struct thread *thread) {
     return get_pseudo_atomic_atomic(thread);
 }
 

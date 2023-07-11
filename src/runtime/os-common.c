@@ -184,7 +184,7 @@ void os_link_runtime()
     for (j = 0 ; j < alien_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];
-        boolean datap = listp(item);
+        bool datap = listp(item);
         lispobj symbol_name = datap ? CONS(item)->car : item;
         char *namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         void* result = os_dlsym_default(namechars);
@@ -201,8 +201,7 @@ void os_unlink_runtime()
 {
 }
 
-boolean
-gc_managed_heap_space_p(lispobj addr)
+bool gc_managed_heap_space_p(lispobj addr)
 {
     if ((READ_ONLY_SPACE_START <= addr && addr < READ_ONLY_SPACE_END)
         || (STATIC_SPACE_START <= addr && addr < STATIC_SPACE_END)
@@ -333,8 +332,7 @@ void* load_core_bytes_jit(int fd, os_vm_offset_t offset, os_vm_address_t addr, o
 
 #endif
 
-boolean
-gc_managed_addr_p(lispobj addr)
+bool gc_managed_addr_p(lispobj addr)
 {
     struct thread *th;
 

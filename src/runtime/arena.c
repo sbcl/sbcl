@@ -449,7 +449,7 @@ lispobj find_containing_arena(lispobj ptr) {
 }
 
 static lispobj target_arena;
-static inline boolean interesting_arena_pointer_p(lispobj ptr)
+static inline int interesting_arena_pointer_p(lispobj ptr)
 {
     lispobj arena = is_lisp_pointer(ptr) ? find_containing_arena(ptr) : 0;
     if (!arena) return 0; // uninteresting

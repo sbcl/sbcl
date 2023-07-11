@@ -146,21 +146,6 @@ void dyndebug_init(void);
 
 #include "align.h"
 
-#if defined(LISP_FEATURE_WIN32)
-/* KLUDGE: Avoid double definition of boolean by rpcndr.h included via
- * shlobj.h.
- *
- * FIXME: We should probably arrange to use the rpcndr.h boolean on Windows,
- * or get rid of our own boolean type.  If the boolean type is only used in
- * the runtime, and never passed to Lisp, then it doesn't matter which one
- * we use.
- */
-#define boolean rpcndr_boolean
-#include <shlobj.h>
-#undef boolean
-#endif
-typedef int boolean;
-
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it
  * in GCC later than version 2.5 or so. */

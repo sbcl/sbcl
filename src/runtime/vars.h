@@ -12,13 +12,14 @@
 /* FIXME: I wonder what this stuff is for. A comment or two would be
  * nice.. */
 
+#include <stdbool.h>
 extern void flush_vars(void);
 extern struct var *lookup_by_name(char *name);
 extern struct var *lookup_by_obj(lispobj obj);
-extern struct var *define_var(char *name, lispobj obj, boolean perm);
+extern struct var *define_var(char *name, lispobj obj, bool perm);
 extern struct var *define_dynamic_var(char *name,
                                       lispobj update_fn(struct var *var),
-                                      boolean perm);
+                                      bool perm);
 
 extern char *var_name(struct var *var);
 extern lispobj var_value(struct var *var);

@@ -23,7 +23,7 @@ static int is_in_static_space(void* ptr) {
     return (uword_t)ptr >= STATIC_SPACE_START && (lispobj*)ptr < static_space_free_pointer;
 }
 
-static boolean card_markedp(void* addr)
+static bool card_markedp(void* addr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (immobile_space_p((lispobj)addr))
@@ -96,7 +96,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
 
     /* Strict containment: no pointer from a heap space may point
      * to anything outside of a heap space. */
-    // boolean strict_containment = state->flags & VERIFY_FINAL;
+    // bool strict_containment = state->flags & VERIFY_FINAL;
 
 #define FAIL_IF(cond, why) \
     if (cond) { if (++state->nerrors > 25) return 1; note_failure(thing,where,state,why); }
@@ -238,7 +238,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
         });
 #if 0 // this looks redundant. It's checked with each pointer, no?
-        boolean rememberedp = header_rememberedp(code->header);
+        bool rememberedp = header_rememberedp(code->header);
         /* The remembered set invariant is that an object is marked "written"
          * if and only if either it points to a younger object or is pointed
          * to by a register or stack. (The pointed-to case assumes that the
@@ -275,7 +275,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
     return 0;
 }
 
-static __attribute__((unused)) boolean acceptable_filler_cons_p(lispobj* where)
+static __attribute__((unused)) bool acceptable_filler_cons_p(lispobj* where)
 {
     if (where[0] == 0 && where[1] == 0) return 1;
     // These "conses" can result from bignum multiplication-
@@ -362,7 +362,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                 }
             }
 #endif
-            boolean strict_containment = state->flags & VERIFY_FINAL;
+            bool strict_containment = state->flags & VERIFY_FINAL;
             if (strict_containment && gencgc_verbose && widetag == SAP_WIDETAG && where[1])
                 fprintf(stderr, "\nStrange SAP %p -> %p\n", where, (void*)where[1]);
         } else {

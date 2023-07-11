@@ -13,6 +13,7 @@
 #define _INCLUDE_INTERRUPT_H_
 
 #include "runtime.h"
+#include <stdbool.h>
 #include <string.h>
 #include "genesis/static-symbols.h"
 
@@ -26,7 +27,7 @@ extern sigset_t blockable_sigset;
 extern sigset_t gc_sigset;
 extern sigset_t thread_start_sigset;
 
-extern boolean deferrables_blocked_p(sigset_t *sigset);
+extern bool deferrables_blocked_p(sigset_t *sigset);
 
 extern void check_deferrables_blocked_or_lose(sigset_t *sigset);
 
@@ -79,7 +80,7 @@ struct interrupt_data {
      * SIG_STOP_FOR_GC happened in a pseudo atomic with GC_INHIBIT NIL
      * and with no pending handler. Both deferrable interrupt handlers
      * and gc are careful not to clobber each other's pending_mask. */
-    boolean gc_blocked_deferrables;
+    bool gc_blocked_deferrables;
 #if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC \
   || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_SPARC
 #define HAVE_ALLOCATION_TRAP_CONTEXT 1
@@ -97,7 +98,7 @@ struct interrupt_data {
 typedef lispobj (*call_into_lisp_lookalike)(
     lispobj fun, lispobj *args, int nargs);
 
-extern boolean interrupt_handler_pending_p(void);
+extern bool interrupt_handler_pending_p(void);
 extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
@@ -106,8 +107,8 @@ extern void arrange_return_to_c_function(
 extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
 extern void interrupt_handle_now(int, siginfo_t*, os_context_t*);
 extern void interrupt_handle_pending(os_context_t*);
-extern void interrupt_internal_error(os_context_t*, boolean continuable);
-extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);
+extern void interrupt_internal_error(os_context_t*, bool continuable);
+extern bool handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 
 #ifdef DO_PENDING_INTERRUPT
 #define do_pending_interrupt ((void(*)(void))SYMBOL(DO_PENDING_INTERRUPT)->value)

@@ -246,7 +246,7 @@ arch_internal_error_arguments(os_context_t *context)
     return 1 + (unsigned char *)OS_CONTEXT_PC(context);
 }
 
-boolean arch_pseudo_atomic_atomic(struct thread *thread) {
+bool arch_pseudo_atomic_atomic(struct thread *thread) {
     return get_pseudo_atomic_atomic(thread);
 }
 
@@ -581,7 +581,7 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-static __attribute__((unused)) boolean codeblob_p(lispobj ptr) {
+static __attribute__((unused)) bool codeblob_p(lispobj ptr) {
     return lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
            widetag_of((lispobj*)(ptr-OTHER_POINTER_LOWTAG)) == CODE_HEADER_WIDETAG;
 }
@@ -662,7 +662,7 @@ extern pthread_mutex_t alloc_profiler_lock;
 
 static unsigned int claim_index(int qty) // qty is 1 or 2
 {
-    static boolean warning_issued;
+    static bool warning_issued;
     unsigned int index = fixnum_value(SYMBOL(N_PROFILE_SITES)->value);
     SYMBOL(N_PROFILE_SITES)->value += make_fixnum(qty);
     if (fixnum_value(SYMBOL(N_PROFILE_SITES)->value) <= max_alloc_point_counters)
@@ -674,7 +674,7 @@ static unsigned int claim_index(int qty) // qty is 1 or 2
     return 0; // use the overflow bin(s)
 }
 
-static boolean NO_SANITIZE_MEMORY
+static bool NO_SANITIZE_MEMORY
 instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
 {
     int __attribute__((unused)) ret = mutex_acquire(&alloc_profiler_lock);
@@ -702,7 +702,7 @@ instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
 
 // logical index 'index' in the metadata array stores the code component
 // and pc-offset relative to the component base address
-static void record_pc(char* pc, unsigned int index, boolean sizedp)
+static void record_pc(char* pc, unsigned int index, bool sizedp)
 {
     lispobj *code = component_ptr_from_pc(pc);
     if (!code) {

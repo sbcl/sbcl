@@ -2,6 +2,7 @@
 #define _INCLUDE_THREAD_H_
 
 #include <sys/types.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <stddef.h>
 #include "sbcl.h"
@@ -21,7 +22,7 @@
 enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 
 #ifdef LISP_FEATURE_SB_THREAD
-void set_thread_state(struct thread *thread, char state, boolean);
+void set_thread_state(struct thread *thread, char state, bool);
 int thread_wait_until_not(int state, struct thread *thread);
 #endif
 

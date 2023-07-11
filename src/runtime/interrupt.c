@@ -466,8 +466,7 @@ sigset_t gc_sigset;
  * are not egregiously violated, not to enforce proper use of each and every signal.
  * (Who would add a SIGTSTP handler that is not completely async safe anyway?)
  */
-boolean
-deferrables_blocked_p(sigset_t *sigset)
+bool deferrables_blocked_p(sigset_t *sigset)
 {
     sigset_t current;
     if (sigset == 0) {
@@ -996,7 +995,7 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 /* a handler for the signal caused by execution of a trap opcode
  * signalling an internal error */
 void
-interrupt_internal_error(os_context_t *context, boolean continuable)
+interrupt_internal_error(os_context_t *context, bool continuable)
 {
     DX_ALLOC_SAP(context_sap, context);
 
@@ -1034,8 +1033,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
         arch_skip_instruction(context);
 }
 
-boolean
-interrupt_handler_pending_p(void)
+bool interrupt_handler_pending_p(void)
 {
     struct interrupt_data *data = &thread_interrupt_data(get_sb_vm_thread());
     return (data->pending_handler != 0);
@@ -1225,7 +1223,7 @@ interrupt_handle_pending(os_context_t *context)
 void
 interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
-    boolean were_in_lisp;
+    bool were_in_lisp;
     lispobj handler = lisp_sig_handlers[signal];
 
     if (!functionp(handler)) return;
@@ -1338,7 +1336,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
  * interrupt already pending
  */
 
-static boolean
+static bool
 can_handle_now(void *handler, struct interrupt_data *data,
                int signal, siginfo_t *info, os_context_t *context)
 {
@@ -1416,7 +1414,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
                         os_context_t *context)
 {
     struct thread *thread = get_sb_vm_thread();
-    boolean was_in_lisp;
+    bool was_in_lisp;
 
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
      * pseudo atomic until gc is finally allowed. */
@@ -1779,8 +1777,7 @@ void reset_thread_control_stack_guard_page(struct thread *th)
 }
 #endif
 
-boolean
-handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
+bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th = get_sb_vm_thread();
 

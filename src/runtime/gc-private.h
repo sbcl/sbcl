@@ -15,6 +15,7 @@
 #ifndef _GC_PRIVATE_H_
 #define _GC_PRIVATE_H_
 
+#include <stdbool.h>
 #include "genesis/instance.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/weak-pointer.h"
@@ -115,13 +116,13 @@ extern void scan_binding_stack(void);
 extern void scan_finalizers();
 extern void cull_weak_hash_tables(int (*[4])(lispobj,lispobj));
 extern void smash_weak_pointers(void);
-extern boolean scan_weak_hashtable(struct hash_table *hash_table,
+extern bool scan_weak_hashtable(struct hash_table *hash_table,
                                    int (*)(lispobj,lispobj),
                                    void (*)(lispobj*));
 extern int (*weak_ht_alivep_funs[4])(lispobj,lispobj);
 extern void gc_scav_pair(lispobj where[2]);
 extern void gc_common_init();
-extern boolean test_weak_triggers(int (*)(lispobj), void (*)(lispobj));
+extern bool test_weak_triggers(int (*)(lispobj), void (*)(lispobj));
 
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
 
@@ -265,7 +266,7 @@ static inline struct bitmap get_layout_bitmap(struct layout* layout)
  * So index 0 may be the layout pointer if #-compact-instance-header,
  * or a user data slot if #+compact-instance-header
  */
-static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
+static inline bool bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 {
     unsigned int word_index = index / N_WORD_BITS;
     unsigned int bit_index  = index % N_WORD_BITS;
@@ -407,7 +408,7 @@ static inline int instance_length(lispobj header)
 // This is index of the bit that differentiates FUNCALLABLE_INSTANCE_WIDETAG
 // from INSTANCE_WIDETAG.
 #define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
-static inline boolean instanceoid_widetag_p(unsigned char widetag) {
+static inline bool instanceoid_widetag_p(unsigned char widetag) {
     return (widetag | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER)) == FUNCALLABLE_INSTANCE_WIDETAG;
 }
 static inline int instanceoid_length(lispobj header) {
@@ -455,7 +456,7 @@ static inline int layout_depth2_id(struct layout* layout) {
 
 /// Return true if 'thing' is a layout.
 /// This predicate is careful, as is it used to verify heap invariants.
-static inline boolean layoutp(lispobj thing)
+static inline bool layoutp(lispobj thing)
 {
     lispobj layout;
     if (lowtag_of(thing) != INSTANCE_POINTER_LOWTAG) return 0;
@@ -463,7 +464,7 @@ static inline boolean layoutp(lispobj thing)
     return layout_depth2_id(LAYOUT(layout)) == LAYOUT_LAYOUT_ID;
 }
 /// Return true if 'thing' is the layout of any subtype of sb-lockless::list-node.
-static inline boolean lockfree_list_node_layout_p(struct layout* layout) {
+static inline bool lockfree_list_node_layout_p(struct layout* layout) {
     return layout_depth2_id(layout) == LFLIST_NODE_LAYOUT_ID;
 }
 
@@ -488,7 +489,7 @@ static const int CONS_PAGE_USABLE_BYTES = MAX_CONSES_PER_PAGE*CONS_SIZE*N_WORD_B
  * given that the words at 'addr' are within range for an allocated page.
  * 'addr' could be a pointer to random data, and this check is merely
  * a heuristic. False positives are possible. */
-static inline boolean plausible_tag_p(lispobj addr)
+static inline bool plausible_tag_p(lispobj addr)
 {
     if (listp(addr))
         return is_cons_half(CONS(addr)->car)

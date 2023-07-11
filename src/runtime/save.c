@@ -231,7 +231,7 @@ open_core_for_saving(char *filename)
 
 void unwind_binding_stack()
 {
-    boolean verbose = !lisp_startup_options.noinform;
+    bool verbose = !lisp_startup_options.noinform;
     struct thread *th = all_threads;
 
     /* Smash the enclosing state. (Once we do this, there's no good
@@ -261,13 +261,12 @@ void unwind_binding_stack()
     if (verbose) printf("done]\n");
 }
 
-boolean
-save_to_filehandle(FILE *file, char *filename, lispobj init_function,
-                   boolean make_executable,
-                   boolean save_runtime_options,
-                   int core_compression_level)
+bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
+                        bool make_executable,
+                        bool save_runtime_options,
+                        int core_compression_level)
 {
-    boolean verbose = !lisp_startup_options.noinform;
+    bool verbose = !lisp_startup_options.noinform;
 
     /* (Now we can actually start copying ourselves into the output file.) */
 
@@ -470,9 +469,8 @@ lose:
     return NULL;
 }
 
-boolean
-save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
-                           int __attribute__((unused)) application_type)
+bool save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
+                                int __attribute__((unused)) application_type)
 {
     size_t padding;
     void *padbytes;
@@ -521,7 +519,7 @@ save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
 }
 
 FILE *
-prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
+prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes,
                 size_t *runtime_size)
 {
     FILE *file;
@@ -556,10 +554,9 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
 }
 
 #ifdef LISP_FEATURE_CHENEYGC
-boolean
-save(char *filename, lispobj init_function, boolean prepend_runtime,
-     boolean save_runtime_options, boolean compressed, int compression_level,
-     int application_type)
+bool save(char *filename, lispobj init_function, bool prepend_runtime,
+          bool save_runtime_options, bool compressed, int compression_level,
+          int application_type)
 {
     FILE *file;
     void *runtime_bytes = NULL;

@@ -35,6 +35,7 @@
     (ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE)
 
 #if !defined(__ASSEMBLER__)
+#include <stdbool.h>
 #include "thread.h"
 
 #if defined(LISP_FEATURE_WIN32)
@@ -93,8 +94,8 @@
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-extern void allocate_lisp_dynamic_space(boolean);
-extern boolean allocate_hardwired_spaces(boolean);
+extern void allocate_lisp_dynamic_space(bool);
+extern bool allocate_hardwired_spaces(bool);
 
 extern void
 protect_control_stack_hard_guard_page(int protect_p, struct thread *thread);

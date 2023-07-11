@@ -130,7 +130,7 @@ dyndebug_init()
 static int max_lines = 20, cur_lines = 0;
 static int max_depth = 5, brief_depth = 2, cur_depth = 0;
 static int max_length = 5;
-static boolean dont_descend = 0, skip_newline = 0;
+static bool dont_descend = 0, skip_newline = 0;
 static int cur_clock = 0;
 
 static void print_obj(char *prefix, lispobj obj);
@@ -150,7 +150,7 @@ static void indent(int in)
 }
 
 static jmp_buf ldb_print_nlx;
-static boolean continue_p(boolean newline)
+static bool continue_p(bool newline)
 {
     char buffer[256];
 
@@ -366,7 +366,7 @@ static void brief_struct(lispobj obj)
 #include "genesis/layout.h"
 #include "genesis/defstruct-description.h"
 #include "genesis/defstruct-slot-description.h"
-static boolean tagged_slot_p(struct layout *layout, int slot_index)
+static bool tagged_slot_p(struct layout *layout, int slot_index)
 {
     if (instancep(layout->_info)) {
         struct defstruct_description* dd = (void*)(layout->_info-INSTANCE_POINTER_LOWTAG);
@@ -749,7 +749,7 @@ static void print_obj(char *prefix, lispobj obj)
     int type = lowtag_of(obj);
     struct var *var = lookup_by_obj(obj);
     char buffer[256];
-    boolean verbose = cur_depth < brief_depth;
+    bool verbose = cur_depth < brief_depth;
 
     if (!continue_p(verbose))
         return;

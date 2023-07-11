@@ -12,6 +12,7 @@
 #ifndef _GENCGC_PRIVATE_H_
 #define _GENCGC_PRIVATE_H_
 
+#include <stdbool.h>
 void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type);
 
 typedef unsigned int page_bytes_t;
@@ -101,7 +102,7 @@ static inline enum prot_mode protection_mode(page_index_t page) {
 #endif
 
 /* True if the page starts a contiguous block. */
-static inline boolean
+static inline bool
 page_starts_contiguous_block_p(page_index_t page_index)
 {
     // Don't use the preprocessor macro: 0 means 0.
@@ -109,7 +110,7 @@ page_starts_contiguous_block_p(page_index_t page_index)
 }
 
 /* True if the page is the last page in a contiguous block. */
-static inline boolean
+static inline bool
 page_ends_contiguous_block_p(page_index_t page_index,
                              generation_index_t __attribute__((unused)) gen)
 {
@@ -129,10 +130,10 @@ page_ends_contiguous_block_p(page_index_t page_index,
      * So _maybe_ both these conditions do not need to be present now ?
      */
     // There is *always* a next page in the page table.
-    boolean answer = page_words_used(page_index) < GENCGC_PAGE_WORDS
+    bool answer = page_words_used(page_index) < GENCGC_PAGE_WORDS
                   || page_starts_contiguous_block_p(page_index+1);
 #ifdef DEBUG
-    boolean safe_answer =
+    bool safe_answer =
            (/* page doesn't fill block */
             (page_words_used(page_index) < GENCGC_PAGE_WORDS)
             /* page is last allocated page */

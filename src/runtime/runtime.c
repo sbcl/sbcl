@@ -376,7 +376,7 @@ struct cmdline_options {
     char
 #endif
      **argv;
-    boolean disable_lossage_handler_p;
+    bool disable_lossage_handler_p;
     int merge_core_pages;
 };
 
@@ -435,13 +435,13 @@ parse_argv(struct memsize_options memsize_options,
 #endif
         **sbcl_argv = 0;
     /* other command line options */
-    boolean disable_lossage_handler_p
+    bool disable_lossage_handler_p
 #if defined(LISP_FEATURE_SB_LDB)
         = 0;
 #else
         = 1;
 #endif
-    boolean debug_environment_p = 0;
+    bool debug_environment_p = 0;
     int merge_core_pages = -1;
 
     int argi = 1;
@@ -486,7 +486,7 @@ parse_argv(struct memsize_options memsize_options,
         // Somebody who wishes this to work for #+win32 should feel free to do the same...
 #endif
     } else {
-        boolean end_runtime_options = 0;
+        bool end_runtime_options = 0;
         /* Parse our any of the command-line options that we handle from C,
          * stopping at the first one that we don't, and leave the rest */
         while (argi < argc) {
@@ -633,7 +633,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     struct memsize_options memsize_options;
     memsize_options.present_in_core = 0;
 
-    boolean have_hardwired_spaces = os_preinit(argv, envp);
+    bool have_hardwired_spaces = os_preinit(argv, envp);
 
     interrupt_init();
 #ifdef LISP_FEATURE_UNIX

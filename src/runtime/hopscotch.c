@@ -323,7 +323,7 @@ static uword_t vector_sxhash(lispobj* object)
  * and unlike EQUALP because it compares strings case-sensitively.
  * Note: this works on most numbers too, not just vectors.
  */
-static boolean vector_eql(uword_t arg1, uword_t arg2)
+static int vector_eql(uword_t arg1, uword_t arg2)
 {
     if (arg1 == arg2) return 1;
     lispobj* obj1 = (lispobj*)arg1;
@@ -790,7 +790,7 @@ found0:
 
 #undef probe
 
-boolean hopscotch_delete(tableptr ht, uword_t key)
+int hopscotch_delete(tableptr ht, uword_t key)
 {
     gc_dcheck(key);
     int logical_index = hash(ht, key) & ht->mask;

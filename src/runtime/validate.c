@@ -84,7 +84,7 @@ ensure_undefined_alien(void) {
     }
 }
 
-boolean allocate_hardwired_spaces(boolean hard_failp)
+bool allocate_hardwired_spaces(bool hard_failp)
 {
     struct {
         uword_t start;
@@ -120,7 +120,7 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
 }
 
 void
-allocate_lisp_dynamic_space(boolean did_preinit)
+allocate_lisp_dynamic_space(bool did_preinit)
 {
     // Small spaces can be allocated after large spaces are.
     // The above code is only utilized when heap relocation is disabled.
