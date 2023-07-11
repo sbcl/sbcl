@@ -345,13 +345,13 @@ uint32_t os_get_build_time_shared_libraries(uint32_t excl_maximum,
          * fortunately, those places are irrelevant to the task at
          * hand. */
 
-        IMAGE_FILE_HEADER* image_file_header = (base_magic_location + 4);
+        IMAGE_FILE_HEADER* image_file_header = (void*)(base_magic_location + 4);
         IMAGE_OPTIONAL_HEADER* image_optional_header =
             (void*)(image_file_header + 1);
         IMAGE_DATA_DIRECTORY* image_import_direntry =
             &image_optional_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
         IMAGE_IMPORT_DESCRIPTOR* image_import_descriptor =
-            base + image_import_direntry->VirtualAddress;
+            (void*)(base + image_import_direntry->VirtualAddress);
         uint32_t nlibrary, j;
 
         for (nlibrary=0u; nlibrary < excl_maximum
@@ -752,7 +752,7 @@ win32_reset_stack_overflow_guard_page() {
      * page. See test (:EXHAUST :WRITE-TO-STACK-ON-UNWIND). */
 #define WIN32_STACK_GUARD_SLACK (2*win32_stack_guarantee + win32_page_size)
     char *stack_guard_start = CONTROL_STACK_GUARD_PAGE(self);
-    fprintf(stderr, "INFO: Reprotecting control stack guard (0x%p+0x%x)\n",
+    fprintf(stderr, "INFO: Reprotecting control stack guard (0x%p+0x%lx)\n",
             stack_guard_start, WIN32_STACK_GUARD_SLACK);
     fflush(stderr);
 

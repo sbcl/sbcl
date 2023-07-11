@@ -74,6 +74,7 @@ int arch_os_thread_init(struct thread *thread)
 
     TlsSetValue(OUR_TLS_INDEX,thread);
 
+    extern void win32_set_stack_guarantee(void);
     win32_set_stack_guarantee();
 
     return 1;

@@ -63,6 +63,7 @@ int arch_os_thread_init(struct thread *thread)
     thread->control_stack_end = cur_stack_end;
 #endif
 
+    extern void win32_set_stack_guarantee(void);
     win32_set_stack_guarantee();
 
     return 1;
@@ -122,9 +123,9 @@ os_context_register_addr(os_context_t *context, int offset)
         offsetof(CONTEXT,R14),
         offsetof(CONTEXT,R15),
     };
-    return
-        (offset >= 0 && offset < 16) ?
-        ((void*)(context->win32_context)) + offsets[offset]  : 0;
+    return (void*)
+       ((offset >= 0 && offset < 16) ?
+        ((char*)(context->win32_context)) + offsets[offset] : 0);
 }
 
 os_context_register_t *

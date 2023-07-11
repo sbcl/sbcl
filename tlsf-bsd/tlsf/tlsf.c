@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "tlsf.h"
 
@@ -1093,14 +1094,15 @@ void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
     fprintf(f, " -----  ----------   ---------------  -----------  -------------\n");
     block_header_t *block = offset_to_block(pool, 0);
     while (block) {
-        unsigned long* header = (unsigned long*)block + 1, word = *header;
-        fprintf(f, " %s %12lx   %7x:%08x %10lx",
+        unsigned long* header = (unsigned long*)block + 1;
+        uintptr_t word = *header;
+        fprintf(f, " %s %12"PRIxPTR"   %7x:%08x %10lx",
                 block_is_free(block) ? "free":"    ",
-                (long)header,
+                (uintptr_t)header,
                 (int)(word>>32), (int)(word & 0xFFFFFFFF),
-                block_size(block)+N_WORD_BYTES);
+                (long)(block_size(block)+N_WORD_BYTES));
         if (block_is_prev_free(block))
-            fprintf(f, "  %12lx", (long)block->prev_phys_block+N_WORD_BYTES);
+            fprintf(f, "  %12"PRIxPTR, (uintptr_t)block->prev_phys_block+N_WORD_BYTES);
         putc('\n', f);
         if (block_is_last(block)) break; // include the sentinel in the display
         block = block_next(block);

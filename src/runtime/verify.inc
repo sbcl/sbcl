@@ -479,15 +479,15 @@ void gc_show_pte(lispobj obj)
         int i;
         for (i=0;i<8;++i) genstring[i] = (gens & (1<<i)) ? '0'+i : '-';
         genstring[8] = 0;
-        printf("page %ld (v) base %p gens %s ss=%p%s\n",
-               page, text_page_address(page), genstring,
+        printf("page %d (v) base %p gens %s ss=%p%s\n",
+               (int)page, text_page_address(page), genstring,
                text_page_scan_start(page),
                card_markedp((void*)obj)?"":" WP");
         return;
     }
     page = find_fixedobj_page_index((void*)obj);
     if (page>=0) {
-        printf("page %ld (f) align %d gens %x%s\n", page,
+        printf("page %d (f) align %d gens %x%s\n", (int)page,
                fixedobj_pages[page].attr.parts.obj_align,
                fixedobj_pages[page].attr.parts.gens_,
                card_markedp((void*)obj)?"": " WP");

@@ -1458,7 +1458,7 @@ static void copy_back(uword_t space_start, struct tempspace* tempspace,
     int new_usage = tempspace->n_bytes;
     memcpy((char*)space_start, tempspace->start, tempspace->n_bytes);
     uword_t end = space_start + new_usage;
-    if (new_usage < old_usage) bzero((char*)end, old_usage - new_usage);
+    if (new_usage < old_usage) memset((char*)end, 0, old_usage - new_usage);
     *pfree_ptr = (lispobj*)end;
 }
 
@@ -1776,10 +1776,10 @@ static void defrag_immobile_space(boolean verbose)
     // Count the number of symbols, fdefns, and layouts that will be relocated
     int obj_type_histo[64];
     struct { int size, count; } sym_kind_histo[N_SYMBOL_KINDS];
-    bzero(obj_type_histo, sizeof obj_type_histo);
-    bzero(sym_kind_histo, sizeof sym_kind_histo);
+    memset(obj_type_histo, 0, sizeof obj_type_histo);
+    memset(sym_kind_histo, 0, sizeof sym_kind_histo);
     struct size_class layout_size_class[MAX_LAYOUT_DEFRAG_SIZE_CLASSES];
-    bzero(layout_size_class, sizeof layout_size_class);
+    memset(layout_size_class, 0, sizeof layout_size_class);
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     // Find the starting address of fixed-size objects that will undergo defrag.
@@ -1914,7 +1914,7 @@ static void defrag_immobile_space(boolean verbose)
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     char* alloc_ptrs[64];
-    bzero(alloc_ptrs, sizeof alloc_ptrs);
+    memset(alloc_ptrs, 0, sizeof alloc_ptrs);
     alloc_ptrs[INSTANCE_WIDETAG/4] = layout_alloc_ptr;
     alloc_ptrs[FDEFN_WIDETAG/4] = fdefn_alloc_ptr;
 
@@ -2139,7 +2139,7 @@ void dump_immobile_text(lispobj* where, lispobj* end, FILE*f)
                     text_page_touched(page)?"":" WP");
             prevpage = page;
         }
-        fprintf(f, "%p: %lx\n", where, *where);
+        fprintf(f, "%p: %"OBJ_FMTX"\n", where, *where);
     }
 }
 
