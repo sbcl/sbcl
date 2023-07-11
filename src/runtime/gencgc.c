@@ -117,7 +117,7 @@ int n_gcs;
 
 /* the verbosity level. All non-error messages are disabled at level 0;
  * and only a few rare messages are printed at level 1. */
-boolean gencgc_verbose = 0;
+int gencgc_verbose = 0;
 
 /* FIXME: At some point enable the various error-checking things below
  * and see what they say. */
@@ -128,7 +128,7 @@ boolean gencgc_verbose = 0;
 generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan of the heap before it's GCed? */
-boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
+int pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
 
 
 /*

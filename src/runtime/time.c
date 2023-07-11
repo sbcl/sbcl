@@ -18,7 +18,7 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-int get_timezone(time_t when, boolean *dst)
+int get_timezone(time_t when, unsigned int *dst)
 {
     struct tm ltm, gtm;
     int sw;

@@ -870,8 +870,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 (define-alien-routine get-timezone int
   (when time-t)
-  ;; KLUDGE: the runtime `boolean' is defined as `int', but the alien
-  ;; type is N-WORD-BITS wide.
+  ;; BOOLEAN is N-WORD-BITS normally. Reduce it to an unsigned int in size.
+  ;; But we can't just put UNSIGNED-INT here because the clients of this function
+  ;; want to receive a T or NIL, not a 1 or 0.
   (daylight-savings-p (boolean 32) :out))
 #-win32
 (defun nanosleep (secs nsecs)

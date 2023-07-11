@@ -119,6 +119,7 @@ extern struct dyndebug_config {
 } dyndebug_config;
 
 #ifdef LISP_FEATURE_GENCGC
+extern int pre_verify_gen_0; // set and read from Lisp tests
 extern int gencgc_verbose;
 #endif
 

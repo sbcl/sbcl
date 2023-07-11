@@ -300,7 +300,6 @@ static int verify_cmd(char __attribute__((unused)) **ptr) {
 static int gc_cmd(char **ptr) {
     int last_gen = 0;
     extern generation_index_t verify_gens;
-    extern boolean pre_verify_gen_0;
     if (more_p(ptr)) parse_number(ptr, &last_gen);
     gencgc_verbose = 2;
     pre_verify_gen_0 = 1;

@@ -327,7 +327,6 @@ void test_dirty_all_gc_cards()
             }
         first = 1+last;
     }
-    extern boolean pre_verify_gen_0;
     pre_verify_gen_0 = 1;
 }
 

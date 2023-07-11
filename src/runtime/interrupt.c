@@ -117,7 +117,7 @@ static inline void sigcopyset(sigset_t *to, sigset_t *from) {
  * 'no', because Lisp is still too brain-dead to handle anything.
  * After sufficient initialization has been completed, the answer
  * becomes 'yes'.) */
-boolean internal_errors_enabled = 0;
+int internal_errors_enabled = 0; // read in cold-init
 
 // SIGRTMAX is not usable in an array size declaration because it might be
 // a variable expression, so use NSIG which is at least as large as SIGRTMAX.
