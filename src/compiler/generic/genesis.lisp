@@ -4238,8 +4238,9 @@ static inline uword_t word_has_stickymark(uword_t word) {
                   (write-primitive-object code stream)))))
           (out-to "primitive-objects"
             (dolist (obj structs)
-              (format stream "~&#include \"~A.h\"~%"
-                      (string-downcase (sb-vm:primitive-object-name obj))))))
+              (unless (eq obj code)
+                (format stream "~&#include \"~A.h\"~%"
+                        (string-downcase (sb-vm:primitive-object-name obj)))))))
         (out-to "layout"
           (write-structure-object (layout-info (find-layout 'layout)) stream
                                   "layout")
