@@ -73,7 +73,6 @@ static inline lispobj points_to_asm_code_p(uword_t ptr) {
     return asm_routines_start <= ptr && ptr < asm_routines_end;
 }
 
-extern boolean alloc_profiling;
 extern os_vm_address_t alloc_profile_buffer;
 extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
 

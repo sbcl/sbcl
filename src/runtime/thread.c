@@ -988,6 +988,7 @@ alloc_thread_struct(void* spaces) {
     th->os_thread = 0;
     // Once allocated, the allocation profiling buffer sticks around.
     // If present and enabled, assign into the new thread.
+    extern int alloc_profiling;
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
     struct extra_thread_data *extra_data = thread_extra_data(th);

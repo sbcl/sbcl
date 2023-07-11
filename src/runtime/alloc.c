@@ -40,6 +40,7 @@ lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 os_vm_address_t alloc_profile_buffer; // array of counters
 static size_t profile_buffer_size;
 lispobj alloc_profile_data;           // SIMPLE-VECTOR of <code-component,PC>
+// This variable is read from Lisp - see src/compiler/generic/core
 int alloc_profiling;              // enabled flag
 
 #ifdef LISP_FEATURE_WIN32
