@@ -23,6 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "pseudo-atomic.h"
+#include "gc-assert.h"
 
 #if defined(LISP_FEATURE_GENCGC)
 #include "gencgc-alloc-region.h"
