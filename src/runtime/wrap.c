@@ -60,7 +60,12 @@
    Unix header, according to Perry E. Metzger, in a message on
    sbcl-devel dated 2004-03-29, this is the POSIXly-correct way of
    using environ: by an explicit declaration.  -- CSR, 2004-03-30 */
+#if defined __W32API_USE_DLLIMPORT__
+// Assume that if that DLLIMPORT preprocessor symbol is defined, then 'environ' is too.
+// It gets defined as '_environ' which in turn is defined as (* __p__environ())
+#else
 extern char **environ;
+#endif
 
 /*
  * stuff needed by CL:DIRECTORY and other Lisp directory operations

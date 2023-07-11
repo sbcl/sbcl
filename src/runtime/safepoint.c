@@ -831,6 +831,7 @@ gc_stop_the_world()
         switch(gc_state.phase) {
         case GC_NONE:
             gc_advance(GC_QUIET,gc_state.phase);
+            /* FALLTHRU */
         case GC_FLIGHT:
         case GC_MESSAGE:
         case GC_INVOKED:
@@ -845,6 +846,7 @@ gc_stop_the_world()
             } else {
                 gc_state_wait(GC_QUIET);
             }
+            /* FALLTHRU */
         case GC_QUIET:
             /* Some number of threads were trying to get to GC_QUIET.
              * But this thread is sufficient to be able to leave

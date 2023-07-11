@@ -54,6 +54,10 @@ int arch_os_thread_init(struct thread *thread)
      * grab the AllocationBase. -AB 2006/11/25
      */
 
+    /* This memset is probably not really necessary but it shuts up a warning
+     * about uninitialized memory. Compiler might be confused that stack_memory
+     * is both the address being queried, and the address of the result */
+    memset(&stack_memory, 0, sizeof(stack_memory));
     if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
         fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
         lose("Could not query stack memory information.");

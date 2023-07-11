@@ -73,9 +73,15 @@
 #include "wrap.h"
 #include "gc.h"
 
+#if defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_64_BIT
+# define CAST_SIZEOF (unsigned long)
+#else
+# define CAST_SIZEOF
+#endif
+
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(define-alien-type " lispname " (%s %lu))\n", \
-           (((foo=-1)<0) ? "signed" : "unsigned"), (8LU * (sizeof foo))); }
+           (((foo=-1)<0) ? "signed" : "unsigned"), (8LU * CAST_SIZEOF (sizeof foo))); }
 
 #define DEFSTRUCT(lispname,cname,body) { cname bar; \
     printf("(define-alien-type nil\n  (struct %s", #lispname); \
@@ -85,7 +91,7 @@
     printf("\n          (%s (%s %lu))", \
            #lispname, \
            (((bar.cname=-1)<0) ? "signed" : "unsigned"), \
-           (8LU * (sizeof bar.cname)))
+           (8LU * CAST_SIZEOF (sizeof bar.cname)))
 
 #define DEFCONSTANT(lispname,cname) \
   if (cname<0) defconstant_neg(lispname, cname); else defconstant(lispname,cname)
