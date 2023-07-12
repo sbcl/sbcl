@@ -1867,6 +1867,23 @@
 
 (defknown array-storage-vector (array) (simple-array * (*))
     (any))
+
+(defknown octets-to-string ((vector (unsigned-byte 8))
+                            &key
+                            (:external-format t)
+                            (:start index)
+                            (:end sequence-end))
+  (or (simple-array character (*)) (simple-array base-char (*)))
+  (flushable))
+(defknown string-to-octets (string
+                            &key
+                            (:external-format t)
+                            (:start index)
+                            (:end sequence-end)
+                            (:null-terminate t))
+  (simple-array (unsigned-byte 8) (*))
+  (flushable))
+
 
 ;;;; magical compiler frobs
 

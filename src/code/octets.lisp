@@ -359,12 +359,20 @@
                                    (default-external-format)
                                    external-format)))
 
-(declaim (ftype (sfunction ((vector (unsigned-byte 8)) &key (:external-format t)
-                                   (:start index)
-                                   (:end sequence-end))
+(declaim (inline %octets-to-string))
+(declaim (ftype (sfunction (function (vector (unsigned-byte 8)) index sequence-end t)
                            (or (simple-array character (*))
                                (simple-array base-char (*))))
-                octets-to-string))
+                %octets-to-string))
+(defun %octets-to-string (fun vector start end replacement)
+  (declare (explicit-check start end :result))
+  (with-array-data ((vector vector)
+                    (start start)
+                    (end end)
+                    :check-fill-pointer t)
+    (declare (type (simple-array (unsigned-byte 8) (*)) vector))
+    (funcall fun vector start end replacement)))
+(declaim (notinline %octets-to-string))
 (defun octets-to-string (vector &key (external-format :default) (start 0) end)
   "Return a string obtained by decoding VECTOR according to EXTERNAL-FORMAT.
 
@@ -380,22 +388,24 @@ SB-INT:CHARACTER-DECODING-ERROR is signaled.
 Note that for some values of EXTERNAL-FORMAT the length of the
 returned string may be different from the length of VECTOR (or the
 subsequence bounded by START and END)."
+  (let* ((ef (maybe-defaulted-external-format external-format))
+         (replacement (ef-replacement ef)))
+    (declare (inline %octets-to-string))
+    (%octets-to-string (ef-octets-to-string-fun ef) vector start end replacement)))
+
+(declaim (inline %string-to-octets))
+(declaim (ftype (sfunction (function string index sequence-end t t)
+                           (simple-array (unsigned-byte 8) (*)))
+                %string-to-octets))
+(defun %string-to-octets (fun string start end null-terminate replacement)
   (declare (explicit-check start end :result))
-  (with-array-data ((vector vector)
+  (with-array-data ((string string)
                     (start start)
                     (end end)
                     :check-fill-pointer t)
-    (declare (type (simple-array (unsigned-byte 8) (*)) vector))
-    (let* ((ef (maybe-defaulted-external-format external-format))
-           (replacement (ef-replacement ef)))
-      (funcall (ef-octets-to-string-fun ef) vector start end replacement))))
-
-(declaim (ftype (sfunction (string &key (:external-format t)
-                                   (:start index)
-                                   (:end sequence-end)
-                                   (:null-terminate t))
-                           (simple-array (unsigned-byte 8) (*)))
-                string-to-octets))
+    (declare (type simple-string string))
+    (funcall fun string start end null-terminate replacement)))
+(declaim (notinline %string-to-octets))
 (defun string-to-octets (string &key (external-format :default)
                          (start 0) end null-terminate)
   "Return an octet vector that is STRING encoded according to EXTERNAL-FORMAT.
@@ -416,15 +426,11 @@ Note that for some values of EXTERNAL-FORMAT and NULL-TERMINATE the
 length of the returned vector may be different from the length of
 STRING (or the subsequence bounded by START and END)."
   (declare (explicit-check start end :result))
-  (with-array-data ((string string)
-                    (start start)
-                    (end end)
-                    :check-fill-pointer t)
-    (declare (type simple-string string))
-    (let* ((ef (maybe-defaulted-external-format external-format))
-           (replacement (ef-replacement ef)))
-      (funcall (ef-string-to-octets-fun ef) string start end
-               (if null-terminate 1 0) replacement))))
+  (let* ((ef (maybe-defaulted-external-format external-format))
+         (replacement (ef-replacement ef)))
+    (declare (inline %string-to-octets))
+    (%string-to-octets (ef-string-to-octets-fun ef) string start end
+                       (if null-terminate 1 0) replacement)))
 
 ;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
 ;;; by one or more keyword symbols. The mapping from symbol to index into this

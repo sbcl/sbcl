@@ -5820,6 +5820,71 @@
                                          (%coerce-callable-to-fun predicate)
                                          (and key (%coerce-callable-to-fun key)))))))
 
+;;;; transforms for SB-EXT:OCTETS-TO-STRING and SB-EXT:STRING-TO-OCTETS
+
+#+sb-xc ; not needed to cross-compile
+(progn
+(deftransform string-to-octets ((string &key external-format (start 0) end null-terminate)
+                                (t &rest t)
+                                *
+                                :node node)
+  "precompute external-format lookup"
+  (unless external-format
+    (give-up-ir1-transform))
+  (unless (constant-lvar-p external-format)
+    (give-up-ir1-transform))
+  (let ((xf-designator (lvar-value external-format)))
+    (when (eql xf-designator :default)
+      (give-up-ir1-transform))
+    (let ((xf (get-external-format xf-designator)))
+      (unless xf
+        (give-up-ir1-transform))
+      (let ((form `(let ((fun (load-time-value
+                               (sb-impl::ef-string-to-octets-fun
+                                (get-external-format ',xf-designator))
+                               t))
+                         (replacement
+                          (load-time-value
+                           (sb-impl::ef-replacement
+                            (get-external-format ',xf-designator)))))
+                     (sb-impl::%string-to-octets fun string start end
+                                                 (if null-terminate 1 0) replacement))))
+        (if (or (csubtypep (lvar-type string) (specifier-type 'simple-string))
+                (policy node (> speed space)))
+            `(locally (declare (inline sb-impl::%string-to-octets))
+               ,form)
+            form)))))
+(deftransform octets-to-string ((vector &key external-format (start 0) end)
+                                (t &rest t)
+                                *
+                                :node node)
+  "precompute external-format lookup"
+  (unless external-format
+    (give-up-ir1-transform))
+  (unless (constant-lvar-p external-format)
+    (give-up-ir1-transform))
+  (let ((xf-designator (lvar-value external-format)))
+    (when (eql xf-designator :default)
+      (give-up-ir1-transform))
+    (let ((xf (get-external-format xf-designator)))
+      (unless xf
+        (give-up-ir1-transform))
+      (let ((form `(let ((fun (load-time-value
+                               (sb-impl::ef-octets-to-string-fun
+                                (get-external-format ',xf-designator))
+                               t))
+                         (replacement
+                          (load-time-value
+                           (sb-impl::ef-replacement
+                            (get-external-format ',xf-designator)))))
+                     (sb-impl::%octets-to-string fun vector start end replacement))))
+        (if (or (csubtypep (lvar-type vector) (specifier-type '(simple-array (unsigned-byte 8) (*))))
+                (policy node (> speed space)))
+            `(locally (declare (inline sb-impl::%octets-to-string))
+               ,form)
+            form)))))
+) ; PROGN
+
 ;;;; debuggers' little helpers
 
 ;;; for debugging when transforms are behaving mysteriously,

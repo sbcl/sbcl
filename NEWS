@@ -49,6 +49,9 @@ changes in the external-format-line-endings branch:
   * optimization: external formats with :REPLACEMENT no longer bind handlers
     for coding errors around conversion functions, and so should cons less and
     be faster.
+  * optimization: when the :EXTERNAL-FORMAT argument to STRING-TO-OCTETS or
+    OCTETS-TO-STRING is a compile-time constant, the external format is
+    resolved at load time rather than on each call.
 
 changes relative to sbcl-2.3.10:
   * enhancement: During generic function dispatch, for a generic function

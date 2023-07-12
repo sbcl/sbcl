@@ -3093,8 +3093,8 @@ possibly temporarily, because it might be used internally.")
            "TWO-ARG-CHAR-LESSP" "TWO-ARG-CHAR-NOT-LESSP"
            "TWO-ARG-CHAR-GREATERP" "TWO-ARG-CHAR-NOT-GREATERP"
            "CHAR-CASE-INFO"
-            ;; FIXME: potential SB-EXT exports
 
+           ;; FIXME: potential SB-EXT exports
            "CHARACTER-CODING-ERROR"
            "CHARACTER-DECODING-ERROR" "CHARACTER-DECODING-ERROR-OCTETS"
            "CHARACTER-ENCODING-ERROR" "CHARACTER-ENCODING-ERROR-CODE"
@@ -3102,6 +3102,10 @@ possibly temporarily, because it might be used internally.")
            "C-STRING-ENCODING-ERROR"
            "C-STRING-DECODING-ERROR"
            "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
+
+           ;; not potential SB-EXT exports
+           "GET-EXTERNAL-FORMAT" "GET-EXTERNAL-FORMAT-OR-LOSE"
+           "MAYBE-DEFAULTED-EXTERNAL-FORMAT"
 
             ;; bootstrapping magic, to make things happen both in
             ;; the cross-compilation host compiler's environment and
