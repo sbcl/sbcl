@@ -14,6 +14,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+unicode-lite (invoke-restart 'run-tests::skip-file)
+
 (defvar *test-path* (scratch-file-name))
 
 (macrolet ((input-test (inxf expected &environment env)

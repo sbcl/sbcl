@@ -14,7 +14,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-unicode (invoke-restart 'run-tests::skip-file)
+#+(or (not sb-unicode) unicode-lite) (invoke-restart 'run-tests::skip-file)
 
 (defvar *test-path* (scratch-file-name))
 
