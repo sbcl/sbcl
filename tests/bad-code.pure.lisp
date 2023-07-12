@@ -701,3 +701,13 @@
                            (let* ((a 1 2))
                              a)))
                       :allow-failure t))))
+
+(with-test (:name :position-derive-empty-type)
+  (multiple-value-bind (fun failure warning)
+      (checked-compile
+       `(lambda (s)
+          (position #\a (the simple-string s) :start 4 :end 2))
+       :allow-warnings t)
+    (declare (ignore failure))
+    (assert warning)
+    (assert-error (funcall fun "abcdef") sb-kernel:bounding-indices-bad-error)))
