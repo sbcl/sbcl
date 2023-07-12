@@ -886,7 +886,6 @@
   (:args (layout :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:policy :fast-safe)
-  (:conditional)
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg
                :unused-if

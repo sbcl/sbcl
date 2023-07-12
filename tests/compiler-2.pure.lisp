@@ -4133,3 +4133,17 @@
             (scale-float m 2))))
    ((1d0 nil) 4d0)
    ((2d0 nil) 8d0)))
+
+(with-test (:name :structure-typep*-deleted-branch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (cond
+           ((typep x 'random-state)
+            1)
+           ((typep x 'hash-table)
+            2)
+           (t x)))
+    ((*random-state*) 1)
+    (((make-hash-table)) 2)
+    ((423444) 423444)))

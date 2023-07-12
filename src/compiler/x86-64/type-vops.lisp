@@ -1119,7 +1119,6 @@
   (:args (layout :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:policy :fast-safe)
-  (:conditional)
   (:info target not-p test-layout)
   (:generator 4
     (structure-is-a layout test-layout target not-p done)
