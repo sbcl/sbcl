@@ -24,7 +24,7 @@ export PATH
 
 # Increase potential soft ulimit on file descriptors for file
 # descriptor test case below.
-test `ulimit -n` -ge 1050 || ulimit -S -n 1050
+test `ulimit -n` -ge 1050 || ulimit -S -n `ulimit -H -n`
 
 # This should probably be broken up into separate pieces.
 run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'

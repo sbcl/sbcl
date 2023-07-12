@@ -297,8 +297,7 @@ fractional bits."
 ;; This test is skipped on x86; as to why see the comment at the test
 ;; (:range-reduction :x87) above.
 (with-test (:name (:range-reduction :precise-pi)
-            :skipped-on :x86
-            :fails-on (and :openbsd :x86-64))
+            :skipped-on :x86)
   (let ((rational-pi-half (/ (pi-gauss-legendre 2200) 2)))
     (labels ((round-pi-half (x)
                "Return two values as if (ROUND X (/ PI 2)) was called
@@ -355,8 +354,6 @@ fractional bits."
                                ;; Some libm's might internally cause an *expected* overflow on
                                ;; certain inputs. So instead of computing an answer for
                                ;; (EXPT 1.7976931348623157d308 4/5) it would trap.
-                               ;; I'll bet that's why we disabled the test on openbsd,
-                               ;; but I don't care to find out.
                                then (sb-int:with-float-traps-masked (:overflow) (expt v 4/5))
                                while (> v (expt 2 50))
                                collect v)
