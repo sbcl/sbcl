@@ -99,13 +99,13 @@
                      :dynamic-space-start #x1000000000)
 
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
-;;; run under the default 512M data size limit.
+;;; run under the default 1G data size limit.
 
 #-(or linux darwin)
 (!gencgc-space-setup #x20000000
                      :read-only-space-size 0
                      :dynamic-space-start #x1000000000
-                     #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
+                     #+openbsd :dynamic-space-size #+openbsd #x2fff0000)
 
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
