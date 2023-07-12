@@ -29,10 +29,13 @@
                           ;; storage class doesn't matter since all float regs
                           ;; and sse regs map to the same storage base.
                           (:temp wordpair double-reg float0-offset))
+  (progn end-card-index)
   (move res vector) ; to "use" res
 
   ;; Mark each GC card of the vector unless ITEM is not a pointer
   ;; (NIL is non-pointer) or the COUNT is 0.
+  #+soft-card-marks
+  (progn
   (inst cmp start end)
   (inst jmp :ge DONE)
   (inst lea :dword count (ea -3 item)) ; same as POINTERP (see type-vops)
@@ -53,12 +56,12 @@
     (inst and :dword card-index card-index-mask)
     (inst and :dword end-card-index card-index-mask)
     (emit-label LOOP)
-    (inst mov :byte (ea gc-card-table-reg-tn card-index) 0) ; mark one card
+    (inst mov :byte (ea gc-card-table-reg-tn card-index) CARD-MARKED) ; mark one card
     (inst cmp card-index end-card-index)
     (inst jmp :e DONE-CARD-MARKING)
     (inst inc :dword card-index)
     (inst and :dword card-index card-index-mask)
-    (inst jmp LOOP))
+    (inst jmp LOOP)))
 
   DONE-CARD-MARKING
   (move count end)

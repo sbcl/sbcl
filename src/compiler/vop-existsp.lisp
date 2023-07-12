@@ -10,7 +10,8 @@
 (in-package "SB-C")
 
 ;;; translation from template names to template structures
-(defglobal *backend-template-names* (make-hash-table)) ; keys are symbols
+(#+sb-xc-host defvar #-sb-xc-host defglobal *backend-template-names*
+              (make-hash-table)) ; keys are symbols
 (declaim (type hash-table *backend-template-names*))
 
 ;;; When compiling the cross-compiler, a %VOP-EXISTS-P result could depend on
@@ -35,8 +36,9 @@
                         (:named
                          (gethash name *backend-template-names*))
                         (:translate
-                         (awhen (info :function :info name)
-                           (fun-info-templates it))))))))
+                         (let ((info (info :function :info name)))
+                           (when info
+                             (fun-info-templates info)))))))))
       ;; Negatives won't be stored in the journal in optimistic mode.
       (when (and (not answer) (not optimistic))
         (pushnew (cons name query) *vop-not-existsp* :test 'equal))

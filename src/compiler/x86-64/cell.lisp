@@ -50,6 +50,15 @@
              (inst mov :qword (object-slot-ea object 1 lowtag) nil-value))
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
+          #-soft-card-marks
+          ((equal name '(setf %funcallable-instance-fun))
+           ;; If soft card marks are disabled, then EMIT-GENGC-BARRIER is disabled too.
+           ;; But funcallable-instances are on PAGE_TYPE_CODE, and code pages do not use
+           ;; MMU-based protection regardless of this feature.
+           ;; So we have to alter the card mark differently.
+           (pseudo-atomic ()
+             (emit-code-page-gengc-barrier object val-temp)
+             (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
            (let* ((value-tn (tn-ref-tn (tn-ref-across args)))
                   (prim-type (sb-c::tn-primitive-type value-tn))
@@ -751,6 +760,29 @@
 (define-full-reffer funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg) * %funcallable-instance-info)
+
+;;; This is arguably a kludge without which you would hit the 'lose("Feh.")' in gencgc
+;;; if trying to fold funinstance setters into closure-index-set.
+;;; (Is's incorrect to manually manipulate the mark on a non-code page.)
+#-soft-card-marks
+(progn
+#-sb-xc-host
+(defun (setf %funcallable-instance-info) (newval fin index)
+  (%primitive %set-funinstance-info fin index newval)
+  newval)
+(define-vop (%set-funinstance-info)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num *)
+  (:temporary (:sc unsigned-reg) val-temp)
+  (:generator 4
+   (let ((ea (ea (- (* funcallable-instance-info-offset n-word-bytes) fun-pointer-lowtag)
+                 object index (index-scale n-word-bytes index))))
+     (pseudo-atomic ()
+       (emit-code-page-gengc-barrier object val-temp)
+       (emit-store ea value val-temp))))))
 
 (define-vop (closure-ref)
   (:args (object :scs (descriptor-reg)))

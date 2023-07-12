@@ -34,6 +34,9 @@
 ;;; 2. hash-table k/v pair should mark once only.
 ;;;    (the vector elements are certainly on the same card)
 (defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
+  #-soft-card-marks (declare (ignore object cell-address scratch-reg value-tn-ref value-tn))
+  #+soft-card-marks
+  (progn
   (when (sc-is object constant immediate)
     (aver (symbolp (tn-value object))))
   (when (require-gengc-barrier-p object value-tn-ref value-tn)
@@ -51,7 +54,14 @@
     ;; I'd like to measure to see if using a register is actually better.
     ;; If all threads store 0, it might be easier on the CPU's store buffer.
     ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
-    (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) 0)))
+    (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))))
+
+#-soft-card-marks
+(defun emit-code-page-gengc-barrier (object scratch-reg)
+  (inst mov scratch-reg object)
+  (inst shr scratch-reg gencgc-card-shift)
+  (inst and :dword scratch-reg card-index-mask)
+  (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
 
 (defun emit-store (ea value val-temp)
   (sc-case value

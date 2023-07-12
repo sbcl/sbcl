@@ -45,14 +45,17 @@
 
 (in-package "SB-IMPL")
 
+(sb-c::unless-vop-existsp (:named sb-vm::%set-funinstance-info)
 (declaim (inline (setf %funcallable-instance-info)))
 ;;; Funcallable instances are just like closures, but there's another slot or two
 ;;; depending on whether the layout pointer is in a slot or in the header word.
+;;; In retrospect, backends may want to emit different code for funcallable-instance
+;;; so it may not have been wise to reduce to the closure setter.
 (defun (setf %funcallable-instance-info) (newval fin index)
   (%closure-index-set fin (+ index (- sb-vm:funcallable-instance-info-offset
                                       sb-vm:closure-info-offset))
                       newval)
-  newval)
+  newval))
 ;;; This is just to keep the DEFSTRUCT logic consistent with %INSTANCE-SET,
 ;;; but the canonical setter is the function named (setf %funcallable-instance-info)
 (declaim (inline %set-funcallable-instance-info))

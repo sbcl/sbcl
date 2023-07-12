@@ -46,6 +46,7 @@
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show" :c-headers)
  ("src/compiler/early-constantp" :c-headers)
+ ("src/compiler/vop-existsp" :c-headers)
  ("src/code/defsetfs" :not-host)
 
   ;; Declare all target special variables defined by ANSI
@@ -97,8 +98,6 @@
 
  ("src/code/defbangtype" :c-headers)
  ("src/code/early-constants" :c-headers)
-
- ("src/compiler/vop-existsp" :c-headers)
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names" :c-headers)

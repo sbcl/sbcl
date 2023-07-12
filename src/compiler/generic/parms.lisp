@@ -158,6 +158,8 @@
          (defconstant gencgc-card-table-index-mask
            (1- (ash 1 gencgc-card-table-index-nbits)))))))
 
+(defconstant card-marked #+soft-card-marks 0 #-soft-card-marks 1)
+
 (defconstant-eqx +c-callable-fdefns+
   '(sub-gc
     sb-kernel::post-gc
