@@ -220,7 +220,7 @@
                            (dotimes (i (length instead))
                              (vector-push-extend (char instead i) string))))
                      (incf pos bytes)))
-          string))
+          (copy-seq string)))
       (defun ,name-be (array astart aend replacement)
         (declare (optimize speed #.*safety-0*)
                  (type ,type array)
@@ -243,7 +243,7 @@
                            (dotimes (i (length instead))
                              (vector-push-extend (char instead i) string))))
                      (incf pos bytes)))
-          string)))))
+          (copy-seq string))))))
 
 (instantiate-octets-definition define-ucs-2->string)
 
@@ -416,7 +416,7 @@
                          (string (dotimes (i (length thing))
                                    (vector-push-extend (char thing i) string)))))
                      (incf pos bytes)))
-          string))
+          (copy-seq string)))
       (defun ,name-be (array astart aend replacement)
         (declare (optimize speed #.*safety-0*)
                  (type ,type array)
@@ -438,7 +438,7 @@
                          (string (dotimes (i (length thing))
                                    (vector-push-extend (char thing i) string)))))
                      (incf pos bytes)))
-          string)))))
+          (copy-seq string))))))
 
 (instantiate-octets-definition define-ucs-4->string)
 
