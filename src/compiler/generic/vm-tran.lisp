@@ -542,49 +542,6 @@
           (if (zerop (lvar-value item)) '(- length count) 'count)
           '(if (zerop item) (- length count) count))))
 
-;;; This transform does not require that ITEM be derived as BIT,
-;;; but at runtime it has to be.
-(deftransform fill ((sequence item) (simple-bit-vector t) *
-                    :policy (>= speed space))
-  `(let ((value (logand (- (the bit item)) most-positive-word)))
-     ;; Unlike for the SIMPLE-BASE-STRING case, we are allowed to touch
-     ;; bits beyond LENGTH with impunity.
-     (dotimes (index (ceiling (vector-length sequence) sb-vm:n-word-bits))
-       (declare (optimize (speed 3) (safety 0))
-                (type index index))
-       (setf (%vector-raw-bits sequence index) value))
-     sequence))
-
-(deftransform fill ((sequence item) (simple-base-string t) *
-                                    :policy (>= speed space))
-  (let ((multiplier (logand #x0101010101010101 most-positive-word)))
-    `(let* ((value ,(if (and (constant-lvar-p item)
-                             (typep (lvar-value item) 'base-char))
-                        (* multiplier (char-code (lvar-value item)))
-                        ;; Use multiplication if it's known to be cheap
-                        #+(or x86 x86-64)
-                        `(* ,multiplier (char-code (the base-char item)))
-                        #-(or x86 x86-64)
-                        '(let ((code (char-code (the base-char item))))
-                          (setf code (dpb code (byte 8 8) code))
-                          (setf code (dpb code (byte 16 16) code))
-                          #+64-bit (dpb code (byte 32 32) code))))
-            (len (vector-length sequence))
-            (words (truncate len sb-vm:n-word-bytes)))
-       (dotimes (index words)
-         (declare (optimize (speed 3) (safety 0))
-                  (type index index))
-         (setf (%vector-raw-bits sequence index) value))
-       ;; For 64-bit:
-       ;;  if 1 more byte should be written, then shift-towards-start 56
-       ;;  if 2 more bytes ...               then shift-towards-start 48
-       ;;  etc
-       ;; This correctly rewrites the trailing null in its proper place.
-       (let ((bits (ash (mod len sb-vm:n-word-bytes) 3)))
-         (when (plusp bits)
-           (setf (%vector-raw-bits sequence words)
-                 (shift-towards-start value (- bits)))))
-       sequence)))
 
 ;;;; %BYTE-BLT
 
