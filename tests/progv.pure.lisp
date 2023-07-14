@@ -33,3 +33,8 @@
                    sb-vm::+symbol-fast-bindable+))
   ;; and still gets a type-error
   (assert-error (f-safe '(*mysym*) '("hi"))))
+
+(with-test (:name :full-call-to-set-symbol-value-does-not-imply-fast-bindable)
+  (let ((s (opaque-identity 'flerb)))
+    (set s 3)
+    (assert (not (logtest (sb-kernel:get-header-data s) sb-vm::+symbol-fast-bindable+)))))

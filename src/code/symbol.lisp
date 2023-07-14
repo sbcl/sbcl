@@ -643,9 +643,11 @@ distinct from the global value. Can also be SETF."
                    (when (eq (info :variable :always-bound symbol) :always-bound)
                      (values "Can't ~@?" nil)))))
         (cond ((not complaint)
-               (let ((package (symbol-package symbol)))
-                 (if (or (not package) (not (package-locked-p package)))
-                     (logior-header-bits symbol sb-vm::+symbol-fast-bindable+))))
+               ;; the optimize bit says whether PROGV can be optimized, and not other actions
+               (when (eq action 'progv)
+                 (let ((package (symbol-package symbol)))
+                   (if (or (not package) (not (package-locked-p package)))
+                       (logior-header-bits symbol sb-vm::+symbol-fast-bindable+)))))
               (continuable
                (cerror "Modify the constant." complaint (describe-action) symbol))
               (t

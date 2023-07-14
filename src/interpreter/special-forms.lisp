@@ -382,12 +382,12 @@
 
 (defspecial progv (symbols values &body forms)
   :immediate (env)
-  (progv (%eval symbols env) (%eval values env) (eval-progn forms env))
+  (checking-progv (%eval symbols env) (%eval values env) (eval-progn forms env))
   :deferred ()
   (let ((symbols (%sexpr symbols)) (values (%sexpr values))
         (forms (%progn forms)))
     (hlambda PROGV (symbols values forms) (env)
-      (progv (dispatch symbols env) (dispatch values env)
+      (checking-progv (dispatch symbols env) (dispatch values env)
         (dispatch forms env)))))
 
 (defspecial load-time-value (form &optional read-only-p)

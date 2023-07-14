@@ -72,6 +72,12 @@
              (gen-code :immediate immediate-code))
           ,(gen-code :deferred deferred-code))))))
 
+(defmacro checking-progv (vars vals &body body)
+  `(locally
+       (declare (optimize (sb-c::type-check 3)))
+       (progv ,vars ,vals
+         (locally (declare (optimize (sb-c::type-check 1))) ,@body))))
+
 ;;; Create parallel bindings for LET or a LAMBDA's required args.
 ;;; Use of this macro is highly confined, so no bothering with ONCE-ONLY.
 ;;; FRAME-INDEX is purposely exposed and SPECIAL-B is freely referenced.
@@ -93,7 +99,7 @@
            ;; which would destroy the list for the LET*-like bindings.
            (dotimes (frame-index ,count
                      (if ,special-vals
-                         (progv ,specials ,special-vals ,@finally)
+                         (checking-progv ,specials ,special-vals ,@finally)
                          (progn ,@finally)))
              (let ((value ,value))
                (if ,specialp
@@ -124,7 +130,7 @@
                 ;; note by "manually" eliding half the logic :-(
                 ,@(if specialp
                       `((if ,specialp
-                            (progv ,specials (list value)
+                            (checking-progv ,specials (list value)
                               (let*-bind (setf ,count-place (1+ frame-index))
                                          end))
                             (progn
