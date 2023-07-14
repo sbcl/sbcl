@@ -342,46 +342,37 @@
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type
                               &optional translate)
-  (let ((lip (if (or (memq 'any-reg scs)
-                     (memq 'descriptor-reg scs))
-                 'lip
-                 'value)))
-    `(define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg unsigned-reg signed-reg immediate)))
-       (:arg-types ,type tagged-num)
-       ,@(when (eq lip 'lip)
-           '((:temporary (:scs (non-descriptor-reg)
-                          :unused-if (sc-is index immediate)) lip)))
-       (:results (value :scs ,scs))
-       (:result-types ,el-type)
-       (:generator 5
-         (sc-case index
-           (immediate
-            (inst ldr value (@ object (load-store-offset
-                                       (- (ash (+ ,offset (tn-value index)) word-shift)
-                                          ,lowtag)))))
-           (t
-            (inst add ,lip object (lsl index (- word-shift (if (sc-is index any-reg)
+  `(define-vop (,name)
+     ,@(when translate
+         `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg unsigned-reg signed-reg immediate)))
+     (:arg-types ,type tagged-num)
+     (:results (value :scs ,scs))
+     (:result-types ,el-type)
+     (:generator 5
+       (sc-case index
+         (immediate
+          (inst ldr value (@ object (load-store-offset
+                                     (- (ash (+ ,offset (tn-value index)) word-shift)
+                                        ,lowtag)))))
+         (t
+          (inst add tmp-tn object (lsl index (- word-shift (if (sc-is index any-reg)
                                                                n-fixnum-tag-bits
                                                                0))))
-            (loadw value ,lip ,offset ,lowtag)))))))
+          (loadw value tmp-tn ,offset ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                               &optional translate)
   `(define-vop (,name)
      ,@(when translate
-             `((:translate ,translate)))
+         `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg unsigned-reg signed-reg immediate))
             (value :scs (,@scs zero)))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (non-descriptor-reg)
-                  :unused-if (sc-is index immediate)) lip)
      (:generator 2
        (sc-case index
          (immediate
@@ -389,59 +380,52 @@
                                      (- (ash (+ ,offset (tn-value index)) word-shift)
                                         ,lowtag)))))
          (t
-          (inst add lip object (lsl index (- word-shift (if (sc-is index any-reg)
-                                                            n-fixnum-tag-bits
-                                                            0))))
-          (storew value lip ,offset ,lowtag))))))
+          (inst add tmp-tn object (lsl index (- word-shift (if (sc-is index any-reg)
+                                                               n-fixnum-tag-bits
+                                                               0))))
+          (storew value tmp-tn ,offset ,lowtag))))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
                                  el-type &optional translate)
-  (let ((lip (if (or (memq 'any-reg scs)
-                     (memq 'descriptor-reg scs))
-                 'lip
-                 'value)))
-    `(define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg unsigned-reg signed-reg immediate)))
-       (:arg-types ,type tagged-num)
-       (:results (value :scs ,scs))
-       (:result-types ,el-type)
-       ,@(when (eq lip 'lip)
-           '((:temporary (:scs (non-descriptor-reg)
-                          :unused-if (sc-is index immediate)) lip)))
-       (:generator 5
-         ,@(multiple-value-bind (op shift)
-               (ecase size
-                 (:byte
-                  (values (if signed 'ldrsb 'ldrb) 0))
-                 (:short
-                  (values (if signed 'ldrsh 'ldrh) 1))
-                 (:word
-                  (values (if signed 'ldrsw 'ldr) 2))
-                 (:single-float
-                  (values 'ldr 2)))
-             (let ((value (if (and (eq size :word)
-                                   (not signed))
-                              '(32-bit-reg value)
-                              'value)))
-               `((sc-case index
-                   (immediate
-                    (inst ,op ,value (@ object (load-store-offset
-                                                (+
-                                                 (ash (tn-value index) ,shift)
-                                                 (- (* ,offset n-word-bytes) ,lowtag))))))
-                   (t
-                    (let ((shift ,shift))
-                      (when (sc-is index any-reg)
-                        (decf shift n-fixnum-tag-bits))
-                      (inst add ,lip object (if (minusp shift)
+  `(define-vop (,name)
+     ,@(when translate
+         `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg unsigned-reg signed-reg immediate)))
+     (:arg-types ,type tagged-num)
+     (:results (value :scs ,scs))
+     (:result-types ,el-type)
+     (:generator 5
+       ,@(multiple-value-bind (op shift)
+             (ecase size
+               (:byte
+                (values (if signed 'ldrsb 'ldrb) 0))
+               (:short
+                (values (if signed 'ldrsh 'ldrh) 1))
+               (:word
+                (values (if signed 'ldrsw 'ldr) 2))
+               (:single-float
+                (values 'ldr 2)))
+           (let ((value (if (and (eq size :word)
+                                 (not signed))
+                            '(32-bit-reg value)
+                            'value)))
+             `((sc-case index
+                 (immediate
+                  (inst ,op ,value (@ object (load-store-offset
+                                              (+
+                                               (ash (tn-value index) ,shift)
+                                               (- (* ,offset n-word-bytes) ,lowtag))))))
+                 (t
+                  (let ((shift ,shift))
+                    (when (sc-is index any-reg)
+                      (decf shift n-fixnum-tag-bits))
+                    (inst add tmp-tn object (if (minusp shift)
                                                 (asr index (- shift))
                                                 (lsl index shift)))
-                      (inst ,op
-                            ,value (@ ,lip (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
+                    (inst ,op
+                          ,value (@ tmp-tn (- (* ,offset n-word-bytes) ,lowtag))))))))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
@@ -465,8 +449,6 @@
                   tagged-num
                   ,@(unless setf-p
                       `(,el-type)))
-      (:temporary (:scs (non-descriptor-reg)
-                   :unused-if (sc-is index immediate)) lip)
       (:generator 5
         (when (sc-is value immediate)
           (setf value zr-tn))
@@ -491,11 +473,11 @@
                    (let ((shift ,shift))
                      (when (sc-is index any-reg)
                        (decf shift n-fixnum-tag-bits))
-                     (inst add lip object (if (minusp shift)
-                                              (asr index (- shift))
-                                              (lsl index shift)))
+                     (inst add tmp-tn object (if (minusp shift)
+                                                 (asr index (- shift))
+                                                 (lsl index shift)))
                      (inst ,op
-                           ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
+                           ,value (@ tmp-tn (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
 
 (defun load-inline-constant (dst &rest constant-descriptor)
   (inst load-from-label dst (cdr (apply #'register-inline-constant constant-descriptor))))
