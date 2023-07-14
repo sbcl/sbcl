@@ -1294,7 +1294,7 @@ struct hash_table *weak_hash_tables = NULL;
 struct hopscotch_table weak_objects; // other than weak pointers
 
 /* Return true if OBJ has already survived the current GC. */
-static inline int pointer_survived_gc_yet(lispobj obj)
+static inline bool pointer_survived_gc_yet(lispobj obj)
 {
 #ifdef LISP_FEATURE_CHENEYGC
     // This is the most straightforward definition.
@@ -1389,7 +1389,7 @@ static inline void add_kv_triggers(lispobj* pair, int weakness)
 
 /* Call 'predicate' on each triggering object, and if it returns 1, then call
  * 'mark' on each livened object, or use scav1() if 'mark' is null */
-bool test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
+bool test_weak_triggers(bool (*predicate)(lispobj), void (*mark)(lispobj))
 {
     extern void gc_private_free(struct cons*);
     int old_count = weak_objects.count;
@@ -2650,8 +2650,8 @@ static inline int dummy_node_p(so_node* node) {
     return (node->hash & make_fixnum(1)) == 0;
 }
 
-static inline int lispobj_livep(lispobj obj_base) {
-    extern int fullcgc_lispobj_livep(lispobj);
+static inline bool lispobj_livep(lispobj obj_base) {
+    extern bool fullcgc_lispobj_livep(lispobj);
     lispobj obj = compute_lispobj((lispobj*)obj_base);
     return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
 }

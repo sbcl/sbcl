@@ -143,14 +143,14 @@ static inline sword_t ptr_to_bit_index(lispobj pointer) {
 #define interesting_pointer_p(x) ptr_to_bit_index(x)>=0
 
 /* Return true if OBJ has already survived the current GC. */
-static inline int pointer_survived_gc_yet(lispobj pointer)
+static inline bool pointer_survived_gc_yet(lispobj pointer)
 {
     sword_t mark_index = ptr_to_bit_index(canonical_ptr(pointer));
     if (mark_index < 0) return 1; // "uninteresting" objects always survive GC
     return (fullcgcmarks[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
 }
 
-int fullcgc_lispobj_livep(lispobj pointer) {
+bool fullcgc_lispobj_livep(lispobj pointer) {
     return pointer_survived_gc_yet(pointer);
 }
 
