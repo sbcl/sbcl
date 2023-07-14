@@ -587,6 +587,13 @@ distinct from the global value. Can also be SETF."
             (intern (%symbol-nameify prefix (incf *gentemp-counter*)) package)
           (unless accessibility (return sym))))))
 
+(macrolet ((signal-type-error (action-description)
+             `(let ((spec (type-specifier type)))
+                (error 'simple-type-error
+                       :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
+                       :format-arguments (list ,action-description symbol new-value spec)
+                       :datum new-value
+                       :expected-type spec))))
 ;;; This function is to be called just before a change which would affect the
 ;;; symbol value. We don't absolutely have to call this function before such
 ;;; changes, since such changes to constants are given as undefined behavior,
@@ -599,6 +606,10 @@ distinct from the global value. Can also be SETF."
 ;;;   foo => 13, (constantp 'foo) => t
 ;;;
 ;;; ...in which case you frankly deserve to lose.
+;;;
+;;; If this function returns normally and was called from PROGV in unsafe code,
+;;; then we'll remember that it's OK not to call it again.
+;;; However, in safe code, PROGV still performs its type checking.
 (defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep) bind)
   (declare (symbol symbol))
   (declare (explicit-check))
@@ -610,7 +621,7 @@ distinct from the global value. Can also be SETF."
              (defconstant "define ~S as a constant")
              (makunbound "make ~S unbound"))))
     (let ((kind (info :variable :kind symbol)))
-      (multiple-value-bind (what continue)
+      (multiple-value-bind (complaint continuable)
           (cond ((eq kind :constant)
                  (cond ((eq symbol t)
                         (values "Veritas aeterna. (can't ~@?)" nil))
@@ -631,21 +642,44 @@ distinct from the global value. Can also be SETF."
                  (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
                    (when (eq (info :variable :always-bound symbol) :always-bound)
                      (values "Can't ~@?" nil)))))
-        (when what
-          (if continue
-              (cerror "Modify the constant." what (describe-action) symbol)
-              (error what (describe-action) symbol)))
-        (when valuep
-          (multiple-value-bind (type declaredp) (info :variable :type symbol)
-            ;; If globaldb returned the default of *UNIVERSAL-TYPE*,
-            ;; don't bother with a type test.
-            (when (and declaredp (not (%%typep new-value type 'functionp)))
-              (let ((spec (type-specifier type)))
-                (error 'simple-type-error
-                       :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
-                       :format-arguments (list (describe-action) symbol new-value spec)
-                       :datum new-value
-                       :expected-type spec)))))))
+        (cond ((not complaint)
+               (let ((package (symbol-package symbol)))
+                 (if (or (not package) (not (package-locked-p package)))
+                     (logior-header-bits symbol sb-vm::+symbol-fast-bindable+))))
+              (continuable
+               (cerror "Modify the constant." complaint (describe-action) symbol))
+              (t
+               (error complaint (describe-action) symbol)))))
+    (when (and valuep (neq action 'progv))
+      (multiple-value-bind (type declaredp) (info :variable :type symbol)
+        ;; If globaldb returned the default of *UNIVERSAL-TYPE*,
+        ;; don't bother with a type test.
+        (when (and declaredp (not (%%typep new-value type 'functionp)))
+          (signal-type-error (describe-action)))))
     nil))
+
+;;; Despite the naming symmetry, these functions are not exactly symmetrical in
+;;; how they are used by the translation of PROGV
+;;; In safe code, the fast-bindable bit is checked inside the assertion,
+;;; because in all cases, we potentially perform a type-check which is too much
+;;; to inline into PROGV.
+;;; In unsafe code, if the symbol's fast-bindable bit is on, then we do NOT call
+;;; the assertion function. When called, its role is to assert that the symbol is
+;;; bindable and then set the bit saying never to call it again unless
+;;; the bit gets unset.
+(defun assert-dynbindable-safe (symbol new-value)
+  (declare (symbol symbol))
+  (unless (test-header-data-bit symbol sb-vm::+symbol-fast-bindable+)
+    (about-to-modify-symbol-value symbol 'progv nil t))
+  ;; Perform the type check here, not in ABOUT-TO-MODIFY-SYMBOL-VALUE, so that that
+  ;; function does not have to be informed when NOT to peform a check (i.e. in usafe code).
+  ;; Specifically, it can always bypass a type-check when the action is progv.
+  (multiple-value-bind (type declaredp) (info :variable :type symbol)
+    (when (and declaredp (not (%%typep new-value type 'functionp)))
+      (signal-type-error "bind ~S"))))
+(defun assert-dynbindable-unsafe (symbol)
+  (declare (symbol symbol))
+  (about-to-modify-symbol-value symbol 'progv nil t))
+) ; end MACROLET
 
 #+sb-thread (defun symbol-tls-index (x) (symbol-tls-index x)) ; necessary stub

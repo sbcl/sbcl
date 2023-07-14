@@ -598,7 +598,15 @@ if PACKAGE doesn't designate a valid package."
 (defun lock-package (package)
   "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
 locked. Signals an error if PACKAGE is not a valid package designator"
-  (setf (package-lock (find-undeleted-package-or-lose package)) t))
+  (flet ((unoptimize (table)
+           (dovector (x (symtbl-cells table))
+             (when (and (symbolp x) (test-header-data-bit x sb-vm::+symbol-fast-bindable+))
+               (sb-c::unset-symbol-progv-optimize x)))))
+    (let ((p (find-undeleted-package-or-lose package)))
+      (setf (package-lock p) t)
+      (unoptimize (package-internal-symbols p))
+      (unoptimize (package-external-symbols p))))
+  t)
 
 (defun unlock-package (package)
   "Unlocks PACKAGE and returns T. Has no effect if PACKAGE was already

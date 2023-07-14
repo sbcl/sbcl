@@ -320,7 +320,12 @@
       (:symbol name "globally declaring ~A ~A" kind)
     (if (eq kind 'always-bound)
         (setf (info :variable :always-bound name) info-value)
-        (setf (info :variable :kind name) info-value))))
+        (setf (info :variable :kind name) info-value)))
+  #-sb-xc-host (unset-symbol-progv-optimize name))
+
+#-sb-xc-host
+(defun unset-symbol-progv-optimize (symbol)
+  (reset-header-bits symbol sb-vm::+symbol-fast-bindable+))
 
 (defun type-proclamation-mismatch-warn (name old new &optional description)
   (warn 'type-proclamation-mismatch-warning

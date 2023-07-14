@@ -1921,17 +1921,21 @@ not stack-allocated LVAR ~S." source-lvar)))))
 ;;; shallow-binding assumptions into IR1tran.
 (def-ir1-translator progv
     ((vars vals &body body) start next result)
-  (ir1-convert
-   start next result
-   (with-unique-names (bind unbind)
-     (once-only ((n-save-bs '(%primitive current-binding-pointer)))
-       `(unwind-protect
+  ;; If we trust and do not verify type assertions, then we only need to check
+  ;; that each symbols is bindable, and not whether the value is OK.
+  (let ((type-check (policy (lexenv-policy *lexenv*) (> type-check 1))))
+    (ir1-convert
+     start next result
+     (with-unique-names (bind unbind)
+       (once-only ((n-save-bs '(%primitive current-binding-pointer)))
+        `(unwind-protect
              (labels ((,unbind (vars)
                         (declare (optimize (speed 2) (debug 0)))
                         (let ((unbound-marker (%primitive make-unbound-marker)))
                           (dolist (var vars)
                             ;; CLHS says "bound and then made to have no value" -- user
                             ;; should not be able to tell the difference between that and this.
+                            ;; MAKUNBOUND makes no use of the memoized fast-bindable bit.
                             (about-to-modify-symbol-value var 'makunbound)
                             (%primitive dynbind unbound-marker var))))
                       (,bind (vars vals)
@@ -1943,7 +1947,11 @@ not stack-allocated LVAR ~S." source-lvar)))))
                               (t
                                (let ((val (car vals))
                                      (var (car vars)))
-                                 (about-to-modify-symbol-value var 'progv val t)
+                                 ,(if type-check
+                                      `(sb-impl::assert-dynbindable-safe var val)
+                                      `(unless (test-header-data-bit
+                                                var sb-vm::+symbol-fast-bindable+)
+                                         (sb-impl::assert-dynbindable-unsafe var)))
                                  (%primitive dynbind val var))
                                (,bind (cdr vars) (cdr vals))))))
                (,bind ,vars ,vals)
@@ -1958,7 +1966,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
           ;; (ensure that debug instrumentation is not emitted for the
           ;; cleanup function). -- JES, 2007-06-16
           (declare (optimize (insert-debug-catch 0)))
-          (%primitive unbind-to-here ,n-save-bs))))))
+          (%primitive unbind-to-here ,n-save-bs)))))))
 
 ;;;; non-local exit
 

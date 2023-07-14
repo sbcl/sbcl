@@ -441,11 +441,12 @@
 ;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
 (defconstant vector-weak-flag          #x01)
 
-;;; This header bit is set for symbols which were present in the pristine core.
-;;; The backend may emit different code when referencing such symbols.
-;;; For x86-64, symbols with this bit set may be assumed to have been
-;;; allocated in immobile space.
-(defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
+;;; A symbol that is "unlocked" is neither constant, nor global,
+;;; nor a global symbol-macro, nor in a locked package. Such symbols can be
+;;; bound by PROGV without calling ABOUT-TO-MODIFY-SYMBOL-VALUE, except in the
+;;; case where PROGV invokes UNBIND.
+;;; This is a mask tested against GET-HEADER-DATA, so skip over the payload size byte.
+(defconstant +symbol-fast-bindable+ #x100)
 
 ;;; Bit indices of the status bits in an INSTANCE header
 ;;; that implement lazily computed stable hash codes.
