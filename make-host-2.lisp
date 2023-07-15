@@ -48,8 +48,7 @@
             (:type (setf types t))
             (:function (setf functions t)))))))
   ;; Exit the compilation unit so that the summary is printed. Then complain.
-  ;; win32 is not clean
-  (when (and fail (not (target-featurep :win32)))
+  (when fail
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-ALLOWLIST*?)~]"

@@ -347,16 +347,8 @@ triggers."
 ;;; the runtime.
 
 #+win32
-(define-alien-type wtimer system-area-pointer) ;HANDLE, but that's not defined yet
-
-#+win32
 (progn
-  (define-alien-routine "os_create_wtimer" wtimer)
-  (define-alien-routine "os_wait_for_wtimer" int (wt wtimer))
-  (define-alien-routine "os_close_wtimer" void (wt wtimer))
-  (define-alien-routine "os_cancel_wtimer" void (wt wtimer))
-  (define-alien-routine "os_set_wtimer" void (wt wtimer) (sec int) (nsec int))
-
+  ;; Shouldn't all this junk be in the win32.lisp file???
   ;; scheduler lock already protects us
 
   (defvar *waitable-timer-handle* nil)
@@ -367,14 +359,14 @@ triggers."
     (aver (under-scheduler-lock-p))
     (or *waitable-timer-handle*
         (prog1
-            (setf *waitable-timer-handle* (os-create-wtimer))
+            (setf *waitable-timer-handle* (sb-win32::os-create-wtimer))
           (setf *timer-thread*
                 (sb-thread::make-system-thread
                  "System timer watchdog thread"
                  (lambda ()
                    (loop while
                          (or (zerop
-                              (os-wait-for-wtimer *waitable-timer-handle*))
+                              (sb-win32::os-wait-for-wtimer *waitable-timer-handle*))
                              *waitable-timer-handle*)
                          doing (run-expired-timers)))
                  nil nil)))))
@@ -385,14 +377,14 @@ triggers."
         (sb-thread:terminate-thread *timer-thread*)
         (sb-thread:join-thread *timer-thread* :default nil))
       (when *waitable-timer-handle*
-        (os-close-wtimer *waitable-timer-handle*)
+        (sb-win32::os-close-wtimer *waitable-timer-handle*)
         (setf *waitable-timer-handle* nil))))
 
   (defun %clear-system-timer ()
-    (os-cancel-wtimer (get-waitable-timer)))
+    (sb-win32::os-cancel-wtimer (get-waitable-timer)))
 
   (defun %set-system-timer (sec nsec)
-    (os-set-wtimer (get-waitable-timer) sec nsec)))
+    (sb-win32::os-set-wtimer (get-waitable-timer) sec nsec)))
 
 ;;; Expiring timers
 

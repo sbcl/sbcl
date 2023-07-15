@@ -63,6 +63,8 @@
 (defconstant file-type-unknown 0)
 
 (defconstant invalid-file-attributes (mod -1 (ash 1 32)))
+(defun sb-impl::file-exists-p (path)
+  (/= (get-file-attributes path) invalid-file-attributes))
 
 ;;;; File Type Introspection by handle
 (define-alien-routine ("GetFileType" get-file-type) dword
@@ -173,20 +175,23 @@
 
 ;;;; System Functions
 
-#-sb-thread
-(define-alien-routine ("Sleep" millisleep) void
-  (milliseconds dword))
+(define-alien-type wtimer system-area-pointer) ;HANDLE, but that's not defined yet
 
-#+sb-thread
+(define-alien-routine "os_create_wtimer" wtimer)
+(define-alien-routine "os_wait_for_wtimer" int (wt wtimer))
+(define-alien-routine "os_close_wtimer" void (wt wtimer))
+(define-alien-routine "os_cancel_wtimer" void (wt wtimer))
+(define-alien-routine "os_set_wtimer" void (wt wtimer) (sec int) (nsec int))
+
 (defun sb-unix:nanosleep (sec nsec)
   (let ((*allow-with-interrupts* *interrupts-enabled*))
     (without-interrupts
-      (let ((timer (sb-impl::os-create-wtimer)))
-        (sb-impl::os-set-wtimer timer sec nsec)
+      (let ((timer (os-create-wtimer)))
+        (os-set-wtimer timer sec nsec)
         (unwind-protect
              (do () ((with-local-interrupts
-                       (zerop (sb-impl::os-wait-for-wtimer timer)))))
-          (sb-impl::os-close-wtimer timer))))))
+                       (zerop (os-wait-for-wtimer timer)))))
+          (os-close-wtimer timer))))))
 
 (define-alien-routine ("win32_wait_object_or_signal" wait-object-or-signal)
     dword

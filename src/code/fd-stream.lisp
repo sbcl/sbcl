@@ -2324,9 +2324,7 @@
          namestring err
          "~@<couldn't rename ~2I~_~S ~I~_to ~2I~_~S~:>" namestring original))))
 
-(defun file-exist-p (path)
-  #-win32 (sb-unix:unix-access path sb-unix:f_ok)
-  #+win32 (/= (sb-win32:get-file-attributes path) sb-win32::invalid-file-attributes))
+#+unix (defun file-exists-p (path) (sb-unix:unix-access path sb-unix:f_ok))
 
 (defun %open-error (pathname errno if-exists if-does-not-exist)
   (flet ((signal-it (&rest arguments)
@@ -2414,7 +2412,7 @@
              (physical (native-namestring (physicalize-pathname pathname) :as-file t))
              ;; One call to access() is reasonable. 40 calls to lstat() is not.
              ;; So DO NOT CALL TRUENAME HERE.
-             (existsp (file-exist-p physical))
+             (existsp (file-exists-p physical))
              ;; Leave NAMESTRING as NIL if nonexistent and not creating a file.
              (namestring (when (or existsp
                                    (or (not input)
