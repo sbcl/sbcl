@@ -635,6 +635,7 @@ case "$sbcl_os" in
             if (( 8 < $darwin_version_major )); then
 	        printf ' :inode64' >> $ltf
             fi
+            printf ' :gcc-tls' >> $ltf
         fi
         if [ $sbcl_arch = "arm64" ]; then
             printf ' :darwin-jit :gcc-tls' >> $ltf

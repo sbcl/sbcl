@@ -15,8 +15,8 @@ ifdef SBCL_MACOSX_VERSION_MIN
   CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
   LINKFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
 else
-  CFLAGS += -mmacosx-version-min=10.6
-  LINKFLAGS += -mmacosx-version-min=10.6
+  CFLAGS += -mmacosx-version-min=10.7
+  LINKFLAGS += -mmacosx-version-min=10.7
 endif
 ifdef LISP_FEATURE_INODE64
 CFLAGS += -D_DARWIN_USE_64_BIT_INODE
