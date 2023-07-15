@@ -122,25 +122,25 @@ set_thread_state(struct thread *thread,
     // If we've already masked the blockable signals we can avoid two syscalls here.
     if (!signals_already_blocked)
         block_blockable_signals(&old);
-    os_sem_wait(&semaphores->state_sem, "set_thread_state");
+    os_sem_wait(&semaphores->state_sem);
     if (thread->state_word.state != state) {
         if ((STATE_STOPPED==state) ||
             (STATE_DEAD==state)) {
             waitcount = semaphores->state_not_running_waitcount;
             semaphores->state_not_running_waitcount = 0;
             for (i=0; i<waitcount; i++)
-                os_sem_post(&semaphores->state_not_running_sem, "set_thread_state (not running)");
+                os_sem_post(&semaphores->state_not_running_sem);
         }
         if ((STATE_RUNNING==state) ||
             (STATE_DEAD==state)) {
             waitcount = semaphores->state_not_stopped_waitcount;
             semaphores->state_not_stopped_waitcount = 0;
             for (i=0; i<waitcount; i++)
-                os_sem_post(&semaphores->state_not_stopped_sem, "set_thread_state (not stopped)");
+                os_sem_post(&semaphores->state_not_stopped_sem);
         }
         thread->state_word.state = state;
     }
-    os_sem_post(&semaphores->state_sem, "set_thread_state");
+    os_sem_post(&semaphores->state_sem);
     if (!signals_already_blocked)
         thread_sigmask(SIG_SETMASK, &old, NULL);
 }
@@ -155,7 +155,7 @@ int thread_wait_until_not(int undesired_state,
     os_sem_t *wait_sem;
     block_blockable_signals(&old);
   start:
-    os_sem_wait(&semaphores->state_sem, "wait_for_thread_state_change");
+    os_sem_wait(&semaphores->state_sem);
     /* "The following functions synchronize memory with respect to other threads:
      *  ... pthread_mutex_lock() ... "
      * https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_11
@@ -178,9 +178,9 @@ int thread_wait_until_not(int undesired_state,
     } else {
         wait_sem = NULL;
     }
-    os_sem_post(&semaphores->state_sem, "wait_for_thread_state_change");
+    os_sem_post(&semaphores->state_sem);
     if (wait_sem) {
-        os_sem_wait(wait_sem, "wait_for_thread_state_change");
+        os_sem_wait(wait_sem);
         goto start;
     }
     thread_sigmask(SIG_SETMASK, &old, NULL);
@@ -1173,7 +1173,7 @@ void gc_stop_the_world()
         if (th != me) {
             gc_assert(th->os_thread != 0);
             struct extra_thread_data *semaphores = thread_extra_data(th);
-            os_sem_wait(&semaphores->state_sem, "notify stop");
+            os_sem_wait(&semaphores->state_sem);
             int state = get_thread_state(th);
             if (state == STATE_RUNNING) {
                 rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
@@ -1184,7 +1184,7 @@ void gc_stop_the_world()
                      // See comment in 'interr.h' about that.
                      (void*)th->os_thread, rc, strerror(rc));
             }
-            os_sem_post(&semaphores->state_sem, "notified stop");
+            os_sem_post(&semaphores->state_sem);
         }
     }
     for_each_thread(th) {

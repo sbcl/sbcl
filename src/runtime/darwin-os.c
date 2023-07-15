@@ -87,13 +87,13 @@ os_sem_init(os_sem_t *sem, unsigned int value)
 }
 
 inline void
-os_sem_wait(os_sem_t *sem, char *what)
+os_sem_wait(os_sem_t *sem)
 {
     dispatch_semaphore_wait(*sem, DISPATCH_TIME_FOREVER);
 }
 
 void
-os_sem_post(os_sem_t *sem, char *what)
+os_sem_post(os_sem_t *sem)
 {
     dispatch_semaphore_signal(*sem);
 }

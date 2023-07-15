@@ -227,8 +227,8 @@ extern char *os_get_runtime_executable_path();
      typedef sem_t os_sem_t;
 #  endif
    void os_sem_init(os_sem_t *sem, unsigned int value);
-   void os_sem_wait(os_sem_t *sem, char *what);
-   void os_sem_post(os_sem_t *sem, char *what);
+   void os_sem_wait(os_sem_t *sem);
+   void os_sem_post(os_sem_t *sem);
    void os_sem_destroy(os_sem_t *sem);
 #endif
 

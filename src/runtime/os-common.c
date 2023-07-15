@@ -123,25 +123,21 @@ os_sem_init(os_sem_t *sem, unsigned int value)
 {
     if (-1==sem_init(sem, 0, value))
         lose("os_sem_init(%p, %u): %s", sem, value, strerror(errno));
-    FSHOW((stderr, "os_sem_init(%p, %u)\n", sem, value));
 }
 
 void
-os_sem_wait(os_sem_t *sem, char *what)
+os_sem_wait(os_sem_t *sem)
 {
-    FSHOW((stderr, "%s: os_sem_wait(%p) ...\n", what, sem));
     while (-1 == sem_wait(sem))
         if (EINTR!=errno)
-            lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
-    FSHOW((stderr, "%s: os_sem_wait(%p) => ok\n", what, sem));
+            lose("os_sem_wait(%p): %s", sem, strerror(errno));
 }
 
 void
-os_sem_post(sem_t *sem, char *what)
+os_sem_post(sem_t *sem)
 {
     if (-1 == sem_post(sem))
-        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
-    FSHOW((stderr, "%s: os_sem_post(%p)\n", what, sem));
+        lose("os_sem_post(%p): %s", sem, strerror(errno));
 }
 
 void

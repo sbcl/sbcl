@@ -393,7 +393,7 @@ static struct sprof_data* enlarge_buffer(struct sprof_data* current,
   if (oldval == LOCK_CONTESTED) { \
         oldval = __sync_val_compare_and_swap(&SPROF_LOCK(th), LOCK_CONTESTED, LOCKED_BY_OTHER); \
         gc_assert(oldval == LOCK_CONTESTED); \
-        os_sem_post(&thread_extra_data(th)->sprof_sem, "sprof"); \
+        os_sem_post(&thread_extra_data(th)->sprof_sem); \
     }
 #else
 #define RELEASE_LOCK(th) SPROF_LOCK(th) = 0
@@ -550,7 +550,7 @@ uword_t acquire_sprof_data(struct thread* thread)
         // if it observes that both lock bits were on.
         // This should be called with the thread's interruption mutex held so that the thread
         // whose data are being acquired can't exit and delete its sprof_sem.
-        os_sem_wait(&thread_extra_data(thread)->sprof_sem, "sprof");
+        os_sem_wait(&thread_extra_data(thread)->sprof_sem);
         gc_assert(SPROF_LOCK(thread) == LOCKED_BY_OTHER);
     }
 #else
