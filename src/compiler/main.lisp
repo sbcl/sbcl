@@ -25,9 +25,6 @@
 
 (defvar *check-consistency* nil)
 
-;;; Set to NIL to disable loop analysis for register allocation.
-(defvar *loop-analyze* t)
-
 (defvar *compile-verbose* t
   "The default for the :VERBOSE argument to COMPILE-FILE.")
 (defvar *compile-print* nil
@@ -721,15 +718,14 @@ necessary, since type inference may take arbitrarily long to converge.")
     ;; really thought things through.  -- AJB, 2014-Jun-08
     (eliminate-dead-code component)
 
-    (when *loop-analyze*
-      (dfo-as-needed component)
-      (maybe-mumble "Dom ")
-      (find-dominators component)
-      (maybe-mumble "Loop ")
-      (loop-analyze component))
+    (dfo-as-needed component)
+    (maybe-mumble "Dom ")
+    (find-dominators component)
+    (maybe-mumble "Loop ")
+    (loop-analyze component)
 
     #|
-    (when (and *loop-analyze* *compiler-trace-output*)
+    (when *compiler-trace-output*
       (labels ((print-blocks (block)
                  (format *compiler-trace-output* "    ~A~%" block)
                  (when (block-loop-next block)

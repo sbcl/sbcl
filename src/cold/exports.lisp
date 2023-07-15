@@ -1491,7 +1491,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
         "SB-KERNEL" "SB-SYS"
         "SB-C")
   (:import-from "SB-C"
-                "*LOOP-ANALYZE*"
                 "BLOCK-INFO" "BLOCK-LAST" "BLOCK-LOOP" "BLOCK-NEXT"
                 "CLEAR-BIT-VECTOR" "COMPONENT-HEAD" "COMPONENT-TAIL"
                 "DEFEVENT" "DELETE-VOP" "DO-IR2-BLOCKS" "DO-LIVE-TNS"

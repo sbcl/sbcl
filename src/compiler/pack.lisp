@@ -1779,7 +1779,7 @@
       (pack-tns (component))
       (pack-tns (normal))))
 
-  (cond ((and *loop-analyze* *pack-assign-costs*)
+  (cond (*pack-assign-costs*
          ;; Allocate normal TNs, starting with the TNs that are
          ;; heavily used in deep loops (which is taken into account in
          ;; TN spill costs).  Only allocate in finite SCs (i.e. not on
