@@ -53,7 +53,7 @@ default_lossage_handler(void)
 }
 static void (*lossage_handler)(void) = default_lossage_handler;
 
-#if QSHOW
+#ifdef LISP_FEATURE_WIN32
 static void
 configurable_lossage_handler()
 {
@@ -72,11 +72,7 @@ configurable_lossage_handler()
 "infinite sleep call, maximizing your chances that the thread's current\n"
 "state can be preserved until you attach an external debugger. Good luck!\n");
         for (;;)
-#         ifdef LISP_FEATURE_WIN32
             Sleep(10000);
-#         else
-            sleep(10);
-#         endif
     }
 
     ldb_monitor();
@@ -85,7 +81,7 @@ configurable_lossage_handler()
 
 void enable_lossage_handler(void)
 {
-#if QSHOW
+#ifdef LISP_FEATURE_WIN32
     lossage_handler = configurable_lossage_handler;
 #else
     lossage_handler = ldb_monitor;

@@ -1733,8 +1733,6 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
 #endif
-    FSHOW((stderr, "/arranged return to Lisp function (0x%lx)\n",
-           (long)function));
 }
 
 void
@@ -2222,7 +2220,6 @@ handle_trap(os_context_t *context, int trap)
     switch(trap) {
 #ifndef LISP_FEATURE_WIN32
     case trap_PendingInterrupt:
-        FSHOW((stderr, "/<trap pending interrupt>\n"));
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
         break;
@@ -2238,7 +2235,6 @@ handle_trap(os_context_t *context, int trap)
 #else
 # define CONTINUABLE_P (trap==trap_Cerror)
 #endif
-        FSHOW((stderr, "/<trap error/cerror %d>\n", trap));
         interrupt_internal_error(context, CONTINUABLE_P);
         break;
     case trap_Breakpoint:

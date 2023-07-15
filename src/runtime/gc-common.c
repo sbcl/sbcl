@@ -2182,7 +2182,6 @@ bool maybe_gc(os_context_t *context)
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
     unblock_gc_stop_signal();
 #endif
-    FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
     /* FIXME: Nothing must go wrong during GC else we end up running
      * the debugger, error handlers, and user code in general in a
      * potentially unsafe place. Running out of the control stack or
@@ -2190,8 +2189,6 @@ bool maybe_gc(os_context_t *context)
      * cannot be unblocked because there may be a pending handler, or
      * we may even be in a WITHOUT-INTERRUPTS. */
     gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
-    FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
-           gc_happened == NIL ? "NIL" : gc_happened == LISP_T ? "T" : "0"));
     /* gc_happened can take three values: T, NIL, 0.
      *
      * T means that the thread managed to trigger a GC, and post-gc
@@ -2223,11 +2220,9 @@ bool maybe_gc(os_context_t *context)
             check_gc_signals_unblocked_or_lose(0);
 #endif
 #endif
-            FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
             funcall0(StaticSymbolFunction(POST_GC));
 #ifndef LISP_FEATURE_WIN32
         } else {
-            FSHOW((stderr, "/maybe_gc: punting on POST_GC due to blockage\n"));
         }
 #endif
     }
@@ -2241,7 +2236,6 @@ bool maybe_gc(os_context_t *context)
         block_blockable_signals(0);
     }
 
-    FSHOW((stderr, "/maybe_gc: returning\n"));
     return (gc_happened != NIL);
 }
 

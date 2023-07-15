@@ -656,11 +656,6 @@ case "$sbcl_os" in
     win32)
         printf ' :win32' >> $ltf
         #
-        # Optional features -- We enable them by default, but the build
-        # ought to work perfectly without them:
-        #
-        printf ' :sb-qshow' >> $ltf
-        #
         # Required features -- Some of these used to be optional, but
         # building without them is no longer considered supported:
         #

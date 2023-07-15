@@ -236,8 +236,6 @@ void arch_skip_instruction(os_context_t *context)
             break;
         }
 
-    FSHOW((stderr,
-           "/[arch_skip_inst resuming at %x]\n", OS_CONTEXT_PC(context)));
 }
 
 unsigned char *

@@ -88,17 +88,6 @@ void gc_state_unlock();
 #endif
 
 /*
- * The next few defines serve as configuration -- edit them inline if
- * you are a developer and want to affect FSHOW behaviour.
- */
-
-#ifdef LISP_FEATURE_SB_QSHOW
-# define QSHOW 1
-#else
-# define QSHOW 0
-#endif
-
-/*
  * Configuration options end here -- the following defines do not
  * generally need customization.
  */
@@ -106,7 +95,6 @@ void gc_state_unlock();
 /* Flags defined in a structure to avoid code duplication between
  * declaration and definition. */
 extern struct dyndebug_config {
-    int dyndebug_fshow;
     int dyndebug_gencgc_verbose;
     int dyndebug_safepoints;
     int dyndebug_seh;
@@ -124,15 +112,6 @@ extern int gencgc_verbose;
 #endif
 
 void dyndebug_init(void);
-
-#if 0
-/* To see output from FSHOW - which is almost certainly a bad idea because it's
- * quite likely to hinder your progress by causing deadlock in stdio - then change
- * the preceding line to "#if 1" */
-# define FSHOW(args) fprintf args
-#else
-# define FSHOW(args)
-#endif
 
 #ifdef _WIN64
 #define AMD64_SYSV_ABI __attribute__((sysv_abi))

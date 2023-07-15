@@ -776,8 +776,6 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     core_string = core;
     posix_argv = options.argv;
 
-    FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
-          (unsigned long)initial_function));
     create_main_lisp_thread(initial_function);
     return 0;
 }

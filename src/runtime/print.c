@@ -33,9 +33,7 @@
 #include <inttypes.h>
 #include <setjmp.h>
 
-struct dyndebug_config dyndebug_config = {
-    QSHOW == 2,
-};
+struct dyndebug_config dyndebug_config;
 
 void
 dyndebug_init()
@@ -54,7 +52,6 @@ dyndebug_init()
     char *names[DYNDEBUG_NFLAGS];
     int *ptrs[DYNDEBUG_NFLAGS];
 
-    dyndebug_init1(fshow,          "FSHOW");
     dyndebug_init1(gencgc_verbose, "GENCGC_VERBOSE");
     dyndebug_init1(safepoints,     "SAFEPOINTS");
     dyndebug_init1(seh,            "SEH");

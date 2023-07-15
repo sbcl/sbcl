@@ -42,7 +42,6 @@ funcall0(lispobj function)
 {
     lispobj *args = NULL;
 
-    FSHOW((stderr, "/entering funcall0(0x%lx)\n", (long)function));
     return call_into_lisp(function, args, 0);
 }
 lispobj

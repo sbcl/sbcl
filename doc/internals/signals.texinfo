@@ -170,16 +170,3 @@ For the reasons above, calling user code, i.e. functions passed in, or
 in other words code that one cannot reason about, from non-reentrant
 code (holding locks), @code{WITHOUT-INTERRUPTS}, @code{WITHOUT-GCING}
 is dangerous and best avoided.
-
-@section Debugging
-
-It is not easy to debug signal problems. The best bet probably is to
-enable @code{QSHOW} in runtime.h and once
-SBCL runs into problems attach gdb. A simple @code{thread apply all
-ba} is already tremendously useful. Another possibility is to send a
-SIGABRT to SBCL to provoke landing in LDB, if it's compiled with it
-and it has not yet done so on its own.
-
-Note, that fprintf used by QSHOW is not reentrant and at least on x86
-linux it is known to cause deadlocks, so place SHOW and co carefully,
-ideally to places where blockable signals are blocked.
