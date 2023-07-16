@@ -3879,6 +3879,7 @@ __attribute__((unused)) static void check_contiguity()
       }
 }
 
+static void finish_code_metadata();
 int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
@@ -4234,6 +4235,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
     scavenge_newspace(new_space);
+    if (save_lisp_gc_iteration == 2) finish_code_metadata();
 
     scan_binding_stack();
     smash_weak_pointers();
@@ -5843,6 +5845,42 @@ static inline bool obj_gen_lessp(lispobj obj, generation_index_t b)
     return ((a==SCRATCH_GENERATION) ? from_space : a) < b;
 }
 
+/* Loosely inspired by the code in 'purify' */
+#define LATERBLOCKSIZE 50000 // arbitrary
+static struct later {
+    struct later *next;
+    struct code *list[LATERBLOCKSIZE];
+    int count;
+} *later_blocks = NULL;
+
+static void delay_code_metadata_scavenge(struct code* code)
+{
+    struct later* block = later_blocks;
+    if (!block || block->count == LATERBLOCKSIZE) {
+        block = calloc(1, sizeof (struct later));
+        block->next = later_blocks;
+        later_blocks = block;
+    }
+    block->list[block->count] = code;
+    ++block->count;
+}
+
+static void finish_code_metadata()
+{
+    struct later *block = later_blocks;
+    int i;
+    save_lisp_gc_iteration = 3; // ensure no more delaying of metadata scavenge
+    for ( ; block ; block = block->next ) {
+        for (i = 0; i < block->count; ++i) {
+            struct code*c = block->list[i];
+            gc_assert(!forwarding_pointer_p((lispobj*)c));
+            scavenge(&c->debug_info, 2); // debug_info and fixups
+            CLEAR_WRITTEN_FLAG((lispobj*)c);
+        }
+    }
+    scavenge_newspace(new_space);
+}
+
 sword_t scav_code_blob(lispobj *object, lispobj header)
 {
     struct code* code = (struct code*)object;
@@ -5878,9 +5916,14 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
         // This assertion fails, but things work nonetheless.
         // gc_assert(!card_protected_p(object));
 
-        /* Scavenge the boxed section of the code data block. */
-        sword_t n_header_words = code_header_words((struct code *)object);
-        scavenge(object + 2, n_header_words - 2);
+        if (save_lisp_gc_iteration == 2) {
+            // Attempt to place debug-info at end of the heap by not scavenging now
+            scavenge(object + 4, nboxed - 4);
+            delay_code_metadata_scavenge(code);
+        } else {
+            /* Scavenge the boxed section of the code data block. */
+            scavenge(object + 2, nboxed - 2);
+        }
 
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         // Process each untagged fdefn pointer.
@@ -5921,12 +5964,14 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
             })
         }
 
+        if (save_lisp_gc_iteration == 2) goto done;
+
         /* If my_gen is other than newspace, then scan for old->young
          * pointers. If my_gen is newspace, there can be no such pointers
          * because newspace is the lowest numbered generation post-GC
          * (regardless of whether this is a promotion cycle) */
         if (my_gen != new_space) {
-            lispobj *where, *end = object + n_header_words, ptr;
+            lispobj *where, *end = object + nboxed, ptr;
             for (where= object + 2; where < end; ++where)
                 if (is_lisp_pointer(ptr = *where) && obj_gen_lessp(ptr, my_gen))
                     goto done;
