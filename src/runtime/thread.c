@@ -609,7 +609,7 @@ void sb_set_os_thread_name(char* name)
     pthread_set_name_np(pthread_self(), name);
 #endif
 #ifdef LISP_FEATURE_DARWIN
-    if (vector_len(v) < 64) pthread_setname_np(namee);
+    if (vector_len(v) < 64) pthread_setname_np(name);
 #endif
 }
 
