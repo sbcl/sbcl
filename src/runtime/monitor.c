@@ -270,11 +270,12 @@ void list_lisp_threads(int regions) {
     for_each_thread(th) {
         memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
         struct thread_instance* i = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-        char* name = NULL;
-        if (i->name != NIL &&
-            widetag_of(native_pointer(i->name)) == SIMPLE_BASE_STRING_WIDETAG)
-            name = (char*)VECTOR(i->name)->data;
-        fprintf(stderr, "%p %p %p \"%s\"\n", th, pthread, (void*)i, name);
+        lispobj name = i->_name;
+        char* cname = NULL;
+        // it's OK to call widetag_of on NIL
+        if (widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG)
+            cname = (char*)VECTOR(name)->data;
+        fprintf(stderr, "%p %p %p \"%s\"\n", th, pthread, (void*)i, cname);
         if (regions) {
 #define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
          &th->r, th->r.start_addr, th->r.end_addr, th->r.free_pointer)

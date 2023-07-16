@@ -511,8 +511,15 @@
   (let ((thr
          (make-thread
           (lambda ()
-            (with-open-file (stream (format nil "/proc/self/task/~d/comm"
-                                            (thread-os-tid *current-thread*)))
-              (read-line stream)))
+            (let ((all-names
+                   (loop for filename in (directory "/proc/self/task/*/comm")
+                         collect (with-open-file (stream filename) (read-line stream)))))
+              (setf (thread-name *current-thread*) "newname")
+              (with-open-file (stream (format nil "/proc/self/task/~d/comm"
+                                              (thread-os-tid *current-thread*)))
+                (list (read-line stream) all-names))))
           :name "testme")))
-    (assert (string= (join-thread thr) "testme"))))
+    (let ((results (join-thread thr)))
+      (assert (string= (first results) "newname"))
+      (assert (find "finalizer" (second results) :test 'string=))
+      (assert (find "testme" (second results) :test 'string=)))))

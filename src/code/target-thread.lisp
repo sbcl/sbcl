@@ -171,9 +171,25 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
     (condition)
   (thread-error-thread condition))
 
-(setf (documentation 'thread-name 'function)
+(defmacro try-set-os-thread-name (str)
+  ;; If NIL or non-base-string, just leave the OS thread name alone
+  `(with-alien ((sb-set-os-thread-name (function void system-area-pointer) :extern))
+     (when (simple-base-string-p ,str)
+       (with-pinned-objects (,str)
+         (alien-funcall sb-set-os-thread-name (vector-sap ,str))))))
+
+(declaim (inline thread-name))
+(defun thread-name (thread)
  "Name of the thread. Can be assigned to using SETF. A thread name must be
-a simple-string (not necessarily unique) or NIL.")
+a simple-string (not necessarily unique) or NIL."
+  (thread-%name thread))
+(defun (setf thread-name) (name thread)
+  (setq name (possibly-base-stringize name))
+  (setf (thread-%name thread) name) ; will fail if non-simple
+  ;; Not all native thread APIs can set the name of a random thread, so only try to do it
+  ;; if changing your own name.
+  (when (eq thread *current-thread*) (try-set-os-thread-name name))
+  name)
 
 (defmethod print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
@@ -1890,6 +1906,8 @@ session."
 
 (defun run (); All threads other than the initial thread start via this function.
   (set-thread-control-stack-slots *current-thread*)
+  (let ((name (thread-%name *current-thread*)))
+    (try-set-os-thread-name name))
   (flet ((unmask-signals ()
            (let ((mask (svref (thread-startup-info *current-thread*) 4)))
                   (if mask

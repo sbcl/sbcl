@@ -4012,6 +4012,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     lispobj pin_list = SYMBOL(STARTING_THREADS)->value;
     for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
         lispobj thing = CONS(pin_list)->car;
+        if (!thing) continue; // Nothing to worry about when 'thing' is already smashed
         // It might be tempting to say that only the SB-THREAD:THREAD instance
         // requires pinning - because right after we access it to extract the
         // primitive thread, we link into all_threads - but it may be that the code
@@ -4020,17 +4021,16 @@ garbage_collect_generation(generation_index_t generation, int raise,
         // seen as valid lisp pointers by the implicit pinning logic.
         // And the precisely GC'd platforms would not pin anything from C code.
         // The tests in 'threads.impure.lisp' are good at detecting omissions here.
-        if (thing) { // Nothing to worry about when 'thing' is already smashed
-            gc_assert(instancep(thing));
-            struct thread_instance *lispthread = (void*)(thing - INSTANCE_POINTER_LOWTAG);
-            lispobj info = lispthread->startup_info;
-            // INFO gets set to a fixnum when the thread is exiting. I *think* it won't
-            // ever be seen in the starting-threads list, but let's be cautious.
-            if (is_lisp_pointer(info)) {
-                gc_assert(simple_vector_p(info));
-                gc_assert(vector_len(VECTOR(info)) >= 1);
-                lispobj fun = VECTOR(info)->data[0];
-                gc_assert(functionp(fun));
+        gc_assert(instancep(thing));
+        struct thread_instance *lispthread = (void*)(thing - INSTANCE_POINTER_LOWTAG);
+        lispobj info = lispthread->startup_info;
+        // INFO gets set to a fixnum when the thread is exiting. I *think* it won't
+        // ever be seen in the starting-threads list, but let's be cautious.
+        if (is_lisp_pointer(info)) {
+            gc_assert(simple_vector_p(info));
+            gc_assert(vector_len(VECTOR(info)) >= 1);
+            lispobj fun = VECTOR(info)->data[0];
+            gc_assert(functionp(fun));
 #ifdef LISP_FEATURE_X86_64
                 /* FIXME: re. the following remark that pin_exact_root() "does not
                  * work", does it have to be that way? It seems the issue is that
@@ -4042,16 +4042,14 @@ garbage_collect_generation(generation_index_t generation, int raise,
                 // is pseudo-static, but let's use the right pinning function.
                 // (This line of code is so rarely executed that it doesn't
                 // impact performance to search for the object)
-                preserve_pointer(fun, 0);
+            preserve_pointer(fun, 0);
 #else
-                pin_exact_root(fun);
+            pin_exact_root(fun);
 #endif
-                // pin_exact_root is more efficient than preserve_pointer()
-                // because it does not search for the object.
-                pin_exact_root(thing);
-                pin_exact_root(info);
-                pin_exact_root(lispthread->name);
-            }
+            // pin_exact_root is more efficient than preserve_pointer()
+            // because it does not search for the object.
+            pin_exact_root(thing);
+            pin_exact_root(info);
         }
     }
 #endif

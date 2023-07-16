@@ -644,7 +644,7 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
     lispobj arena = find_containing_arena((lispobj)addr);
     struct thread* th = get_sb_vm_thread();
     struct thread_instance* instance = (void*)native_pointer(th->lisp_thread);
-    lispobj name = instance->name;
+    lispobj name = instance->_name;
     char *c_string = 0;
     if (name != NIL) {
         struct vector* string = (void*)native_pointer(name);

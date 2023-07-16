@@ -532,39 +532,6 @@ void* new_thread_trampoline(void* arg)
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->_ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
 
-    /* Potentially set the externally-visible name of this thread,
-     * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
-     * https://github.com/llvm-mirror/llvm/blob/394ea6522c69c2668bf328fc923e1a11cd785265/lib/Support/Unix/Threading.inc
-     * which among other things, suggests that Linux might not even have the syscall */
-    lispobj name = lispthread->name; // pinned
-    if (other_pointer_p(name) &&
-        header_widetag(VECTOR(name)->header) == SIMPLE_BASE_STRING_WIDETAG) {
-#ifdef LISP_FEATURE_LINUX
-        /* "The thread name is a meaningful C language string, whose length is
-         *  restricted to 16 characters, including the terminating null byte ('\0').
-         *  The pthread_setname_np() function can fail with the following error:
-         *  ERANGE The length of the string ... exceeds the allowed limit." */
-        if (vector_len(VECTOR(name)) <= 15)
-            pthread_setname_np(pthread_self(), (char*)VECTOR(name)->data);
-#endif
-#ifdef LISP_FEATURE_NETBSD
-        /* This constant is an upper bound on the length including the NUL.
-         * Exceeding it will fail the call. It happens to be 32.
-         * Also, don't want to printf-format a name containing a '%' */
-        if (vector_len(VECTOR(name)) < PTHREAD_MAX_NAMELEN_NP)
-            pthread_setname_np(pthread_self(), "%s", (char*)VECTOR(name)->data);
-#endif
-#if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_OPENBSD
-        /* Some places document that the length limit is either 16 or 32,
-         * but my testing showed that 12.1 seems to accept any length */
-        pthread_set_name_np(pthread_self(), (char*)VECTOR(name)->data);
-#endif
-#ifdef LISP_FEATURE_DARWIN
-        if (vector_len(VECTOR(name)) < 64)
-            pthread_setname_np((char*)VECTOR(name)->data);
-#endif
-    }
-
 #ifdef ATOMIC_LOGGING
       char* string = strdup((char*)VECTOR(name)->data);
       int index = __sync_fetch_and_add(&thread_name_map_count, 1);
@@ -612,6 +579,38 @@ void* new_thread_trampoline(void* arg)
     unregister_thread(th, SCRIBBLE);
 
     return 0;
+}
+
+
+// This receives a VECTOR-SAP
+void sb_set_os_thread_name(char* name)
+{
+    struct vector* v = (void*)(name - offsetof(struct vector,data));
+    /* Potentially set the externally-visible name of this thread,
+     * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
+     * https://github.com/llvm-mirror/llvm/blob/394ea6522c69c2668bf328fc923e1a11cd785265/lib/Support/Unix/Threading.inc
+     * which among other things, suggests that Linux might not even have the syscall */
+#ifdef LISP_FEATURE_LINUX
+    /* "The thread name is a meaningful C language string, whose length is
+     *  restricted to 16 characters, including the terminating null byte ('\0').
+     *  The pthread_setname_np() function can fail with the following error:
+     *  ERANGE The length of the string ... exceeds the allowed limit." */
+    if (vector_len(v) <= 15) pthread_setname_np(pthread_self(), name);
+#endif
+#ifdef LISP_FEATURE_NETBSD
+    /* This constant is an upper bound on the length including the NUL.
+     * Exceeding it will fail the call. It happens to be 32.
+     * Also, don't want to printf-format a name containing a '%' */
+    if (vector_len(v) < PTHREAD_MAX_NAMELEN_NP) pthread_setname_np(pthread_self(), "%s", name);
+#endif
+#if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_OPENBSD
+    /* Some places document that the length limit is either 16 or 32,
+     * but my testing showed that 12.1 seems to accept any length */
+    pthread_set_name_np(pthread_self(), name);
+#endif
+#ifdef LISP_FEATURE_DARWIN
+    if (vector_len(v) < 64) pthread_setname_np(namee);
+#endif
 }
 
 #ifdef LISP_FEATURE_OS_THREAD_STACK

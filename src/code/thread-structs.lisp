@@ -72,11 +72,11 @@ future."
 (sb-ext:define-load-time-global *profiled-threads* :all)
 (declaim (type (or (eql :all) list) *profiled-threads*))
 
-(sb-xc:defstruct (thread (:constructor %make-thread (name %ephemeral-p semaphore))
+(sb-xc:defstruct (thread (:constructor %make-thread (%name %ephemeral-p semaphore))
                          (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
-  (name          nil :type (or null simple-string)) ; C code could read this
+  (%name         nil :type (or null simple-string)) ; C code could read this
   (%ephemeral-p  nil :type boolean :read-only t)
   ;; This is one of a few different views of a lisp thread:
   ;;  1. the memory space (thread->os_addr in C)
@@ -159,7 +159,7 @@ in future versions."
 
 (sb-xc:defstruct (foreign-thread
                   (:copier nil)
-                  (:include thread (name "callback"))
+                  (:include thread (%name "callback"))
                   (:constructor make-foreign-thread ())
                   (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
