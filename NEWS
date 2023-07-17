@@ -16,6 +16,15 @@ changes not yet implemented in the external-format-line-endings branch:
   * enhancement: the character-decoding-error condition has readers for the
     the number of octets that will be skipped if the USE-VALUE restart is
     invoked.
+  * enhancement: SB-EXT:MAKE-OCTETS-INPUT-STREAM,
+    SB-EXT:WITH-INPUT-FROM-OCTETS, SB-EXT:MAKE-OCTETS-OUTPUT-STREAM and
+    SB-EXT:WITH-OUTPUT-TO-OCTETS are now provided, with their behavior
+    essentially analogous to the standard STRING equivalents.
+  * enhancement: octet and string input and output streams can be bivalent if
+    they are created with the :ELEMENT-TYPE :DEFAULT (non-standard) keyword
+    argument.  If they are, their external format for conversions between
+    characters and octets is provided by the :EXTERNAL-FORMAT keyword argument
+    at their creation.
 
 changes in the external-format-line-endings branch:
   * minor incompatible change: streams with an external-format specified with
