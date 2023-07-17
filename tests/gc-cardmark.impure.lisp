@@ -15,7 +15,7 @@
   (unless (probe-file "gc-testlib.so")
     (sb-ext:run-program "sh"
                         `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                          #+darwin ,@'("-flat_namespace" "-undefined" "suppress")
+                          #+darwin ,@'("-flat_namespace" "-undefined" "suppress"  "-mmacosx-version-min=10.7")
                           "-I../src/runtime"
                           "gc-testlib.c" "-o" "gc-testlib.so")
                         :search t
