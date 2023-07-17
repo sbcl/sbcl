@@ -81,7 +81,7 @@
 
 ;;;; Description of the target address space.
 
-(!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
+(gc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
 ;; Size of one alien-linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c

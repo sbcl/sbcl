@@ -72,9 +72,9 @@
 
 (progn
   #+(or linux netbsd)
-  (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
+  (gc-space-setup #x04000000 :dynamic-space-start #x4f000000)
   #+openbsd
-  (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000))
+  (gc-space-setup #x04000000 :dynamic-space-start #x10000000))
 
 (defconstant alien-linkage-table-growth-direction :down)
 (defconstant alien-linkage-table-entry-size 16)

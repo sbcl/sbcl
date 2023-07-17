@@ -92,7 +92,7 @@
 ;;; it would cause. -- JES, 2005-12-11
 
 #+(or linux darwin)
-(!gencgc-space-setup #x50000000
+(gc-space-setup #x50000000
                      :read-only-space-size 0
                      :fixedobj-space-size #.(* 40 1024 1024)
                      :text-space-size #.(* 130 1024 1024)
@@ -102,7 +102,7 @@
 ;;; run under the default 1G data size limit.
 
 #-(or linux darwin)
-(!gencgc-space-setup #x20000000
+(gc-space-setup #x20000000
                      :read-only-space-size 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x2fff0000)

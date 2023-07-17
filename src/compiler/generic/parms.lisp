@@ -40,8 +40,7 @@
 ;; By happenstance this is the same as small-space-size.
 (defconstant alien-linkage-table-space-size #x100000)
 
-#+gencgc
-;; Define START/END constants for GENCGC spaces.
+;; Define START/END constants for GC spaces.
 ;; Assumptions:
 ;;     We only need very small read-only and static spaces, because
 ;;     gencgc does not purify any more.  We can count on being able to
@@ -55,7 +54,7 @@
 ;;
 ;;     The safepoint page (if enabled) is to be allocated immediately
 ;;     prior to static page.
-(defmacro !gencgc-space-setup
+(defmacro gc-space-setup
     (small-spaces-start
           ;; These keywords variables have to be careful not to overlap with the
           ;; the DEFCONSTANT of the same name, hence the suffix.

@@ -78,7 +78,7 @@
 
 ;;;; Where to put the different spaces.
 
-(!gencgc-space-setup #x04000000
+(gc-space-setup #x04000000
                               :read-only-space-size 0
                               :dynamic-space-start #x1000000000)
 

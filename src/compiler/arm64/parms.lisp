@@ -67,7 +67,7 @@
 
 ;;;; Where to put the different spaces.
 
-(!gencgc-space-setup #+(or linux openbsd netbsd freebsd)
+(gc-space-setup #+(or linux openbsd netbsd freebsd)
                      #x2F0000000
                      #+darwin #x300000000
                      #-darwin :read-only-space-size #-darwin 0
