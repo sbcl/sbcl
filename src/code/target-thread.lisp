@@ -172,7 +172,9 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
   (thread-error-thread condition))
 
 (defmacro try-set-os-thread-name (str)
+  #-sb-thread (declare (ignore str))
   ;; If NIL or non-base-string, just leave the OS thread name alone
+  #+sb-thread
   `(with-alien ((sb-set-os-thread-name (function void system-area-pointer) :extern))
      (when (simple-base-string-p ,str)
        (with-pinned-objects (,str)
