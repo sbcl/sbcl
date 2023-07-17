@@ -1654,7 +1654,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (incf (string-output-stream-index stream) full-length)))
 
 ;;; Factored out of the -misc method due to size.
-;;; This is a steaming pile of horsecrap (lp#1839040)
 (defun set-string-output-stream-file-position (stream pos)
   (let* ((index (string-output-stream-index stream))
          (end (max index (string-output-stream-index-cache stream))))
@@ -1668,6 +1667,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
              (decf (string-output-stream-pointer stream) over))
            (setf (string-output-stream-index stream) end))
           ((< pos index)
+           ;; Set INDEX to the start of the current buffer
+           (decf (string-output-stream-index stream) (string-output-stream-pointer stream))
+           (setf index (string-output-stream-index stream))
+           (setf (string-output-stream-pointer stream) 0)
            (loop while (< pos index)
                  do (string-output-stream-prev-buffer stream)
                  (setf index (string-output-stream-index stream)))
@@ -1677,12 +1680,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           ((> pos index)
            ;; We allow moving beyond the end of stream, implicitly
            ;; extending the output stream.
-           (let ((next (string-output-stream-next-buffer stream)))
-             ;; Update after -next-buffer, INDEX is kept pointing at
-             ;; the end of the current buffer.
-             (setf index (string-output-stream-index stream))
+           (let ((next (string-output-stream-buffer stream)))
+             ;; Set INDEX to the end of the current buffer.
+             (incf index (- (length next) (string-output-stream-pointer stream)))
              (loop while (and next (> pos index))
                    do (setf next (string-output-stream-next-buffer stream)
+                            ;; Update after -next-buffer, INDEX is kept pointing at
+                            ;; the end of the current buffer.
                             index (string-output-stream-index stream))))
            ;; Allocate new buffer if needed, or step back to
            ;; the desired index and set pointer and index

@@ -207,6 +207,31 @@
     (princ "!!" stream)
     (assert (equal "0b2d!!" (get-output-stream-string stream)))))
 
+(with-test (:name (make-string-output-stream file-position :lp-1839040))
+  (let ((stream (make-string-output-stream)))
+    (dotimes (i 64) (write-char #\a stream))
+    (file-position stream 40)
+    (write-char #\x stream)
+    (file-position stream 39)
+    (write-char #\y stream)
+    (file-position stream 41)
+    (write-char #\z stream)
+    (let ((string (get-output-stream-string stream)))
+      (assert (equal "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaayxzaaaaaaaaaaaaaaaaaaaaaa" string))))
+  #+nil
+  (let ((stream (make-string-output-stream)))
+    (dotimes (i 64) (write-char #\a stream))
+    (dotimes (i 64) (write-char #\b stream))
+    (file-position stream 3)
+    (file-position stream 4)
+    (write-char #\x stream)
+    (let ((string (get-output-stream-string stream))
+          (expected (concatenate
+                     'string
+                     (loop for i from 0 below 64 collect (if (= i 4) #\x #\a))
+                     (loop for i from 0 below 64 collect #\b))))
+      (assert (equal expected string)))))
+
 ;;; WITH-OUTPUT-TO-STRING (when provided with a string argument)
 ;;;
 ;;; * Observe FILE-POSITION :START and :END, and allow setting of
