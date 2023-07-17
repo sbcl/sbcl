@@ -4147,3 +4147,16 @@
     ((*random-state*) 1)
     (((make-hash-table)) 2)
     ((423444) 423444)))
+
+(with-test (:name :deleted-call-type)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (labels ((foo (x)
+                 x))
+        (foo 1)
+        (when x
+          (unless x
+            (foo 3)))
+        (foo 2)))
+    (:return-type (values (integer 1 2) &optional))))

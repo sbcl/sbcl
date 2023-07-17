@@ -1569,14 +1569,18 @@
              (optional-dispatch
               (unless (eq (functional-kind leaf) :deleted)
                 (delete-optional-dispatch leaf)))))
-          ((null (rest refs))
-           (typecase leaf
-             (clambda (or (maybe-let-convert leaf)
-                          (maybe-convert-to-assignment leaf)))
-             (lambda-var (reoptimize-lambda-var leaf))))
           (t
            (typecase leaf
-             (clambda (maybe-convert-to-assignment leaf))))))
+             (clambda (or (maybe-let-convert leaf)
+                          (maybe-convert-to-assignment leaf)
+                          ;; Trigger PROPAGATE-LOCAL-CALL-ARGS
+                          (loop for ref in refs
+                                for dest = (node-dest ref)
+                                when (basic-combination-p dest)
+                                do (reoptimize-node dest)
+                                   (loop for arg in (basic-combination-args dest)
+                                         do (reoptimize-lvar arg)))))
+             (lambda-var (reoptimize-lambda-var leaf))))))
 
   (values))
 
