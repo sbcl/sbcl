@@ -392,9 +392,6 @@ static inline int instance_length(lispobj header)
 {
     // * Byte 3 of an instance header word holds the immobile gen# and visited bit,
     //   so those have to be masked off.
-    // * fullcgc uses bit index 31 as a mark bit, so that has to
-    //   be cleared. Lisp does not have to clear bit 31 because fullcgc does not
-    //   operate concurrently.
     // * If the object is in hashed-and-moved state and the original instance payload
     //   length was odd (total object length was even), then add 1.
     //   This can be detected by ANDing some bits, bit 10 being the least-significant

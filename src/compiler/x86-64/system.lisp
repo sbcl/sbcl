@@ -143,8 +143,7 @@
   (:generator 6
     (move temp data)
     (inst shl temp (- n-widetag-bits n-fixnum-tag-bits))
-    ;; merge in the widetag. We should really preserve bit 63 as well
-    ;; which could be a GC mark bit, but it's not concurrent at the moment.
+    ;; merge in the widetag
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)))
 (define-vop (logior-header-bits)

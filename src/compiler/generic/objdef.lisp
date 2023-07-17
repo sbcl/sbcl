@@ -159,7 +159,6 @@ Code header representation:
 For both:
   code-size = total words * n-word-bytes - boxed bytes
   text-size = code-size - simple-fun table size - padding bytes
-  bit 31 of word 0 = fullcgc mark bit
   bit 30           = touched since last GC bit
   The boxed byte count is stored "raw" (i.e. it's not a tagged value,
   but it has fixnum nature)

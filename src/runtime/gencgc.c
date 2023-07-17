@@ -2627,8 +2627,7 @@ static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
         }
         return 1;
     }
-    // Mark only: search for the object, because the mark bit is stored
-    // in the object. Writing to random addresses would be bad.
+    // Mark only: search for the object, because fullcgc can't handle random pointers
     lispobj* found = search_dynamic_space((void*)word);
     if (found) gc_mark_obj(compute_lispobj(found));
     return found != 0;

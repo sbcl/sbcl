@@ -435,19 +435,12 @@
   EQL-BIGNUM
   (inst mov rax (ea (- other-pointer-lowtag) rdi))
   (inst xor rax (ea (- other-pointer-lowtag) rsi))
-  ;; kill the GC mark bit by shifting out (as if we'd actually get fullcgc
-  ;; to concurrently mark the heap. Well, I can hope can't I?)
-  (inst shl rax 1)
   (inst jmp :ne done) ; not equal
-  ;; Preserve rcx and compute the header length in words.
-  ;; Maybe we should deem that bignums have at most (2^32-1) payload words
-  ;; so that I can use an unaligned 'movl'. Or, maybe I should put the length
-  ;; in the high 4 bytes of the header so that the same GC mark bit would work
-  ;; as for all other objects (in byte index 3 of the header)
+  ;; Preserve rcx and compute the length in words.
+  ;; MAXIMUM-BIGNUM-LENGTH is a 4-byte quantity. Probably better if this would use
+  ;; the high 4 bytes of the header to naturally align the load.
   (inst push rcx)
-  (inst mov rcx (ea (- other-pointer-lowtag) rdi))
-  (inst shl rcx 1) ; shift out GC mark bit
-  (inst shr rcx (1+ n-widetag-bits))
+  (inst mov :dword rcx (ea (- 1 other-pointer-lowtag) rdi))
   #+bignum-assertions
   (progn (inst mov r11 rcx)
          (inst or r11 1)) ; align to start of ubsan bits

@@ -964,9 +964,7 @@ scav_funinstance(lispobj *where, lispobj header)
     return 1 + (nslots | 1);
 }
 
-/* Bignums use the highest bit of the header word as the GC mark bit.
- *
- * If assertions are enabled, the number of words taken up is double
+/* If assertions are enabled, the number of words taken up is double
  * what it would ordinarily be, which is a gross overstatement of the
  * the number of words actually needed for sanity-check bits,
  * i.e. ALIGN_UP(CEILING(nwords,N_WORD_BITS),2)

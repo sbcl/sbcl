@@ -460,10 +460,8 @@
 
     ;; If the widetags are not the same, return false.
     ;; Using a :dword compare gets us the bignum length check almost for free
-    ;; unless the length's representation requires more than 3 bytes.
-    ;; It sounds like a :qword compare would be the right thing, but remember
-    ;; one header bit acts as a concurrent GC mark bit in all headered objects,
-    ;; though we're not really using it yet. (We are, but not concurrently)
+    ;; unless the length's representation requires more 4 bytes.
+    ;; I bet nobody would mind if MAXIMUM-BIGNUM-LENGTH were #xFFFFFF.
     (inst mov :dword rax (ea (- other-pointer-lowtag) x))
     (inst cmp :dword rax (ea (- other-pointer-lowtag) y))
     (inst jmp :ne done) ; negative

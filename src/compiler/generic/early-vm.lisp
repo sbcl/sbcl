@@ -163,9 +163,14 @@
 (defconstant short-header-max-words #x7fff)
 
 #+gencgc
-(defconstant max-conses-per-page
-  (floor (* gencgc-page-bytes n-byte-bits)
-         (1+ (* n-word-bytes 2 n-byte-bits)))) ; 1 extra bit per cons
+(progn
+  (defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))
+  ;; Preventing use of the last 2 words on a page ensures that we never
+  ;; "extend" an allocation region of conses from one page to the next page.
+  ;; All other things being equal, it's better for each page to start
+  ;; a contiguous block.
+  (defconstant max-conses-per-page
+    (1- (floor gencgc-page-words 2))))
 
 ;;; Amount to righ-shift an instance header to get the length.
 ;;; Similar consideration as above with regard to use of generation# byte.
@@ -184,6 +189,3 @@
 (defconstant gc-safepoint-trap-offset n-word-bytes)
 
 #+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
-
-#+gencgc
-(defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))
