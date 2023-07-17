@@ -144,10 +144,6 @@
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
     (format stream "~%}~%"))
 
-  (format stream "extern unsigned char widetag_lowtag[256];
-static inline lispobj compute_lispobj(lispobj* base_addr) {
-  return make_lispobj(base_addr, LOWTAG_FOR_WIDETAG(*base_addr & WIDETAG_MASK));~%}~%")
-
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
   (let ((lowtag-tbl (make-array 256 :initial-element 0)))
     ;; Build a table translating from the from low byte of first word of any

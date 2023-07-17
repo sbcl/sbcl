@@ -446,7 +446,6 @@ static inline int layout_depth2_id(struct layout* layout) {
 }
 // Keep in sync with hardwired IDs in CHOOSE-LAYOUT-ID
 // in src/compiler/generic/layout-ids.lisp
-#define WRAPPER_LAYOUT_ID 2
 #define LAYOUT_LAYOUT_ID 3
 #define LFLIST_NODE_LAYOUT_ID 4
 #define BROTHERTREE_UNARY_NODE_LAYOUT_ID 5
@@ -505,12 +504,6 @@ static inline bool plausible_tag_p(lispobj addr)
 #else
 # define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
 # define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
-#endif
-
-#ifdef LISP_FEATURE_BIG_ENDIAN
-# define assign_widetag(addr, byte) ((unsigned char*)addr)[N_WORD_BYTES-1] = byte
-#else
-# define assign_widetag(addr, byte) *(unsigned char*)addr = byte
 #endif
 
 #endif /* _GC_PRIVATE_H_ */

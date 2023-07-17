@@ -93,13 +93,6 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
       flag_VectorWeak << ARRAY_FLAGS_POSITION;
 }
 
-#ifdef LISP_FEATURE_LITTLE_ENDIAN
-// read byte index 1 of the header
-# define WEAKPTR_PAYLOAD_WORDS(wp) ((char*)(wp))[1]
-#else
-# define WEAKPTR_PAYLOAD_WORDS(wp) ((char*)(wp))[N_WORD_BYTES-2]
-#endif
-
 // This bit can be anything that doesn't conflict with a bit seen by lisp.
 // Byte index 0 is the widetag, byte indices 1 and 2 are for the array-rank
 // and vector-flags, depending on how src/compiler/generic/early-objdef assigns them.
@@ -108,29 +101,6 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
 // Assert that the 'v' is a visited weak object, and then clear the visited bit.
 #define UNSET_WEAK_VECTOR_VISITED(v) \
   gc_assert(v->header & WEAK_VECTOR_VISITED_BIT); v->header ^= WEAK_VECTOR_VISITED_BIT
-
-extern sword_t (*sizetab[256])(lispobj *where);
-typedef sword_t (*sizerfn)(lispobj*);
-static inline sword_t object_size(lispobj* where) {
-    sizerfn f = sizetab[widetag_of(where)];
-    return f ? f(where) : CONS_SIZE;
-}
-// These three variants are potentially more efficient -
-//  (1) if the widetag was loaded, avoids one memory read
-//  (2) if you know the object isn't a cons, use headerobj_size
-//  (3) both of the above pertain.
-// Cases 1 and 3 exist only because C doesn't have optional args.
-// These might be premature optimizations, I really don't know.
-static inline sword_t object_size2(lispobj* where, unsigned int header) {
-    sizerfn f = sizetab[header & WIDETAG_MASK];
-    return f ? f(where) : CONS_SIZE;
-}
-static inline sword_t headerobj_size(lispobj* where) {
-    return sizetab[widetag_of(where)](where);
-}
-static inline sword_t headerobj_size2(lispobj* where, unsigned int header) {
-    return sizetab[header & WIDETAG_MASK](where);
-}
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
@@ -158,8 +128,6 @@ extern void
 instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj *instance_ptr, sword_t n_words,
               lispobj bitmap, uword_t arg);
-
-extern int simple_fun_index(struct code*, struct simple_fun*);
 
 extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);
 extern void gc_close_thread_regions(struct thread*, int);

@@ -22,10 +22,10 @@ void unwind_binding_stack(void);
 extern FILE *prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes, size_t *runtime_size);
 extern bool save_runtime_to_filehandle(FILE *output, void *runtime_bytes,
                                           size_t runtime_size, int application_type);
-extern bool save_to_filehandle(FILE *file, char *filename, lispobj initfun,
+extern bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                                   bool make_executable, bool keep_runtime_options,
                                   int core_compression_level);
-extern bool save(char *filename, lispobj initfun, bool prepend_runtime,
+extern bool save(char *filename, lispobj init_function, bool prepend_runtime,
                     bool keep_runtime_options,
                     bool compressed_core, int core_compression_level,
                     int application_type);

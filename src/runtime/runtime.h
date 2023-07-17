@@ -106,11 +106,6 @@ extern struct dyndebug_config {
     int dyndebug_runtime_link;
 } dyndebug_config;
 
-#ifdef LISP_FEATURE_GENCGC
-extern int pre_verify_gen_0; // set and read from Lisp tests
-extern int gencgc_verbose;
-#endif
-
 void dyndebug_init(void);
 
 #ifdef _WIN64
@@ -152,7 +147,7 @@ extern char *copied_string (char *string);
 # define GENCGC_IS_PRECISE 0
 #endif
 
-void *os_dlsym_default(char *name);
+void *os_dlsym_default(char *name); // Why not in 'os.h' ?
 
 /* Even with just -O1, gcc optimizes the jumps in this "loop" away
  * entirely, giving the ability to define WITH-FOO-style macros. */

@@ -50,6 +50,11 @@ static inline int widetag_of(lispobj* obj)
     return *(unsigned char*)obj;
 #endif
 }
+#ifdef LISP_FEATURE_BIG_ENDIAN
+# define assign_widetag(addr, byte) ((unsigned char*)addr)[N_WORD_BYTES-1] = byte
+#else
+# define assign_widetag(addr, byte) *(unsigned char*)addr = byte
+#endif
 
 static inline int listp(lispobj obj) {
     return lowtag_of(obj) == LIST_POINTER_LOWTAG;
@@ -173,6 +178,10 @@ static inline int other_immediate_lowtag_p(lispobj header)
 extern unsigned char widetag_lowtag[256];
 #define LOWTAG_FOR_WIDETAG(x) (widetag_lowtag[x] & LOWTAG_MASK)
 
+static inline lispobj compute_lispobj(lispobj* base_addr) {
+    return make_lispobj(base_addr, LOWTAG_FOR_WIDETAG(*base_addr & WIDETAG_MASK));
+}
+
 // is_header() and is_cons_half() are logical complements when invoked
 // on the first word of any lisp object. However, given a word which is
 // only *potentially* the first word of a lisp object, they can both be false.
@@ -181,6 +190,29 @@ extern unsigned char widetag_lowtag[256];
 // of a cons is smaller than the set of patterns accepted by !is_header().
 static inline int is_header(lispobj potential_header_word) {
     return widetag_lowtag[potential_header_word & WIDETAG_MASK] & 0x80;
+}
+
+extern sword_t (*sizetab[256])(lispobj *where);
+typedef sword_t (*sizerfn)(lispobj*);
+static inline sword_t object_size(lispobj* where) {
+    sizerfn f = sizetab[widetag_of(where)];
+    return f ? f(where) : CONS_SIZE;
+}
+// These three variants are potentially more efficient -
+//  (1) if the widetag was loaded, avoids one memory read
+//  (2) if you know the object isn't a cons, use headerobj_size
+//  (3) both of the above pertain.
+// Cases 1 and 3 exist only because C doesn't have optional args.
+// These might be premature optimizations, I really don't know.
+static inline sword_t object_size2(lispobj* where, unsigned int header) {
+    sizerfn f = sizetab[header & WIDETAG_MASK];
+    return f ? f(where) : CONS_SIZE;
+}
+static inline sword_t headerobj_size(lispobj* where) {
+    return sizetab[widetag_of(where)](where);
+}
+static inline sword_t headerobj_size2(lispobj* where, unsigned int header) {
+    return sizetab[header & WIDETAG_MASK](where);
 }
 
 #endif

@@ -174,4 +174,6 @@ base_pointer(lispobj ptr)
   fun->self != fun_self_from_baseptr(fun) && fun->self != 0
 #define CODE_IS_TRACED 0x01
 
+extern int simple_fun_index(struct code*, struct simple_fun*);
+
 #endif
