@@ -851,6 +851,7 @@ extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
 extern struct thread *alloc_thread_struct(void*);
 
+static inline void* vector_sap(lispobj v) { return VECTOR(v)->data; }
 int load_gc_crashdump(char* pathname)
 {
     int fd;
@@ -985,10 +986,10 @@ int load_gc_crashdump(char* pathname)
         checked_read(" TLS", fd, &th->lisp_thread, preamble.tls_size-skip);
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
         struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-        lispobj name = instance->name;
+        lispobj name = instance->_name;
         char* cname = (gc_managed_addr_p(name) &&
                        widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG)
-                      ? (char*)name+1 : 0;
+                      ? vector_sap(name): 0;
         fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
                 th, (void*)thread_preamble.address,
                 (int)(thread_preamble.binding_stack_nbytes>>WORD_SHIFT),

@@ -91,6 +91,10 @@ void disable_lossage_handler(void)
 {
     lossage_handler = default_lossage_handler;
 }
+void set_lossage_handler(void (*handler)(void))
+{
+    lossage_handler = handler ? handler : &default_lossage_handler;
+}
 
 static
 void print_message(char *fmt, va_list ap)
@@ -103,10 +107,7 @@ void print_message(char *fmt, va_list ap)
     fprintf(stderr, "\n");
 }
 
-static inline void
-call_lossage_handler() never_returns;
-
-static inline void
+static inline void never_returns
 call_lossage_handler()
 {
     lossage_handler();
