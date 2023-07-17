@@ -25,14 +25,6 @@
 #include "pseudo-atomic.h"
 #include "gc-assert.h"
 
-#if defined(LISP_FEATURE_GENCGC)
-#include "gencgc-alloc-region.h"
-#endif
-
-#ifdef LISP_FEATURE_SB_THREAD
-#include "pseudo-atomic.h"
-#endif
-
   /* The header files may not define PT_DAR/PT_DSISR.  This definition
      is correct for all versions of ppc linux >= 2.0.30
 
