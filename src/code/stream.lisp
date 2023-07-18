@@ -1531,21 +1531,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (t
            (error "~S is not a subtype of CHARACTER" element-type)))))
 
-;;; Now that we support base-char string-output streams, it may be possible to eliminate
-;;; this, though the other benefit it confers is that the buffer never needs to extend,
-;;; and we merely shrink it to the proper size when done writing.
-(defstruct (finite-base-string-output-stream
-            (:include ansi-stream
-                      (cout #'finite-base-string-ouch)
-                      (sout #'finite-base-string-sout)
-                      (misc #'finite-base-string-out-misc))
-            (:constructor %make-finite-base-string-output-stream (buffer))
-            (:copier nil)
-            (:predicate nil))
-  (buffer nil :type simple-base-string :read-only t)
-  (pointer 0 :type index))
-(declaim (freeze-type finite-base-string-output-stream))
-
 ;;; Pushes the current segment onto the prev-list, and either pops
 ;;; or allocates a new one.
 (defun string-output-stream-new-buffer (stream size)
@@ -1826,6 +1811,21 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                      (truly-the index (ash end scale))))))
                     (if base-string-p 0 2)))))
     result))
+
+;;; Now that we support base-char string-output streams, it may be possible to eliminate
+;;; this, though the other benefit it confers is that the buffer never needs to extend,
+;;; and we merely shrink it to the proper size when done writing.
+(defstruct (finite-base-string-output-stream
+            (:include ansi-stream
+                      (cout #'finite-base-string-ouch)
+                      (sout #'finite-base-string-sout)
+                      (misc #'finite-base-string-out-misc))
+            (:constructor %make-finite-base-string-output-stream (buffer))
+            (:copier nil)
+            (:predicate nil))
+  (buffer nil :type simple-base-string :read-only t)
+  (pointer 0 :type index))
+(declaim (freeze-type finite-base-string-output-stream))
 
 (defun finite-base-string-ouch (stream character)
   (declare (optimize (sb-c:insert-array-bounds-checks 0)))
