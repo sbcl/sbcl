@@ -1335,7 +1335,6 @@
                                      (limit 'end)
                                      (string 'simple-string)
                                      (in 'input-routine)
-                                     (misc '#'string-in-misc)
                                      (t (dsd-default dsd)))))
                            (dd-slots
                             (find-defstruct-description 'string-input-stream)))))
