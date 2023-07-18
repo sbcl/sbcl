@@ -262,8 +262,8 @@ char* vm_thread_name(struct thread* th)
     if (!th) return "non-lisp";
     struct thread_instance *lispthread =
         (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-    struct vector* name = VECTOR(lispthread->_name);
-    if (widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG) return (char*)name->data;
+    lispobj name = lispthread->_name;
+    if (simple_base_string_p(name)) return vector_sap(name);
     return "?";
 }
 

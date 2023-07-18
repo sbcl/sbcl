@@ -182,7 +182,7 @@ void os_link_runtime()
         lispobj item = symbols->data[j];
         bool datap = listp(item);
         lispobj symbol_name = datap ? CONS(item)->car : item;
-        char *namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
+        char *namechars = vector_sap(symbol_name);
         void* result = os_dlsym_default(namechars);
 
         if (result) {

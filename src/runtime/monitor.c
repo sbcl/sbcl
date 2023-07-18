@@ -270,11 +270,10 @@ void list_lisp_threads(int regions) {
     for_each_thread(th) {
         memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
         struct thread_instance* i = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-        lispobj name = i->_name;
+        lispobj name = instancep(th->lisp_thread) ? i->_name : 0;
         char* cname = NULL;
-        // it's OK to call widetag_of on NIL
-        if (widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG)
-            cname = (char*)VECTOR(name)->data;
+        // it's OK to call widetag_of on NIL but not NULL
+        if (name && simple_base_string_p(name)) cname = vector_sap(name);
         fprintf(stderr, "%p %p %p \"%s\"\n", th, pthread, (void*)i, cname);
         if (regions) {
 #define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
@@ -851,7 +850,6 @@ extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
 extern struct thread *alloc_thread_struct(void*);
 
-static inline void* vector_sap(lispobj v) { return VECTOR(v)->data; }
 int load_gc_crashdump(char* pathname)
 {
     int fd;
@@ -987,9 +985,8 @@ int load_gc_crashdump(char* pathname)
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
         struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
         lispobj name = instance->_name;
-        char* cname = (gc_managed_addr_p(name) &&
-                       widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG)
-                      ? vector_sap(name): 0;
+        char* cname = gc_managed_addr_p(name) && simple_base_string_p(name)
+                      ? vector_sap(name) : 0;
         fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
                 th, (void*)thread_preamble.address,
                 (int)(thread_preamble.binding_stack_nbytes>>WORD_SHIFT),

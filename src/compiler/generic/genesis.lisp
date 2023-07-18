@@ -3380,6 +3380,13 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
 #define reset_weak_pointer_next(wp) set_weak_pointer_next(wp,0)
 #define in_weak_pointer_list(wp) (get_weak_pointer_next(wp)!=0)~%"))
 
+(defun write-vector-sap-helpers ()
+  (format t "static inline char* vector_sap(lispobj v) { return (char*)VECTOR(v)->data; }
+static inline int simple_base_string_p(lispobj x) {
+    // caller MUST ensure that 'x' is an OTHER pointer
+    return widetag_of(native_pointer(x)) == SIMPLE_BASE_STRING_WIDETAG;
+}~%"))
+
 (defun write-sap-initializer ()
   (let ((sap-align #+riscv 32 ; not sure why this is larger than normal
                    #-riscv (* 2 sb-vm:n-word-bytes)))
@@ -3446,7 +3453,9 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
              (when (eq name 'sb-vm::sap)
                (write-sap-initializer))
              (when (member name '(cons vector symbol fdefn instance))
-               (write-cast-operator name c-name lowtag *standard-output*)))
+               (write-cast-operator name c-name lowtag *standard-output*))
+             (when (eq name 'vector)
+               (write-vector-sap-helpers)))
            (output-asm ()
              (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
              (format t " * so they work directly on tagged addresses. */~2%")

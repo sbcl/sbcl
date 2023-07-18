@@ -533,7 +533,7 @@ void* new_thread_trampoline(void* arg)
     if (lispthread->_ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
 
 #ifdef ATOMIC_LOGGING
-      char* string = strdup((char*)VECTOR(name)->data);
+      char* string = strdup((char*)VECTOR(name)->data); // FIXME: no such var as 'name'
       int index = __sync_fetch_and_add(&thread_name_map_count, 1);
       gc_assert(index < THREAD_NAME_MAP_MAX);
       thread_name_map[index].thread = pthread_self();

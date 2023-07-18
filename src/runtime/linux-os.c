@@ -130,18 +130,16 @@ void lisp_mutex_done_eventrecording() {
         if (events[i].timeout >= 0) // must also have mutex_name in this case
             fprintf(stderr, "[%d.%09ld] %s: %s '%s' timeout %ld\n",
                     (int)rel_time.tv_sec, rel_time.tv_nsec,
-                    (char*)VECTOR(threadname)->data,
+                    vector_sap(threadname),
                     events[i].label, events[i].mutex_name, events[i].timeout);
         else if (events[i].mutex_name)
             fprintf(stderr, "[%d.%09ld] %s: %s '%s'\n",
                     (int)rel_time.tv_sec, rel_time.tv_nsec,
-                    (char*)VECTOR(threadname)->data,
-                    events[i].label, events[i].mutex_name);
+                    vector_sap(threadname), events[i].label, events[i].mutex_name);
         else
             fprintf(stderr, "[%d.%09ld] %s: %s\n",
                     (int)rel_time.tv_sec, rel_time.tv_nsec,
-                    (char*)VECTOR(threadname)->data,
-                    events[i].label);
+                    vector_sap(threadname), events[i].label);
     }
     fprintf(stderr, "-----\n");
 }
@@ -207,9 +205,8 @@ char* futex_name(int *lock_word)
 {
     // If there is a Lisp string at lock_word+1, return that, otherwise NULL.
     lispobj name = ((lispobj*)lock_word)[1];
-    if (lowtag_of(name) == OTHER_POINTER_LOWTAG &&
-        header_widetag(VECTOR(name)->header) == SIMPLE_BASE_STRING_WIDETAG)
-        return (char*)VECTOR(name)->data;
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && simple_base_string_p(name))
+        return vector_sap(name);
     return 0;
 }
 
@@ -221,7 +218,7 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 
 #ifdef MUTEX_EVENTRECORDING
     struct mutex* m = (void*)((char*)lock_word - offsetof(struct mutex,state));
-    char *name = m->name != NIL ? (char*)VECTOR(m->name)->data : "(unnamed)";
+    char *name = m->name != NIL ? vector_sap((m->name) : "(unnamed)";
 #endif
   if (sec<0) {
       lisp_mutex_event1("start futex wait", name);
@@ -250,7 +247,7 @@ futex_wake(int *lock_word, int n)
 {
 #ifdef MUTEX_EVENTRECORDING
     struct mutex* m = (void*)((char*)lock_word - offsetof(struct mutex,state));
-    char *name = m->name != NIL ? (char*)VECTOR(m->name)->data : "(unnamed)";
+    char *name = m->name != NIL ? vector_sap(m->name) : "(unnamed)";
     lisp_mutex_event1("waking futex", name);
 #endif
     return sys_futex(lock_word, futex_wake_op(),n,0);

@@ -691,9 +691,9 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
 #ifdef LISP_FEATURE_SB_THREAD
     // the TLS area is not used if #-sb-thread. And if so, it must be "main thread"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
-    if (lispthread->name != NIL) {
+    if (lispthread->_name != NIL) {
         fprintf(stderr, " (\"");
-        print_string(VECTOR(lispthread->name), stderr);
+        print_string(VECTOR(lispthread->_name), stderr);
         fprintf(stderr, "\")");
     }
     putc('\n', stderr);
