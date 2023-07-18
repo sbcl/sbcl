@@ -150,7 +150,7 @@
                   (when lvar
                     (call lvar annotation)))))))))
 
-(defun lvar-fun-type (lvar &optional defined-here declared-only)
+(defun lvar-fun-type (lvar &optional defined-here declared-only asserted-type)
   ;; Handle #'function,  'function and (lambda (x y))
   (let* ((use (principal-lvar-use lvar))
          (lvar-type (lvar-type lvar))
@@ -196,6 +196,10 @@
                            (make-fun-type :wild-args t
                                           :returns
                                           (tail-set-type (lambda-tail-set entry-fun))))
+                          (asserted-type
+                           ;; Don't trust FUNCTION type declarations,
+                           ;; they perform no runtime assertions.
+                           nil)
                           (t
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)
@@ -223,10 +227,11 @@
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
-                      (if (or defined-here
-                              declared-only
-                              (fun-lexically-notinline-p fun-name
-                                                         (node-lexenv (lvar-dest lvar))))
+                      (if (or (fun-lexically-notinline-p fun-name
+                                                         (node-lexenv (lvar-dest lvar)))
+                              (and (neq (info :function :where-from fun-name) :declared)
+                                   (or defined-here
+                                       declared-only)))
                           lvar-type
                           (global-ftype fun-name)))
                      ((functional-p leaf)

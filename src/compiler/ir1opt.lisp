@@ -1141,7 +1141,7 @@
                       (cond ((global-var-p leaf)
                              (values (leaf-type leaf) (leaf-defined-type leaf)))
                             ((eq kind :unknown-keys)
-                             (values (lvar-fun-type fun t t) nil))
+                             (values (lvar-fun-type fun t t t) nil))
                             (t
                              (values nil nil)))
                     (when (or (and (eq kind :unknown-keys)
@@ -2345,7 +2345,7 @@
                  (setf (lvar-reoptimize arg) nil))
            (when fun-changed
              (setf (lvar-reoptimize fun) nil)
-             (let ((type (lvar-fun-type fun t)))
+             (let ((type (lvar-fun-type fun t t t)))
                (when (fun-type-p type)
                  (derive-node-type node (fun-type-returns type))))
              (maybe-terminate-block node nil)

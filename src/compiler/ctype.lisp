@@ -910,7 +910,7 @@ and no value was provided for it." name))))))))))
                                                           unknown-keys-fun
                                                           declared-only)
   (declare (type function fun) (type combination call))
-  (binding* ((type (lvar-fun-type (combination-fun call) declared-only declared-only))
+  (binding* ((type (lvar-fun-type (combination-fun call) declared-only declared-only declared-only))
              (nil (fun-type-p type) :exit-if-null)
              (annotation (and info
                               (fun-info-annotation info)))
