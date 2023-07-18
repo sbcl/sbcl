@@ -218,7 +218,6 @@
     (write-char #\z stream)
     (let ((string (get-output-stream-string stream)))
       (assert (equal "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaayxzaaaaaaaaaaaaaaaaaaaaaa" string))))
-  #+nil
   (let ((stream (make-string-output-stream)))
     (dotimes (i 64) (write-char #\a stream))
     (dotimes (i 64) (write-char #\b stream))
