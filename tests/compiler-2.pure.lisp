@@ -4160,3 +4160,21 @@
             (foo 3)))
         (foo 2)))
     (:return-type (values (integer 1 2) &optional))))
+
+(with-test (:name :optional-type-propagation)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (labels ((foo (&optional x)
+                    x))
+           (foo 1)
+           (foo 2)))
+    (:return-type (values (integer 1 2) &optional)))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (labels ((foo (&key x)
+                    x))
+           (foo :x 1)
+           (foo :x 2)))
+    (:return-type (values (integer 1 2) &optional))))

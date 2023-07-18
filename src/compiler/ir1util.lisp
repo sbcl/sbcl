@@ -1518,15 +1518,11 @@
                (unless (eq (functional-kind fun) :deleted)
                  (aver (eq (functional-kind fun) :optional))
                  (setf (functional-kind fun) nil)
-                 (let ((refs (leaf-refs fun)))
-                   (cond ((null refs)
-                          (delete-lambda fun))
-                         ((null (rest refs))
-                          (or (maybe-let-convert fun)
-                              (maybe-convert-to-assignment fun)))
-                         (t
-                          (maybe-convert-to-assignment fun)))))))
-
+                 (if (leaf-refs fun)
+                     (or (maybe-let-convert fun)
+                         (maybe-convert-to-assignment fun)
+                         (reoptimize-lambda fun))
+                     (delete-lambda fun)))))
         (dolist (ep (optional-dispatch-entry-points leaf))
           (when (promise-ready-p ep)
             (frob (force ep))))
@@ -1541,6 +1537,15 @@
 
   (values))
 
+;; Trigger PROPAGATE-LOCAL-CALL-ARGS
+(defun reoptimize-lambda (fun)
+  (loop for ref in (leaf-refs fun)
+        for dest = (node-dest ref)
+        when (basic-combination-p dest)
+        do (reoptimize-node dest)
+           (loop for arg in (basic-combination-args dest)
+                 do (reoptimize-lvar arg))))
+
 ;;; Do stuff to delete the semantic attachments of a REF node. When
 ;;; this leaves zero or one reference, we do a type dispatch off of
 ;;; the leaf to determine if a special action is appropriate.
@@ -1554,33 +1559,26 @@
                (not (find home refs :key #'node-home-lambda)))
       ;; It was the last reference from this lambda, remove it
       (sset-delete leaf (lambda-calls-or-closes home)))
-    (cond ((null refs)
-           (typecase leaf
-             (lambda-var
-              (delete-lambda-var leaf))
-             (clambda
-              (ecase (functional-kind leaf)
-                ((nil :let :mv-let :assignment :escape :cleanup)
-                 (delete-lambda leaf))
-                (:external
-                 (unless (functional-has-external-references-p leaf)
-                   (delete-lambda leaf)))
-                ((:deleted :zombie :optional))))
-             (optional-dispatch
-              (unless (eq (functional-kind leaf) :deleted)
-                (delete-optional-dispatch leaf)))))
-          (t
-           (typecase leaf
-             (clambda (or (maybe-let-convert leaf)
-                          (maybe-convert-to-assignment leaf)
-                          ;; Trigger PROPAGATE-LOCAL-CALL-ARGS
-                          (loop for ref in refs
-                                for dest = (node-dest ref)
-                                when (basic-combination-p dest)
-                                do (reoptimize-node dest)
-                                   (loop for arg in (basic-combination-args dest)
-                                         do (reoptimize-lvar arg)))))
-             (lambda-var (reoptimize-lambda-var leaf))))))
+    (if refs
+        (typecase leaf
+          (clambda (or (maybe-let-convert leaf)
+                       (maybe-convert-to-assignment leaf)
+                       (reoptimize-lambda leaf)))
+          (lambda-var (reoptimize-lambda-var leaf)))
+        (typecase leaf
+          (lambda-var
+           (delete-lambda-var leaf))
+          (clambda
+           (ecase (functional-kind leaf)
+             ((nil :let :mv-let :assignment :escape :cleanup)
+              (delete-lambda leaf))
+             (:external
+              (unless (functional-has-external-references-p leaf)
+                (delete-lambda leaf)))
+             ((:deleted :zombie :optional))))
+          (optional-dispatch
+           (unless (eq (functional-kind leaf) :deleted)
+             (delete-optional-dispatch leaf))))))
 
   (values))
 

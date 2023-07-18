@@ -2249,7 +2249,8 @@
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
   (unless (functional-entry-fun fun)
-    (if (lambda-optional-dispatch fun)
+    (if (and (lambda-optional-dispatch fun)
+             (neq (functional-kind (lambda-optional-dispatch fun)) :deleted))
         ;; We can still make sure &REST is known to be a list.
         (loop for var in (lambda-vars fun)
               do (let ((info (lambda-var-arg-info var)))
