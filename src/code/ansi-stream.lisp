@@ -300,9 +300,9 @@
   ;; end of the stream.
   (index-cache 0 :type index)
   ;; Pseudo-actual element type. We no longer store the as-requested type.
-  ;; (If the value is :DEFAULT, we return CHARACTER on inquiry.)
+  ;; (If the value is *, we return CHARACTER on inquiry.)
   (element-type nil :read-only t
-                    :type (member #+sb-unicode :default
+                    :type (member #+sb-unicode *
                                   #+sb-unicode character
                                   base-char nil)))
 (declaim (freeze-type string-output-stream))

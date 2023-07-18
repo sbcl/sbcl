@@ -1447,7 +1447,7 @@
                             (truly-the simple-base-string src)
                             :start1 start1 :start2 start2 :end2 end2))))
              (input-contains-unicode ()
-               ;; For streams with :DEFAULT element-type (producing the most space-efficient
+               ;; For streams with * element-type (producing the most space-efficient
                ;; string that can hold the output), checking whether Unicode characters appear
                ;; in the source material is potentially advantageous versus checking the
                ;; buffer in GET-OUTPUT-STREAM-STRING, because if all source strings are
@@ -1495,7 +1495,7 @@
             #+sb-unicode
             (#.sb-vm:simple-character-string-widetag
              (if wild-result-type
-                 (values :default   nil  #'default-out   #'char-string-out)
+                 (values '*         nil  #'default-out   #'char-string-out)
                  (values 'character t    #'character-out #'char-string-out)))
             (#.sb-vm:simple-base-string-widetag
              (values 'base-char :ignore #'base-char-out #'base-string-out))
@@ -1724,7 +1724,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (:element-type
      (let ((et (string-output-stream-element-type stream)))
        ;; Always return a valid type-specifier
-       (if (eq et :default) 'character et)))
+       (if (eq et '*) 'character et)))
     (:element-mode 'character)))
 
 ;;; Return a string of all the characters sent to a stream made by
@@ -1756,7 +1756,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (string-output-stream-next stream) nil)
 
     ;; Reset UNICODE-P unless it was :IGNORE or element-type is CHARACTER.
-    (when (and (eq (string-output-stream-element-type stream) :default)
+    (when (and (eq (string-output-stream-element-type stream) '*)
                (eq (string-output-stream-unicode-p stream) t))
       (call-ansi-stream-misc stream :reset-unicode-p))
 
@@ -1766,7 +1766,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;;  BASE-STRING into BASE-STRING
     ;; BASE-STRING copied into CHARACTER-STRING is not possible.
     ;; Strings with element type NIL are not possible.
-    ;; The first case occurs when and only when the element type is :DEFAULT and
+    ;; The first case occurs when and only when the element type is * and
     ;; only base characters were written. The other two cases can be handled
     ;; using BYTE-BLT with indices multiplied by either 1 or 4.
     (flet ((copy (fun extra)
@@ -1782,7 +1782,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (dolist (buffer next)
                  (funcall fun result buffer start extra)
                  (incf start (length buffer))))))
-      (if (and (eq (string-output-stream-element-type stream) :default)
+      (if (and (eq (string-output-stream-element-type stream) '*)
                base-string-p)
           ;; This is the most common case, arising from WRITE-TO-STRING,
           ;; PRINx-TO-STRING, (FORMAT NIL ...), and many other constructs.
