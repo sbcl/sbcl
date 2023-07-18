@@ -2590,16 +2590,17 @@ static void pin_object(lispobj object)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
+static void NO_SANITIZE_MEMORY preserve_pointer(os_context_register_t word, void* arg)
 {
+    int contextp = arg == (void*)1;
     page_index_t page = find_page_index((void*)word);
     if (page < 0) {
         // Though immobile_space_preserve_pointer accepts any pointer,
         // there's a benefit to testing immobile_space_p first
         // because it's inlined. Either is a no-op if no immobile space.
         if (immobile_space_p(word))
-            return immobile_space_preserve_pointer((void*)word);
-        return 0;
+            immobile_space_preserve_pointer((void*)word);
+        return;
     }
 
     // Special case for untagged instance pointers in registers. This might belong in
@@ -2612,10 +2613,10 @@ static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
         word |= INSTANCE_POINTER_LOWTAG;
 
     lispobj object = conservative_root_p(word, page);
-    if (!object) return 0;
+    if (!object) return;
     if (object != AMBIGUOUS_POINTER) {
         pin_object(object);
-        return 1;
+        return;
     }
     // It's a non-large non-code ambiguous pointer.
     if (compacting_p()) {
@@ -2625,12 +2626,11 @@ static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
             // Divide the page into 8 parts, mark that part pinned
             gc_page_pins[page] |= 1 << (addr_lowpart / (GENCGC_PAGE_BYTES/8));
         }
-        return 1;
+        return;
     }
     // Mark only: search for the object, because fullcgc can't handle random pointers
     lispobj* found = search_dynamic_space((void*)word);
     if (found) gc_mark_obj(compute_lispobj(found));
-    return found != 0;
 }
 /* Additional logic for soft marks: any word that is potentially a
  * tagged pointer to a page being written must preserve the mark regardless
@@ -2656,7 +2656,7 @@ static bool NO_SANITIZE_MEMORY preserve_pointer(uword_t word, int contextp)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
 // registers can be wider than words. This could accept uword_t as the arg type
 // but I like it to be directly callable with os_context_register.
-static void sticky_preserve_pointer(os_context_register_t register_word, int contextp)
+static void sticky_preserve_pointer(os_context_register_t register_word, void* arg)
 {
     uword_t word = register_word;
     if (is_lisp_pointer(word)) {
@@ -2686,7 +2686,7 @@ static void sticky_preserve_pointer(os_context_register_t register_word, int con
             }
         }
     }
-    preserve_pointer(word, contextp);
+    preserve_pointer(word, arg);
 }
 #endif
 #endif
@@ -3729,8 +3729,8 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
 #endif
 
 #if !GENCGC_IS_PRECISE
-extern void visit_context_registers(void (*proc)(os_context_register_t, int),
-                                    os_context_t *context);
+extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
+                                    os_context_t *context, void*);
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
@@ -3750,11 +3750,11 @@ conservative_stack_scan(struct thread* th,
      * sigcontext, though there could, in theory be if it performs
      * GC while handling an interruption */
 
-    __attribute__((unused)) void (*context_method)(os_context_register_t,int) =
+    __attribute__((unused)) void (*context_method)(os_context_register_t,void*) =
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        gen == 0 ? sticky_preserve_pointer : (void (*)(os_context_register_t,int))preserve_pointer;
+        gen == 0 ? sticky_preserve_pointer : preserve_pointer;
 #else
-        (void (*)(os_context_register_t,int))preserve_pointer;
+        preserve_pointer;
 #endif
 
     void* esp = (void*)-1;
@@ -3781,7 +3781,7 @@ conservative_stack_scan(struct thread* th,
         while (k > 0) {
             os_context_t* context = nth_interrupt_context(--k, th);
             if (context)
-                visit_context_registers(context_method, context);
+                visit_context_registers(context_method, context, (void*)1);
         }
     }
 #  endif
@@ -3793,7 +3793,7 @@ conservative_stack_scan(struct thread* th,
             th->control_stack_end - th->control_stack_start); */
     for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
         os_context_t *c = nth_interrupt_context(i, th);
-        visit_context_registers(context_method, c);
+        visit_context_registers(context_method, c, (void*)1);
         lispobj* esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
         if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end && (void*)esp1 < esp)
             esp = esp1;

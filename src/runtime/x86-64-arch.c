@@ -144,23 +144,24 @@ arch_get_bad_addr(int __attribute__((unused)) sig,
 // I don't have an easy way to test changes for these OSes, so just use this
 // context visitor based on the old slightly-less-efficient way of doing it.
 #if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
-void visit_context_registers(void (*proc)(os_context_register_t, int), os_context_t *context)
+void visit_context_registers(void (*proc)(os_context_register_t, void*),
+                             os_context_t *context, void* arg)
 {
-    proc(os_context_pc(context), 1);
-    proc(*os_context_register_addr(context, reg_RAX), 1);
-    proc(*os_context_register_addr(context, reg_RCX), 1);
-    proc(*os_context_register_addr(context, reg_RDX), 1);
-    proc(*os_context_register_addr(context, reg_RBX), 1);
-    proc(*os_context_register_addr(context, reg_RSI), 1);
-    proc(*os_context_register_addr(context, reg_RDI), 1);
-    proc(*os_context_register_addr(context, reg_R8 ), 1);
-    proc(*os_context_register_addr(context, reg_R9 ), 1);
-    proc(*os_context_register_addr(context, reg_R10), 1);
-    proc(*os_context_register_addr(context, reg_R11), 1);
-    proc(*os_context_register_addr(context, reg_R12), 1);
-    proc(*os_context_register_addr(context, reg_R13), 1);
-    proc(*os_context_register_addr(context, reg_R14), 1);
-    proc(*os_context_register_addr(context, reg_R15), 1);
+    proc(os_context_pc(context), arg);
+    proc(*os_context_register_addr(context, reg_RAX), arg);
+    proc(*os_context_register_addr(context, reg_RCX), arg);
+    proc(*os_context_register_addr(context, reg_RDX), arg);
+    proc(*os_context_register_addr(context, reg_RBX), arg);
+    proc(*os_context_register_addr(context, reg_RSI), arg);
+    proc(*os_context_register_addr(context, reg_RDI), arg);
+    proc(*os_context_register_addr(context, reg_R8 ), arg);
+    proc(*os_context_register_addr(context, reg_R9 ), arg);
+    proc(*os_context_register_addr(context, reg_R10), arg);
+    proc(*os_context_register_addr(context, reg_R11), arg);
+    proc(*os_context_register_addr(context, reg_R12), arg);
+    proc(*os_context_register_addr(context, reg_R13), arg);
+    proc(*os_context_register_addr(context, reg_R14), arg);
+    proc(*os_context_register_addr(context, reg_R15), arg);
 }
 #endif
 

@@ -75,16 +75,18 @@ int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 
-void visit_context_registers(void (*p)(os_context_register_t,int), os_context_t *context)
+void visit_context_registers(void (*p)(os_context_register_t,void*),
+                             os_context_t *context, void* arg)
 {
     mcontext_t* m = &context->uc_mcontext;
-    p(m->gregs[REG_RIP], 1);
+    p(m->gregs[REG_RIP], arg);
     // This is the order the registers appear in gregset_t (which makes no difference of course).
     // Not sure why the order is so kooky.
-    p(m->gregs[REG_R8 ], 1); p(m->gregs[REG_R9 ], 1); p(m->gregs[REG_R10], 1); p(m->gregs[REG_R11], 1);
-    p(m->gregs[REG_R12], 1); p(m->gregs[REG_R13], 1); p(m->gregs[REG_R14], 1); p(m->gregs[REG_R15], 1);
-    p(m->gregs[REG_RDI], 1); p(m->gregs[REG_RSI], 1); p(m->gregs[REG_RBX], 1);
-    p(m->gregs[REG_RDX], 1); p(m->gregs[REG_RAX], 1); p(m->gregs[REG_RCX], 1);
+    p(m->gregs[REG_R8 ], arg); p(m->gregs[REG_R9 ], arg); p(m->gregs[REG_R10], arg);
+    p(m->gregs[REG_R11], arg); p(m->gregs[REG_R12], arg); p(m->gregs[REG_R13], arg);
+    p(m->gregs[REG_R14], arg); p(m->gregs[REG_R15], arg);
+    p(m->gregs[REG_RDI], arg); p(m->gregs[REG_RSI], arg); p(m->gregs[REG_RBX], arg);
+    p(m->gregs[REG_RDX], arg); p(m->gregs[REG_RAX], arg); p(m->gregs[REG_RCX], arg);
     // We could implicitly pin objects pointed to by parts of an XMM or YMM register here
 }
 
