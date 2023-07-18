@@ -1730,7 +1730,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         (go :next))))
     (:set-file-position
      (set-string-output-stream-file-position stream arg1)
-     t) ; just claim it worked, who cares (see lp#1839040)
+     t)
     (:get-file-position
      (string-output-stream-index stream))
     (:close
