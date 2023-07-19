@@ -1038,7 +1038,9 @@ and no value was provided for it." name))))))))))
            (lambda (arg type lvars &optional annotation)
              (when (and
                     (apply-type-annotation name arg type
-                                           lvars policy annotation 'ftype-context)
+                                           lvars policy annotation
+                                           (and (not trusted)
+                                                'ftype-context))
                     (not trusted))
                (reoptimize-lvar arg)))
            call
