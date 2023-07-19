@@ -196,10 +196,12 @@
                            (make-fun-type :wild-args t
                                           :returns
                                           (tail-set-type (lambda-tail-set entry-fun))))
-                          (asserted-type
+                          ((and asserted-type
+                                (not (or (constant-lvar-p lvar)
+                                         (constant-p leaf))))
                            ;; Don't trust FUNCTION type declarations,
                            ;; they perform no runtime assertions.
-                           nil)
+                           (specifier-type 'function))
                           (t
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)

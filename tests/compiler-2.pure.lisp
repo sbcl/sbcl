@@ -4178,3 +4178,11 @@
            (foo :x 1)
            (foo :x 2)))
     (:return-type (values (integer 1 2) &optional))))
+
+(with-test (:name :local-function-declaration)
+  (checked-compile-and-assert
+      ()
+      `(lambda (n)
+         (declare ((function * fixnum) n))
+         (typep (funcall n) 'fixnum))
+    ((#'list) nil)))
