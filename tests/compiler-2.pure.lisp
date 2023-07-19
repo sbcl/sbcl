@@ -4181,8 +4181,8 @@
 
 (with-test (:name :local-function-declaration)
   (checked-compile-and-assert
-      ()
+      (:optimize :safe)
       `(lambda (n)
          (declare ((function * fixnum) n))
          (typep (funcall n) 'fixnum))
-    ((#'list) nil)))
+    ((#'list) (condition 'type-error))))

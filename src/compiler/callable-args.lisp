@@ -183,6 +183,7 @@
                              (eq (functional-kind leaf) :external))
                         (functional-entry-fun leaf)
                         leaf))
+         (asserted t)
          (lvar-type (cond ((and defined-type
                                 (neq defined-type *universal-type*))
                            defined-type)
@@ -199,10 +200,12 @@
                           ((and asserted-type
                                 (not (or (constant-lvar-p lvar)
                                          (constant-p leaf))))
+                           (setf asserted nil)
                            ;; Don't trust FUNCTION type declarations,
                            ;; they perform no runtime assertions.
                            (specifier-type 'function))
                           (t
+                           (setf asserted nil)
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf)
@@ -243,7 +246,7 @@
                             lvar-type)))
                      (t
                       lvar-type))))
-    (values type fun-name leaf)))
+    (values type fun-name leaf asserted)))
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
   (if (or (not leaf)

@@ -269,7 +269,8 @@
              (when (eq arg lvar)
                (return-from lvar-externally-checkable-type
                  (coerce-to-values type))))
-           dest))))
+           dest
+           nil nil t))))
     *wild-type*))
 
 ;;;; interface routines used by optimizers
@@ -1359,7 +1360,7 @@
 ;;; syntax check, arg/result type processing, but still call
 ;;; RECOGNIZE-KNOWN-CALL, since the call might be to a known lambda,
 ;;; and that checking is done by local call analysis.
-(defun validate-call-type (call type fun &optional ir1-converting-not-optimizing-p)
+(defun validate-call-type (call type fun &optional ir1-converting-not-optimizing-p (trusted t))
   (declare (type combination call) (type ctype type))
   (let* ((where (when fun (leaf-where-from fun)))
          (same-file-p (eq :defined-here where)))
@@ -1394,7 +1395,7 @@
                               :unwinnage-fun #'compiler-notify)
              (declare (ignore unwinnage))
              (cond (valid
-                    (assert-call-type call type)
+                    (assert-call-type call type trusted)
                     (maybe-terminate-block call ir1-converting-not-optimizing-p)
                     (cond ((eq (combination-kind call) :error)
                            (values nil nil))
@@ -1426,9 +1427,10 @@
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
-           (let* ((uses (lvar-uses fun-lvar))
-                  (leaf (when (ref-p uses) (ref-leaf uses))))
-             (validate-call-type call (lvar-fun-type fun-lvar t t t) leaf))
+           (multiple-value-bind (type name leaf asserted)
+               (lvar-fun-type fun-lvar t t)
+             (declare (ignore name))
+             (validate-call-type call type leaf nil asserted))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))
