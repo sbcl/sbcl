@@ -4596,37 +4596,45 @@
 (defun derive-gcd (args)
   (let ((min)
         (max)
-        includes-zero
+        (includes-zero t)
+        unbounded
         primes)
     (loop for arg in args
           for type = (lvar-type arg)
           do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
-               (unless (and low high)
-                 (return-from derive-gcd))
-               (cond ((<= low 0 high)
-                      (setf includes-zero t))
-                     ((/= low high))
-                     ((= low 1)
-                      (return-from derive-gcd (specifier-type '(eql 1))))
-                     #-sb-xc-host
-                     ((and (typep (abs low)
-                                  `(integer 0
-                                            ,(min (expt 2 32)
-                                                  most-positive-fixnum)))
-                           ;; Get some extra points
-                           (positive-primep (abs low)))
-                      (pushnew (abs low) primes)))
-               (if min
-                   (setf min (min min low)
-                         max (max max high))
-                   (setf min low
-                         max high))))
+               (let ((zero (types-equal-or-intersect type (specifier-type '(eql 0)))))
+                 (unless zero
+                   (setf includes-zero nil))
+                 (cond ((not (and low high))
+                        (setf unbounded t))
+                       ((and (= (abs low) 1)
+                             (= (abs high) 1)
+                             (not zero))
+                        (return-from derive-gcd (specifier-type '(eql 1))))
+                       #-sb-xc-host
+                       ((and (= low high)
+                             (typep (abs low)
+                                    `(integer 0
+                                              ,(min (expt 2 32)
+                                                    most-positive-fixnum)))
+                             ;; Get some extra points
+                             (positive-primep (abs low)))
+                        (pushnew (abs low) primes))))
+               (cond (unbounded)
+                     (min
+                      (setf min (min min low)
+                            max (max max high)))
+                     (t
+                      (setf min low
+                            max high)))))
     (specifier-type (cond ((not primes)
                            `(integer ,(if includes-zero
                                           0
                                           1)
-                                     ,(max (abs min)
-                                           (abs max))))
+                                     ,(if unbounded
+                                          '*
+                                          (max (abs min)
+                                               (abs max)))))
                           ((cdr primes)
                            '(eql 1))
                           (t

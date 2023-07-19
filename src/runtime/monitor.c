@@ -330,7 +330,7 @@ static int findpath_cmd(char **ptr) {
                 if (listp(pair->cdr)) {
                     // thread root - complicated to print
                 } else {
-                    // otherwise, object and word index 
+                    // otherwise, object and word index
                     fprintf(stderr, " %"OBJ_FMTX" word %d\n",
                             pair->car, (int)pair->cdr);
                 }
