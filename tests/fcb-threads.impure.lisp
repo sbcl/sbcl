@@ -183,7 +183,7 @@
                         (sb-thread:join-thread-error () 'ok))))
           (when (eq result 'ok)
             ;; actually join it to avoid resource leak
-            (assert (zerop 
+            (assert (zerop
                      (alien-funcall
                       (extern-alien "pthread_join" (function int unsigned unsigned))
                       (aref pthread 0)
