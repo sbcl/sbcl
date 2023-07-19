@@ -978,7 +978,7 @@ and no value was provided for it." name))))))))))
         (use-lvar cast internal-lvar)
         t))))
 
-(defun apply-type-annotation (fun-name arg type lvars policy &optional annotation)
+(defun apply-type-annotation (fun-name arg type lvars policy &optional annotation context)
   (case (car annotation)
     (function-designator
      (assert-function-designator fun-name lvars arg (cdr annotation) policy)
@@ -1002,7 +1002,7 @@ and no value was provided for it." name))))))))))
         (add-annotation arg
                         (make-lvar-proper-sequence-annotation
                          :kind (car annotation)))))
-     (assert-lvar-type arg type policy))))
+     (assert-lvar-type arg type policy context))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
@@ -1026,7 +1026,7 @@ and no value was provided for it." name))))))))))
                      (not (return-p (lvar-dest lvar)))
                      (not (mv-combination-p (lvar-dest lvar)))
                      (lvar-has-single-use-p lvar))
-            (when (assert-lvar-type lvar returns policy)
+            (when (assert-lvar-type lvar returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
     (let* ((name (lvar-fun-name (combination-fun call) t))
            (info (and name
@@ -1038,7 +1038,7 @@ and no value was provided for it." name))))))))))
            (lambda (arg type lvars &optional annotation)
              (when (and
                     (apply-type-annotation name arg type
-                                           lvars policy annotation)
+                                           lvars policy annotation 'ftype-context)
                     (not trusted))
                (reoptimize-lvar arg)))
            call
