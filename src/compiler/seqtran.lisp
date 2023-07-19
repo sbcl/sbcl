@@ -501,7 +501,7 @@
                                            (not key))
                                        (eq-comparable-type-p (lvar-type item)))
                                       (t
-                                       (let ((type (lvar-fun-type key t t t)))
+                                       (let ((type (lvar-fun-type key t t)))
                                          (when (fun-type-p type)
                                            (eq-comparable-type-p
                                             (single-value-type (fun-type-returns type)))))))
@@ -1990,7 +1990,7 @@
                             (lvar-fun-is key '(identity)))))
     (flet ((fun-accepts-type (fun-lvar argument)
              (when fun-lvar
-               (let ((fun-type (lvar-fun-type fun-lvar t t t)))
+               (let ((fun-type (lvar-fun-type fun-lvar t t)))
                  (when (fun-type-p fun-type)
                    (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
                      (when arg
@@ -3106,14 +3106,14 @@
                                          start
                                          end
                                          &allow-other-keys))
-  (multiple-value-bind (fun-type name) (lvar-fun-type fun t t t)
+  (multiple-value-bind (fun-type name) (lvar-fun-type fun t t)
     (when (fun-type-p fun-type)
       (let* ((initial-value-type (and initial-value
                                       (lvar-type initial-value)))
              (sequence-type (lvar-type sequence))
              (element-type
                (cond ((and key
-                           (multiple-value-bind (key-type name) (lvar-fun-type key t t t)
+                           (multiple-value-bind (key-type name) (lvar-fun-type key t t)
                              (cond ((eq name 'identity)
                                     nil)
                                    ((fun-type-p key-type)

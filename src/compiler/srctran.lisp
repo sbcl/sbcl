@@ -5590,7 +5590,7 @@
 #+sb-thread
 (progn
 (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
-  (let ((type (lvar-fun-type function t t t)))
+  (let ((type (lvar-fun-type function t t)))
     (when (fun-type-p type)
       (let ((null-p (not (and (constant-lvar-p waitp)
                               (lvar-value waitp)

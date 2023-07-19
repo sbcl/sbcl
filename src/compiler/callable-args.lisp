@@ -150,7 +150,7 @@
                   (when lvar
                     (call lvar annotation)))))))))
 
-(defun lvar-fun-type (lvar &optional defined-here declared-only asserted-type)
+(defun lvar-fun-type (lvar &optional defined-here asserted-type)
   ;; Handle #'function,  'function and (lambda (x y))
   (let* ((use (principal-lvar-use lvar))
          (lvar-type (lvar-type lvar))
@@ -163,27 +163,36 @@
                                 (node-source-form use))
                                (t
                                 '.anonymous.))))))
+         (asserted t)
          (defined-type (and (global-var-p leaf)
                             (case (leaf-where-from leaf)
                               (:declared
                                (leaf-type leaf))
-                              ((:defined :defined-here)
-                               (if (or (and (defined-fun-p leaf)
-                                            (eq (defined-fun-inlinep leaf) 'notinline))
-                                       declared-only
-                                       (and defined-here
-                                            (eq (leaf-where-from leaf) :defined))
-                                       (fun-lexically-notinline-p (leaf-%source-name leaf)
-                                                                  (node-lexenv (lvar-dest lvar))))
-                                   lvar-type
-                                   (global-ftype (leaf-%source-name leaf))))
+                              (:defined
+                               (cond ((or defined-here
+                                          asserted-type
+                                          (and (defined-fun-p leaf)
+                                               (eq (defined-fun-inlinep leaf) 'notinline))
+                                          (fun-lexically-notinline-p (leaf-%source-name leaf)
+                                                                     (node-lexenv (lvar-dest lvar))))
+                                      (setf asserted nil)
+                                      lvar-type)
+                                     (t
+                                      (global-ftype (leaf-%source-name leaf)))))
+                              (:defined-here
+                               (cond ((or (and (defined-fun-p leaf)
+                                               (eq (defined-fun-inlinep leaf) 'notinline))
+                                          (fun-lexically-notinline-p (leaf-%source-name leaf)
+                                                                     (node-lexenv (lvar-dest lvar))))
+                                      lvar-type)
+                                     (t
+                                      (global-ftype (leaf-%source-name leaf)))))
                               (t
                                (global-var-defined-type leaf)))))
          (entry-fun (if (and (functional-p leaf)
                              (eq (functional-kind leaf) :external))
                         (functional-entry-fun leaf)
                         leaf))
-         (asserted t)
          (lvar-type (cond ((and defined-type
                                 (neq defined-type *universal-type*))
                            defined-type)
@@ -235,8 +244,7 @@
                       (if (or (fun-lexically-notinline-p fun-name
                                                          (node-lexenv (lvar-dest lvar)))
                               (and (neq (info :function :where-from fun-name) :declared)
-                                   (or defined-here
-                                       declared-only)))
+                                   asserted-type))
                           lvar-type
                           (global-ftype fun-name)))
                      ((functional-p leaf)

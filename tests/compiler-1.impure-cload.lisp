@@ -183,7 +183,7 @@
       (declare (type (real 1) x))
     (setq x z))
   (list x z))
-(assert-error (bug231b nil 1) type-error)
+(assert-error (bug231b (eval 'nil) 1) type-error)
 (assert-error (bug231b 0 1.5) type-error)
 (assert-error (bug231b 0 0) type-error)
 

@@ -1606,8 +1606,7 @@
 
 ;;;; bug 305: INLINE/NOTINLINE causing local ftype to be lost
 
-(test-util:with-test (:name (compile inline notinline)
-                      :fails-on :sbcl)
+(test-util:with-test (:name (compile inline notinline))
   (labels ((compile-lambda (type sense allow-notes)
              (nth-value
               4 (test-util:checked-compile

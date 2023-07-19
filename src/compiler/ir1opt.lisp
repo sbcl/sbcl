@@ -257,20 +257,15 @@
   (let ((dest (lvar-dest lvar)))
     (when (combination-p dest)
       ;; TODO: MV-COMBINATION
-      (let* ((fun (combination-fun dest))
-             (fun-type (lvar-type fun)))
-        (when (and (call-full-like-p dest)
-                   (fun-type-p fun-type)
-                   ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
-                   (not (fun-type-wild-args fun-type)))
-          (map-combination-args-and-types
-           (lambda (arg type &rest args)
-             (declare (ignore args))
-             (when (eq arg lvar)
-               (return-from lvar-externally-checkable-type
-                 (coerce-to-values type))))
-           dest
-           nil nil t))))
+      (when (call-full-like-p dest)
+        (map-combination-args-and-types
+         (lambda (arg type &rest args)
+           (declare (ignore args))
+           (when (eq arg lvar)
+             (return-from lvar-externally-checkable-type
+               (coerce-to-values type))))
+         dest
+         nil nil t t)))
     *wild-type*))
 
 ;;;; interface routines used by optimizers
@@ -1142,7 +1137,7 @@
                       (cond ((global-var-p leaf)
                              (values (leaf-type leaf) (leaf-defined-type leaf)))
                             ((eq kind :unknown-keys)
-                             (values (lvar-fun-type fun t t t) nil))
+                             (values (lvar-fun-type fun t t) nil))
                             (t
                              (values nil nil)))
                     (when (or (and (eq kind :unknown-keys)
@@ -1427,8 +1422,7 @@
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
-           (multiple-value-bind (type name leaf asserted)
-               (lvar-fun-type fun-lvar t t)
+           (multiple-value-bind (type name leaf asserted) (lvar-fun-type fun-lvar)
              (declare (ignore name))
              (validate-call-type call type leaf nil asserted))
          (cond ((functional-p leaf)
@@ -2347,7 +2341,7 @@
                  (setf (lvar-reoptimize arg) nil))
            (when fun-changed
              (setf (lvar-reoptimize fun) nil)
-             (let ((type (lvar-fun-type fun t t t)))
+             (let ((type (lvar-fun-type fun t t)))
                (when (fun-type-p type)
                  (derive-node-type node (fun-type-returns type))))
              (maybe-terminate-block node nil)
