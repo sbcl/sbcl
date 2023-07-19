@@ -31,7 +31,7 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
-extern lispobj lisp_init_function, gc_object_watcher;
+extern lispobj lisp_init_function;
 
 struct unbounded_queue {
   struct Qblock* head_block;
@@ -408,7 +408,6 @@ void execute_full_mark_phase()
     }
     gc_mark_obj(lisp_package_vector);
     gc_mark_obj(lisp_init_function);
-    gc_mark_obj(gc_object_watcher);
     gc_mark_obj(alloc_profile_data);
     do {
         lispobj ptr = gc_dequeue();

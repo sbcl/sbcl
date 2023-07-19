@@ -35,17 +35,17 @@
            (ecase root
              (:tls
               (scrubstack)
-              (sb-ext:search-roots wp :criterion :oldest :gc t :print nil))
+              (sb-ext:search-roots wp :criterion :oldest :print nil))
              (:bindings ; bind *FRED* again so the old value is on the binding stack
               (let ((*fred* 1))
                 (scrubstack)
-                (sb-ext:search-roots wp :criterion :oldest :gc t :print nil)))
+                (sb-ext:search-roots wp :criterion :oldest :print nil)))
              (:stack
               ; put the OBJ back on the control stack
               ; and also ensure that *FRED* is not a root.
               (setq obj *fred* *fred* nil)
               (scrubstack)
-              (sb-ext:search-roots wp :criterion :oldest :gc t :print nil)))))
+              (sb-ext:search-roots wp :criterion :oldest :print nil)))))
       (assert paths)
       (let* ((path (cdar paths))
              (root (car path)))
@@ -69,7 +69,7 @@
 (defun f0 ()
   (let* ((c (cons 1 2))
          (wp (make-weak-pointer c)))
-    (let ((paths (sb-ext:search-roots wp :criterion :static :gc t :print nil)))
+    (let ((paths (sb-ext:search-roots wp :criterion :static :print nil)))
       (assert paths)
       (let* ((path (car paths))
              (nodes (cdr path)))
@@ -129,4 +129,4 @@
 
 #+gencgc
 (with-test (:name (sb-ext:search-roots :ignore-immediate))
-  (sb-ext:search-roots (make-weak-pointer 48) :gc t :print nil))
+  (sb-ext:search-roots (make-weak-pointer 48) :print nil))

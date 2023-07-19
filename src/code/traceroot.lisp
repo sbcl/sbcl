@@ -14,9 +14,6 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export '(sb-ext::search-roots) 'sb-ext))
 
-(define-alien-variable  "gc_object_watcher" unsigned)
-(define-alien-variable  "gc_traceroot_criterion" int)
-
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
 ;;;
@@ -155,31 +152,16 @@
 (declaim (ftype (function ((or list sb-ext:weak-pointer)
                            &key
                            (:criterion (member :oldest :pseudo-static :static))
-                           (:gc t)
                            (:ignore list)
                            (:print (or boolean (eql :verbose)))))
                 search-roots))
-(defun search-roots (weak-pointers &key (criterion :oldest) (gc nil)
+(defun search-roots (weak-pointers &key (criterion :oldest)
                                         (ignore '(* ** *** / // ///))
                                         (print t))
   "Find roots keeping the targets of WEAK-POINTERS alive.
 
 WEAK-POINTERS must be a single SB-EXT:WEAK-POINTER or a list of those,
 pointing to objects for which roots should be searched.
-
-GC controls whether the search is performed in the context of a
-garbage collection, that is with all Lisp threads stopped. Possible
-values are:
-
-  T
-    This is the more accurate of the object liveness proof generators,
-    as there is no chance for other code to execute in between the
-    garbage collection and production of the chain of referencing
-    objects.
-
-  NIL
-    This works well enough, but might be adversely affected by actions
-    of concurrent threads.
 
 CRITERION determines just how rooty (how deep) a root must be in order
 to be considered. Possible values are:
@@ -244,27 +226,26 @@ printed. Possible values are
 Experimental: subject to change without prior notice."
   (let* ((input (ensure-list weak-pointers))
          (output (make-array (length input)))
-         (param (vector input
-                        (if ignore (coerce ignore 'simple-vector) 0)
-                        (cons :result output)))
-         (criterion-value (ecase criterion
-                            (:oldest 0)
-                            (:pseudo-static 1)
-                            (:static 2))))
-    (cond (gc
-           (setf gc-traceroot-criterion criterion-value)
-           (sb-sys:with-pinned-objects (param (elt param 1))
-             (setf gc-object-watcher (sb-kernel:get-lisp-obj-address param)))
-           (gc :full t)
-           (setf gc-object-watcher 0))
-          (t
-           (sb-sys:without-gcing
-             (sb-vm::close-thread-alloc-region)
-             (alien-funcall
-              (extern-alien "prove_liveness" (function int unsigned int))
-              (sb-kernel:get-lisp-obj-address param)
-              criterion-value))))
-    (case (car (elt param 2))
+         (ignore (if ignore (coerce ignore 'simple-vector) 0))
+         (criterion (ecase criterion
+                      (:oldest 0)
+                      (:pseudo-static 1)
+                      (:static 2)))
+         result)
+    (with-alien ((gc-pathfind (function int unsigned unsigned unsigned int)
+                              :extern))
+      (without-gcing
+          (when (sb-kernel::try-acquire-gc-lock
+                 (sb-kernel::gc-stop-the-world)
+                 (setq result
+                       (alien-funcall gc-pathfind
+                                      (get-lisp-obj-address input)
+                                      (get-lisp-obj-address output)
+                                      (get-lisp-obj-address ignore)
+                                      criterion)))
+            (sb-kernel::gc-start-the-world))))
+    (case result
+      ((nil) (error "Could not stop all threads"))
       (-1 (error "Input is not a proper list of weak pointers.")))
     (let ((paths (preprocess-traceroot-results input output)))
       (cond (print

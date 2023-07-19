@@ -159,13 +159,11 @@ page_index_t page_table_pages;
 struct page *page_table;
 unsigned char *gc_page_pins;
 unsigned char *gc_card_mark;
-lispobj gc_object_watcher;
-int gc_traceroot_criterion;
 // Filtered pins include code but not simple-funs,
 // and must not include invalid pointers.
-lispobj* gc_filtered_pins;
+static lispobj* gc_filtered_pins;
 static int pins_alloc_size;
-int gc_pin_count;
+static int gc_pin_count;
 struct hopscotch_table pinned_objects;
 
 /* This is always 0 except during gc_and_save() */
@@ -2491,10 +2489,6 @@ static void obliterate_nonpinned_words()
 #undef page_base
     if (pins_alloc_size) {
         os_deallocate((char*)gc_filtered_pins, pins_alloc_size);
-        // Traceroot can't use the pinned objects in this case
-        // But hopefully you're not relying on traceroot
-        // with thousands of pins. That's not really it's intent
-        // (which is to find retention due to paths in the heap)
         gc_filtered_pins = 0;
         gc_pin_count = 0;
         pins_alloc_size = 0;
@@ -4165,7 +4159,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
      * symbol. It is passed to gc_and_save() in this C variable */
     if (lisp_init_function) scavenge(&lisp_init_function, 1);
     if (lisp_package_vector) scavenge(&lisp_package_vector, 1);
-    if (gc_object_watcher)  scavenge(&gc_object_watcher, 1);
     if (alloc_profile_data) scavenge(&alloc_profile_data, 1);
 
     /* If SB-SPROF was used, enliven all pages of code.
@@ -4669,18 +4662,6 @@ collect_garbage(generation_index_t last_gen)
  finish:
     write_protect_immobile_space();
     gc_active_p = 0;
-
-    if (gc_object_watcher) {
-        extern void gc_prove_liveness(void(*)(), lispobj, int, uword_t*, int);
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        gc_prove_liveness(visit_context_registers,
-                          gc_object_watcher,
-                          gc_pin_count, gc_filtered_pins,
-                          gc_traceroot_criterion);
-#else
-        gc_prove_liveness(0, gc_object_watcher, 0, 0, gc_traceroot_criterion);
-#endif
-    }
 
 #ifdef COLLECT_GC_STATS
     struct timespec t_gc_done;

@@ -233,7 +233,7 @@ static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, catchers_cmd;
-static cmd threads_cmd;
+static cmd threads_cmd, findpath_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
 static void suspend_other_threads() {
@@ -290,6 +290,57 @@ static int threads_cmd(char **ptr) {
     list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2));
     return 0;
 }
+extern int heap_trace_verbose;
+extern int gc_pathfind_aux(lispobj*, lispobj, lispobj, lispobj, int);
+
+static int findpath_cmd(char **ptr) {
+    // prevent the path finder from seeing the object that results from parsing the command
+    lispobj* stackptr = (lispobj*)&ptr;
+    // overaligned for 32-bit but doesn't matter
+    struct vector __attribute__ ((aligned (16))) result;
+    struct cons __attribute__ ((aligned (16))) list;
+    /* Despite capturing the stack pointer coming in to this function,
+     * it's very difficult to ensure that a locally allocated weak pointer
+     * is not above that (and hence its value slot seen).
+     * So it has to be malloc()ed. */
+    char* wp_mem = malloc(sizeof (struct weak_pointer) + N_WORD_BYTES);
+    struct weak_pointer* wp =
+      (void*)(wp_mem + (((uword_t)wp_mem & LOWTAG_MASK) ? N_WORD_BYTES : 0));
+    wp->header = ((WEAK_POINTER_SIZE-1)<<N_WIDETAG_BITS)|WEAK_POINTER_WIDETAG;
+    if (parse_lispobj(ptr, &wp->value)) {
+        list.car = make_lispobj(wp, OTHER_POINTER_LOWTAG);
+        list.cdr = NIL;
+        result.header = SIMPLE_VECTOR_WIDETAG;
+        result.length_ = make_fixnum(1);
+        result.data[0] = 0;
+        suspend_other_threads();
+        int save = heap_trace_verbose;
+        heap_trace_verbose = 4;
+        gc_pathfind_aux(stackptr,
+                        make_lispobj(&list, LIST_POINTER_LOWTAG),
+                        make_lispobj(&result, OTHER_POINTER_LOWTAG),
+                        0, 2);
+        heap_trace_verbose = save;
+        unsuspend_other_threads();
+        lispobj path = result.data[0];
+        if (listp(path)) {
+            fprintf(stderr, "Answer:\n");
+            while (path != NIL) {
+                struct cons* pair = CONS(CONS(path)->car);
+                if (listp(pair->cdr)) {
+                    // thread root - complicated to print
+                } else {
+                    // otherwise, object and word index 
+                    fprintf(stderr, " %"OBJ_FMTX" word %d\n",
+                            pair->car, (int)pair->cdr);
+                }
+                path = CONS(path)->cdr;
+            }
+        }
+    }
+    free(wp_mem);
+    return 0;
+}
 static int verify_cmd(char __attribute__((unused)) **ptr) {
     gencgc_verbose = 1;
     suspend_other_threads();
@@ -334,6 +385,7 @@ static struct cmd {
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
     {"d", "(an alias for dump)", dump_cmd},
     {"exit", "Exit this instance of the monitor.", exit_cmd},
+    {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},

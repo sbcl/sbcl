@@ -51,12 +51,7 @@ typedef struct hopscotch_table* inverted_heap_t;
 
 int heap_trace_verbose = 0;
 
-#ifdef LISP_FEATURE_ARM64
 typedef uint64_t traceroot_pointer;
-#else
-typedef uint32_t traceroot_pointer;
-#endif
-
 
 extern generation_index_t gencgc_oldest_gen_to_gc;
 
@@ -207,9 +202,50 @@ static inline int interestingp(lispobj ptr, struct hopscotch_table* targets)
     return is_lisp_pointer(ptr) && hopscotch_containsp(targets, ptr);
 }
 
+/* This is not performance-critical */
+static lispobj* valid_ambiguous_pointer_p(lispobj ptr, int registerp)
+{
+    lispobj *start = search_all_gc_spaces((void*)ptr);
+    if (start == NULL) return NULL;
+    // exact pointer is always a winner
+    if (compute_lispobj(start) == ptr) return start;
+    unsigned char widetag = widetag_of(start);
+    // allow untagged and/or interior pointer to code, fdefn, funcallable-instance
+    // FIXME: could add a few more rejection filters
+    //        such as untagged ptr to 2nd word of fdefn
+    if (widetag == CODE_HEADER_WIDETAG ||
+        widetag == FDEFN_WIDETAG ||
+        widetag == FUNCALLABLE_INSTANCE_WIDETAG)
+        return start;
+    // allow in-register untagged pointer to lockfree list node
+    if (registerp && widetag == INSTANCE_WIDETAG && ptr == (lispobj)start
+        && instance_layout(start) != 0
+        && lockfree_list_node_layout_p(LAYOUT(instance_layout(start))))
+        return start;
+    return 0;
+}
+
+static uword_t cur_thread_stackptr_at_entry; // current thread has no sigcontext
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+static os_context_t* get_register_context(struct thread* th)
+{
+    if (th != get_sb_vm_thread()
+        // don't give a damn about nested interrupts
+        && read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th) == make_fixnum(1))
+        return nth_interrupt_context(0, th);
+    return 0;
+}
+
+static lispobj* get_stackptr(struct thread* th)
+{
+    if (th == get_sb_vm_thread()) return (lispobj*)cur_thread_stackptr_at_entry;
+    os_context_t* context = get_register_context(th);
+    if (context) return (lispobj*)(uword_t)*os_context_sp_addr(context);
+    lose("No stack pointer for %p", th);
+}
+
 /* Try to find the call frame that contains 'addr', which is the address
- * in which a conservative root was seen.
+ * in which an ambiguous root was seen.
  * Return the program counter associated with that frame. */
 static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
 {
@@ -232,50 +268,24 @@ static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
     }
 }
 
-static struct { void* pointer; bool found; } pin_seek_state;
-static void compare_pointer(void *addr) {
-    if (addr == pin_seek_state.pointer)
-        pin_seek_state.found = 1;
-}
-
-/* Figure out which thread's control stack contains 'pointer'
- * and the PC within the active function in the referencing frame  */
+/* Figure out which thread's control stack contains 'pointer'.
+ * Also guess the PC within the active function in the referencing frame.
+ * BUG: what about context registers? */
 static struct thread* NO_SANITIZE_MEMORY
-deduce_thread(void (*context_scanner)(void*, os_context_t *),
-              uword_t pointer, char** pc)
+deduce_thread(uword_t pointer, char** pc)
 {
     struct thread *th;
 
     *pc = 0;
-    pin_seek_state.found = 0;
     for_each_thread(th) {
-        void **esp=(void **)-1;
-        sword_t i,free;
-        if (th == get_sb_vm_thread())
-            esp = (void **)((void *)&pointer);
-        else {
-            void **esp1;
-            free = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-            for(i=free-1;i>=0;i--) {
-                os_context_t *c = nth_interrupt_context(i, th);
-                esp1 = (void **) *os_context_register_addr(c,reg_SP);
-                if (esp1>=(void **)th->control_stack_start && esp1<(void **)th->control_stack_end) {
-                    if(esp1<esp) esp=esp1;
-                    pin_seek_state.pointer = (void*)pointer;
-                    context_scanner(compare_pointer, c);
-                    pin_seek_state.pointer = 0;
-                    if (pin_seek_state.found) return th;
-                }
-            }
-        }
-        if (!esp || esp == (void*) -1)
-            UNKNOWN_STACK_POINTER_ERROR("deduce_thread", th);
-        void** where;
-        for (where = ((void **)th->control_stack_end)-1; where >= esp;  where--)
-            if ((uword_t)*where == pointer) {
-                *pc = deduce_thread_pc(th, where);
+        lispobj* stackptr = get_stackptr(th);
+        for ( ; stackptr < th->control_stack_end ; ++stackptr ) {
+            lispobj* obj = valid_ambiguous_pointer_p(*stackptr, 0);
+            if (obj && compute_lispobj(obj) == pointer) {
+                *pc = deduce_thread_pc(th, (void**)stackptr);
                 return th;
             }
+        }
     }
     return 0;
 }
@@ -298,20 +308,44 @@ static __attribute__((unused)) int tls_index_ok(lispobj tlsindex, struct vector*
     return 1; // is OK
 }
 
-/* KNOWN BUG: stack reference to pinned large object or immobile object
- * won't be found in pins hashtable */
-/* Also: should take 'struct lisp_thread**' instead of 'struct thread**' */
+// Return any key in common between the two supplied tables
+__attribute__((unused))
+static uword_t table_intersect(struct hopscotch_table *tbl1,
+                               struct hopscotch_table *tbl2)
+{
+    // Whichever table has fewer keys will be tbl1
+    if (tbl2->count < tbl1->count) {
+        struct hopscotch_table *temp;
+        temp = tbl1;
+        tbl1 = tbl2;
+        tbl2 = temp;
+    }
+    int i;
+    uword_t key;
+    for_each_hopscotch_key(i, key, (*tbl1)) {
+        if (hopscotch_containsp(tbl2, key)) return key;
+    }
+    return 0;
+}
+
 static lispobj examine_threads(struct hopscotch_table* targets,
-                               void (*context_scanner)(),
-                               int n_pins, lispobj* pins,
+                               struct hopscotch_table* stack_roots,
                                enum ref_kind *root_kind,
                                struct thread** root_thread,
                                char** thread_pc,
                                struct vector* ignored_objects,
                                lispobj *tls_index)
 {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    // Look in the control stacks
+    uword_t root = table_intersect(targets, stack_roots);
+    if (root) {
+        *root_thread = deduce_thread(root, thread_pc);
+        *root_kind = CONTROL_STACK;
+        return root;
+    }
+#endif
     struct thread *th;
-
     for_each_thread(th) {
         lispobj *where, *end;
         // Examine thread-local storage
@@ -346,48 +380,8 @@ static lispobj examine_threads(struct hopscotch_table* targets,
                 *thread_pc = 0;
                 return *where;
             }
-        // Examine the explicit pin list
-        lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
-        while (pin_list != NIL) {
-            uword_t pin = CONS(pin_list)->car;
-            if (interestingp(pin, targets)) {
-                *root_thread = th;
-                *thread_pc = 0;
-                return *where;
-            }
-            pin_list = CONS(pin_list)->cdr;
-        }
 #endif
     }
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    // Look in the control stacks
-    *root_kind = CONTROL_STACK;
-    uword_t pin;
-    int i;
-    for (i=n_pins-1; i>=0; --i)
-        // Bypass interestingp() to avoid one test - pins are known pointers.
-        if (hopscotch_containsp(targets, pin = pins[i])) {
-            bool world_stopped = context_scanner != 0;
-            if (world_stopped) {
-                *root_thread = deduce_thread(context_scanner, pin, thread_pc);
-            } else {
-                *root_thread = 0;
-                *thread_pc = 0;
-                // Scan just the current thread's stack
-                // (We don't know where the other stack pointers are)
-                th = get_sb_vm_thread();
-                void **esp = __builtin_frame_address(0);
-                void **where;
-                for (where = ((void **)th->control_stack_end)-1; where >= esp;  --where)
-                    if (*where == (void*)pin) {
-                        *root_thread = th;
-                        *thread_pc = deduce_thread_pc(th, where);
-                        break;
-                    }
-            }
-            if (*root_thread) return pin;
-        }
-#endif
     *root_kind = HEAP;
     return 0;
 }
@@ -411,7 +405,8 @@ static struct node* find_node(struct layer* layer, lispobj ptr)
     return 0;
 }
 
-#ifdef LISP_FEATURE_ARM64
+// No longer using compressed pointers by default
+#if 1
 static inline traceroot_pointer encode_pointer(lispobj pointer)
 {
     return pointer;
@@ -524,7 +519,7 @@ static lispobj trace1(lispobj object,
                       inverted_heap_t graph,
                       struct scratchpad* scratchpad,
                       struct vector* ignored_objects,
-                      int n_pins, lispobj* pins, void (*context_scanner)(),
+                      struct hopscotch_table* stack_roots,
                       int criterion)
 {
     struct node* anchor = 0;
@@ -540,7 +535,7 @@ static lispobj trace1(lispobj object,
     int layer_capacity = 0;
 
     hopscotch_put(targets, object, 1);
-    while ((thread_ref = examine_threads(targets, context_scanner, n_pins, pins,
+    while ((thread_ref = examine_threads(targets, stack_roots,
                                          &root_kind, &root_thread, &thread_pc,
                                          ignored_objects, &tls_index)) == 0) {
         // TODO: preallocate layers to avoid possibility of malloc deadlock
@@ -861,9 +856,9 @@ static uword_t build_refs(lispobj* where, lispobj* end,
 }
 #undef check_ptr
 
-#define show_tally(b,a) /* "before" and "after" */   \
+#define show_tally(b,a,space) /* "before" and "after" */     \
   if(heap_trace_verbose && !ss->record_ptrs) \
-    fprintf(stderr, "%ld objs, %ld ptrs, %ld immediates\n", \
+    fprintf(stderr, space " space: %ld objs, %ld ptrs, %ld immediates\n", \
             a->n_objects - b.n_objects, a->n_pointers - b.n_pointers, \
             (a->n_scanned_words - a->n_pointers) - (b.n_scanned_words - b.n_pointers))
 
@@ -872,17 +867,17 @@ static void scan_spaces(struct scan_state* ss)
     struct scan_state old = *ss;
     build_refs((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, ss);
     build_refs((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, ss);
-    show_tally(old, ss);
+    show_tally(old, ss, "static");
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     old = *ss; build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);
-    show_tally(old, ss);
+    show_tally(old, ss, "fixedobj");
     old = *ss; build_refs((lispobj*)TEXT_SPACE_START, text_space_highwatermark, ss);
-    show_tally(old, ss);
+    show_tally(old, ss, "text");
 #endif
     old = *ss;
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))build_refs,
                     -1, (uword_t)ss);
-    show_tally(old, ss);
+    show_tally(old, ss, "dynamic");
 }
 
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
@@ -956,55 +951,121 @@ static void* compute_heap_inverse(bool keep_leaves,
     return ss.inverted_heap;
 };
 
-/* Return true if the user wants to find a leaf object.
- * If not, then we can omit all leaf objects from the inverted heap
- * because no leaf object can point to anything */
-static bool finding_leaf_p(lispobj weak_pointers)
+// FIXME: precise registers don't use this yet
+__attribute__((unused)) static void add_to_roots(os_context_register_t word, void* arg)
 {
-    do {
-        lispobj car = CONS(weak_pointers)->car;
-        lispobj value = ((struct weak_pointer*)native_pointer(car))->value;
-        weak_pointers = CONS(weak_pointers)->cdr;
-        if (is_lisp_pointer(value)
-            && !listp(value)
-            && leaf_obj_widetag_p(widetag_of(native_pointer(value)))) return 1;
-    } while (weak_pointers != NIL);
-    return 0; // this is the expected (and optimal) case
+    lispobj* obj = valid_ambiguous_pointer_p(word, 1);
+    // fprintf(stderr, "  reg %lx -> %p\n", word, obj);
+    if (obj) hopscotch_put(arg, compute_lispobj(obj), 1);
 }
 
-/* Find any shortest path from a thread or tenured object
- * to each of the specified objects.
- */
-static int trace_paths(void (*context_scanner)(),
-                       lispobj weak_pointers, // list of inputs
-                       lispobj paths, // vector of outputs
-                       lispobj ignored_objects, // tagged pointer to vector
-                       int n_pins, lispobj* pins,
-                       int criterion)
+extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
+                                    os_context_t *context, void*);
+
+/* Return number of sought objects that had paths to them.
+ * Return -1 for invalid input.
+ * This must be called inside WITHOUT-GCING. */
+int gc_pathfind_aux(lispobj* stackptr,
+                    lispobj input, lispobj results, lispobj ignored_objects,
+                    int criterion)
 {
-    int i;
-    void* inverted_heap;
+    cur_thread_stackptr_at_entry = (uword_t)stackptr;
+    int n_inputs = 0, n_live = 0, n_bad = 0, n_imm = 0;
+    /* If 'inputs' does NOT contain any leaf object, then all leaf objects
+     * can be omitted from the inverted heap as they can't point to anything.
+     * Start by assuming that leaves need not be included in the search space.
+     * This forces far more work that should be required, because if finding
+     * a path to a leaf object, the inverse heap should include *only* the
+     * pointerless objects that are in 'inputs', and not all such objects */
+    int include_leaves = 0;
+    lispobj list;
+    for (list = input ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
+        ++n_inputs;
+        lispobj car = CONS(list)->car;
+        if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
+             widetag_of(native_pointer(car)) != WEAK_POINTER_WIDETAG)) {
+            ++n_bad;
+            continue;
+        }
+        lispobj wpval = ((struct weak_pointer*)native_pointer(car))->value;
+        if (is_lisp_pointer(wpval)) {
+            ++n_live;
+            if (!listp(wpval) && leaf_obj_widetag_p(widetag_of(native_pointer(wpval))))
+                include_leaves = 1;
+        } else if (wpval != UNBOUND_MARKER_WIDETAG)
+            ++n_imm;
+    }
+    if (!listp(list) || n_bad || lowtag_of(results) != OTHER_POINTER_LOWTAG
+        || widetag_of(native_pointer(results)) != SIMPLE_VECTOR_WIDETAG) {
+        if (heap_trace_verbose) {
+            fprintf(stderr, "; Bad value in liveness tracker\n");
+        }
+        return -1;
+    }
+    if (heap_trace_verbose) {
+        fprintf(stderr, "; Liveness tracking: %d/%d live objects", n_live, n_inputs);
+
+        if (n_imm)
+            fprintf(stderr, " (ignored %d non-pointers)", n_imm);
+        putc('\n', stderr);
+    }
+    if (!n_live) return 0;
+    struct thread *th;
+    for_each_thread(th) gc_close_thread_regions(th, 0);
+    ensure_region_closed(code_region, PAGE_TYPE_CODE);
+
+    struct hopscotch_table roots;
+    hopscotch_create(&roots, HOPSCOTCH_HASH_FUN_DEFAULT, 0, 32, 0);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    th = get_sb_vm_thread();
+    // Compute all the roots from stack (+ context registers)
+    for_each_thread(th) {
+        lispobj* stackptr = get_stackptr(th);
+        os_context_t* context = get_register_context(th);
+        fprintf(stderr, "thread %p stack range %p..%p\n", th, stackptr, th->control_stack_end);
+        if (context) visit_context_registers(add_to_roots, context, &roots);
+        for ( ; stackptr < th->control_stack_end ; ++stackptr ) {
+            lispobj word = *stackptr;
+            lispobj *obj = valid_ambiguous_pointer_p(word, 0);
+            if (obj) {
+                if (heap_trace_verbose>3)
+                    fprintf(stderr, "  %p: %lx = %lx %s\n", stackptr, word,
+                            compute_lispobj(obj),
+                            lowtag_of(compute_lispobj(obj))==LIST_POINTER_LOWTAG?"":
+                            widetag_names[widetag_of(obj)>>2]);
+                hopscotch_put(&roots, compute_lispobj(obj), 1);
+            }
+        }
+    }
+#else
+    for_each_thread(th) {
+        lispobj* where = th->control_stack_start;
+        lispobj* end = access_control_stack_pointer(th);
+        for ( ; where < end ; ++where) {
+            lispobj word = *where;
+            lispobj *obj = valid_ambiguous_pointer_p(word, 0);
+            if (obj) {
+                hopscotch_put(&roots, compute_lispobj(obj), 1);
+            }
+        }
+    }
+#endif
+    // Compute the heap inverse
     struct scratchpad scratchpad;
+    void* inverted_heap = compute_heap_inverse(include_leaves, ignored_objects,
+                                               &scratchpad);
+
     // A hashset of all objects in the reverse reachability graph so far
     struct hopscotch_table visited;  // *Without* lowtag
     // A hashset of objects in the current graph layer
     struct hopscotch_table targets;  // With lowtag
     int n_found = 0; // how many objects had paths to them
-
-    if (heap_trace_verbose) {
-        fprintf(stderr, "%d pins:\n", n_pins);
-        for(i=0;i<n_pins;++i)
-          fprintf(stderr, " %p%s", (void*)pins[i],
-                  ((i%8)==7||i==n_pins-1)?"\n":"");
-    }
-    inverted_heap = compute_heap_inverse(finding_leaf_p(weak_pointers),
-                                         ignored_objects, &scratchpad);
     hopscotch_create(&visited, HASH_FUNCTION, 0, 32, 0);
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
-    i = 0;
+    lispobj weak_pointers = input;
+    int i = 0;
     do {
-        // Oh dear, is this really supposed to be '<=' (vs '<') ?
-        gc_assert(i <= vector_len(VECTOR(paths)));
+        gc_assert(i < vector_len(VECTOR(results)));
         lispobj car = CONS(weak_pointers)->car;
         lispobj value = ((struct weak_pointer*)native_pointer(car))->value;
         weak_pointers = CONS(weak_pointers)->cdr;
@@ -1016,21 +1077,20 @@ static int trace_paths(void (*context_scanner)(),
             lispobj path = trace1(canonical_obj(value),
                                   &targets, &visited,
                                   inverted_heap, &scratchpad,
+                                  // could be NULL so don't use VECTOR() cast on it
                                   (struct vector*)native_pointer(ignored_objects),
-                                  n_pins, pins, context_scanner, criterion);
-            lispobj* elt = VECTOR(paths)->data + i;
+                                  &roots, criterion);
+            lispobj* elt = VECTOR(results)->data + i;
             vector_notice_pointer_store(elt);
             if ((*elt = path) != 0) ++n_found;
         }
         ++i;
     } while (weak_pointers != NIL);
-    // gc_close_collector_regions() won't suffice here.
-    // Depending on whether this is called from prove_liveness() or
-    // gc_prove_liveness() via collect_garbage(), there may be an open
-    // region that has the THREAD_PAGE_FLAG in its PTE. But that's not
-    // correct for the allocations made for traceroot's answers.
+    cur_thread_stackptr_at_entry = 0;
+
     ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
+
     os_deallocate(scratchpad.base, scratchpad.end-scratchpad.base);
 #if TRACEROOT_USE_ABSL_HASHMAP
     absl_hashmap_destroy(inverted_heap);
@@ -1040,69 +1100,15 @@ static int trace_paths(void (*context_scanner)(),
 #endif
     hopscotch_destroy(&visited);
     hopscotch_destroy(&targets);
+
     return n_found;
 }
 
-/// Return number of sought objects that had paths to them.
-/// Return -1 for invalid input.
-int gc_prove_liveness(void(*context_scanner)(),
-                      lispobj objects,
-                      int n_pins, uword_t* pins,
-                      int criterion)
+int gc_pathfind(lispobj input, lispobj results, lispobj ignored_objects,
+                int criterion)
 {
-    int n_watched = 0, n_live = 0, n_bad = 0, n_imm = 0, n_paths = 0;
-    lispobj input  = VECTOR(objects)->data[0],
-            ignore = VECTOR(objects)->data[1],
-            output = VECTOR(objects)->data[2],
-            paths  = CONS(output)->cdr;
-    lispobj list;
-    for (list = input ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
-        ++n_watched;
-        lispobj car = CONS(list)->car;
-        if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
-             widetag_of(native_pointer(car)) != WEAK_POINTER_WIDETAG)) {
-            ++n_bad;
-            continue;
-        }
-        lispobj wpval = ((struct weak_pointer*)native_pointer(car))->value;
-        if (is_lisp_pointer(wpval))
-            ++n_live;
-        else if (wpval != UNBOUND_MARKER_WIDETAG)
-            ++n_imm;
-    }
-    if (!listp(list) || n_bad || lowtag_of(paths) != OTHER_POINTER_LOWTAG
-        || widetag_of(native_pointer(paths)) != SIMPLE_VECTOR_WIDETAG) {
-        if (heap_trace_verbose) {
-            fprintf(stderr, "; Bad value in liveness tracker\n");
-        }
-        CONS(output)->car = make_fixnum(-1);
-        return -1;
-    }
-    if (heap_trace_verbose) {
-        fprintf(stderr, "; Liveness tracking: %d/%d live watched objects",
-                n_live, n_watched);
-
-        if (n_imm)
-            fprintf(stderr, " (ignored %d non-pointers)", n_imm);
-        putc('\n', stderr);
-    }
-    if (!n_live) {
-        CONS(output)->car = make_fixnum(0);
-        return 0;
-    }
-    n_paths = trace_paths(context_scanner, input, paths, ignore,
-                          n_pins, (lispobj*)pins, criterion);
-    CONS(output)->car = make_fixnum(n_paths);
-    return n_paths;
-}
-
-/* This should be called inside WITHOUT-GCING so that the set
- * of pins does not change out from underneath.
- */
-int prove_liveness(lispobj objects, int criterion)
-{
-    extern struct hopscotch_table pinned_objects;
-    extern int gc_pin_count;
-    extern lispobj* gc_filtered_pins;
-    return gc_prove_liveness(0, objects, gc_pin_count, gc_filtered_pins, criterion);
+    // Approximate the stack pointer by using an incoming arg's address
+    return gc_pathfind_aux(&input,
+                           input, results, ignored_objects,
+                           criterion);
 }
