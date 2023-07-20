@@ -1029,7 +1029,7 @@ int gc_pathfind_aux(lispobj* stackptr,
             lispobj *obj = valid_ambiguous_pointer_p(word, 0);
             if (obj) {
                 if (heap_trace_verbose>3)
-                    fprintf(stderr, "  %p: %lx = %lx %s\n", stackptr, word,
+                    fprintf(stderr, "  %p: %"OBJ_FMTX" = %"OBJ_FMTX" %s\n", stackptr, word,
                             compute_lispobj(obj),
                             lowtag_of(compute_lispobj(obj))==LIST_POINTER_LOWTAG?"":
                             widetag_names[widetag_of(obj)>>2]);

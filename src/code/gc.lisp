@@ -126,6 +126,13 @@ run in any thread.")
      (alien-funcall (extern-alien "release_gc_lock" (function void)))
      t))
 
+(defmacro get-gc-real-time ()
+  ;; 64-bit is just a call to clock-gettime and some math that won't ever cons
+  #+64-bit '(get-internal-real-time)
+  ;; 32-bit memoizes the result to try to avoid bignum consing,
+  ;; which can fail during foreign thread creation.
+  #-64-bit 0)
+
 (defun sub-gc (gen)
   (cond (*gc-inhibit*
          (setf *gc-pending* t)
@@ -139,11 +146,11 @@ run in any thread.")
                   (let ((old-usage (dynamic-usage))
                         (new-usage 0)
                         (start-time (get-internal-run-time))
-                        (start-real-time (get-internal-real-time)))
+                        (start-real-time (get-gc-real-time)))
                     (collect-garbage gen)
                     (setf *gc-epoch* (cons 0 0))
                     (let ((run-time (- (get-internal-run-time) start-time))
-                          (real-time (- (get-internal-real-time) start-real-time)))
+                          (real-time (- (get-gc-real-time) start-real-time)))
                       (incf *gc-real-time* real-time)
                       ;; KLUDGE: Sometimes we see the second getrusage() call
                       ;; return a smaller value than the first, which can
