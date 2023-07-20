@@ -2635,8 +2635,7 @@
   (:result-types unsigned-num)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 10
-    (inst mul temp dividend c)
-    (inst and temp temp #xFFFFFFFF) ; drop the high 32 bits, keep the low 32 bits
+    (inst mul (32-bit-reg temp) dividend c) ; drop the high 32 bits, keep the low 32 bits
     (inst mul temp temp divisor)
     (inst lsr remainder temp 32))) ; take the high 32 bits
 (define-vop ()
