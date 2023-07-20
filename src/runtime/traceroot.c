@@ -51,7 +51,7 @@ typedef struct hopscotch_table* inverted_heap_t;
 
 int heap_trace_verbose = 0;
 
-typedef uint64_t traceroot_pointer;
+typedef uintptr_t traceroot_pointer;
 
 extern generation_index_t gencgc_oldest_gen_to_gc;
 
