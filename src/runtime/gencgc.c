@@ -3667,22 +3667,22 @@ static void semiconservative_pin_stack(struct thread* th,
         for(j=1; j<32; ++j) {
             // context registers have more significant bits than lispobj.
             uword_t word = mctx->gregs[j];
-            if (gen == 0) sticky_preserve_pointer(word, 1);
-            else preserve_pointer(word, 1);
+            if (gen == 0) sticky_preserve_pointer(word, (void*)1);
+            else preserve_pointer(word, (void*)1);
         }
 #elif defined LISP_FEATURE_PPC64
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
-            if (gen == 0) sticky_preserve_pointer(word, 1);
-            else preserve_pointer(word, 1);
+            if (gen == 0) sticky_preserve_pointer(word, (void*)1);
+            else preserve_pointer(word, (void*)1);
         }
         // What kinds of data do we put in the Count register?
         // maybe it's count (raw word), maybe it's a PC. I just don't know.
-        preserve_pointer(*os_context_lr_addr(context), 1);
-        preserve_pointer(*os_context_ctr_addr(context), 1);
+        preserve_pointer(*os_context_lr_addr(context), (void*)1);
+        preserve_pointer(*os_context_ctr_addr(context), (void*)1);
 #endif
-        preserve_pointer(os_context_pc(context), 1);
+        preserve_pointer(os_context_pc(context), (void*)1);
     }
 }
 #endif

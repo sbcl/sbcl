@@ -600,7 +600,12 @@ if PACKAGE doesn't designate a valid package."
 locked. Signals an error if PACKAGE is not a valid package designator"
   (flet ((unoptimize (table)
            (dovector (x (symtbl-cells table))
-             (when (and (symbolp x) (test-header-data-bit x sb-vm::+symbol-fast-bindable+))
+             ;; By some small miracle this was mostly correct for NIL
+             ;; except that on ppc64le, (GET-HEADER-DATA NIL) returns #x52D00
+             ;; which appears to have the +symbol-fast-bindable+ bit on.
+             ;; What horrible fate befalls you for unsetting that.
+             (when (and (typep x '(and symbol (not null)))
+                        (test-header-data-bit x sb-vm::+symbol-fast-bindable+))
                (sb-c::unset-symbol-progv-optimize x)))))
     (let ((p (find-undeleted-package-or-lose package)))
       (setf (package-lock p) t)
