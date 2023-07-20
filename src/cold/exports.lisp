@@ -791,6 +791,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
    "BYTES-CONSED-BETWEEN-GCS"
    "GC" "GET-BYTES-CONSED"
    "*GC-RUN-TIME*"
+   "*GC-REAL-TIME*"
    "PURIFY"
    "DYNAMIC-SPACE-SIZE"
    ;; Gencgc only, but symbols exist for manual building

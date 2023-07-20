@@ -214,6 +214,7 @@
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
       sb-kernel::*type-cache-nonce*
       sb-ext:*gc-run-time*
+      sb-ext:*gc-real-time*
       sb-kernel::*gc-epoch*
       sb-int:*n-bytes-freed-or-purified*
       ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")

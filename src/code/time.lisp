@@ -242,15 +242,18 @@ format."
 
 ;;;; TIME
 
+(defvar *gc-real-time* 0
+  "Total real time spent doing garbage collection (as reported by
+GET-INTERNAL-REAL-TIME.) Initialized to zero on startup.")
 (defvar *gc-run-time* 0
   "Total CPU time spent doing garbage collection (as reported by
 GET-INTERNAL-RUN-TIME.) Initialized to zero on startup. It is safe to bind
 this to zero in order to measure GC time inside a certain section of code, but
 doing so may interfere with results reported by eg. TIME.")
-(declaim (type index *gc-run-time*))
+(declaim (type index *gc-run-time* *gc-real-time*))
 
 (defun print-time (&key real-time-ms user-run-time-us system-run-time-us
-                   gc-run-time-ms processor-cycles eval-calls
+                   gc-run-time-ms gc-real-time-ms processor-cycles eval-calls
                    lambdas-converted page-faults bytes-consed
                    aborted)
   (let ((total-run-time-us (+ user-run-time-us system-run-time-us))
@@ -263,6 +266,8 @@ doing so may interfere with results reported by eg. TIME.")
                          ~@<  ~@;~/sb-impl::format-milliseconds/ of real time~%~
                                  ~/sb-impl::format-microseconds/ of total run time ~
                                   (~@/sb-impl::format-microseconds/ user, ~@/sb-impl::format-microseconds/ system)~%~
+                                 ~[[ Real times consist of ~/sb-impl::format-milliseconds/ GC time, ~
+                                                       and ~/sb-impl::format-milliseconds/ non-GC time. ]~%~;~2*~]~
                                  ~[[ Run times consist of ~/sb-impl::format-milliseconds/ GC time, ~
                                                       and ~/sb-impl::format-milliseconds/ non-GC time. ]~%~;~2*~]~
                                  ~,2F% CPU~%~
@@ -276,6 +281,9 @@ doing so may interfere with results reported by eg. TIME.")
             total-run-time-us
             user-run-time-us
             system-run-time-us
+            (if (zerop gc-real-time-ms) 1 0)
+            gc-real-time-ms
+            (- real-time-ms gc-real-time-ms)
             (if (zerop gc-run-time-ms) 1 0)
             gc-run-time-ms
             ;; Round up so we don't mislead by saying 0.0 seconds of non-GC time...
@@ -398,6 +406,9 @@ returns values returned by FUNCTION.
   :GC-RUN-TIME-MS
       GC run time in milliseconds (included in user and system run time.)
 
+  :GC-REAL-TIME-MS
+      GC real time in milliseconds.
+
   :PROCESSOR-CYCLES
       Approximate number of processor cycles used. (Omitted  if not supported on
       the platform -- currently available on x86 and x86-64 only.)
@@ -454,6 +465,7 @@ EXPERIMENTAL: Interface subject to change."
       (time-get-sys-info))
     (setq old-real-time (get-internal-real-time))
     (let ((start-gc-internal-run-time *gc-run-time*)
+          (start-gc-internal-real-time *gc-real-time*)
           (*eval-calls* 0)
           (sb-c::*lambda-conversions* 0)
           (aborted t))
@@ -462,12 +474,14 @@ EXPERIMENTAL: Interface subject to change."
              (multiple-value-prog1 (apply fun arguments)
                (setf aborted nil))
           (multiple-value-bind (h1 l1) (read-cycle-counter)
-            (let ((stop-gc-internal-run-time *gc-run-time*))
+            (let ((stop-gc-internal-run-time *gc-run-time*)
+                  (stop-gc-internal-real-time *gc-real-time*))
               (multiple-value-setq
                   (new-run-utime new-run-stime new-page-faults new-bytes-consed)
                 (time-get-sys-info))
               (setq new-real-time (- (get-internal-real-time) real-time-overhead))
               (let* ((gc-internal-run-time (max (- stop-gc-internal-run-time start-gc-internal-run-time) 0))
+                     (gc-internal-real-time (max (- stop-gc-internal-real-time start-gc-internal-real-time) 0))
                      (real-time (max (- new-real-time old-real-time) 0))
                      (user-run-time (max (- new-run-utime old-run-utime) 0))
                      (system-run-time (max (- new-run-stime old-run-stime) 0))
@@ -487,6 +501,8 @@ EXPERIMENTAL: Interface subject to change."
                     (note :eval-calls *eval-calls* #'zerop)
                     (note :gc-run-time-ms (floor gc-internal-run-time
                                                  (/ internal-time-units-per-second 1000)))
+                    (note :gc-real-time-ms (floor gc-internal-real-time
+                                                  (/ internal-time-units-per-second 1000)))
                     (note :system-run-time-us system-run-time)
                     (note :user-run-time-us user-run-time)
                     (note :real-time-ms (floor real-time
