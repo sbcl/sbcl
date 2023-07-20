@@ -5908,17 +5908,18 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         // Process each untagged fdefn pointer.
         // TODO: assert that the generation of any fdefn is older than that of 'code'.
-        lispobj* fdefns_start = code->constants + code_n_funs(code)
-                                * CODE_SLOTS_PER_SIMPLE_FUN;
+        lispobj* fdefns = code->constants +
+          code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
         int n_fdefns = code_n_named_calls(code);
         int i;
         for (i=0; i<n_fdefns; ++i) {
-            lispobj word = fdefns_start[i];
-            if ((word & LOWTAG_MASK) == 0 && word != 0) {
+            lispobj word = fdefns[i];
+            if (word) {
+                gc_assert(!(word & LOWTAG_MASK)); // must not have OTHER_POINTER_LOWTAG
                 lispobj tagged_word = word | OTHER_POINTER_LOWTAG;
                 scavenge(&tagged_word, 1);
                 if (tagged_word - OTHER_POINTER_LOWTAG != word) {
-                    fdefns_start[i] = tagged_word - OTHER_POINTER_LOWTAG;
+                    fdefns[i] = tagged_word - OTHER_POINTER_LOWTAG;
                 }
             }
         }
