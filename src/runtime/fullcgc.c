@@ -48,7 +48,7 @@ static page_index_t free_page;
  * If it collides with 'next_free_page', then you lose.
  * TODO: It would be reasonably simple to have this request more memory from
  * the OS instead of failing on overflow */
-static void* get_free_page(bool prezero) {
+static void* get_free_page() {
     --free_page;
     if (free_page < next_free_page)
         lose("Needed more space to GC");
@@ -59,7 +59,6 @@ static void* get_free_page(bool prezero) {
 #elif defined LISP_FEATURE_WIN32
     os_commit_memory(page_address(free_page), GENCGC_PAGE_BYTES);
 #endif
-    if (prezero) zeroize_pages_if_needed(free_page, free_page, 0);
     return mem;
 }
 
@@ -74,7 +73,7 @@ static void gc_enqueue(lispobj object)
         if (next) {
             scav_queue.recycler = next->next;
         } else {
-            next = (struct Qblock*)get_free_page(0);
+            next = (struct Qblock*)get_free_page();
         }
         block = block->next = next;
         block->next = 0;
@@ -245,7 +244,7 @@ void gc_mark_range(lispobj* where, long count) {
 void prepare_for_full_mark_phase()
 {
     free_page = page_table_pages;
-    struct Qblock* block = (struct Qblock*)get_free_page(0);
+    struct Qblock* block = (struct Qblock*)get_free_page();
     scav_queue.head_block = block;
     scav_queue.tail_block = block;
     scav_queue.recycler   = 0;
