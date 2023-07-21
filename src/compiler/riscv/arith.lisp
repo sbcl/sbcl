@@ -875,3 +875,35 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst sll result digit count)))
+
+#+64-bit
+(progn
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mul temp dividend c)
+    (inst slli temp temp 32) ; drop the high 32 bits, keep the low 32 bits
+    (inst srli temp temp 32)
+    (inst mul temp temp divisor)
+    (inst srli remainder temp 32))) ; take the high 32 bits
+(define-vop ()
+  (:translate fastrem-64)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mul temp dividend c) ; keep only the low 64 bits
+    (inst mulhu remainder temp divisor)))) ; only the high 64 bits
