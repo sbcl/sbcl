@@ -267,6 +267,7 @@
   ;; if the defstruct was compiled in a policy of SPEED 3.
   (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
   ;; Information for the quicker variant of SLOT-VALUE on STRUCTURE-OBJECT
+  #+64-bit
   (struct-slot-map nil)
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
