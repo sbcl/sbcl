@@ -4094,11 +4094,12 @@
    ()
    `(lambda (b)
       (tagbody
-         ((lambda (v6)
+         ((lambda (v)
+            (declare (ignore v))
             ((lambda (a b &rest c)
                a b c
                (go 7))
-             (catch 'ct8 0)
+             (catch 'c 0)
              (case b ((-424 -278) b) (t 0))))
           ((lambda () (go 7))))
        7))))
