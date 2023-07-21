@@ -4412,8 +4412,6 @@ remap_free_pages (page_index_t from, page_index_t to)
 
 generation_index_t small_generation_limit = 1;
 
-// one pair of counters per widetag, though we're only tracking code as yet
-int n_scav_calls[64], n_scav_skipped[64];
 extern int finalizer_thread_runflag;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -4553,15 +4551,7 @@ collect_garbage(generation_index_t last_gen)
                 generations[gen+1].bytes_allocated;
         }
 
-        memset(n_scav_calls, 0, sizeof n_scav_calls);
-        memset(n_scav_skipped, 0, sizeof n_scav_skipped);
         garbage_collect_generation(gen, raise, cur_thread_approx_stackptr);
-
-        if (gencgc_verbose)
-            fprintf(stderr,
-                    "code scavenged: %d total, %d skipped\n",
-                    n_scav_calls[CODE_HEADER_WIDETAG/4],
-                    n_scav_skipped[CODE_HEADER_WIDETAG/4]);
 
         /* Reset the memory age cum_sum. */
         generations[gen].cum_sum_bytes_allocated = 0;
@@ -5867,8 +5857,6 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
     int nboxed = code_header_words(code);
     if (!nboxed) goto done;
 
-    ++n_scav_calls[CODE_HEADER_WIDETAG/4];
-
     int my_gen = gc_gen_of((lispobj)object, ARTIFICIALLY_HIGH_GEN);
     if (my_gen < ARTIFICIALLY_HIGH_GEN && ((my_gen & 7) == from_space)) {
         // Since 'from_space' objects are not directly scavenged - they can
@@ -5958,8 +5946,6 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
                     goto done;
         }
         CLEAR_WRITTEN_FLAG(object);
-    } else {
-        ++n_scav_skipped[CODE_HEADER_WIDETAG/4];
     }
 done:
     return code_total_nwords(code);
