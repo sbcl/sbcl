@@ -47,6 +47,7 @@
 (with-test (:name (slot-unbound :struct-a))
   (setf *slot-unbounds* nil)
   (let ((struct-a (make-struct-a)))
+    (declare (optimize safety))
     (assert (eql (slot-value struct-a 'boxed) 0))
     (assert (eql (slot-value struct-a 'raw) 0.0d0))
     (assert (eql (slot-value struct-a 'unboundable) 42))

@@ -266,6 +266,8 @@
   ;; Could be the generalized function, or a type-specific one
   ;; if the defstruct was compiled in a policy of SPEED 3.
   (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
+  ;; Information for the quicker variant of SLOT-VALUE on STRUCTURE-OBJECT
+  (struct-slot-map nil)
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.

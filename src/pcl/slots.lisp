@@ -84,7 +84,64 @@
 
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
+(macrolet
+    ((fast-get-dsd-index-by-name ()
+       ;; This macro is unhygienic, freely referencing MAP and SLOT-NAME
+       ;; from STRUCTURE-SLOT-VALUE or SLOT-VALUE.
+       `(let* ((shift (truly-the (integer 0 31) (svref map 0)))
+               (mask (truly-the (unsigned-byte 32) (svref map 1)))
+               (c (truly-the (unsigned-byte 32) (svref map 2)))
+               ;; elide the check for whether hash was precomputed. It has to have been,
+               ;; and even if it wasn't we'd just take the slow path, so no harm done.
+               (hash (logand (ash (sb-sys:%primitive sb-vm::symbol-hash
+                                                     (truly-the symbol slot-name))
+                                  (- shift))
+                             mask))
+               (n-cells
+                (truly-the (unsigned-byte 32)
+                           (ash (- (length map) sb-kernel::fast-slot-table-fixed-cells)
+                                -1)))
+               ;; Cribbed from SYMBOL-TABLE-HASH in src/code/target-package
+               (bin (+ (sb-vm::fastrem-32 hash c n-cells)
+                       sb-kernel::fast-slot-table-fixed-cells))
+               (entry (svref map bin)))
+          (cond ((eq entry slot-name)
+                 (svref map (+ bin n-cells))) ; skip over the fixed portion
+                ((eql entry 0) nil)
+                (t
+                 (let ((v (truly-the simple-vector entry)))
+                   ;; try to find slot-name in the collision vector
+                   (dotimes (i (length v))
+                     (when (eq (svref v i) slot-name)
+                       (let ((indices (svref map (+ bin n-cells))))
+                         (return (svref (truly-the simple-vector indices) i)))))))))))
+
+;;; Structure-slot-value is usually faster than our litle chunks of code that are
+;;; automatically cobbled together for SLOT-VALUE on an unknown type but constant slot name.
+;;; While the global generic for a specific slot might only need to invoke a type-check,
+;;; the dispatch function is not faster than this, if even as fast.
+#+64-bit
+(defun structure-slot-value (instance slot-name)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (let* ((layout (%instance-layout (truly-the structure-object instance)))
+         (map (the simple-vector (sb-kernel::layout-struct-slot-map layout)))
+         (dsd-index (fast-get-dsd-index-by-name)))
+    ;; TODO: encode dsd-raw-type into the index, and handle all raw types here
+    (if dsd-index
+        ;; We don't transform SLOT-VALUE to STRUCTURE-SLOT-VALUE in safety 3,
+        ;; So this need not check for unbound-marker.
+        (%instance-ref instance (truly-the index dsd-index))
+        ;; not found, take the slow path
+        (locally (declare (notinline slot-value))
+          (slot-value instance slot-name)))))
+) ; end MACROLET
+
 (declaim (ftype (sfunction (t symbol) t) slot-value))
+;;; It would be nifty if this could utilize the LAYOUT-STRUCT-SLOT-MAP
+;;; to optimize for subtypes of STRUCTURE-OBJECT in here, but as currently
+;;; defined, STRUCTURE-SLOT-VALUE calls SLOT-VALUE when either it can't find
+;;; the slot or the slot is raw. Since that function punts to this as a fallback,
+;;; this can't utilize that or else they enter an infinite loop on failure.
 (defun slot-value (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
          (cell (find-slot-cell wrapper slot-name))

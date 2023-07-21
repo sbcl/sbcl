@@ -487,5 +487,90 @@
              (format t "Layout flags = #b~10,'0b~%" flags)
              (setq prev flags)))
          (format t "  ~a~%" layout)))))
+
+(defconstant fast-slot-table-fixed-cells 3)
+
+;;; Optimizations to speed up slot-value on structure-object
+;;;  1. try to generate fewer collisions in the symbol -> index map
+;;;  2. use the fastrem-32 algorithm to compute FLOOR
+;;;  3. specialized function which doesn't check slot-unbound or whether the
+;;;     slot has :CLASS allocation (which it can't)
+;;; If "flexible" defstructs (multiple inheritance, standard-object ancestors) are ever
+;;; brought to life, these might be inadmissible. Probably we would not store the
+;;; fast map in such situations.
+#+64-bit
+(progn
+(defun best-slot-map-parameters (names)
+  (let* ((raw-hashes (mapcar (lambda (x) (sxhash (the symbol x))) names))
+         (n-names (length names))
+         (n-cells (logior n-names 1)) ; round to odd if not already
+         ;; remember the best N-COLLISIONS N-CELLS MASK C
+         (best))
+    (declare (type (unsigned-byte 32) n-cells))
+    ;; Unlike with package symbol tables, a slot table has a fixed set of symbols.
+    ;; Therefore we can try to produce the best hashing for that particular set.
+    (loop ; over increasing value of N-CELLS
+     (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params n-cells)
+       (loop for shift from 0 to 31
+             do
+             (let* ((indices
+                     (mapcar (lambda (hash)
+                               (let ((masked-hash (logand (ash hash (- shift)) mask)))
+                                 (sb-vm::fastrem-32 masked-hash c n-cells)))
+                             raw-hashes))
+                    (badness (- n-names (length (remove-duplicates indices)))))
+               (when (= badness 0)
+                 (return-from best-slot-map-parameters
+                   (list 0 n-cells shift mask c)))
+               (when (or (not best) (< badness (car best)))
+                 (setf best
+                       (list badness n-cells shift mask c))))))
+     (when (> n-cells (* 2 n-names))
+       (return best))
+     (incf n-cells 2))))
+
+;; The result is a vector:
+;;  #(SHIFT MASK C symbol .. symbol ... index .. index ...)
+;; The length of the vector implies the divisor.
+(defun make-struct-slot-map (dd)
+  (destructuring-bind (n-cells shift mask c)
+      (cdr (best-slot-map-parameters
+            (mapcar 'dsd-name (dd-slots dd))))
+    (let ((map (make-array (+ (* n-cells 2) fast-slot-table-fixed-cells)
+                           :initial-element 0)))
+      (setf (aref map 0) shift
+            (aref map 1) mask
+            (aref map 2) c)
+      (fill map nil :start (+ fast-slot-table-fixed-cells n-cells))
+      (dolist (dsd (dd-slots dd) map)
+        ;; minor kludge: skip raw slots for now, and let structure-slot-value
+        ;; fall back to the fully general SLOT-VALUE. A better solution would be
+        ;; to encode the raw-type into the value stored in the index vector.
+        (when (eq (dsd-raw-type dsd) t)
+          (binding*
+              ((hash (sxhash (dsd-name dsd)))
+                 (masked-hash (logand (ash hash (- shift)) mask))
+               (bin (truly-the index
+                               (+ (sb-vm::fastrem-32 masked-hash c n-cells)
+                                  fast-slot-table-fixed-cells)))
+               (dsd-index (dsd-index dsd))
+               (name (dsd-name dsd))
+               ((key value)
+                (cond ((eql (svref map bin) 0) ; empty, just store the name and dsd-index
+                       (values name dsd-index))
+                      ;; A bin with a collision is upgraded to a vector of the two entries
+                      ((symbolp (svref map bin))
+                       (values (vector (svref map bin) name)
+                               (vector (svref map (+ bin n-cells)) dsd-index)))
+                      ;; Multiple collisions
+                      (t
+                       (values (concatenate 'vector (svref map bin) (vector name))
+                               (concatenate 'vector
+                                            (svref map (+ bin n-cells))
+                                            (vector dsd-index)))))))
+              (setf (svref map bin) key
+                    (svref map (+ bin n-cells)) value)))))))
+) ; end PROGN
+
 
 (/show0 "target-defstruct.lisp end of file")
