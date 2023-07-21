@@ -55,7 +55,8 @@ static void* get_free_page() {
     page_table[free_page].type = PAGE_TYPE_UNBOXED;
     char* mem = page_address(free_page);
 #ifdef LISP_FEATURE_DARWIN_JIT
-    prezero = 1; // Might need to alter MMU-based protection
+    // Might need to alter MMU-based protection
+    zeroize_pages_if_needed(free_page, free_page, 0);
 #elif defined LISP_FEATURE_WIN32
     os_commit_memory(page_address(free_page), GENCGC_PAGE_BYTES);
 #endif
