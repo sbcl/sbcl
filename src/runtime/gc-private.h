@@ -100,6 +100,7 @@ gc_copy_object_resizing(lispobj object, long nwords, void* region, int page_type
 extern sword_t (*const scavtab[256])(lispobj *where, lispobj object);
 extern struct cons *weak_vectors; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
+extern void acquire_gc_page_table_lock(void), release_gc_page_table_lock(void);
 
 // These next two are prototyped for both GCs
 // but only gencgc will ever call them.
@@ -505,5 +506,17 @@ static inline bool plausible_tag_p(lispobj addr)
 # define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
 # define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
 #endif
+
+extern char * gc_logfile;
+extern void log_generation_stats(char *logfile, char *header);
+extern void print_generation_stats(void);
+extern double generation_average_age(generation_index_t);
+#define PAGE_INDEX_FMT PRIdPTR
+static inline os_vm_size_t npage_bytes(page_index_t npages)
+{
+    gc_assert(npages>=0);
+    return ((os_vm_size_t)npages)*GENCGC_PAGE_BYTES;
+}
+extern os_vm_size_t auto_gc_trigger;
 
 #endif /* _GC_PRIVATE_H_ */

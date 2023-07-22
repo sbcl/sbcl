@@ -101,6 +101,65 @@ static inline enum prot_mode protection_mode(page_index_t page) {
 }
 #endif
 
+static inline bool page_free_p(page_index_t page) {
+    return (page_table[page].type == FREE_PAGE_FLAG);
+}
+
+#include "genesis/cardmarks.h"
+
+/* Check that X is a higher address than Y and return offset from Y to
+ * X in bytes. */
+static inline os_vm_size_t
+addr_diff(void *x, void *y)
+{
+    gc_assert(x >= y);
+    return (uintptr_t)x - (uintptr_t)y;
+}
+
+/* As usually configured, generations 0-5 are normal collected generations,
+   6 is pseudo-static (the objects in which are never moved nor reclaimed),
+   and 7 is scratch space used when collecting a generation without promotion,
+   wherein it is moved to generation 7 and back again.
+ */
+/*
+ * SCRATCH_GENERATION as we've defined it is kinda stupid because "<"
+ * doesn't do what you want. Other choices of value do, and since this an
+ * enum, it should be possible to change. Except it isn't because .. reasons.
+ * Here are some alternatives:
+ *  A: gen 0 through 6 remain as-is and SCRATCH becomes -1
+ *
+ *  B: 1 = nursery, 2 = older, ... up through "old" 6 which becomes the new 7;
+ *     and SCRATCH becomes 0. This is like alternative (A) but avoids negatives.
+ *
+ *  C: (probably the best)
+ *  generations are stored with an implied decimal and one bit of fraction
+ *  representing a half step so that:
+ *     #b0000 = 0, #b0001 = 1/2   | #b0010 = 1, #b0011 = 1 1/2
+ *     #b0100 = 2, #b0101 = 2 1/2 | #b0110 = 3, #b0111 = 3 1/2 ...
+ *  up to 6 1/2. When GCing without promotion, we'd raise each object by half
+ *  a generation, and then demote en masse, which is good because it makes the
+ *  scratch pages older than from_space but younger than the youngest root gen.
+ *
+ * Of course, you could try to solve all this by keeping the existing numbering,
+ * but expressing comparison "a < b" as either:
+ *     "logical_gen(a) < logical_gen(b)" // re-map numerically before compare
+ *  or "gen_lessp(a,b)" // just rename the comparator
+ *
+ * I generally prefer numeric comparison to just work, though we have a further
+ * difficulty that page_table[page].gen is not always the generation of an object,
+ * as when it is non-large and pinned. So the helpers might be needed anyway.
+ */
+
+enum {
+    SCRATCH_GENERATION = PSEUDO_STATIC_GENERATION+1,
+    NUM_GENERATIONS
+};
+
+extern struct generation generations[NUM_GENERATIONS];
+extern os_vm_size_t bytes_allocated;
+
+extern void reset_page_flags(page_index_t page);
+
 /* True if the page starts a contiguous block. */
 static inline bool
 page_starts_contiguous_block_p(page_index_t page_index)

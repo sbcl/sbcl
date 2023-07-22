@@ -41,5 +41,13 @@ extern struct alloc_region  gc_alloc_region[6];
                |(uintptr_t)gc_alloc_region[5].start_addr))
 
 extern int gencgc_alloc_profiler;
+#ifdef LISP_FEATURE_SB_THREAD
+# define THREAD_ALLOC_REGION(threadvar,slot) &threadvar-> slot ##_tlab
+#else
+# define THREAD_ALLOC_REGION(threadvar,slot) main_thread_ ##slot ##_region
+#define main_thread_mixed_region (struct alloc_region*)(STATIC_SPACE_START + MIXED_REGION_OFFSET)
+#define main_thread_cons_region (struct alloc_region*)(STATIC_SPACE_START + CONS_REGION_OFFSET)
+#define main_thread_boxed_region (struct alloc_region*)(STATIC_SPACE_START + BOXED_REGION_OFFSET)
+#endif
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */

@@ -34,6 +34,7 @@ extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
 
 extern bool maybe_gc(os_context_t *context);
+void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested) never_returns;
 
 extern bool gc_active_p;
 extern int sb_sprof_enabled;
