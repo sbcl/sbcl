@@ -743,8 +743,7 @@ static void record_pc(char* pc, unsigned int index, bool sizedp)
     }
 }
 
-void AMD64_SYSV_ABI
-allocation_tracker_counted(uword_t* sp)
+void allocation_tracker_counted(uword_t* sp)
 {
     uword_t *pc, word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {
@@ -775,8 +774,7 @@ allocation_tracker_counted(uword_t* sp)
     gc_assert(ret);
 }
 
-void AMD64_SYSV_ABI
-allocation_tracker_sized(uword_t* sp)
+void allocation_tracker_sized(uword_t* sp)
 {
     uword_t *pc, word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {

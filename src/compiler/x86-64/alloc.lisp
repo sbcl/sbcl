@@ -1074,37 +1074,43 @@
 
 #+sb-xc-host
 (define-vop (alloc-code)
-  (:args (total-words :scs (unsigned-reg) :target rdi)
-         (boxed-words :scs (unsigned-reg) :target rsi))
-  (:temporary (:sc unsigned-reg :offset rdi-offset
-               :from (:argument 0) :to :result) rdi)
+  (:args (total-words :scs (unsigned-reg) :target c-arg-1)
+         (boxed-words :scs (unsigned-reg) :target c-arg-2))
+  (:temporary (:sc unsigned-reg
+               :offset #.(first *c-call-register-arg-offsets*)
+               :from (:argument 0) :to :result) c-arg-1)
   (:temporary (:sc unsigned-reg :offset rsi-offset
-               :from (:argument 1) :to :result) rsi)
+               :offset #.(second *c-call-register-arg-offsets*)
+               :from (:argument 1) :to :result) c-arg-2)
   (:temporary (:sc unsigned-reg :offset r15-offset) dummy)
   (:results (res :scs (descriptor-reg)))
   (:ignore dummy)
   (:generator 1
-    (move rdi total-words) ; C arg 1
-    (move rsi boxed-words) ; C arg 2
-    (with-registers-preserved (c :except rdi :frame-reg r15)
+    (move c-arg-1 total-words)
+    (move c-arg-2 boxed-words)
+    (with-registers-preserved (c :except #-win32 rdi #+win32 rcx :frame-reg r15)
       (pseudo-atomic ()
-        #-immobile-code (inst call (ea (make-fixup "alloc_code_object" :foreign 8)))
-        #+immobile-code (inst call (make-fixup "alloc_code_object" :foreign)))
-      (move rdi rax-tn))
-    (move res rdi)))
+        (call-c
+         #-immobile-code (ea (make-fixup "alloc_code_object" :foreign 8))
+         #+immobile-code (make-fixup "alloc_code_object" :foreign)))
+      (move c-arg-1 rax-tn))
+    (move res c-arg-1)))
 
 #+immobile-space
-(macrolet ((c-call (name)
+(macrolet ((c-fun (name)
              `(let ((c-fun (make-fixup ,name :foreign)))
-                (inst call (cond ((sb-c::code-immobile-p node) c-fun)
-                                 (t (progn (inst mov rax c-fun) rax)))))))
+                (cond ((sb-c::code-immobile-p node) c-fun)
+                                 (t (progn (inst mov rax c-fun) rax))))))
 (define-vop (!alloc-immobile-fixedobj)
   (:args (size-class :scs (any-reg) :target c-arg1)
          (nwords :scs (any-reg) :target c-arg2)
          (header :scs (any-reg) :target c-arg3))
-  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset) c-arg1)
-  (:temporary (:sc unsigned-reg :from (:argument 1) :to :eval :offset rsi-offset) c-arg2)
-  (:temporary (:sc unsigned-reg :from (:argument 2) :to :eval :offset rdx-offset) c-arg3)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval
+               :offset #.(first *c-call-register-arg-offsets*)) c-arg1)
+  (:temporary (:sc unsigned-reg :from (:argument 1) :to :eval
+               :offset #.(second *c-call-register-arg-offsets*)) c-arg2)
+  (:temporary (:sc unsigned-reg :from (:argument 2) :to :eval
+               :offset #.(third *c-call-register-arg-offsets*)) c-arg3)
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) rax)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -1116,7 +1122,7 @@
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic ()
-     (c-call "alloc_immobile_fixedobj")
+     (call-c (c-fun "alloc_immobile_fixedobj"))
      (move result rax))))
 
 ;;; Timing test:

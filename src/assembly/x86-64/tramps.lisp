@@ -89,7 +89,7 @@
   (with-registers-preserved (c :except (rsi rdi))
     (pseudo-atomic ()
       #-system-tlabs (inst break halt-trap)
-      #+system-tlabs (inst call (make-fixup "switch_to_arena" :foreign)))))
+      #+system-tlabs (call-c (make-fixup "switch_to_arena" :foreign) #+win32 rdi-tn #+win32 rsi-tn))))
 
 (macrolet ((def-routine-pair (name&options vars &body code)
              `(progn
@@ -105,56 +105,58 @@
 
 (def-routine-pair (alloc-tramp) ()
   (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst mov rsi-tn system-tlab-p)
-    (inst call (make-fixup "alloc" :foreign))
+    (call-c (make-fixup "alloc" :foreign)
+            (ea 16 rbp-tn)
+            system-tlab-p)
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
   (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst mov rsi-tn system-tlab-p)
-    (inst call (make-fixup "alloc_list" :foreign))
+    (call-c (make-fixup "alloc_list" :foreign)
+            (ea 16 rbp-tn)
+            system-tlab-p)
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (listify-&rest (:return-style :none)) ()
   (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
-    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
-    (inst mov rdx-tn system-tlab-p)
-    (inst call (make-fixup "listify_rest_arg" :foreign))
-    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+    (call-c (make-fixup "listify_rest_arg" :foreign)
+            (ea 16 rbp-tn)
+            (ea 24 rbp-tn)
+            system-tlab-p)
+    (inst mov (ea 24 rbp-tn) rax-tn))   ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
 (def-routine-pair (make-list (:return-style :none)) ()
   (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
-    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
-    (inst mov rdx-tn system-tlab-p)
-    (inst call (make-fixup "make_list" :foreign))
+    (call-c (make-fixup "make_list" :foreign)
+            (ea 16 rbp-tn)
+            (ea 24 rbp-tn)
+            system-tlab-p)
     (inst mov (ea 24 rbp-tn) rax-tn)) ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 )
 
 (define-assembly-routine (alloc-funinstance) ()
   (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup "alloc_funinstance" :foreign))
+    (call-c (make-fixup "alloc_funinstance" :foreign)
+            (ea 16 rbp-tn))
     (inst mov (ea 16 rbp-tn) rax-tn)))
 
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.
 (define-assembly-routine (enable-alloc-counter) ()
   (with-registers-preserved (c)
-    (inst lea rdi-tn (ea 8 rbp-tn))
     #+sb-thread
-    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
+    (pseudo-atomic ()
+      (call-c (make-fixup "allocation_tracker_counted" :foreign)
+              (* (ea 8 rbp-tn))))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
   (with-registers-preserved (c)
-    (inst lea rdi-tn (ea 8 rbp-tn))
     #+sb-thread
-    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
+    (pseudo-atomic ()
+      (call-c (make-fixup "allocation_tracker_sized" :foreign)
+              (* (ea 8 rbp-tn))))))
 
 (define-assembly-routine (undefined-tramp (:return-style :none))
     ((:temp rax descriptor-reg rax-offset))

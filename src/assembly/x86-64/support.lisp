@@ -143,3 +143,17 @@
          ,@(when frame-tn
              `((inst mov rsp-tn ,frame-tn)
                (inst pop ,frame-tn)))))))
+
+(defmacro call-c (fun &rest args)
+  `(progn
+     #+win32 (inst sub rsp-tn 32)
+     ,@(loop for arg in args
+             for c-arg in
+             #+win32 '(rcx-tn rdx-tn r8-tn r9-tn)
+             #-win32 '(rdi-tn rsi-tn rdx-tn rcx-tn r8-tn r9-tn)
+             collect
+             (if (typep arg '(cons (eql *)))
+                 `(inst lea ,c-arg ,(cadr arg))
+                 `(inst mov ,c-arg ,arg)))
+     (inst call ,fun)
+     #+win32 (inst add rsp-tn 32)))

@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: msys2/setup-msys2@v2.17.0
+    - uses: msys2/setup-msys2@v2
       with:
         install: mingw-w64-x86_64-gcc make diffutils git
 

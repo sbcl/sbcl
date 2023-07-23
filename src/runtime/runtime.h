@@ -108,12 +108,6 @@ extern struct dyndebug_config {
 
 void dyndebug_init(void);
 
-#ifdef _WIN64
-#define AMD64_SYSV_ABI __attribute__((sysv_abi))
-#else
-#define AMD64_SYSV_ABI
-#endif
-
 #include <sys/types.h>
 
 #define OBJ_FMTX PRIxPTR

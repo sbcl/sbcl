@@ -135,7 +135,7 @@ void arena_release_memblks(lispobj arena_taggedptr)
     ARENA_MUTEX_RELEASE(arena);
 }
 
-void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
+void sbcl_delete_arena(lispobj arena_taggedptr)
 {
     arena_release_memblks(arena_taggedptr);
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
@@ -173,7 +173,7 @@ static page_index_t close_heap_region(struct alloc_region* r, int page_type) {
     return result;
 }
 
-void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
+void switch_to_arena(lispobj arena_taggedptr,
                      __attribute__((unused)) lispobj* ra) // return address
 {
     struct arena* arena = (void*)native_pointer(arena_taggedptr);

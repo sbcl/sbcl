@@ -103,7 +103,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
     (pseudo-atomic ()
       (inst mov rsp-save rsp-tn)
       (inst and rsp-tn -16) ; align as required by some ABIs
-      (inst call (ea (make-fixup "sbcl_delete_arena" :foreign 8)))
+      (call-c (ea (make-fixup "sbcl_delete_arena" :foreign 8)) #+win32 rdi)
       (inst mov rsp-tn rsp-save)))))
 
 ;;; Destroy memory associated with ARENA, unlinking it from the global chain.

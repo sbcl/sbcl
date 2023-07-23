@@ -229,7 +229,7 @@ extern lispobj* lisp_alloc(int, struct alloc_region *, sword_t,
 // The asm routines have been modified so that alloc() and alloc_list()
 // each receive the size an a single-bit flag affecting locality of the result.
 #define DEFINE_LISP_ENTRYPOINT(name, largep, TLAB, page_type) \
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes, int sys) { \
+NO_SANITIZE_MEMORY lispobj *name(sword_t nbytes, int sys) { \
     struct thread *self = get_sb_vm_thread(); \
     return lisp_alloc(largep | sys, \
                       sys ? &self->sys_##TLAB##_tlab : THREAD_ALLOC_REGION(self,TLAB), \
@@ -241,7 +241,7 @@ DEFINE_LISP_ENTRYPOINT(alloc_list, 0, cons, PAGE_TYPE_CONS)
 #else
 
 #define DEFINE_LISP_ENTRYPOINT(name, largep, tlab, page_type) \
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
+NO_SANITIZE_MEMORY lispobj *name(sword_t nbytes) { \
     struct thread *self = get_sb_vm_thread(); \
     return lisp_alloc(largep, THREAD_ALLOC_REGION(self,tlab), nbytes, page_type, self); }
 
@@ -258,7 +258,7 @@ DEFINE_LISP_ENTRYPOINT(alloc_list, 0, mixed, PAGE_TYPE_MIXED)
 
 #endif
 
-lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
+lispobj alloc_code_object(unsigned total_words, unsigned boxed)
 {
     struct thread *th = get_sb_vm_thread();
     // x86-64 uses pseudo-atomic. Others should too, but instead use WITHOUT-GCING
@@ -311,7 +311,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
 #endif
 
 #ifdef LISP_FEATURE_X86_64
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI alloc_funinstance(sword_t nbytes)
+NO_SANITIZE_MEMORY lispobj alloc_funinstance(sword_t nbytes)
 {
     struct thread *th = get_sb_vm_thread();
     __attribute__((unused)) int result = mutex_acquire(&code_allocator_lock);
@@ -325,7 +325,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI alloc_funinstance(sword_t nbytes)
 
 /* Make a list that couldn't be inline-allocated. Break it up into contiguous
  * blocks of conses not to exceed one GC page each. */
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI
+NO_SANITIZE_MEMORY lispobj
 make_list(lispobj element, sword_t nbytes, int sys) {
     // Technically this overflow handler could permit garbage collection
     // between separate allocation. For now the entire thing is pseudo-atomic.
@@ -353,7 +353,7 @@ make_list(lispobj element, sword_t nbytes, int sys) {
 
 /* Convert a &MORE context to a list. Split it up like make_list if we have to */
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI
+NO_SANITIZE_MEMORY lispobj
 listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();

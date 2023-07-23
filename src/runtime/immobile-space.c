@@ -335,7 +335,7 @@ long immobile_alloc_collisions;
      masking. if the next address is above or equal to the page start,
      store it in the hint, otherwise mark the page full */
 
-lispobj AMD64_SYSV_ABI
+lispobj
 alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
 {
   size_class = fixnum_value(size_class);
