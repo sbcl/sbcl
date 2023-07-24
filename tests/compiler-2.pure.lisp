@@ -4187,3 +4187,19 @@
          (declare ((function * fixnum) n))
          (typep (funcall n) 'fixnum))
     ((#'list) (condition 'type-error))))
+
+(declaim (inline member-type-derivation))
+(defun member-type-derivation (x)
+  (member x '(a b c d)))
+
+(with-test (:name :member-type-derivation )
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (when (member-type-derivation n)
+        t))
+   (('a) t)
+   (('b) t)
+   (('c) t)
+   (('d) t)
+   (('e) nil)))

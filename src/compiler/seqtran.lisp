@@ -447,15 +447,17 @@
                       (every #'symbolp items) ; and all symbols
                       ;; Reject if can't be hashed with at most 2 items per bin
                       (<= (pick-best-sxhash-bits uniqued 'sxhash) 2))))
-      (if (if-p (node-dest node))
-          ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)
-          ;; which lets CASE see that it doesn't need a vector of return values.
-          ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
-          ;; are declared in fndb to return a list. If it were just the symbol T,
-          ;; then type inference would get all whacky on you.
-          `(case item (,items '(t)))
-          `(case item
-             ,@(maplist (lambda (list) `((,(car list)) ',list)) items))))))
+      (cond ((if-p (node-dest node))
+             ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)
+             ;; which lets CASE see that it doesn't need a vector of return values.
+             ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
+             ;; are declared in fndb to return a list. If it were just the symbol T,
+             ;; then type inference would get all whacky on you.
+             (derive-node-type node (specifier-type 'list) :from-scratch t) ; erase any cons types
+             `(case item (,items '(t))))
+            (t
+             `(case item
+                ,@(maplist (lambda (list) `((,(car list)) ',list)) items)))))))
 
 (defparameter *list-open-code-limit* 128)
 
