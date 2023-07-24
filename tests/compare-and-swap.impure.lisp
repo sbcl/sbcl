@@ -580,7 +580,7 @@
     t))
 
 (test-util:with-test (:name :wide-compare-and-exchange
-                      :skipped-on (or :interpreter (not (or :x86 :x86-64))))
+                      :skipped-on (not (or :x86 :x86-64)))
   (multiple-value-bind (a b c d) (%cpu-identification 0 0)
     (declare (ignore b c d))
     ;; paranoidly check for whether we can execute function ID 1
