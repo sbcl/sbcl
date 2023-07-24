@@ -19,7 +19,7 @@ extern void lose(char *fmt, ...)
 #endif
  never_returns;
 extern void tprintf(char *fmt, ...);
-extern bool lose_on_corruption_p;
+extern int lose_on_corruption_p;
 extern void corruption_warning_and_maybe_lose(char *fmt, ...);
 extern void enable_lossage_handler(void);
 extern void disable_lossage_handler(void);

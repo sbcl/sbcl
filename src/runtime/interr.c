@@ -164,7 +164,7 @@ void tprintf(char *fmt, ...)
 }
 #endif
 
-bool lose_on_corruption_p = 0;
+int lose_on_corruption_p = 0; // DO NOT CHANGE THIS TO 'bool'. (Naughty users think it's 4 bytes)
 
 void
 corruption_warning_and_maybe_lose(char *fmt, ...)
