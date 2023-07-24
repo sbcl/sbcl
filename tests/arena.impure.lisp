@@ -47,6 +47,20 @@
     (assert (not (c-find-heap->arena)))
     (destroy-arena a)))
 
+(test-util:with-test (:name :interrupt-thread-on-arena)
+  (let* ((a (new-arena 1048576))
+         (sem (sb-thread:make-semaphore))
+         (junk))
+    (sb-vm:with-arena (a)
+      (sb-thread:interrupt-thread
+       sb-thread:*current-thread*
+       (lambda ()
+         (setf junk (cons 'foo 'bar))
+         (sb-thread:signal-semaphore sem))))
+    (sb-thread:wait-on-semaphore sem)
+    (sb-vm:destroy-arena a)
+    (assert (heap-allocated-p junk))))
+
 (defun find-some-pkg () (find-package "NOSUCHPKG"))
 
 (test-util:with-test (:name :find-package-1-element-cache)
