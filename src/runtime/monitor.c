@@ -285,6 +285,18 @@ void list_lisp_threads(int regions) {
 #undef show_tlab
         }
     }
+    if (regions) {
+#define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
+         r, r->start_addr, r->end_addr, r->free_pointer)
+        fprintf(stderr, "global regions:\n");
+        show_tlab("mixed    ", mixed_region);
+        show_tlab("smallmix ", small_mixed_region);
+        show_tlab("unboxed  ", unboxed_region);
+        show_tlab("code     ", code_region);
+        show_tlab("boxed    ", boxed_region);
+        show_tlab("cons     ", cons_region);
+#undef show_tlab
+    }
 }
 static int threads_cmd(char **ptr) {
     list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2));

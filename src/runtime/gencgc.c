@@ -4430,6 +4430,7 @@ void gc_allocate_ptes()
     /* Initialize gc_alloc. */
     gc_alloc_generation = 0;
     gc_init_region(mixed_region);
+    gc_init_region(small_mixed_region);
     gc_init_region(boxed_region);
     gc_init_region(unboxed_region);
     gc_init_region(code_region);
