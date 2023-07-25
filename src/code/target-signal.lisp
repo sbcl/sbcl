@@ -177,7 +177,7 @@
 ;;; from the kernel.
 (defun sigurg-handler (signal code sb-kernel:*current-internal-error-context*)
   (declare (ignore signal code))
-  (sb-vm:without-arena "sigurg" (sb-thread::run-interruption)))
+  (sb-thread::run-interruption))
 
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
 (defun sigchld-handler  (signal code context)
