@@ -1400,7 +1400,7 @@
                                              0)
                                             (t
                                              (ash offset (- scale))))
-                                      (reg-offset base)
+                                      (gpr-offset base)
                                       dst))
           ((and (eq mode :offset)
                 (or (register-p offset)
@@ -1422,15 +1422,14 @@
                                v opc
                                (reg-offset register)
                                extend shift
-                               (reg-offset base)
+                               (gpr-offset base)
                                dst)))
           ((and (typep offset '(signed-byte 9))
-                (or (register-p base)
-                    (fp-register-p base)))
+                (register-p base))
            (emit-ldr-str-unscaled-imm segment size v
                                       opc offset
                                       index-encoding
-                                      (reg-offset base) dst))
+                                      (gpr-offset base) dst))
           (t
            (error "Invalid STR/LDR arguments: ~s ~s" dst address)))))
 
@@ -1473,7 +1472,7 @@
    (typecase address
      (fixup
       (note-fixup segment :pc-relative-ldr-str address)
-      (emit-pc-relative segment 1 0 0 (reg-offset dst))  ; ADRP
+      (emit-pc-relative segment 1 0 0 (gpr-offset dst))  ; ADRP
       (assemble (segment)
         (inst ldr dst (@ dst))))
      (label
@@ -2566,13 +2565,13 @@
           (emit-fp-immediate segment 0 0 #b01
                              (encode-fp-immediate rn)
                              0
-                             (reg-offset rd)))
+                             (fpr-offset rd)))
          ((single-float-p rn)
           (aver (sc-is rd single-reg))
           (emit-fp-immediate segment 0 0 #b00
                              (encode-fp-immediate rn)
                              0
-                             (reg-offset rd)))
+                             (fpr-offset rd)))
          ((or (sc-is rd complex-double-reg complex-single-reg)
               (sc-is rn complex-double-reg complex-single-reg))
           (break "Implement"))
@@ -2582,7 +2581,7 @@
                   "Arguments should have the same fp storage class: ~s ~s."
                   rd rn)
           (emit-fp-data-processing-1 segment (fp-reg-type rn) 0
-                                     (reg-offset rn) (reg-offset rd)))
+                                     (fpr-offset rn) (fpr-offset rd)))
          ((and (register-p rd)
                (fp-register-p rn))
           (let* ((type (fp-reg-type rn))
@@ -2594,7 +2593,7 @@
                                 (if 128-p
                                     #b01111
                                     #b110)
-                                (reg-offset rn) (reg-offset rd))))
+                                (fpr-offset rn) (gpr-offset rd))))
          ((and (register-p rn)
                (fp-register-p rd))
           (let* ((type (fp-reg-type rd))
@@ -2606,7 +2605,7 @@
                                 (if 128-p
                                     #b01111
                                     #b111)
-                                (reg-offset rn) (reg-offset rd)))))))
+                                (gpr-offset rn) (fpr-offset rd)))))))
 
 (define-instruction load-from-label (segment dest label &optional lip)
   (:vop-var vop)
@@ -2625,7 +2624,7 @@
                (emit-pc-relative segment 0
                                  (ldb (byte 2 0) low)
                                  (ldb (byte 19 2) low)
-                                 (reg-offset lip))
+                                 (gpr-offset lip))
                (assemble (segment vop)
                  (inst movz dest high 16)
                  (inst ldr dest (@ lip (extend dest (if negative
@@ -2677,7 +2676,7 @@
                 (emit-pc-relative segment 0
                                   (ldb (byte 2 0) low)
                                   (ldb (byte 19 2) low)
-                                  (reg-offset lip))
+                                  (gpr-offset lip))
                 (assemble (segment vop)
                   (inst movz dest high 16)
                   (inst ldr dest (@ lip (extend dest (if negative
