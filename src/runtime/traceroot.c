@@ -271,7 +271,7 @@ static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
 /* Figure out which thread's control stack contains 'pointer'.
  * Also guess the PC within the active function in the referencing frame.
  * BUG: what about context registers? */
-static struct thread* NO_SANITIZE_MEMORY
+static struct thread* NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 deduce_thread(uword_t pointer, char** pc)
 {
     struct thread *th;
@@ -965,9 +965,9 @@ extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
 /* Return number of sought objects that had paths to them.
  * Return -1 for invalid input.
  * This must be called inside WITHOUT-GCING. */
-int gc_pathfind_aux(lispobj* stackptr,
-                    lispobj input, lispobj results, lispobj ignored_objects,
-                    int criterion)
+int NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
+gc_pathfind_aux(lispobj* stackptr, lispobj input, lispobj results,
+                lispobj ignored_objects, int criterion)
 {
     cur_thread_stackptr_at_entry = (uword_t)stackptr;
     int n_inputs = 0, n_live = 0, n_bad = 0, n_imm = 0;
