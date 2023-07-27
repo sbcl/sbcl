@@ -185,8 +185,8 @@ void switch_to_arena(lispobj arena_taggedptr,
             (arena ? "to" : "from"),
             (arena ? arena : (void*)th->arena),
             (uword_t)ra, id);
-#endif
     struct extra_thread_data *extra_data = thread_extra_data(th);
+#endif
     if (arena) { // switching from the dynamic space to an arena
         if (th->arena)
             lose("arena error: can't switch from %p to %p", (void*)th->arena,
@@ -221,6 +221,7 @@ void switch_to_arena(lispobj arena_taggedptr,
 #endif
     } else { // finished with the arena
         gc_assert(th->arena); // must have been an arena in use
+#if 0
         struct arena* old_arena = (void*)native_pointer(th->arena);
         int arena_index = fixnum_value(old_arena->index);
         // Ensure that this thread has enough space in its save area for the arena index.
@@ -241,6 +242,7 @@ void switch_to_arena(lispobj arena_taggedptr,
         state->token = old_arena->uw_token;
         state->mixed = th->mixed_tlab;
         state->cons  = th->cons_tlab;
+#endif
         // Indicate that the tlabs have no space remaining.
         gc_set_region_empty(&th->mixed_tlab);
         gc_set_region_empty(&th->cons_tlab);
