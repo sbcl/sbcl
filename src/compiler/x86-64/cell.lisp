@@ -51,7 +51,7 @@
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           #-soft-card-marks
-          ((equal name '(setf %funcallable-instance-fun))
+          ((or (equal name '(setf %funcallable-instance-fun)) (eq name '%set-fun-layout))
            ;; If soft card marks are disabled, then EMIT-GENGC-BARRIER is disabled too.
            ;; But funcallable-instances are on PAGE_TYPE_CODE, and code pages do not use
            ;; MMU-based protection regardless of this feature.

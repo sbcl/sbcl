@@ -165,6 +165,12 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
         || (state->object_header
             && header_widetag(state->object_header) != SIMPLE_VECTOR_WIDETAG
             && card_markedp(state->object_addr))
+#elif defined LISP_FEATURE_EXECUTABLE_FUNINSTANCES
+        /* #+(and (not soft-card-marks) executable-funinstances) could find the mark
+         * for a page-spanning funinstance on the preceding page, because it uses
+         * logical marking, not physical protection of the page holding the pointer */
+        || (header_widetag(state->object_header) == FUNCALLABLE_INSTANCE_WIDETAG
+            && card_markedp(state->object_addr))
 #endif
         ;
         FAIL_IF(!marked, "younger obj from WP page");
