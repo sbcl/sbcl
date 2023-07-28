@@ -15,7 +15,8 @@ changes relative to sbcl-2.3.6:
     ** on OpenBSD, the data limit is now 1GB.  (lp#2027536, thanks to
        Sebastien Marie)
     ** on Darwin with the SB-FUTEX feature, do not use unpaired
-       mach_thread_self() syscalls.
+       mach_thread_self() syscalls, avoiding resource leaks when creating
+       threads.
     ** on 64-bit RISCV, add support for some REM-by-multiplication
        optimizations.
     ** on Windows, work around a C compiler bug relating to SYSV_ABI.
@@ -80,10 +81,10 @@ changes in sbcl-2.3.5 relative to sbcl-2.3.4:
     (lp#2018124, reported by Matt Kaufmann)
   * optimization: MAPCAN/MAPCON are less accidentally quadratic.  (thanks to
     Gleefre)
-  * optimization: improved arithmetic operations in the form of 
+  * optimization: improved arithmetic operations in the form of
     (the word-sized-type (-+* word-sized word-sized)) when the result can
     overflow. For arm64 and x86-64.
-    
+
 changes in sbcl-2.3.4 relative to sbcl-2.3.3:
   * enhancement: attempts to call non-callable objects can now provide
     USE-VALUE restarts on x86-64 and arm64.
