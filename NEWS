@@ -1,8 +1,41 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.6:
+  * minor incompatible change: MACROLET macro functions are now compiled with
+    (SPEED 1), leading to fewer efficiency notes being emitted when compiled
+    in otherwise high-SPEED environments.
+  * minor incompatible change: when coalescing list data, the file compiler
+    respects substructure equality more accurately, with the side-effect of
+    coalescing along CDR chains as well as CARs.  (lp#2025086)
+  * minor incompatible change: FUNCTION type declarations for local variables
+    generate assertions around their use when called.
+  * platform support
+    ** on OpenBSD, the regression test suite expectations have been updated.
+       (lp#2026809, thanks to Sebastien Marie)
+    ** on OpenBSD, the data limit is now 1GB.  (lp#2027536, thanks to
+       Sebastien Marie)
+    ** on Darwin with the SB-FUTEX feature, do not use unpaired
+       mach_thread_self() syscalls.
+    ** on 64-bit RISCV, add support for some REM-by-multiplication
+       optimizations.
+    ** on Windows, work around a C compiler bug relating to SYSV_ABI.
   * bug fix: FILE-POSITION on string output streams no longer crashes or
     causes arbitrary memory overwrites.  (lp#1839040)
+  * bug fix: the compiler no longer constant-folds POSITION to NIL if the
+    START or END arguments are not valid.
+  * optimization: the compiler derives types of &KEY arguments in local calls.
+    (lp#655562)
+  * optimization: type tests of values of known union type can be faster if
+    the type being tested for has a non-trivial intersection with the known
+    type.
+  * optimization: the low-level implementation of NUMBERP, REALP and RATIONALP
+    has been improved on x86-64 and arm64.
+  * optimization: the compiler removes known-NIL arguments from calls to
+    APPEND and NCONC, and empty sequences from calls to CONCATENATE.
+  * optimization: checks for symbols being bindable are now memoized, speeding
+    up compiled uses of PROGV.
+  * optimization: SLOT-VALUE on STRUCTURE-OBJECTs with non-constant slot-name
+    argument is faster.
 
 changes in sbcl-2.3.6 relative to sbcl-2.3.5:
   * platform support:
