@@ -4142,6 +4142,7 @@ III. initially undefined function references (alphabetically):
 
 #+gencgc
 (defun write-mark-array-operators (stream &optional (ncards sb-vm::cards-per-page))
+  #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
   (format stream "#include ~S
 extern unsigned char *gc_card_mark;~%" (lispobj-dot-h))
 
