@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.6:
+changes in sbcl-2.3.7 relative to sbcl-2.3.6:
   * minor incompatible change: MACROLET macro functions are now compiled with
     (SPEED 1), leading to fewer efficiency notes being emitted when compiled
     in otherwise high-SPEED environments.
