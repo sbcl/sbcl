@@ -1129,11 +1129,3 @@
                     object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
         (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi
                          eax ebx ecx edx result-lo result-hi)))))
-
-;; Placeholders until non-STW GC becomes a reality
-#+weak-vector-readbarrier
-(progn
-(define-full-reffer %weakvec-ref * vector-data-offset other-pointer-lowtag
-  (any-reg descriptor-reg) * %weakvec-ref)
-(define-full-setter %weakvec-set * vector-data-offset other-pointer-lowtag
-  (any-reg descriptor-reg) * %weakvec-set))

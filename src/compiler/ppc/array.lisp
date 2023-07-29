@@ -462,6 +462,15 @@
          (value :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
   (:variant vector-data-offset other-pointer-lowtag))
+
+;;; Weak vectors
+(define-vop (%weakvec-ref word-index-ref)
+  (:translate %weakvec-ref)
+  (:variant vector-data-offset other-pointer-lowtag))
+
+(define-vop (%weakvec-set word-index-set)
+  (:translate %weakvec-set)
+  (:variant vector-data-offset other-pointer-lowtag))
 
 ;;;
 

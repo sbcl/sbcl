@@ -677,6 +677,11 @@
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
  (unsigned-reg) unsigned-num %set-vector-raw-bits)
 
+;;; Weak vectors
+(define-full-reffer %weakvec-ref * vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %weakvec-ref)
+(define-full-setter %weakvec-set * vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %weakvec-set)
 
 ;;;; ATOMIC-INCF for arrays
 

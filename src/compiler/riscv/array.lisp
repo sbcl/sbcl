@@ -330,6 +330,12 @@
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
+
+;;; Weak vectors
+(define-full-reffer %weakvec-ref * vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %weakvec-ref)
+(define-full-setter %weakvec-set * vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %weakvec-set)
 
 (define-full-casser data-vector-cas/simple-vector simple-vector vector-data-offset other-pointer-lowtag
   (any-reg descriptor-reg) * %compare-and-swap-svref)
