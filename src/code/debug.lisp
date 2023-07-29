@@ -2026,7 +2026,7 @@ forms that explicitly control this kind of evaluation.")
 
 ;; Yet another stack unwinder, this one via libunwind, if present.
 ;; Calls lose() if runtime was not built with -lunwind.
-#+x86-64
+#+(and x86-64 sb-thread)
 (progn
 ;; get_proc_name can slow down the unwind by 100x. Depending on whether you need
 ;; every stack trace with C symbols many times quickly, or not so many times but
