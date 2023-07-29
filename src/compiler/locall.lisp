@@ -504,12 +504,7 @@
     (unless (or (member (basic-combination-kind call) '(:local :error))
                 (node-to-be-deleted-p call)
                 (member (functional-kind original-fun)
-                        '(:toplevel-xep :deleted))
-                (not (or (eq (component-kind component) :initial)
-                         (eq (block-component
-                              (node-block
-                               (lambda-bind (main-entry original-fun))))
-                             component))))
+                        '(:toplevel-xep :deleted)))
       (let ((fun (if (xep-p original-fun)
                      (functional-entry-fun original-fun)
                      original-fun))
@@ -524,15 +519,17 @@
                    ;; let-converted.
                    (let-convertable-p call fun))
           (setq fun (maybe-expand-local-inline fun ref call)))
-
-        (aver (member (functional-kind fun)
-                      '(nil :escape :cleanup :optional :assignment)))
-        (cond ((mv-combination-p call)
-               (convert-mv-call ref call fun))
-              ((lambda-p fun)
-               (convert-lambda-call ref call fun))
-              (t
-               (convert-hairy-call ref call fun))))))
+        ;; Expanding inline might move it to the current component
+        (when (or (eq (component-kind component) :initial)
+                  (eq (node-component (lambda-bind (main-entry fun))) component))
+          (aver (member (functional-kind fun)
+                        '(nil :escape :cleanup :optional :assignment)))
+          (cond ((mv-combination-p call)
+                 (convert-mv-call ref call fun))
+                ((lambda-p fun)
+                 (convert-lambda-call ref call fun))
+                (t
+                 (convert-hairy-call ref call fun)))))))
 
   (values))
 
