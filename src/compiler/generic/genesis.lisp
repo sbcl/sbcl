@@ -3483,11 +3483,10 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
   ;; 'flags' is a packed integer.
   ;; See PACK-HT-FLAGS-WEAKNESS and PACK-HT-FLAGS-KIND in hash-table.lisp
   (format t "
-#define hashtable_kind(ht) ((ht->uw_flags >> 4) & 3)
-#define hashtable_weakp(ht) (ht->uw_flags & 8)
-#define hashtable_weakness(ht) (ht->uw_flags >> 6)
-#define HASHTABLE_KIND_EQL 1
-~%"))
+static inline int hashtable_kind(struct hash_table* ht) { return (ht->uw_flags >> 4) & 3; }
+static inline int hashtable_weakp(struct hash_table* ht) { return ht->uw_flags & 8; }
+static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flags >> 6; }
+#define HASHTABLE_KIND_EQL 1~%"))
 
 (defun write-structure-object (dd *standard-output* &optional structure-tag)
   (labels
@@ -3529,9 +3528,9 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
          (format t "};~%")))
   (format t "#ifndef __ASSEMBLER__~2%")
   (format t "#include ~S~%" (lispobj-dot-h))
+  (output dd (or structure-tag (cstring (dd-name dd))))
   (when (eq (dd-name dd) 'sb-impl::general-hash-table)
     (write-hash-table-flag-extractors))
-  (output dd (or structure-tag (cstring (dd-name dd))))
   (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
     (terpri)
     (output (layout-info (find-layout 'sb-lockless::so-data-node))
