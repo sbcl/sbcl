@@ -510,7 +510,13 @@
                      original-fun))
             (*compiler-error-context* call))
 
-        (when (and (eq (functional-inlinep fun) 'inline)
+        (when (and (or (eq (functional-inlinep fun) 'inline)
+                       (and (and (neq (component-kind component) :initial)
+                                 (neq (node-component (lambda-bind (main-entry fun))) component))
+                            ;; If it's in a different component then inline it anyway,
+                            ;; othrewise it won't get any benefits of maybe-inline.
+                            (eq (functional-inlinep fun) 'maybe-inline)))
+
                    (rest (leaf-refs original-fun))
                    ;; Some REFs are already unused bot not yet deleted,
                    ;; avoid unnecessary inlining
