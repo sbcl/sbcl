@@ -677,11 +677,30 @@ static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
   return 0;
 }
 
-#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
-#define UNW_LOCAL_ONLY
 #ifdef HAVE_LIBUNWIND
+#define UNW_LOCAL_ONLY
 #include <libunwind.h>
+int get_sizeof_unw_context() { return sizeof (unw_context_t); }
+int get_sizeof_unw_cursor() { return sizeof (unw_cursor_t); }
+#ifdef LISP_FEATURE_DARWIN // slightly different libunwind. And it doesn't work for me
+int sb_unw_init(void* a, void* b) { return unw_init_local(a, b); }
+int sb_unw_get_pc(void* a, void* b) { return unw_get_reg(a, UNW_REG_IP, b); }
+#else
+int sb_unw_init(void* a, void* b) { return unw_init_local2(a, b, UNW_INIT_SIGNAL_FRAME); }
+int sb_unw_get_pc(void* a, void* b) { return unw_get_reg(a, UNW_TDEP_IP, b); }
 #endif
+int sb_unw_get_proc_name(void* a, void* b, int c, unw_word_t* d) { return unw_get_proc_name(a, b, c, d); }
+int sb_unw_step(void* a) { return unw_step(a); }
+#else
+int get_sizeof_unw_context() { return 0; }
+int get_sizeof_unw_cursor() { return 0; }
+int sb_unw_init(void* a, void* b) { lose("unw_init %p %p", a, b); }
+int sb_unw_get_proc_name(void* a, void* b, int c, void* d) { lose("unw_get_proc_name %p %p %d %p", a, b, c, d); }
+int sb_unw_step(void* a) { lose("unw_step %p", a); }
+int sb_unw_get_pc(void* a, void* b) { lose("unw_get_pc %p %p", a, b); }
+#endif
+
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
 #include "genesis/thread-instance.h"
 #include "genesis/mutex.h"
 static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};

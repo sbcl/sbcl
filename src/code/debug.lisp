@@ -2023,3 +2023,93 @@ forms that explicitly control this kind of evaluation.")
                         pc)))
                 list)
         list)))
+
+;; Yet another stack unwinder, this one via libunwind, if present.
+;; Calls lose() if runtime was not built with -lunwind.
+#+x86-64
+(progn
+;; get_proc_name can slow down the unwind by 100x. Depending on whether you need
+;; every stack trace with C symbols many times quickly, or not so many times but
+;; more informatively, you'd set this off or on respectively.
+(defglobal *use-libunwind-get-proc-name* nil)
+(defun libunwind-backtrace (thread thread-sap context stream)
+  (declare (ignorable thread thread-sap))
+  (sb-alien:with-alien
+      ((get-sizeof-unw-cursor (function sb-alien:int) :extern)
+       (sb-unw-init (function sb-alien:int system-area-pointer system-area-pointer) :extern)
+       (sb-unw-get-pc (function sb-alien:int system-area-pointer (* sb-alien:unsigned)) :extern)
+       (sb-unw-get-proc-name (function sb-alien:int system-area-pointer system-area-pointer
+                                       sb-alien:int
+                                       (* sb-alien:unsigned))
+                             :extern)
+       (sb-unw-step (function sb-alien:int system-area-pointer) :extern)
+       (word sb-alien:unsigned))
+    (let* ((cursor-size (the (mod 2048) (sb-alien:alien-funcall get-sizeof-unw-cursor)))
+           (cursor (make-array cursor-size :element-type '(unsigned-byte 8)))
+           (string (make-array 127 :element-type 'base-char))
+           (n 0)
+           code)
+      (declare (truly-dynamic-extent cursor string))
+      (aver (zerop
+             (sb-alien:alien-funcall sb-unw-init
+                                     (vector-sap cursor) (sb-alien:alien-sap context))))
+      (loop
+       (aver (zerop
+              (sb-alien:alien-funcall sb-unw-get-pc (vector-sap cursor) (sb-alien:addr word))))
+       (format stream "~D: #x~12,'0X " n word)
+       (incf n)
+       (cond ((setq code (sb-di::code-header-from-pc word))
+              (let ((pc (sap- (int-sap word) (code-instructions code))))
+                (format stream "~A"
+                        (sb-di:debug-fun-name (sb-di::debug-fun-from-pc code pc nil)))))
+             ((not *use-libunwind-get-proc-name*))
+             ((= (sb-alien:alien-funcall sb-unw-get-proc-name (vector-sap cursor)
+                                         (vector-sap string) (1+ (length string))
+                                         (sb-alien:addr word)) 0)
+              (format stream "~s + #x~x"
+                      (sb-alien::%naturalize-c-string (vector-sap string)) word))
+             (t
+              (format stream "???")))
+       (terpri stream)
+       ;; nonzero = success, 0 = failure / end-of-walk
+       (when (= (sb-alien:alien-funcall sb-unw-step (vector-sap cursor)) 0)
+         (return))))))
+
+(defun vmthread-state (vmthread)
+  ;; Refer to the definition of thread_state_word in src/runtime/genesis/thread.h
+  ;; and 'enum threadstate' in src/runtime/thread.h
+  (ecase (sap-ref-8 vmthread (+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift) 2))
+    (1 :running)
+    (2 :stopped)
+    (3 :dead)))
+
+(export 'backtrace-all-threads)
+(defun backtrace-all-threads (&aux (stream (make-string-output-stream))
+                                   results)
+  (without-gcing
+      (when (sb-kernel::try-acquire-gc-lock
+             (sb-kernel::gc-stop-the-world))
+        ;; The GC's thread list is exactly what we want to traverse here
+        ;; since that is the set of threads responding to the stop signal.
+        (do ((vmthread (sb-alien:extern-alien "all_threads" system-area-pointer)
+                       (sap-ref-sap vmthread (ash sb-vm::thread-next-slot sb-vm:word-shift))))
+            ((zerop (sap-int vmthread)))
+          (let ((tls-size (sb-alien:extern-alien "dynamic_values_bytes" (sb-alien:unsigned 32)))
+                (thread-instance
+                 (sap-ref-lispobj vmthread
+                                  (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift))))
+            (cond ((eq thread-instance sb-thread:*current-thread*)
+                   (print-backtrace :stream stream))
+                  ((eq (vmthread-state vmthread) :stopped)
+                   (format stream "Backtrace for: ~S~%" thread-instance)
+                   (let* ((ici (sb-sys:sap-ref-lispobj
+                                vmthread (symbol-tls-index '*free-interrupt-context-index*)))
+                          (context-sap
+                           (sap-ref-sap vmthread
+                                        (+ tls-size (ash (1- ici) sb-vm:word-shift))))
+                          (context (sb-alien:sap-alien context-sap (* os-context-t))))
+                     (libunwind-backtrace thread-instance vmthread context stream)))))
+          (push (get-output-stream-string stream) results))
+        (sb-kernel::gc-start-the-world)))
+  results)
+) ; end PROGN
