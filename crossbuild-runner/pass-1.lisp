@@ -17,6 +17,7 @@
       (format t "(lambda (features) (union features (list :crossbuild-test :os-provides-dlopen ~s ~a~%"
               target-symbol
               (case target-symbol
+                (:sparc ":unix :sunos :elf")
                 ((:x86 :x86-64) ":win32 :sb-thread :sb-safepoint")
                 (t ":unix :linux :elf"))))
     ;; "features" contains the mandatory set of symbols for any build of that target.
