@@ -60,33 +60,21 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           sb-alien:int sb-alien:c-string sb-alien:unsigned))
 (setq *summarize-test-times* t)
 ;;; Ordered approximately in descending order by running time
-(defvar *slow-tests* '("threads.impure"
-                       "seq.impure"
-                       "threads.pure"
-                       "compiler.pure"
-                       "timer.impure"
-                       "bug-1180102.impure"
-                       "gethash-concurrency.pure"
-                       "arith-slow.pure"))
+(defvar *timings* (with-open-file (s "timing") (read s)))
+
 (defvar *filter* nil)
 (defglobal *delete-logs* nil)
 (defun choose-order (tests)
   (when *filter*
     (let (strings)
-       (with-open-file (file *filter*)
-         (loop (let ((line (read-line file nil)))
-                 (if line (push line strings) (return)))))
-       (setq tests (remove-if (lambda (x) (not (find x strings :test #'string=)))
-                              tests))))
+      (with-open-file (file *filter*)
+        (loop (let ((line (read-line file nil)))
+                (if line (push line strings) (return)))))
+      (setq tests (remove-if (lambda (x) (not (find x strings :test #'string=)))
+                             tests))))
   (sort tests
-        (lambda (a b)
-          (let ((posn-a (or (position a *slow-tests* :test #'string=)
-                            most-positive-fixnum))
-                (posn-b (or (position b *slow-tests* :test #'string=)
-                            most-positive-fixnum)))
-            (cond ((< posn-a posn-b) t)
-                  ((> posn-a posn-b) nil)
-                  (t (string< a b)))))))
+        #'> :key (lambda (file) (or (cadr (assoc file *timings* :test #'equal)) 0))))
+
 (defun summarize-gc-times ()
   (let (observations)
     (flet ((parse-triple (string pos)
