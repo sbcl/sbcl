@@ -107,7 +107,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
         thread_sigmask(SIG_BLOCK, 0, &curmask);
         if (*(unsigned long int*)&curmask == 0) {
             char msg[] = "WARNING: broken sigaction() workaround enabled\n";
-            write(2, msg, sizeof msg-1);
+            ignore_value(write(2, msg, sizeof msg-1));
             sigaction_workaround = 1;
         } else {
             sigaction_workaround = -1;

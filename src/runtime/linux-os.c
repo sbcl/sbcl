@@ -283,8 +283,8 @@ int os_preinit(char *argv[], char *envp[])
      * whether the emulation looks bad. */
     char buf[100];
     FILE *f = fopen("/proc/cpuinfo", "r");
-    fgets(buf, sizeof buf, f);
-    fgets(buf, sizeof buf, f);
+    ignore_value(fgets(buf, sizeof buf, f));
+    ignore_value(fgets(buf, sizeof buf, f));
     if (!strstr(buf, "hart")) { // look for "hardware thread" string
         fprintf(stderr, "WARNING: enabling mmap() workaround. GC time may be affected\n");
         rewind(f);
