@@ -118,12 +118,6 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #define gencgc_apply_code_fixups(ignore1,ignore2)
 #endif
 
-#if N_WORD_BITS == 32
-# define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG
-#elif N_WORD_BITS == 64
-# define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
-#endif
-
 extern void
 instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj *instance_ptr, sword_t n_words,
