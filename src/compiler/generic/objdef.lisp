@@ -52,7 +52,7 @@
                                 :lowtag other-pointer-lowtag
                                 :widetag ratio-widetag
                                 :alloc-trans %make-ratio)
-  (numerator :type integer
+  (numerator :type (and integer (not (eql 0)))
              :ref-known (flushable movable)
              :ref-trans %numerator
              :init :arg)

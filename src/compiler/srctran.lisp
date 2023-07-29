@@ -426,6 +426,12 @@
     `(if (ratiop ,n-num)
          (%denominator ,n-num)
          1)))
+
+(defoptimizer (%numerator derive-type) ((num))
+  (cond ((csubtypep (lvar-type num) (specifier-type '(rational 0)))
+         (specifier-type '(integer 1)))
+        ((csubtypep (lvar-type num) (specifier-type '(rational * 0)))
+         (specifier-type '(integer * -1)))))
 
 ;;;; interval arithmetic for computing bounds
 ;;;;
