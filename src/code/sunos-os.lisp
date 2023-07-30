@@ -32,20 +32,3 @@
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
   nil)
-
-(in-package "SB-UNIX")
-
-;; SunOS defines CLOCK_PROCESS_CPUTIME_ID but you get EINVAL if you try to use it.
-(defun system-internal-run-time ()
-  (multiple-value-bind (utime-sec utime-usec stime-sec stime-usec)
-      (with-alien ((usage (struct sb-unix::rusage)))
-        (syscall* ("sb_getrusage" int (* (struct sb-unix::rusage)))
-                  (values (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-sec)
-                          (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-usec)
-                          (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-sec)
-                          (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-usec))
-                  rusage_self (addr usage)))
-    (+ (* (+ utime-sec stime-sec) internal-time-units-per-second)
-       (floor (+ utime-usec stime-usec
-                 (floor microseconds-per-internal-time-unit 2))
-              microseconds-per-internal-time-unit))))
