@@ -86,6 +86,7 @@ interface stability.")
    "ST-RDEV" "ST-SIZE" "ST-UID" "STAT" "TIME-T"
    "TIMEVAL" "TIMEZONE"
    "TIOCGPGRP"
+   #-avoid-clock-gettime
    "CLOCK-GETTIME" "TV-SEC" "TV-USEC"
    "TZ-DSTTIME" "TZ-MINUTESWEST" "UID-T" "UNIX-CLOSE"
    "UNIX-CLOSEDIR" "UNIX-DIRENT-NAME" "UNIX-DUP"
@@ -104,8 +105,11 @@ interface stability.")
    "W_OK" "X_OK"
    "SC-NPROCESSORS-ONLN"
    "VOID-SYSCALL"
+   #-avoid-clock-gettime
    "CLOCK-THREAD-CPUTIME-ID"
+   #-avoid-clock-gettime
    "CLOCK-PROCESS-CPUTIME-ID"
+   #-avoid-clock-gettime
    "CLOCK-REALTIME"
 
    ;; signals

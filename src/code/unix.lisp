@@ -987,7 +987,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #-win32
 (progn
 
+  #-avoid-clock-gettime
   (declaim (inline clock-gettime))
+  #-avoid-clock-gettime
   (defun clock-gettime (clockid)
     (declare (type (signed-byte 32) clockid))
     (with-alien ((ts (struct timespec)))
@@ -1022,7 +1024,10 @@ the UNIX epoch (January 1st 1970.)"
           ;; By scaling down we end up with far less resolution than clock-realtime
           ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
           ;; BSD has something similar.
+          #-avoid-clock-gettime
           (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
+          #+avoid-clock-gettime
+          (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
 
         #+64-bit ;; I know that my math is valid for 64-bit.
         (declare (optimize (sb-c::type-check 0)))
@@ -1071,12 +1076,29 @@ the UNIX epoch (January 1st 1970.)"
                   current)))))))
 
   (declaim (inline system-internal-run-time))
-  #-sunos ; defined in sunos-os
+
+  ;; SunOS defines CLOCK_PROCESS_CPUTIME_ID but you get EINVAL if you try to use it,
+  ;; also use the same trick when clock_gettime should be avoided.
+  #-(or sunos avoid-clock-gettime)
   (defun system-internal-run-time ()
     (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
       (+ (* sec internal-time-units-per-second)
          (floor (+ nsec (floor nanoseconds-per-internal-time-unit 2))
-                nanoseconds-per-internal-time-unit)))))
+                nanoseconds-per-internal-time-unit))))
+  #+(or sunos avoid-clock-gettime)
+  (defun system-internal-run-time ()
+    (multiple-value-bind (utime-sec utime-usec stime-sec stime-usec)
+        (with-alien ((usage (struct sb-unix::rusage)))
+          (syscall* ("sb_getrusage" int (* (struct sb-unix::rusage)))
+                    (values (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-sec)
+                            (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-usec)
+                            (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-sec)
+                            (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-usec))
+                    rusage_self (addr usage)))
+      (+ (* (+ utime-sec stime-sec) internal-time-units-per-second)
+         (floor (+ utime-usec stime-usec
+                   (floor microseconds-per-internal-time-unit 2))
+                microseconds-per-internal-time-unit)))))
 
 ;;; FIXME, KLUDGE: GET-TIME-OF-DAY used to be UNIX-GETTIMEOFDAY, and had a
 ;;; primary return value indicating sucess, and also returned timezone

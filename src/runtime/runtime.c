@@ -614,6 +614,12 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     struct lisp_exception_frame exception_frame;
 #endif
 #ifdef LISP_FEATURE_UNIX
+#ifdef LISP_FEATURE_AVOID_CLOCK_GETTIME
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    lisp_init_time.tv_sec = tv.tv_sec;
+    lisp_init_time.tv_nsec = tv.tv_usec * 1000;
+#else
     clock_gettime(
 #ifdef LISP_FEATURE_LINUX
         CLOCK_MONOTONIC_COARSE
@@ -621,6 +627,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
         CLOCK_MONOTONIC
 #endif
         , &lisp_init_time);
+#endif
 #endif
 
     /* the name of the core file we're to execute. Note that this is

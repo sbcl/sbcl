@@ -350,6 +350,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 #endif // !WIN32
     printf("\n");
 
+#if !defined(LISP_FEATURE_AVOID_CLOCK_GETTIME)
 #ifdef LISP_FEATURE_UNIX
     DEFCONSTANT("clock-realtime", CLOCK_REALTIME);
     DEFCONSTANT("clock-monotonic", CLOCK_MONOTONIC);
@@ -372,6 +373,7 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("clock-boottime-alarn", CLOCK_BOOTTIME_ALARM);
 #endif
     DEFCONSTANT("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
+#endif
 #endif
     printf(";;; structures\n");
     DEFSTRUCT(timeval, struct timeval,
