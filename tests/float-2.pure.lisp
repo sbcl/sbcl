@@ -394,3 +394,12 @@ fractional bits."
              (test (- (expt 2 i)))
              (test (1+ (expt 2 i)))
              (test (- (expt 2 i))))))
+
+(with-test (:name :scale-float-unboxed)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare (single-float x))
+         (locally (declare (optimize (space 0)))
+           (scale-float x 1)))
+    ((1.0) 2.0)))

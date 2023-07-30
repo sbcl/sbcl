@@ -157,7 +157,8 @@
               for fun-info = (info :function :info (functional-%source-name fun))
               when
               (and fun-info
-                   (ir1-attributep (fun-info-attributes fun-info) unboxed-return))
+                   (ir1-attributep (fun-info-attributes fun-info) unboxed-return)
+                   (not (lambda-inline-expanded fun)))
               return :unboxed)
         (find-if #'xep-p funs)
         (some (lambda (fun) (policy fun (>= insert-debug-catch 2))) funs)
