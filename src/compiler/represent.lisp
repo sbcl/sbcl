@@ -407,8 +407,14 @@
          (other-scn (sc-number other-sc))
          (any-ptype *backend-t-primitive-type*)
          (op-ptype (tn-primitive-type op-tn)))
-    (let ((other-ptype (if (eq other-ptype any-ptype) op-ptype other-ptype))
-          (op-ptype (if (eq op-ptype any-ptype) other-ptype op-ptype)))
+    (let ((other-ptype (if (or (eq other-ptype any-ptype)
+                               (eq (primitive-type-name other-ptype) 'integer))
+                           op-ptype
+                           other-ptype))
+          (op-ptype (if (or (eq op-ptype any-ptype)
+                            (eq (primitive-type-name op-ptype) 'integer))
+                        other-ptype
+                        op-ptype)))
       (dolist (info (if write-p
                         (svref (funcall slot op-sc) other-scn)
                         (svref (funcall slot other-sc) op-scn))
