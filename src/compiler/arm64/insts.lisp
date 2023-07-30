@@ -3595,6 +3595,26 @@
         (delete-stmt stmt)
         next))))
 
+(defpattern "asr + arith -> arith" ((sbfm) (add and orr eor)) (stmt next)
+  (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn srcm) (stmt-operands next)
+      (when (and (= imms 63)
+                 (tn-p srcm)
+                 (or
+                  (location= dst1 srcm)
+                  (location= dst1 srcn))
+                 (not (location= srcn srcm))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx
+                                       logand logior logxor)))
+        (setf (stmt-operands next) (list dst2 (if (location= dst1 srcm)
+                                                  srcn
+                                                  srcm)
+                                         (asr src1 immr)))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
 (defpattern "lsl + sub -> sub" ((ubfm) (sub)) (stmt next)
   (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
     (destructuring-bind (dst2 srcn srcm) (stmt-operands next)
