@@ -31,8 +31,6 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
-extern lispobj lisp_init_function;
-
 struct unbounded_queue {
   struct Qblock* head_block;
   struct Qblock* tail_block;

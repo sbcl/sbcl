@@ -580,3 +580,225 @@ bool save(char *filename, lispobj init_function, bool prepend_runtime,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);
 }
 #endif
+
+#include "gencgc-internal.h"
+#include "gencgc-private.h"
+
+/* Things to do before doing a final GC before saving a core.
+ *
+ * + Single-object pages aren't moved by the GC, so we need to
+ *   unset that flag from all pages.
+ * + Change all pages' generations to 0 so that we can do all the collection
+ *   in a single invocation of collect_generation()
+ * + Instances on unboxed pages need to have their layout pointer visited,
+ *   so all pages have to be turned to boxed.
+ */
+static void prepare_dynamic_space_for_final_gc()
+{
+    page_index_t i;
+
+    prepare_immobile_space_for_final_gc();
+    /* TODO: external full compactor thingy for MR */
+    for (i = 0; i < next_free_page; i++) {
+        // Compaction requires that we permit large objects to be copied henceforth.
+        // Object of size >= LARGE_OBJECT_SIZE get re-allocated to single-object pages.
+        page_table[i].type &= ~SINGLE_OBJECT_FLAG;
+        // Turn every page to boxed so that the layouts of instances
+        // which were relocated to unboxed pages get scanned and fixed.
+        if ((page_table[i].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED)
+            page_table[i].type = PAGE_TYPE_MIXED;
+        generation_index_t gen = page_table[i].gen;
+        if (gen != 0) {
+            page_table[i].gen = 0;
+            int used = page_bytes_used(i);
+            generations[gen].bytes_allocated -= used;
+            generations[0].bytes_allocated += used;
+        }
+    }
+
+#ifdef LISP_FEATURE_SB_THREAD
+    // Avoid tenuring of otherwise-dead objects referenced by
+    // dynamic bindings which disappear on image restart.
+    struct thread *thread = get_sb_vm_thread();
+    char *start = (char*)&thread->lisp_thread;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+#endif
+    // Make sure that it's done after zeroing above, the GC needs to
+    // see a list there
+#ifdef PINNED_OBJECTS
+    struct thread *th;
+    for_each_thread(th) {
+        write_TLS(PINNED_OBJECTS, NIL, th);
+    }
+#endif
+}
+
+/* Set this switch to 1 for coalescing of strings dumped to fasl,
+ * or 2 for coalescing of those,
+ * plus literal strings in code compiled to memory. */
+char gc_coalesce_string_literals = 0;
+
+extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
+
+/* Do a non-conservative GC twice, and then save a core with the initial
+ * function being set to the value of 'lisp_init_function'.
+ * The first GC is into relatively high page indices, and the 2nd is back
+ * into lower page indices. This compacts the retained data into the lower
+ * pages, minimizing the size of the core file.
+ *
+ * But note: There is no assurance that this technique actually works,
+ * and that the final GC can fit all data below the starting allocation
+ * page in the penultimate GC. If it doesn't fit, things are technically
+ * ok, but horrible in terms of core file size.  Consider:
+ *
+ * Penultimate GC: (moves all objects higher in memory)
+ *   | ... from_space ... |
+ *                        ^--  gencgc_alloc_start_page = next_free_page
+ *                        | ... to_space ... |
+ *                                           ^ new next_free_page
+ *
+ * Utimate GC: (moves all objects lower in memory)
+ *   | ... to_space ...   | ... from_space ...| ... |
+ *                                                  ^ new next_free_page ?
+ * Question:
+ *  In the ultimate GC, can next_free_page actually increase past
+ *  its ending value from the penultimate GC?
+ * Answer:
+ *  Yes- Suppose the sequence of copying is so adversarial to the allocator
+ *  that attempts to fit an object in a region fail often, and require
+ *  frequent opening of new regions. (And/or imagine a particularly bad mix
+ *  of boxed and non-boxed allocations such that the logic for resuming
+ *  at the tail of a partially filled page in gc_find_freeish_pages()
+ *  is seldom applicable)  If this occurs, then some allocation must
+ *  be on a higher page than all of to_space and from_space.
+ *  Then the entire (zeroed) from_space will be present in the saved core
+ *  as empty pages, because we can't represent discontiguous ranges.
+ */
+void
+gc_and_save(char *filename, bool prepend_runtime, bool purify,
+            bool save_runtime_options, bool compressed,
+            int compression_level, int application_type)
+{
+    // FIXME: Instead of disabling purify for static space relocation,
+    // we should make r/o space read-only after fixing up pointers to
+    // static space instead.
+#if ((defined LISP_FEATURE_SPARC && defined LISP_FEATURE_LINUX) || \
+     (defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE))
+    /* OS says it'll give you the memory where you want, then it says
+     * it won't map over it from the core file.  That's news to me.
+     * Fragment of output from 'strace -e mmap2 src/runtime/sbcl --core output/sbcl.core':
+     * ...
+     * mmap2(0x2fb58000, 4882432, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x2fb58000
+     * mmap2(0x2fb58000, 4882432, PROT_READ, MAP_SHARED|MAP_FIXED, 3, 0x2000) = -1 EINVAL (Invalid argument)
+     */
+    purify = 0;
+#endif
+    FILE *file;
+    void *runtime_bytes = NULL;
+    size_t runtime_size;
+    extern void coalesce_similar_objects();
+    bool verbose = !lisp_startup_options.noinform;
+
+    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
+                           &runtime_size);
+    if (file == NULL)
+       return;
+
+    /* The filename might come from Lisp, and be moved by the now
+     * non-conservative GC. */
+    filename = strdup(filename);
+
+    /* We're committed to process death at this point, and interrupts can not
+     * possibly be handled in Lisp. Let the installed handler closures become
+     * garbage, since new ones will be made by ENABLE-INTERRUPT on restart */
+#ifndef LISP_FEATURE_WIN32
+    {
+        int i;
+        for (i=0; i<NSIG; ++i)
+            lisp_sig_handlers[i] = 0;
+    }
+#endif
+
+    conservative_stack = 0;
+    gencgc_oldest_gen_to_gc = 0;
+    // From here on until exit, there is no chance of continuing
+    // in Lisp if something goes wrong during GC.
+    // Flush regions to ensure heap scan in copy_rospace doesn't miss anything
+    struct thread *thread = get_sb_vm_thread();
+    gc_close_thread_regions(thread, 0);
+    gc_close_collector_regions(0);
+    move_rospace_to_dynamic(0);
+    pre_verify_gen_0 = 1;
+    prepare_immobile_space_for_final_gc(); // once is enough
+    prepare_dynamic_space_for_final_gc();
+    unwind_binding_stack();
+    // Avoid tenuring of otherwise-dead objects referenced by bindings which
+    // disappear on image restart. This must occcur *after* unwind_binding_stack()
+    // because unwinding moves values from the binding stack into TLS.
+    char *start = (char*)&thread->lisp_thread;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+    // After zeroing, make sure PINNED_OBJECTS is a list again.
+    write_TLS(PINNED_OBJECTS, NIL, thread);
+
+    save_lisp_gc_iteration = 1;
+    collect_garbage(0);
+    verify_heap(0, VERIFY_POST_GC);
+
+    THREAD_JIT(0);
+
+    // We always coalesce copyable numbers. Additional coalescing is done
+    // only on request, in which case a message is shown (unless verbose=0).
+    if (gc_coalesce_string_literals && verbose) {
+        printf("[coalescing similar vectors... ");
+        fflush(stdout);
+    }
+    // Now that we've GC'd to eliminate as much junk as possible...
+    coalesce_similar_objects();
+    if (gc_coalesce_string_literals && verbose)
+        printf("done]\n");
+
+    // Do a non-moving collection so that orphaned strings that result
+    // from coalescing STRING= symbol names do not consume read-only space.
+    collect_garbage(1+PSEUDO_STATIC_GENERATION);
+    prepare_readonly_space(purify, 0);
+    if (verbose) { printf("[performing final GC..."); fflush(stdout); }
+    prepare_dynamic_space_for_final_gc();
+    save_lisp_gc_iteration = 2;
+    gencgc_alloc_start_page = 0;
+    collect_garbage(0);
+    /* All global allocation regions should be empty */
+    ASSERT_REGIONS_CLOSED();
+    // Enforce (rather, warn for lack of) self-containedness of the heap
+    verify_heap(0, VERIFY_FINAL | VERIFY_QUICK);
+    if (verbose)
+        printf(" done]\n");
+
+    THREAD_JIT(0);
+    // Scrub remaining garbage
+    extern void zero_all_free_ranges(void);
+    zero_all_free_ranges();
+    // Assert that defrag will not move the init_function
+    gc_assert(!immobile_space_p(lisp_init_function));
+    // Defragment and set all objects' generations to pseudo-static
+    prepare_immobile_space_for_save(verbose);
+
+#ifdef LISP_FEATURE_X86_64
+    untune_asm_routines_for_microarch();
+#endif
+    os_unlink_runtime();
+
+    if (prepend_runtime)
+        save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
+                                   application_type);
+
+    save_to_filehandle(file, filename, lisp_init_function,
+                       prepend_runtime, save_runtime_options,
+                       compressed ? compression_level : COMPRESSION_LEVEL_NONE);
+    /* Oops. Save still managed to fail. Since we've mangled the stack
+     * beyond hope, there's not much we can do.
+     * (beyond FUNCALLing lisp_init_function, but I suspect that's
+     * going to be rather unsatisfactory too... */
+    lose("Attempt to save core after non-conservative GC failed.");
+}

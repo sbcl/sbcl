@@ -86,4 +86,10 @@ page_index_t gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbyte
                                    int page_type, generation_index_t gen);
 
 extern void tlsf_dump_pool(void*, void*, char *pathname);
+
+extern generation_index_t gencgc_oldest_gen_to_gc;
+extern page_index_t gencgc_alloc_start_page;
+extern bool conservative_stack;
+extern lispobj lisp_init_function;
+
 #endif /* _GC_H_ */
