@@ -546,6 +546,22 @@
       (double-stack
        (storew temp (current-nfp-tn vop) (tn-offset res))))))
 
+(define-vop (%make-double-float)
+  (:args (bits :scs (signed-reg)))
+  (:results (res :scs (double-reg)
+                 :load-if (not (sc-is res double-stack))))
+  (:arg-types signed-num)
+  (:result-types double-float)
+  (:translate %make-double-float)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 2
+    (sc-case res
+      (double-reg
+       (inst fmov res bits))
+      (double-stack
+       (storew bits (current-nfp-tn vop) (tn-offset res))))))
+
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))
