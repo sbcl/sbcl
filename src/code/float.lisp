@@ -360,24 +360,41 @@
     ((integer * 0) (scale-single-float-maybe-underflow x exp))))
 
 (defun scale-double-float (x exp)
-  (declare (double-float x) (integer exp))
   (etypecase exp
     (fixnum
-     (let* ((hi (double-float-high-bits x))
-            (lo (double-float-low-bits x))
-            (old-exp (ldb sb-vm:double-float-exponent-byte hi))
-            (new-exp (+ old-exp exp)))
-       (cond
-         ((zerop x) x)
-         ((or (< old-exp sb-vm:double-float-normal-exponent-min)
-              (< new-exp sb-vm:double-float-normal-exponent-min))
-          (scale-double-float-maybe-underflow x exp))
-         ((or (> old-exp sb-vm:double-float-normal-exponent-max)
-              (> new-exp sb-vm:double-float-normal-exponent-max))
-          (scale-double-float-maybe-overflow x exp))
-         (t
-          (make-double-float (dpb new-exp sb-vm:double-float-exponent-byte hi)
-                             lo)))))
+     (sb-c::if-vop-existsp
+         (:translate %make-double-float)
+         (let* ((bits (double-float-bits x))
+                (old-exp (ldb (byte (byte-size sb-vm:double-float-exponent-byte)
+                                    (+ (byte-position sb-vm:double-float-exponent-byte) 32)) bits))
+                (new-exp (+ old-exp exp)))
+           (cond
+             ((zerop x) x)
+             ((or (< old-exp sb-vm:double-float-normal-exponent-min)
+                  (< new-exp sb-vm:double-float-normal-exponent-min))
+              (scale-double-float-maybe-underflow x exp))
+             ((or (> old-exp sb-vm:double-float-normal-exponent-max)
+                  (> new-exp sb-vm:double-float-normal-exponent-max))
+              (scale-double-float-maybe-overflow x exp))
+             (t
+              (%make-double-float (dpb new-exp (byte (byte-size sb-vm:double-float-exponent-byte)
+                                                     (+ (byte-position sb-vm:double-float-exponent-byte) 32))
+                                       bits)))))
+         (let* ((hi (double-float-high-bits x))
+                (lo (double-float-low-bits x))
+                (old-exp (ldb sb-vm:double-float-exponent-byte hi))
+                (new-exp (+ old-exp exp)))
+           (cond
+             ((zerop x) x)
+             ((or (< old-exp sb-vm:double-float-normal-exponent-min)
+                  (< new-exp sb-vm:double-float-normal-exponent-min))
+              (scale-double-float-maybe-underflow x exp))
+             ((or (> old-exp sb-vm:double-float-normal-exponent-max)
+                  (> new-exp sb-vm:double-float-normal-exponent-max))
+              (scale-double-float-maybe-overflow x exp))
+             (t
+              (make-double-float (dpb new-exp sb-vm:double-float-exponent-byte hi)
+                                 lo))))))
     (unsigned-byte (scale-double-float-maybe-overflow x exp))
     ((integer * 0) (scale-double-float-maybe-underflow x exp))))
 
@@ -385,7 +402,7 @@
 (defun scale-float (f ex)
   "Return the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
   of precision or overflow."
-  (declare (explicit-check))
+  (declare (explicit-check f))
   (number-dispatch ((f float))
     ((single-float)
      (scale-single-float f ex))
