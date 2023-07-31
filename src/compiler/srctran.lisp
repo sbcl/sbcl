@@ -2611,14 +2611,24 @@
 ;;; the range -2^(n-1) .. 1-2^n, instead of allowing result types of
 ;;; (UNSIGNED-BYTE N) and result types of (SIGNED-BYTE N).
 
-(deftransform %dpb ((new size posn int) * word)
+(deftransform %dpb ((new size posn int) * word :node node)
   "convert to inline logical operations"
+  (unless (and (or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
+                   (csubtypep (lvar-type int) (specifier-type 'word)))
+               (or (csubtypep (lvar-type new) (specifier-type 'sb-vm:signed-word))
+                   (csubtypep (lvar-type new) (specifier-type 'word))))
+    (delay-ir1-transform node :ir1-phases))
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
              (logand int (lognot (ash mask posn))))))
 
-(deftransform %dpb ((new size posn int) * sb-vm:signed-word)
+(deftransform %dpb ((new size posn int) * sb-vm:signed-word :node node)
   "convert to inline logical operations"
+  (unless (and (or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
+                   (csubtypep (lvar-type int) (specifier-type 'word)))
+               (or (csubtypep (lvar-type new) (specifier-type 'sb-vm:signed-word))
+                   (csubtypep (lvar-type new) (specifier-type 'word))))
+    (delay-ir1-transform node :ir1-phases))
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
              (logand int (lognot (ash mask posn))))))
