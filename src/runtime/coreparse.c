@@ -1118,6 +1118,7 @@ void darwin_jit_code_pages_kludge () {
 void gc_load_corefile_ptes(int card_table_nbits,
                            core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
                            os_vm_offset_t offset, int fd,
+                           struct coreparse_space *spaces,
                            struct heap_adjust *adj)
 {
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
@@ -1335,7 +1336,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
             gc_load_corefile_ptes(ptr[0], ptr[1], ptr[2],
                                   file_offset + (ptr[3] + 1) * os_vm_page_size, fd,
-                                  &adj);
+                                  spaces, &adj);
             break;
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
             initial_function = adjust_word(&adj, (lispobj)*ptr);
