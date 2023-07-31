@@ -170,8 +170,8 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; Return true if any of the named traps are currently trapped, false
 ;;; otherwise.
 (defmacro current-float-trap (&rest traps)
-  `(not (zerop (logand ,(dpb (float-trap-mask traps) float-traps-byte 0)
-                       (floating-point-modes)))))
+  `(logtest ,(dpb (float-trap-mask traps) float-traps-byte 0)
+            (floating-point-modes)))
 
 ;;; SIGFPE code to floating-point error
 #-win32
