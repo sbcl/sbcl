@@ -572,6 +572,17 @@
     (inst add temp temp lo-bits)
     (inst fmvx-> :double res temp)))
 
+#+64-bit
+(define-vop (%make-double-float)
+  (:args (bits :scs (signed-reg)))
+  (:results (res :scs (double-reg)))
+  (:arg-types signed-num)
+  (:result-types double-float)
+  (:translate make-double-float)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst fmvx-> :double res bits)))
+
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))

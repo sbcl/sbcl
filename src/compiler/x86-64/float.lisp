@@ -1302,6 +1302,28 @@
   (:generator 1
     (inst movsd res (register-inline-constant :qword (logior (ash hi 32) lo)))))
 
+(define-vop (%make-double-float)
+  (:args (bits :scs (signed-reg)))
+  (:results (res :scs (double-reg)))
+  (:arg-types signed-num)
+  (:result-types double-float)
+  (:translate %make-double-float)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 4
+    (inst movq res bits)))
+
+(define-vop (%make-double-float-c)
+  (:results (res :scs (double-reg)))
+  (:arg-types (:constant (signed-byte 64)))
+  (:result-types double-float)
+  (:info bits)
+  (:translate make-double-float)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 1
+    (inst movsd res (register-inline-constant :qword bits))))
+
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))
