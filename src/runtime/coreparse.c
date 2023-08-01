@@ -725,7 +725,7 @@ static void
 process_directory(int count, struct ndir_entry *entry,
                   int fd, os_vm_offset_t file_offset,
                   int __attribute__((unused)) merge_core_pages,
-                  struct coreparse_space *spaces,
+                  __attribute__((unused)) struct coreparse_space *spaces,
                   struct heap_adjust *adj)
 {
 #if ELFCORE
