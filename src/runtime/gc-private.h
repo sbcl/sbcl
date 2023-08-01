@@ -17,7 +17,6 @@
 
 #include <stdbool.h>
 #include "genesis/instance.h"
-#include "genesis/funcallable-instance.h"
 #include "genesis/weak-pointer.h"
 #include "immobile-space.h"
 #include "gencgc-internal.h"
@@ -236,7 +235,6 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     weak_pointer_chain = wp;
 }
 
-#include "genesis/layout.h"
 struct bitmap { sword_t *bits; unsigned int nwords; };
 static inline struct bitmap get_layout_bitmap(struct layout* layout)
 {
@@ -445,11 +443,6 @@ static inline int layout_depth2_id(struct layout* layout) {
     int32_t* vector = (int32_t*)&layout->uw_id_word0;
     return vector[0];
 }
-// Keep in sync with hardwired IDs in CHOOSE-LAYOUT-ID
-// in src/compiler/generic/layout-ids.lisp
-#define LAYOUT_LAYOUT_ID 3
-#define LFLIST_NODE_LAYOUT_ID 4
-#define BROTHERTREE_UNARY_NODE_LAYOUT_ID 5
 
 /// Return true if 'thing' is a layout.
 /// This predicate is careful, as is it used to verify heap invariants.

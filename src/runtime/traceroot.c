@@ -11,7 +11,6 @@
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"
 #include "genesis/instance.h"
-#include "genesis/layout.h"
 #include "genesis/package.h"
 #include "genesis/vector.h"
 #include "search.h"

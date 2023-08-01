@@ -34,7 +34,6 @@
 #include "genesis/gc-tables.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
-#include "genesis/layout.h"
 #include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
 #include "code.h"

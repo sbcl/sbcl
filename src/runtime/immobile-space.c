@@ -54,7 +54,6 @@
 #include "genesis/cons.h"
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"
-#include "genesis/layout.h"
 #include "genesis/package.h"
 #include "genesis/vector.h"
 #include "immobile-space.h"

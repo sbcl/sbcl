@@ -20,9 +20,6 @@
 #include "gc-private.h"
 #include "genesis/vector.h"
 #include "genesis/gc-tables.h"
-// FIXME: cheneygc needs layout.h but gencgc doesn't,
-// which means it's leaking in from somewhere else. Yuck.
-#include "genesis/layout.h"
 #include "gc-internal.h"
 #include "immobile-space.h"
 #include "hopscotch.h"

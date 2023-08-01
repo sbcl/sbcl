@@ -233,7 +233,6 @@ struct heap_adjust {
 #include "genesis/gc-tables.h"
 #include "genesis/cons.h"
 #include "genesis/hash-table.h"
-#include "genesis/layout.h"
 #include "genesis/vector.h"
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
