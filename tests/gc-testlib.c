@@ -6,6 +6,7 @@
 #include "sbcl.h"
 #include "gc-internal.h"
 #include "gc-private.h"
+#include "genesis/instance.h"
 
 extern struct generation generations[];
 extern os_vm_size_t bytes_allocated;
