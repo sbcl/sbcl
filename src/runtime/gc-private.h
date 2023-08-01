@@ -275,14 +275,6 @@ static inline bool bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 
 extern unsigned char* gc_card_mark;
 
-#ifdef LISP_FEATURE_DARWIN_JIT
-#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ
-#define OS_VM_PROT_JIT_ALL OS_VM_PROT_READ | OS_VM_PROT_WRITE
-#else
-#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ | OS_VM_PROT_EXECUTE
-#define OS_VM_PROT_JIT_ALL OS_VM_PROT_ALL
-#endif
-
 // "assign" as the operation name is a little clearer than "set"
 // which tends to be synonymous with setting a bit to 1.
 #define assign_page_card_marks(page, val) \

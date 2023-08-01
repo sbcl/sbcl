@@ -33,10 +33,6 @@ typedef int os_vm_prot_t;
 #include "target-arch.h"
 #define linuxversion(a, b, c) (((a)<<16)+((b)<<8)+(c))
 
-#define OS_VM_PROT_READ    PROT_READ
-#define OS_VM_PROT_WRITE   PROT_WRITE
-#define OS_VM_PROT_EXECUTE PROT_EXEC
-
 #define SIG_MEMORY_FAULT SIGSEGV
 
 /* Note that this must be higher than the highest numbered

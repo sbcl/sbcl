@@ -59,6 +59,20 @@
 
 #include "target-os.h"
 
+#ifndef LISP_FEATURE_WIN32
+// all posix systems can use the same #defines
+#define OS_VM_PROT_READ    PROT_READ
+#define OS_VM_PROT_WRITE   PROT_WRITE
+#define OS_VM_PROT_EXECUTE PROT_EXEC
+#endif
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ
+#define OS_VM_PROT_JIT_ALL OS_VM_PROT_READ | OS_VM_PROT_WRITE
+#else
+#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ | OS_VM_PROT_EXECUTE
+#define OS_VM_PROT_JIT_ALL OS_VM_PROT_ALL
+#endif
 
 #define OS_VM_PROT_ALL \
   (OS_VM_PROT_READ | OS_VM_PROT_WRITE | OS_VM_PROT_EXECUTE)
