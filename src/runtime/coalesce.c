@@ -21,6 +21,7 @@
 #include "genesis/vector.h"
 #include "genesis/gc-tables.h"
 #include "gc-internal.h"
+#include "genesis/instance.h"
 #include "immobile-space.h"
 #include "hopscotch.h"
 #include "code.h"

@@ -13,6 +13,7 @@
 #include "gc-private.h"
 #include "gencgc-private.h"
 #include "genesis/gc-tables.h"
+#include "genesis/instance.h"
 #include "globals.h"
 #include "forwarding-ptr.h"
 #include <stdio.h>

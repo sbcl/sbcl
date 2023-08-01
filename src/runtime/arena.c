@@ -14,6 +14,7 @@
 #include "genesis/arena.h"
 #include "genesis/gc-tables.h"
 #include "thread.h"
+#include "genesis/instance.h"
 #include "graphvisit.h"
 
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();

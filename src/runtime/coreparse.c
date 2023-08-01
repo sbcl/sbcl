@@ -43,6 +43,7 @@
 #include "gencgc-private.h"
 #include "code.h"
 #include "graphvisit.h"
+#include "genesis/instance.h"
 
 #include <errno.h>
 

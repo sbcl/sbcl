@@ -215,4 +215,48 @@ static inline sword_t headerobj_size2(lispobj* where, unsigned int header) {
     return sizetab[header & WIDETAG_MASK](where);
 }
 
+#ifdef LISP_FEATURE_64_BIT
+# define make_filler_header(n) (((uword_t)(n)<<32)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>32)
+#else
+# define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
+#endif
+
+/*
+ * Predicates rather than bit extractors should be used to test the flags
+ * in a vector header, because:
+ *
+ * - while trying to place the flags into a different header byte, I found it
+ *   unobvious whether to treat flags as part of the "Header data" (which is a
+ *   3-byte or 7-byte wide field starting at bit 8) versus the entire "Header word".
+ *   So e.g. if the Lisp VECTOR-WEAK value were redefined to #x0100, which would
+ *   place a 1 bit into byte index 3 (using SET-HEADER-DATA), it isn't clear that
+ *   "vector_flags(vector) == vectorWeak" is the proper test, because vector_flags()
+ *   could reasonably be defined to right-shift by 0, 8, or 16 bits.
+ *   (i.e. leave the bits where they are, but mask out the widetag; or make them
+ *   act like "Header data"; or right-align as if we had Lisp bitfield extractors)
+ *   Looked at differently, the natural values for the first 3 flag bits should be
+ *   1, 2, and 4 but this would force you to write expressions such as:
+ *    (SET-HEADER-DATA V (ASH SB-VM:VECTOR-HASHING-FLAG SB-VM:VECTOR-FLAG-BITS-SHIFT))
+ *   which looks to be terribly inconvenient for Lisp.
+ *   Alternatively, the constants can be defined as their "natural" values for C
+ *   which would have flag_VectorWeak = 0x010000, but then you need the inverse
+ *   shift in Lisp which expects SET-HEADER-DATA to get #x0100 as the argument.
+ *   Hypothetically, that is.
+ *
+ * - With smarter macros it ought to be possible to avoid 8-byte loads and shifts.
+ *   They would need to be endian-aware, which I didn't want to do just yet.
+ */
+#define vector_flagp(header, val) ((int)header & (flag_##val << ARRAY_FLAGS_POSITION))
+#define vector_flags_zerop(header) ((int)(header) & 0x07 << ARRAY_FLAGS_POSITION) == 0
+// Return true if vector is a weak vector that is not a hash-table <k,v> vector.
+static inline int vector_is_weak_not_hashing_p(unsigned int header) {
+    return (header & ((flag_VectorWeak|flag_VectorHashing) << ARRAY_FLAGS_POSITION)) ==
+      flag_VectorWeak << ARRAY_FLAGS_POSITION;
+}
+
+#define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
+#define KV_PAIRS_REHASH(kvv) kvv[1]
+
 #endif

@@ -3300,7 +3300,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (fdefn
      (format stream "#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
 /* Return 'fun' given a tagged pointer to an fdefn. */
-static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }~%"))
+static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }
+extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);~%"))
     (symbol
      (format stream "
 lispobj symbol_function(struct symbol* symbol);
@@ -4263,7 +4264,9 @@ static inline uword_t word_has_stickymark(uword_t word) {
                    (write-structure-object (layout-info (find-layout 'layout)) stream
                                   "layout")
                    (write-cast-operator 'layout "layout"
-                                        sb-vm:instance-pointer-lowtag stream))
+                                        sb-vm:instance-pointer-lowtag stream)
+                   (format stream "#include ~S~%"
+                           (namestring (merge-pathnames "instance.inc" (lispobj-dot-h)))))
                   (simple-fun
                    (write-primitive-object code stream))))))
           (out-to "primitive-objects"
