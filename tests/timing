@@ -247,7 +247,7 @@
 ("sb-gmp.impure" 557)
 ("save9.test" 1445)
 ("sb-rotate-byte.impure" 108)
-("sb-simd.impure" 106)
+("sb-simd.impure" 26856)
 ("save6.test" 2093)
 ("selfbuild-output.pure" 109)
 ("sb-introspect.impure" 920)
