@@ -26,7 +26,10 @@ struct arena_memblk {
     char* freeptr;
     char* limit;
     struct arena_memblk* next;
-    uword_t padding; // always 0
+    // The first memblk contains a 'struct arena' and a pthread mutex
+    // and the arena_memblk itself. Other memblks only have the memblk.
+    // Either way, Lisp objects commence at the 'allocator_base'.
+    char* allocator_base;
 };
 
 #if 1
@@ -81,13 +84,11 @@ lispobj sbcl_new_arena(size_t size)
     // all user allocations instead of having to skip the first batch
     // so that the arena struct always remains accessible.
     char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
-    memset(mem_base, 0xCC, aligned_mem_base - mem_base);
-    block->freeptr = aligned_mem_base;
+    block->freeptr = block->allocator_base = aligned_mem_base;
     char *limit = (char*)arena + size;
     char *aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
     block->limit = aligned_limit;
     block->next = NULL;
-    block->padding = 0;
     arena->uw_original_size = size;
     arena->uw_length = size;
     arena->uw_current_block = arena->uw_first_block = (uword_t)block;
@@ -120,8 +121,7 @@ void arena_release_memblks(lispobj arena_taggedptr)
         block = next;
     }
     arena->uw_current_block = arena->uw_first_block;
-    char* mem_base = (char*)first + sizeof (struct arena_memblk);
-    first->freeptr = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
+    first->freeptr = first->allocator_base;
     first->next = NULL;
     // Release huge-object blocks
     block = (void*)arena->uw_huge_objects;
@@ -299,12 +299,11 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                 // Alignment serves the needs of hide/unhide because mprotect()
                 // operates only on boundaries as dictated by the OS and/or CPU.
                 char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
-                extension->freeptr = aligned_mem_base;
+                extension->freeptr = extension->allocator_base = aligned_mem_base;
                 char* limit = new_mem + actual_request;
                 char* aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
                 extension->limit = aligned_limit;
                 extension->next = NULL;
-                extension->padding = 0;
                 // tally up the total length
                 // For huge objects, count only the directly requested space,
                 // not the "bookends" (alignment chunks)
@@ -392,7 +391,7 @@ long arena_bytes_used(lispobj arena_taggedptr)
     ARENA_MUTEX_ACQUIRE(arena);
     struct arena_memblk* block = (void*)arena->uw_first_block;
     do {
-        sum += block->freeptr - (char*)block;
+        sum += block->freeptr - block->allocator_base;
     } while ((block = block->next) != NULL);
     ARENA_MUTEX_RELEASE(arena);
     return sum;
@@ -419,13 +418,16 @@ void gc_scavenge_arenas()
             if (a->hidden == NIL) {
                 struct arena_memblk* block = (void*)a->uw_first_block;
                 do {
-                    // The block is its own lower bound for scavenge.
-                    // Its first 4 words look like fixnums, so no need to skip 'em.
                     if (gencgc_verbose)
                         fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
-                                a, block, block->freeptr);
-                    heap_scavenge((lispobj*)block, (lispobj*)block->freeptr);
+                                a, block->allocator_base, block->freeptr);
+                    heap_scavenge((lispobj*)block->allocator_base, (lispobj*)block->freeptr);
                 } while ((block = block->next) != NULL);
+                for ( block = (void*)a->uw_huge_objects ; block ; block = block->next ) {
+                    lispobj* obj = (lispobj*)block->allocator_base;
+                    lispobj header = *obj;
+                    scavtab[header_widetag(header)](obj, header);
+                }
             }
             chain = a->link;
         } while (chain != NIL);

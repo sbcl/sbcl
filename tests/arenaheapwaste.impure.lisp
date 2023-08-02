@@ -54,3 +54,27 @@
   ;; as 70% before starting a GC.
   (let ((avg-frac-waste (try-wasting-heap)))
     (assert (< avg-frac-waste .05))))
+
+(defvar *arena* (sb-vm:new-arena 10485760))
+(defun make-biga (a &optional (len 3000))
+  (sb-vm:with-arena (a) (make-array (the integer len))))
+(compile 'make-biga)
+(defvar *biggy*)
+(loop (setq *biggy* (make-biga *arena* 2000000))
+ (when (/= 0 (sb-vm::arena-huge-objects *arena*))
+   (return)))
+(defvar *cons-address* 0)
+(sb-thread:join-thread
+ (sb-thread:make-thread
+  (lambda ()
+    (let ((c (list "try" "this")))
+      (setf (aref *biggy* 0) c)
+      (setf *cons-address* (sb-kernel:get-lisp-obj-address c))))))
+
+(gc :gen 2)
+(test-util:with-test (:name :huge-objects-scavenged-in-gc)
+  (let ((cell (aref *biggy* 0)))
+    (assert (/= (sb-kernel:get-lisp-obj-address cell) *cons-address*))
+    (assert (string= (car cell) "try"))
+    (assert (string= (cadr cell) "this")))
+  (sb-vm:destroy-arena *arena*))
