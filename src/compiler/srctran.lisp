@@ -4047,9 +4047,7 @@
                              ((equal-comparable-types x-type y-type)
                               :give-up)
                              ((types-equal-or-intersect x-type y-type)
-                              '(eql x y))
-                             (t
-                              :give-up))))))))
+                              '(eql x y)))))))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
                    (let* ((not-x-type (type-difference x-type (specifier-type 'null)))
