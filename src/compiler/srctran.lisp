@@ -3933,6 +3933,21 @@
         (both-intersect-p 'instance)
         (both-intersect-p 'hash-table))))
 
+(defun equalp-eql-comparable-types (x y)
+  (flet ((both-intersect-p (type)
+           (let ((ctype (specifier-type type)))
+             (and (types-equal-or-intersect x ctype)
+                  (types-equal-or-intersect y ctype)))))
+    (not (or (and (let ((int-x (type-intersection x (specifier-type 'number)))
+                        (int-y (type-intersection y (specifier-type 'number))))
+                    (not (and (csubtypep int-x (specifier-type 'integer))
+                              (csubtypep int-y (specifier-type 'integer))))))
+             (both-intersect-p 'array)
+             (both-intersect-p 'cons)
+             (both-intersect-p 'pathname)
+             (both-intersect-p 'instance)
+             (both-intersect-p 'hash-table)))))
+
 (defun equal-remove-incompatible-types (x y &optional equalp)
   (block nil
     (let ((n-x (type-intersection x (specifier-type 'number)))
@@ -3976,8 +3991,6 @@
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
-        (combination-type (specifier-type '(or bit-vector string
-                                            cons pathname)))
         (constraint (or (find-ref-equality-constraint 'eql x y)
                         (find-ref-equality-constraint 'eq x y))))
     (cond ((and constraint
@@ -4031,13 +4044,11 @@
                              ((or (eq x-type *empty-type*)
                                   (eq y-type *empty-type*))
                               nil)
-                             ((types-equal-or-intersect x-type y-type)
-                              (cond ((and (types-equal-or-intersect x-type combination-type)
-                                          (types-equal-or-intersect y-type combination-type))
-                                     :give-up)
-                                    (t
-                                     '(eql x y))))
                              ((equal-comparable-types x-type y-type)
+                              :give-up)
+                             ((types-equal-or-intersect x-type y-type)
+                              '(eql x y))
+                             (t
                               :give-up))))))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
@@ -4070,10 +4081,6 @@
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
-        (combination-type (specifier-type '(or number array
-                                            character
-                                            cons pathname
-                                            instance hash-table)))
         (constraint (or (find-ref-equality-constraint 'eql x y)
                         (find-ref-equality-constraint 'eq x y))))
     (cond ((and constraint
@@ -4131,10 +4138,9 @@
                                   (eq y-type *empty-type*))
                               nil)
                              ((types-equal-or-intersect x-type y-type)
-                              (if (and (types-equal-or-intersect x-type combination-type)
-                                       (types-equal-or-intersect y-type combination-type))
-                                  :give-up
-                                  '(eq x y)))
+                              (if (equalp-eql-comparable-types x-type y-type)
+                                  '(eql x y)
+                                  :give-up))
                              ((equalp-comparable-types x-type y-type)
                               :give-up))))))))
              (let ((r (try x-type y-type)))
