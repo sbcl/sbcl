@@ -89,6 +89,13 @@
   ;; does *not* hold.
   (not-p nil :type boolean))
 
+(defstruct (equality-constraint
+            (:include constraint)
+            (:constructor make-equality-constraint
+                (number operator x y not-p
+                 &aux (kind 'equality))))
+  (operator nil :type symbol))
+
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
 ;;; Lisp says. NIL means unbounded.
@@ -1122,13 +1129,18 @@
                               (reoptimize-lvar lvar)
                               (unless (eq lvar principal-lvar)
                                 (reoptimize-lvar principal-lvar)))))
-                        (try (x)
+                        (try (x y)
                           (when (and (vector-length-constraint-p x)
                                      (eq (vector-length-constraint-var x) leaf))
+                            (when (and (constant-p y)
+                                       (not not-p)
+                                       (eq (equality-constraint-operator con) 'eq)
+                                       (not (types-equal-or-intersect res (specifier-type '(not simple-array)))))
+                              (setf res (type-intersection res (specifier-type `(simple-array * (,(constant-value y)))))))
                             (reoptimize (node-dest ref))
                             t)))
-                 (or (try x)
-                     (try y)
+                 (or (try x y)
+                     (try y x)
                      (reoptimize ref)))))
             (typep
              (if not-p

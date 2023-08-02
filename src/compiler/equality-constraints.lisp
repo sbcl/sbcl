@@ -9,14 +9,6 @@
 
 (in-package "SB-C")
 
-(defstruct (equality-constraint
-            (:include constraint)
-            (:constructor make-equality-constraint
-                (number operator x y not-p
-                 &aux (kind 'equality))))
-
-  (operator nil :type symbol))
-
 (defun constraint-var (thing)
   (if (vector-length-constraint-p thing)
       (vector-length-constraint-var thing)
