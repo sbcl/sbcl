@@ -3877,36 +3877,25 @@
       (t
        (give-up-ir1-transform)))))
 
-(defun array-type-dimensions-mismatch (x-type y-type &optional equalp)
-  (and (types-equal-or-intersect x-type (specifier-type 'array))
-       (types-equal-or-intersect y-type (specifier-type 'array))
-       (let ((x-diff (type-difference x-type (specifier-type 'array)))
-             (y-diff (type-difference y-type (specifier-type 'array))))
-         ;; Handle (equalp (or integer (simple-string 3)) (simple-string 4))
-         (when (or (eq x-diff *empty-type*)
-                   (eq y-diff *empty-type*)
-                   (and (not (types-equal-or-intersect x-diff y-diff))
-                        (not (if equalp
-                                 (equalp-comparable-types x-diff y-diff)
-                                 (equal-comparable-types x-diff y-diff)))))
-           (let ((x-type (type-intersection x-type (specifier-type 'array)))
-                 (y-type (type-intersection y-type (specifier-type 'array))))
-             (let ((x-dims (ctype-array-dimensions x-type))
-                   (y-dims (ctype-array-dimensions y-type)))
-               (and (consp x-dims)
-                    (consp y-dims)
-                    (or (/= (length x-dims)
-                            (length y-dims))
-                        ;; Can compare dimensions only for simple
-                        ;; arrays due to fill-pointer and
-                        ;; adjust-array.
-                        (and (csubtypep x-type (specifier-type 'simple-array))
-                             (csubtypep y-type (specifier-type 'simple-array))
-                             (loop for x-dim in x-dims
-                                   for y-dim in y-dims
-                                   thereis (and (integerp x-dim)
-                                                (integerp y-dim)
-                                                (not (= x-dim y-dim)))))))))))))
+(defun array-type-dimensions-mismatch (x-type y-type)
+  (and (csubtypep x-type (specifier-type 'array))
+       (csubtypep y-type (specifier-type 'array))
+       (let ((x-dims (ctype-array-dimensions x-type))
+             (y-dims (ctype-array-dimensions y-type)))
+         (and (consp x-dims)
+              (consp y-dims)
+              (or (/= (length x-dims)
+                      (length y-dims))
+                  ;; Can compare dimensions only for simple
+                  ;; arrays due to fill-pointer and
+                  ;; adjust-array.
+                  (and (csubtypep x-type (specifier-type 'simple-array))
+                       (csubtypep y-type (specifier-type 'simple-array))
+                       (loop for x-dim in x-dims
+                             for y-dim in y-dims
+                             thereis (and (integerp x-dim)
+                                          (integerp y-dim)
+                                          (not (= x-dim y-dim))))))))))
 
 ;;; Only a simple array will always remain non-empty
 (defun array-type-non-empty-p (type)
@@ -3944,6 +3933,42 @@
         (both-intersect-p 'instance)
         (both-intersect-p 'hash-table))))
 
+(defun equal-remove-incompatible-types (x y &optional equalp)
+  (block nil
+    (let ((n-x (type-intersection x (specifier-type 'number)))
+          (n-y (type-intersection y (specifier-type 'number))))
+      (unless (or (eq n-x *empty-type*)
+                  (eq n-y *empty-type*))
+        (let ((i-x (type-approximate-interval n-x))
+              (i-y (type-approximate-interval n-y)))
+          (when (and i-x i-y
+                     (interval-/= i-x i-y))
+            (return
+              (values (type-difference x n-x)
+                      (type-difference y n-y)))))))
+    (let ((a-x (type-intersection x (specifier-type 'array)))
+          (a-y (type-intersection y (specifier-type 'array))))
+      (when (not (or (eq a-x *empty-type*)
+                     (eq a-y *empty-type*)))
+        (when (or (not equalp)
+                  ;; At least one array has to be longer than 0
+                  ;; and not adjustable, because #() and "" are equalp.
+                  (array-type-non-empty-p a-x)
+                  (array-type-non-empty-p a-y))
+          (let ((x-et (type-array-element-type a-x))
+                (y-et (type-array-element-type a-y)))
+            (when (and (neq x-et *wild-type*)
+                       (neq y-et *wild-type*)
+                       (not (types-equal-or-intersect x-et y-et)))
+              (return
+                (values (type-difference x a-x)
+                        (type-difference y a-y))))))
+        (when (array-type-dimensions-mismatch a-x a-y)
+          (return
+            (values (type-difference x a-x)
+                    (type-difference y a-y))))))
+    (values x y)))
+
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
 ;;; with strings and bit-vectors.
@@ -3959,6 +3984,8 @@
                 (not (constraint-not-p constraint)))
            t)
           ((same-leaf-ref-p x y) t)
+          ((array-type-dimensions-mismatch x-type y-type)
+           nil)
           (t
            (flet ((try (x-type y-type)
                     (flet ((both-csubtypep (type)
@@ -3978,8 +4005,6 @@
                                                    (csubtypep x equal-types))
                                                  element-types))))))
                       (cond
-                        ((array-type-dimensions-mismatch x-type y-type)
-                         nil)
                         ((and (constant-lvar-p x)
                               (equal (lvar-value x) ""))
                          `(and (stringp y)
@@ -4000,14 +4025,20 @@
                         ((or (non-equal-array-p x-type)
                              (non-equal-array-p y-type))
                          '(eq x y))
-                        ((types-equal-or-intersect x-type y-type)
-                         (cond ((and (types-equal-or-intersect x-type combination-type)
-                                     (types-equal-or-intersect y-type combination-type))
-                                :give-up)
-                               (t
-                                '(eql x y))))
-                        ((equal-comparable-types x-type y-type)
-                         :give-up)))))
+                        ((multiple-value-bind (x-type y-type)
+                             (equal-remove-incompatible-types x-type y-type)
+                           (cond
+                             ((or (eq x-type *empty-type*)
+                                  (eq y-type *empty-type*))
+                              nil)
+                             ((types-equal-or-intersect x-type y-type)
+                              (cond ((and (types-equal-or-intersect x-type combination-type)
+                                          (types-equal-or-intersect y-type combination-type))
+                                     :give-up)
+                                    (t
+                                     '(eql x y))))
+                             ((equal-comparable-types x-type y-type)
+                              :give-up))))))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
                    (let* ((not-x-type (type-difference x-type (specifier-type 'null)))
@@ -4049,7 +4080,7 @@
                 (not (constraint-not-p constraint)))
            t)
           ((same-leaf-ref-p x y) t)
-          ((array-type-dimensions-mismatch x-type y-type t)
+          ((array-type-dimensions-mismatch x-type y-type)
            nil)
           (t
            (flet ((try (x-type y-type)
@@ -4092,30 +4123,20 @@
                          '(hash-table-equalp x y))
                         ;; TODO: two instances of the same type should dispatch
                         ;; directly to the EQUALP-IMPL function in the layout.
-                        ((and (both-csubtypep 'array)
-                              ;; At least one array has to be longer than 0
-                              ;; and not adjustable, because #() and "" are equal.
-                              (or (array-type-non-empty-p x-type)
-                                  (array-type-non-empty-p y-type))
-                              (let ((number-ctype (specifier-type 'number))
-                                    (x-et (type-array-element-type x-type))
-                                    (y-et (type-array-element-type y-type)))
-                                (and (neq x-et *wild-type*)
-                                     (neq y-et *wild-type*)
-                                     (cond ((types-equal-or-intersect x-et y-et)
-                                            nil)
-                                           ((csubtypep x-et number-ctype)
-                                            (not (types-equal-or-intersect y-et number-ctype)))
-                                           ((types-equal-or-intersect y-et number-ctype)
-                                            (not (types-equal-or-intersect x-et number-ctype)))))))
-                         nil)
-                        ((types-equal-or-intersect x-type y-type)
-                         (if (and (types-equal-or-intersect x-type combination-type)
-                                  (types-equal-or-intersect y-type combination-type))
-                             :give-up
-                             '(eq x y)))
-                        ((equalp-comparable-types x-type y-type)
-                         :give-up)))))
+                        (t
+                         (multiple-value-bind (x-type y-type)
+                             (equal-remove-incompatible-types x-type y-type t)
+                           (cond
+                             ((or (eq x-type *empty-type*)
+                                  (eq y-type *empty-type*))
+                              nil)
+                             ((types-equal-or-intersect x-type y-type)
+                              (if (and (types-equal-or-intersect x-type combination-type)
+                                       (types-equal-or-intersect y-type combination-type))
+                                  :give-up
+                                  '(eq x y)))
+                             ((equalp-comparable-types x-type y-type)
+                              :give-up))))))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
                    (let* ((not-x-type (type-difference x-type (specifier-type 'null)))
