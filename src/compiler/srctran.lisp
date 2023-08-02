@@ -3877,27 +3877,36 @@
       (t
        (give-up-ir1-transform)))))
 
-(defun array-type-dimensions-mismatch (x-type y-type)
-  (let ((array-type (specifier-type 'array))
-        (simple-array-type (specifier-type 'simple-array)))
-    (and (csubtypep x-type array-type)
-         (csubtypep y-type array-type)
-         (let ((x-dims (ctype-array-dimensions x-type))
-               (y-dims (ctype-array-dimensions y-type)))
-           (and (consp x-dims)
-                (consp y-dims)
-                (or (/= (length x-dims)
-                        (length y-dims))
-                    ;; Can compare dimensions only for simple
-                    ;; arrays due to fill-pointer and
-                    ;; adjust-array.
-                    (and (csubtypep x-type simple-array-type)
-                         (csubtypep y-type simple-array-type)
-                         (loop for x-dim in x-dims
-                               for y-dim in y-dims
-                               thereis (and (integerp x-dim)
-                                            (integerp y-dim)
-                                            (not (= x-dim y-dim)))))))))))
+(defun array-type-dimensions-mismatch (x-type y-type &optional equalp)
+  (and (types-equal-or-intersect x-type (specifier-type 'array))
+       (types-equal-or-intersect y-type (specifier-type 'array))
+       (let ((x-diff (type-difference x-type (specifier-type 'array)))
+             (y-diff (type-difference y-type (specifier-type 'array))))
+         ;; Handle (equalp (or integer (simple-string 3)) (simple-string 4))
+         (when (or (eq x-diff *empty-type*)
+                   (eq y-diff *empty-type*)
+                   (and (not (types-equal-or-intersect x-diff y-diff))
+                        (not (if equalp
+                                 (equalp-comparable-types x-diff y-diff)
+                                 (equal-comparable-types x-diff y-diff)))))
+           (let ((x-type (type-intersection x-type (specifier-type 'array)))
+                 (y-type (type-intersection y-type (specifier-type 'array))))
+             (let ((x-dims (ctype-array-dimensions x-type))
+                   (y-dims (ctype-array-dimensions y-type)))
+               (and (consp x-dims)
+                    (consp y-dims)
+                    (or (/= (length x-dims)
+                            (length y-dims))
+                        ;; Can compare dimensions only for simple
+                        ;; arrays due to fill-pointer and
+                        ;; adjust-array.
+                        (and (csubtypep x-type (specifier-type 'simple-array))
+                             (csubtypep y-type (specifier-type 'simple-array))
+                             (loop for x-dim in x-dims
+                                   for y-dim in y-dims
+                                   thereis (and (integerp x-dim)
+                                                (integerp y-dim)
+                                                (not (= x-dim y-dim)))))))))))))
 
 ;;; Only a simple array will always remain non-empty
 (defun array-type-non-empty-p (type)
@@ -3907,6 +3916,33 @@
               (every (lambda (dim)
                        (typep dim '(integer 1)))
                      dimensions)))))
+
+(defun equal-comparable-types (x y)
+  (flet ((both-intersect-p (type)
+           (let ((ctype (specifier-type type)))
+             (and (types-equal-or-intersect x ctype)
+                  (types-equal-or-intersect y ctype)))))
+    (or (both-intersect-p 'string)
+        ;; Even though PATHNAME doesn't have any parameters it
+        ;; may appear in an EQL type.
+        (both-intersect-p 'pathname)
+        (both-intersect-p 'bit-vector)
+        (both-intersect-p 'cons))))
+
+(defun equalp-comparable-types (x y)
+  (flet ((both-intersect-p (type)
+           (let ((ctype (specifier-type type)))
+             (and (types-equal-or-intersect x ctype)
+                  (types-equal-or-intersect y ctype)))))
+    (or (both-intersect-p 'number)
+        (both-intersect-p 'array)
+        (both-intersect-p 'character)
+        (both-intersect-p 'cons)
+        ;; Even though these don't have any parameters they may
+        ;; appear in an EQL type.
+        (both-intersect-p 'pathname)
+        (both-intersect-p 'instance)
+        (both-intersect-p 'hash-table))))
 
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
@@ -3929,10 +3965,6 @@
                              (let ((ctype (specifier-type type)))
                                (and (csubtypep x-type ctype)
                                     (csubtypep y-type ctype))))
-                           (both-intersect-p (type)
-                             (let ((ctype (specifier-type type)))
-                               (and (types-equal-or-intersect x-type ctype)
-                                    (types-equal-or-intersect y-type ctype))))
                            (some-csubtypep (type)
                              (let ((ctype (specifier-type type)))
                                (or (csubtypep x-type ctype)
@@ -3974,12 +4006,7 @@
                                 :give-up)
                                (t
                                 '(eql x y))))
-                        ((or (both-intersect-p 'string)
-                             ;; Even though PATHNAME doesn't have any parameters it
-                             ;; may appear in an EQL type.
-                             (both-intersect-p 'pathname)
-                             (both-intersect-p 'bit-vector)
-                             (both-intersect-p 'cons))
+                        ((equal-comparable-types x-type y-type)
                          :give-up)))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
@@ -4022,16 +4049,14 @@
                 (not (constraint-not-p constraint)))
            t)
           ((same-leaf-ref-p x y) t)
+          ((array-type-dimensions-mismatch x-type y-type t)
+           nil)
           (t
            (flet ((try (x-type y-type)
                     (flet ((both-csubtypep (type)
                              (let ((ctype (specifier-type type)))
                                (and (csubtypep x-type ctype)
                                     (csubtypep y-type ctype))))
-                           (both-intersect-p (type)
-                             (let ((ctype (specifier-type type)))
-                               (and (types-equal-or-intersect x-type ctype)
-                                    (types-equal-or-intersect y-type ctype))))
                            (some-csubtypep (type)
                              (let ((ctype (specifier-type type)))
                                (or (csubtypep x-type ctype)
@@ -4041,8 +4066,6 @@
                                   (characterp (lvar-value y))
                                   (transform-constant-char-equal x y 'eq))))
                       (cond
-                        ((array-type-dimensions-mismatch x-type y-type)
-                         nil)
                         ((and (constant-lvar-p x)
                               (typep (lvar-value x) '(simple-array * (0))))
                          `(and (vectorp y)
@@ -4091,15 +4114,7 @@
                                   (types-equal-or-intersect y-type combination-type))
                              :give-up
                              '(eq x y)))
-                        ((or (both-intersect-p 'number)
-                             (both-intersect-p 'array)
-                             (both-intersect-p 'character)
-                             (both-intersect-p 'cons)
-                             ;; Even though these don't have any parameters they may
-                             ;; appear in an EQL type.
-                             (both-intersect-p 'pathname)
-                             (both-intersect-p 'instance)
-                             (both-intersect-p 'hash-table))
+                        ((equalp-comparable-types x-type y-type)
                          :give-up)))))
              (let ((r (try x-type y-type)))
                (if (eq r :give-up)
