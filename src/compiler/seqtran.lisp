@@ -1127,7 +1127,7 @@
 
 (defun check-sequence-ranges (string start end node &optional (suffix "") sequence-name)
   (let* ((type (lvar-type string))
-         (length (vector-type-length type))
+         (lengths (vector-type-lengths type))
          (annotation (find-if #'lvar-sequence-bounds-annotation-p (lvar-annotations string))))
     (when annotation
       (when (shiftf (lvar-annotation-fired annotation) t)
@@ -1137,22 +1137,26 @@
                (constant (ctype-of (constant-value x)))
                (lvar (lvar-type x))
                (t (leaf-type x)))))
-      (when length
-        (flet ((check (index name length-type)
-                 (when index
-                   (let ((index-type (arg-type index)))
-                     (unless (types-equal-or-intersect index-type
-                                                       (specifier-type length-type))
-                       (let ((*compiler-error-context* node))
-                         (compiler-warn "Bad :~a~a ~a for~a ~a"
-                                        name suffix
-                                        (type-specifier index-type)
-                                        (if sequence-name
-                                            (format nil " for ~a of type" sequence-name)
-                                            suffix)
-                                        (type-specifier type))))))))
-          (check start "start" `(integer 0 ,length))
-          (check end "end" `(or null (integer 0 ,length)))))
+      (flet ((check (index name length-type)
+               (when index
+                 (let ((index-type (arg-type index)))
+                   (unless (types-equal-or-intersect index-type
+                                                     (specifier-type length-type))
+                     (let ((*compiler-error-context* node))
+                       (compiler-warn "Bad :~a~a ~a for~a ~a"
+                                      name suffix
+                                      (type-specifier index-type)
+                                      (if sequence-name
+                                          (format nil " for ~a of type" sequence-name)
+                                          suffix)
+                                      (type-specifier type))
+                       t))))))
+        (loop for length in lengths
+              thereis
+              (check start "start" `(integer 0 ,length)))
+        (loop for length in lengths
+              thereis
+              (check end "end" `(or null (integer 0 ,length)))))
       (when (and start end)
         (let* ((start-type (arg-type start))
                (start-interval (type-approximate-interval start-type))
