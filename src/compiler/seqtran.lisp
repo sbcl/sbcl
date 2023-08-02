@@ -1229,6 +1229,9 @@
   (check-sequence-ranges sequence1 start1 end1 node 1 'sequence1)
   (check-sequence-ranges sequence2 start2 end2 node 2 'sequence2))
 
+(defoptimizer (vector-subseq* ir2-hook) ((vector start end) node)
+  (check-sequence-ranges vector start end node))
+
 (defun string-cmp-deriver (string1 string2 start1 end1 start2 end2 &optional equality)
   (flet ((dims (string start end)
            (let* ((type (lvar-type string))

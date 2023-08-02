@@ -560,6 +560,9 @@
 (defknown subseq (proper-sequence index &optional sequence-end) consed-sequence
   (flushable))
 
+(defknown vector-subseq* (vector index sequence-end) (simple-array * (*))
+  (flushable))
+
 (defknown copy-seq (proper-sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
