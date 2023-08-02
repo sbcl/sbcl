@@ -3985,21 +3985,27 @@
                (if (eq r :give-up)
                    (let* ((not-x-type (type-difference x-type (specifier-type 'null)))
                           (r (try not-x-type y-type)))
-                     (if (neq r :give-up)
-                         `(when x
-                            ,r)
-                         (let* ((not-y-type (type-difference y-type (specifier-type 'null)))
-                                (r (try x-type not-y-type)))
-                           (if (neq r :give-up)
-                               `(when y
-                                  ,r)
-                               (let ((r (try not-x-type not-y-type)))
-                                 (if (neq r :give-up)
-                                     `(if (null x)
-                                          (null y)
-                                          (and y
-                                               ,r))
-                                     (give-up-ir1-transform)))))))
+                     (cond ((not r)
+                            `(eq x y))
+                           ((neq r :give-up)
+                            `(when x
+                               ,r))
+                           (t
+                            (let* ((not-y-type (type-difference y-type (specifier-type 'null)))
+                                   (r (try x-type not-y-type)))
+                              (cond ((not r)
+                                     `(eq x y))
+                                    ((neq r :give-up)
+                                     `(when y
+                                        ,r))
+                                    (t
+                                     (let ((r (try not-x-type not-y-type)))
+                                       (if (neq r :give-up)
+                                           `(if (null x)
+                                                (null y)
+                                                (and y
+                                                     ,r))
+                                           (give-up-ir1-transform)))))))))
                    r)))))))
 
 (deftransform equalp ((x y) * *)
@@ -4099,21 +4105,27 @@
                (if (eq r :give-up)
                    (let* ((not-x-type (type-difference x-type (specifier-type 'null)))
                           (r (try not-x-type y-type)))
-                     (if (neq r :give-up)
-                         `(when x
-                            ,r)
-                         (let* ((not-y-type (type-difference y-type (specifier-type 'null)))
-                                (r (try x-type not-y-type)))
-                           (if (neq r :give-up)
-                               `(when y
-                                  ,r)
-                               (let ((r (try not-x-type not-y-type)))
-                                 (if (neq r :give-up)
-                                     `(if (null x)
-                                          (null y)
-                                          (and y
-                                               ,r))
-                                     (give-up-ir1-transform)))))))
+                     (cond ((not r)
+                            `(eq x y))
+                           ((neq r :give-up)
+                            `(when x
+                               ,r))
+                           (t
+                            (let* ((not-y-type (type-difference y-type (specifier-type 'null)))
+                                   (r (try x-type not-y-type)))
+                              (cond ((not r)
+                                     `(eq x y))
+                                    ((neq r :give-up)
+                                     `(when y
+                                        ,r))
+                                    (t
+                                     (let ((r (try not-x-type not-y-type)))
+                                       (if (neq r :give-up)
+                                           `(if (null x)
+                                                (null y)
+                                                (and y
+                                                     ,r))
+                                           (give-up-ir1-transform)))))))))
                    r)))))))
 
 (defoptimizer (equal constraint-propagate-if) ((x y) node gen)

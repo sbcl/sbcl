@@ -4192,7 +4192,7 @@
 (defun member-type-derivation (x)
   (member x '(a b c d)))
 
-(with-test (:name :member-type-derivation )
+(with-test (:name :member-type-derivation)
   (checked-compile-and-assert
    ()
    `(lambda (n)
@@ -4203,3 +4203,21 @@
    (('c) t)
    (('d) t)
    (('e) nil)))
+
+(with-test (:name :equal-not-null-transform)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (declare (atom x) (list y))
+         (equalp x y))
+    ((nil nil) t)
+    ((nil '(1)) nil)
+    ((1 nil) nil))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (declare (atom x) (list y))
+         (equal y x))
+    ((nil nil) t)
+    ((nil '(1)) nil)
+    ((1 nil) nil)))
