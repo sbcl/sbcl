@@ -4384,6 +4384,18 @@ used for a COMPLEX component.~:@>"
                 (process-compound-type (intersection-type-types type))))))
     (determine type)))
 
+(defun ctype-array-union-dimensions (type)
+  (if (union-type-p type)
+      (loop with dims
+            for type in (union-type-types type)
+            for dim = (ctype-array-dimensions type)
+            do
+            (when (eq dim '*)
+              (return '(*)))
+            (pushnew dim dims :test #'equal)
+            finally (return dims))
+      (list (ctype-array-dimensions type))))
+
 (defun ctype-array-specialized-element-types (type)
   (let (types)
     (labels ((process-compound-type (types)

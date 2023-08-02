@@ -3880,22 +3880,27 @@
 (defun array-type-dimensions-mismatch (x-type y-type)
   (and (csubtypep x-type (specifier-type 'array))
        (csubtypep y-type (specifier-type 'array))
-       (let ((x-dims (ctype-array-dimensions x-type))
-             (y-dims (ctype-array-dimensions y-type)))
-         (and (consp x-dims)
-              (consp y-dims)
-              (or (/= (length x-dims)
-                      (length y-dims))
-                  ;; Can compare dimensions only for simple
-                  ;; arrays due to fill-pointer and
-                  ;; adjust-array.
-                  (and (csubtypep x-type (specifier-type 'simple-array))
-                       (csubtypep y-type (specifier-type 'simple-array))
-                       (loop for x-dim in x-dims
-                             for y-dim in y-dims
-                             thereis (and (integerp x-dim)
-                                          (integerp y-dim)
-                                          (not (= x-dim y-dim))))))))))
+       (let ((x-dims (sb-kernel::ctype-array-union-dimensions x-type))
+             (y-dims (sb-kernel::ctype-array-union-dimensions y-type)))
+         (unless (or (eq (car x-dims) '*)
+                     (eq (car y-dims) '*))
+           (loop with simple = (and (csubtypep x-type (specifier-type 'simple-array))
+                                    (csubtypep y-type (specifier-type 'simple-array)))
+                 for x-dim in x-dims
+                 never
+                 (loop for y-dim in y-dims
+                       thereis
+                       (and (= (length x-dim)
+                               (length y-dim))
+                            ;; Can compare dimensions only for simple
+                            ;; arrays due to fill-pointer and
+                            ;; adjust-array.
+                            (or (not simple)
+                                (loop for x in x-dim
+                                      for y in y-dim
+                                      always (or (eq x '*)
+                                                 (eq y '*)
+                                                 (= x y)))))))))))
 
 ;;; Only a simple array will always remain non-empty
 (defun array-type-non-empty-p (type)
