@@ -129,8 +129,8 @@
   (let* ((name (etypecase fdefn-or-symbol
                  #+untagged-fdefns
                  ((unsigned-byte 61)
-                  (fdefn-name (make-lisp-obj (logior (get-lisp-obj-address fdefn-or-symbol)
-                                                     sb-vm:other-pointer-lowtag))))
+                  (fdefn-name (%make-lisp-obj (logior (get-lisp-obj-address fdefn-or-symbol)
+                                                      sb-vm:other-pointer-lowtag))))
                  (symbol fdefn-or-symbol)
                  (fdefn (fdefn-name fdefn-or-symbol))))
          (condition
