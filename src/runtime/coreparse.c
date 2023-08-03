@@ -875,30 +875,27 @@ process_directory(int count, struct ndir_entry *entry,
             }
 
             sword_t offset = os_vm_page_size * (1 + entry->data_page);
+#ifdef LISP_FEATURE_DARWIN_JIT
+            if (id == READ_ONLY_CORE_SPACE_ID)
+                os_protect((os_vm_address_t)addr, len, OS_VM_PROT_WRITE);
+#endif
             if (compressed) {
-#ifdef LISP_FEATURE_DARWIN_JIT
-                if (id == READ_ONLY_CORE_SPACE_ID)
-                    os_protect((os_vm_address_t)addr, len, OS_VM_PROT_WRITE);
-#endif
                 inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
-
-#ifdef LISP_FEATURE_DARWIN_JIT
-                if (id == READ_ONLY_CORE_SPACE_ID)
-                    os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
-#endif
-
             }
             else
 #ifdef LISP_FEATURE_DARWIN_JIT
-            if (id == DYNAMIC_CORE_SPACE_ID || id == STATIC_CODE_CORE_SPACE_ID) {
+            if (id == DYNAMIC_CORE_SPACE_ID || id == STATIC_CODE_CORE_SPACE_ID || id == READ_ONLY_CORE_SPACE_ID) {
                 load_core_bytes_jit(fd, offset + file_offset, (os_vm_address_t)addr, len);
             } else
 #endif
-              {
+            {
                 load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len, id == READ_ONLY_CORE_SPACE_ID);
             }
         }
-
+#ifdef LISP_FEATURE_DARWIN_JIT
+        if (id == READ_ONLY_CORE_SPACE_ID)
+            os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+#endif
 #ifdef MADV_MERGEABLE
         if ((merge_core_pages == 1)
             || ((merge_core_pages == -1) && compressed)) {
