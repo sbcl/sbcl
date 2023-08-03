@@ -529,12 +529,6 @@ int s_issock(mode_t mode)
 #endif /* !LISP_FEATURE_WIN32 */
 
 #ifdef LISP_FEATURE_UNIX
-#ifdef LISP_FEATURE_DARWIN
-/* nanosleep() is not re-entrant on some versions of Darwin and is
- * reimplemented using the underlying syscalls.
- */
-int sb_nanosleep(time_t sec, int nsec);
-#else
 void sb_nanosleep(time_t sec, int nsec)
 {
     struct timespec rqtp = {sec, nsec};
@@ -542,36 +536,8 @@ void sb_nanosleep(time_t sec, int nsec)
 
     while(nanosleep(&rqtp, &rmtp) && errno == EINTR) {
         rqtp = rmtp;
-        /* The old lisp version stated
-           ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
-           ;; take longer than the requested time, the call will
-           ;; return with EINT and (unsigned)-1 seconds in the
-           ;; remainder timespec, which would cause us to enter
-           ;; nanosleep again for ~136 years. So, we check that the
-           ;; remainder time is actually decreasing.
-           ;;
-           ;; It would be neat to do this bit of defensive
-           ;; programming on all platforms, but unfortunately on
-           ;; Linux, REM can be a little higher than REQ if the
-           ;; nanosleep() call is interrupted quickly enough,
-           ;; probably due to the request being rounded up to the
-           ;; nearest HZ. This would cause the sleep to return way
-           ;; too early.
-           #+darwin
-           (let ((rem-sec (slot rem 'tv-sec))
-           (rem-nsec (slot rem 'tv-nsec)))
-           (when (or (> secs rem-sec)
-           (and (= secs rem-sec) (>= nsecs rem-nsec)))
-           ;; Update for next round.
-           (setf secs  rem-sec
-           nsecs rem-nsec)
-           t)
-
-           but the Darwin variant is implemented elsewhere
-        */
     }
 }
-#endif
 
 void sb_nanosleep_double(double seconds) {
     /* Some (which?) platforms, apparently, can't sleep more than 100
