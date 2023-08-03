@@ -1937,7 +1937,7 @@
              fast-ash-left/unsigned=>unsigned)
   (:translate ash-left-mod64)
   (:arg-refs nil amount-ref)
-  (:generator 3
+  (:generator 4
     (with-shift-operands
       (move ecx amount)
       (unless (csubtypep (tn-ref-type amount-ref)

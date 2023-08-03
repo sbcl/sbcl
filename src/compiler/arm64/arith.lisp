@@ -745,9 +745,9 @@
                   (:result-types ,type)
                   (:policy :fast-safe)
                   (:generator ,(1- cost)
-                              (if (< amount 64)
-                                  (inst lsl result number amount)
-                                  (inst mov result 0)))))))
+                    (if (< amount 64)
+                        (inst lsl result number amount)
+                        (inst mov result 0)))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum fast-ash-left-c/fixnum=>fixnum any-reg tagged-num any-reg 2)
@@ -779,10 +779,6 @@
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-left-c/unsigned=>unsigned)
-  (:translate ash-left-mod64))
-
-(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
-             fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
 (define-vop (fast-ash-modfx/signed=>signed
