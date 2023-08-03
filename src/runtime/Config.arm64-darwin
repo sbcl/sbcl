@@ -13,7 +13,7 @@ CFLAGS += -g -Wall -fdollars-in-identifiers
 
 OS_SRC = bsd-os.c arm64-bsd-os.c darwin-os.c arm64-darwin-os.c
 
-OS_LIBS = -lSystem -lc -ldl
+OS_LIBS = -lc -ldl
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
@@ -28,7 +28,7 @@ endif
 ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
-LINKFLAGS += -dynamic -twolevel_namespace -bind_at_load
+LINKFLAGS += -dynamic -twolevel_namespace
 
 CFLAGS += -fno-omit-frame-pointer
 DISABLE_PIE=no
