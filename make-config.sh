@@ -761,21 +761,27 @@ case "$sbcl_arch" in
     ;;
 esac
 
-# Use a little C program to try to guess the endianness.  Ware
-# cross-compilers!
-#
-# FIXME: integrate to grovel-features, mayhaps
-if $android
+if [ "$sbcl_os" = darwin -a  "$sbcl_arch" = arm64 ]
 then
+    # Launching new executables is pretty slow on macOS, but this configuration is pretty uniform
+    echo ' :little-endian :os-provides-dlopen :os-provides-dladdr :os-provides-blksize-t :os-provides-suseconds-t' >> $ltf
+else
+    # Use a little C program to try to guess the endianness.  Ware
+    # cross-compilers!
+    #
+    # FIXME: integrate to grovel-features, mayhaps
+    if $android
+    then
         $CC tools-for-build/determine-endianness.c -o tools-for-build/determine-endianness
         android_run tools-for-build/determine-endianness >> $ltf
-else
+    else
         $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
         tools-for-build/determine-endianness >> $ltf
+    fi
+    export sbcl_os sbcl_arch android
+    sh tools-for-build/grovel-features.sh >> $ltf
 fi
 
-export sbcl_os sbcl_arch android
-sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf
 printf " %s" "`cat crossbuild-runner/backends/${sbcl_arch}/features`" >> $ltf
