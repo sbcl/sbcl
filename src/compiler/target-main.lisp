@@ -15,9 +15,8 @@
 
 ;;;; CL:COMPILE
 
-(defun ir1-toplevel-for-compile (form name path)
-  (let* ((*current-path* path)
-         (component (make-empty-component))
+(defun ir1-toplevel-for-compile (form name)
+  (let* ((component (make-empty-component))
          (*current-component* component)
          (debug-name-tail (or name (name-lambdalike form)))
          (source-name (or name '.anonymous.)))
@@ -59,7 +58,7 @@
 ;;;
 ;;; If NAME is provided, then we try to use it as the name of the
 ;;; function for debugging/diagnostic information.
-(defun %compile (form ephemeral name tlf)
+(defun %compile (form ephemeral name)
   (when name
     (legal-fun-name-or-type-error name))
   (with-ir1-namespace
@@ -68,8 +67,7 @@
                       :handled-conditions *handled-conditions*
                       :disabled-package-locks *disabled-package-locks*))
            (*compile-object* (make-core-object ephemeral))
-           (path `(original-source-start 0 ,tlf))
-           (lambda (ir1-toplevel-for-compile form name path)))
+           (lambda (ir1-toplevel-for-compile form name)))
 
       ;; FIXME: The compile-it code from here on is sort of a
       ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
@@ -128,7 +126,6 @@
                     (and (member :msan *features*)
                          (find-dynamic-foreign-symbol-address "__msan_unpoison"))
                     :block-compile nil))
-                  (*current-path* nil)
                   (*last-message-count* (list* 0 nil nil))
                   (*last-error-context* nil)
                   (*gensym-counter* 0)
@@ -164,14 +161,18 @@
              (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
                (unless source-paths
                  (find-source-paths form tlf))
-               (let ((*compiler-error-bailout*
+               (let ((*current-path* (or (get-source-path form)
+                                         (cons form (or (and (boundp '*current-path*)
+                                                             *current-path*)
+                                                        `(original-source-start 0 ,tlf)))))
+                     (*compiler-error-bailout*
                        (lambda (e)
                          (setf oops e)
                          ;; Unwind the compiler frames: users want the know where
                          ;; the error came from, not how the compiler got there.
                          (go :error))))
                  (return
-                   (%compile form ephemeral name tlf))))
+                   (%compile form ephemeral name))))
            :error
              ;; Either signal the error right away, or return a function that
              ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so
