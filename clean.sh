@@ -114,7 +114,6 @@ find . \( \
         -name 'test-status.lisp-expr' -o \
         -name 'last-random-state.lisp-expr' -o \
         -name 'test.log' -o \
-        -name 'whitespace-stamp' -o \
         -name 'a.out' -o \
         -name 'sbcl' -o \
         -name 'sbcl.h' -o \

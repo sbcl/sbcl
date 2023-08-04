@@ -540,7 +540,7 @@ echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
-echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WITH_FEATURES " >> $ltf
+echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WITH_FEATURES" >> $ltf
 
 # Automatically block sb-simd on non-x86 platforms, at least for now.
 case "$sbcl_arch" in
