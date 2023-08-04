@@ -8,7 +8,19 @@ set -e
 # The supposed explanation definitely no longer holds - there is no "src/c-runtime/sbcl.h"
 # as a symlink into "output/". The sbcl.h file is a plain file, and it's been that way
 # for quite some time.
-rm -rf obj/* output/* src/runtime/genesis/ src/runtime/sbcl.mk src/runtime/*.dSYM
+rm -rf obj/* src/runtime/genesis/ src/runtime/sbcl.mk src/runtime/*.dSYM
+
+if [ -z "$SBCL_LEAVE_OUTPUT" ]
+then
+    rm -fr output/*
+else
+    for f in output/*; do
+        
+        if [ $f != output/ucd ]; then
+            rm -r $f
+        fi
+    done
+fi
 
 # Ensure that we know GNUMAKE.
 . ./find-gnumake.sh

@@ -17,10 +17,10 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *proplist-properties*
     (mapcar (lambda (x) (cons (car x) (sb-xc:coerce (cdr x) '(vector (unsigned-byte 32)))))
-            '#.(plist-to-alist (sb-cold:read-from-file "output/misc-properties.lisp-expr")))))
+            '#.(plist-to-alist (sb-cold:read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
 (sb-ext:define-load-time-global **confusables**
-    (let ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr")))
+    (let ((data '#.(sb-cold:read-from-file "output/ucd/confusables.lisp-expr")))
       (sb-impl::%stuff-hash-table
         (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))
         (loop for (source . target) in data
@@ -40,7 +40,7 @@
         t)))
 
 (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-    (let ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
+    (let ((list '#.(sb-cold:read-from-file "output/ucd/bidi-mirrors.lisp-expr")))
       (sb-impl::%stuff-hash-table
        (make-hash-table :test #'eq :size (length list))
        (loop for (k v) in list collect (cons k v))
@@ -169,7 +169,7 @@ Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
   (or (gethash character
                (load-time-value
-                (let ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr")))
+                (let ((list '#.(sb-cold:read-from-file "output/ucd/numerics.lisp-expr")))
                   (sb-impl::%stuff-hash-table
                    (make-hash-table :test #'eq :size (length list))
                    (loop for (k . v) in list
@@ -213,10 +213,10 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
          (block-index (ordered-ranges-position
                        code
-                       #.(coerce (sb-cold:read-from-file "output/block-ranges.lisp-expr")
+                       #.(coerce (sb-cold:read-from-file "output/ucd/block-ranges.lisp-expr")
                                        '(vector (unsigned-byte 32))))))
     (if block-index
-        (aref #.(sb-cold:read-from-file "output/block-names.lisp-expr") block-index)
+        (aref #.(sb-cold:read-from-file "output/ucd/block-names.lisp-expr") block-index)
         :no-block)))
 
 (defun unicode-1-name (character)
@@ -456,7 +456,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
   #-sb-unicode
   (declare (ignore char1 char2))
   #-sb-unicode
-  #.(let* ((data (sb-cold:read-from-file "output/comp.lisp-expr"))
+  #.(let* ((data (sb-cold:read-from-file "output/ucd/comp.lisp-expr"))
            (entries (loop for pair across data
                           for key = (car pair)
                           for c1 = (ldb (byte 21 21) key)
@@ -480,7 +480,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
        (cond
          ((gethash (dpb c1 (byte 21 21) c2)
                    (load-time-value
-                    (let ((data '#.(sb-cold:read-from-file "output/comp.lisp-expr")))
+                    (let ((data '#.(sb-cold:read-from-file "output/ucd/comp.lisp-expr")))
                       (sb-impl::%stuff-hash-table
                        (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
                        (loop for pair across data
@@ -592,10 +592,10 @@ only characters for which it returns T are collected."
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
 (sb-ext:define-load-time-global **special-titlecases**
-  '#.(sb-cold:read-from-file "output/titlecases.lisp-expr"))
+  '#.(sb-cold:read-from-file "output/ucd/titlecases.lisp-expr"))
 
 (sb-ext:define-load-time-global **special-casefolds**
-  '#.(sb-cold:read-from-file "output/foldcases.lisp-expr"))
+  '#.(sb-cold:read-from-file "output/ucd/foldcases.lisp-expr"))
 
 (defun has-case-p (char)
   ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
@@ -1422,7 +1422,7 @@ it defaults to 80 characters"
 
 ;;; Collation
 (defconstant +maximum-variable-primary-element+
-  #.(sb-cold:read-from-file "output/other-collation-info.lisp-expr"))
+  #.(sb-cold:read-from-file "output/ucd/other-collation-info.lisp-expr"))
 
 (defun unpack-collation-key (key)
   (flet ((unpack (value)
@@ -1439,7 +1439,7 @@ it defaults to 80 characters"
 
 (macrolet ((collations-hash-table ()
              (let ((data (let ((*read-base* 16))
-                           (sb-cold:read-from-file "output/collation.lisp-expr"))))
+                           (sb-cold:read-from-file "output/ucd/collation.lisp-expr"))))
                #+64-bit (dovector (item data) (aver (fixnump (car item))))
                `(load-time-value
                  (sb-impl::%stuff-hash-table

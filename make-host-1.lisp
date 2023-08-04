@@ -76,6 +76,7 @@
       (values (read stream) (read stream)))
   (unless (outputs-up-to-date inputs outputs)
     (format t "~&; Building Unicode data~%")
+    (ensure-directories-exist "output/ucd/")
     (let ((*ucd-inputs* (make-hash-table :test 'equal))
           (*ucd-outputs* (make-hash-table :test 'equal)))
       (dolist (input inputs)

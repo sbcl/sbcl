@@ -60,7 +60,7 @@
 
 (macrolet ((frob ()
              (flet ((file (name type)
-                      (sb-cold:find-bootstrap-file (format nil "output/~A.~A" name type)))
+                      (sb-cold:find-bootstrap-file (format nil "output/ucd/~A.~A" name type)))
                     (read-ub8-vector (pathname)
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))

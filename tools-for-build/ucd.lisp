@@ -6,7 +6,7 @@
 
 (defvar *output-directory*
   (merge-pathnames
-   (make-pathname :directory '(:relative :up "output"))
+   (make-pathname :directory '(:relative :up "output" "ucd"))
    (make-pathname :directory (pathname-directory *load-truename*))))
 
 (defparameter *unicode-character-database*
@@ -43,7 +43,7 @@
                                :direction :output
                                :if-exists :supersede
                                :if-does-not-exist :create)
-           (setf (gethash (format nil "output/~A.txt" ,name) *ucd-outputs*) 'made)
+           (setf (gethash (format nil "output/ucd/~A.txt" ,name) *ucd-outputs*) 'made)
            (do ((inbyte (read-byte ,in nil nil) (read-byte ,in nil nil))
                 (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
                 (eszet-count 0)
@@ -105,7 +105,7 @@
                                :direction :output
                                :if-exists :supersede
                                :if-does-not-exist :create)
-           (setf (gethash (format nil "output/~A.txt" ,name) *ucd-outputs*) 'made)
+           (setf (gethash (format nil "output/ucd/~A.txt" ,name) *ucd-outputs*) 'made)
            (do ((inbyte (read-byte ,in nil nil) (read-byte ,in nil nil)))
                ((null inbyte) nil)
              (cond
@@ -124,7 +124,7 @@
                                       :defaults *output-directory*)
                        :direction :output :element-type '(unsigned-byte 8)
                        :if-exists :supersede :if-does-not-exist :create)
-     (setf (gethash (format nil "output/~A.dat" ,name) *ucd-outputs*) 'made)
+     (setf (gethash (format nil "output/ucd/~A.dat" ,name) *ucd-outputs*) 'made)
      ,@body))
 
 (defmacro with-ucd-output-syntax (&body body)
@@ -139,7 +139,7 @@
                                       :defaults *output-directory*)
                        :direction :output :element-type 'character
                        :if-exists :supersede :if-does-not-exist :create)
-     (setf (gethash (format nil "output/~A.lisp-expr" ,name) *ucd-outputs*) 'made)
+     (setf (gethash (format nil "output/ucd/~A.lisp-expr" ,name) *ucd-outputs*) 'made)
      (with-ucd-output-syntax
          ,@body)))
 
@@ -1046,6 +1046,7 @@ Used to look up block data.")
     (prin1 *maximum-variable-key*) (terpri)))
 
 (defun output (&optional (*output-directory* *output-directory*))
+  (ensure-directories-exist *output-directory*)
   (output-misc-data)
   (output-ucd-data)
   (output-decomposition-data)
