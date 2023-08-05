@@ -12,13 +12,13 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; Stream and single-file functions
 
 #+ecl (ext:quit) ; avoids 'Unexpected end of file on #<input file "stdin">.'
+
 #+sbcl
 (progn
 
-(defvar *buffer* (make-string (* 2 1024 1024)))
+(defvar *buffer* (make-string (* 3/2 1024 1024)))
 
 (defun canonicalize-whitespace (string length)
   (declare ((simple-array character (*)) string))
@@ -68,9 +68,12 @@
   (let ((new
           (with-open-file (stream file :external-format :utf-8 :if-does-not-exist nil)
             (when stream
-              (canonicalize-whitespace
-               *buffer*
-               (read-sequence *buffer* stream))))))
+              (let ((length (file-length stream)))
+                (when (> length (length *buffer*))
+                  (when (> length (* 10 1024 1024))
+                    (warn "~a too large" file))
+                  (setf *buffer* (make-string length))))
+              (canonicalize-whitespace *buffer* (read-sequence *buffer* stream))))))
     (when new
       (with-open-file (stream file :direction :output
                                    :external-format :utf-8
@@ -78,7 +81,6 @@
         (print file)
         (write-sequence new stream)))))
 
-;;; Timestamp functions
 (defvar *source-types* '("lisp" "lisp-expr" "c" "h" "asd" "texinfo"))
 
 (defvar *exceptions* '("compile-file-pos-utf16be"))
