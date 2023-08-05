@@ -418,6 +418,7 @@ process to continue normally."
     (setf (extern-alien "internal_errors_enabled" int) 1)
     (float-cold-init-or-reinit))
   (gc-reinit)
+  (finalizers-reinit)
   (foreign-reinit)
   #+win32 (reinit-internal-real-time)
   ;; If the debugger was disabled in the saved core, we need to

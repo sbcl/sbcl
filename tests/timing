@@ -121,6 +121,7 @@
 ("gcd.pure" 100)
 ("genheaders.test" 50)
 ("finalize.impure" 2473)
+("finalize-2.impure" 8000)
 ("gray-streams.impure" 124)
 ("gc.impure" 1031)
 ("hash-custom-test.pure" 80)

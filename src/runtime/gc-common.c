@@ -2647,40 +2647,6 @@ static inline bool lispobj_livep(lispobj obj_base) {
     return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
 }
 
-static void push_in_lockfree_list(struct symbol* list_holder,
-                                  so_node* this, lispobj key, lispobj data)
-{
-    // Using the so_node type for the rehash list is slightly wasteful of space
-    // but I don't feel like inventing another type just to eliminate the 'hash' slot.
-    // It is, however, imperative that we create new objects, because
-    // the lockfree algorithm crashes if nodes are mutated.
-    so_node* node =
-      gc_general_alloc(mixed_region, ALIGN_UP(sizeof (so_node), 2*N_WORD_BYTES),
-                       PAGE_TYPE_MIXED);
-    const unsigned int header_low =
-        (((sizeof (so_node) / N_WORD_BYTES) - 1) << INSTANCE_LENGTH_SHIFT)
-        | INSTANCE_WIDETAG;
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    node->lfnode.header = ((this->lfnode.header >> 32) << 32) | header_low;
-    *(&node->data + 1) = 0; // padding words
-#else
-    node->lfnode.header = header_low;
-    node->lfnode._layout = this->lfnode._layout;
-#endif
-    node->hash = 0;
-    node->key = key;
-    node->data = data;
-    lispobj old = list_holder->value;
-    node->lfnode._node_next = old != NIL ? old : LFLIST_TAIL_ATOM;
-    // This __sync_val_compare_and_swap can not fail.
-    // On the machines that have spurious failure, it is not exposed,
-    // unlike in C++ where you can choose compare_exchange_{weak|strong}
-    lispobj new = make_lispobj(node, INSTANCE_POINTER_LOWTAG);
-    lispobj __attribute__((unused)) actual =
-        __sync_val_compare_and_swap(&list_holder->value, old, new);
-    gc_assert(actual == old);
-    if (!compacting_p()) gc_mark_obj(new);
-}
 static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
 {
     struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
@@ -2692,6 +2658,15 @@ static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
         __sync_val_compare_and_swap(&list_holder->value, old, new);
     gc_assert(actual == old);
     if (!compacting_p()) gc_mark_obj(new);
+}
+static void push_in_alist(struct symbol* list_holder, lispobj key, lispobj val)
+{
+    struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
+    cons->car = key;
+    cons->cdr = val;
+    lispobj pair = make_lispobj(cons, LIST_POINTER_LOWTAG);
+    if (!compacting_p()) gc_mark_obj(pair);
+    push_in_ordinary_list(list_holder, pair);
 }
 
 /* Scan the finalizer table and take action on each node as follows:
@@ -2708,64 +2683,40 @@ void scan_finalizers()
     lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
     gc_assert(lowtag_of(finalizer_store) == INSTANCE_POINTER_LOWTAG);
     struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
-    so_node* prev = (void*)native_pointer(solist->head);
     // SO-HEAD can not possibly be marked for deletion, therefore %NODE-NEXT
     // returns a valid node.
-    lispobj node = prev->lfnode._node_next;
+    lispobj node = ((so_node*)native_pointer(solist->head))->lfnode._node_next;
     while (node != LFLIST_TAIL_ATOM) {
         // At each iteration, 'this' is the node whose disposition we're pondering,
-        // and 'prev' is its immediate predecessor, always a valid non-deleted node.
         so_node* this = (so_node*)(node-INSTANCE_POINTER_LOWTAG);
         // To determine if 'this' is pending deletion, read the bits of its 'next'
         lispobj next = this->lfnode._node_next;
-        if (dummy_node_p(this)) {
-            // Case 1: split-order dummy node
-            gc_assert(!fixnump(next)); // 'this' can not be marked for impending deletion
-            prev = this, node = next;
-            continue;
-        } else if (fixnump(next)) {
-            // Case 2: logically deleted regular node- "help" the lisp code along
-            // by completing this deletion. Lisp will decrement SO-COUNT (I hope!)
-        } else if (forwarding_pointer_p((lispobj*)this->key)) {
-            // Case 3: live object moved
-            // Get the moved object and construct a weak pointer to it.
-            // If the new object were directly stored in node->key, that would create
-            // a strong reference which not delays finalization, but also transitively
-            // enlivens anything it reaches.
-            struct weak_pointer* weakptr =
-              gc_general_alloc(mixed_region,
-                               ALIGN_UP(sizeof (struct weak_pointer), 2*N_WORD_BYTES),
-                               PAGE_TYPE_MIXED);
-            weakptr->header = ((WEAK_POINTER_SIZE-1) << N_WIDETAG_BITS) | WEAK_POINTER_WIDETAG;
-            weakptr->value = forwarding_pointer_value((lispobj*)this->key);
-#ifndef LISP_FEATURE_64_BIT
-            // 64-bit weak-pointers are 2 words, but 32-bit are 4 words because there
-            // is a GC-use field. In 64-bit, that field fits in the header.
-            memset(&weakptr->next, 0, 2*N_WORD_BYTES); // Will crash without this
-#endif
-            if (!compacting_p()) gc_mark_obj(make_lispobj(weakptr, OTHER_POINTER_LOWTAG));
-            push_in_lockfree_list(SYMBOL(FINALIZER_REHASHLIST),
-                                  this, make_lispobj(weakptr, OTHER_POINTER_LOWTAG),
-                                  this->data);
-            this->key = 0; // clobber dangling reference
-            --solist->uw_count;
-        } else if (!lispobj_livep(this->key)) {
-            // Case 4: dead object
-            push_in_ordinary_list(SYMBOL(FINALIZERS_TRIGGERED), this->data);
-            this->key = 0; // clobber dangling reference
-            --solist->uw_count;
-        } else {
-            // Case 5: ordinary node, live unmoved object
-            prev = this, node = next;
+        if (fixnump(next)) { // node is already logically deleted, pending physical deletion
+            gc_assert(!dummy_node_p(this));
+            node = next | INSTANCE_POINTER_LOWTAG;
             continue;
         }
-        // Cases 2 through 4 all delete 'this' from the list
-        node = next | INSTANCE_POINTER_LOWTAG; // restore lowtag on 'next' for case 2
-        notice_pointer_store(prev, &prev->lfnode._node_next);
-        prev->lfnode._node_next = node;
+        if (dummy_node_p(this)) {
+            // nothing to do
+        } else if (forwarding_pointer_p((lispobj*)this->key)) {
+            // live object moved
+            push_in_alist(SYMBOL(FINALIZER_REHASHLIST),
+                          forwarding_pointer_value((lispobj*)this->key),
+                          this->data);
+            this->key = 0; // clobber dangling reference
+            // FIXME: use sync_fetch_and_and or does it not matter since world is stopped?
+            this->lfnode._node_next = next & ~LOWTAG_MASK; // logically delete
+            --solist->uw_count;
+        } else if (!lispobj_livep(this->key)) {
+            push_in_ordinary_list(SYMBOL(FINALIZERS_TRIGGERED), this->data);
+            this->key = 0; // clobber dangling reference
+            // ditto
+            this->lfnode._node_next = next & ~LOWTAG_MASK; // logically delete
+            --solist->uw_count;
+        }
+        node = next;
     }
     // Close the region
-    ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
 }
 
