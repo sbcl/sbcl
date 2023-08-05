@@ -393,13 +393,26 @@
 
 (defvar *pre-gc-xset-stable-hash-count*
   (hash-table-count sb-kernel::*xset-stable-hashes*))
+;;; The fix for lp#2029306 significantly simplified the logic of scan_finalizers
+;;; by avoiding use of weak pointers for objects in the live-and-moved state.
+;;; This is not so bad, because an object being live means that adding another
+;;; ref does not per se cause liveness to be preserved. However, the action of the
+;;; finalizer thread is not immediate - it has move the to-be-rehashed items back
+;;; into the weak table, and then another GC cycle is required to discover that the
+;;; cons cells which held the rehash list became dead. Futhermore, to ensure that
+;;; finalizers are run in time for this test to examine the expected state,
+;;; we can "help" the finalizer thread by calling RUN-PENDING-FINALIZERS.
+;;; This sequence yields a count of zero in the xset stable ID table for x86-64,
+;;; but I have not tried the others, so I'm not asserting that it's zero.
 (gc :full t)
+(sb-kernel:run-pending-finalizers)
+(gc :full t)
+(sb-kernel:run-pending-finalizers)
 #+sb-thread (sb-kernel:run-pending-finalizers)
 (with-test (:name :xset-stable-hash-weakness)
   ;; After running the :MEMBER-TYPE-HASH-MIXER test, there were >5000 entries
   ;; in the *XSET-STABLE-HASHES* table for me.
   ;; The preceding GC should have had some effect.
   (let ((count (hash-table-count sb-kernel::*xset-stable-hashes*)))
-    (when (plusp count)
-      (format t "::: NOTE: hash-table-count = ~D~%" count))
+    (format t "::: NOTE: hash-table-count = ~D~%" count)
     (assert (< count (/ *pre-gc-xset-stable-hash-count* 2)))))
