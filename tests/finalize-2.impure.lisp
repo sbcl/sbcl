@@ -1,3 +1,5 @@
+#-sb-thread (invoke-restart 'run-tests::skip-file)
+
 (setq *evaluator-mode* :compile)
 ;; example from lp#2029306
 (defvar *x*)
