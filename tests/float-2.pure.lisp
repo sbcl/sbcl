@@ -420,6 +420,7 @@ fractional bits."
       (= (/ a b)
          (/ c d)))
    ((#C(1.0d0 0.0d0) #C(10000.1d0 1.3d0) #C(1.0d0 0.0d0) #C(10000.1d0 1.3d0)) t))
+  #-x86
   (checked-compile-and-assert
    ()
    `(lambda (a b c d)
@@ -428,6 +429,7 @@ fractional bits."
       (= (/ a b)
          (/ c d)))
    ((1.0f0 #C(10000.1f0 1.3f0) 1.0f0 #C(10000.1f0 1.3f0)) t))
+  #-x86
   (checked-compile-and-assert
    ()
    `(lambda (a b c d)
