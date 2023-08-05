@@ -360,11 +360,13 @@ sufficiently motivated to do lengthy fixes."
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
 
-sb-c::
+(in-package "SB-C")
+
 (defun coalesce-debug-info ()
   (flet ((debug-source= (a b)
-           (and (equal (debug-source-plist a) (debug-source-plist b))
-                (eql (debug-source-created a) (debug-source-created b)))))
+           (and (equalp a b)
+                ;; Case sensitive
+                (equal (debug-source-plist a) (debug-source-plist b)))))
     ;; Coalesce the following:
     ;;  DEBUG-INFO-SOURCE, DEBUG-FUN-NAME
     ;;  SIMPLE-FUN-ARGLIST, SIMPLE-FUN-TYPE
@@ -378,59 +380,59 @@ sb-c::
        (lambda (obj widetag size)
          (declare (ignore size))
          (case widetag
-          (#.sb-vm:code-header-widetag
-           (let ((di (%code-debug-info obj)))
-             ;; Discard memoized debugger's debug info
-             (when (typep di 'sb-c::compiled-debug-info)
-               (setf (sb-c::compiled-debug-info-memo-cell di) nil)))
-           (dotimes (i (sb-kernel:code-n-entries obj))
-             (let* ((fun (sb-kernel:%code-entry-point obj i))
-                    (arglist (%simple-fun-arglist fun))
-                    (info (%simple-fun-info fun))
-                    (type (typecase info
-                            ((cons t simple-vector) (car info))
-                            ((not simple-vector) info)))
-                    (type  (ensure-gethash type type-hash type))
-                    (xref (%simple-fun-xrefs fun)))
-               (setf (%simple-fun-arglist fun)
-                     (ensure-gethash arglist arglist-hash arglist))
-               (setf (sb-impl::%simple-fun-info fun)
-                     (if (and type xref) (cons type xref) (or type xref))))))
-          (#.sb-vm:instance-widetag
-           (typecase obj
-            (compiled-debug-info
-             (let ((source (compiled-debug-info-source obj)))
-               (typecase source
-                 (core-debug-source)    ; skip - uh, why?
-                 (debug-source
-                  (let* ((namestring (debug-source-namestring source))
-                         (canonical-repr
-                           (find-if (lambda (x) (debug-source= x source))
-                                    (gethash namestring source-ht))))
-                    (cond ((not canonical-repr)
-                           (push source (gethash namestring source-ht)))
-                          ((neq source canonical-repr)
-                           (setf (compiled-debug-info-source obj)
-                                 canonical-repr)))))))
-             (loop for debug-fun = (compiled-debug-info-fun-map obj) then next
-                   for next = (sb-c::compiled-debug-fun-next debug-fun)
-                   do
-                   (binding* ((name (compiled-debug-fun-name debug-fun))
-                              ((new foundp) (gethash name name-ht)))
-                     (cond ((not foundp)
-                            (setf (gethash name name-ht) name))
-                           ((neq name new)
-                            (%instance-set debug-fun (get-dsd-index compiled-debug-fun name)
-                                  new))))
-                   while next))
-            (sb-lockless::linked-list
-             ;; In the normal course of execution, incompletely deleted nodes
-             ;; exist only for a brief moment, as the next operation on the list by
-             ;; any thread that touches the logically deleted node can fully delete it.
-             ;; If somehow we get here and there are in fact pending deletions,
-             ;; they must be finished or else bad things can happen, since 'coreparse'
-             ;; can not deal with the untagged pointer convention.
-             (sb-lockless::finish-incomplete-deletions obj))))))
+           (#.sb-vm:code-header-widetag
+            (let ((di (%code-debug-info obj)))
+              ;; Discard memoized debugger's debug info
+              (when (typep di 'sb-c::compiled-debug-info)
+                (setf (sb-c::compiled-debug-info-memo-cell di) nil)))
+            (dotimes (i (sb-kernel:code-n-entries obj))
+              (let* ((fun (sb-kernel:%code-entry-point obj i))
+                     (arglist (%simple-fun-arglist fun))
+                     (info (%simple-fun-info fun))
+                     (type (typecase info
+                             ((cons t simple-vector) (car info))
+                             ((not simple-vector) info)))
+                     (type  (ensure-gethash type type-hash type))
+                     (xref (%simple-fun-xrefs fun)))
+                (setf (%simple-fun-arglist fun)
+                      (ensure-gethash arglist arglist-hash arglist))
+                (setf (sb-impl::%simple-fun-info fun)
+                      (if (and type xref) (cons type xref) (or type xref))))))
+           (#.sb-vm:instance-widetag
+            (typecase obj
+              (compiled-debug-info
+               (let ((source (compiled-debug-info-source obj)))
+                 (typecase source
+                   (core-debug-source)  ; skip - uh, why?
+                   (debug-source
+                    (let* ((namestring (debug-source-namestring source))
+                           (canonical-repr
+                             (find-if (lambda (x) (debug-source= x source))
+                                      (gethash namestring source-ht))))
+                      (cond ((not canonical-repr)
+                             (push source (gethash namestring source-ht)))
+                            ((neq source canonical-repr)
+                             (setf (compiled-debug-info-source obj)
+                                   canonical-repr)))))))
+               (loop for debug-fun = (compiled-debug-info-fun-map obj) then next
+                     for next = (sb-c::compiled-debug-fun-next debug-fun)
+                     do
+                     (binding* ((name (compiled-debug-fun-name debug-fun))
+                                ((new foundp) (gethash name name-ht)))
+                       (cond ((not foundp)
+                              (setf (gethash name name-ht) name))
+                             ((neq name new)
+                              (%instance-set debug-fun (get-dsd-index compiled-debug-fun name)
+                                             new))))
+                     while next))
+              (sb-lockless::linked-list
+               ;; In the normal course of execution, incompletely deleted nodes
+               ;; exist only for a brief moment, as the next operation on the list by
+               ;; any thread that touches the logically deleted node can fully delete it.
+               ;; If somehow we get here and there are in fact pending deletions,
+               ;; they must be finished or else bad things can happen, since 'coreparse'
+               ;; can not deal with the untagged pointer convention.
+               (sb-lockless::finish-incomplete-deletions obj))))))
        :all))))
 
 (in-package "SB-VM")
