@@ -499,10 +499,14 @@
 ;;; do it for any rational that has a precise representation as a
 ;;; float (such as 0).
 (macrolet ((frob (op &optional complex)
-             `(deftransform ,op ((x y) (,(if complex
-                                             '(complex float)
-                                             'float)
-                                        rational) *)
+             `(deftransform ,op ((x y) (:or (,(if complex
+                                                  '(complex single-float)
+                                                  'single-float)
+                                             rational)
+                                            (,(if complex
+                                                  '(complex double-float)
+                                                  'double-float)
+                                             rational)) *)
                 "open-code FLOAT to RATIONAL comparison"
                 (unless (constant-lvar-p y)
                   (give-up-ir1-transform
@@ -528,6 +532,7 @@
   (frob >=)
   (frob =)
   (frob = t))
+
 
 ;;;; irrational transforms
 

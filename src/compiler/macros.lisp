@@ -333,11 +333,15 @@
                            ,,n-lambda)))))))
           (if defun-only
               `(defun ,name ,@stuff)
-              `(%deftransform ',name
-                              ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
-                              '(function ,arg-types ,result-type)
-                              (named-lambda (deftransform ,name) ,@stuff)
-                              ,important)))))))
+              `(let ((fun (named-lambda (deftransform ,name) ,@stuff)))
+                 ,@(loop for arg-types in (if (typep arg-types '(cons (eql :or)))
+                                              (cdr arg-types)
+                                              (list arg-types))
+                         collect `(%deftransform ',name
+                                                 ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
+                                                 '(function ,arg-types ,result-type)
+                                                 fun
+                                                 ,important)))))))))
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
