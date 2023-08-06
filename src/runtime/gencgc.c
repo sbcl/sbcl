@@ -5345,7 +5345,7 @@ void hexdump_spaces(struct verify_state* state, char *reason)
                     uword_t word = where[i];
                     if (i==0)
                         fprintf(f, " %06x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffffff, word);
-v                    else
+                    else
                         fprintf(f, "   %04x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffff, word);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
                     if (i == 0 && header_widetag(word) == INSTANCE_WIDETAG) word >>= 32;
