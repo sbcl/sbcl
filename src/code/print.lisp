@@ -1843,20 +1843,14 @@ variable: an unreadable object representing the error is printed instead.")
            (write-string (if (float-trapping-nan-p x) " trapping" " quiet") stream)
            (write-string " NaN" stream))))
     (t
-     (let ((x (cond ((minusp (float-sign x))
-                     (write-char #\- stream)
-                     (- x))
-                    (t
-                     x))))
-       (cond
-         ((zerop x)
-          (write-string "0.0" stream)
-          (print-float-exponent x 0 stream))
-         (t
-          (print-float x stream)))))))
-
-
-
+     (when (plusp (float-sign-bit x))
+       (write-char #\- stream))
+     (cond
+       ((zerop x)
+        (write-string "0.0" stream)
+        (print-float-exponent x 0 stream))
+       (t
+        (print-float x stream))))))
 
 ;;;; other leaf objects
 
