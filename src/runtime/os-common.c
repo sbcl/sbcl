@@ -328,6 +328,18 @@ void* load_core_bytes_jit(int fd, os_vm_offset_t offset, os_vm_address_t addr, o
 
 #endif
 
+bool is_in_stack_space(lispobj ptr)
+{
+    struct thread *th;
+    for_each_thread(th) {
+        if ((th->control_stack_start <= (lispobj *)ptr) &&
+            (th->control_stack_end >= (lispobj *)ptr)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 bool gc_managed_addr_p(lispobj addr)
 {
     struct thread *th;

@@ -97,6 +97,9 @@ extern lispobj *static_space_free_pointer;
 static inline bool readonly_space_p(lispobj ptr) {
     return ptr >= READ_ONLY_SPACE_START && (lispobj*)ptr < read_only_space_free_pointer;
 }
+static inline bool is_in_static_space(void* ptr) {
+    return (uword_t)ptr >= STATIC_SPACE_START && (lispobj*)ptr < static_space_free_pointer;
+}
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 extern lispobj *static_code_space_free_pointer;

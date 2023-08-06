@@ -423,4 +423,6 @@ extern int sb_GetTID();
 #else
 #define THREAD_JIT(x)
 #endif
+
+extern bool is_in_stack_space(lispobj);
 #endif /* _INCLUDE_THREAD_H_ */
