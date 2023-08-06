@@ -1918,7 +1918,7 @@
         ;; us with a dangling finalizer (that would close the same
         ;; --possibly reassigned-- FD again), or a stream with a closed
         ;; FD that appears open.
-        (cancel-finalization fd-stream)
+        (aver (cancel-finalization fd-stream))
         (let ((fd (fd-stream-fd fd-stream)))
           (when (and (/= fd -1)
                      (eq (cas (fd-stream-fd fd-stream) fd -1) fd))
