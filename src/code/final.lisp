@@ -241,7 +241,13 @@ Examples:
   (labels
       ((filter-actions (object actions)
          (when (fd-stream-p object)
-           (flameout object))
+           (flameout object)
+           ;; Never save a finalizer on an fd-stream. If it runs, it might close
+           ;; a file descriptor open to something else. Too bad if a user adds a finalizer
+           ;; on an fd-stream- we'll drop it. It's possible to figure out whether this
+           ;; is a closure made by fd-stream, but saving finalizers seems like such a
+           ;; generally bad idea anyway to be honest.
+           (return-from filter-actions))
          ;; Remove any finalizer created with the DONT-SAVE option. The rest are saved
          ;; but that's actually somewhat bogus anyway for two reasons: (1) there's no
          ;; guarantee that finalizers on objects killed in the last GC of save-lisp-and-die
@@ -299,9 +305,12 @@ Examples:
     (let ((key (weak-pointer-value (car pair))))
       (if key
           (finalize key (cdr pair))
-          ;; Shouldn't be too surprising to users that finalizers on objects
-          ;; killed in save-lisp-and-die get executed on restart.
-          (atomic-push (cdr pair) *finalizers-triggered*)))))
+          ;; Objects that died in the final GC do ** NOT ** get their finalizer
+          ;; run. Consider: some object that dies which acquired an OS resource
+          ;; identified by a file-descriptor that might now be open to
+          ;; some other descriptor.
+          ;; (atomic-push (cdr pair) *finalizers-triggered*)
+          ))))
 
 (defvar *in-a-finalizer* nil)
 (define-load-time-global *user-finalizer-runcount* 0)
