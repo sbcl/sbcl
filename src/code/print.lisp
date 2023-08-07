@@ -1535,10 +1535,6 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; paper might not bring immediate illumination as CSR has attempted
 ;;; to turn idiomatic Scheme into idiomatic Lisp.
 ;;;
-;;; FIXME: figure 1 from Burger and Dybvig is the unoptimized
-;;; algorithm, noticeably slow at finding the exponent.  Figure 2 has
-;;; an improved algorithm, but CSR ran out of energy.
-;;;
 ;;; possible extension for the enthusiastic: printing floats in bases
 ;;; other than base 10.
 (defconstant single-float-min-e
@@ -1574,28 +1570,37 @@ variable: an unreadable object representing the error is printed instead.")
         (let ((shift (- float-digits (integer-length f))))
           (setq f (ash f shift)
                 e (- e shift))))
-      (let ( ;; FIXME: these even tests assume normal IEEE rounding
+      (let (;; FIXME: these even tests assume normal IEEE rounding
             ;; mode.  I wonder if we should cater for non-normal?
             (high-ok (evenp f))
             (low-ok (evenp f)))
-        (labels ((scale (r s m+ m-)
-                   (do ((r+m+ (+ r m+))
-                        (k 0 (1+ k))
-                        (s s (* s print-base)))
-                       ((not (or (> r+m+ s)
-                                 (and high-ok (= r+m+ s))))
-                        (do ((k k (1- k))
-                             (r r (* r print-base))
-                             (m+ m+ (* m+ print-base))
-                             (m- m- (* m- print-base)))
-                            ((not (and (> r m-) ; Extension to handle zero
-                                       (let ((x (* (+ r m+) print-base)))
-                                         (or (< x s)
-                                             (and (not high-ok)
-                                                  (= x s))))))
-                             (funcall prologue-fun k)
-                             (generate r s m+ m-)
-                             (funcall epilogue-fun k))))))
+        (labels ((expt2 (n)
+                   (svref #.(coerce (loop for i from 0 to 972 collect (expt 2 i))
+                                    'vector) n))
+                 (expt10 (n)
+                   (svref #.(coerce (loop for i from 0 to 323 collect (expt 10 i))
+                                    'vector) n))
+                 (scale (r s m+ m-)
+                   (let ((est (truly-the (integer -323 309)
+                                         (ceiling (- (* (+ e (integer-length (truly-the sb-kernel:double-float-significand f)) -1)
+                                                        (log $2d0 10))
+                                                     $1.0e-10)))))
+                     (if (>= est 0)
+                         (fixup r (* s (expt10 est)) m+ m- est)
+                         (let ((scale (expt10 (- est))))
+                           (fixup (* r scale)
+                                  s (* m+ scale) (* m- scale) est)))))
+
+                 (fixup (r s m+ m- k)
+                   (let ((r+m+ (+ r m+)))
+                     (when (if high-ok
+                               (>= r+m+ s)
+                               (> r+m+ s))
+                       (incf k)
+                       (setf s (* s 10)))
+                     (funcall prologue-fun k)
+                     (generate r s m+ m-)
+                     (funcall epilogue-fun k)))
                  (generate (r s m+ m-)
                    (let (d tc1 tc2)
                      (tagbody
@@ -1620,65 +1625,81 @@ variable: an unreadable object representing the error is printed instead.")
                                    (t
                                     (1+ d)))))
                           (funcall char-fun d)))))
-                 (initialize ()
-                   (let (r s m+ m-)
-                     (cond ((>= e 0)
-                            (let ((be (expt float-radix e)))
-                              (if (/= f (expt float-radix (1- float-digits)))
-                                  ;; multiply F by 2 first, avoding consing two bignums
-                                  (setf r (* f 2 be)
-                                        s 2
-                                        m+ be
-                                        m- be)
-                                  (setf m- be
-                                        m+ (* be float-radix)
-                                        r (* f 2 m+)
-                                        s (* float-radix 2)))))
-                           ((or (= e min-e)
-                                (/= f (expt float-radix (1- float-digits))))
-                            (setf r (* f 2)
-                                  s (expt float-radix (- 1 e))
-                                  m+ 1
-                                  m- 1))
-                           (t
-                            (setf r (* f float-radix 2)
-                                  s (expt float-radix (- 2 e))
-                                  m+ float-radix
-                                  m- 1)))
-                     (when position
-                       (when relativep
-                         (aver (> position 0))
-                         (do ((k 0 (1+ k))
-                              ;; running out of letters here
-                              (l 1 (* l print-base)))
-                             ((>= (* s l) (+ r m+))
-                              ;; k is now \hat{k}
-                              (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
-                                     (* s l))
-                                  (setf position (- k position))
-                                  (setf position (- k position 1))))))
-                       (let* ((x (/ (* s (expt print-base position)) 2))
-                              (low (max m- x))
-                              (high (max m+ x)))
-                         (when (<= m- low)
-                           (setf m- low)
-                           (setf low-ok t))
-                         (when (<= m+ high)
-                           (setf m+ high)
-                           (setf high-ok t))))
-                     (values r s m+ m-))))
-          (multiple-value-bind (r s m+ m-) (initialize)
-            (scale r s m+ m-)))))))
+                 (scale-p (r s m+ m-)
+                   (when relativep
+                     (aver (> position 0))
+                     (do ((k 0 (1+ k))
+                          ;; running out of letters here
+                          (l 1 (* l print-base)))
+                         ((>= (* s l) (+ r m+))
+                          ;; k is now \hat{k}
+                          (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
+                                 (* s l))
+                              (setf position (- k position))
+                              (setf position (- k position 1))))))
+                   (let* ((x (/ (* s (expt print-base position)) 2))
+                          (low (max m- x))
+                          (high (max m+ x)))
+                     (when (<= m- low)
+                       (setf m- low)
+                       (setf low-ok t))
+                     (when (<= m+ high)
+                       (setf m+ high)
+                       (setf high-ok t)))
+                   (do ((r+m+ (+ r m+))
+                        (k 0 (1+ k))
+                        (s s (* s print-base)))
+                       ((not (or (> r+m+ s)
+                                 (and high-ok (= r+m+ s))))
+                        (do ((k k (1- k))
+                             (r r (* r print-base))
+                             (m+ m+ (* m+ print-base))
+                             (m- m- (* m- print-base)))
+                            ((not (and (> r m-) ; Extension to handle zero
+                                       (let ((x (* (+ r m+) print-base)))
+                                         (or (< x s)
+                                             (and (not high-ok)
+                                                  (= x s))))))
+                             (funcall prologue-fun k)
+                             (generate r s m+ m-)
+                             (funcall epilogue-fun k)))))))
+          (let (r s m+ m-)
+            (cond ((>= e 0)
+                   (let ((be (expt2 e)))
+                     (setf m- be)
+                     (if (/= f (expt float-radix (1- float-digits)))
+                         (setf r (ash f (+ e 1))
+                               s 2
+                               m+ be)
+                         (setf m+ (expt2 (1+ e))
+                               r (ash f (+ e 2))
+                               s (* float-radix 2)))))
+                  ((or (= e min-e)
+                       (/= f (expt float-radix (1- float-digits))))
+                   (setf r (* f 2)
+                         s (expt float-radix (- 1 e))
+                         m+ 1
+                         m- 1))
+                  (t
+                   (setf r (* f float-radix 2)
+                         s (expt float-radix (- 2 e))
+                         m+ float-radix
+                         m- 1)))
+            (if position
+                (scale-p r s m+ m-)
+                (scale r s m+ m-))))))))
 
 (defun flonum-to-digits (float &optional position relativep)
-  (let ((digit-characters "0123456789"))
-    (with-push-char (:element-type base-char)
-      (%flonum-to-digits
-       (lambda (d)
-         (push-char (char digit-characters d)))
-       (lambda (k) k)
-       (lambda (k) (values k (get-pushed-string)))
-       float position relativep))))
+  (if (zerop float)
+      (values 0 "0")
+      (let ((digit-characters "0123456789"))
+        (with-push-char (:element-type base-char)
+          (%flonum-to-digits
+           (lambda (d)
+             (push-char (char digit-characters d)))
+           (lambda (k) k)
+           (lambda (k) (values k (get-pushed-string)))
+           float position relativep)))))
 
 (defun print-float (float stream)
   (let ((position 0)
