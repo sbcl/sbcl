@@ -701,7 +701,6 @@ int sb_unw_get_pc(void* a, void* b) { lose("unw_get_pc %p %p", a, b); }
 #endif
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
-#include "genesis/thread-instance.h"
 #include "genesis/mutex.h"
 static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};
 void libunwind_backtrace(struct thread *th, os_context_t *context)

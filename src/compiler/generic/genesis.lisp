@@ -3334,6 +3334,8 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
       (c-name (string-downcase slot-name))))
 
 (defun write-genesis-thread-h-requisites ()
+  (write-structure-object (layout-info (find-layout 'sb-thread::thread))
+                          *standard-output* "thread_instance" nil)
   ;; The os_thread field is either pthread_t or lispobj.
   ;; If no threads, then it's lispobj. #+win32 uses lispobj too
   ;; but it gets cast to HANDLE upon use.
@@ -3489,7 +3491,8 @@ static inline int hashtable_weakp(struct hash_table* ht) { return ht->uw_flags &
 static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flags >> 6; }
 #define HASHTABLE_KIND_EQL 1~%"))
 
-(defun write-structure-object (dd *standard-output* &optional structure-tag)
+(defun write-structure-object (dd *standard-output* &optional structure-tag
+                                                      (assembler-guard t))
   (labels
       ((cstring (designator) (c-name (string-downcase designator)))
        (output (dd structure-tag)
@@ -3527,16 +3530,18 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
                          (if (string= (car slot) "default") "_default" (car slot))
                          (cdr slot))))
          (format t "};~%")))
-  (format t "#ifndef __ASSEMBLER__~2%")
-  (format t "#include ~S~%" (lispobj-dot-h))
-  (output dd (or structure-tag (cstring (dd-name dd))))
-  (when (eq (dd-name dd) 'sb-impl::general-hash-table)
-    (write-hash-table-flag-extractors))
-  (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
-    (terpri)
-    (output (layout-info (find-layout 'sb-lockless::so-data-node))
-            "split_ordered_list_node"))
-  (format t "~%#endif /* __ASSEMBLER__ */~2%")))
+    (when assembler-guard
+      (format t "#ifndef __ASSEMBLER__~2%")
+      (format t "#include ~S~%" (lispobj-dot-h)))
+    (output dd (or structure-tag (cstring (dd-name dd))))
+    (when (eq (dd-name dd) 'sb-impl::general-hash-table)
+      (write-hash-table-flag-extractors))
+    (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
+      (terpri)
+      (output (layout-info (find-layout 'sb-lockless::so-data-node))
+              "split_ordered_list_node"))
+    (when assembler-guard
+      (format t "~%#endif /* __ASSEMBLER__ */~2%"))))
 
 (defun write-thread-init (stream)
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
@@ -4294,9 +4299,6 @@ static inline uword_t word_has_stickymark(uword_t word) {
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class))
                                     stream)))
-        (out-to "thread-instance"
-          (write-structure-object (layout-info (find-layout 'sb-thread::thread))
-                                  stream "thread_instance"))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file

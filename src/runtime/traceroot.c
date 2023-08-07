@@ -16,7 +16,6 @@
 #include "search.h"
 #include "genesis/avlnode.h"
 #include "genesis/sap.h"
-#include "genesis/thread-instance.h"
 #include "print.h"
 
 #include <stdlib.h>
