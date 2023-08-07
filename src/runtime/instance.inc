@@ -1,3 +1,4 @@
+#include <stddef.h> // for offsetof()
 #include "align.h"
 
 // This is index of the bit that differentiates FUNCALLABLE_INSTANCE_WIDETAG

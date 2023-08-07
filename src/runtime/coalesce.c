@@ -22,9 +22,12 @@
 #include "genesis/gc-tables.h"
 #include "gc-internal.h"
 #include "genesis/instance.h"
+#include "genesis/symbol.h"
 #include "immobile-space.h"
 #include "hopscotch.h"
 #include "code.h"
+#include "genesis/static-symbols.h"
+#include "validate.h"
 
 static bool gcable_pointer_p(lispobj pointer)
 {

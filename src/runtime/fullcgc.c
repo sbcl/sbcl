@@ -19,10 +19,14 @@
 #include "genesis/vector.h"
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"
+#include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
+#include "genesis/fdefn.h"
 #include "code.h"
 #include "immobile-space.h"
 #include "queue.h"
 #include "os.h"
+#include "validate.h"
 
 #include <stdio.h>
 #ifndef LISP_FEATURE_WIN32

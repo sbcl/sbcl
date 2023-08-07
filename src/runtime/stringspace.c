@@ -14,8 +14,12 @@
 #include "gencgc-private.h"
 #include "genesis/gc-tables.h"
 #include "genesis/instance.h"
+#include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
+#include "genesis/vector.h"
 #include "globals.h"
 #include "forwarding-ptr.h"
+#include "validate.h"
 #include <stdio.h>
 #include <stdlib.h>
 

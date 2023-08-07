@@ -16,6 +16,7 @@
 #ifndef PSEUDO_ATOMIC_H
 #define PSEUDO_ATOMIC_H
 
+#include "genesis/thread.h"
 #if defined LISP_FEATURE_SPARC || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
 
 /* These architectures make no distinction between +/- sb-thread.

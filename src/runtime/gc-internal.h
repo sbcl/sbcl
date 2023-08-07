@@ -23,9 +23,6 @@
 #ifndef _GC_INTERNAL_H_
 #define _GC_INTERNAL_H_
 
-#include "genesis/simple-fun.h"
-#include "thread.h"
-#include "interr.h" /* for lose() */
 #include "gc-assert.h"
 #include "code.h"
 extern const char *widetag_names[];
@@ -57,21 +54,12 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
                             (void*)(1+((lispobj)pointer | LOWTAG_MASK)));
 }
 
-extern void scrub_control_stack(void);
-extern void scrub_thread_control_stack(struct thread *);
-
 #ifdef LISP_FEATURE_X86
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #else
 #define gencgc_apply_code_fixups(ignore1,ignore2)
 #endif
 
-extern void
-instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
-              lispobj *instance_ptr, sword_t n_words,
-              lispobj bitmap, uword_t arg);
-
-extern void gc_close_thread_regions(struct thread*, int);
 extern void gc_close_collector_regions(int);
 
 /* The various sorts of pointer swizzling in SBCL. */

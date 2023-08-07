@@ -253,8 +253,6 @@ SB-C::DXABLE-ARGS
 (defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
 
 (defun choose-layout-id (name conditionp)
-  ;; If you change these, then also change src/runtime/gc-private.h
-  ;; The ID of T is irrelevant since we'll never try to compare to it.
   (case name
     ((t) 0)
     (structure-object 1)

@@ -24,6 +24,7 @@
 #include "gc-assert.h"
 #include "gencgc-alloc-region.h"
 #include "genesis/simple-fun.h"
+#include "globals.h"
 #include "hopscotch.h"
 
 #ifndef GENCGC_IS_PRECISE

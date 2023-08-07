@@ -109,7 +109,6 @@ void add_to_weak_vector_list(lispobj* vector, lispobj header);
 
 extern void heap_scavenge(lispobj *start, lispobj *limit);
 extern sword_t scavenge(lispobj *start, sword_t n_words);
-extern void scavenge_interrupt_contexts(struct thread *thread);
 extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
 extern void scan_binding_stack(void);
 extern void scan_finalizers();
@@ -134,10 +133,6 @@ static inline int properly_tagged_descriptor_p(void *pointer, lispobj *start_add
   return is_lisp_pointer((lispobj)pointer) &&
     properly_tagged_p_internal((lispobj)pointer, start_addr);
 }
-
-extern void scavenge_control_stack(struct thread *th);
-extern void scrub_control_stack(void);
-extern void scrub_thread_control_stack(struct thread *);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 
