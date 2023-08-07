@@ -22,9 +22,7 @@
 #include "genesis/fdefn.h"
 #endif
 
-#ifdef LISP_FEATURE_GENCGC
-#include "gc-internal.h"
-#endif
+#include "gc.h"
 
 void os_init() {}
 

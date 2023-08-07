@@ -41,7 +41,7 @@
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
-#include "gc-internal.h"
+#include "gc.h"
 
 
 

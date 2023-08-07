@@ -1,6 +1,6 @@
 #include "thread.h"
-#include "gc-internal.h"
-#include "gc-private.h"
+#include "gc.h"
+#include "code.h"
 void set_thread_stack(void *address) {
     /* KLUDGE: There is no interface to change the stack location of
        the initial thread, and without that backtrace(3) returns zero

@@ -54,6 +54,7 @@
 
 #include "runtime.h"
 #include "arch.h"
+#include "code.h"
 #include "os.h"
 #include "interrupt.h"
 #include "globals.h"
@@ -61,8 +62,6 @@
 #include "validate.h"
 #include "interr.h"
 #include "gc.h"
-#include "gc-assert.h"
-#include "gc-internal.h"
 #include "genesis/sap.h"
 #include "dynbind.h"
 #include "pseudo-atomic.h"

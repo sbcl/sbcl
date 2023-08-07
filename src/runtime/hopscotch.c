@@ -17,7 +17,7 @@
  */
 
 #include "os.h"
-#include "gc-internal.h" // for sizetab[] and os_allocate()
+#include "gc.h" // for sizetab[] and os_allocate()
 #include "hopscotch.h"
 #include <stdint.h>
 #include <stdio.h>

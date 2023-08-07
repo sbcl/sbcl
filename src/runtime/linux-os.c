@@ -46,7 +46,7 @@
 
 #include "validate.h"
 #include "thread.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include <fcntl.h>
 #include <sys/prctl.h>
 

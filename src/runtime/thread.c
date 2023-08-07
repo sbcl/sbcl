@@ -39,7 +39,7 @@
 #include "genesis/fdefn.h"
 #include "genesis/vector.h"
 #include "interr.h"             /* for lose() */
-#include "gc-internal.h"
+#include "gc.h"
 #include "pseudo-atomic.h"
 #include "interrupt.h"
 #include "lispregs.h"

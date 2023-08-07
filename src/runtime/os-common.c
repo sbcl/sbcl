@@ -32,6 +32,9 @@
 #if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
 # include <dlfcn.h>
 #endif
+#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SOFT_CARD_MARKS
+#include "gc.h" // for find_page_index
+#endif
 
 /*
  * historically, this used sysconf to select the runtime page size
@@ -384,7 +387,6 @@ char *copied_string(char *string)
 }
 
 #ifdef LISP_FEATURE_UNIX
-#include "gc-internal.h"
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {

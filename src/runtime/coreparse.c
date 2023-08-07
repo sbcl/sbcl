@@ -38,12 +38,11 @@
 #include "thread.h"
 
 #include "validate.h"
-#include "gc-internal.h"
-#include "gc-private.h"
-#include "gencgc-private.h"
+#include "gc.h"
 #include "code.h"
 #include "graphvisit.h"
 #include "genesis/instance.h"
+#include "genesis/fdefn.h"
 
 #include <errno.h>
 

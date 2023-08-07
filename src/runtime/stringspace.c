@@ -9,9 +9,8 @@
  * files for more information.
  */
 
-#include "gc-internal.h"
-#include "gc-private.h"
-#include "gencgc-private.h"
+#include "code.h"
+#include "gc.h"
 #include "genesis/gc-tables.h"
 #include "genesis/instance.h"
 #include "genesis/static-symbols.h"

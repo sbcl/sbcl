@@ -37,7 +37,6 @@
 #include "gc.h"
 #include "code.h"
 #include "var-io.h"
-#include "gc-internal.h"
 #include "forwarding-ptr.h"
 #include "lispstring.h"
 

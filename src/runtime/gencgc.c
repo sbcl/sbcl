@@ -37,9 +37,6 @@
 #include "lispregs.h"
 #include "arch.h"
 #include "gc.h"
-#include "gc-internal.h"
-#include "gc-private.h"
-#include "gencgc-private.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "code.h"
@@ -176,7 +173,6 @@ void reset_page_flags(page_index_t page) {
 
 #include "genesis/cardmarks.h"
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-// This is a macro from gc-private.h otherwise
 int page_cards_all_marked_nonsticky(page_index_t page) {
     return cardseq_all_marked_nonsticky(page_to_card_index(page));
 }
@@ -4577,7 +4573,6 @@ void zero_all_free_ranges() /* called only by gc_and_save() */
 #endif
 }
 
-#define ARTIFICIALLY_HIGH_GEN 8
 generation_index_t gc_gen_of(lispobj obj, int defaultval) {
     int page = find_page_index((void*)obj);
     if (page >= 0) return page_table[page].gen;
@@ -5409,4 +5404,3 @@ int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 #endif
     return verify_heap(cur_thread_approx_stackptr, flags);
 }
-

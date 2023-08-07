@@ -46,10 +46,9 @@
 #endif
 
 #include "code.h"
+#include "core.h" // for CORE_PAGE_GENERATION
 #include "forwarding-ptr.h"
 #include "gc.h"
-#include "gc-internal.h"
-#include "gc-private.h"
 #include "genesis/brothertree.h"
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"

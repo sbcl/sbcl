@@ -4,8 +4,7 @@
 
 #include <stdio.h>
 #include "sbcl.h"
-#include "gc-internal.h"
-#include "gc-private.h"
+#include "gc.h"
 #include "genesis/instance.h"
 #include "thread.h"
 

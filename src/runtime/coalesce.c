@@ -16,11 +16,8 @@
 #include <stdbool.h>
 #include "sbcl.h"
 #include "gc.h"
-#include "gc-internal.h"
-#include "gc-private.h"
 #include "genesis/vector.h"
 #include "genesis/gc-tables.h"
-#include "gc-internal.h"
 #include "genesis/instance.h"
 #include "genesis/symbol.h"
 #include "immobile-space.h"

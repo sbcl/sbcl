@@ -30,11 +30,12 @@
 #include "search.h"
 #include "var-io.h"
 
+#include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "forwarding-ptr.h"
 #include "core.h"
-#include "gc-private.h"
+#include "gc.h"
 
 #define INT3_INST 0xCC
 #define INTO_INST 0xCE

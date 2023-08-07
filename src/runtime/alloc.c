@@ -16,13 +16,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "gc.h"
-#include "gc-internal.h"
-#include "gc-private.h"
-#include "gencgc-private.h"
 #include "pseudo-atomic.h"
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "arch.h" // why is this where funcall2 is declared???
+#include "genesis/fdefn.h" // for StaticSymbolFunction
+#include "code.h"
 
 lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 {

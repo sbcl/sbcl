@@ -32,7 +32,7 @@
 #include "dynbind.h"
 #include "lispregs.h"
 #include "validate.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include "thread.h"
 #include "arch.h"
 #include "genesis/static-symbols.h"
@@ -580,9 +580,6 @@ bool save(char *filename, lispobj init_function, bool prepend_runtime,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);
 }
 #endif
-
-#include "gencgc-internal.h"
-#include "gencgc-private.h"
 
 /* Things to do before doing a final GC before saving a core.
  *

@@ -71,7 +71,8 @@
 #endif
 
 #include "wrap.h"
-#include "gc.h"
+#include "gc-typedefs.h" // for page_index_t
+#include "os.h" // for os_vm_size_t
 
 #if defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_64_BIT
 # define CAST_SIZEOF (unsigned long)

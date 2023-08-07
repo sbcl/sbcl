@@ -5,7 +5,7 @@
 #include "murmur_hash.h"
 #include "gc-assert.h"
 #include "arch.h" // why is component_ptr_from_pc declared here???
-#include "gc-internal.h"
+#include "code.h"
 #include "gc.h"
 #include "lispregs.h"
 #if !defined LISP_FEATURE_X86 && !defined LISP_FEATURE_X86_64

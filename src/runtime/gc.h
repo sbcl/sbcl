@@ -17,15 +17,10 @@
 #define _GC_H_
 
 #include "sbcl.h"
-#include "os.h"
+#include "gc-assert.h"
+#include "gc-typedefs.h"
 #include <stdbool.h>
 #include <stdint.h>
-
-typedef intptr_t page_index_t;
-
-// This decl should probably be be in gencgc-internal,
-// except it can't be: collect_garbage() receives a generation number.
-typedef signed char generation_index_t;
 
 extern void gc_init(void);
 extern void collect_garbage(generation_index_t last_gen);
@@ -91,5 +86,10 @@ extern generation_index_t gencgc_oldest_gen_to_gc;
 extern page_index_t gencgc_alloc_start_page;
 extern bool conservative_stack;
 extern lispobj lisp_init_function;
+
+#include "immobile-space.h" // provides dummy stubs if #-immobile-space
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc-impl.h"
+#endif
 
 #endif /* _GC_H_ */

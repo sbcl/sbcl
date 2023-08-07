@@ -22,8 +22,6 @@
 #include "runtime.h"
 #include "os.h"
 #include "gc.h"
-#include "gc-internal.h"
-#include "gc-private.h"
 #include "globals.h"
 #include "interrupt.h"
 #include "validate.h"

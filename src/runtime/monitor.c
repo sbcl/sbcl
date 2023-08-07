@@ -37,7 +37,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include "../../tlsf-bsd/tlsf/tlsf.h"
 extern void* tlsf_control;
 
@@ -864,7 +864,6 @@ void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing
 #include <errno.h>
 #include "core.h"
-#include "gencgc-private.h"
 struct lisp_startup_options lisp_startup_options;
 char gc_coalesce_string_literals;
 

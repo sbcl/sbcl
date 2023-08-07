@@ -12,11 +12,10 @@
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
-#include "genesis/fdefn.h"
 #include "genesis/vector.h"
 #include "interrupt.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
-#include "gc.h" // for page_index_t
+#include "gc-typedefs.h" // for page_index_t
 
 enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 

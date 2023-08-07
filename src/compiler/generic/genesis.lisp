@@ -720,7 +720,7 @@
                       sb-vm:+pseudo-static-generation+))
                   0))
          (widetag (logand header-word sb-vm:widetag-mask))
-         ;; Refer to depiction of "Immobile object header word" in gc-private.h
+         ;; Refer to depiction of "Immobile object header word" in immobile-space.h
          (gen-shift (if (= widetag sb-vm:fdefn-widetag) 8 24)))
     (write-wordindexed/raw des 0 (logior (ash gen gen-shift) header-word))))
 
@@ -4154,7 +4154,7 @@ extern unsigned char *gc_card_mark;~%" (lispobj-dot-h))
   #-soft-card-marks
   (progn
     (aver (= ncards 1))
-    #+nil ; we take these from gc-private.h. Is that right?
+    #+nil ; this are gencgc-impl
     (progn
       (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
     return gc_card_mark[card] == CARD_MARKED;~%}~%")

@@ -45,9 +45,6 @@
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"
 #include "genesis/split-ordered-list.h"
-#define WANT_SCAV_TRANS_SIZE_TABLES
-#include "gc-internal.h"
-#include "gc-private.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
 #include "search.h"
@@ -1909,6 +1906,7 @@ size_lose(lispobj *where)
  */
 
 sword_t scav_code_blob(lispobj *object, lispobj header);
+#define WANT_SCAV_TRANS_SIZE_TABLES
 #include "genesis/gc-tables.h"
 
 /* Find the code object for the given pc, or return NULL on

@@ -37,7 +37,7 @@
 #include "genesis/fdefn.h"
 #include "interr.h"
 #include "genesis/sap.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include "interrupt.h"
 #include "lispregs.h"
 #include "print.h"

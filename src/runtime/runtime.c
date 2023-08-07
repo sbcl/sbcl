@@ -365,7 +365,6 @@ char *dir_name(char *path) {
 }
 
 
-extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
 
 struct cmdline_options {
