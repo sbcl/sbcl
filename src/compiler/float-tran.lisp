@@ -352,47 +352,6 @@
         (type-error ()
           nil)))))
 
-;;;; float contagion
-(deftransform single-float-real-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type y) (specifier-type 'single-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) x (%single-float y))))
-
-(deftransform real-single-float-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type x) (specifier-type 'single-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) (%single-float x) y)))
-
-(deftransform double-float-real-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type y) (specifier-type 'double-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y))))
-
-(deftransform real-double-float-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type x) (specifier-type 'double-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y)))
-
-(flet ((def (op)
-         (%deftransform op nil '(function (single-float real) single-float)
-                        #'single-float-real-contagion)
-         (%deftransform op nil '(function (real single-float) single-float)
-                        #'real-single-float-contagion)
-         (%deftransform op nil '(function (double-float real))
-                        #'double-float-real-contagion)
-         (%deftransform op nil '(function (real double-float))
-                        #'real-double-float-contagion)))
-  (dolist (op '(+ * / -))
-    (def op)))
-
-(flet ((def (op)
-         (%deftransform op nil '(function (double-float single-float) *)
-                        #'double-float-real-contagion)
-         (%deftransform op nil '(function (single-float double-float) *)
-                        #'real-double-float-contagion)))
-  (dolist (op '(= < > <= >=))
-    (def op)))
-
 (macrolet ((def (type &rest args)
              `(deftransform * ((x y) (,type (constant-arg (member ,@args))) *
                                ;; Beware the SNaN!
@@ -1408,6 +1367,62 @@
                 )))
   (frob single-float (or rational single-float))
   (frob double-float (or rational single-float double-float)))
+
+
+;;;; float contagion
+(deftransform single-float-real-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type y) (specifier-type 'single-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) x (%single-float y))))
+
+(deftransform real-single-float-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type x) (specifier-type 'single-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) (%single-float x) y)))
+
+(deftransform double-float-real-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type y) (specifier-type 'double-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y))))
+
+(deftransform real-double-float-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type x) (specifier-type 'double-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y)))
+
+(flet ((def (op)
+         (%deftransform op nil '(function (single-float real) single-float)
+                        #'single-float-real-contagion)
+         (%deftransform op nil '(function (real single-float) single-float)
+                        #'real-single-float-contagion)
+         (%deftransform op nil '(function (double-float real))
+                        #'double-float-real-contagion)
+         (%deftransform op nil '(function (real double-float))
+                        #'real-double-float-contagion)
+
+         (%deftransform op nil '(function ((complex single-float) real) (complex single-float))
+                        #'single-float-real-contagion)
+         (%deftransform op nil '(function (real (complex single-float)) (complex single-float))
+                        #'real-single-float-contagion)
+         (%deftransform op nil '(function ((complex double-float) real) (complex double-float))
+                        #'double-float-real-contagion)
+         (%deftransform op nil '(function (real (complex double-float)) (complex double-float))
+                        #'real-double-float-contagion)))
+  (dolist (op '(+ * / -))
+    (def op)))
+
+(flet ((def (op)
+         (%deftransform op nil '(function (double-float single-float))
+                        #'double-float-real-contagion)
+         (%deftransform op nil '(function (single-float double-float))
+                        #'real-double-float-contagion)))
+  (dolist (op '(= < > <= >=))
+    (def op)))
+
+(%deftransform '= nil '(function ((complex double-float) single-float))
+               #'double-float-real-contagion)
+(%deftransform '= nil '(function (single-float (complex double-float)))
+               #'real-double-float-contagion)
 
 (deftransform complex ((realpart &optional imagpart) (rational &optional (or null (integer 0 0))))
   'realpart)
