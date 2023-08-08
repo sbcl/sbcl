@@ -293,7 +293,7 @@
              `(let (ints
                     floats
                     (start (- ,(find-symbol (format nil
-                                                    "MOST-~A-EXACTLY-~A-FIXNUM"
+                                                    "MOST-~A-EXACTLY-~A-INTEGER"
                                                     sign type)
                                             :sb-kernel)
                               ,range)))

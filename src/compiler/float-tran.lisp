@@ -1412,9 +1412,23 @@
     (def op)))
 
 (flet ((def (op)
-         (%deftransform op nil '(function (double-float single-float))
+         (%deftransform op nil `(function (single-float (integer ,most-negative-exactly-single-float-integer
+                                                                 ,most-positive-exactly-single-float-integer)))
+                        #'single-float-real-contagion)
+         (%deftransform op nil `(function ((integer ,most-negative-exactly-single-float-integer
+                                                    ,most-positive-exactly-single-float-integer)
+                                           single-float))
+                        #'real-single-float-contagion)
+
+         (%deftransform op nil `(function (double-float
+                                           (or single-float
+                                               (integer ,most-negative-exactly-double-float-integer
+                                                        ,most-positive-exactly-double-float-integer))))
                         #'double-float-real-contagion)
-         (%deftransform op nil '(function (single-float double-float))
+         (%deftransform op nil `(function ((or single-float
+                                               (integer ,most-negative-exactly-double-float-integer
+                                                        ,most-positive-exactly-double-float-integer))
+                                           double-float))
                         #'real-double-float-contagion)))
   (dolist (op '(= < > <= >=))
     (def op)))

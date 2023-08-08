@@ -535,9 +535,13 @@
        ;;
        ;; FIXME: If we ever add SSE-support for x86, this conditional needs to
        ;; change.
+       ;; This is somewhat dubious. Why isn't anything done about
+       ;; ratios? Why isn't safe-double-coercion-p doing the same,
+       ;; given that x87 floats are 80-bits internally?
        #+x86
-       (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
-                          (integer (,most-positive-exactly-single-float-fixnum) *))))
+       (typep x `(or (not integer)
+                     (integer ,most-negative-exactly-single-float-integer
+                              ,most-positive-exactly-single-float-integer)))
        (sb-xc:<= most-negative-single-float x most-positive-single-float))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
@@ -546,7 +550,7 @@
 ;;;
 ;;; FIXME: only used in this file, not needed in target runtime
 
-;;; ANSI contaigon specifies coercion to floating point if one of the
+;;; ANSI contagion specifies coercion to floating point if one of the
 ;;; arguments is floating point. Here we should check to be sure that
 ;;; the other argument is within the bounds of that floating point
 ;;; type.

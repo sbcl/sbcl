@@ -124,14 +124,14 @@
 ;;; running full tilt will exhaust this faster, but it's still plenty enough.
 (defconstant sb-kernel::internal-time-bits 61)
 
-(defconstant most-positive-exactly-single-float-fixnum
-  (min (expt 2 single-float-digits) most-positive-fixnum))
-(defconstant most-negative-exactly-single-float-fixnum
-  (max (- (expt 2 single-float-digits)) most-negative-fixnum))
-(defconstant most-positive-exactly-double-float-fixnum
-  (min (expt 2 double-float-digits) most-positive-fixnum))
-(defconstant most-negative-exactly-double-float-fixnum
-  (max (- (expt 2 double-float-digits)) most-negative-fixnum))
+(defconstant most-positive-exactly-single-float-integer
+  (expt 2 single-float-digits))
+(defconstant most-negative-exactly-single-float-integer
+  (- (expt 2 single-float-digits)))
+(defconstant most-positive-exactly-double-float-integer
+  (expt 2 double-float-digits))
+(defconstant most-negative-exactly-double-float-integer
+  (- (expt 2 double-float-digits)))
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
