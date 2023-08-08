@@ -622,23 +622,20 @@
 (with-test (:name (:fp-print-read-consistency double-float))
   (let ((*random-state* (make-random-state t))
         (oops))
-    ;; FIXME skipping denormalized floats due to bug 793774.
     (loop for f = most-positive-double-float then (/ f 2d0)
           while (> f 0d0)
           do (loop for fr = (random f)
                    repeat 10
-                   do (unless (float-denormalized-p fr)
-                        (unless (eql fr (read-from-string (prin1-to-string fr)))
-                          (push fr oops)
-                          (return)))))
+                   do (unless (eql fr (read-from-string (prin1-to-string fr)))
+                        (push fr oops)
+                        (return))))
     (loop for f = most-negative-double-float then (/ f 2d0)
           while (< f -0d0)
           do (loop for fr = (- (random (- f)))
                    repeat 10
-                   do (unless (float-denormalized-p fr)
-                        (unless (eql fr (read-from-string (prin1-to-string fr)))
-                          (push fr oops)
-                          (return)))))
+                   do (unless (eql fr (read-from-string (prin1-to-string fr)))
+                        (push fr oops)
+                        (return))))
     (when oops
       (error "FP print-read inconsistencies:~%~:{  ~S => ~S~%~}"
              (mapcar (lambda (f)
