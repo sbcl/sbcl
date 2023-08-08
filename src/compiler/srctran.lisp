@@ -533,8 +533,6 @@
        ;; return at runtime. (This affects not just +, but other operators are
        ;; well.)
        ;;
-       ;; See also: SAFE-CTYPE-FOR-SINGLE-COERCION-P
-       ;;
        ;; FIXME: If we ever add SSE-support for x86, this conditional needs to
        ;; change.
        #+x86

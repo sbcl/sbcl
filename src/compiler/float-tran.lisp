@@ -353,77 +353,45 @@
           nil)))))
 
 ;;;; float contagion
+(deftransform single-float-real-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type y) (specifier-type 'single-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) x (%single-float y))))
 
-(defun safe-ctype-for-single-coercion-p (x)
-  ;; See comment in SAFE-SINGLE-COERCION-P -- this deals with the same
-  ;; problem, but in the context of evaluated and compiled (+ <int> <single>)
-  ;; giving different result if we fail to check for this.
-  (or (not (csubtypep x (specifier-type 'integer)))
-      #+x86
-      (csubtypep x (specifier-type `(integer ,most-negative-exactly-single-float-fixnum
-                                             ,most-positive-exactly-single-float-fixnum)))
-      #-x86
-      (csubtypep x (specifier-type 'fixnum))))
+(deftransform real-single-float-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type x) (specifier-type 'single-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) (%single-float x) y)))
 
-;;; Do some stuff to recognize when the loser is doing mixed float and
-;;; rational arithmetic, or different float types, and fix it up. If
-;;; we don't, we won't even get so much as an efficiency note.
-;;; Unfortunately this produces unnecessarily bad code for something
-;;; as simple as (ZEROP (THE FLOAT X)) because we _know_ that the thing
-;;; is a float, but the ZEROP transform injected a rational 0,
-;;; which we then go to the trouble of coercing to a float.
-(progn
-  (deftransform real-float-contagion-arg1 ((x y) * * :defun-only t :node node)
-    "open-code float conversion in mixed numeric operation"
-    (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
-            (safe-ctype-for-single-coercion-p (lvar-type x)))
-        `(,(lvar-fun-name (basic-combination-fun node)) (float x y) y)
-        (give-up-ir1-transform #1="the first argument cannot safely be converted to SINGLE-FLOAT")))
-  (deftransform complex-float-contagion-arg1 ((x y) * * :defun-only t :node node)
-    "open-code float conversion in mixed numeric operation"
-    (if (or (not (types-equal-or-intersect
-                  (lvar-type y) (specifier-type '(complex single-float))))
-            (safe-ctype-for-single-coercion-p (lvar-type x)))
-        `(,(lvar-fun-name (basic-combination-fun node))
-          (float x (realpart y)) y)
-        (give-up-ir1-transform #1#)))
-  (deftransform real-float-contagion-arg2 ((x y) * * :defun-only t :node node)
-    "open-code float conversion in mixed numeric operation"
-    (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type 'single-float)))
-            (safe-ctype-for-single-coercion-p (lvar-type y)))
-        `(,(lvar-fun-name (basic-combination-fun node)) x (float y x))
-        (give-up-ir1-transform #2="the second argument cannot safely be converted to SINGLE-FLOAT")))
-  (deftransform complex-float-contagion-arg2 ((x y) * * :defun-only t :node node)
-    "open-code float conversion in mixed numeric operation"
-    (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(complex single-float))))
-            (safe-ctype-for-single-coercion-p (lvar-type y)))
-        `(,(lvar-fun-name (basic-combination-fun node))
-          x (float y (realpart x)))
-        (give-up-ir1-transform #2#))))
+(deftransform double-float-real-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type y) (specifier-type 'double-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y))))
 
-(flet ((def (operator float-type other-type complexp argument)
-         (multiple-value-bind (type1 type2 function)
-             (ecase argument
-               (1 (if complexp
-                      (values other-type `(complex ,float-type) #'complex-float-contagion-arg1)
-                      (values other-type float-type #'real-float-contagion-arg1)))
-               (2 (if complexp
-                      (values `(complex ,float-type) other-type #'complex-float-contagion-arg2)
-                      (values float-type other-type #'real-float-contagion-arg2))))
-             (%deftransform operator nil `(function (,type1 ,type2) *) function))))
+(deftransform real-double-float-contagion ((x y) * * :node node :defun-only t)
+  (if (csubtypep (lvar-type x) (specifier-type 'double-float))
+      (give-up-ir1-transform)
+      `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y)))
 
-  (dolist (operator '(+ * / -))
-    (def operator 'float 'rational nil 1)
-    (def operator 'float 'rational nil 2)
-    (def operator 'float 'rational t   1)
-    (def operator 'float 'rational t   2))
+(flet ((def (op)
+         (%deftransform op nil '(function (single-float real) single-float)
+                        #'single-float-real-contagion)
+         (%deftransform op nil '(function (real single-float) single-float)
+                        #'real-single-float-contagion)
+         (%deftransform op nil '(function (double-float real))
+                        #'double-float-real-contagion)
+         (%deftransform op nil '(function (real double-float))
+                        #'real-double-float-contagion)))
+  (dolist (op '(+ * / -))
+    (def op)))
 
-  (dolist (operator '(= < > <= >= + * / -))
-    (def operator 'double-float 'single-float nil 1)
-    (def operator 'double-float 'single-float nil 2)
-    (when (member operator '(= + * / -))
-      (def operator 'double-float 'single-float t 1)
-      (def operator 'double-float 'single-float t 2))))
+(flet ((def (op)
+         (%deftransform op nil '(function (double-float single-float) *)
+                        #'double-float-real-contagion)
+         (%deftransform op nil '(function (single-float double-float) *)
+                        #'real-double-float-contagion)))
+  (dolist (op '(= < > <= >=))
+    (def op)))
 
 (macrolet ((def (type &rest args)
              `(deftransform * ((x y) (,type (constant-arg (member ,@args))) *
@@ -1412,7 +1380,7 @@
                               (complex (/ (+ (* rx r) ix) dn)
                                        (/ (- (* ix r) rx) dn)))))))
                 ;; Divide a real by a complex.
-                (deftransform / ((x y) (,type (complex ,type)) *)
+                (deftransform / ((x y) (real (complex ,type)) *)
                   (if (vop-existsp :translate sb-vm::swap-complex)
                       '(let* ((ry (realpart y))
                               (iy (imagpart y)))
