@@ -1432,9 +1432,10 @@ is replaced with replacement."
                        (format stream "~a -> ~a~a;~%"
                                (block-label block)
                                (block-label succ)
-                               attr)))
-            (when (nle-block-p block)
-              (format stream "~a -> ~a [style=dotted];~%"
-                      (block-label block)
-                      (block-label (nle-block-entry-block block))))))))
+                               attr)))))
+        (dolist (ep (block-succ (component-head component)))
+          (when (not (bind-p (block-start-node ep)))
+            (format stream "~a -> ~a [style=dotted];~%"
+                    (block-label ep)
+                    (block-label (nle-block-entry-block ep)))))))
     (write-line "}" stream)))

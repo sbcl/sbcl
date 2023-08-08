@@ -380,15 +380,16 @@
           (dolist (dx-info dx-infos)
             (let ((dx (dx-info-kind dx-info)))
               (aver (eq cleanup (dx-info-cleanup dx-info)))
-              (labels ((mark-dx (lvar)
+              (labels ((mark-dx (lvar parent)
                          (setf (lvar-dynamic-extent lvar) dx-info)
+                         (setf (lvar-dynamic-extent-dest lvar) parent)
                          (push lvar (dx-info-subparts dx-info))
                          (push lvar (component-dx-lvars component))
                          ;; Now look to see if there are otherwise
                          ;; inaccessible parts of the value in LVAR.
                          (do-uses (use lvar)
                            (etypecase use
-                             (cast (mark-dx (cast-value use)))
+                             (cast (mark-dx (cast-value use) use))
                              (combination
                               ;; Don't propagate through &REST, for
                               ;; sanity.
@@ -397,12 +398,12 @@
                                 (dolist (arg (combination-args use))
                                   (when (and arg
                                              (lvar-good-for-dx-p arg cleanup dx))
-                                    (mark-dx arg)))))
+                                    (mark-dx arg use)))))
                              (ref
                               (let ((leaf (ref-leaf use)))
                                 (typecase leaf
                                   (lambda-var
-                                   (mark-dx (let-var-initial-value leaf)))
+                                   (mark-dx (let-var-initial-value leaf) use))
                                   (clambda
                                    (let ((fun (functional-entry-fun leaf)))
                                      (setf (enclose-cleanup (functional-enclose fun)) cleanup)
@@ -411,7 +412,7 @@
                   ;; Check that the value hasn't been flushed somehow.
                   (when (lvar-uses lvar)
                     (cond ((lvar-good-for-dx-p lvar cleanup dx)
-                           (mark-dx lvar))
+                           (mark-dx lvar entry))
                           (t
                            (setf (lvar-dynamic-extent lvar) nil))))))))))))
   ;; Mark closures as dynamic-extent allocatable by making the ENCLOSE
@@ -435,11 +436,13 @@
                                                      :subparts (list lvar)
                                                      :cleanup cleanup)))
                           (setf (lvar-dynamic-extent lvar) dx-info)
+                          (setf (lvar-dynamic-extent-dest lvar) enclose)
                           (dolist (dx-info (cleanup-nlx-info cleanup))
                             (setf (lvar-dynamic-extent (dx-info-value dx-info)) nil))
                           (setf (cleanup-nlx-info cleanup) (list dx-info)))
                         (let* ((ref-lvar (node-lvar (first (leaf-refs xep))))
                                (dx-info (lvar-dynamic-extent ref-lvar)))
+                          (setf (lvar-dynamic-extent-dest lvar) (first (leaf-refs xep)))
                           (cond (dx-info
                                  ;; This enclose was marked DX by back
                                  ;; propagation.

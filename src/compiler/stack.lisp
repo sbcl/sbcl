@@ -46,10 +46,6 @@
   (values))
 
 ;;;; Computation of live UVL sets
-(defun nle-block-p (block)
-  (and (eq (component-head (block-component block))
-           (first (block-pred block)))
-       (not (bind-p (block-start-node block)))))
 (defun nle-block-nlx-info (block)
   (let* ((start-node (block-start-node block))
          (nlx-ref (ctran-next (node-next start-node)))
@@ -75,115 +71,6 @@
   (declare (ir2-block 2block))
   (member lvar (reverse (ir2-block-pushed 2block))))
 
-;;; Find the lowest common ancestor of BLOCKs in the dominator tree.
-(defun find-lowest-common-dominator (blocks)
-  (labels ((intersect (block1 block2)
-             (cond ((eq block1 block2) block1)
-                   ((< (block-number block1) (block-number block2))
-                    (intersect (block-dominator block1) block2))
-                   (t
-                    (intersect block1 (block-dominator block2))))))
-    (let ((dominator (block-dominator (first blocks))))
-      (dolist (block (rest blocks))
-        (setq dominator (intersect block dominator)))
-      dominator)))
-
-;;; Carefully back-propagate DX LVARs from the start of their
-;;; environment to where they are allocated, along all code paths
-;;; which actually allocate said LVARs.
-(defun back-propagate-one-dx-lvar (block dx-lvar)
-  (declare (type cblock block)
-           (type lvar dx-lvar))
-  ;; We have to back-propagate the lifetime of DX-LVAR to its USEs,
-  ;; but only along the paths which actually USE it.  The naive
-  ;; solution (which we're going with for now) is a depth-first search
-  ;; over an arbitrarily complex chunk of flow graph that is known to
-  ;; have a single entry block.
-  (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
-         (flag use-blocks) ;; for block-flag, no need to clear-flags, as it's fresh
-         (cycle (list :cycle))
-         (nlx (list :nlx))
-         ;; We have to back-propagate not just the DX-LVAR, but every
-         ;; UVL or DX LVAR that is live wherever DX-LVAR is USEd
-         ;; (allocated) because we can't move live DX-LVARs to release
-         ;; them.
-         (preserve-lvars (reduce #'merge-uvl-live-sets
-                                 use-blocks
-                                 :key (lambda (block)
-                                        (let ((2block (block-info block)))
-                                          ;; same as logic in UPDATE-UVL-LIVE-SETS
-                                          (merge-uvl-live-sets
-                                           (set-difference
-                                            (ir2-block-start-stack 2block)
-                                            (ir2-block-popped 2block))
-                                           (ir2-block-pushed-before dx-lvar 2block))))))
-         (start-block (find-lowest-common-dominator
-                       (list* block use-blocks))))
-    (aver start-block)
-    (labels ((revisit-cycles (block)
-               (dolist (succ (block-succ block))
-                 (when (eq (block-flag succ) cycle)
-                   (mark succ)))
-               (when (eq (block-out block) nlx)
-                 (do-nested-cleanups (cleanup block)
-                   (case (cleanup-kind cleanup)
-                     ((:block :tagbody :catch :unwind-protect)
-                      (dolist (nlx-info (cleanup-nlx-info cleanup))
-                        (let ((target (nlx-info-target nlx-info)))
-                          (when (eq (block-flag target) cycle)
-                            (mark target)))))))))
-             (mark (block)
-               (let ((2block (block-info block)))
-                 (unless (eq (block-flag block) flag)
-                   (setf (block-flag block) flag)
-                   (setf (ir2-block-end-stack 2block)
-                         (merge-uvl-live-sets
-                          preserve-lvars
-                          (ir2-block-end-stack 2block)))
-                   (setf (ir2-block-start-stack 2block)
-                         (merge-uvl-live-sets
-                          preserve-lvars
-                          (ir2-block-start-stack 2block)))
-                   (revisit-cycles block))))
-             (back-propagate-pathwise (current-block)
-               (cond
-                 ((member current-block use-blocks)
-                  ;; The LVAR is live on exit from a use-block, but
-                  ;; not on entry.
-                  (pushnew dx-lvar (ir2-block-end-stack
-                                    (block-info current-block)))
-                  t)
-                 ((eq (block-flag current-block) flag)
-                  t)
-                 ((eq (block-flag current-block) cycle)
-                  nil)
-                 ;; Don't go back past START-BLOCK.
-                 ((not (eq current-block start-block))
-                  (setf (block-flag current-block) cycle)
-                  (let (marked)
-                    (dolist (pred-block (if (nle-block-p current-block)
-                                            ;; Follow backwards through
-                                            ;; NLEs to the start of
-                                            ;; their environment
-                                            (let ((entry-block (nle-block-entry-block current-block)))
-                                              ;; Mark for later if
-                                              ;; revisit-cycles needs
-                                              ;; to go back from here.
-                                              (setf (block-out entry-block) nlx)
-                                              (list* entry-block (block-pred current-block)))
-                                            (block-pred current-block)))
-                      (when (back-propagate-pathwise pred-block)
-                        (mark current-block)
-                        (setf marked t)))
-                    marked)))))
-      (back-propagate-pathwise block))))
-
-(defun back-propagate-dx-lvars (block dx-infos)
-  (declare (type cblock block))
-  (dolist (dx-info dx-infos)
-    (dolist (dx-lvar (dx-info-subparts dx-info))
-      (back-propagate-one-dx-lvar block dx-lvar))))
-
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
@@ -199,11 +86,7 @@
          (new-end end))
     (dolist (succ (block-succ block))
       (setq new-end (merge-uvl-live-sets new-end
-                                         ;; Don't back-propagate DX
-                                         ;; LVARs automatically,
-                                         ;; they're handled specially.
-                                         (remove-if #'lvar-dynamic-extent
-                                                    (ir2-block-start-stack (block-info succ))))))
+                                         (ir2-block-start-stack (block-info succ)))))
     (do-nested-cleanups (cleanup block)
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
@@ -216,45 +99,14 @@
                                   (remove exit-lvar nle-start-stack)
                                   nle-start-stack)))
              (setq new-end (merge-uvl-live-sets
-                            new-end next-stack)))))
-        (:dynamic-extent
-         (dolist (dx-info (cleanup-nlx-info cleanup))
-           (dolist (lvar (dx-info-subparts dx-info))
-             (do-uses (generator lvar)
-               (let* ((block (node-block generator))
-                      (2block (block-info block)))
-                 ;; DX objects, living in the LVAR, are alive in
-                 ;; the environment, protected by the CLEANUP. We
-                 ;; also cannot move them (because, in general, we
-                 ;; cannot track all references to them).
-                 ;; Therefore, everything, allocated deeper than a
-                 ;; DX object -- that is, before the DX object --
-                 ;; should be kept alive until the object is
-                 ;; deallocated.
-                 (setq new-end (merge-uvl-live-sets
-                                new-end
-                                (set-difference
-                                 (ir2-block-start-stack 2block)
-                                 (ir2-block-popped 2block))))
-                 (setq new-end (merge-uvl-live-sets
-                                new-end
-                                (ir2-block-pushed-before lvar 2block)))))))
-         ;; We need to back-propagate the DX LVARs from the start of
-         ;; their environments to their allocation sites. The
-         ;; %CLEANUP-POINT funny function combination ensures the
-         ;; mess-up node's block will end with an enclosing
-         ;; cleanup. We need to be clever about this because some code
-         ;; paths may not allocate all of the DX LVARs.
-         (let ((mess-up (cleanup-mess-up cleanup)))
-           (when (and (eq (node-block mess-up) block)
-                      (entry-p mess-up))
-             (back-propagate-dx-lvars block (cleanup-nlx-info cleanup)))))))
+                            new-end next-stack)))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
+      (setq start (merge-uvl-live-sets start (ir2-block-dx-popped 2block)))
 
       (when *check-consistency*
         (aver (subsetp original-start start)))
@@ -263,6 +115,47 @@
             (t
              (setf (ir2-block-start-stack 2block) start)
              t)))))
+
+;;; Once the ordinary liveness of stack objects has been computed,
+;;; extend their live ranges to conform to any dynamic extent
+;;; semantics. First, we must keep dynamic extent values live within
+;;; the extent of their cleanups. Second, since dynamic extent objects
+;;; can't move (as object identity must be preserved and we can't in
+;;; general track all references), everything allocated deeper than a
+;;; DX object -- that is, before the DX object -- should be kept alive
+;;; until the object is deallocated as well.
+(defun extend-live-ranges (block)
+  (declare (type cblock block))
+  (let* ((2block (block-info block))
+         (end (ir2-block-end-stack 2block)))
+    (do-nested-cleanups (cleanup block)
+      (case (cleanup-kind cleanup)
+        (:dynamic-extent
+         (dolist (dx-info (cleanup-nlx-info cleanup))
+           (dolist (lvar (dx-info-subparts dx-info))
+             (pushnew lvar end))))))
+
+    (dolist (lvar end)
+      (when (and (lvar-dynamic-extent lvar)
+                 (not (memq lvar (ir2-block-pushed 2block))))
+        (do-uses (generator lvar)
+          (let ((2block (block-info (node-block generator))))
+            (setq end (merge-uvl-live-sets
+                       end
+                       (set-difference
+                        (ir2-block-start-stack 2block)
+                        (ir2-block-popped 2block))))
+            (setq end (merge-uvl-live-sets
+                       end
+                       (ir2-block-pushed-before lvar 2block)))))))
+
+    (setf (ir2-block-end-stack 2block) end)
+    (setf (ir2-block-start-stack 2block)
+          (merge-uvl-live-sets
+           (merge-uvl-live-sets
+            (set-difference end (ir2-block-pushed 2block))
+            (ir2-block-popped 2block))
+           (ir2-block-dx-popped 2block)))))
 
 
 ;;;; Ordering of live UVL stacks
@@ -479,11 +372,6 @@
 ;;; unknown-values lvars used across block boundaries and no DX LVARs.
 (defun stack-analyze (component)
   (declare (type component component))
-  ;; Used for DX LVAR back propagation (see
-  ;; BACK-PROPAGATE-ONE-DX-LVAR).
-  (when (component-dx-lvars component)
-    (clear-dominators component)
-    (find-dominators component))
   (let* ((2comp (component-info component))
          (receivers (ir2-component-values-receivers 2comp))
          (generators (find-pushing-blocks receivers
@@ -492,12 +380,23 @@
     (dolist (block generators)
       (find-pushed-lvars block)))
 
+  (dolist (dx-lvar (component-dx-lvars component))
+    (let ((dest-block (node-block (lvar-dynamic-extent-dest dx-lvar))))
+      (unless (and (not (listp (lvar-uses dx-lvar)))
+                   (eq (node-block (lvar-use dx-lvar))
+                       dest-block))
+        (push dx-lvar
+              (ir2-block-dx-popped (block-info dest-block))))))
+
   ;; Compute sets of live UVLs and DX LVARs
   (loop for did-something = nil
      do (do-blocks-backwards (block component)
           (when (update-uvl-live-sets block)
             (setq did-something t)))
      while did-something)
+  (when (component-dx-lvars component)
+    (do-blocks (block component)
+      (extend-live-ranges block)))
 
   (order-uvl-sets component)
 

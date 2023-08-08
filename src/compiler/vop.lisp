@@ -150,6 +150,7 @@
   ;; by stack analysis.
   (pushed () :type list)
   (popped () :type list)
+  (dx-popped () :type list)
   ;; the result of stack analysis: lists of all the unknown-values
   ;; LVARs on the stack at the block start and end, topmost LVAR
   ;; first.
