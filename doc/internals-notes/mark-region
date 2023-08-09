@@ -1,0 +1,217 @@
+A mark-region collector is being developed for SBCL. The intention is
+that avoiding compaction/copying should allow for better performance,
+should lead to a simpler parallel implementation, and should
+make implementing concurrent collection easier.
+
+Heap layout
+-----------
+
+The collector retains the page-orientation of gencgc, but introduces a
+second layer of "lines" as used in the Immix collector for small
+objects. Line metadata, including the generation number, freshness
+and a mark bit, is stored in a "bytemap". Memory used for small objects
+is reclaimed at the line level, rather than the page level, in order to
+reclaim most memory without having to move objects. Each line is
+assigned its own generation, to allow memory from older generations to
+be reused for newer generations. Line size is fixed to 16 words
+(i.e. 8 possible places an object could be allocated) to make bitwise
+operations simpler.
+
+Ambiguous references
+--------------------
+
+The starts of objects are recorded in an allocation bitmap. While it
+is possible for Lisp to eagerly update the allocation bitmap (such as
+in "Fast conservative garbage collection"), we instead have the
+garbage collector lazily update the allocation bitmap. The starts of
+objects can be determined lazily by exploiting that the allocator
+still uses bump-allocation, but in less structured "runs" of lines
+rather than entire pages. The allocator records which lines it just
+allocated into (which we call "fresh"); and when the collector needs
+to check if a conservative pointer in such a fresh line is valid, it
+searches for the start and end of the run enclosing the pointer,
+and materialises the object bitmap for that run only then. This approach
+experimentally reduces the time overhead in maintaining the allocation
+bitmap, as theoretically "most objects die young", and so only small
+portions of the allocation bitmap need to be maintained. It also
+requires less platform-specific code, as it is not necessary to write
+inline code to update the bitmap. Such code is also tricky to write on
+non-x86 platforms; the x86 instruction set includes a BTS instruction
+to set a bit in a bitmap in memory*, but setting a bit requires the
+computation to be done by the user on e.g. ARM.
+
+(* Though, per compiler/x86-64/array.lisp, BTS m,r is really slow and
+   so the best performance would still require some finessing.)
+
+Marking
+-------
+
+The collector employs a classic tri-color mark-sweep algorithm. A mark
+bitmap stores mark bits for objects, storing if an object is white, or
+if an object is grey or black. Lines are also assigned mark bits,
+which represent if the line can be reclaimed or not, and all lines
+intersecting an object are marked when an object is marked. Grey
+objects are stored on a mark stack, represented as a linked list of
+"grey packets", each packet containing a vector of pointers to
+trace. The collector reads off pointers to trace from an "input
+packet", and writes out more pointers to trace from an "output
+packet". Prefetching the pointers in the input packet is somewhat
+effective.
+
+Marking is made parallel by giving each collector thread its own
+input and output packets, and requiring the shading of an object to be
+an atomic operation. A thread does not trace an object if it fails to
+set the mark bit atomically, as another thread traced it in the
+meanwhile, and will proceed in marking the object. (Atomicity might
+seem unnecessary, since marking and tracing are idempotent, but
+writing the bitmap must be atomic, or data races could cause objects
+to become unmarked.)
+
+Sweeping
+--------
+
+Sweeping is complicated by the use of generations, and by the rather
+odd heap layout. If a full collection was used, it would suffice to
+copy the mark bitmap to the allocation bitmap, in order to sweep the
+allocation bitmap, and to free every line that was not
+marked. However, the use of generations requires that we retain
+allocations and line usage for older generations. Conceptually, now,
+we have to "blend" the allocation and mark bitmaps, based on the
+values stored in the line bytemap.
+
+This blending operation is made rather simple, as every byte of the
+allocation bitmap corresponds to a byte of the line bytemap, due to
+our definition of the line size. We copy a byte of the mark bitmap to
+the allocation bitmap only when the corresponding line is in the
+generation being collected, preserving allocation bits for older
+objects. We unmark each line that is marked and in the generation
+being collected, and free each line that is unmarked and in the
+generation being collected, preserving older lines.
+
+Computing occupancy of each page, each generation, and the entire heap
+is also tricky. The current approach, which could be improved upon, is
+to count the number of dead lines on each page, and then decrement the
+occupancy of the page, the heap, and the generation being collected by
+the number of dead bytes found. Another approach would be to count the
+number of live lines on each page, which requires the same amount of
+work, and to also count the number of live lines in the generation
+being collected. In either case, it is only necessary to recompute
+occupancy for the generation being collected, as the collector
+performs no actions that would cause the occupancy of any other
+generation to change.
+
+All the sweeping operations can be (automatically) vectorised, which
+improves performance substantially. Parallelisation also improves
+performance, but it is very possible that one can run out of memory
+bandwidth long before one runs out of cores. To make the best use of
+memory bandwidth, it is important to avoid touching metadata which
+is irrelevant (say, by corresponding to pages with no objects on them).
+
+Scavenging
+----------
+
+In a generational collector, it is also necessary to trace certain
+"remembered" objects in older generations, which contain pointers to
+new objects which must be preserved. SBCL records pointer writes using
+a card map, and a subset of these writes will be to older objects, and
+a subset of those writes will be storing pointers to new objects. The
+collector scans every card to find pointers from old objects to new
+objects, and mark the new objects. Similar to sweeping, it is possible
+to use blending to compute a bitmap of only old objects, by only
+retaining bytes from the allocation bitmap that reside on older lines.
+
+In order to support the write barrier for SIMPLE-VECTORs writing any
+card, scavenging also searches the space between the start of a card
+and the first object for pointers to younger objects. If any are found,
+scavenging then tries to find a SIMPLE-VECTOR before, and then
+scavenges that vector and dirties the card.
+
+Compacting
+----------
+
+The collection algorithm thus far is not really complete; it will never
+be able to release any lines when used by objects, even when the size
+of live objects is less than the size of live lines. We need to be able to
+compact these lines; we use the algorithm described in "An algorithm
+for parallel incremental compaction" which copies a small portion of
+the heap at a time. Copying small parts of the heap reduces the space
+overhead of garbage collection, reduces latency, and ideally produces
+comparable quality to full compaction if pages to compact are selected
+appropriately.
+
+First, pages are selected for compaction, by scanning from the end of
+the heap for sparsely used pages, until a space limit is reached.
+Marking records pointers to objects in the selected pages into a
+remembered set. After sweeping, all live objects in the selected pages
+are copied, and then the remembered set is consulted to fix every
+incoming pointer. Both stages can be done using multiple threads;
+but for simplicity we intend to copy serially, as copying some objects
+can copy other objects, breaking any simple guarantees of isolation.
+However, there are no problems with fixing pointers in parallel,
+though experimentally there are few pointers to fix.
+
+Currently only objects in the generation being collected can be
+compacted, to have compaction correctly "piggy-back" on tracing to
+find pointers. This may be an issue, if fragmentation accumulates
+in older objects and collections of older generations are never triggered.
+It may also harm selection of pages, if pages with only older objects
+are selected.
+
+The C shore
+-----------
+
+The heap layout breaks many things which one might have taken for
+granted in the heap layout used by gencgc. For example, objects are no
+longer really contiguous in the heap, and trying to walk a page with
+something like
+
+  for (lispobj *where = start; where < end; where += object_size(where))
+    ...
+
+is not going to work. Instead, there is a shim in walk-heap.h which
+allows for walking a non-contiguous heap correctly; this must also be
+called to initialise `where` so that the first object in the range is
+found correctly. Such a loop may instead be written like
+
+  for (lispobj *where = next_object(start, 0, end); where;
+       where = next_object(where, object_size, end))
+    ...
+
+which admittedly is less pretty. next_object just computes (where + size)
+and checks bounds when using the copying collector, and so using it is
+portable across both collectors.
+
+Another less portable thing is the value of `end` in the supposed loop.
+With the copying collector, this is indeed
+`page_address(page) + page_words_used(page)`, but when using the
+mark-region collector, all of the page must be considered, and so the
+end should be `page_address(page + 1)`. Similarly, page_limit may be
+used now to find the end of a page, and walk_generation will also
+do what you want.
+
+Running the write barrier manually in C is also likely to be wrong;
+we now _need_ to dirty the card on the start of the object, and not
+any card intersecting the object, when the object is small. We need
+to dirty both the start and the slot when the object is large.
+
+Todo
+----
+
+We should crack free_pages_lock. If Lisp only ever allocated single
+pages at a time, each page could be claimed/opened with a
+compare-and-swap. A readers-writer lock could be used to allow for
+claiming multiple sequential pages (for large objects) too; threads
+trying to claim single pages take the readers lock and use the
+forementioned CAS protocol, whereas (less frequent) threads trying
+to claim multiple pages take the writers lock. I tried implementing
+this, but somehow threads would update the allocator start pages
+to nearly the end of the heap, causing very premature heap
+exhaustion; but I haven't a clue how that would happen.
+
+Useful references
+-----------------
+Immix: https://www.cs.utexas.edu/users/speedway/DaCapo/papers/immix-pldi-2008.pdf
+Grey packets: https://dl.acm.org/doi/10.1145/1108970.1108972
+Sticky marks in generational collection: https://dl.acm.org/doi/pdf/10.1145/96709.96735
+Fast conservative garbage collection: https://users.cecs.anu.edu.au/~steveb/pubs/papers/consrc-oopsla-2014.pdf
+An algorithm for parallel incremental compaction: https://dl.acm.org/doi/10.1145/773039.512442
