@@ -61,7 +61,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
              ;; ":PURE T" in its defstruct, then it will not be put in readonly
              ;; space, so we _could_ avoid the indirection cell. But it's not
              ;; worth trying to optimize that out for benefit of a crappy GC.
-             (cond #-gencgc
+             (cond #+cheneygc
                    ((not read-only-p)
                     `(make-value-cell ,form))
                    (t
@@ -69,7 +69,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
           (unless (csubtypep type source-type)
             (setf type source-type))
           (let ((value-form
-                  (cond #-gencgc
+                  (cond #+cheneygc
                         ((not read-only-p)
                          `(value-cell-ref (%load-time-value ',handle)))
                         (t
@@ -97,12 +97,12 @@ guaranteed to never be modified, so it can be put in read-only storage."
                                            condition))))))
           (if read-only-p
               (ir1-convert start next result `',value)
-              #-gencgc
+              #+cheneygc
               (the-in-policy (ctype-of value)
                              `(value-cell-ref ,(make-value-cell value))
                              **zero-typecheck-policy**
                              start next result)
-              #+gencgc
+              #+generational
               ;; Avoid complaints about constant modification
               (ir1-convert start next result `(ltv-wrapper ',value)))))))
 

@@ -45,8 +45,7 @@
 
 ;; Assert something about *CURRENT-THREAD* seeing objects that it just consed.
 (with-test (:name :m-a-o-threadlocally-precise
-                  :skipped-on (:or (:not (:and :gencgc :sb-thread))
-                                   :interpreter))
+                  :skipped-on (:or (:not :sb-thread) :interpreter))
   (let ((before (make-array 4))
         (after  (make-array 4 :initial-element 0)))
     (flet ((countit (obj type size)
@@ -132,7 +131,6 @@
           (list (sb-kernel:get-lisp-obj-address afunction)
                 (sb-kernel:get-lisp-obj-address string-one)
                 (sb-kernel:get-lisp-obj-address string-two)))))
-#+gencgc
 (with-test (:name :pin-all-code-with-gc-enabled
                   :skipped-on :interpreter)
   (gc)
@@ -166,7 +164,6 @@
                 (or #+immobile-code :immobile :static)))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
-#+gencgc ; sb-ext: symbol was removed for cheneygc
 (with-test (:name :bug-529014)
   (loop for i from 0 to sb-vm:+pseudo-static-generation+
      do (assert (= (sb-ext:generation-bytes-consed-between-gcs i)
@@ -178,7 +175,7 @@
         (assert (= (sb-ext:generation-minimum-age-before-gc i) 0.75))
         (assert (= (sb-ext:generation-number-of-gcs-before-promotion i) 1))))
 
-(with-test (:name :gc-logfile :skipped-on (not :gencgc))
+(with-test (:name :gc-logfile)
   (assert (not (gc-logfile)))
   (let ((p (scratch-file-name "log")))
     (assert (not (probe-file p)))
@@ -231,7 +228,6 @@
                *pin-test-object-address*))))
 
 (import 'sb-kernel:%make-lisp-obj)
-#+gencgc
 (defun ensure-code/data-separation ()
   (let* ((n-bits (+ sb-vm:next-free-page 10))
          (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
@@ -429,7 +425,6 @@
     (gc)
     (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))
 
-#+gencgc
 (progn
 (defun code-iterator (how)
   (let ((n 0) (tot-bytes 0))
@@ -453,7 +448,7 @@
     (assert (= slow-bytes fast-bytes)))))
 
 (defglobal *wp-for-signal-handler-gc-test* nil)
-#+(and gencgc unix sb-thread)
+#+(and generational unix sb-thread)
 (with-test (:name :signal-handler-gc-test)
   (sb-thread:join-thread
    (sb-thread:make-thread
@@ -471,10 +466,9 @@
 
 ;;; We can be certain that the marked status pertains to exactly one
 ;;; object by ensuring that it can not share pages with other objects.
-#+gencgc (defvar *vvv* (make-array
+(defvar *vvv* (make-array
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
-#+gencgc
 (with-test (:name :page-protected-p :broken-on :x86
                   :fails-on (and :big-endian :ppc64))
   (if (= (sb-kernel:generation-of *vvv*) 0) (gc))

@@ -210,7 +210,7 @@ static lispobj lookup_symbol(char *name)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
       { FIXEDOBJ_SPACE_START, (uword_t)fixedobj_free_pointer },
 #endif
-#if defined(LISP_FEATURE_GENCGC)
+#ifdef LISP_FEATURE_GENERATIONAL
       { DYNAMIC_SPACE_START, dynamic_space_highwatermark() }
 #else
       { (uword_t)current_dynamic_space, (uword_t)get_alloc_pointer() }

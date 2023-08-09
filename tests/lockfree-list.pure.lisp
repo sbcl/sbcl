@@ -117,7 +117,7 @@
     (when show (show (list-head *lfl*) #'get-next "del "))))
 
 ;; Enable heap validity tester
-#+gencgc (setf (sb-alien:extern-alien "verify_gens" char) 0)
+#+generational (setf (sb-alien:extern-alien "verify_gens" char) 0)
 
 (test-util:with-test (:name :lockfree-list-gc-correctness)
   ;; Create a small list and perform logical deletion of 2 nodes

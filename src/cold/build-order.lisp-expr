@@ -712,7 +712,7 @@
   "src/code/alien-callback"
   "src/code/run-program"
   #+win32 "src/code/warm-mswin"
-  #+gencgc "src/code/traceroot"
+  "src/code/traceroot"
 
   "src/code/query"
   "src/code/timer"

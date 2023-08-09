@@ -1,4 +1,3 @@
-#+gencgc
 (progn
 (defun on-large-page-p (x)
   (and (eq (sb-ext:heap-allocated-p x) :dynamic)

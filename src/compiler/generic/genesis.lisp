@@ -443,7 +443,6 @@
 
 (defconstant min-usable-hole-size 10) ; semi-arbitrary constant to speed up the allocator
 ;; Place conses and code on their respective page type.
-#+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type
                                     &aux (words-per-page
                                           (/ sb-vm:gencgc-page-bytes sb-vm:n-word-bytes)))
@@ -565,7 +564,6 @@
                            (delete n-words *immobile-space-map* :key 'car))
                      (setf (car found) next-word)))
                (+ page-word-index page-base-index))))
-          #+gencgc
           ((eq gspace *dynamic*)
            (dynamic-space-claim-n-words gspace n-words page-type))
           (t
@@ -2912,7 +2910,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (cold-layout-id (gethash (descriptor-bits name)
                                        *cold-layout-by-addr*)))
              ;; The machine-dependent code decides how to patch in 'nbits'
-             #+gencgc (:card-table-index-mask sb-vm::gencgc-card-table-index-nbits)
+             (:card-table-index-mask sb-vm::gencgc-card-table-index-nbits)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -2946,7 +2944,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (check sb-vm:static-space-start sb-vm:static-space-end :static)
       #+relocatable-static-space
       (check sb-vm:static-space-start (+ sb-vm:static-space-start sb-vm::static-space-size) :static)
-      #+gencgc
       (check sb-vm:dynamic-space-start
              (+ sb-vm:dynamic-space-start sb-vm::default-dynamic-space-size)
              :dynamic)
@@ -2954,7 +2951,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       ;; Must be a multiple of 32 because it makes the math a nicer
       ;; when computing word and bit index into the 'touched' bitmap.
       (aver (zerop (rem sb-vm:fixedobj-space-size (* 32 sb-vm:immobile-card-bytes))))
-      #-gencgc
+      #+cheneygc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
       #-immobile-space
       (let ((end (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size)))
@@ -3129,15 +3126,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
   ;; backend-page-bytes doesn't really mean much any more.
   ;; It's the granularity at which we can map the core file pages.
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
-  #+gencgc ; values never needed in Lisp, so therefore not a defconstant
+  ;; values never needed in Lisp, so therefore not a defconstant
   (progn
   (format t "#define MAX_CONSES_PER_PAGE ~D~%" sb-vm::max-conses-per-page)
   (format t "#define CARDS_PER_PAGE ~D~%#define GENCGC_CARD_SHIFT ~D~%"
           sb-vm::cards-per-page ; this is the "GC" page, not "backend" page
           sb-vm::gencgc-card-shift))
 
-  (let ((size #+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
-              #+gencgc sb-vm::default-dynamic-space-size))
+  (let ((size sb-vm::default-dynamic-space-size))
   ;; "-DDEFAULT_DYNAMIC_SPACE_SIZE=n" in CFLAGS will override this.
     (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
 #define DEFAULT_DYNAMIC_SPACE_SIZE ~D /* ~:*0x~X */
@@ -3834,7 +3830,6 @@ III. initially undefined function references (alphabetically):
 
     (+ data-page page-count)))
 
-#+gencgc
 (defun output-page-table (gspace data-page core-file verbose)
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
@@ -3922,7 +3917,7 @@ III. initially undefined function references (alphabetically):
         (write-words core-file (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
           (setq data-page (output-gspace space data-page core-file verbose))))
-      #+gencgc (output-page-table *dynamic* data-page core-file verbose)
+      (output-page-table *dynamic* data-page core-file verbose)
 
       ;; Write the initial function.
       (let ((initial-fun (descriptor-bits (cold-symbol-function '!cold-init))))
@@ -4020,8 +4015,7 @@ III. initially undefined function references (alphabetically):
                                          :objects (make-array 20000 :fill-pointer 0 :adjustable t)))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
-                                     #+gencgc sb-vm:dynamic-space-start
-                                     #-gencgc sb-vm:dynamic-0-space-start))
+                                     sb-vm:dynamic-space-start))
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)
@@ -4145,7 +4139,6 @@ III. initially undefined function references (alphabetically):
           (write-makefile-features stream)))
       (write-c-headers c-header-dir-name))))
 
-#+gencgc
 (defun write-mark-array-operators (stream &optional (ncards sb-vm::cards-per-page))
   #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
   (format stream "#include ~S
@@ -4154,7 +4147,7 @@ extern unsigned char *gc_card_mark;~%" (lispobj-dot-h))
   #-soft-card-marks
   (progn
     (aver (= ncards 1))
-    #+nil ; this are gencgc-impl
+    #+nil ; these are in gencgc-impl
     (progn
       (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
     return gc_card_mark[card] == CARD_MARKED;~%}~%")

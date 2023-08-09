@@ -22,7 +22,6 @@
     (setf (info :variable :wired-tls (slot-special slot))
           (ash (slot-offset slot) word-shift))))
 
-#+gencgc
 (progn
 ;;; don't change allocation granularity
 (assert (= gencgc-alloc-granularity 0))

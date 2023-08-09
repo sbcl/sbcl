@@ -1432,7 +1432,7 @@
          ;; Only pin things on GENCGC, since on CHENEYGC it'd imply
          ;; disabling the GC.  Which is something we don't want to do
          ;; every time we're calling to C.
-         #+gencgc
+         #-cheneygc
          (loop for variable in variables
             for type in types
             when (invoke-alien-type-method :deport-pin-p type)

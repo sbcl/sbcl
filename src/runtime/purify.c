@@ -42,7 +42,7 @@
  * x86oids, which has now been removed. So this code can't even be
  * compiled with GENCGC any more.  -- JES, 2007-04-30.
  */
-#ifndef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_CHENEYGC
 
 #define PRINTNOISE
 
@@ -733,11 +733,11 @@ purify(lispobj static_roots, lispobj read_only_roots)
     //fclose(xlog);
     return 0;
 }
-#else /* LISP_FEATURE_GENCGC */
+#else // dummy stub
 int
 purify(lispobj __attribute__((unused)) static_roots,
        lispobj __attribute__((unused)) read_only_roots)
 {
     lose("purify called for GENCGC. This should not happen.");
 }
-#endif /* LISP_FEATURE_GENCGC */
+#endif /* LISP_FEATURE_GENERATIONAL */

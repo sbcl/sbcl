@@ -17,14 +17,14 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection."
-     #-gencgc "  This is currently implemented by disabling GC")
-  #-gencgc
+     #-generational "  This is currently implemented by disabling GC")
+  #-generational
   `(progn ,@objects (,(if objects 'without-gcing 'progn) ,@body))
-  #+(and gencgc (not (or x86 x86-64)))
+  #+(and generational (not (or x86 x86-64)))
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
      (declare (truly-dynamic-extent *pinned-objects*))
      ,@body)
-  #+(and gencgc (or x86 x86-64))
+  #+(and generational (or x86 x86-64))
   (if objects
       (let ((pins (make-gensym-list (length objects)))
             (wpo (gensym "WITH-PINNED-OBJECTS-THUNK")))
@@ -53,13 +53,13 @@ garbage collection."
       `(progn ,@body)))
 
 (defmacro with-pinned-object-iterator ((name) &body body)
-  #-gencgc
+  #-generational
   `(macrolet ((,name (arg) (declare (ignore arg)) nil)) ,@body)
-  #+(and gencgc (not (or x86 x86-64)))
+  #+(and generational (not (or x86 x86-64)))
   `(dx-let ((.cell. (cons nil *pinned-objects*)))
      (let ((*pinned-objects* .cell.))
        (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
-  #+(and gencgc (or x86 x86-64))
+  #+(and generational (or x86 x86-64))
   `(dx-let ((.cell. (cons nil nil)))
      (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
 
@@ -85,7 +85,7 @@ garbage collection."
 ;;;
 (defmacro with-code-pages-pinned ((space) &body body)
   #+cheneygc (declare (ignore space))
-  #+gencgc `(let ((*gc-pin-code-pages*
+  #+generational `(let ((*gc-pin-code-pages*
                     (logior *gc-pin-code-pages*
                             ,(ecase space
                                (:dynamic 1)

@@ -820,7 +820,7 @@ Experimental: interface subject to change."
              (sb-sys:with-pinned-objects (object)
                (let ((space (sb-ext:heap-allocated-p object)))
                  (when space
-                   #+gencgc
+                   #+generational
                    (if (eq :dynamic space)
                        (symbol-macrolet ((page (sb-alien:deref sb-vm::page-table index)))
                          ;; No wonder #+big-endian failed introspection tests-
@@ -839,7 +839,7 @@ Experimental: interface subject to change."
                                  :large (logbitp 4 type)
                                  :page index)))
                        (list :space space))
-                   #-gencgc
+                   #-generational
                    (list :space space))))))
         (cond (plist
                (values :heap plist))
@@ -1037,17 +1037,17 @@ Experimental: interface subject to change."
                                    (= this-bin-size (+ prev-bin-size 2)))
                                this-bin-size))))))))
 
-(defun largest-objects (&key (threshold #+gencgc sb-vm:gencgc-page-bytes
-                                        #-gencgc sb-c:+backend-page-bytes+)
+(defun largest-objects (&key (threshold #+generational sb-vm:gencgc-page-bytes
+                                        #-generational sb-c:+backend-page-bytes+)
                              (sort :size))
   (declare (type (member :address :size) sort))
   (flet ((show-obj (obj)
-           #-gencgc
+           #-generational
            (format t "~10x ~7x ~s~%"
                      (get-lisp-obj-address obj)
                      (primitive-object-size obj)
                      (type-of obj))
-           #+gencgc
+           #+generational
            (let* ((gen (generation-of obj))
                   (page (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address obj)))
                   (flags (if (>= page 0)

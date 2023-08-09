@@ -135,7 +135,7 @@
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
-#+(and gencgc sb-xc-host)
+#+(and generational sb-xc-host)
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
           (start dynamic-space-start))
@@ -162,7 +162,7 @@
 ;;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
 
-#+gencgc
+#+generational
 (progn
   (defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))
   ;; Preventing use of the last 2 words on a page ensures that we never

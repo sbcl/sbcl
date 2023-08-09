@@ -323,10 +323,11 @@
 
 (defun nuke-fop-vector (vector)
   (declare (simple-vector vector)
-           #-gencgc (ignore vector)
+           (ignorable vector)
            (optimize speed))
   ;; Make sure we don't keep any garbage.
-  #+gencgc
+  ;; NOTE: for the work-in-progress concurrent GC, it is better *NOT* to 0-fill
+  ;; if the the deletion barrier is enabled.
   (fill vector 0))
 
 

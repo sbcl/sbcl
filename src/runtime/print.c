@@ -103,7 +103,7 @@ dyndebug_init()
             }
         }
     }
-#if defined(LISP_FEATURE_GENCGC)
+#if defined(LISP_FEATURE_GENERATIONAL)
     if (dyndebug_config.dyndebug_gencgc_verbose) {
         gencgc_verbose = 1;
     }

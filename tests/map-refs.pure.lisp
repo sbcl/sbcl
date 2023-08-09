@@ -7,7 +7,7 @@
                                   :dynamic '*posix-argv*)
   (let ((v (sb-kernel:symbol-%info 'satisfies)) referers)
     (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
-                                    #+gencgc :dynamic #-gencgc :static v)
+                                    #+generational :dynamic #-generational :static v)
     #+immobile-space
     (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
                                     :immobile v)

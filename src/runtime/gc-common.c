@@ -148,7 +148,7 @@ static inline void scav1(lispobj* addr, lispobj object)
             enliven_immobile_obj(ptr, 1);
     }
 #endif
-#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
+#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENERATIONAL)
     else if (object == FORWARDING_HEADER)
           lose("unexpected forwarding pointer in scavenge @ %p", addr);
 #endif

@@ -64,8 +64,7 @@
                               (weak-pointer-value
                                ;; Preserve gencgc invariant that a weak pointer
                                ;; can't point to an object younger than itself.
-                               `(cond #+gencgc
-                                      ((let ((newval-gen (generation-of newval)))
+                               `(cond ((let ((newval-gen (generation-of newval)))
                                          (and (fixnump newval-gen)
                                               (< newval-gen (generation-of object))))
                                        #+nil
@@ -277,7 +276,7 @@
 
 (defun fold-identical-code (&key aggressive preserve-docstrings (print nil))
   (loop
-    #+gencgc (gc :gen 7)
+    (gc :gen 7)
     ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
     ;; to have a mode that scans only GC pages with that can hold code
     ;; (or any subset of page types). This is fine though.

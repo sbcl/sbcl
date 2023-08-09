@@ -732,7 +732,6 @@
 
 ;; You have to shoehorn this arbitrary sexpr into a feature expression
 ;; to have the test summary show that a test was disabled.
-#+gencgc
 (unless (eql (extern-alien "verify_gens" int)
              (+ sb-vm:+highest-normal-generation+ 2))
   (pushnew :verify-gens *features*))

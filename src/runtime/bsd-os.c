@@ -255,8 +255,6 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
  * any OS-dependent special low-level handling for signals
  */
 
-#if defined LISP_FEATURE_GENCGC
-
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
@@ -275,7 +273,9 @@ memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     if (handle_safepoint_violation(context, fault_addr)) return;
 #endif
 
+#if defined LISP_FEATURE_GENCGC
     if (gencgc_handle_wp_violation(context, fault_addr)) return;
+#endif
 
     if (!handle_guard_page_triggered(context,fault_addr))
             lisp_memory_fault_error(context, fault_addr);
@@ -298,28 +298,6 @@ os_install_interrupt_handlers(void)
 
     }
 }
-
-#else /* Currently PPC/Darwin/Cheney only */
-
-static void
-sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
-{
-    os_vm_address_t addr;
-
-    addr = arch_get_bad_addr(signal, info, context);
-    if (cheneygc_handle_wp_violation(context, addr)) return;
-
-    if (!handle_guard_page_triggered(context, addr))
-            interrupt_handle_now(signal, info, context);
-}
-
-void
-os_install_interrupt_handlers(void)
-{
-    ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
-}
-
-#endif /* defined GENCGC */
 
 #ifdef __NetBSD__
 static void netbsd_init()

@@ -200,7 +200,7 @@
     #+sb-thread *stop-for-gc-pending*
     sb-impl::*unweakened-vectors*
     *pinned-objects*
-    #+gencgc (*gc-pin-code-pages* 0)
+    (*gc-pin-code-pages* 0)
     ;; things needed for non-local-exit
     (*current-catch-block* 0)
     (*current-unwind-protect-block* 0)
@@ -365,7 +365,6 @@
   #+(and (not x86-64) immobile-space) 14 ; the safepoint trap page is at word index -15
   #+(and (not x86-64) (not immobile-space)) 0)
 
-#+gencgc
 (progn
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))

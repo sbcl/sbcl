@@ -16,8 +16,7 @@
 ;;;; It's just that sometimes we get :PINNED as a root instead of
 ;;;; the expected reference to the one and only thread.
 ;;;; And also sb-safepoint gets a crash in C.
-#-(and gencgc sb-thread (not sb-safepoint)
-       (or arm64 ppc64 x86-64))
+#-(and (or arm64 ppc64 x86-64) sb-thread (not sb-safepoint))
 (invoke-restart 'run-tests::skip-file)
 
 (setq sb-ext:*evaluator-mode* :compile)
@@ -119,7 +118,6 @@
     (something)))
 
 (defvar *foo*)
-#+gencgc
 (with-test (:name (sb-ext:search-roots :simple-fun))
   ;; Tracing a path to a simple fun wasn't working at some point
   ;; because of failure to employ fun_code_header in the right place.
@@ -127,6 +125,5 @@
   (let ((wp (sb-ext:make-weak-pointer *foo*)))
     (assert (sb-ext:search-roots wp :criterion :oldest :print nil))))
 
-#+gencgc
 (with-test (:name (sb-ext:search-roots :ignore-immediate))
   (sb-ext:search-roots (make-weak-pointer 48) :print nil))

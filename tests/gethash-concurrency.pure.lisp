@@ -16,7 +16,7 @@
                                      (if (eq tbl *table-under-test*) -1 0)))))))
 
 ;;; Keep moving everything that can move during each GC
-#+gencgc (setf (generation-number-of-gcs-before-promotion 0) 1000000)
+#+generational (setf (generation-number-of-gcs-before-promotion 0) 1000000)
 
 (defvar *errors* nil)
 

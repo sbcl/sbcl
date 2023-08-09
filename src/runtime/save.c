@@ -356,7 +356,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_lispobj(3, file);
     write_lispobj(init_function, file);
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     {
         extern void gc_store_corefile_ptes(struct corefile_pte*);
         size_t true_size = next_free_page * sizeof(struct corefile_pte);

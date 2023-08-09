@@ -31,7 +31,6 @@
   (alien-funcall (extern-alien "gc_private_free" (function void unsigned))
                  list))
 
-#+gencgc
 (progn
 (defun page-words-used (index)
   (ash (slot (deref sb-vm::page-table index) 'sb-vm::words-used*) -1))
@@ -72,33 +71,6 @@
     (dolist (index pages)
       (assert (page-need-to-zero index))
       (assert (= (page-words-used index) 0))))))
-
-#-gencgc
-(defun test-private-consing ()
-  (let ((conses-per-chunk ; subtract one for the chunk header cons
-         (1- (/ 4096 (* 2 sb-vm:n-word-bytes)))) ; 4096 = CHUNKSIZE
-        (counter 0)
-        (chain))
-    (dotimes (i 5) ; 5 = number of times to invoke malloc()
-      (push nil chain)
-      ;; Use up the chunk, which happens in descending address order.
-      ;; So the last cons allocated is nearest the head of the chunk.
-      (dotimes (i conses-per-chunk)
-        (let ((list (private-list (incf counter))))
-          (setf (car chain) list)))
-      ;; The malloc() result was 1 cons below the lowest cons
-      ;; return by the suballocator.
-      (decf (car chain) (* 2 sb-vm:n-word-bytes)))
-    ;; Test that there are 5 chunks on which to invoke free()
-    (let ((len 0))
-      (loop (unless chain (return))
-            (assert (= (sb-sys:sap-ref-word (sb-sys:int-sap (car chain))
-                                            sb-vm:n-word-bytes)
-                       (or (cadr chain) 0)))
-            (incf len)
-            (pop chain))
-      (assert (= len 5))))
-  (alien-funcall (extern-alien "gc_dispose_private_pages" (function void))))
 
 ;;; These tests disable GC because the private cons allocator
 ;;; assumes exclusive use of the page table, and moreover if GC

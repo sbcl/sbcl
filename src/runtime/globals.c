@@ -67,10 +67,6 @@ os_vm_address_t anon_dynamic_space_start;
 // of new objects handed out by the code allocator.
 lispobj* tlsf_mem_start; // meaningful only if immobile space
 
-#ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */
-lispobj *current_auto_gc_trigger;
-#endif
-
 lispobj lisp_package_vector;
 // Tagged lisp pointer to a 'struct arena' (which is also a lisp DEFSTRUCT)
 // The chain terminates with NIL.
@@ -82,11 +78,6 @@ void globals_init(void)
      * validate() and coreparse(). */
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
     current_control_frame_pointer = (lispobj *)0;
-#endif
-
-#ifndef LISP_FEATURE_GENCGC
-    /* no GC trigger yet */
-    current_auto_gc_trigger = NULL;
 #endif
 
 #ifndef LISP_FEATURE_SB_THREAD

@@ -1343,7 +1343,7 @@ variable: an unreadable object representing the error is printed instead.")
                       ;; the character.
                       (write-char (schar chars r) stream)))))
       (cond ((typep integer 'word) ; Division vops can handle this all inline.
-             #+(and gencgc c-stack-is-control-stack) ; strings can be DX
+             #+c-stack-is-control-stack ; strings can be DX-allocated
              ;; For bases exceeding 10 we know how many characters (at most)
              ;; will be output. This allows for a single %WRITE-STRING call.
              ;; There's diminishing payback for other bases because the fixed array
@@ -1357,7 +1357,7 @@ variable: an unreadable object representing the error is printed instead.")
                    (declare (truly-dynamic-extent buffer))
                    (iterative-algorithm)
                    (%write-string buffer stream ptr (length buffer))))
-             #-(and gencgc c-stack-is-control-stack) ; strings can not be DX
+             #-c-stack-is-control-stack ; strings can't be DX-allocated
              ;; Use the alien stack, which is not as fast as using the control stack
              ;; (when we can). Even the absence of 0-fill doesn't make up for it.
              ;; Since we've no choice in the matter, might as well allow

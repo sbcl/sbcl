@@ -28,7 +28,7 @@ run_sbcl <<EOF
     (:generic-function-class subgf)
     (:method ((self integer)) 'hey-integer))
   (defun assign-layout ()
-    #+gencgc (setf (extern-alien "verify_gens" char) 0)
+    #+generational (setf (extern-alien "verify_gens" char) 0)
     (defclass subgf (standard-generic-function) (a b) ; add a slot
       (:metaclass sb-mop:funcallable-standard-class))
     (defclass subgf (standard-generic-function) (a) ; remove a slot

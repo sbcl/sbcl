@@ -97,7 +97,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool ignore_c
     lispobj* limit = (lispobj*)end;
     lispobj namelen = make_fixnum(strlen(name));
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     // This function was never safe to use on pages that were dirtied with unboxed words.
     // It has become even less safe now that don't prezero most pages during GC,
     // because we will certainly encounter remnants of forwarding pointers etc.

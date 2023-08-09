@@ -297,7 +297,7 @@ We could try a few things to mitigate this:
              (let ((start (%make-lisp-obj (+ static-space-start static-space-objects-offset)))
                    (end (%make-lisp-obj (sap-int *static-space-free-pointer*))))
                (map-objects-in-range fun start end)))
-            ((:read-only #-gencgc :dynamic)
+            ((:read-only)
              ;; Read-only space (and dynamic space on cheneygc) is a block
              ;; of contiguous allocations.
              (multiple-value-bind (start end) (%space-bounds space)
@@ -313,8 +313,7 @@ We could try a few things to mitigate this:
                (map-immobile-objects #'filter :fixed))))))
     (do-rest-arg ((space) spaces)
       (if (eq space :dynamic)
-          (without-gcing #+cheneygc (do-1-space space)
-                         #+gencgc (walk-dynamic-space fun #b1111111 0 0))
+          (without-gcing (walk-dynamic-space fun #b1111111 0 0))
           (do-1-space space)))))
 
 ;;; Using the mask bits you can make many different match conditions resulting
@@ -326,7 +325,6 @@ We could try a few things to mitigate this:
 ;;; and free_pages_lock, that this can be made reliable (both crash-free and
 ;;; guaranteed to visit all chosen objects) despite other threads running.
 ;;; As things are it is only "maybe" reliable, regardless of the parameters.
-#+gencgc
 (defun walk-dynamic-space (fun generation-mask
                                page-type-mask page-type-constraint)
   (declare (function fun)
@@ -405,7 +403,7 @@ We could try a few things to mitigate this:
 ;; Moreover it's probably not safe in the least to walk any thread's
 ;; allocation region, unless the observer and observed aren't consing.
 (defun close-thread-alloc-region ()
-  #+gencgc (alien-funcall (extern-alien "close_current_thread_tlab" (function void)))
+  (alien-funcall (extern-alien "close_current_thread_tlab" (function void)))
   nil)
 
 ;;;; MEMORY-USAGE
@@ -1187,7 +1185,6 @@ We could try a few things to mitigate this:
 ;;; Show objects in a much simpler way than print-allocated-objects.
 ;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.
 ;;; (And this is removed from the image; it's meant for developers)
-#+gencgc
 (defun show-generation-objs (gen space)
   (let ((*print-pretty* nil))
     (map-allocated-objects
@@ -1199,7 +1196,6 @@ We could try a few things to mitigate this:
 
 ;;; Unfortunately this is a near total copy of the test in gc.impure.lisp
 (defun !ensure-genesis-code/data-separation ()
-  #+gencgc
   (let* ((n-bits
           (progn
             (close-thread-alloc-region)
@@ -1281,7 +1277,6 @@ We could try a few things to mitigate this:
         (format t "~5d = ~s~%" n x)
         (setq prev n)))))
 
-#+gencgc
 (flet ((print-it (obj type size)
          (declare (ignore type size))
          (let ((*print-level* 2) (*print-lines* 1))

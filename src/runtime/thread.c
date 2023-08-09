@@ -1023,7 +1023,7 @@ alloc_thread_struct(void* spaces) {
 
 #ifdef HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT
     memset(&th->pseudo_atomic_bits, 0, sizeof th->pseudo_atomic_bits);
-#elif defined LISP_FEATURE_GENCGC
+#elif defined LISP_FEATURE_GENERATIONAL
     clear_pseudo_atomic_atomic(th);
     clear_pseudo_atomic_interrupted(th);
 #endif

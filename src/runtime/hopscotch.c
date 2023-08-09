@@ -46,7 +46,7 @@ void hopscotch_integrity_check(tableptr,char*,int);
 /// If a specific function has been set, then use that.
 static inline uint32_t hash(tableptr ht, lispobj x) {
     return ht->hash ? ht->hash(x) :
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
       (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
 #else
       (x >> (1+WORD_SHIFT));

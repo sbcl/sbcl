@@ -765,7 +765,7 @@
   (assert-no-consing (make-array-on-stack-11)))
 
 (with-test (:name (:no-consing :dx-raw-instances)
-            :skipped-on (not (and :gencgc :c-stack-is-control-stack)))
+            :skipped-on (not (and :generational :c-stack-is-control-stack)))
   (let (a b)
     (setf a 1.24 b 1.23d0)
     (assert-no-consing (make-foo2-on-stack a b)))
@@ -1429,7 +1429,6 @@
   (assert-no-consing (autodxclosure1 42))
   (assert-no-consing (autodxclosure2)))
 
-#+gencgc
 (with-test (:name (:no-consing :more-auto-dx-closures))
   (assert-no-consing
    (let ((ct 0))

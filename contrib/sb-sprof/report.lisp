@@ -6,9 +6,9 @@
 (in-package #:sb-sprof)
 
 (defconstant +alloc-region-size+
-  #-gencgc
+  #-generational
   sb-c:+backend-page-bytes+
-  #+gencgc
+  #+generational
   (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-page-bytes))
 
 (deftype report-type ()

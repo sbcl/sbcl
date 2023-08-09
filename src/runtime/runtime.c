@@ -665,7 +665,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     /* Align down to multiple of page_table page size, and to the appropriate
      * stack alignment. */
     dynamic_space_size &= ~(sword_t)(BACKEND_PAGE_BYTES-1);
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     dynamic_space_size &= ~(sword_t)(GENCGC_PAGE_BYTES-1);
 #endif
     thread_control_stack_size &= ~(sword_t)(CONTROL_STACK_ALIGNMENT_BYTES-1);

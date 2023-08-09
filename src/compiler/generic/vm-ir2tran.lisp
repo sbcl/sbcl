@@ -29,7 +29,7 @@
 
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
   (eq dx 'truly-dynamic-extent))
-#+(and gencgc c-stack-is-control-stack)
+#+c-stack-is-control-stack
 (defoptimizer (%make-instance/mixed stack-allocate-result) ((n) node dx)
   (eq dx 'truly-dynamic-extent))
 (defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)

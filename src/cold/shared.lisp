@@ -289,6 +289,8 @@
              (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
                           sb-xc:*features*))
              (arch (target-platform-keyword)))
+        (when (eq gc :gencgc)
+          (pushnew :generational sb-xc:*features*))
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         ;; Futexes aren't available in all macos versions, but they are available in
         ;; all versions that support arm, so always enable them there

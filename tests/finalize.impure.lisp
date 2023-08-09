@@ -80,7 +80,6 @@
     (sb-impl::run-pending-finalizers))
   ;; expect that 97% of the finalizers ran
   (assert (>= *count* (* *n-finalized-things* 97/100)))
-  #+gencgc
   (unless (= *count* *n-finalized-things*)
     ;; show how the junk was reachable
     (search-roots *weak-pointers* :print :verbose)))

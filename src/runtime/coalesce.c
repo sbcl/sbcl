@@ -32,7 +32,7 @@ static bool gcable_pointer_p(lispobj pointer)
    return pointer >= (lispobj)current_dynamic_space
        && pointer < (lispobj)get_alloc_pointer();
 #endif
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
    return find_page_index((void*)pointer) >= 0 || immobile_space_p(pointer);
 #endif
 }
@@ -210,7 +210,7 @@ void coalesce_similar_objects()
     coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);
     coalesce_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, arg);
 #endif
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     walk_generation(coalesce_range, -1, arg);
 #else
     coalesce_range(current_dynamic_space, get_alloc_pointer(), arg);

@@ -217,6 +217,7 @@
       sb-ext:*gc-real-time*
       sb-kernel::*gc-epoch*
       sb-int:*n-bytes-freed-or-purified*
+      ,(maybe "SB-APROF" "*ALLOCATION-PROFILE-METADATA*")
       ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")
       ,(maybe "SB-VM" "*CONTROL-STACK-POINTER*")
       ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")

@@ -15,12 +15,7 @@
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
-  #+gencgc
-  (extern-alien "bytes_allocated" os-vm-size-t)
-  #-gencgc
-  (truly-the word
-             (- (sap-int (sb-c::dynamic-space-free-pointer))
-                sb-vm:dynamic-space-start)))
+  (extern-alien "bytes_allocated" os-vm-size-t))
 
 (defun static-space-usage ()
   (- (sap-int sb-vm:*static-space-free-pointer*) sb-vm:static-space-start))
@@ -292,7 +287,6 @@ run in any thread.")
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)
-  #+gencgc
   "Initiate a garbage collection.
 
 The default is to initiate a nursery collection, which may in turn
@@ -302,26 +296,14 @@ used to specify the oldest generation guaranteed to be collected.
 
 On CheneyGC platforms arguments FULL and GEN take no effect: a full
 collection is always performed."
-  #-gencgc
-  "Initiate a garbage collection.
-
-The collection is always a full collection.
-
-Arguments FULL and GEN can be used for compatibility with GENCGC
-platforms: there the default is to initiate a nursery collection,
-which may in turn trigger a collection of one or more older
-generations as well. If FULL is true, all generations are collected.
-If GEN is provided, it can be used to specify the oldest generation
-guaranteed to be collected."
-  #-gencgc (declare (ignore full))
-  (let (#+gencgc (gen (if full sb-vm:+pseudo-static-generation+ gen)))
+  (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
     (when (eq t (sub-gc gen))
       (post-gc))))
 
 (define-alien-routine scrub-control-stack void)
 
 (defun unsafe-clear-roots (gen)
-  #-gencgc (declare (ignore gen))
+  (declare (ignorable gen))
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
   ;; as having these cons more than we have space left leads to huge
   ;; badness.
@@ -330,7 +312,6 @@ guaranteed to be collected."
   ;; removes duplicate entries.
   (scrub-power-cache)
   ;; Clear caches depending on the generation being collected.
-  #+gencgc
   (cond ((eql 0 gen)
          ;; Drop strings because the hash is pointer-hash
          ;; but there is no automatic cache rehashing after GC.
@@ -338,9 +319,7 @@ guaranteed to be collected."
         ((eql 1 gen)
          (sb-format::tokenize-control-string-cache-clear))
         (t
-         (drop-all-hash-caches)))
-  #-gencgc
-  (drop-all-hash-caches))
+         (drop-all-hash-caches))))
 
 ;;;; auxiliary functions
 

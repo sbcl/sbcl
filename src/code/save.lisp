@@ -17,7 +17,7 @@
 
 ;;;; SAVE-LISP-AND-DIE itself
 
-#-gencgc
+#+cheneygc
 (define-alien-routine "save" (boolean)
   (file c-string)
   (initial-fun (unsigned #.sb-vm:n-word-bits))
@@ -27,7 +27,6 @@
   (compression-level int)
   (application-type int))
 
-#+gencgc
 (define-alien-routine "gc_and_save" void
   (file c-string)
   (prepend-runtime int)
@@ -37,7 +36,6 @@
   (compression-level int)
   (application-type int))
 
-#+gencgc
 (define-alien-variable "lisp_init_function" (unsigned #.sb-vm:n-machine-word-bits))
 
 (define-condition save-condition (reference-condition)
@@ -203,7 +201,6 @@ This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
-  #+gencgc
   (declare (ignorable root-structures))
   (when (and callable-exports toplevel-supplied)
     (error ":TOPLEVEL cannot be supplied when there are callable exports."))
@@ -232,7 +229,7 @@ sufficiently motivated to do lengthy fixes."
                                      :as-file t))
             (startfun (start-lisp toplevel callable-exports)))
         (deinit)
-        #+gencgc
+        #+generational
         (progn
           ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
           ;; prior causes compilation to occur into immobile space.
@@ -262,7 +259,7 @@ sufficiently motivated to do lengthy fixes."
                        #+win32 (ecase application-type (:console 0) (:gui 1))
                        #-win32 0)
           (setf lisp-init-function 0)) ; only reach here on save error
-        #-gencgc
+        #-generational
         (progn
           ;; Coalescing after GC will do no good - the un-needed dups
           ;; of things won't actually go away. Do it before.
@@ -288,7 +285,7 @@ sufficiently motivated to do lengthy fixes."
 (defun tune-image-for-dump ()
   ;; C code will GC again (nonconservatively if pertinent), but the coalescing
   ;; steps done below will be more efficient if some junk is removed now.
-  #+gencgc (gc :full t)
+  (gc :full t)
 
   ;; Share EQUALP FUN-INFOs
   (let ((ht (make-hash-table :test 'equalp)))

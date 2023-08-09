@@ -497,7 +497,7 @@ dump_cmd(char **ptr)
                    visible(cptr[0]), visible(cptr[1]),
                    visible(cptr[2]), visible(cptr[3]));
 #endif
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
             if (aligned) {
                 lispobj ptr = *(lispobj*)addr;
                 int gen;
@@ -566,16 +566,12 @@ regs_cmd(char __attribute__((unused)) **ptr)
     printf("\n");
 #endif
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     /* printf("DYNAMIC\t=\t%p\n", (void*)DYNAMIC_SPACE_START); */
 #else
     printf("STATIC\t=\t%p   ", static_space_free_pointer);
     printf("RDONLY\t=\t%p   ", read_only_space_free_pointer);
     printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
-#endif
-
-#ifndef LISP_FEATURE_GENCGC
-    printf("TRIGGER\t=\t%p\n", (void*)current_auto_gc_trigger);
 #endif
     return 0;
 }

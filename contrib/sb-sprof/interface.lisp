@@ -148,7 +148,7 @@ The following keyword args are recognized:
   (declare (type (real (0)) sample-interval))
   (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
   (when max-depth (warn "MAX-DEPTH is ignored"))
-  #-gencgc
+  #-generational
   (when (eq mode :alloc)
     (error "Allocation profiling is only supported for builds using the generational garbage collector."))
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))

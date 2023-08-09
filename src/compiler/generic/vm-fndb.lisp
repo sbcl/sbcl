@@ -162,7 +162,7 @@
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
 
-#+gencgc
+#+generational
 (defknown generation-of (t) (or (signed-byte 8) null) (flushable))
 
 ;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
