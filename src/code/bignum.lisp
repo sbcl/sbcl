@@ -1248,10 +1248,30 @@
 
 ;;;; float conversion
 
+;;; Return T if the least significant N-BITS bits of BIGNUM are all
+;;; zero, else NIL. If the integer-length of BIGNUM is less than N-BITS,
+;;; the result is NIL, too.
+(declaim (inline bignum-lower-bits-zero-p))
+(defun bignum-lower-bits-zero-p (bignum n-bits)
+  (declare (type bignum bignum)
+           (type bit-index n-bits))
+  (multiple-value-bind (n-full-digits n-bits-partial-digit)
+      (floor n-bits digit-size)
+    (declare (type bignum-length n-full-digits))
+    (when (> (%bignum-length bignum) n-full-digits)
+      (dotimes (index n-full-digits)
+        (declare (type bignum-index index))
+        (unless (zerop (%bignum-ref bignum index))
+          (return-from bignum-lower-bits-zero-p nil)))
+      (zerop (logand (1- (ash 1 n-bits-partial-digit))
+                     (%bignum-ref bignum n-full-digits))))))
+
 ;;; Make a single or double float with the specified significand,
 ;;; exponent and sign.
 ;;; FIXME: how are these not the same as {SINGLE,DOUBLE}-FROM-BITS ???
+#-64-bit
 (declaim (inline single-float-from-bits double-float-from-bits))
+#-64-bit
 (defun single-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"
@@ -1265,6 +1285,7 @@
      (if plusp
          res
          (logior res (ash -1 sb-vm:float-sign-shift))))))
+#-64-bit
 (defun double-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"
@@ -1292,6 +1313,7 @@
 
 ;;; Convert Bignum to a float in the specified Format, rounding to the best
 ;;; approximation.
+#-64-bit
 (macrolet ((def (type)
              `(defun ,(symbolicate 'bignum-to- type) (bignum)
                (let* ((plusp (bignum-plus-p bignum))
@@ -1359,6 +1381,59 @@
                      ;; Otherwise, round up.
                      (t
                       (round-up))))))))
+  (def single-float)
+  (def double-float))
+
+#+64-bit
+(macrolet
+    ((def (type)
+       (flet ((const (name)
+                ;; The constants are for hi and low bits,
+                ;; which should probably be changed
+                (or (and (eq type 'double-float)
+                         (case name
+                           (significand-byte '(byte 52 0))
+                           (exponent-byte '(byte 11 52))))
+                    (package-symbolicate :sb-vm type '- name))))
+         `(defun ,(symbolicate 'bignum-to- type) (bignum)
+            (let* ((plusp (bignum-plus-p bignum))
+                   (sign 0)
+                   (abs-bignum (cond (plusp
+                                      bignum)
+                                     (t
+                                      (setf sign (dpb 0 (byte (+ (byte-size ,(const 'exponent-byte))
+                                                                 (byte-position ,(const 'exponent-byte))) 0) ;; 32/64
+                                                      -1))
+                                      (negate-bignum bignum))))
+                   (length (truly-the bignum-length (bignum-integer-length abs-bignum)))
+                   (shift (- length ,(const 'digits)))
+                   ;; Get one more bit for rounding
+                   (shifted (truly-the fixnum
+                                       (last-bignum-part=>fixnum (1- shift) abs-bignum)))
+                   ;; Cut off the hidden bit
+                   (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
+                   (exp (truly-the (unsigned-byte ,(byte-size sb-vm:double-float-exponent-byte))
+                                   (+ ,(const 'bias) length)))
+                   (bits (ash exp
+                              (byte-position ,(const 'exponent-byte)))))
+
+              (when (and (logtest shifted 1)
+                         (or (logtest signif 1)
+                             (not (bignum-lower-bits-zero-p abs-bignum shift))))
+                ;; Round up
+                (incf signif))
+              ;; If rounding up overflows this will increase the exponent too
+              (let ((bits (+ bits signif)))
+                (when (or (> exp ,(const 'normal-exponent-max))
+                          ;; Overflow after rounding up
+                          (= bits (,(const 'bits) ,(const 'positive-infinity))))
+                  (error 'floating-point-overflow
+                         :operation 'float
+                         :operands (list bignum ',type)))
+                (,(case type
+                    (single-float 'make-single-float)
+                    (double-float '%make-double-float))
+                 (logior sign bits))))))))
   (def single-float)
   (def double-float))
 
@@ -2068,24 +2143,6 @@
   (clear-info :function :inlinep s)
   (clear-info :source-location :declaration s))
 
-;;; Return T if the least significant N-BITS bits of BIGNUM are all
-;;; zero, else NIL. If the integer-length of BIGNUM is less than N-BITS,
-;;; the result is NIL, too.
-(declaim (inline bignum-lower-bits-zero-p))
-(defun bignum-lower-bits-zero-p (bignum n-bits)
-  (declare (type bignum bignum)
-           (type bit-index n-bits))
-  (multiple-value-bind (n-full-digits n-bits-partial-digit)
-      (floor n-bits digit-size)
-    (declare (type bignum-length n-full-digits))
-    (when (> (%bignum-length bignum) n-full-digits)
-      (dotimes (index n-full-digits)
-        (declare (type bignum-index index))
-        (unless (zerop (%bignum-ref bignum index))
-          (return-from bignum-lower-bits-zero-p nil)))
-      (zerop (logand (1- (ash 1 n-bits-partial-digit))
-                     (%bignum-ref bignum n-full-digits))))))
-
 #|
 (let (code-components)
   (do-symbols (s 'sb-bignum)
