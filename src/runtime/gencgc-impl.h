@@ -309,15 +309,6 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
 extern void gc_close_collector_regions(int);
 
-/* The various sorts of pointer swizzling in SBCL. */
-enum source {
-  SOURCE_NORMAL,
-  SOURCE_ZERO_TAG,              /* code, lflist */
-  SOURCE_CLOSURE,
-  SOURCE_SYMBOL_NAME,
-  SOURCE_FDEFN_RAW
-};
-
 void *collector_alloc_fallback(struct alloc_region*,sword_t,int);
 static inline void* __attribute__((unused))
 gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
