@@ -52,7 +52,6 @@
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "genesis/brothertree.h"
-#include "forwarding-ptr.h"
 #include "var-io.h"
 
 /* forward declarations */

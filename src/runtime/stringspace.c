@@ -17,7 +17,6 @@
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
 #include "globals.h"
-#include "forwarding-ptr.h"
 #include "validate.h"
 #include <stdio.h>
 #include <stdlib.h>

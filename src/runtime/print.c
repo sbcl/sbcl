@@ -827,7 +827,6 @@ void brief_print(lispobj obj)
 // and return a Lisp string, are designed to be foolproof during GC,
 // hence all the forwarding checks.
 
-#include "forwarding-ptr.h"
 struct vector * symbol_name(struct symbol* sym)
 {
   if (forwarding_pointer_p((lispobj*)sym))

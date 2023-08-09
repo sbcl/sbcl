@@ -45,7 +45,6 @@
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"
 #include "genesis/split-ordered-list.h"
-#include "forwarding-ptr.h"
 #include "var-io.h"
 #include "search.h"
 #include "murmur_hash.h"
@@ -1287,34 +1286,10 @@ void smash_weak_pointers(void)
 struct hash_table *weak_hash_tables = NULL;
 struct hopscotch_table weak_objects; // other than weak pointers
 
-/* Return true if OBJ has already survived the current GC. */
-static inline bool pointer_survived_gc_yet(lispobj obj)
-{
-#ifdef LISP_FEATURE_CHENEYGC
-    // This is the most straightforward definition.
-    return (!from_space_p(obj) || forwarding_pointer_p(native_pointer(obj)));
-#else
-    /* Check for a pointer to dynamic space before considering immobile space.
-       Based on the relative size of the spaces, this should be a win because
-       if the object is in the dynamic space and not the 'from' generation
-       we don't want to test immobile_space_p() at all.
-       Additionally, pinned_p() is both more expensive and less likely than
-       forwarding_pointer_p(), so we want to reverse those conditions, which
-       would not be possible with pinned_p() buried inside from_space_p(). */
-    page_index_t page_index = find_page_index((void*)obj);
-    if (page_index >= 0)
-        return page_table[page_index].gen != from_space ||
-               forwarding_pointer_p(native_pointer(obj)) ||
-               pinned_p(obj, page_index);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (immobile_space_p(obj))
-        return immobile_obj_gen_bits(base_pointer(obj)) != from_space;
-#endif
-    return 1;
-#endif
-}
-
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME weak_ht_alivep_funs
+static inline bool pointer_survived_gc_yet(lispobj obj) {
+    return taggedptr_alivep_impl(obj);
+}
 #include "weak-hash-pred.inc"
 
 /* Return the beginning of data in ARRAY (skipping the header and the

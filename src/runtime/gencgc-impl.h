@@ -300,8 +300,8 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
                             (void*)(1+((lispobj)pointer | LOWTAG_MASK)));
 }
 
-#ifdef LISP_FEATURE_X86
 #include "code.h"
+#ifdef LISP_FEATURE_X86
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #else
 #define gencgc_apply_code_fixups(ignore1,ignore2)
@@ -860,3 +860,29 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
                 generation_index_t generation, uword_t extra);
 
 generation_index_t gc_gen_of(lispobj obj, int defaultval);
+
+#include "forwarding-ptr.inc"
+
+/* Return true if OBJ has already survived the current GC.
+ * This is actually a lot of code, but the C compiler may choose to
+ * inline because it's static. "unused" since not all includers need it */
+__attribute__((unused)) static bool taggedptr_alivep_impl(lispobj obj)
+{
+    /* Check for a pointer to dynamic space before considering immobile space.
+       Based on the relative size of the spaces, this should be a win because
+       if the object is in the dynamic space and not the 'from' generation
+       we don't want to test immobile_space_p() at all.
+       Additionally, pinned_p() is both more expensive and less likely than
+       forwarding_pointer_p(), so we want to reverse those conditions, which
+       would not be possible with pinned_p() buried inside from_space_p(). */
+    page_index_t page_index = find_page_index((void*)obj);
+    if (page_index >= 0)
+        return page_table[page_index].gen != from_space ||
+               forwarding_pointer_p(native_pointer(obj)) ||
+               pinned_p(obj, page_index);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p(obj))
+        return immobile_obj_gen_bits(base_pointer(obj)) != from_space;
+#endif
+    return 1;
+}

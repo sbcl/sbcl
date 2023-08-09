@@ -1,14 +1,3 @@
-#ifndef _FORWARDING_PTR_H_
-#define _FORWARDING_PTR_H_
-
-#include <stdbool.h>
-#ifndef LISP_FEATURE_GENCGC
-inline static bool
-in_gc_p(void) {
-    return current_dynamic_space == from_space;
-}
-#endif
-
 #define FORWARDING_HEADER 1
 
 inline static bool
@@ -25,11 +14,7 @@ forwarding_pointer_p(lispobj *pointer) {
 
 static inline lispobj
 forwarding_pointer_value(lispobj *pointer) {
-#ifdef LISP_FEATURE_GENCGC
     return pointer[1];
-#else
-    return pointer[0];
-#endif
 }
 static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) {
   // The object at 'addr' might already have been forwarded,
@@ -71,5 +56,3 @@ static inline lispobj follow_fp(lispobj ptr)
   return forwarding_pointer_p(native_pointer(ptr))
       ? forwarding_pointer_value(native_pointer(ptr)) : ptr;
 }
-
-#endif

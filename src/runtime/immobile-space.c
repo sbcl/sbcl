@@ -47,7 +47,6 @@
 
 #include "code.h"
 #include "core.h" // for CORE_PAGE_GENERATION
-#include "forwarding-ptr.h"
 #include "gc.h"
 #include "genesis/brothertree.h"
 #include "genesis/cons.h"

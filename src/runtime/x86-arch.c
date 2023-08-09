@@ -23,7 +23,7 @@
 #include "breakpoint.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
-#include "forwarding-ptr.h"
+#include "gc.h"
 #include "var-io.h"
 #include "code.h"
 #include "unaligned.h"

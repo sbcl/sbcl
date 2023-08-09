@@ -23,7 +23,6 @@
 #include "genesis/package.h"
 #include "genesis/split-ordered-list.h"
 #include "genesis/brothertree.h"
-#include "forwarding-ptr.h"
 
 lispobj *
 search_read_only_space(void *pointer)

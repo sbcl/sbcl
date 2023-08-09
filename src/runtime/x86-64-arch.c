@@ -33,7 +33,6 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
-#include "forwarding-ptr.h"
 #include "core.h"
 #include "gc.h"
 
