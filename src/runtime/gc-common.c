@@ -2639,12 +2639,6 @@ static inline int dummy_node_p(so_node* node) {
     return (node->hash & make_fixnum(1)) == 0;
 }
 
-static inline bool lispobj_livep(lispobj obj_base) {
-    extern bool fullcgc_lispobj_livep(lispobj);
-    lispobj obj = compute_lispobj((lispobj*)obj_base);
-    return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
-}
-
 static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
 {
     struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
@@ -2668,16 +2662,18 @@ static void push_in_alist(struct symbol* list_holder, lispobj key, lispobj val)
 }
 
 /* Scan the finalizer table and take action on each node as follows:
- * - dummy nodes are ignored
- * - nodes marked for deletion (by CANCEL-FINALIZATION) are culled
- * - transported keys are moved to the "rehash" list
- * - dead keys are moved to the "triggered" list
- * - all other live keys are left alone
+ * - nodes already marked for deletion, and dummy nodes, are ignored
+ * - transported keys are moved to the "rehash" list and then logically deleted
+ * - dead keys are moved to the "triggered" list and then logically deleted
  */
+static inline bool obj_alivep(lispobj* obj_base) {
+    extern bool fullcgc_lispobj_livep(lispobj);
+    lispobj obj = compute_lispobj(obj_base);
+    return compacting_p() ? pointer_survived_gc_yet(obj) : fullcgc_lispobj_livep(obj);
+}
+
 void scan_finalizers()
 {
-    // NOTE: we do NOT need to invoke notice_pointer_store() on the global values
-    // of REHASHLIST or TRIGGERED because those are static symbols.
     lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
     gc_assert(lowtag_of(finalizer_store) == INSTANCE_POINTER_LOWTAG);
     struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
@@ -2705,7 +2701,7 @@ void scan_finalizers()
             // FIXME: use sync_fetch_and_and or does it not matter since world is stopped?
             this->lfnode._node_next = next & ~LOWTAG_MASK; // logically delete
             --solist->uw_count;
-        } else if (!lispobj_livep(this->key)) {
+        } else if (!obj_alivep((lispobj*)this->key)) {
             push_in_ordinary_list(SYMBOL(FINALIZERS_TRIGGERED), this->data);
             this->key = 0; // clobber dangling reference
             // ditto
