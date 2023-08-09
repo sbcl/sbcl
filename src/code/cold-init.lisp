@@ -149,10 +149,7 @@
   ;; debugging.
   (show-and-call !format-cold-init)
   (unless (!c-runtime-noinform-p)
-    ;; I'd like FORMAT to remain working in cold-init, where it does work,
-    ;; hence the conditional.
-    #+(or x86 x86-64) (format t "COLD-INIT... ")
-    #-(or x86 x86-64) (write-string "COLD-INIT... "))
+    (write-string "COLD-INIT... "))
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
@@ -219,8 +216,7 @@
   (show-and-call sb-kernel::!set-up-structure-object-class)
 
   (unless (!c-runtime-noinform-p)
-    #+(or x86 x86-64) (format t "[Length(TLFs)=~D]" (length *!cold-toplevels*))
-    #-(or x86 x86-64) (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil))
+    (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil))
 
   (setq sb-pcl::*!docstrings* nil) ; needed before any documentation is set
   (setq sb-c::*queued-proclaims* nil) ; needed before any proclaims are run
