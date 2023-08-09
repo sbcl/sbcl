@@ -41,6 +41,7 @@
 
 #elif defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 \
   || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_RISCV
+#include "thread.h" // for SymbolValue
 
 /* These architectures use a thread slot if #+sb-thread,
  * or else two static symbols if #-sb-thread.
