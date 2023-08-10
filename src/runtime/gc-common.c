@@ -1879,11 +1879,6 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
         hopscotch_reset(&weak_objects);
     // Close the region used when pushing into hash_table->smashed_cells
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
-#ifdef LISP_FEATURE_MARK_REGION_GC
-    /* cull_weak_hash_table_bucket may have logged some more pointers,
-     * so commit them now. */
-    commit_thread_local_remset();
-#endif
 }
 
 

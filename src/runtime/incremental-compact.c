@@ -12,6 +12,7 @@
 #include "incremental-compact.h"
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
+#include "mark-region.h"
 
 #include "genesis/closure.h"
 #include "genesis/gc-tables.h"
@@ -115,16 +116,16 @@ static inline enum source source_from_tagged(lispobj t) { return t & 7; }
 static inline lispobj *slot_from_tagged(lispobj t) { return (lispobj*)(t &~ 7); }
 /* Each tracing thread records sources into thread-local blocks, like they
  * do with grey objects. */
-static _Thread_local struct Qblock *remset_block = NULL;
+static _Thread_local struct Qblock *output_block = NULL;
 
 void commit_thread_local_remset() {
-  if (remset_block && remset_block->count) {
+  if (output_block && output_block->count) {
     acquire_lock(&remset_lock);
-    remset_block->next = remset;
-    remset = remset_block;
-    remset_block = NULL;
+    output_block->next = remset;
+    remset = output_block;
     release_lock(&remset_lock);
   }
+  output_block = NULL;
 }
 
 /* We need to know which object a slot resides in for two reasons:
@@ -137,13 +138,12 @@ void commit_thread_local_remset() {
  * prefer not to.
  */
 void log_relevant_slot(lispobj *slot, lispobj *source, enum source source_type) {
-  if (!remset_block || remset_block->count == QBLOCK_CAPACITY) {
+  if (!output_block || output_block->count == QBLOCK_CAPACITY) {
     commit_thread_local_remset();
-    remset_block = suballoc_allocate(&remset_suballocator);
+    output_block = suballoc_allocate(&remset_suballocator);
   }
-  remset_block->elements[remset_block->count] = tag_source(slot, source_type);
-  remset_block->elements[remset_block->count+1] = (lispobj)source;
-  remset_block->count += 2;
+  output_block->elements[output_block->count++] = tag_source(slot, source_type);
+  output_block->elements[output_block->count++] = (lispobj)source;
 }
 
 /* Compacting */
@@ -162,22 +162,20 @@ static void move_objects() {
    * But early experiements in parallel copying suggested we're bottlenecked
    * by refilling TLABs too. */
   uword_t pages_moved = 0;
+  unsigned char *allocation = (unsigned char*)allocation_bitmap;
   for (page_index_t p = 0; p < page_table_pages; p++)
     // What's wrong with testing page_single_obj_p in pick_targets?
     if (target_pages[p] && !page_single_obj_p(p)) {
       pages_moved++;
-      lispobj *end = (lispobj*)page_address(p + 1);
-      /* Move every object in this page in the right generation. */
-      for (lispobj *where = next_object((lispobj*)page_address(p), 0, end);
-           where;
-           /* We install forwarding pointers, so we'll conservatively assume
-            * the object is at least two words large. */
-           where = next_object(where, 2, end)) {
-        if (gc_gen_of((lispobj)where, -1) == target_generation) {
-          lispobj bogus = compute_lispobj(where);
-          scavenge(&bogus, 1);
-        }
-      }
+      /* Move every object in the right generation in this page. */
+      for_lines_in_page (l, p)
+        if (line_bytemap[l] && DECODE_GEN(line_bytemap[l]) == target_generation)
+          for (int i = 0; i < 8; i++)
+            if (allocation[l] & (1 << i)) {
+              lispobj *where = (lispobj*)line_address(l) + 2 * i;
+              lispobj bogus = compute_lispobj(where);
+              scavenge(&bogus, 1);
+            }
       /* Free all lines we just copied from. */
       uword_t decrement = 0;
       char *allocation = (char*)allocation_bitmap;

@@ -7,15 +7,14 @@
 
 static unsigned int gc_threads;
 static pthread_t *threads;
-static os_sem_t start_semaphore;
+static os_sem_t *start_semaphores;
 static os_sem_t join_semaphore;
-static int semaphores_initializedp;
 static void (*action)(void);
 
-static void *worker(void *nothing) {
-  (void)nothing;
+static void *worker(void *index) {
+  uword_t i = (uword_t)index;
   while (1) {
-    os_sem_wait(&start_semaphore);
+    os_sem_wait(start_semaphores + i);
     action();
     os_sem_post(&join_semaphore);
   }
@@ -23,12 +22,6 @@ static void *worker(void *nothing) {
 }
 
 void thread_pool_init() {
-  if (!semaphores_initializedp) {
-      os_sem_init(&start_semaphore, 0);
-      os_sem_init(&join_semaphore, 0);
-      semaphores_initializedp = 1;
-  }
-
   char *str = getenv("GC_THREADS"), *tail;
   if (str == NULL) {
     gc_threads = 3;
@@ -37,11 +30,18 @@ void thread_pool_init() {
     if (tail == str || parse >= 256) lose("%s isn't a number of GC threads", str);
     gc_threads = parse;
   }
-  threads = successful_malloc(sizeof(pthread_t) * gc_threads);
 
-  for (unsigned int i = 0; i < gc_threads; i++)
-    if (pthread_create(threads + i, NULL, worker, NULL))
-      lose("Failed to create GC thread #%d", i);
+  if (!start_semaphores) {
+    start_semaphores = successful_malloc(sizeof(sem_t) * gc_threads);
+    for (unsigned int i = 0; i < gc_threads; i++)
+      os_sem_init(start_semaphores + i, 0);
+    os_sem_init(&join_semaphore, 0);
+  }
+
+  threads = successful_malloc(sizeof(pthread_t) * gc_threads);
+  for (uword_t i = 0; i < gc_threads; i++)
+    if (pthread_create(threads + i, NULL, worker, (void*)i))
+      lose("Failed to create GC thread #%ld", i);
     else {
 #ifdef LISP_FEATURE_LINUX
       pthread_setname_np(threads[i], "Parallel GC");
@@ -50,7 +50,7 @@ void thread_pool_init() {
 }
 
 static void wake_gc_threads() {
-  for (unsigned int i = 0; i < gc_threads; i++) os_sem_post(&start_semaphore);
+  for (unsigned int i = 0; i < gc_threads; i++) os_sem_post(start_semaphores + i);
 }
 
 static void join_gc_threads() {
