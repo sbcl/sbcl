@@ -273,6 +273,13 @@
 (defstruct page
   (type nil :type (member nil :code :list :mixed))
   (words-used 0)
+  (allocation-bitmap
+   (make-array (/ sb-vm:gencgc-page-bytes
+                  (ash 1 sb-vm:n-lowtag-bits)
+                  sb-vm:n-word-bits)
+               :element-type 'sb-vm:word
+               :initial-element 0))
+  single-object-p
   scan-start) ; byte offset from base of the space
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
@@ -463,11 +470,24 @@
                (unless (> (length (gspace-page-table gspace)) end-page)
                  (adjust-array (gspace-page-table gspace) (1+ end-page)
                                :initial-element nil))
+               #+mark-region-gc
+               (when (> end-page start-page)
+                 (assert (alignedp start-word-index)))
                (loop for page-index from start-page to end-page
                      for pte = (pte page-index)
                      do (if (null (page-type pte))
                             (setf (page-type pte) page-type)
                             (aver (eq (page-type pte) page-type))))))
+           (mark-allocation (start-word-index)
+             ;; Mark the start of the object for mark-region GC.
+             (let* ((start-page (page-index start-word-index))
+                    (pte (pte start-page))
+                    (word-in-page (mod start-word-index words-per-page)))
+               (multiple-value-bind (word-index bit-index)
+                   (floor (floor word-in-page 2) sb-vm:n-word-bits)
+                 (setf (ldb (byte 1 bit-index)
+                            (aref (page-allocation-bitmap pte) word-index))
+                       1))))
            (note-words-used (start-word-index)
              (let* ((start-page (page-index start-word-index))
                     (end-word-index (+ start-word-index n-words))
@@ -483,11 +503,12 @@
                (loop for index from start-page to end-page
                      do (let ((pte (pte index)))
                           (unless (page-scan-start pte)
-                            (setf (page-scan-start pte) start-word-index)))))
+                            (setf (page-scan-start pte) start-word-index
+                                  (page-single-object-p pte) (>= n-words words-per-page))))))
              start-word-index)
            (get-frontier-page-type ()
              (page-type (pte (page-index (1- (gspace-free-word-index gspace))))))
-           (realign-frontier ()
+           (realign-frontier (&key (keep-hole t))
              ;; Align the frontier to a page, putting the empty space onto a free list
              (let* ((free-ptr (gspace-free-word-index gspace))
                     (avail (- (align-up free-ptr words-per-page) free-ptr))
@@ -497,7 +518,7 @@
                (aver (= word-index free-ptr))
                (aver (alignedp (gspace-free-word-index gspace)))
                (aver (= (gspace-free-word-index gspace) (+ free-ptr avail)))
-               (when (>= avail min-usable-hole-size)
+               (when (and (>= avail min-usable-hole-size) keep-hole)
                  ;; allocator is first-fit; space goes to the tail of the other freelist.
                  (nconc (ecase other-type
                           (:code  (gspace-code-free-ranges gspace))
@@ -519,6 +540,7 @@
                                                    sb-vm:cons-size))))))))
              (result (car region)))
         (incf (page-words-used (pte (page-index result))) sb-vm:cons-size)
+        (mark-allocation result)
         (when (= (incf (car region) sb-vm:cons-size) (cdr region))
           (setf (gspace-cons-region gspace) nil))
         (return-from dynamic-space-claim-n-words result)))
@@ -532,13 +554,30 @@
           (if (< (decf (cdr found) n-words) min-usable-hole-size) ; discard this hole now?
               (rplacd holder (delete found (cdr holder) :count 1)) ; yup
               (incf (car found) n-words))
+          (mark-allocation word-index)
           (return-from dynamic-space-claim-n-words (note-words-used word-index))))
       ;; Avoid switching between :CODE and :MIXED on a page
       (unless (or (alignedp (gspace-free-word-index gspace))
                   (eq (get-frontier-page-type) page-type))
         (realign-frontier))
+      ;; The mark-region GC is stricter on what kind of heap it can work
+      ;; with. Notably: objects don't span pages,
+      #+mark-region-gc
+      (let* ((free-ptr (gspace-free-word-index gspace))
+             (avail (- (align-up free-ptr words-per-page) free-ptr)))
+        (when (< avail n-words)
+          (realign-frontier)))
+      ;; and large objects have their own pages,
+      #+mark-region-gc
+      (when (>= n-words words-per-page)
+        (realign-frontier))
       (let ((word-index (gspace-claim-n-words gspace n-words)))
         (assign-page-type page-type word-index n-words)
+        (mark-allocation word-index)
+        ;; so small objects can't be put at the end of large objects.
+        #+mark-region-gc
+        (when (>= n-words words-per-page)
+          (realign-frontier :keep-hole nil))
         (note-words-used word-index)))))
 
 (defun gspace-claim-n-bytes (gspace specified-n-bytes &optional (page-type :mixed))
@@ -3855,8 +3894,13 @@ III. initially undefined function references (alphabetically):
                               (:code  (incf n-code)  #b111)
                               (:list  (incf n-cons)  #b101)
                               (:mixed (incf n-mixed) #b011))
-                            0)))
+                            0))
+             #+mark-region-gc
+             (single-object-bit (if (page-single-object-p pte) 1 0)))
         (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
+        #+mark-region-gc
+        (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes)) (logior usage single-object-bit))
+        #-mark-region-gc
         (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes)) usage)))
     (when verbose
       (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
@@ -3865,6 +3909,11 @@ III. initially undefined function references (alphabetically):
     (let ((posn (file-position core-file)))
       (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
       (write-bigvec-as-sequence ptes core-file :end pte-bytes)
+      #+mark-region-gc
+      (dotimes (page-index n-ptes)
+        (loop for word across (page-allocation-bitmap
+                               (aref (gspace-page-table gspace) page-index))
+              do (write-words core-file word)))
       (force-output core-file)
       (file-position core-file posn))
     (write-words core-file
@@ -4182,8 +4231,8 @@ static inline uword_t word_has_stickymark(uword_t word) {
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 16)) 2)
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 8)) 1)
                 ((and (= sb-vm:n-word-bytes 4) (= ncards 8)) 2)
-                (t (error "bad cards-per-page"))))
-         (indices (loop for i below n-markwords collect i)))
+                (t (/ ncards sb-vm:n-word-bytes))))
+         (indices (progn (assert (integerp ncards)) (loop for i below n-markwords collect i))))
     (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
     uword_t* mark = (uword_t*)&gc_card_mark[card];
     return (~{mark[~d]~^ | ~}) == 0;~%}~%" indices)

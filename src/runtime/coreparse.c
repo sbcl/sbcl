@@ -398,7 +398,6 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
 
 static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
-    lispobj *where = (lispobj*)start;
     int widetag;
     long nwords;
     lispobj layout, adjusted_layout;
@@ -407,7 +406,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
     int i;
 
     adj->n_relocs_abs = adj->n_relocs_rel = 0;
-    for ( ; where < end ; where += nwords ) {
+    lispobj *where = next_object((lispobj*)start, 0, end);
+    for ( ; where ; where = next_object(where, nwords, end) ) {
         lispobj word = *where;
         if (!is_header(word)) {
             adjust_pointers(where, 2, adj);
@@ -1073,8 +1073,8 @@ void gcbarrier_patch_code(void* __attribute__((unused)) where, int __attribute__
 static void gengcbarrier_patch_code_range(uword_t start, lispobj* limit)
 {
     struct varint_unpacker unpacker;
-    lispobj *where = (lispobj*)start;
-    for ( ; where < limit ; where += object_size(where) ) {
+    lispobj *where = next_object((lispobj*)start, 0, limit);
+    for ( ; where ; where = next_object(where, object_size(where), limit) ) {
         struct code* code = (void*)where;
         if (widetag_of(where) != CODE_HEADER_WIDETAG || !code->fixups) continue;
         varint_unpacker_init(&unpacker, code->fixups);
@@ -1170,6 +1170,9 @@ void gc_load_corefile_ptes(int card_table_nbits,
 
     // Adjust for discrepancies between actually-allocated space addresses
     // and desired addresses.
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    load_corefile_bitmaps(fd, n_ptes);
+#endif
     if (adj->n_ranges) relocate_heap(adj);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

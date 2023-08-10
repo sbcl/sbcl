@@ -14,7 +14,6 @@
 #include "genesis/instance.h"
 #include "graphvisit.h"
 
-extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
 extern lispobj * component_ptr_from_pc(char *pc);
 
 // Arena memory block. At least one is associated with each arena,
@@ -418,7 +417,11 @@ void gc_scavenge_arenas()
                     if (gencgc_verbose)
                         fprintf(stderr, "Arena @ %p: scavenging %p..%p\n",
                                 a, block->allocator_base, block->freeptr);
+#ifdef LISP_FEATURE_MARK_REGION_GC
+                    mr_trace_bump_range((lispobj*)block->allocator_base, (lispobj*)block->freeptr);
+#else
                     heap_scavenge((lispobj*)block->allocator_base, (lispobj*)block->freeptr);
+#endif
                 } while ((block = block->next) != NULL);
                 for ( block = (void*)a->uw_huge_objects ; block ; block = block->next ) {
                     lispobj* obj = (lispobj*)block->allocator_base;

@@ -309,6 +309,7 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
 extern void gc_close_collector_regions(int);
 
+#define SET_ALLOCATED_BIT(x)
 void *collector_alloc_fallback(struct alloc_region*,sword_t,int);
 static inline void* __attribute__((unused))
 gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
@@ -876,4 +877,12 @@ __attribute__((unused)) static bool taggedptr_alivep_impl(lispobj obj)
         return immobile_obj_gen_bits(base_pointer(obj)) != from_space;
 #endif
     return 1;
+}
+
+static inline lispobj* next_object(lispobj *previous, uword_t size, lispobj *end) {
+    return (previous + size >= end) ? NULL : previous + size;
+}
+
+static inline lispobj* page_limit(page_index_t page) {
+    return (lispobj*)page_address(page) + page_words_used(page);
 }

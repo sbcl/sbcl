@@ -155,7 +155,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
 };
 
 static long write_bytes(FILE *file, char *addr, size_t bytes,
-                        os_vm_offset_t file_offset, int compression)
+                        os_vm_offset_t file_offset, int compression, int align)
 {
     ftell_type here, data;
 
@@ -169,7 +169,7 @@ static long write_bytes(FILE *file, char *addr, size_t bytes,
     here = FTELL(file);
     FSEEK(file, 0, SEEK_END);
     data = ALIGN_UP(FTELL(file), os_vm_page_size);
-    FSEEK(file, data, SEEK_SET);
+    if (align) FSEEK(file, data, SEEK_SET);
     write_bytes_to_file(file, addr, bytes, compression);
     FSEEK(file, here, SEEK_SET);
     return ((data - file_offset) / os_vm_page_size) - 1;
@@ -212,7 +212,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
      * That seems quite bogus to operate on bytes that the caller didn't promise were OK
      * to be saved out (and didn't contain, say, a password and social security number) */
     data = write_bytes(file, (char *)addr, ALIGN_UP(bytes, os_vm_page_size),
-                       file_offset, core_compression_level);
+                       file_offset, core_compression_level, 1);
 
     write_lispobj(data, file);
     write_lispobj((uword_t)addr, file);
@@ -372,7 +372,13 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         write_lispobj(next_free_page, file);
         write_lispobj(aligned_size, file);
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
-                                     COMPRESSION_LEVEL_NONE);
+                                     COMPRESSION_LEVEL_NONE, 1);
+#ifdef LISP_FEATURE_MARK_REGION_GC
+        extern sword_t bitmap_size(core_entry_elt_t);
+        sword_t size = bitmap_size(next_free_page);
+        extern uword_t *allocation_bitmap;
+        write_bytes(file, (char*)allocation_bitmap, size, core_start_pos, COMPRESSION_LEVEL_NONE, 0);
+#endif
         write_lispobj(offset, file);
     }
 #endif
@@ -581,6 +587,8 @@ bool save(char *filename, lispobj init_function, bool prepend_runtime,
 }
 #endif
 
+#include "incremental-compact.h"
+
 /* Things to do before doing a final GC before saving a core.
  *
  * + Single-object pages aren't moved by the GC, so we need to
@@ -597,6 +605,7 @@ static void prepare_dynamic_space_for_final_gc()
     prepare_immobile_space_for_final_gc();
     /* TODO: external full compactor thingy for MR */
     for (i = 0; i < next_free_page; i++) {
+#ifndef LISP_FEATURE_MARK_REGION_GC
         // Compaction requires that we permit large objects to be copied henceforth.
         // Object of size >= LARGE_OBJECT_SIZE get re-allocated to single-object pages.
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
@@ -604,14 +613,32 @@ static void prepare_dynamic_space_for_final_gc()
         // which were relocated to unboxed pages get scanned and fixed.
         if ((page_table[i].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED)
             page_table[i].type = PAGE_TYPE_MIXED;
+#endif
         generation_index_t gen = page_table[i].gen;
         if (gen != 0) {
             page_table[i].gen = 0;
+#ifndef LISP_FEATURE_MARK_REGION_GC
             int used = page_bytes_used(i);
             generations[gen].bytes_allocated -= used;
             generations[0].bytes_allocated += used;
+#endif
         }
     }
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    for (generation_index_t g = 1; g <= PSEUDO_STATIC_GENERATION; g++) {
+      generations[0].bytes_allocated += generations[g].bytes_allocated;
+      generations[g].bytes_allocated = 0;
+    }
+    extern void prepare_lines_for_final_gc(void);
+    prepare_lines_for_final_gc();
+    /* Do one last aggressive compaction. */
+    force_compaction = 1;
+    page_overhead_threshold = 0.0;
+    page_utilisation_threshold = 1.0;
+    minimum_compact_gen = 0;
+    /* This number has to be guesstimated manually at the moment. */
+    bytes_to_copy = 45000000;
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
     // Avoid tenuring of otherwise-dead objects referenced by
@@ -725,6 +752,12 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     struct thread *thread = get_sb_vm_thread();
     gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    /* Do a minor GC to instate allocation bitmap for new objects.
+     * This is needed to make heap walking in move_rospace_to_dynamic
+     * work. */
+    collect_garbage(0);
+#endif
     move_rospace_to_dynamic(0);
     pre_verify_gen_0 = 1;
     prepare_immobile_space_for_final_gc(); // once is enough
@@ -740,6 +773,9 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     write_TLS(PINNED_OBJECTS, NIL, thread);
 
     save_lisp_gc_iteration = 1;
+#ifndef LISP_FEATURE_MARK_REGION_GC
+    gencgc_alloc_start_page = next_free_page;
+#endif
     collect_garbage(0);
     verify_heap(0, VERIFY_POST_GC);
 

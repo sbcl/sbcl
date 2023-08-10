@@ -138,6 +138,7 @@ void sync_close_regions(int block_signals, int options,
     for (i=0; i<count; ++i) {
         page_index_t p = find_page_index(a[i].r->start_addr);
         if (p < 0) continue;
+#ifndef LISP_FEATURE_MARK_REGION_GC
         /* Potentially use up all remaining bytes in the TLAB before closing.
          * Pages below the alloc_start for the page type cannot possibly be used,
          * but we didn't properly account for that space, which has a bad effect
@@ -157,6 +158,7 @@ void sync_close_regions(int block_signals, int options,
             deposit_filler(freeptr, new_end);
             a[i].r->free_pointer = new_end;
         }
+#endif
         ensure_region_closed(a[i].r, a[i].type);
     }
     if (options & LOCK_PAGE_TABLE) release_gc_page_table_lock();
@@ -291,6 +293,7 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
     THREAD_JIT(1);
 
+    SET_ALLOCATED_BIT(code);
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 
@@ -340,6 +343,7 @@ make_list(lispobj element, sword_t nbytes, int sys) {
         struct cons* limit = c + ncells;
         while (c < limit) {
             c->car = element; c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            SET_ALLOCATED_BIT(c);
             ++c;
         }
         tail = &((c-1)->cdr);
@@ -372,6 +376,10 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
             c[1].car = context[-1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
             c[2].car = context[-2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
             c[3].car = context[-3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
+            SET_ALLOCATED_BIT(c);
+            SET_ALLOCATED_BIT(c+1);
+            SET_ALLOCATED_BIT(c+2);
+            SET_ALLOCATED_BIT(c+3);
             c += 4;
             context -= 4;
         }
@@ -379,6 +387,7 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
         while (ncells--) {
             c->car = *context--;
             c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            SET_ALLOCATED_BIT(c);
             c++;
         }
         tail = &((c-1)->cdr);
@@ -413,6 +422,10 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
             c[1].car = context[ 1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
             c[2].car = context[ 2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
             c[3].car = context[ 3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
+            SET_ALLOCATED_BIT(c);
+            SET_ALLOCATED_BIT(c+1);
+            SET_ALLOCATED_BIT(c+2);
+            SET_ALLOCATED_BIT(c+3);
             c += 4;
             context += 4;
         }
@@ -420,6 +433,7 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
         while (ncells--) {
             c->car = *context++;
             c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            SET_ALLOCATED_BIT(c);
             c++;
         }
         tail = &((c-1)->cdr);
@@ -599,12 +613,16 @@ void gc_gen_report_to_file(int filedes, FILE *file)
         struct generation* gen = &generations[gen_num];
         /* This wouldn't appear to hold for how mark-region GC treats pages.
          * TODO: Write what should hold. */
+#ifdef LISP_FEATURE_MARK_REGION_GC
+        words_allocated = generations[gen_num].bytes_allocated >> WORD_SHIFT;
+#else
         if (gen_num == 0)
             gc_assert(gen->bytes_allocated ==
                       (words_allocated+eden_words_allocated) << WORD_SHIFT);
         else {
             gc_assert(gen->bytes_allocated == words_allocated << WORD_SHIFT);
         }
+#endif
         page_index_t n_dirty;
         count_generation_pages(gen_num, &n_dirty);
         uword_t waste = npage_bytes(tot_pages) - (words_allocated<<WORD_SHIFT);

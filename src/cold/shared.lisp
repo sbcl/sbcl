@@ -295,6 +295,8 @@
         ;; all our GCs are generational
         (when (member gc '(:gencgc :mark-region-gc))
           (pushnew :generational sb-xc:*features*))
+        (when (eq gc :mark-region-gc)
+          (setq sb-xc:*features* (remove :immobile-space sb-xc:*features*)))
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         ;; Futexes aren't available in all macos versions, but they are available in
         ;; all versions that support arm, so always enable them there

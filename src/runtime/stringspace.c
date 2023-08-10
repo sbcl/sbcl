@@ -129,8 +129,11 @@ static sword_t careful_object_size(lispobj* obj) {
 
 static void walk_range(lispobj* start, lispobj* end, void (*func)(lispobj*,uword_t), uword_t arg)
 {
-    lispobj* where = start;
-    for ( ; where < end ; where += careful_object_size(where) ) func(where, arg);
+    lispobj* where = next_object(start, 0, end);
+    while (where) {
+        func(where, arg);
+        where = next_object(where, careful_object_size(where), end);
+    }
 }
 
 static void walk_all_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
@@ -145,7 +148,7 @@ static void walk_all_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
     for ( first = 0 ; first < next_free_page ; first = 1+last ) {
         last = contiguous_block_final_page(first);
         walk_range((lispobj*)page_address(first),
-                   (lispobj*)page_address(last) + page_words_used(last),
+                   page_limit(last),
                    fun, arg);
     }
 }
@@ -209,11 +212,13 @@ void prepare_readonly_space(int purify, int print)
     for ( first = 0; first < next_free_page; first = 1+last ) {
         last = contiguous_block_final_page(first);
         lispobj* where = (lispobj*)page_address(first);
-        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
-        sword_t nwords;
-        for ( ; where < limit ; where += nwords ) {
+        lispobj* limit = (lispobj*)page_limit(last);
+        where = next_object(where, 0, limit);
+        uword_t nwords;
+        while (where) {
             nwords = object_size(where);
             if ( readonly_unboxed_obj_p(where) ) sum_sizes += nwords;
+            where = next_object(where, nwords, limit);
         }
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -246,9 +251,12 @@ void prepare_readonly_space(int purify, int print)
     for ( first = 0; first < next_free_page; first = 1+last ) {
         last = contiguous_block_final_page(first);
         lispobj* where = (lispobj*)page_address(first);
-        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
-        for ( ; where < limit ; where += careful_object_size(where) )
+        lispobj* limit = page_limit(last);
+        where = next_object(where, 0, limit);
+        while (where) {
             if (readonly_unboxed_obj_p(where)) ensure_forwarded(where);
+            where = next_object(where, careful_object_size(where), limit);
+        }
     }
 
     // 4. Update all objects in all spaces to point to r/o copy of anything that moved
@@ -289,6 +297,7 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
     for ( ; where < read_only_space_free_pointer ; where += nwords, shadow_cursor += nwords ) {
         nwords = headerobj_size(where);
         lispobj *new = gc_general_alloc(unboxed_region, nwords*N_WORD_BYTES, PAGE_TYPE_BOXED);
+        SET_ALLOCATED_BIT(new);
         memcpy(new, where, nwords*N_WORD_BYTES);
         *shadow_cursor = make_lispobj(new, OTHER_POINTER_LOWTAG);
     }
@@ -320,8 +329,9 @@ void test_dirty_all_gc_cards()
     while (first < next_free_page) {
         page_index_t last = contiguous_block_final_page(first);
         lispobj* where = (lispobj*)page_address(first);
-        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
-        for ( ; where < limit ; where += object_size(where) )
+        lispobj* limit = page_limit(last);
+        for (where = next_object(where, 0, limit) ; where ;
+             where = next_object(where, object_size(where), limit) )
             if (widetag_of(where) == CODE_HEADER_WIDETAG) {
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS // only touch code pages, others got WP faults
                 gc_card_mark[addr_to_card_index(where)] = 1;

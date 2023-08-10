@@ -15,6 +15,11 @@
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
+  #+mark-region-gc
+  (let ((bytes (extern-alien "bytes_allocated" os-vm-size-t)))
+    (values bytes
+            (- (* (pages-allocated) sb-vm:gencgc-page-bytes) bytes)))
+  #-mark-region-gc ; FIXME: should be #+gencgc
   (extern-alien "bytes_allocated" os-vm-size-t))
 
 (defun static-space-usage ()
@@ -404,6 +409,11 @@ statistics are appended to it."
 (declaim (inline sb-vm:find-page-index))
 (define-alien-routine ("ext_find_page_index" sb-vm:find-page-index) page-index-t (address unsigned))
 
+(defun pages-allocated ()
+  (loop for n below (extern-alien "next_free_page" signed)
+        count (not (zerop (slot (deref sb-vm:page-table n) 'sb-vm::flags)))))
+
+#-mark-region-gc
 (defun generation-of (object)
   (with-pinned-objects (object)
     (let* ((addr (get-lisp-obj-address object))
@@ -417,6 +427,13 @@ statistics are appended to it."
              (let ((sap (int-sap (logandc2 addr sb-vm:lowtag-mask))))
                (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
                        #xF)))))))
+
+#+mark-region-gc
+(define-alien-routine "gc_gen_of" char (address unsigned))
+#+mark-region-gc
+(defun generation-of (object)
+  (with-pinned-objects (object)
+    (gc-gen-of (get-lisp-obj-address object))))
 
 (export 'page-protected-p)
 (macrolet ((addr->mark (addr)

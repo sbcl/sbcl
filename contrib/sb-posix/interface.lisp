@@ -369,7 +369,9 @@ not supported."
       (sb-impl::finalizer-thread-start)
       (error "Cannot fork with multiple threads running."))
     (let ((pid (posix-fork)))
-      #+darwin (when (= pid 0) (darwin-reinit))
+      (when (= pid 0) ; child
+        #+darwin (darwin-reinit)
+        #+mark-region-gc (alien-funcall (extern-alien "thread_pool_init" (function void))))
       #+sb-thread (sb-impl::finalizer-thread-start)
       pid))
   (export 'fork :sb-posix)

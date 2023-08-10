@@ -253,6 +253,7 @@
   (gc)
   (assert (= (sb-kernel:generation-of *5*) 0))
   (assert (= (sb-kernel:generation-of *10*) 0))
+  #-mark-region-gc
   (assert (not (eql (get-lisp-obj-address *10*)
                     *addr-of-10*))))
 

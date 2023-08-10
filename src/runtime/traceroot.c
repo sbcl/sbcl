@@ -744,7 +744,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             n_immediates = 0, n_pointers = 0;
 
     bool count_only = !ss->record_ptrs;
-    for ( ; where < end ; where += nwords ) {
+    for (where = next_object(where, 0, end) ; where ; where = next_object(where, nwords, end)) {
         if (ss->ignored_objects && ignorep(where, ss->ignored_objects)) {
             nwords = object_size(where);
             continue;

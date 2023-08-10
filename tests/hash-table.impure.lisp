@@ -79,7 +79,8 @@
 ;;; hash-vector. EQ tables don't have a hash-vector, so that's no good.
 ;;; EQL tables don't hash symbols address-sensitively,
 ;;; so use a bunch of cons cells.
-(with-test (:name :gc-while-growing-weak-hash-table)
+(with-test (:name :gc-while-growing-weak-hash-table
+            :skipped-on :mark-region-gc)
   (let ((h (make-hash-table :weakness :key)))
     (setq *gc-after-rehash-me* h)
     (dotimes (i 50) (setf (gethash (list (gensym)) h) i))

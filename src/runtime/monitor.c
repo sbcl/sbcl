@@ -502,8 +502,17 @@ dump_cmd(char **ptr)
                 lispobj ptr = *(lispobj*)addr;
                 int gen;
                 if (is_lisp_pointer(ptr) && gc_managed_heap_space_p(ptr)
-                    && (gen = gc_gen_of(ptr, 99)) != 99) // say that static is 99
+                    && (gen = gc_gen_of(ptr, 99)) != 99) { // say that static is 99
                     if (gen != 99) printf(" | %d", gen);
+                } else {
+                    printf("    "); // padding to make MR part line up
+                }
+            }
+#endif
+#ifdef LISP_FEATURE_MARK_REGION_GC
+            if (aligned && find_page_index(addr) != -1) {
+                extern bool allocation_bit_marked(void*);
+                printf(" %c", allocation_bit_marked(addr) ? '*' : ' ');
             }
 #endif
             if (decode && addr == (char*)next_object) {

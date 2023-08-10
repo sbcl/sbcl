@@ -154,18 +154,25 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
     sword_t nwords, i;
 
-    for ( ; where < limit ; where += nwords ) {
+    where = next_object(where, 0, limit);
+    while (where) {
         lispobj word = *where;
         if (is_header(word)) {
             int widetag = header_widetag(word);
             nwords = sizetab[widetag](where);
-            if (leaf_obj_widetag_p(widetag)) continue; // Ignore this object.
+            lispobj *next = next_object(where, nwords, limit);
+            if (leaf_obj_widetag_p(widetag)) {
+              // Ignore this object.
+              where = next;
+              continue;
+            }
             sword_t coalesce_nwords = nwords;
             if (instanceoid_widetag_p(widetag)) {
                 lispobj layout = layout_of(where);
                 struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
                 for (i=0; i<(nwords-1); ++i)
                     if (bitmap_logbitp(i, bitmap)) coalesce_obj(where+1+i, ht);
+                where = next;
                 continue;
             }
             switch (widetag) {
@@ -175,6 +182,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                 lispobj name = decode_symbol_name(symbol->name);
                 coalesce_obj(&name, ht);
                 set_symbol_name(symbol, name);
+                where = next;
                 continue;
             }
             case CODE_HEADER_WIDETAG:
@@ -183,10 +191,12 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             }
             for(i=1; i<coalesce_nwords; ++i)
                 coalesce_obj(where+i, ht);
+            where = next;
         } else {
             nwords = 2;
             coalesce_obj(where+0, ht);
             coalesce_obj(where+1, ht);
+            where = next_object(where, 2, limit);
         }
     }
     return 0;

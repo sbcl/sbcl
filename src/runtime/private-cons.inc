@@ -73,18 +73,24 @@ static struct cons* private_cons_impl()
     if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_PAGE_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
+#ifdef LISP_FEATURE_MARK_REGION_GC
+        page_index_t alloc_start = get_alloc_start_page(PAGE_TYPE_UNBOXED);
+        page = try_allocate_large(GENCGC_PAGE_BYTES, PAGE_TYPE_UNBOXED, 0,
+                                  &alloc_start, page_table_pages, NULL);
+        set_alloc_start_page(PAGE_TYPE_UNBOXED, alloc_start);
+        /* TODO: Should figure out what will trigger "heap exhausted" errors.
+         * Probably not this though. */
+        if (page == -1) lose("Ran out of pages for GC-private conses");
+#else
         page = get_alloc_start_page(PAGE_TYPE_UNBOXED);
         page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
                                   SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED,
                                   GC_PRIVATE_CONS_GENERATION);
+        // See question about last_page in gc_alloc_large
         set_alloc_start_page(PAGE_TYPE_UNBOXED, page);
-
-        struct cons* page_header = (struct cons*)page_address(page);
-        if (PRIVATE_CONS_DEBUG)
-            fprintf(stderr, "GC-private page %"PAGE_INDEX_FMT" @ %p\n", page, page_header);
         gc_assert(last_page == page);
-        gc_dcheck(page_cards_all_marked_nonsticky(page));
+#endif
         page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         page_table[page].type = PAGE_TYPE_UNBOXED;
 #ifdef LISP_FEATURE_DARWIN_JIT
@@ -94,6 +100,9 @@ static struct cons* private_cons_impl()
 #elif defined LISP_FEATURE_WIN32
         os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
 #endif
+        struct cons* page_header = (struct cons*)page_address(page);
+        if (PRIVATE_CONS_DEBUG)
+            fprintf(stderr, "GC-private page @ %p\n", page_header);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);

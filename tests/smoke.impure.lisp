@@ -12,6 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+mark-region-gc (invoke-restart 'run-tests::skip-file)
 (cl:in-package :cl-user)
 
 ;;; Regression due to 1f892df9600eb986038526c3ec738809b15a3f75

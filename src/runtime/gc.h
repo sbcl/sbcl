@@ -80,7 +80,7 @@ struct verify_state {
     uword_t flags;
     generation_index_t object_gen;
     generation_index_t min_pointee_gen;
-    int nerrors;
+    _Atomic(int) nerrors;
     lispobj err_objs[5];
 };
 void hexdump_spaces(struct verify_state*, char *reason);
@@ -98,8 +98,13 @@ extern bool conservative_stack;
 extern lispobj lisp_init_function;
 
 #include "immobile-space.h" // provides dummy stubs if #-immobile-space
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_MARK_REGION_GC
+#include "pmrgc-impl.h"
+#include "mark-region.h"
+#elif defined LISP_FEATURE_GENCGC
 #include "gencgc-impl.h"
+#else
+#error "GC selector not defined"
 #endif
 
 #endif /* _GC_H_ */

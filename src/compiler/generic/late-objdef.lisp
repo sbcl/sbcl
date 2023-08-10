@@ -28,7 +28,9 @@
 ;;; cards are not larger than pages
 (assert (<= gencgc-page-bytes +backend-page-bytes+))
 ;;; largeness does not depend on the hardware page size
-(defconstant large-object-size (* 4 gencgc-page-bytes)))
+(defconstant large-object-size #-mark-region-gc (* 4 gencgc-page-bytes)
+                               #+mark-region-gc (* 3/4 gencgc-page-bytes))
+(assert (integerp large-object-size)))
 
 ;;; Keep this (mostly) lined up with 'early-objdef' for sanity's sake!
 ;;; The "transport" function is used only if the object is an OTHER-POINTER

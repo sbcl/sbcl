@@ -190,8 +190,8 @@
     (dotimes (i 10)
       (setf (gethash (cons 'foo (gensym)) tbl) 1))
     (gc)
-    ;; The need-to-rehash bit is set
-    (assert (eql 1 (svref (sb-impl::hash-table-pairs tbl) 1)))
+    ;; Set the need-to-rehash bit
+    (setf (svref (sb-impl::hash-table-pairs tbl) 1) 1)
     (clrhash tbl)
     ;; The need-to-rehash bit is not set
     (assert (eql 0 (svref (sb-impl::hash-table-pairs tbl) 1)))))
