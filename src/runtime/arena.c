@@ -425,8 +425,15 @@ void gc_scavenge_arenas()
                 } while ((block = block->next) != NULL);
                 for ( block = (void*)a->uw_huge_objects ; block ; block = block->next ) {
                     lispobj* obj = (lispobj*)block->allocator_base;
+#ifdef LISP_FEATURE_MARK_REGION_GC
+                    // fprintf(stderr, "arena huge object @ %p: %lx %lx\n", obj, obj[0], obj[1]);
+                    // probably could call trace_other_object directly here?
+                    lispobj* end = obj + object_size(obj);
+                    mr_trace_bump_range(obj, end);
+#else
                     lispobj header = *obj;
                     scavtab[header_widetag(header)](obj, header);
+#endif
                 }
             }
             chain = a->link;
