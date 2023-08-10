@@ -27,6 +27,8 @@ LINKFLAGS += -Wl,--export-dynamic
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
+else ifdef LISP_FEATURE_MARK_REGION_GC
+  GC_SRC = fullcgc.c pmrgc.c traceroot.c mark-region.c incremental-compact.c gc-thread-pool.c
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif

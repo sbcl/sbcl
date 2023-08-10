@@ -585,7 +585,7 @@ void* new_thread_trampoline(void* arg)
 // This receives a VECTOR-SAP
 void sb_set_os_thread_name(char* name)
 {
-    struct vector* v = (void*)(name - offsetof(struct vector,data));
+    __attribute__((unused)) struct vector* v = (void*)(name - offsetof(struct vector,data));
     /* Potentially set the externally-visible name of this thread,
      * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
      * https://github.com/llvm-mirror/llvm/blob/394ea6522c69c2668bf328fc923e1a11cd785265/lib/Support/Unix/Threading.inc

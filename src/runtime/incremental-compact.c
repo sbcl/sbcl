@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 #include "os.h"
 #include "gc.h"
