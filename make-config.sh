@@ -610,6 +610,7 @@ case "$sbcl_os" in
                 ;;
             openbsd)
                 printf ' :openbsd' >> $ltf
+                printf ' :gcc-tls' >> $ltf
                 link_or_copy Config.$sbcl_arch-openbsd Config
                 ;;
             netbsd)

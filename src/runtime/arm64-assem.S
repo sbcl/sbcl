@@ -141,6 +141,11 @@ GNAME(call_into_lisp):
         ldr     x8, [x0]
         blr     x8
         ldr     reg_THREAD, [x0]
+#elif defined LISP_FEATURE_OPENBSD
+        adrp    x0, :got:__emutls_v.current_thread
+        ldr     x0, [x0, :got_lo12:__emutls_v.current_thread]
+        bl      __emutls_get_address
+        ldr     reg_THREAD, [x0]
 #else
 	adrp	x0, :gottprel:current_thread
 	ldr	x0, [x0, #:gottprel_lo12:current_thread]
