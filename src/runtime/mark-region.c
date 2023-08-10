@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <string.h>
