@@ -1266,6 +1266,22 @@
       (zerop (logand (1- (ash 1 n-bits-partial-digit))
                      (%bignum-ref bignum n-full-digits))))))
 
+(declaim (inline bignum-negate-last-two))
+(defun bignum-negate-last-two (bignum &optional (len (%bignum-length bignum)))
+  (let* ((last1 0)
+         (last2 0)
+         (carry 1)
+         (i 0))
+    (declare (type bit carry)
+             (type bignum-index i))
+    (loop (when (= i len)
+            (return))
+          (setf last1 last2)
+          (setf (values last2 carry)
+                (%add-with-carry (%lognot (%bignum-ref bignum i)) 0 carry))
+          (incf i))
+    (values last1 last2)))
+
 ;;; Make a single or double float with the specified significand,
 ;;; exponent and sign.
 ;;; FIXME: how are these not the same as {SINGLE,DOUBLE}-FROM-BITS ???
@@ -1396,44 +1412,66 @@
                            (exponent-byte '(byte 11 52))))
                     (package-symbolicate :sb-vm type '- name))))
          `(defun ,(symbolicate 'bignum-to- type) (bignum)
-            (let* ((plusp (bignum-plus-p bignum))
-                   (sign 0)
-                   (abs-bignum (cond (plusp
-                                      bignum)
-                                     (t
-                                      (setf sign (dpb 0 (byte (+ (byte-size ,(const 'exponent-byte))
-                                                                 (byte-position ,(const 'exponent-byte))) 0) ;; 32/64
-                                                      -1))
-                                      (negate-bignum bignum))))
-                   (length (truly-the bignum-length (bignum-integer-length abs-bignum)))
-                   (shift (- length ,(const 'digits)))
-                   ;; Get one more bit for rounding
-                   (shifted (truly-the fixnum
-                                       (last-bignum-part=>fixnum (1- shift) abs-bignum)))
-                   ;; Cut off the hidden bit
-                   (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
-                   (exp (truly-the (unsigned-byte ,(byte-size sb-vm:double-float-exponent-byte))
-                                   (+ ,(const 'bias) length)))
-                   (bits (ash exp
-                              (byte-position ,(const 'exponent-byte)))))
-
-              (when (and (logtest shifted 1)
-                         (or (logtest signif 1)
-                             (not (bignum-lower-bits-zero-p abs-bignum shift))))
-                ;; Round up
-                (incf signif))
-              ;; If rounding up overflows this will increase the exponent too
-              (let ((bits (+ bits signif)))
-                (when (or (> exp ,(const 'normal-exponent-max))
-                          ;; Overflow after rounding up
-                          (= bits (,(const 'bits) ,(const 'positive-infinity))))
-                  (error 'floating-point-overflow
-                         :operation 'float
-                         :operands (list bignum ',type)))
-                (,(case type
-                    (single-float 'make-single-float)
-                    (double-float '%make-double-float))
-                 (logior sign (truly-the sb-vm:signed-word bits)))))))))
+            (let ((bignum-length (%bignum-length bignum)))
+              (,(case type
+                  (single-float 'make-single-float)
+                  (double-float '%make-double-float))
+               (if (%bignum-0-or-plusp bignum bignum-length)
+                   (let* ((length (truly-the bignum-length (bignum-buffer-integer-length bignum bignum-length)))
+                          (shift (- length ,(const 'digits)))
+                          ;; Get one more bit for rounding
+                          (shifted (truly-the fixnum
+                                              (last-bignum-part=>fixnum (1- shift) bignum)))
+                          ;; Cut off the hidden bit
+                          (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
+                          (exp (truly-the (unsigned-byte ,(byte-size sb-vm:double-float-exponent-byte))
+                                          (+ ,(const 'bias) length)))
+                          (bits (ash exp
+                                     (byte-position ,(const 'exponent-byte)))))
+                     (when (and (logtest shifted 1)
+                                (or (logtest signif 1)
+                                    (not (bignum-lower-bits-zero-p bignum shift))))
+                       ;; Round up
+                       (incf signif))
+                     ;; If rounding up overflows this will increase the exponent too
+                     (let ((bits (+ bits signif)))
+                       (when (or (> exp ,(const 'normal-exponent-max))
+                                 ;; Overflow after rounding up
+                                 (= bits (,(const 'bits) ,(const 'positive-infinity))))
+                         (error 'floating-point-overflow
+                                :operation 'float
+                                :operands (list bignum ',type)))
+                       (truly-the sb-vm:signed-word bits)))
+                   (multiple-value-bind (last1 last2) (bignum-negate-last-two bignum bignum-length)
+                     (let* ((last2-length (integer-length last2))
+                            (length (+ last2-length (* (1- bignum-length) digit-size)))
+                            (shift (- length ,(const 'digits)))
+                            (bit-index (rem (1- shift) digit-size))
+                            (shifted (cond ((zerop last2)
+                                            (truly-the word (ash last1 (- bit-index))))
+                                           ((<= bit-index (- digit-size (1+ ,(const 'digits))))
+                                            (truly-the word (ash last2 (- bit-index))))
+                                           (t
+                                            (logand most-positive-word
+                                                    (logior (ash last2 (- digit-size bit-index))
+                                                            (ash last1 (- bit-index)))))))
+                            (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
+                            (exp (truly-the (unsigned-byte 11) (+ ,(const 'bias) length)))
+                            (bits (ash exp (byte-position ,(const 'exponent-byte)))))
+                       (when (and (logtest shifted 1)
+                                  (or (logtest signif 1)
+                                      (not (bignum-lower-bits-zero-p bignum shift))))
+                         (incf signif))
+                       (let ((bits (+ bits signif)))
+                         (when (or (> exp ,(const 'normal-exponent-max))
+                                   (= bits (,(const 'bits) ,(const 'positive-infinity))))
+                           (error 'floating-point-overflow
+                                  :operation 'float
+                                  :operands (list bignum ',type)))
+                         (logior (ash -1 ,(case type
+                                            (double-float 63)
+                                            (single-float 31)))
+                                 (truly-the sb-vm:signed-word bits))))))))))))
   (def single-float)
   (def double-float))
 
