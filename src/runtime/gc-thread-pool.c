@@ -32,7 +32,7 @@ void thread_pool_init() {
   }
 
   if (!start_semaphores) {
-    start_semaphores = successful_malloc(sizeof(sem_t) * gc_threads);
+    start_semaphores = successful_malloc(sizeof(os_sem_t) * gc_threads);
     for (unsigned int i = 0; i < gc_threads; i++)
       os_sem_init(start_semaphores + i, 0);
     os_sem_init(&join_semaphore, 0);
