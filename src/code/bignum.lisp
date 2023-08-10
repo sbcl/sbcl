@@ -1433,7 +1433,7 @@
                 (,(case type
                     (single-float 'make-single-float)
                     (double-float '%make-double-float))
-                 (logior sign bits))))))))
+                 (logior sign (truly-the sb-vm:signed-word bits)))))))))
   (def single-float)
   (def double-float))
 

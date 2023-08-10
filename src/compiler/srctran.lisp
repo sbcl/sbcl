@@ -408,7 +408,10 @@
            (give-up-ir1-transform)))))
 
 (define-source-transform byte (size position)
-  `(cons ,size ,position))
+  (if (and (constantp size)
+           (constantp position))
+      `'(,(constant-form-value size) . ,(constant-form-value position))
+      `(cons ,size ,position)))
 (define-source-transform byte-size (spec) `(car ,spec))
 (define-source-transform byte-position (spec) `(cdr ,spec))
 (define-source-transform ldb-test (bytespec integer)
