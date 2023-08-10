@@ -21,6 +21,7 @@
 #include "gc-typedefs.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
 # define THREADS_USING_GCSIGNAL 1
