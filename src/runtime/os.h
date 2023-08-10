@@ -23,9 +23,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#if defined(LISP_FEATURE_GENCGC) && !defined(ENABLE_PAGE_PROTECTION)
+#if defined LISP_FEATURE_GENERATIONAL && !defined ENABLE_PAGE_PROTECTION
 /* Should we use page protection to help avoid the scavenging of pages
  * that don't have pointers to younger generations?
+ * (Protection can mean either MMU-based or logical protection)
  * You can change this to 0 if you want SBCL not to install the handlers
  * for SIGSEGV and SIGBUS. That will slow down GC, but might be desirable
  * for debugging or for exploring GC strategies such as remembered sets */
@@ -35,7 +36,7 @@
 #if defined LISP_FEATURE_CHENEYGC || defined LISP_FEATURE_SB_SAFEPOINT
 // safepoint traps always require a signal handler
 #define INSTALL_SIG_MEMORY_FAULT_HANDLER 1
-#elif defined LISP_FEATURE_GENCGC
+#elif defined LISP_FEATURE_GENERATIONAL
 #define INSTALL_SIG_MEMORY_FAULT_HANDLER ENABLE_PAGE_PROTECTION
 #endif
 

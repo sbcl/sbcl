@@ -113,14 +113,6 @@ extern lispobj ALIEN_LINKAGE_TABLE_SPACE_START;
 extern os_vm_address_t anon_dynamic_space_start;
 extern lispobj* tlsf_mem_start; // meaningful only if immobile space
 
-# ifndef LISP_FEATURE_GENCGC
-extern lispobj *current_auto_gc_trigger;
-# endif
-
-#ifdef LISP_FEATURE_CHENEYGC
-extern lispobj *current_dynamic_space;
-#endif
-
 extern lispobj lisp_package_vector;
 
 extern void globals_init(void);

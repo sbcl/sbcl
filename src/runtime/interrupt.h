@@ -112,7 +112,7 @@ extern bool handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 
 #ifdef DO_PENDING_INTERRUPT
 #define do_pending_interrupt ((void(*)(void))SYMBOL(DO_PENDING_INTERRUPT)->value)
-#elif defined(LISP_FEATURE_GENCGC)
+#else
 /* assembly language stub that executes trap_PendingInterrupt */
 extern void do_pending_interrupt(void);
 #endif

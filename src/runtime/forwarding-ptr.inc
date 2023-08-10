@@ -25,7 +25,7 @@ static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) 
   // things down, so we blindly stomp on whatever was there.
   // Unfortunately this also implies we can't assert
   // that we're operating on a not-yet-forwarded object here.
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
   //gc_dcheck(from_space_p(addr)); // inclusion order problem, too bad
     addr[0] = FORWARDING_HEADER;
     addr[1] = newspace_copy;

@@ -130,17 +130,6 @@ void dyndebug_init(void);
 extern void *successful_malloc (size_t size);
 extern char *copied_string (char *string);
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_SAFEPOINT)
-# define THREADS_USING_GCSIGNAL 1
-#endif
-
-/* FIXME: this is the wrong header to make this choice */
-#if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-# define GENCGC_IS_PRECISE 1
-#else
-# define GENCGC_IS_PRECISE 0
-#endif
-
 void *os_dlsym_default(char *name); // Why not in 'os.h' ?
 
 /* Even with just -O1, gcc optimizes the jumps in this "loop" away

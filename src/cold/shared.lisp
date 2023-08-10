@@ -286,10 +286,14 @@
              ;; Bind temporarily so that TARGET-FEATUREP and TARGET-PLATFORM-KEYWORD
              ;; can see the tentative list.
              (sb-xc:*features* (funcall customizer default-features))
-             (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
-                          sb-xc:*features*))
+             (gc (intersection '(:cheneygc :gencgc :mark-region-gc)
+                               sb-xc:*features*))
              (arch (target-platform-keyword)))
-        (when (eq gc :gencgc)
+        (unless (and gc (not (cdr gc)))
+          (error "Exactly 1 GC implementation needs to be selected"))
+        (setq gc (car gc))
+        ;; all our GCs are generational
+        (when (member gc '(:gencgc :mark-region-gc))
           (pushnew :generational sb-xc:*features*))
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         ;; Futexes aren't available in all macos versions, but they are available in
@@ -355,17 +359,13 @@
 ;;; combinations now, and provide a description of what the actual
 ;;; failure is (not always obvious from when the build fails).
 (let ((feature-compatibility-tests
-       '(("(and sb-thread (not gencgc))"
-          ":SB-THREAD requires :GENCGC")
-         ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
+       '(("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and (not sb-thread) (or arm64 ppc64))"
           "The selected architecture requires :SB-THREAD")
          ("(and gencgc cheneygc)"
           ":GENCGC and :CHENEYGC are incompatible")
-         ("(not (or gencgc cheneygc))"
-          "One of :GENCGC or :CHENEYGC must be enabled")
          ("(and sb-safepoint (not (and (or arm64 x86 x86-64) (or darwin linux win32))))"
           ":SB-SAFEPOINT not supported on selected arch/OS")
          ("(not (or elf mach-o win32))"

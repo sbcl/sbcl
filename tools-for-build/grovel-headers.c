@@ -404,7 +404,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 #endif
 
     printf("(in-package \"SB-KERNEL\")\n\n");
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENERATIONAL
     printf(";;; GENCGC related\n");
     DEFTYPE("page-index-t", page_index_t);
     DEFTYPE("generation-index-t", generation_index_t);
