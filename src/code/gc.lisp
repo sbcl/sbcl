@@ -19,7 +19,7 @@
   (let ((bytes (extern-alien "bytes_allocated" os-vm-size-t)))
     (values bytes
             (- (* (pages-allocated) sb-vm:gencgc-page-bytes) bytes)))
-  #-mark-region-gc ; FIXME: should be #+gencgc
+  #+gencgc
   (extern-alien "bytes_allocated" os-vm-size-t))
 
 (defun static-space-usage ()
