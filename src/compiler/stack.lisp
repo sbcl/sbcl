@@ -204,11 +204,10 @@
       ;; If we are in the conditional-DX control-flow join case then
       ;; we need to find an order for START-STACK that is compatible
       ;; with all of our predecessors.
-      (dolist (end-stack (mapcar #'ir2-block-end-stack
-                                 (mapcar #'block-info
-                                         (block-pred block))))
-        (setf pred-end-stack
-              (ordered-list-union pred-end-stack end-stack)))
+      (dolist (pred (block-pred block))
+        (let ((end-stack (ir2-block-end-stack (block-info pred))))
+          (setf pred-end-stack
+                (ordered-list-union pred-end-stack end-stack))))
       (setf start-stack (ordered-list-intersection pred-end-stack start)))
 
     (when *check-consistency*
@@ -216,7 +215,9 @@
     (setf (ir2-block-start-stack 2block) start-stack)
 
     (let* ((last (block-last block))
-           (tailp-lvar (if (node-tail-p last) (node-lvar last)))
+           (tailp-lvar (if (and (basic-combination-p last)
+                                (node-tail-p last))
+                           (node-lvar last)))
            (end-stack start-stack))
       (dolist (pop (ir2-block-popped 2block))
         (aver (eq pop (car end-stack)))
