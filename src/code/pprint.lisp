@@ -1502,9 +1502,10 @@ line break."
 ;;; Called to inform the pretty stream that a #\Space character just
 ;;; written is significant even if it is at end-of-line.
 (defun note-significant-space (stream)
-  (declare (type pretty-stream stream))
-  (push (1- (pretty-stream-buffer-fill-pointer stream))
-        (pretty-stream-buffer-significant-spaces stream)))
+  (declare (type stream stream))
+  (when (pretty-stream-p stream)
+    (push (1- (pretty-stream-buffer-fill-pointer stream))
+          (pretty-stream-buffer-significant-spaces stream))))
 
 ;;; Warm bootup is slightly less brittle if we can avoid first having to run
 ;;; the compiler to make the predicates for the initial PPD type specifiers.

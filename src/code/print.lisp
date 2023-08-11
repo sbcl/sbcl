@@ -1888,10 +1888,8 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (write-char char stream)
            ;; KLUDGE: arguably this should be in an :AROUND method
-           ;; specialized on ((EQL #\SPACE) PRETTY-STREAM), but quite
-           ;; a lot of the system depends on the fact that there is no
-           ;; specialization on the second argument of PRINT-OBJECT.
-           (when (and (eql char #\Space) (sb-pretty:pretty-stream-p stream))
+           ;; specialized on ((EQL #\SPACE) T).
+           (when (and (eql char #\Space))
              (sb-pretty:note-significant-space stream)))))
       (write-char char stream)))
 
