@@ -138,6 +138,9 @@
   (buffer (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; The index into BUFFER where more text should be put.
   (buffer-fill-pointer 0 :type index)
+  ;; A list holding the positions in BUFFER of spaces which must not
+  ;; be removed if they are at the end of a line.
+  (buffer-significant-spaces nil :type list)
   ;; Whenever we output stuff from the buffer, we shift the remaining noise
   ;; over. This makes it difficult to keep references to locations in
   ;; the buffer. Therefore, we have to keep track of the total amount of

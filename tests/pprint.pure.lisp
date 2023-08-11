@@ -15,3 +15,26 @@
   (assert (not (search "#1=" (write-to-string '(let () (let () x))
                                               :circle t
                                               :pretty t)))))
+
+(with-test (:name :pprint-list-spaces)
+  (let* ((list (make-list 50 :initial-element #\Space))
+         (string (write-to-string list :pretty t :escape t)))
+    (assert (equal (read-from-string string) list))
+    (assert (= (count #\Newline string) 2))))
+
+(with-test (:name :pprint-vector-spaces)
+  (let* ((vector (coerce (make-list 50 :initial-element #\Space) 'vector))
+         (string (write-to-string vector :pretty t :escape t)))
+    (assert (equalp (read-from-string string) vector))
+    (assert (= (count #\Newline string) 2))))
+
+(with-test (:name :pprint-random-spaces)
+  (dotimes (i 100)
+    (let* ((list (loop repeat 1000 if (= (random 2) 1) collect #\Space else collect #\Tab))
+           (lstring (write-to-string list :pretty t :escape t))
+           (lread (read-from-string lstring))
+           (vector (coerce list 'vector))
+           (vstring (write-to-string vector :pretty t :escape t))
+           (vread (read-from-string vstring)))
+      (assert (equal list lread))
+      (assert (equalp vector vread)))))

@@ -1883,9 +1883,16 @@ variable: an unreadable object representing the error is printed instead.")
                            (standard-char-p char)))
             (name (char-name char)))
         (write-string "#\\" stream)
-        (if (and name (or (not graphicp) *print-readably*))
-            (quote-string name stream)
-            (write-char char stream)))
+        (cond
+          ((and name (or (not graphicp) *print-readably*)) (quote-string name stream))
+          (t
+           (write-char char stream)
+           ;; KLUDGE: arguably this should be in an :AROUND method
+           ;; specialized on ((EQL #\SPACE) PRETTY-STREAM), but quite
+           ;; a lot of the system depends on the fact that there is no
+           ;; specialization on the second argument of PRINT-OBJECT.
+           (when (and (eql char #\Space) (sb-pretty:pretty-stream-p stream))
+             (sb-pretty:note-significant-space stream)))))
       (write-char char stream)))
 
 (defmethod print-object ((sap system-area-pointer) stream)
