@@ -196,11 +196,11 @@
 
     (when (not (subsetp start start-stack))
       ;; If BLOCK is a control-flow join for DX allocation paths with
-      ;; different sets of DX LVARs being pushed then we cannot
-      ;; process it correctly until all of its predecessors have been
-      ;; processed.
-      (unless (every #'block-flag (block-pred block))
-        (return-from order-block-uvl-sets nil))
+      ;; different sets of DX LVARs being pushed, we cannot be in a
+      ;; loop, so since we are processing the blocks in reverse
+      ;; post-order, its predecessors should all have been processed
+      ;; already.
+      (aver (every #'block-flag (block-pred block)))
       ;; If we are in the conditional-DX control-flow join case then
       ;; we need to find an order for START-STACK that is compatible
       ;; with all of our predecessors.
@@ -230,8 +230,7 @@
                  (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
         (aver (eq tailp-lvar (first end-stack)))
         (pop end-stack))
-      (setf (ir2-block-end-stack 2block) end-stack)))
-  t)
+      (setf (ir2-block-end-stack 2block) end-stack))))
 
 (defun order-uvl-sets (component)
   (clear-flags component)
@@ -249,10 +248,11 @@
                             (not (bind-p (block-start-node block))))
                    (let ((entry (nle-block-entry-block block)))
                      (setq pred (if (block-flag entry) entry nil))))
-                 (if (and pred
-                          (order-block-uvl-sets block pred))
-                     (setf (block-flag block) t)
-                     (incf todo)))))
+                 (cond (pred
+                        (setf (block-flag block) t)
+                        (order-block-uvl-sets block pred))
+                       (t
+                        (incf todo))))))
         do (when (= last-todo todo)
              ;; If the todo count is the same as on last iteration and
              ;; there are still blocks to do, it means we are stuck,
