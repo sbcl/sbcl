@@ -3509,6 +3509,9 @@
       (give-up-ir1-transform))
     'x))
 
+(deftransform logandc2 ((x y) ((constant-arg (eql -1)) t) *)
+  `(lognot y))
+
 (deftransform mask-signed-field ((size x) ((constant-arg t) t) *)
   "fold identity operation"
   (let ((size (lvar-value size)))
