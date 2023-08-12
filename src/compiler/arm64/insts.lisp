@@ -3214,6 +3214,78 @@
     (fpr-offset rn)
     (fpr-offset rd))))
 
+(def-emitter simd-three-extension
+  (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b01110 5 24)
+  (size 2 22)
+  (#b0 1 21)
+  (rm 5 16)
+  (#b1 1 15)
+  (opc 4 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-three-extension 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op3 :field (byte 1 31) :value #b0)
+  (u :field (byte 1 29))
+  (op4 :field (byte 5 24) :value #b01110)
+  (size :field (byte 2 22))
+  (op5 :field (byte 1 21) :value #b0)
+  (rm :fields (list (byte 1 30) (byte 2 22) (byte 5 16)) :type 'simd-reg)
+  (op6 :field (byte 1 15) :value #b1)
+  (op :field (byte 4 11))
+  (op7 :field (byte 1 10) :value #b1)
+  (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
+
+
+
+(define-instruction fcadd (segment rd rn rm &optional size (rot 90))
+  (:printer simd-three-extension ((op #b1100) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #90"))
+  (:printer simd-three-extension ((op #b1110) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #270"))
+  (:emitter
+   (multiple-value-bind (q size) (encode-vector-size size)
+     (emit-simd-three-extension segment
+                                q
+                                1 size
+                           (fpr-offset rm)
+                           (ecase rot
+                             (90 #b1100)
+                             (270 #b1110))
+                           (fpr-offset rn)
+                           (fpr-offset rd)))))
+
+(define-instruction fcmla (segment rd rn rm &optional size (rot 90))
+  (:printer simd-three-extension ((op #b1000) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #0"))
+  (:printer simd-three-extension ((op #b1001) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #90"))
+  (:printer simd-three-extension ((op #b1010) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #180"))
+  (:printer simd-three-extension ((op #b1011) (u 1))
+            '(:name :tab rd ", " rn ", " rm ", #270"))
+  (:emitter
+   (multiple-value-bind (q size) (encode-vector-size size)
+     (emit-simd-three-extension segment
+                                q
+                                1 size
+                                (fpr-offset rm)
+                                (ecase rot
+                                  (0 #b1000)
+                                  (90 #b1001)
+                                  (180 #b1010)
+                                  (270 #b1011))
+                                (fpr-offset rn)
+                                (fpr-offset rd)))))
+
+
+
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)
   (let ((first (car constant))
