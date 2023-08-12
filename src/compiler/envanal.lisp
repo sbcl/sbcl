@@ -235,9 +235,8 @@
 ;;;    be deleted (although not removed from the DFO.)  The escape
 ;;;    function is no longer needed, and we don't want to emit code
 ;;;    for it.
-;;; -- Change the %NLX-ENTRY call to use the NLX lvar so that 1) there
-;;;    will be a use to represent the NLX use; 2) make life easier for
-;;;    the stack analysis.
+;;; -- Change the %NLX-ENTRY call to use the NLX lvar so that there
+;;;    will be a use to represent the NLX use.
 (defun note-non-local-exit (env exit)
   (declare (type environment env) (type exit exit))
   (let ((lvar (node-lvar exit))

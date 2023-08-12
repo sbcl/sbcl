@@ -1437,5 +1437,7 @@ is replaced with replacement."
           (when (not (bind-p (block-start-node ep)))
             (format stream "~a -> ~a [style=dotted];~%"
                     (block-label ep)
-                    (block-label (nle-block-entry-block ep)))))))
+                    (block-label (node-block
+                                  (cleanup-mess-up
+                                   (block-start-cleanup ep)))))))))
     (write-line "}" stream)))

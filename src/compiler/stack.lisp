@@ -46,16 +46,6 @@
   (values))
 
 ;;;; Computation of live UVL sets
-(defun nle-block-nlx-info (block)
-  (let* ((start-node (block-start-node block))
-         (nlx-ref (ctran-next (node-next start-node)))
-         (nlx-info (constant-value (ref-leaf nlx-ref))))
-    nlx-info))
-(defun nle-block-entry-block (block)
-  (let* ((nlx-info (nle-block-nlx-info block))
-         (mess-up (cleanup-mess-up (nlx-info-cleanup nlx-info)))
-         (entry-block (node-block mess-up)))
-    entry-block))
 
 ;;; Add LVARs from LATE to EARLY; use EQ to check whether EARLY has
 ;;; been changed.
@@ -91,13 +81,13 @@
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
          (dolist (nlx-info (cleanup-nlx-info cleanup))
-           (let* ((nle (nlx-info-target nlx-info))
-                  (nle-start-stack (ir2-block-start-stack
-                                    (block-info nle)))
+           (let* ((target (nlx-info-target nlx-info))
+                  (target-start-stack (ir2-block-start-stack
+                                       (block-info target)))
                   (exit-lvar (nlx-info-lvar nlx-info))
                   (next-stack (if exit-lvar
-                                  (remove exit-lvar nle-start-stack)
-                                  nle-start-stack)))
+                                  (remove exit-lvar target-start-stack)
+                                  target-start-stack)))
              (setq new-end (merge-uvl-live-sets
                             new-end next-stack)))))))
 
@@ -246,7 +236,9 @@
                (let ((pred (find-if #'block-flag (block-pred block))))
                  (when (and (eq pred head)
                             (not (bind-p (block-start-node block))))
-                   (let ((entry (nle-block-entry-block block)))
+                   (let ((entry (node-block
+                                 (cleanup-mess-up
+                                  (block-start-cleanup block)))))
                      (setq pred (if (block-flag entry) entry nil))))
                  (cond (pred
                         (setf (block-flag block) t)
