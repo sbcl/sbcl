@@ -3492,7 +3492,8 @@
   (def logior 0 x)
   (def logior -1 -1)
   (def logxor -1 (lognot x))
-  (def logxor 0 x))
+  (def logxor 0 x)
+  (def logandc2 0 x))
 
 (defun least-zero-bit (x)
   (and (/= x -1)
