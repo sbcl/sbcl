@@ -2063,18 +2063,13 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
   (values))
 
-;;; Scan each of ENTRY's exits, setting up the exit for each lexical exit.
+;;; If ENTRY establishes lexical exits, set up each non-local exit.
 (defun ir2-convert-entry (node block)
   (declare (type entry node) (type ir2-block block))
-  (let ((nlxes '()))
-    (dolist (exit (entry-exits node))
-      (let ((info (exit-nlx-info exit)))
-        (when (and info
-                   (not (memq info nlxes))
-                   (member (cleanup-kind (nlx-info-cleanup info))
-                           '(:block :tagbody)))
-          (push info nlxes)
-          (emit-nlx-start node block info nil)))))
+  (let ((cleanup (entry-cleanup node)))
+    (when (member (cleanup-kind cleanup) '(:block :tagbody))
+      (dolist (info (cleanup-nlx-info cleanup))
+        (emit-nlx-start node block info nil))))
   (values))
 
 ;;; Set up the unwind block for these guys.
