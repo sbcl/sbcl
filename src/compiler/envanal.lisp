@@ -163,10 +163,12 @@
              (when (lambda-var-indirect thing)
                (setf (lambda-var-explicit-value-cell thing) t)))
             (nlx-info
-             (let ((exit (nlx-info-exit thing)))
-               (unless (policy exit (zerop safety))
-                 (setf (nlx-info-safe-p thing) t)
-                 (note-exit-check-elision-failure exit))))))))))
+             (let ((entry (cleanup-mess-up (nlx-info-cleanup thing))))
+               (dolist (exit (entry-exits entry))
+                 (when (eq thing (exit-nlx-info exit))
+                   (unless (policy exit (zerop safety))
+                     (setf (nlx-info-safe-p thing) t)
+                     (note-exit-check-elision-failure exit))))))))))))
 
 (defun note-exit-check-elision-failure (exit)
   (when (policy exit (> speed safety))
@@ -201,7 +203,7 @@
          (next-block (first (block-succ exit-block)))
          (entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
-         (info (make-nlx-info cleanup (first (block-succ exit-block)) exit))
+         (info (make-nlx-info cleanup (first (block-succ exit-block))))
          (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
                                          `(%nlx-entry ',info)
