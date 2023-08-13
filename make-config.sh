@@ -277,6 +277,8 @@ echo "$SBCL_DYNAMIC_SPACE_SIZE" > output/dynamic-space-size.txt
 . ./find-gnumake.sh
 find_gnumake
 
+CC="${CC:-cc}"
+
 ./generate-version.sh
 
 # Now that we've done our option parsing and found various
@@ -767,18 +769,10 @@ then
     # Launching new executables is pretty slow on macOS, but this configuration is pretty uniform
     echo ' :little-endian :os-provides-dlopen :os-provides-dladdr :os-provides-blksize-t :os-provides-suseconds-t' >> $ltf
 else
-    # Use a little C program to try to guess the endianness.  Ware
-    # cross-compilers!
+    # Use the C preprocessor to try to guess the endianness. 
     #
     # FIXME: integrate to grovel-features, mayhaps
-    if $android
-    then
-        $CC tools-for-build/determine-endianness.c -o tools-for-build/determine-endianness
-        android_run tools-for-build/determine-endianness >> $ltf
-    else
-        $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
-        tools-for-build/determine-endianness >> $ltf
-    fi
+    "$CC" $CFLAGS -Wall -E tools-for-build/determine-endianness.c 2>&1 | sed -rn 's/^.*(error|warning):.*"( :.+-endian)".*$/\2/gp' >> $ltf
     export sbcl_os sbcl_arch android
     sh tools-for-build/grovel-features.sh >> $ltf
 fi
