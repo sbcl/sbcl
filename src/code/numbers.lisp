@@ -914,6 +914,21 @@ the first."
          (progn ,@body)
          (progn ,@body))))
 
+(defmacro dispatch-two-ratios ((ratio1 numerator1 denominator1)
+                               (ratio2 numerator2 denominator2)
+                               body
+                               &optional (fixnum-body body))
+  `(let ((,numerator1 (numerator ,ratio1))
+         (,denominator1 (denominator ,ratio1))
+         (,numerator2 (numerator ,ratio2))
+         (,denominator2 (denominator ,ratio2)))
+     (if (and (fixnump ,numerator1)
+              (fixnump ,numerator2)
+              (fixnump ,denominator1)
+              (fixnump ,denominator2))
+         ,fixnum-body
+         ,body)))
+
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
@@ -943,8 +958,9 @@ the first."
                                    denominator)
                       y)))
                   ((ratio ratio)
-                   (dispatch-ratio (x numerator-x denominator-x)
-                     (dispatch-ratio (y numerator-y denominator-y)
+                   (dispatch-two-ratios
+                       (x numerator-x denominator-x)
+                       (y numerator-y denominator-y)
                        (or
                         ,@(case op
                             ((<= >=)
@@ -955,7 +971,19 @@ the first."
                             (>= '>)
                             (t op))
                          (* numerator-x denominator-y)
-                         (* numerator-y denominator-x))))))
+                         (* numerator-y denominator-x)))
+                       ,(sb-c::when-vop-existsp (:translate %signed-multiply-high)
+                          `(let ((high1 (%signed-multiply-high numerator-x denominator-y))
+                                 (high2 (%signed-multiply-high numerator-y denominator-x)))
+                             (cond ((= high1 high2)
+                                    (,op (logand most-positive-word (* numerator-x denominator-y))
+                                         (logand most-positive-word (* numerator-y denominator-x))))
+                                   ((,(case op
+                                        (<= '<)
+                                        (>= '>)
+                                        (t op))
+                                     high1 high2)
+                                    t))))))
                   ,@cases))))
   (def-two-arg-</> two-arg-< < floor ceiling
     ((fixnum bignum)
