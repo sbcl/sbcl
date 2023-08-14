@@ -2856,3 +2856,15 @@
   (def range<= nil nil)
   (def range<<= t nil)
   (def range<=< nil t))
+
+(define-vop (signed-multiply-low-high)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:results (lo :scs (unsigned-reg))
+            (hi :scs (signed-reg)))
+  (:result-types unsigned-num signed-num)
+  (:generator 2
+    (inst smulh hi x y)
+    (inst mul lo x y)))
