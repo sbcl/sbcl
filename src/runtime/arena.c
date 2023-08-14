@@ -389,6 +389,9 @@ long arena_bytes_used(lispobj arena_taggedptr)
     do {
         sum += block->freeptr - block->allocator_base;
     } while ((block = block->next) != NULL);
+    for ( block = (void*)arena->uw_huge_objects ; block ; block = block->next) {
+        sum += block->limit - block->allocator_base;
+    }
     ARENA_MUTEX_RELEASE(arena);
     return sum;
 }
