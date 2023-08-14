@@ -2196,6 +2196,12 @@ bootstrapping.
       (clos-slots-ref (std-instance-slots method) +sm-qualifiers-index+)
       (method-qualifiers method)))
 
+(defconstant +sgf-name-index+
+  (!bootstrap-slot-index 'standard-generic-function 'name))
+(declaim (inline !early-gf-name))
+(defun !early-gf-name (gf)
+  (clos-slots-ref (get-slots gf) +sgf-name-index+))
+
 (defun set-arg-info1 (gf arg-info new-method methods was-valid-p first-p)
   (let* ((existing-p (and methods (cdr methods) new-method))
          (nreq (length (arg-info-metatypes arg-info)))
@@ -2385,12 +2391,6 @@ bootstrapping.
     (typecase state
       (function nil)
       (cons (cddr state)))))
-
-(defconstant +sgf-name-index+
-  (!bootstrap-slot-index 'standard-generic-function 'name))
-
-(defun !early-gf-name (gf)
-  (clos-slots-ref (get-slots gf) +sgf-name-index+))
 
 (defun gf-lambda-list (gf)
   (let ((arg-info (if (eq **boot-state** 'complete)
@@ -2714,6 +2714,9 @@ bootstrapping.
       (when existing (remove-method gf existing))
       (add-method gf new))))
 
+(defmacro skip-update-dfun-in-add/remove-method (f)
+  `(assoc (!early-gf-name ,f) *!generic-function-fixups* :test #'equal))
+
 ;;; This is the early version of ADD-METHOD. Later this will become a
 ;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has
 ;;; special knowledge about ADD-METHOD.
@@ -2724,9 +2727,7 @@ bootstrapping.
     (error "Early ADD-METHOD didn't get an early method."))
   (push method (early-gf-methods generic-function))
   (set-arg-info generic-function :new-method method)
-  (unless (assoc (!early-gf-name generic-function)
-                 *!generic-function-fixups*
-                 :test #'equal)
+  (unless (skip-update-dfun-in-add/remove-method generic-function)
     (update-dfun generic-function)))
 
 ;;; This is the early version of REMOVE-METHOD. See comments on
@@ -2739,9 +2740,7 @@ bootstrapping.
   (setf (early-gf-methods generic-function)
         (remove method (early-gf-methods generic-function)))
   (set-arg-info generic-function)
-  (unless (assoc (!early-gf-name generic-function)
-                 *!generic-function-fixups*
-                 :test #'equal)
+  (unless (skip-update-dfun-in-add/remove-method generic-function)
     (update-dfun generic-function)))
 
 ;;; This is the early version of GET-METHOD. See comments on the early
