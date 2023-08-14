@@ -437,7 +437,7 @@
  ("src/compiler/generic/type-error")
  ("src/compiler/envanal")
 
- ;; KLUDGE: The assembly files need to be compiled twice: once as
+ ;; The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a
  ;; different suffix / "file type" for the :assem versions to make
  ;; sure we don't scribble over anything we shouldn't.
@@ -494,8 +494,6 @@
 
  ("src/code/share-vm" :not-host)
 
- ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
- ;; instead of a bunch of reader macros. -- WHN 19990308
  #+sparc ("src/code/sparc-vm" :not-host)
  #+x86   ("src/code/x86-vm"   :not-host)
  #+x86-64("src/code/x86-64-vm"   :not-host)
