@@ -126,26 +126,32 @@
              (pushnew lvar end))))))
 
     (dolist (lvar end)
-      (when (and (lvar-dynamic-extent lvar)
-                 (not (memq lvar (ir2-block-pushed 2block))))
-        (do-uses (generator lvar)
-          (let ((2block (block-info (node-block generator))))
-            (setq end (merge-uvl-live-sets
-                       end
-                       (set-difference
-                        (ir2-block-start-stack 2block)
-                        (ir2-block-popped 2block))))
-            (setq end (merge-uvl-live-sets
-                       end
-                       (ir2-block-pushed-before lvar 2block)))))))
+      (when (lvar-dynamic-extent lvar)
+        (let ((generators (lvar-uses lvar)))
+          (unless (and (listp generators)
+                       (find block generators :key #'node-block))
+            (do-uses (generator lvar)
+              (let ((2block (block-info (node-block generator))))
+                (setq end (merge-uvl-live-sets
+                           end
+                           (set-difference
+                            (ir2-block-start-stack 2block)
+                            (ir2-block-popped 2block))))
+                (setq end (merge-uvl-live-sets
+                           end
+                           (ir2-block-pushed-before lvar 2block)))))))))
 
     (setf (ir2-block-end-stack 2block) end)
-    (setf (ir2-block-start-stack 2block)
-          (merge-uvl-live-sets
-           (merge-uvl-live-sets
-            (set-difference end (ir2-block-pushed 2block))
-            (ir2-block-popped 2block))
-           (ir2-block-dx-popped 2block)))))
+    (let ((new-start (merge-uvl-live-sets
+                      (merge-uvl-live-sets
+                       (set-difference end (ir2-block-pushed 2block))
+                       (ir2-block-popped 2block))
+                      (ir2-block-dx-popped 2block))))
+      (cond ((subsetp new-start (ir2-block-start-stack 2block))
+             nil)
+            (t
+             (setf (ir2-block-start-stack 2block) new-start)
+             t)))))
 
 
 ;;;; Ordering of live UVL stacks
@@ -388,8 +394,11 @@
             (setq did-something t)))
      while did-something)
   (when (component-dx-lvars component)
-    (do-blocks (block component)
-      (extend-live-ranges block)))
+    (loop for did-something = nil
+      do (do-blocks (block component)
+           (when (extend-live-ranges block)
+             (setq did-something t)))
+      while did-something))
 
   (order-uvl-sets component)
 

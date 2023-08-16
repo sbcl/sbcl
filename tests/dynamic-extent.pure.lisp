@@ -1853,3 +1853,19 @@
       x
       y))
    (('(1 2 3 4) '(1 2 3 4) 1) '(3 5 7 9) :test #'equal)))
+
+(defun dxf (s i)
+  (elt s i))
+(declaim (notinline dxf))
+
+(with-test (:name :dynamic-extent-lp2031224)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda (a b)
+       (let ((v
+               (list
+                (list (vector 0 0) a
+                      (restart-bind nil a))
+                (block b2 b))))
+         (declare (dynamic-extent v))
+         (dxf (dxf v 0) 2))))))
