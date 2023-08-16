@@ -1869,3 +1869,18 @@
                 (block b2 b))))
          (declare (dynamic-extent v))
          (dxf (dxf v 0) 2))))))
+
+(with-test (:name :dynamic-extent-lp2031399)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda ()
+       (declare (notinline funcall not))
+       (labels ((%f1 ()
+                  (labels ((%f2 (&key (key1
+                                       (if (not t)
+                                           (ignore-errors 0)
+                                           0)))
+                             (declare (ignore key1))
+                             0))
+                    (funcall #'%f2))))
+         (%f1))))))

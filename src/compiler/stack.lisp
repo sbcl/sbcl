@@ -129,7 +129,9 @@
       (when (lvar-dynamic-extent lvar)
         (let ((generators (lvar-uses lvar)))
           (unless (and (listp generators)
-                       (find block generators :key #'node-block))
+                       (dolist (generator generators nil)
+                         (when (eq block (node-block generator))
+                           (return t))))
             (do-uses (generator lvar)
               (let ((2block (block-info (node-block generator))))
                 (setq end (merge-uvl-live-sets
@@ -384,8 +386,9 @@
       (unless (and (not (listp (lvar-uses dx-lvar)))
                    (eq (node-block (lvar-use dx-lvar))
                        dest-block))
-        (push dx-lvar
-              (ir2-block-dx-popped (block-info dest-block))))))
+        (when (block-info dest-block) ; maybe the node was deleted.
+          (push dx-lvar
+                (ir2-block-dx-popped (block-info dest-block)))))))
 
   ;; Compute sets of live UVLs and DX LVARs
   (loop for did-something = nil
