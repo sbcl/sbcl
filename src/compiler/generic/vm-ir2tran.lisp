@@ -157,13 +157,9 @@
            (and vop (eq (vop-name vop) 'make-unbound-marker))))))
 
 (defun emit-fixed-alloc (node block name words type lowtag result lvar)
-  (let ((stack-allocate-p (lvar-dynamic-extent lvar)))
-    (cond (stack-allocate-p
-           (vop current-stack-pointer node block
-                (ir2-lvar-stack-pointer (lvar-info lvar)))
-           (vop fixed-alloc-to-stack node block name words type lowtag t result))
-          (t
-           (vop fixed-alloc node block name words type lowtag nil result)))))
+  (if (lvar-dynamic-extent lvar)
+      (vop fixed-alloc-to-stack node block name words type lowtag t result)
+      (vop fixed-alloc node block name words type lowtag nil result)))
 
 (defun link-allocator-to-inits (allocator-vop last-init-vop lvar)
   (declare (ignorable allocator-vop last-init-vop lvar))
@@ -195,9 +191,6 @@
         (let ((words (+ (lvar-value extra) words)))
           (emit-fixed-alloc node block name words type lowtag result lvar))
         (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
-          (when stack-allocate-p
-            (vop current-stack-pointer node block
-                 (ir2-lvar-stack-pointer (lvar-info lvar))))
           (vop var-alloc node block (lvar-tn node block extra) name words
                type lowtag stack-allocate-p result)))
     (let ((allocator-vop (ir2-block-last-vop block))

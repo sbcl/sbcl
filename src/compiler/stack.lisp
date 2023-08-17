@@ -32,15 +32,21 @@
           (when (eq node last-pop)
             (setq saw-last t))
 
-          (when (and lvar
-                     (or (lvar-dynamic-extent lvar)
-                         (let ((dest (lvar-dest lvar))
-                               (2lvar (lvar-info lvar)))
-                           (and (not (eq (node-block dest) block))
-                                2lvar
-                                (eq (ir2-lvar-kind 2lvar) :unknown)))))
+          (when (and lvar (not (lvar-dynamic-extent lvar))
+                     (let ((dest (lvar-dest lvar))
+                           (2lvar (lvar-info lvar)))
+                       (and (not (eq (node-block dest) block))
+                            2lvar
+                            (eq (ir2-lvar-kind 2lvar) :unknown))))
             (aver (or saw-last (not last-pop)))
-            (pushed lvar))))
+            (pushed lvar))
+          (when lvar
+            (let ((dx-info (lvar-dynamic-extent lvar)))
+              (when dx-info
+                (let ((value (dx-info-value dx-info)))
+                  (unless (memq value (pushed))
+                    (aver (or saw-last (not last-pop)))
+                    (pushed value))))))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
@@ -68,6 +74,13 @@
 ;;; An LVAR is live at the end iff it is live at any of blocks which
 ;;; BLOCK can transfer control to. There are two kind of control
 ;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
+;;;
+;;; Additionally, we must keep dynamic extent values live within the
+;;; extent of their cleanups. Also, since dynamic extent objects can't
+;;; move (as object identity must be preserved and we can't in general
+;;; track all references), everything allocated deeper than a DX
+;;; object -- that is, before the DX object -- should be kept alive
+;;; until the object is deallocated as well.
 (defun update-uvl-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
@@ -89,7 +102,26 @@
                                   (remove exit-lvar target-start-stack)
                                   target-start-stack)))
              (setq new-end (merge-uvl-live-sets
-                            new-end next-stack)))))))
+                            new-end next-stack)))))
+        (:dynamic-extent
+         (dolist (dx-info (cleanup-nlx-info cleanup))
+           (when (dx-info-subparts dx-info)
+             (pushnew (dx-info-value dx-info) new-end))))))
+
+    (dolist (lvar new-end)
+      (when (lvar-dynamic-extent lvar)
+        (dolist (subpart (dx-info-subparts (lvar-dynamic-extent lvar)))
+          (do-uses (generator subpart)
+            (let ((2block (block-info (node-block generator))))
+              (setq new-end
+                    (merge-uvl-live-sets
+                     new-end
+                     (set-difference
+                      (ir2-block-start-stack 2block)
+                      (ir2-block-popped 2block))))
+              (setq new-end (merge-uvl-live-sets
+                             new-end
+                             (ir2-block-pushed-before lvar 2block))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
@@ -106,108 +138,21 @@
              (setf (ir2-block-start-stack 2block) start)
              t)))))
 
-;;; Once the ordinary liveness of stack objects has been computed,
-;;; extend their live ranges to conform to any dynamic extent
-;;; semantics. First, we must keep dynamic extent values live within
-;;; the extent of their cleanups. Second, since dynamic extent objects
-;;; can't move (as object identity must be preserved and we can't in
-;;; general track all references), everything allocated deeper than a
-;;; DX object -- that is, before the DX object -- should be kept alive
-;;; until the object is deallocated as well.
-(defun extend-live-ranges (block)
-  (declare (type cblock block))
-  (let* ((2block (block-info block))
-         (end (ir2-block-end-stack 2block)))
-    (do-nested-cleanups (cleanup block)
-      (case (cleanup-kind cleanup)
-        (:dynamic-extent
-         (dolist (dx-info (cleanup-nlx-info cleanup))
-           (dolist (lvar (dx-info-subparts dx-info))
-             (pushnew lvar end))))))
-
-    (dolist (lvar end)
-      (when (lvar-dynamic-extent lvar)
-        (let ((generators (lvar-uses lvar)))
-          (unless (and (listp generators)
-                       (dolist (generator generators nil)
-                         (when (eq block (node-block generator))
-                           (return t))))
-            (do-uses (generator lvar)
-              (let ((2block (block-info (node-block generator))))
-                (setq end (merge-uvl-live-sets
-                           end
-                           (set-difference
-                            (ir2-block-start-stack 2block)
-                            (ir2-block-popped 2block))))
-                (setq end (merge-uvl-live-sets
-                           end
-                           (ir2-block-pushed-before lvar 2block)))))))))
-
-    (setf (ir2-block-end-stack 2block) end)
-    (let ((new-start (merge-uvl-live-sets
-                      (merge-uvl-live-sets
-                       (set-difference end (ir2-block-pushed 2block))
-                       (ir2-block-popped 2block))
-                      (ir2-block-dx-popped 2block))))
-      (cond ((subsetp new-start (ir2-block-start-stack 2block))
-             nil)
-            (t
-             (setf (ir2-block-start-stack 2block) new-start)
-             t)))))
-
 
 ;;;; Ordering of live UVL stacks
 
-(defun ordered-list-intersection (ordered-list other-list)
-  (loop for item in ordered-list
-     when (memq item other-list)
-     collect item))
-
-(defun ordered-list-union (ordered-list-1 ordered-list-2)
-  (labels ((sub-union (ol1 ol2 result)
-             (cond ((and (null ol1) (null ol2))
-                    result)
-                   ((and (null ol1) ol2)
-                    (sub-union ol1 (cdr ol2) (cons (car ol2) result)))
-                   ((and ol1 (null ol2))
-                    (sub-union (cdr ol1) ol2 (cons (car ol1) result)))
-                   ((eq (car ol1) (car ol2))
-                    (sub-union (cdr ol1) (cdr ol2) (cons (car ol1) result)))
-                   ((memq (car ol1) ol2)
-                    (sub-union ol1 (cdr ol2) (cons (car ol2) result)))
-                   (t
-                    (sub-union (cdr ol1) ol2 (cons (car ol1) result))))))
-    (nreverse (sub-union ordered-list-1 ordered-list-2 nil))))
-
 ;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
-;;; is a predecessor of BLOCK with already sorted stacks; if all UVLs
-;;; being live at the BLOCK start are live in PRED we just need to
-;;; delete killed UVLs, otherwise we need (thanks to conditional or
-;;; nested DX) to set a total order for the UVLs live at the end of
-;;; all predecessors.
+;;; is a predecessor of BLOCK with already sorted stacks; because all
+;;; UVLs live at the BLOCK start are live in PRED, we just need
+;;; to delete dead UVLs.
 (defun order-block-uvl-sets (block pred)
   (let* ((2block (block-info block))
          (pred-end-stack (ir2-block-end-stack (block-info pred)))
          (start (ir2-block-start-stack 2block))
-         (start-stack (ordered-list-intersection pred-end-stack start))
+         (start-stack (loop for lvar in pred-end-stack
+                            when (memq lvar start)
+                            collect lvar))
          (end (ir2-block-end-stack 2block)))
-
-    (when (not (subsetp start start-stack))
-      ;; If BLOCK is a control-flow join for DX allocation paths with
-      ;; different sets of DX LVARs being pushed, we cannot be in a
-      ;; loop, so since we are processing the blocks in reverse
-      ;; post-order, its predecessors should all have been processed
-      ;; already.
-      (aver (every #'block-flag (block-pred block)))
-      ;; If we are in the conditional-DX control-flow join case then
-      ;; we need to find an order for START-STACK that is compatible
-      ;; with all of our predecessors.
-      (dolist (pred (block-pred block))
-        (let ((end-stack (ir2-block-end-stack (block-info pred))))
-          (setf pred-end-stack
-                (ordered-list-union pred-end-stack end-stack))))
-      (setf start-stack (ordered-list-intersection pred-end-stack start)))
-
     (when *check-consistency*
       (aver (subsetp start start-stack)))
     (setf (ir2-block-start-stack 2block) start-stack)
@@ -221,8 +166,10 @@
         (aver (eq pop (car end-stack)))
         (pop end-stack))
       (dolist (push (ir2-block-pushed 2block))
-        (aver (not (memq push end-stack)))
-        (push push end-stack))
+        (unless (and (lvar-dynamic-extent push)
+                     (memq push end-stack))
+          (aver (not (memq push end-stack)))
+          (push push end-stack)))
       (aver (subsetp end end-stack))
       (when (and tailp-lvar
                  (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
@@ -263,6 +210,29 @@
              (aver (not (plusp todo))))
         while (plusp todo)))
 
+;;; Insert calls to %DYNAMIC-EXTENT-START when the stack at the end of
+;;; BLOCK contains a dynamic extent object group not present at the
+;;; start of BLOCK. This allows cleanup code inserted by
+;;; DISCARD-UNUSED-VALUES to reset the stack to the right place.
+(defun insert-stack-mess-ups (block)
+  (let ((stack-pointers '()))
+    (do-nodes (node lvar block)
+      (when lvar
+        (let ((dx-info (lvar-dynamic-extent lvar)))
+          (when dx-info
+            (let ((value (dx-info-value dx-info))
+                  (2block (block-info block)))
+              (when (and (not (memq value (ir2-block-start-stack 2block)))
+                         (not (memq value stack-pointers)))
+                (aver (memq value (ir2-block-end-stack 2block)))
+                (setf (ctran-next (node-prev node)) nil)
+                (let ((ctran (make-ctran)))
+                  (with-ir1-environment-from-node node
+                    (ir1-convert (node-prev node) ctran nil
+                                 `(%dynamic-extent-start ',value))
+                    (link-node-to-previous-ctran node ctran)))
+                (push value stack-pointers)))))))))
+
 ;;; This is called when we discover that the stack-top unknown-values
 ;;; lvar at the end of BLOCK1 is different from that at the start of
 ;;; BLOCK2 (its successor).
@@ -278,7 +248,7 @@
 ;;; will never actually be executed. It doesn't seem to be worth the
 ;;; risk of trying to optimize this, since this rarely happens and
 ;;; wastes only space.
-(defun insert-stack-cleanups (block1 block2)
+(defun discard-unused-values (block1 block2)
   (declare (type cblock block1 block2))
   (collect ((cleanup-code))
     (labels ((find-popped (before after)
@@ -318,20 +288,10 @@
                       (find-popped before-stack after-stack)
                     (declare (ignore popped))
                     (cleanup-code `(%pop-values ',last-popped))
-                    (discard rest after-stack)))))
-             (dummy-allocations (before-stack after-stack)
-               (loop
-                  for previous-lvar = nil then lvar
-                  for lvar in after-stack
-                  unless (memq lvar before-stack)
-                  do (cleanup-code
-                      `(%dummy-dx-alloc ',lvar ',previous-lvar)))))
+                    (discard rest after-stack))))))
       (let* ((end-stack (ir2-block-end-stack (block-info block1)))
-             (start-stack (ir2-block-start-stack (block-info block2)))
-             (pruned-start-stack (ordered-list-intersection
-                                  start-stack end-stack)))
-        (discard end-stack pruned-start-stack)
-        (dummy-allocations pruned-start-stack start-stack)
+             (start-stack (ir2-block-start-stack (block-info block2))))
+        (discard end-stack start-stack)
         (when (cleanup-code)
           (let* ((block (insert-cleanup-code (list block1) block2
                                              (block-start-node block2)
@@ -367,10 +327,10 @@
 
 ;;; Analyze the use of unknown-values and DX lvars in COMPONENT,
 ;;; inserting cleanup code to discard values that are generated but
-;;; never received and to set appropriate bounds for DX values that
-;;; are cleaned up but never allocated. This phase doesn't need to be
-;;; run when Values-Receivers and Dx-Lvars are null, i.e. there are no
-;;; unknown-values lvars used across block boundaries and no DX LVARs.
+;;; never received and to set appropriate bounds for dynamic extent
+;;; values. This phase doesn't need to be run when Values-Receivers
+;;; and Dx-Lvars are null, i.e. there are no unknown-values lvars used
+;;; across block boundaries and no DX LVARs.
 (defun stack-analyze (component)
   (declare (type component component))
   (let* ((2comp (component-info component))
@@ -382,13 +342,14 @@
       (find-pushed-lvars block)))
 
   (dolist (dx-lvar (component-dx-lvars component))
-    (let ((dest-block (node-block (lvar-dynamic-extent-dest dx-lvar))))
+    (let ((dest-block (node-block (lvar-dynamic-extent-dest dx-lvar)))
+          (value (dx-info-value (lvar-dynamic-extent dx-lvar))))
       (unless (and (not (listp (lvar-uses dx-lvar)))
                    (eq (node-block (lvar-use dx-lvar))
                        dest-block))
         (when (block-info dest-block) ; maybe the node was deleted.
-          (push dx-lvar
-                (ir2-block-dx-popped (block-info dest-block)))))))
+          (pushnew value
+                   (ir2-block-dx-popped (block-info dest-block)))))))
 
   ;; Compute sets of live UVLs and DX LVARs
   (loop for did-something = nil
@@ -396,14 +357,12 @@
           (when (update-uvl-live-sets block)
             (setq did-something t)))
      while did-something)
-  (when (component-dx-lvars component)
-    (loop for did-something = nil
-      do (do-blocks (block component)
-           (when (extend-live-ranges block)
-             (setq did-something t)))
-      while did-something))
 
   (order-uvl-sets component)
+
+  (when (component-dx-lvars component)
+    (do-blocks (block component)
+      (insert-stack-mess-ups block)))
 
   (do-blocks (block component)
     (let ((top (ir2-block-end-stack (block-info block))))
@@ -415,6 +374,6 @@
           (let ((start (block-last succ)))
             (unless (and (return-p start)
                          (eq (block-start succ) (node-prev start)))
-              (insert-stack-cleanups block succ)))))))
+              (discard-unused-values block succ)))))))
 
   (values))

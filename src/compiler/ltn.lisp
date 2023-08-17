@@ -135,7 +135,9 @@
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
           (setf (tn-type tn) (lvar-type lvar))
           (setf (ir2-lvar-locs info) (list tn))
-          (when (lvar-dynamic-extent lvar)
+          (when (and (lvar-dynamic-extent lvar)
+                     (eq (dx-info-value (lvar-dynamic-extent lvar))
+                         lvar))
             (setf (ir2-lvar-stack-pointer info)
                   (make-stack-pointer-tn)))))))
   (ltn-annotate-casts lvar)
@@ -303,8 +305,9 @@
     (setf (lvar-info lvar) info)
     (when (lvar-dynamic-extent lvar)
       (aver (proper-list-of-length-p types 1))
-      (setf (ir2-lvar-stack-pointer info)
-            (make-stack-pointer-tn))))
+      (when (eq (dx-info-value (lvar-dynamic-extent lvar)) lvar)
+        (setf (ir2-lvar-stack-pointer info)
+              (make-stack-pointer-tn)))))
   (ltn-annotate-casts lvar)
   (values))
 
@@ -504,8 +507,9 @@
       (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
         (setf (lvar-info lvar) info)
         (setf (ir2-lvar-kind info) :delayed)
-        (setf (ir2-lvar-stack-pointer info)
-              (make-stack-pointer-tn))))))
+        (when (eq (dx-info-value (lvar-dynamic-extent lvar)) lvar)
+          (setf (ir2-lvar-stack-pointer info)
+                (make-stack-pointer-tn)))))))
 
 ;;; We need a special method for %UNWIND-PROTECT that ignores the
 ;;; cleanup function. We don't annotate either arg, since we don't
@@ -522,7 +526,6 @@
 ;;; (Otherwise the compiler may dump its internal structures as
 ;;; constants :-()
 (defoptimizer (%pop-values ltn-annotate) ((%lvar)))
-(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source)))
 
 (defoptimizer (%nip-values ltn-annotate) ((&rest lvars))
   ;; Undo the optimization performed by LTN-ANALYZE-MV-CALL,

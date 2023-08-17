@@ -280,10 +280,7 @@
 (defun ir2-convert-enclose (node ir2-block)
   (declare (type enclose node)
            (type ir2-block ir2-block))
-  (let ((funs (enclose-funs node))
-        (lvar (node-lvar node))) ; non-null when DX
-    (when lvar
-      (vop current-stack-pointer node ir2-block (ir2-lvar-stack-pointer (lvar-info lvar))))
+  (let ((funs (enclose-funs node)))
     (collect ((delayed))
       (dolist (fun funs)
         (let ((xep (functional-entry-fun fun)))
@@ -297,7 +294,7 @@
                        #-(or x86-64 arm64)
                        (entry (make-load-time-constant-tn :entry xep))
                        (env (node-environment node))
-                       (leaf-dx-p (and lvar (leaf-dynamic-extent fun))))
+                       (leaf-dx-p (and (node-lvar node) (leaf-dynamic-extent fun))))
                   (aver (entry-info-offset entry-info))
                   (vop make-closure node ir2-block #-(or x86-64 arm64) entry
                                     (entry-info-offset entry-info) (length closure)
@@ -774,9 +771,6 @@
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)
                      (template-info-arg-count template)))
-            (when (and lvar (lvar-dynamic-extent lvar))
-              (vop current-stack-pointer call block
-                   (ir2-lvar-stack-pointer (lvar-info lvar))))
             (when (emit-step-p call)
               (vop sb-vm::step-instrument-before-vop call block))
             (if info-args
@@ -1809,26 +1803,6 @@
             (t
              (bug "Trying to nip a not stack-allocated LVAR ~S." after))))))
 
-(defoptimizer (%dummy-dx-alloc ir2-convert) ((target source) node block)
-  (let* ((target-lvar (lvar-value target))
-         (source-lvar (lvar-value source))
-         (target-2lvar (lvar-info target-lvar))
-         (source-2lvar (and source-lvar (lvar-info source-lvar))))
-    (aver (lvar-dynamic-extent target-lvar))
-    (cond ((not source-lvar)
-           (vop current-stack-pointer node block
-                (ir2-lvar-stack-pointer target-2lvar)))
-          ((lvar-dynamic-extent source-lvar)
-           (emit-move node block
-                      (ir2-lvar-stack-pointer source-2lvar)
-                      (ir2-lvar-stack-pointer target-2lvar)))
-          ((eq (ir2-lvar-kind source-2lvar) :unknown)
-           (emit-move node block
-                      (first (ir2-lvar-locs source-2lvar))
-                      (ir2-lvar-stack-pointer target-2lvar)))
-          (t (bug "Trying to dummy up DX allocation from a ~
-not stack-allocated LVAR ~S." source-lvar)))))
-
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
   (let ((tns (mapcar (lambda (x)
@@ -1885,6 +1859,12 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (when fun
     (ir2-convert-full-call node block)))
 
+;;;; DYNAMIC-EXTENT
+
+(defoptimizer (%dynamic-extent-start ir2-convert) ((%lvar) node block)
+  (vop current-stack-pointer node block
+       (ir2-lvar-stack-pointer (lvar-info (lvar-value %lvar)))))
+
 ;;;; special binding
 
 ;;; This is trivial, given our assumption of a shallow-binding
@@ -2185,8 +2165,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
                                     nil))
            (lvar (node-lvar node))
            (res (lvar-result-tns lvar (list (specifier-type 'list)))))
-      (when (and lvar (lvar-dynamic-extent lvar))
-        (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
       ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name
       ;;; doesn't exist. This was the best workaround I found, short of using #+.
       (or (when-vop-existsp (:named cons)

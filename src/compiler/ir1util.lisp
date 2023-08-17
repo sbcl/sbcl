@@ -773,11 +773,6 @@
     (setf (node-lexenv call)
           (make-lexenv :default (node-lexenv call)
                        :cleanup cleanup))
-    (setf (ctran-next (node-prev call)) nil)
-    (let ((ctran (make-ctran)))
-      (with-ir1-environment-from-node call
-        (ir1-convert (node-prev call) ctran nil '(%cleanup-point))
-        (link-node-to-previous-ctran call ctran)))
     ;; Make CALL end its block, so that we have a place to
     ;; insert cleanup code.
     (node-ends-block call)

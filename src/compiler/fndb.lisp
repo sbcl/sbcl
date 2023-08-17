@@ -1894,6 +1894,7 @@
   :derive-type #'result-type-first-arg)
 
 (defknown %cleanup-point (&rest t) t (reoptimize-when-unlinking))
+(defknown %dynamic-extent-start (t) t)
 (defknown %special-bind (t t) t)
 (defknown %special-unbind (&rest symbol) t)
 (defknown %listify-rest-args (t index) list (flushable))
@@ -1921,7 +1922,6 @@
 (defknown %%primitive (t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %nip-values (t t &rest t) (values))
-(defknown %dummy-dx-alloc (t t) t)
 (defknown %type-check-error (t t t) nil)
 (defknown %type-check-error/c (t t t) nil)
 
