@@ -482,6 +482,19 @@
     (((expt 2 80)) t)
     (:return-type (values (member t) &optional))))
 
+(with-test (:name :constant-refs.2)
+  (checked-compile-and-assert
+      ()
+      `(lambda (v)
+         (if (<= -3483114449144072 v)
+             0
+             (if (>= -3483114449144072 v)
+                 1
+                 40)))
+    ((9) 0)
+    ((-3483114449144073) 1)
+    (:return-type (values bit &optional))))
+
 (with-test (:name :array-has-fill-pointer-p-constraint)
   (assert
    (type-specifiers-equal

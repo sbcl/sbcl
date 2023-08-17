@@ -348,7 +348,8 @@
      (equality-constraint >= nil nil)
      (equality-constraint > true nil)
      (equality-constraint = true)
-     (equality-constraint < inverse-true nil))
+     (equality-constraint < inverse-true nil)
+     (equality-constraint <= inverse-true nil))
     result))
 
 (defoptimizer (<= equality-constraint) ((x y))
@@ -357,7 +358,8 @@
      (equality-constraint < true nil)
      (equality-constraint <= nil nil)
      (equality-constraint = true)
-     (equality-constraint > inverse-true nil))
+     (equality-constraint > inverse-true nil)
+     (equality-constraint >= inverse-true nil))
     result))
 
 (defoptimizer (- equality-constraint) ((x y) node)
