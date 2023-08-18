@@ -294,7 +294,8 @@
                        #-(or x86-64 arm64)
                        (entry (make-load-time-constant-tn :entry xep))
                        (env (node-environment node))
-                       (leaf-dx-p (and (node-lvar node) (leaf-dynamic-extent fun))))
+                       (leaf-dx-p (leaf-dynamic-extent fun)))
+                  (when leaf-dx-p (aver (node-lvar node)))
                   (aver (entry-info-offset entry-info))
                   (vop make-closure node ir2-block #-(or x86-64 arm64) entry
                                     (entry-info-offset entry-info) (length closure)
