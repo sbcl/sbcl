@@ -819,9 +819,9 @@
 
 (defun lvar-good-for-dx-p (lvar cleanup dx)
   (aver (lvar-uses lvar))
-  (do-uses (use lvar t)
-    (unless (use-good-for-dx-p use cleanup dx)
-      (return nil))))
+  (do-uses (use lvar nil)
+    (when (use-good-for-dx-p use cleanup dx)
+      (return t))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe
 ;;; or whose result is that value and ends up being discarded.

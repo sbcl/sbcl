@@ -389,26 +389,27 @@
                          ;; Now look to see if there are otherwise
                          ;; inaccessible parts of the value in LVAR.
                          (do-uses (use lvar)
-                           (etypecase use
-                             (cast (mark-dx (cast-value use) use))
-                             (combination
-                              ;; Don't propagate through &REST, for
-                              ;; sanity.
-                              (unless (eq (combination-fun-source-name use nil)
-                                          '%listify-rest-args)
-                                (dolist (arg (combination-args use))
-                                  (when (and arg
-                                             (lvar-good-for-dx-p arg cleanup dx))
-                                    (mark-dx arg use)))))
-                             (ref
-                              (let ((leaf (ref-leaf use)))
-                                (typecase leaf
-                                  (lambda-var
-                                   (mark-dx (let-var-initial-value leaf) use))
-                                  (clambda
-                                   (let ((fun (functional-entry-fun leaf)))
-                                     (setf (enclose-cleanup (functional-enclose fun)) cleanup)
-                                     (setf (leaf-dynamic-extent fun) dx))))))))))
+                           (when (use-good-for-dx-p use cleanup dx)
+                             (etypecase use
+                               (cast (mark-dx (cast-value use) use))
+                               (combination
+                                ;; Don't propagate through &REST, for
+                                ;; sanity.
+                                (unless (eq (combination-fun-source-name use nil)
+                                            '%listify-rest-args)
+                                  (dolist (arg (combination-args use))
+                                    (when (and arg
+                                               (lvar-good-for-dx-p arg cleanup dx))
+                                      (mark-dx arg use)))))
+                               (ref
+                                (let ((leaf (ref-leaf use)))
+                                  (typecase leaf
+                                    (lambda-var
+                                     (mark-dx (let-var-initial-value leaf) use))
+                                    (clambda
+                                     (let ((fun (functional-entry-fun leaf)))
+                                       (setf (enclose-cleanup (functional-enclose fun)) cleanup)
+                                       (setf (leaf-dynamic-extent fun) dx)))))))))))
                 (let ((lvar (dx-info-value dx-info)))
                   ;; Check that the value hasn't been flushed somehow.
                   (when (lvar-uses lvar)
