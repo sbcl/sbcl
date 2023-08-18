@@ -150,7 +150,6 @@
   ;; by stack analysis.
   (pushed () :type list)
   (popped () :type list)
-  (dx-popped () :type list)
   ;; the result of stack analysis: lists of all the unknown-values
   ;; LVARs on the stack at the block start and end, topmost LVAR
   ;; first.
@@ -293,6 +292,9 @@
   ;; POPPED. This slot is initialized by LTN-ANALYZE as an input to
   ;; STACK-ANALYZE.
   (values-receivers nil :type list)
+  ;; a list of all the blocks which mess up the stack with dynamic
+  ;; extent allocated objects.
+  (stack-mess-ups nil :type list)
   ;; an adjustable vector that records all the constants in the
   ;; constant pool. A non-immediate :CONSTANT TN with offset 0 refers
   ;; to the constant in element 0, etc. Normal constants are

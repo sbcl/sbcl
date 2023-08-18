@@ -40,13 +40,11 @@
                             (eq (ir2-lvar-kind 2lvar) :unknown))))
             (aver (or saw-last (not last-pop)))
             (pushed lvar))
-          (when lvar
-            (let ((dx-info (lvar-dynamic-extent lvar)))
-              (when dx-info
-                (let ((value (dx-info-value dx-info)))
-                  (unless (memq value (pushed))
-                    (aver (or saw-last (not last-pop)))
-                    (pushed value))))))))
+          (when (and (basic-combination-p node)
+                     (eq (basic-combination-kind node) :known)
+                     (eq (combination-fun-source-name node) '%dynamic-extent-start))
+            (aver (or saw-last (not last-pop)))
+            (pushed (lvar-value (car (basic-combination-args node)))))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
@@ -128,7 +126,6 @@
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
-      (setq start (merge-uvl-live-sets start (ir2-block-dx-popped 2block)))
 
       (when *check-consistency*
         (aver (subsetp original-start start)))
@@ -166,10 +163,8 @@
         (aver (eq pop (car end-stack)))
         (pop end-stack))
       (dolist (push (ir2-block-pushed 2block))
-        (unless (and (lvar-dynamic-extent push)
-                     (memq push end-stack))
-          (aver (not (memq push end-stack)))
-          (push push end-stack)))
+        (aver (not (memq push end-stack)))
+        (push push end-stack))
       (aver (subsetp end end-stack))
       (when (and tailp-lvar
                  (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
@@ -210,28 +205,40 @@
              (aver (not (plusp todo))))
         while (plusp todo)))
 
-;;; Insert calls to %DYNAMIC-EXTENT-START when the stack at the end of
-;;; BLOCK contains a dynamic extent object group not present at the
-;;; start of BLOCK. This allows cleanup code inserted by
-;;; DISCARD-UNUSED-VALUES to reset the stack to the right place.
-(defun insert-stack-mess-ups (block)
-  (let ((stack-pointers '()))
-    (do-nodes (node lvar block)
-      (when lvar
-        (let ((dx-info (lvar-dynamic-extent lvar)))
-          (when dx-info
-            (let ((value (dx-info-value dx-info))
-                  (2block (block-info block)))
-              (when (and (not (memq value (ir2-block-start-stack 2block)))
-                         (not (memq value stack-pointers)))
-                (aver (memq value (ir2-block-end-stack 2block)))
-                (setf (ctran-next (node-prev node)) nil)
-                (let ((ctran (make-ctran)))
-                  (with-ir1-environment-from-node node
-                    (ir1-convert (node-prev node) ctran nil
-                                 `(%dynamic-extent-start ',value))
-                    (link-node-to-previous-ctran node ctran)))
-                (push value stack-pointers)))))))))
+;;; Do a forward walk in the flow graph and insert calls to
+;;; %DYNAMIC-EXTENT-START whenever we mess up the run-time stack by
+;;; allocating a dynamic extent object. BLOCK is the block that is
+;;; currently being walked and STACK is the stack of mess-ups. Objects
+;;; with the same lifetime share the same mess-ups. This allows
+;;; cleanup code inserted by DISCARD-UNUSED-VALUES to reset the stack
+;;; to the right place.
+(defun stack-mess-up-walk (block stack)
+  (declare (type cblock block) (list stack))
+  (unless (block-flag block)
+    (setf (block-flag block) t)
+    (let ((2comp (component-info (block-component block))))
+      (do-nodes (node lvar block)
+        (when lvar
+          (let ((dx-info (lvar-dynamic-extent lvar)))
+            (when dx-info
+              (let ((value (dx-info-value dx-info)))
+                (unless (memq value stack)
+                  (push value stack)
+                  (pushnew block (ir2-component-stack-mess-ups 2comp))
+                  (setf (ctran-next (node-prev node)) nil)
+                  (let ((ctran (make-ctran)))
+                    (with-ir1-environment-from-node node
+                      (ir1-convert (node-prev node) ctran nil
+                                   `(%dynamic-extent-start ',value))
+                      (link-node-to-previous-ctran node ctran))))))))
+        (when (entry-p node)
+          (dolist (nlx-info (cleanup-nlx-info (entry-cleanup node)))
+            (when (nlx-info-p nlx-info)
+              (stack-mess-up-walk (nlx-info-target nlx-info) stack))))))
+    (dolist (succ (block-succ block))
+      (stack-mess-up-walk succ stack)))
+
+  (values))
 
 ;;; This is called when we discover that the stack-top unknown-values
 ;;; lvar at the end of BLOCK1 is different from that at the start of
@@ -310,19 +317,16 @@
 ;;;; stack analysis
 
 ;;; Return a list of all the blocks containing genuine uses of one of
-;;; the RECEIVERS (blocks) and DX-LVARS. Exits are excluded, since
-;;; they don't drop through to the receiver.
-(defun find-pushing-blocks (receivers dx-lvars)
-  (declare (list receivers dx-lvars))
+;;; the RECEIVERS. Exits are excluded, since they don't drop through
+;;; to the receiver.
+(defun find-values-generators (receivers)
+  (declare (list receivers))
   (collect ((res nil adjoin))
     (dolist (rec receivers)
       (dolist (pop (ir2-block-popped (block-info rec)))
         (do-uses (use pop)
           (unless (exit-p use)
             (res (node-block use))))))
-    (dolist (dx-lvar dx-lvars)
-      (do-uses (use dx-lvar)
-        (res (node-block use))))
     (res)))
 
 ;;; Analyze the use of unknown-values and DX lvars in COMPONENT,
@@ -335,21 +339,20 @@
   (declare (type component component))
   (let* ((2comp (component-info component))
          (receivers (ir2-component-values-receivers 2comp))
-         (generators (find-pushing-blocks receivers
-                                          (component-dx-lvars component))))
+         (generators (find-values-generators receivers)))
+
+    (when (component-dx-lvars component)
+      (clear-flags component)
+      (dolist (ep (block-succ (component-head component)))
+        (when (bind-p (block-start-node ep))
+          (stack-mess-up-walk ep ()))))
 
     (dolist (block generators)
-      (find-pushed-lvars block)))
+      (find-pushed-lvars block))
 
-  (dolist (dx-lvar (component-dx-lvars component))
-    (let ((dest-block (node-block (lvar-dynamic-extent-dest dx-lvar)))
-          (value (dx-info-value (lvar-dynamic-extent dx-lvar))))
-      (unless (and (not (listp (lvar-uses dx-lvar)))
-                   (eq (node-block (lvar-use dx-lvar))
-                       dest-block))
-        (when (block-info dest-block) ; maybe the node was deleted.
-          (pushnew value
-                   (ir2-block-dx-popped (block-info dest-block)))))))
+    (dolist (block (ir2-component-stack-mess-ups 2comp))
+      (unless (ir2-block-pushed (block-info block))
+        (find-pushed-lvars block))))
 
   ;; Compute sets of live UVLs and DX LVARs
   (loop for did-something = nil
@@ -359,10 +362,6 @@
      while did-something)
 
   (order-uvl-sets component)
-
-  (when (component-dx-lvars component)
-    (do-blocks (block component)
-      (insert-stack-mess-ups block)))
 
   (do-blocks (block component)
     (let ((top (ir2-block-end-stack (block-info block))))

@@ -196,8 +196,6 @@
   (reoptimize t :type boolean)
   ;; if the LVAR value is DYNAMIC-EXTENT, some information.
   (dynamic-extent nil :type (or null dx-info))
-  ;; Like LVAR-DEST but aware of DX propagation through REF nodes.
-  (dynamic-extent-dest nil :type (or node null))
   ;; something or other that the back end annotates this lvar with
   (info nil)
   ;; Nodes to reoptimize together with the lvar

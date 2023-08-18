@@ -1919,3 +1919,38 @@
          res))
      ((t 4 5) 20)
      ((nil 4 5) nil))))
+
+(with-test (:name :dynamic-extent-mess-up)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (x)
+       (let ((y (list (cons 1 2)
+                      (progn
+                        (if x
+                            (print-nothing 2)
+                            (print-nothing 3))
+                        (cons 3 4))
+                      (progn
+                        (if x
+                            (print-nothing 2)
+                            (print-nothing 3))
+                        (cons 3 4)))))
+         (declare (dynamic-extent y))
+         (assert (sb-ext:stack-allocated-p y))
+         (copy-tree y)))
+     ((t) '((1 . 2) (3 . 4) (3 . 4)) :test #'tree-equal))))
+
+(with-test (:name :stack-analysis-graph-walk-nlx)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda ()
+       (let ((+++ 3))
+         (multiple-value-bind (result error)
+             (ignore-errors (eval 1))
+           (declare (ignore result error)))
+         (catch 'foo
+           (error "bar"))
+         (multiple-value-bind (result error)
+             (ignore-errors (eval 1))
+           (declare (ignore result error))))))))
