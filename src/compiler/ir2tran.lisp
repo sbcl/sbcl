@@ -280,43 +280,42 @@
 (defun ir2-convert-enclose (node ir2-block)
   (declare (type enclose node)
            (type ir2-block ir2-block))
-  (let ((funs (enclose-funs node)))
-    (collect ((delayed))
-      (dolist (fun funs)
-        (let ((xep (functional-entry-fun fun)))
-          ;; If there is no XEP then no closure needs to be created.
-          (when (and xep (not (eq (functional-kind xep) :deleted)))
-            (aver (xep-p xep))
-            (let ((closure (environment-closure (get-lambda-environment xep))))
-              (when closure
-                (let* ((entry-info (lambda-info xep))
-                       (tn (entry-info-closure-tn entry-info))
-                       #-(or x86-64 arm64)
-                       (entry (make-load-time-constant-tn :entry xep))
-                       (env (node-environment node))
-                       (leaf-dx-p (leaf-dynamic-extent fun)))
-                  (when leaf-dx-p (aver (node-lvar node)))
-                  (aver (entry-info-offset entry-info))
-                  (vop make-closure node ir2-block #-(or x86-64 arm64) entry
-                                    (entry-info-offset entry-info) (length closure)
-                                    leaf-dx-p tn)
-                  (loop for what in closure and n from 0 do
-                    (if (lambda-p what)
-                        (unless (eq (functional-kind what) :deleted)
-                          (delayed (list tn (find-in-environment what env) n
-                                         leaf-dx-p)))
-                        (unless (and (lambda-var-p what)
-                                     (null (leaf-refs what)))
-                          (let ((initial-value (closure-initial-value what env nil)))
-                            (if initial-value
-                                (vop closure-init node ir2-block tn initial-value n
-                                     leaf-dx-p)
-                                ;; An initial-value of NIL means to
-                                ;; stash the frame pointer... which
-                                ;; requires a different VOP.
-                                (vop closure-init-from-fp node ir2-block tn n))))))))))))
-      (loop for (tn what n leaf-dx-p) in (delayed)
-            do (vop closure-init node ir2-block tn what n leaf-dx-p))))
+  (collect ((delayed))
+    (dolist (fun (enclose-funs node))
+      (let ((xep (functional-entry-fun fun)))
+        ;; If there is no XEP then no closure needs to be created.
+        (when (and xep (not (eq (functional-kind xep) :deleted)))
+          (aver (xep-p xep))
+          (let ((closure (environment-closure (get-lambda-environment xep))))
+            (when closure
+              (let* ((entry-info (lambda-info xep))
+                     (tn (entry-info-closure-tn entry-info))
+                     #-(or x86-64 arm64)
+                     (entry (make-load-time-constant-tn :entry xep))
+                     (env (node-environment node))
+                     (leaf-dx-p (leaf-dynamic-extent fun)))
+                (when leaf-dx-p (aver (node-lvar node)))
+                (aver (entry-info-offset entry-info))
+                (vop make-closure node ir2-block #-(or x86-64 arm64) entry
+                     (entry-info-offset entry-info) (length closure)
+                     leaf-dx-p tn)
+                (loop for what in closure and n from 0 do
+                  (if (lambda-p what)
+                      (unless (eq (functional-kind what) :deleted)
+                        (delayed (list tn (find-in-environment what env) n
+                                       leaf-dx-p)))
+                      (unless (and (lambda-var-p what)
+                                   (null (leaf-refs what)))
+                        (let ((initial-value (closure-initial-value what env nil)))
+                          (if initial-value
+                              (vop closure-init node ir2-block tn initial-value n
+                                   leaf-dx-p)
+                              ;; An initial-value of NIL means to
+                              ;; stash the frame pointer... which
+                              ;; requires a different VOP.
+                              (vop closure-init-from-fp node ir2-block tn n))))))))))))
+    (loop for (tn what n leaf-dx-p) in (delayed)
+          do (vop closure-init node ir2-block tn what n leaf-dx-p)))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
