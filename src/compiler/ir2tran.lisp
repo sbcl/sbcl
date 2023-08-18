@@ -2353,28 +2353,35 @@
       (aver (singleton-p succ))
       (let ((target (first succ)))
         (cond ((eq target (component-tail (block-component block)))
-               (when (and (basic-combination-p last)
-                          (or (eq (basic-combination-kind last) :full)
-                              (and (eq (basic-combination-kind last) :known)
-                                   (eq (basic-combination-info last) :full))))
-                 (let* ((fun (basic-combination-fun last))
-                        (use (lvar-uses fun))
-                        (name (and (ref-p use)
-                                   (leaf-has-source-name-p (ref-leaf use))
-                                   (leaf-source-name (ref-leaf use))))
-                        (ftype (and (info :function :info name) ; only use the FTYPE if
-                                    (global-ftype name)))) ; NAME was DEFKNOWN
-                   (unless (or (node-tail-p last)
-                               (policy last (zerop safety))
-                               (and (fun-type-p ftype)
-                                    (eq *empty-type* (fun-type-returns ftype))))
-                     (vop nil-fun-returned-error last 2block
-                          (if name
-                              (emit-constant name)
-                              (multiple-value-bind (tn named)
-                                  (fun-lvar-tn last 2block fun)
-                                (aver (not named))
-                                tn)))))))
+               (cond ((and (basic-combination-p last)
+                           (or (eq (basic-combination-kind last) :full)
+                               (and (eq (basic-combination-kind last) :known)
+                                    (eq (basic-combination-info last) :full))))
+                      (let* ((fun (basic-combination-fun last))
+                             (use (lvar-uses fun))
+                             (name (and (ref-p use)
+                                        (leaf-has-source-name-p (ref-leaf use))
+                                        (leaf-source-name (ref-leaf use))))
+                             (ftype (and (info :function :info name) ; only use the ftype if
+                                         (global-ftype name)))) ; name was defknown
+                        (unless (or (node-tail-p last)
+                                    (policy last (zerop safety))
+                                    (and (fun-type-p ftype)
+                                         (eq *empty-type* (fun-type-returns ftype))))
+                          (vop nil-fun-returned-error last 2block
+                               (if name
+                                   (emit-constant name)
+                                   (multiple-value-bind (tn named)
+                                       (fun-lvar-tn last 2block fun)
+                                     (aver (not named))
+                                     tn))))))
+                     ;; Something was not properly deleted
+                     ((not (or (return-p last)
+                               (exit-p last)
+                               (and
+                                (basic-combination-p last)
+                                (not (node-tail-p last)))))
+                      (vop sb-impl::unreachable last 2block))))
               ((not (eq (ir2-block-next 2block) (block-info target)))
                (vop branch last 2block (block-label target)))
               (t
