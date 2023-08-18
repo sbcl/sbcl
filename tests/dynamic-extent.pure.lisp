@@ -1900,3 +1900,22 @@
               (* (car (car x)) (cdr x)))))
      ((t 4 5) 20)
      ((nil 4 5) nil))))
+
+(with-test (:name :dynamic-extent-conditional-allocation.partial.2)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (test y z)
+       (let (res)
+         (dotimes (i 3)
+           (let ((x (if test
+                        (cons (cons y y) z)
+                        nil)))
+             (declare (dynamic-extent x))
+             (when test
+               (assert (sb-ext:stack-allocated-p x)))
+             (setq res (and x
+                            (* (car (car x)) (cdr x))))))
+         res))
+     ((t 4 5) 20)
+     ((nil 4 5) nil))))
