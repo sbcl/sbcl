@@ -61,8 +61,7 @@
 
 ;;; Return a list of all lvars pushed before LVAR in 2BLOCK.
 (defun ir2-block-pushed-before (lvar 2block)
-  (declare (lvar lvar))
-  (declare (ir2-block 2block))
+  (declare (type lvar lvar) (type ir2-block 2block))
   (member lvar (reverse (ir2-block-pushed 2block))))
 
 ;;; Update information on stacks of unknown-values LVARs on the
@@ -138,72 +137,50 @@
 
 ;;;; Ordering of live UVL stacks
 
-;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
-;;; is a predecessor of BLOCK with already sorted stacks; because all
-;;; UVLs live at the BLOCK start are live in PRED, we just need
-;;; to delete dead UVLs.
-(defun order-block-uvl-sets (block pred)
-  (let* ((2block (block-info block))
-         (pred-end-stack (ir2-block-end-stack (block-info pred)))
-         (start (ir2-block-start-stack 2block))
-         (start-stack (loop for lvar in pred-end-stack
-                            when (memq lvar start)
-                            collect lvar))
-         (end (ir2-block-end-stack 2block)))
-    (when *check-consistency*
-      (aver (subsetp start start-stack)))
-    (setf (ir2-block-start-stack 2block) start-stack)
+;;; Do a forward walk in the flow graph and put UVLs on the start/end
+;;; stacks of BLOCK in the right order. STACK is an already sorted
+;;; stack coming from a predecessor of BLOCK. Because all UVLs live at
+;;; the start of BLOCK are on STACK, we just need to delete dead UVLs.
+(defun order-uvl-sets-walk (block stack)
+  (unless (block-flag block)
+    (setf (block-flag block) t)
+    (let* ((2block (block-info block))
+           (start (ir2-block-start-stack 2block))
+           (start-stack (loop for lvar in stack
+                              when (memq lvar start)
+                                collect lvar)))
+      (aver (subsetp start start-stack))
+      (setf (ir2-block-start-stack 2block) start-stack)
 
-    (let* ((last (block-last block))
-           (tailp-lvar (if (and (basic-combination-p last)
-                                (node-tail-p last))
-                           (node-lvar last)))
-           (end-stack start-stack))
-      (dolist (pop (ir2-block-popped 2block))
-        (aver (eq pop (car end-stack)))
-        (pop end-stack))
-      (dolist (push (ir2-block-pushed 2block))
-        (aver (not (memq push end-stack)))
-        (push push end-stack))
-      (aver (subsetp end end-stack))
-      (when (and tailp-lvar
-                 (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
-        (aver (eq tailp-lvar (first end-stack)))
-        (pop end-stack))
-      (setf (ir2-block-end-stack 2block) end-stack))))
+      (let* ((last (block-last block))
+             (tailp-lvar (if (and (basic-combination-p last)
+                                  (node-tail-p last))
+                             (node-lvar last)))
+             (end-stack start-stack))
+        (dolist (pop (ir2-block-popped 2block))
+          (aver (eq pop (car end-stack)))
+          (pop end-stack))
+        (dolist (push (ir2-block-pushed 2block))
+          (aver (not (memq push end-stack)))
+          (push push end-stack))
+        (aver (subsetp (ir2-block-end-stack 2block) end-stack))
+        (when (and tailp-lvar
+                   (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
+          (aver (eq tailp-lvar (first end-stack)))
+          (pop end-stack))
+        (setf (ir2-block-end-stack 2block) end-stack)
+        (let ((start-cleanup (block-start-cleanup block)))
+          (do-nested-cleanups (cleanup block)
+            (when (eq cleanup start-cleanup)
+              (return))
+            (unless (eq (cleanup-kind cleanup) :dynamic-extent)
+              (dolist (nlx-info (cleanup-nlx-info cleanup))
+                (order-uvl-sets-walk (nlx-info-target nlx-info)
+                                     end-stack)))))
+        (dolist (succ (block-succ block))
+          (order-uvl-sets-walk succ end-stack)))))
 
-(defun order-uvl-sets (component)
-  (clear-flags component)
-  ;; KLUDGE: Workaround for lp#308914: we keep track of number of blocks
-  ;; needing repeats, and bug out if we get stuck.
-  (loop with head = (component-head component)
-        with todo = 0
-        with last-todo = 0
-        do (psetq last-todo todo
-                  todo 0)
-        do (do-blocks (block component)
-             (unless (block-flag block)
-               (let ((pred (find-if #'block-flag (block-pred block))))
-                 (when (and (eq pred head)
-                            (not (bind-p (block-start-node block))))
-                   (let ((entry (node-block
-                                 (cleanup-mess-up
-                                  (block-start-cleanup block)))))
-                     (setq pred (if (block-flag entry) entry nil))))
-                 (cond (pred
-                        (setf (block-flag block) t)
-                        (order-block-uvl-sets block pred))
-                       (t
-                        (incf todo))))))
-        do (when (= last-todo todo)
-             ;; If the todo count is the same as on last iteration and
-             ;; there are still blocks to do, it means we are stuck,
-             ;; which in turn means the unmarked blocks are actually
-             ;; unreachable and should have been eliminated by DCE,
-             ;; and will very likely cause problems with later parts
-             ;; of STACK analysis, so abort now if we're in trouble.
-             (aver (not (plusp todo))))
-        while (plusp todo)))
+  (values))
 
 ;;; Do a forward walk in the flow graph and insert calls to
 ;;; %DYNAMIC-EXTENT-START whenever we mess up the run-time stack by
@@ -361,7 +338,10 @@
             (setq did-something t)))
      while did-something)
 
-  (order-uvl-sets component)
+  (clear-flags component)
+  (dolist (ep (block-succ (component-head component)))
+    (when (bind-p (block-start-node ep))
+      (order-uvl-sets-walk ep ())))
 
   (do-blocks (block component)
     (let ((top (ir2-block-end-stack (block-info block))))
