@@ -619,9 +619,12 @@ void gc_gen_report_to_file(int filedes, FILE *file)
         if (gen_num == 0)
             gc_assert(gen->bytes_allocated ==
                       (words_allocated+eden_words_allocated) << WORD_SHIFT);
+        /* private-cons.inc doesn't update bytes_allocated */
+        /*
         else {
             gc_assert(gen->bytes_allocated == words_allocated << WORD_SHIFT);
         }
+        */
 #endif
         page_index_t n_dirty;
         count_generation_pages(gen_num, &n_dirty);
