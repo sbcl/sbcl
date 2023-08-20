@@ -156,17 +156,17 @@
          (let ((vop (tn-ref-vop writes)))
            (and vop (eq (vop-name vop) 'make-unbound-marker))))))
 
-(defun emit-fixed-alloc (node block name words type lowtag result lvar)
-  (if (lvar-dynamic-extent lvar)
+(defun emit-fixed-alloc (node block name words type lowtag result)
+  (if (node-stack-allocate-p node)
       (vop fixed-alloc-to-stack node block name words type lowtag t result)
       (vop fixed-alloc node block name words type lowtag nil result)))
 
-(defun link-allocator-to-inits (allocator-vop last-init-vop lvar)
-  (declare (ignorable allocator-vop last-init-vop lvar))
+(defun link-allocator-to-inits (allocator-vop last-init-vop node)
+  (declare (ignorable allocator-vop last-init-vop node))
   ;; This can easily enough be changed to any set of platforms for which it is
   ;; desirable to assign structure slots within pseudo-atomic in a constructor
   #+x86-64
-  (unless (or (lvar-dynamic-extent lvar) (eq last-init-vop allocator-vop))
+  (unless (or (node-stack-allocate-p node) (eq last-init-vop allocator-vop))
     ;; extra codegen info is OK
     (setf (vop-codegen-info allocator-vop)
           (append (vop-codegen-info allocator-vop) (list last-init-vop)))))
@@ -176,10 +176,10 @@
   (let* ((lvar (the (not null) (node-lvar node)))
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
-    (emit-fixed-alloc node block name words type lowtag result lvar)
+    (emit-fixed-alloc node block name words type lowtag result)
     (let ((allocator-vop (ir2-block-last-vop block))
           (last-init-vop (emit-inits node block result lowtag inits args)))
-      (link-allocator-to-inits allocator-vop last-init-vop lvar))
+      (link-allocator-to-inits allocator-vop last-init-vop node))
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -189,13 +189,12 @@
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
-          (emit-fixed-alloc node block name words type lowtag result lvar))
-        (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
-          (vop var-alloc node block (lvar-tn node block extra) name words
-               type lowtag stack-allocate-p result)))
+          (emit-fixed-alloc node block name words type lowtag result))
+        (vop var-alloc node block (lvar-tn node block extra) name words
+             type lowtag (node-stack-allocate-p node) result))
     (let ((allocator-vop (ir2-block-last-vop block))
           (last-init-vop (emit-inits node block result lowtag inits args)))
-      (link-allocator-to-inits allocator-vop last-init-vop lvar))
+      (link-allocator-to-inits allocator-vop last-init-vop node))
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
@@ -214,12 +213,12 @@
                         layout)
                       #-compact-instance-header
                       c-dd))
-        (emit-fixed-alloc node block name words metadata lowtag result lvar))
+        (emit-fixed-alloc node block name words metadata lowtag result))
       (let ((allocator-vop (ir2-block-last-vop block))
             (last-init-vop
              (emit-inits node block result lowtag
                          `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)))
-        (link-allocator-to-inits allocator-vop last-init-vop lvar))
+        (link-allocator-to-inits allocator-vop last-init-vop node))
       (move-lvar-result node block locs lvar))))
 
 ;;; FIXME: this causes emission of GC store barriers, but it should not.
@@ -283,8 +282,7 @@
                  index)))
       (let ((setter (compute-setter))
             (length (length initial-contents))
-            (dx-p (and lvar
-                       (lvar-dynamic-extent lvar)))
+            (dx-p (node-stack-allocate-p node))
             (character (eq (primitive-type-name elt-ptype)
                            'character)))
         (dotimes (i length)

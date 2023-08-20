@@ -120,7 +120,7 @@
 
                  ;; Definitely do this if copying to stack
                  ;; (Allocation has to be inlined, otherwise there's no way to DX it)
-                 (or (lvar-dynamic-extent result)
+                 (or (node-stack-allocate-p node)
                      (and dd-copier
                           (eq (sb-int:info :function :inlinep dd-copier) 'inline))
                      ;; Or if it's a small fixed number of words
