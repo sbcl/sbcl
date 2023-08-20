@@ -164,14 +164,28 @@
                          (logand-derive-unsigned-bounds x y)
                        (specifier-type `(integer ,low ,high)))))
               ;; X is positive, but Y might be negative.
-              (cond (x-high
+              (cond ((and x-len y-low y-high (< y-high 0))
+                     (multiple-value-bind (low high)
+                         (let ((len (max x-len y-len)))
+                           (logand-derive-unsigned-bounds x (make-numeric-type :class 'integer
+                                                                               :low (ldb (byte len 0) y-low)
+                                                                               :high (ldb (byte len 0) y-high))))
+                       (specifier-type `(integer ,low ,high))))
+                    (x-high
                      (specifier-type `(integer 0 ,x-high)))
                     (t
                      (specifier-type 'unsigned-byte))))
           ;; X might be negative.
           (if (not y-neg)
               ;; Y must be positive.
-              (cond (y-high
+              (cond ((and y-len x-low x-high (< x-high 0))
+                     (multiple-value-bind (low high)
+                         (let ((len (max x-len y-len)))
+                           (logand-derive-unsigned-bounds y (make-numeric-type :class 'integer
+                                                                               :low (ldb (byte len 0) x-low)
+                                                                               :high (ldb (byte len 0) x-high))))
+                       (specifier-type `(integer ,low ,high))))
+                    (y-high
                      (specifier-type `(integer 0 ,y-high)))
                     (t
                      (specifier-type 'unsigned-byte)))
