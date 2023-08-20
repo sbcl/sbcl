@@ -230,7 +230,7 @@
                   (target-compile-stem stem flags)
                   (let ((elapsed (/ (- (get-internal-real-time) start)
                                     internal-time-units-per-second)))
-                    (format t " (~f sec)~%" elapsed)
+                    (format t " (~5,3f sec)~%" elapsed)
                     (incf total-time elapsed)))
                 ;(sb-kernel::show-ctype-ctor-cache-metrics)
                 (when sb-impl::*profile-hash-cache*
