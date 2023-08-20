@@ -59,25 +59,14 @@
   (dolist (e late early)
     (pushnew e early)))
 
-;;; Return a list of all lvars pushed before LVAR in 2BLOCK.
-(defun ir2-block-pushed-before (lvar 2block)
-  (declare (type lvar lvar) (type ir2-block 2block))
-  (member lvar (reverse (ir2-block-pushed 2block))))
-
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
 ;;;
 ;;; An LVAR is live at the end iff it is live at any of blocks which
-;;; BLOCK can transfer control to. There are two kind of control
-;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
-;;;
-;;; Additionally, we must keep dynamic extent values live within the
-;;; extent of their cleanups. Also, since dynamic extent objects can't
-;;; move (as object identity must be preserved and we can't in general
-;;; track all references), everything allocated deeper than a DX
-;;; object -- that is, before the DX object -- should be kept alive
-;;; until the object is deallocated as well.
+;;; BLOCK can transfer control to, or it is a dynamic extent object
+;;; kept live within the extent of its cleanup. There are two kind of
+;;; control transfers: normal, expressed with BLOCK-SUCC, and NLX.
 (defun update-uvl-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
@@ -105,21 +94,6 @@
            (when (dx-info-subparts dx-info)
              (pushnew (dx-info-value dx-info) new-end))))))
 
-    (dolist (lvar new-end)
-      (when (lvar-dynamic-extent lvar)
-        (dolist (subpart (dx-info-subparts (lvar-dynamic-extent lvar)))
-          (do-uses (generator subpart)
-            (let ((2block (block-info (node-block generator))))
-              (setq new-end
-                    (merge-uvl-live-sets
-                     new-end
-                     (set-difference
-                      (ir2-block-start-stack 2block)
-                      (ir2-block-popped 2block))))
-              (setq new-end (merge-uvl-live-sets
-                             new-end
-                             (ir2-block-pushed-before lvar 2block))))))))
-
     (setf (ir2-block-end-stack 2block) new-end)
 
     (let ((start new-end))
@@ -140,15 +114,29 @@
 ;;; Do a forward walk in the flow graph and put UVLs on the start/end
 ;;; stacks of BLOCK in the right order. STACK is an already sorted
 ;;; stack coming from a predecessor of BLOCK. Because all UVLs live at
-;;; the start of BLOCK are on STACK, we just need to delete dead UVLs.
+;;; the start of BLOCK are on STACK, we just need to remove dead UVLs,
+;;; but only above the top-most dynamic extent stack pointer, as stack
+;;; allocated objects can't move; object identity must be preserved
+;;; and we can't in general track all references. It's safe to only
+;;; track the stack pointer for groups of stack allocated objects with
+;;; the same lifetime as we do in the PUSHED sets, since
+;;; unknown-values pushes and pops can't be interleaved with stack
+;;; allocations, due to the implementation of mv-call relying on
+;;; contiguous unknown-values arguments on the stack.
 (defun order-uvl-sets-walk (block stack)
   (unless (block-flag block)
     (setf (block-flag block) t)
     (let* ((2block (block-info block))
            (start (ir2-block-start-stack 2block))
-           (start-stack (loop for lvar in stack
-                              when (memq lvar start)
-                                collect lvar)))
+           (start-stack
+             (collect ((prefix))
+               (do ((tail stack (cdr tail)))
+                   ((null tail) (prefix))
+                 (let ((lvar (car tail)))
+                   (when (memq lvar start)
+                     (when (lvar-dynamic-extent lvar)
+                       (return (append (prefix) tail)))
+                     (prefix lvar)))))))
       (aver (subsetp start start-stack))
       (setf (ir2-block-start-stack 2block) start-stack)
 
