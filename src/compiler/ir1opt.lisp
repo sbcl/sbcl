@@ -704,7 +704,8 @@
                      (let* ((lvar (node-lvar ref))
                             (combination (lvar-dest lvar)))
                        (setf (node-derived-type combination) type)
-                       (principal-lvar-single-valuify (node-lvar combination))))
+                       (principal-lvar-single-valuify (node-lvar combination))
+                       (reoptimize-lvar (node-lvar combination))))
                    (setf (return-result-type node) type
                          (tail-set-type (lambda-tail-set lambda)) type)
                    (do-uses (use lvar)
