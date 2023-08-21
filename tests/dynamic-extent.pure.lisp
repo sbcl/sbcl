@@ -1954,3 +1954,21 @@
          (multiple-value-bind (result error)
              (ignore-errors (eval 1))
            (declare (ignore result error))))))))
+
+(with-test (:name :stack-analysis-graph-walk-nlx.2)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda ()
+       (declare (optimize (speed 0) (debug 1)))
+       (tagbody
+        a
+          (flet ((f ()
+                   (go tag)))
+            (f))
+        tag
+          (let ((m (list 1)))
+            (declare (dynamic-extent m))
+            (eval m)
+            (let ((m (list 2)))
+              (declare (dynamic-extent m))
+              (eval m))))))))
