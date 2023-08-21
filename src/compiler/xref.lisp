@@ -75,7 +75,8 @@
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry combination mv-combination cast exit enclose combination))
+    ((or creturn cif entry combination mv-combination cast exit
+         enclose combination cdynamic-extent))
     (ref
      (let ((leaf (ref-leaf node)))
        (typecase leaf

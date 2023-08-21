@@ -1241,15 +1241,7 @@
   (defoptimizer (vop-optimize values-list)
       (vop)
     (let ((return (next-vop-is vop '(return-multiple))))
-      (when (and return
-                 ;; The list might be allocated on the stack and the
-                 ;; return values might overwrite it.
-                 (not
-                  (find-if (lambda (lvar)
-                             (and (lvar-dynamic-extent lvar)
-                                  (eq (ir2-lvar-primitive-type (lvar-info lvar))
-                                      (primitive-type-or-lose 'list))))
-                           (ir2-block-end-stack (ir2-block-prev (vop-block return))))))
+      (when return
         (vop-bind (list) () vop
           (emit-and-insert-vop (vop-node return)
                                (vop-block return)

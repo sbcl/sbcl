@@ -347,12 +347,14 @@
   (values))
 
 (defun propagate-lvar-dx (new old)
-  (let ((dx-info (lvar-dynamic-extent old)))
-    (when dx-info
+  (let ((dynamic-extent (lvar-dynamic-extent old)))
+    (when dynamic-extent
       (setf (lvar-dynamic-extent old) nil)
+      (setf (dynamic-extent-values dynamic-extent)
+            (delq1 old (dynamic-extent-values dynamic-extent)))
       (unless (lvar-dynamic-extent new)
-        (setf (lvar-dynamic-extent new) dx-info)
-        (setf (dx-info-value dx-info) new)))))
+        (setf (lvar-dynamic-extent new) dynamic-extent)
+        (push new (dynamic-extent-values dynamic-extent))))))
 
 (defun lexenv-contains-lambda (lambda parent-lexenv)
   (loop for lexenv = (lambda-lexenv lambda)
@@ -370,28 +372,27 @@
 ;;;               (fill m)
 ;;;               m))))
 (defun propagate-ref-dx (new-ref old-lvar var)
-  (let ((dx-info (lvar-dynamic-extent old-lvar))
+  (let ((dynamic-extent (lvar-dynamic-extent old-lvar))
         (leaf (ref-leaf new-ref)))
-    (when dx-info
-      (let ((cleanup (dx-info-cleanup dx-info)))
-        (typecase leaf
-          (lambda-var
-           (when (and (eq (functional-kind (lambda-var-home leaf)) :let)
-                      ;; Make sure the let is inside the dx let
-                      (lexenv-contains-lambda (lambda-var-home leaf)
-                                              (node-lexenv (cleanup-mess-up cleanup))))
-             (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
-          (clambda
-           (when (and (null (rest (leaf-refs leaf)))
-                      (lexenv-contains-lambda leaf
-                                              (node-lexenv (cleanup-mess-up cleanup))))
-             (let ((fun (functional-entry-fun leaf)))
-               (setf (enclose-cleanup (functional-enclose fun)) cleanup)
-               (setf (leaf-dynamic-extent fun) (leaf-dynamic-extent var))
-               (let ((dx-info (lvar-dynamic-extent old-lvar)))
-                 (setf (lvar-dynamic-extent old-lvar) nil)
-                 (setf (cleanup-nlx-info cleanup)
-                       (remove dx-info (cleanup-nlx-info cleanup)))))))))
+    (when dynamic-extent
+      (typecase leaf
+        (lambda-var
+         (when (and (eq (functional-kind (lambda-var-home leaf)) :let)
+                    ;; Make sure the let is inside the dx let
+                    (lexenv-contains-lambda (lambda-var-home leaf)
+                                            (node-lexenv dynamic-extent)))
+           (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
+        (clambda
+         (when (and (null (rest (leaf-refs leaf)))
+                    (lexenv-contains-lambda leaf
+                                            (node-lexenv dynamic-extent)))
+           (let ((fun (functional-entry-fun leaf)))
+             (setf (enclose-dynamic-extent (functional-enclose fun))
+                   dynamic-extent)
+             (setf (leaf-dynamic-extent fun) (leaf-dynamic-extent var))
+             (setf (lvar-dynamic-extent old-lvar) nil)
+             (setf (dynamic-extent-values dynamic-extent)
+                   (delq1 old-lvar (dynamic-extent-values dynamic-extent)))))))
       t)))
 
 (defun node-dominates-p (node1 node2)
@@ -761,37 +762,38 @@
 
 ;;;; DYNAMIC-EXTENT related
 
-;;; Insert code to establish a dynamic extent cleanup around CALL,
-;;; returning the cleanup.
-(defun insert-dynamic-extent-cleanup (call)
-  (let* ((entry (with-ir1-environment-from-node call
-                  (make-entry)))
+;;; Insert code to establish a dynamic extent around CALL, returning
+;;; the dynamic extent.
+(defun insert-dynamic-extent (call kind)
+  (let* ((dynamic-extent (with-ir1-environment-from-node call
+                           (make-dynamic-extent :kind kind)))
          (cleanup (make-cleanup :kind :dynamic-extent
-                                :mess-up entry)))
-    (setf (entry-cleanup entry) cleanup)
-    (insert-node-before call entry)
+                                :mess-up dynamic-extent)))
+    (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
+    (insert-node-before call dynamic-extent)
     (setf (node-lexenv call)
           (make-lexenv :default (node-lexenv call)
                        :cleanup cleanup))
     ;; Make CALL end its block, so that we have a place to
     ;; insert cleanup code.
     (node-ends-block call)
-    (push entry (lambda-entries (node-home-lambda entry)))
-    cleanup))
+    (push dynamic-extent
+          (lambda-dynamic-extents (node-home-lambda dynamic-extent)))
+    dynamic-extent))
 
-(defun use-good-for-dx-p (use cleanup dx)
+(defun use-good-for-dx-p (use dynamic-extent)
   (typecase use
     (combination
      (and (eq (combination-kind use) :known)
           (let ((info (combination-fun-info use)))
             (or (awhen (fun-info-stack-allocate-result info)
-                  (funcall it use dx))
+                  (funcall it use (dynamic-extent-kind dynamic-extent)))
                 (awhen (fun-info-result-arg info)
                   (lvar-good-for-dx-p (nth it (combination-args use))
-                                      cleanup dx))))))
+                                      dynamic-extent))))))
     (cast
      (and (not (cast-type-check use))
-          (lvar-good-for-dx-p (cast-value use) cleanup dx)))
+          (lvar-good-for-dx-p (cast-value use) dynamic-extent)))
     (ref
      (let ((leaf (ref-leaf use)))
        (typecase leaf
@@ -800,27 +802,26 @@
           (when (and (eq (functional-kind (lambda-var-home leaf)) :let)
                      (not (lambda-var-sets leaf))
                      (lexenv-contains-lambda (lambda-var-home leaf)
-                                             (node-lexenv (cleanup-mess-up cleanup)))
+                                             (node-lexenv dynamic-extent))
                      ;; Check the other refs are good.
                      (dolist (ref (leaf-refs leaf) t)
                        (unless (eq use ref)
                          (when (not (ref-good-for-dx-p ref))
                            (return nil)))))
-            (lvar-good-for-dx-p
-             (let-var-initial-value leaf) cleanup dx)))
+            (lvar-good-for-dx-p (let-var-initial-value leaf) dynamic-extent)))
          (clambda
           (aver (eq (functional-kind leaf) :external))
           (when (and (null (rest (leaf-refs leaf)))
                      (environment-closure (get-lambda-environment leaf))
                      (lexenv-contains-lambda leaf
-                                             (node-lexenv (cleanup-mess-up cleanup))))
+                                             (node-lexenv dynamic-extent)))
             (aver (eq use (first (leaf-refs leaf))))
             t)))))))
 
-(defun lvar-good-for-dx-p (lvar cleanup dx)
+(defun lvar-good-for-dx-p (lvar dynamic-extent)
   (aver (lvar-uses lvar))
   (do-uses (use lvar nil)
-    (when (use-good-for-dx-p use cleanup dx)
+    (when (use-good-for-dx-p use dynamic-extent)
       (return t))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe
@@ -1704,7 +1705,8 @@
                (delete node (basic-var-sets var)))))
       (cast
        (flush-dest (cast-value node)))
-      (enclose)))
+      (enclose)
+      (cdynamic-extent)))
 
   (remove-from-dfo block)
   (values))

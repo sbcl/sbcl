@@ -934,13 +934,18 @@ also processed as top level forms."
     (cond ((some #'leaf-dynamic-extent funs)
            (ctran-starts-block next)
            (let* ((enclose (ctran-use enclose-ctran))
+                  (dynamic-extent (make-dynamic-extent :kind 'dynamic-extent))
                   (cleanup (make-cleanup :kind :dynamic-extent
-                                         :mess-up enclose))
-                  (cleanup-ctran (make-ctran)))
-             (setf (enclose-cleanup enclose) cleanup)
+                                         :mess-up dynamic-extent))
+                  (dynamic-extent-ctran (make-ctran)))
+             (setf (enclose-dynamic-extent enclose) dynamic-extent)
+             (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
+             (link-node-to-previous-ctran dynamic-extent enclose-ctran)
+             (use-ctran dynamic-extent dynamic-extent-ctran)
+             (push dynamic-extent
+                   (lambda-dynamic-extents (node-home-lambda dynamic-extent)))
              (let ((*lexenv* (make-lexenv :cleanup cleanup)))
-               (ir1-convert enclose-ctran cleanup-ctran nil '(%cleanup-point))
-               (ir1-convert-progn-body cleanup-ctran next result body))))
+               (ir1-convert-progn-body dynamic-extent-ctran next result body))))
           (t
            (ir1-convert-progn-body enclose-ctran next result body)))))
 

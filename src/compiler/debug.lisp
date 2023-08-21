@@ -339,8 +339,7 @@
             (when (singleton-p (lvar-uses lvar))
               (barf "~S has exactly 1 use, but LVAR-USES is a list."
                     lvar))
-            (unless (or (lvar-dest lvar)
-                        (enclose-p node))
+            (unless (lvar-dest lvar)
               (barf "~S does not have dest." lvar))))
 
         (check-node-reached node)
@@ -503,6 +502,7 @@
        (let ((enclose (functional-enclose fun)))
          (unless (eq node enclose)
            (barf "~S is not the ENCLOSE for its FUN ~S." node enclose)))))
+    (cdynamic-extent)
     (exit
      (let ((entry (exit-entry node))
            (value (exit-value node)))
@@ -973,7 +973,9 @@
 (defun print-lvar-stack (stack &optional (stream *standard-output*))
   (loop for (lvar . rest) on stack
         do (format stream "~:[u~;d~]v~D~@[ ~]"
-                   (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
+                   (eq (ir2-lvar-kind (lvar-info lvar)) :stack)
+                   (cont-num lvar)
+                   rest)))
 
 (defvar *debug-print-types* nil)
 (defvar *debug-print-vop-temps* nil)
@@ -1036,13 +1038,7 @@
            (print-lvar (return-result node))
            (print-leaf (return-lambda node)))
           (entry
-           (let ((cleanup (entry-cleanup node)))
-             (case (cleanup-kind cleanup)
-               ((:dynamic-extent)
-                (format t "entry DX~{ ~D~}"
-                        (cleanup-nlx-info cleanup)))
-               (t
-                (format t "entry ~S" (entry-exits node))))))
+           (format t "entry ~S" (entry-exits node)))
           (exit
            (let ((value (exit-value node)))
              (cond (value
@@ -1076,7 +1072,9 @@
                        (leaf (print-leaf thing))
                        (nlx-info (princ thing))))
                    (write-string "}"))))
-             (write-char #\space))))
+             (write-char #\space)))
+          (cdynamic-extent
+           (format t "dynamic extent ~S" (dynamic-extent-values node))))
         (when (and *debug-print-types*
                    (valued-node-p node))
           (write-char #\space)

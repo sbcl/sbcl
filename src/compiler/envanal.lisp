@@ -286,7 +286,7 @@
 (defun dxify-downward-funargs (node dxable-args fun-name)
   #+sb-xc-host
   (declare (ignore fun-name))
-  (let (cleanup)
+  (let (dynamic-extent)
     ;; Experience shows that users place incorrect DYNAMIC-EXTENT declarations
     ;; without due consideration and care. Since the declaration was ignored
     ;; in more contexts than not, it was relatively harmless.
@@ -344,23 +344,22 @@
                            (lambda-p (ref-leaf use))
                            (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
                   (let ((enclose (xep-enclose (ref-leaf use))))
-                    (cond ((enclose-cleanup enclose)
+                    (cond ((and enclose
+                                (enclose-dynamic-extent enclose))
                            (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
                                  'dynamic-extent))
                           (t
-                           (unless cleanup
-                             (setq cleanup (insert-dynamic-extent-cleanup node)))
-                           (let ((dx-info (make-dx-info :kind 'dynamic-extent
-                                                        :value arg :cleanup cleanup)))
-                             (setf (lvar-dynamic-extent arg) dx-info)
-                             (push dx-info (cleanup-nlx-info cleanup)))))))))))))
+                           (unless dynamic-extent
+                             (setq dynamic-extent (insert-dynamic-extent node 'dynamic-extent)))
+                           (setf (lvar-dynamic-extent arg) dynamic-extent)
+                           (push arg (dynamic-extent-values dynamic-extent))))))))))))
 
 ;;; Starting from the potentially (declared) dynamic extent lvars
-;;; recognized during local call analysis and the declared dynamic
-;;; extent local functions recognized during IR1tran, determine if
-;;; these are actually eligible for dynamic-extent allocation. If so,
-;;; we also transitively mark the otherwise-inaccessible parts of
-;;; these values as dynamic extent.
+;;; recognized during local call analysis and declared dynamic extent
+;;; functions recognized during IR1tran, determine if these are
+;;; actually eligible for dynamic-extent allocation. If so, we also
+;;; transitively mark the otherwise-inaccessible parts of these values
+;;; as dynamic extent.
 (defun find-dynamic-extent-lvars (component)
   (declare (type component component))
   (do-blocks (block component)
@@ -374,50 +373,45 @@
               (when dxable-args
                 (dxify-downward-funargs node dxable-args name))))))))
   (dolist (lambda (component-lambdas component))
-    (dolist (entry (lambda-entries lambda))
-      (let* ((cleanup (entry-cleanup entry))
-             (dx-infos (cleanup-nlx-info cleanup)))
-        (when (eq (cleanup-kind cleanup) :dynamic-extent)
-          (dolist (dx-info dx-infos)
-            (let ((dx (dx-info-kind dx-info)))
-              (aver (eq cleanup (dx-info-cleanup dx-info)))
-              (labels ((mark-dx (lvar)
-                         (setf (lvar-dynamic-extent lvar) dx-info)
-                         (push lvar (dx-info-subparts dx-info))
-                         (push lvar (component-dx-lvars component))
-                         ;; Now look to see if there are otherwise
-                         ;; inaccessible parts of the value in LVAR.
-                         (do-uses (use lvar)
-                           (when (use-good-for-dx-p use cleanup dx)
-                             (etypecase use
-                               (cast (mark-dx (cast-value use)))
-                               (combination
-                                ;; Don't propagate through &REST, for
-                                ;; sanity.
-                                (unless (eq (combination-fun-source-name use nil)
-                                            '%listify-rest-args)
-                                  (dolist (arg (combination-args use))
-                                    (when (and arg
-                                               (lvar-good-for-dx-p arg cleanup dx))
-                                      (mark-dx arg)))))
-                               (ref
-                                (let ((leaf (ref-leaf use)))
-                                  (typecase leaf
-                                    (lambda-var
-                                     (mark-dx (let-var-initial-value leaf)))
-                                    (clambda
-                                     (let ((fun (functional-entry-fun leaf)))
-                                       (setf (enclose-cleanup (functional-enclose fun)) cleanup)
-                                       (setf (leaf-dynamic-extent fun) dx)))))))))))
-                (let ((lvar (dx-info-value dx-info)))
-                  ;; Check that the value hasn't been flushed somehow.
-                  (when (lvar-uses lvar)
-                    (cond ((lvar-good-for-dx-p lvar cleanup dx)
-                           (mark-dx lvar))
-                          (t
-                           (setf (lvar-dynamic-extent lvar) nil))))))))))))
-  ;; Mark closures as dynamic-extent allocatable by making the ENCLOSE
-  ;; node for the closure use an LVAR.
+    (dolist (dynamic-extent (lambda-dynamic-extents lambda))
+      (dolist (lvar (dynamic-extent-values dynamic-extent))
+        (aver (eq dynamic-extent (lvar-dynamic-extent lvar)))
+        (labels ((mark-dx (lvar)
+                   (setf (lvar-dynamic-extent lvar) dynamic-extent)
+                   ;; Now look to see if there are otherwise
+                   ;; inaccessible parts of the value in LVAR.
+                   (do-uses (use lvar)
+                     (when (use-good-for-dx-p use dynamic-extent)
+                       (etypecase use
+                         (cast (mark-dx (cast-value use)))
+                         (combination
+                          ;; Don't propagate through &REST, for
+                          ;; sanity.
+                          (unless (eq (combination-fun-source-name use nil)
+                                      '%listify-rest-args)
+                            (dolist (arg (combination-args use))
+                              (when (and arg
+                                         (lvar-good-for-dx-p arg dynamic-extent))
+                                (mark-dx arg)))))
+                         (ref
+                          (let ((leaf (ref-leaf use)))
+                            (typecase leaf
+                              (lambda-var
+                               (mark-dx (let-var-initial-value leaf)))
+                              (clambda
+                               (let ((fun (functional-entry-fun leaf)))
+                                 (setf (enclose-dynamic-extent (functional-enclose fun))
+                                       dynamic-extent)
+                                 (setf (leaf-dynamic-extent fun)
+                                       (dynamic-extent-kind dynamic-extent))))))))))))
+          ;; Check that the value hasn't been flushed somehow.
+          (when (lvar-uses lvar)
+            (cond ((lvar-good-for-dx-p lvar dynamic-extent)
+                   (mark-dx lvar)
+                   (unless (dynamic-extent-info dynamic-extent)
+                     (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
+                  (t
+                   (setf (lvar-dynamic-extent lvar) nil))))))))
   (dolist (lambda (component-lambdas component))
     (let ((fun (if (eq (lambda-kind lambda) :optional)
                    (lambda-optional-dispatch lambda)
@@ -427,44 +421,10 @@
           ;; We need to have a closure environment to dynamic-extent
           ;; allocate.
           (when (and xep (environment-closure (get-lambda-environment xep)))
-            (let ((enclose (functional-enclose fun)))
-              (when (and enclose (not (node-lvar enclose)))
-                (let ((lvar (make-lvar)))
-                  (use-lvar enclose lvar)
-                  (let ((cleanup (enclose-cleanup enclose)))
-                    (if (eq enclose (cleanup-mess-up cleanup))
-                        (let ((dx-info (make-dx-info :kind 'enclose :value lvar
-                                                     :subparts (list lvar)
-                                                     :cleanup cleanup)))
-                          (setf (lvar-dynamic-extent lvar) dx-info)
-                          (dolist (dx-info (cleanup-nlx-info cleanup))
-                            (setf (lvar-dynamic-extent (dx-info-value dx-info)) nil))
-                          (setf (cleanup-nlx-info cleanup) (list dx-info)))
-                        (let* ((ref-lvar (node-lvar (first (leaf-refs xep))))
-                               (dx-info (lvar-dynamic-extent ref-lvar)))
-                          (cond (dx-info
-                                 ;; This enclose was marked DX by back
-                                 ;; propagation.
-                                 (setf (lvar-dynamic-extent lvar) dx-info)
-                                 (push lvar (dx-info-subparts dx-info)))
-                                (t
-                                 ;; This enclose was either a
-                                 ;; LET-bound anonymous lambda or
-                                 ;; inferred from a call-site to be
-                                 ;; DXable.
-                                 (let ((dx-info
-                                         (make-dx-info :kind 'enclose
-                                                       :value lvar
-                                                       :subparts (list lvar)
-                                                       :cleanup cleanup)))
-                                   (setf (lvar-dynamic-extent lvar) dx-info)
-                                   (push dx-info (cleanup-nlx-info cleanup))))))))
-                  ;; The node component of ENCLOSE may be a different
-                  ;; component for top level closure references. We
-                  ;; always compile non-top-level components before
-                  ;; top-level components, so this takes effect at the
-                  ;; right time.
-                  (push lvar (component-dx-lvars (node-component enclose)))))))))))
+            (let ((dynamic-extent
+                    (enclose-dynamic-extent (functional-enclose fun))))
+              (unless (dynamic-extent-info dynamic-extent)
+                (setf (dynamic-extent-info dynamic-extent) (make-lvar)))))))))
   (values))
 
 ;;;; cleanup emission
@@ -510,10 +470,8 @@
              (dolist (nlx (cleanup-nlx-info cleanup))
                (code `(%lexical-exit-breakup ',nlx))))
             (:dynamic-extent
-             (dolist (dx-info (cleanup-nlx-info cleanup))
-               (when (dx-info-subparts dx-info)
-                 (code `(%cleanup-point))
-                 (return))))
+             (when (dynamic-extent-info node)
+               (code `(%cleanup-point))))
             (:restore-nsp
              (code `(%primitive set-nsp ,(ref-leaf node))))))))
     (flet ((coalesce-unbinds (code)

@@ -112,14 +112,13 @@
 ;;; return the leaf, otherwise return NIL.
 (defun lvar-delayed-leaf (lvar)
   (declare (type lvar lvar))
-  (unless (lvar-dynamic-extent lvar)
-    (let ((use (lvar-uses lvar)))
-      (and (ref-p use)
-           (let ((leaf (ref-leaf use)))
-             (etypecase leaf
-               (lambda-var (if (null (lambda-var-sets leaf)) leaf nil))
-               (constant leaf)
-               ((or functional global-var) nil)))))))
+  (let ((use (lvar-uses lvar)))
+    (and (ref-p use)
+         (let ((leaf (ref-leaf use)))
+           (etypecase leaf
+             (lambda-var (if (null (lambda-var-sets leaf)) leaf nil))
+             (constant leaf)
+             ((or functional global-var) nil))))))
 
 ;;; Annotate a normal single-value lvar. If its only use is a ref that
 ;;; we are allowed to delay the evaluation of, then we mark the lvar
@@ -134,12 +133,7 @@
       (setf (ir2-lvar-kind info) :delayed))
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
           (setf (tn-type tn) (lvar-type lvar))
-          (setf (ir2-lvar-locs info) (list tn))
-          (when (and (lvar-dynamic-extent lvar)
-                     (eq (dx-info-value (lvar-dynamic-extent lvar))
-                         lvar))
-            (setf (ir2-lvar-stack-pointer info)
-                  (make-stack-pointer-tn)))))))
+          (setf (ir2-lvar-locs info) (list tn))))))
   (ltn-annotate-casts lvar)
   (values))
 
@@ -302,12 +296,7 @@
       (loop for type in lvar-types
             for tn in (ir2-lvar-locs info)
             do (setf (tn-type tn) type)))
-    (setf (lvar-info lvar) info)
-    (when (lvar-dynamic-extent lvar)
-      (aver (proper-list-of-length-p types 1))
-      (when (eq (dx-info-value (lvar-dynamic-extent lvar)) lvar)
-        (setf (ir2-lvar-stack-pointer info)
-              (make-stack-pointer-tn)))))
+    (setf (lvar-info lvar) info))
   (ltn-annotate-casts lvar)
   (values))
 
@@ -500,16 +489,22 @@
           (annotate-unknown-values-lvar value))))
   (values))
 
-(defun ltn-analyze-enclose (node)
-  (declare (type enclose node))
-  (let ((lvar (node-lvar node)))
-    (when lvar ; only DX encloses use lvars.
+;;; Annotate DYNAMIC-EXTENT's info lvar as a stack lvar, which cleanup
+;;; code will use to clean up any values stack allocated in this
+;;; extent. Stack analysis will insert code to initialize this lvar
+;;; wherever necessary.
+(defun ltn-analyze-dynamic-extent (node)
+  (declare (type cdynamic-extent node))
+  (let ((lvar (dynamic-extent-info node))
+        (2comp (component-info (node-component node))))
+    (when lvar
+      (setf (ir2-component-stack-allocates-p 2comp) t)
+      (setf (lvar-dest lvar) node)
       (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
         (setf (lvar-info lvar) info)
-        (setf (ir2-lvar-kind info) :delayed)
-        (when (eq (dx-info-value (lvar-dynamic-extent lvar)) lvar)
-          (setf (ir2-lvar-stack-pointer info)
-                (make-stack-pointer-tn)))))))
+        (setf (ir2-lvar-kind info) :stack)
+        (setf (ir2-lvar-locs info)
+              (list (make-stack-pointer-tn)))))))
 
 ;;; We need a special method for %UNWIND-PROTECT that ignores the
 ;;; cleanup function. We don't annotate either arg, since we don't
@@ -1044,7 +1039,8 @@
       (exit (ltn-analyze-exit node))
       (cset (ltn-analyze-set node))
       (cast (ltn-analyze-cast node))
-      (enclose (ltn-analyze-enclose node))
+      (enclose)
+      (cdynamic-extent (ltn-analyze-dynamic-extent node))
       (mv-combination
        (ecase (basic-combination-kind node)
          (:local

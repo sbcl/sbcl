@@ -577,7 +577,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (report-code-deletion)
 
   (when (or (ir2-component-values-receivers (component-info component))
-            (component-dx-lvars component))
+            (ir2-component-stack-allocates-p (component-info component)))
     (maybe-mumble "Stack ")
     (stack-analyze component)
     ;; Assign BLOCK-NUMBER for any cleanup blocks introduced by

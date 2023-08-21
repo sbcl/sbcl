@@ -71,17 +71,15 @@
 ;;; clear whether a combination can actually stack allocate it's value.
 (defun mark-dynamic-extent-args (call fun)
   (declare (type combination call) (type clambda fun))
-  (let (cleanup)
+  (let (dynamic-extent)
     (loop for arg in (basic-combination-args call)
           for var in (lambda-vars fun)
           do (let ((dx-kind (leaf-dynamic-extent var)))
                (when (and arg dx-kind (not (lvar-dynamic-extent arg)))
-                 (unless cleanup
-                   (setq cleanup (insert-dynamic-extent-cleanup call)))
-                 (let ((dx-info (make-dx-info :kind dx-kind :value arg
-                                              :cleanup cleanup)))
-                   (setf (lvar-dynamic-extent arg) dx-info)
-                   (push dx-info (cleanup-nlx-info cleanup)))))))
+                 (unless dynamic-extent
+                   (setq dynamic-extent (insert-dynamic-extent call dx-kind)))
+                 (setf (lvar-dynamic-extent arg) dynamic-extent)
+                 (push arg (dynamic-extent-values dynamic-extent))))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially
@@ -974,6 +972,10 @@
     (setf (lambda-entries home)
           (nconc (lambda-entries clambda)
                  (lambda-entries home)))
+    ;; All of CLAMBDA's DYNAMIC-EXTENTS belong to HOME now.
+    (setf (lambda-dynamic-extents home)
+          (nconc (lambda-dynamic-extents clambda)
+                 (lambda-dynamic-extents home)))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; with ENTRIES.
     (setf (lambda-entries clambda) nil))

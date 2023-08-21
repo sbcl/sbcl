@@ -231,7 +231,10 @@
   ;;
   ;; If this is :UNUSED, then this LVAR should never actually be used
   ;; as the destination of a value: it is only used tail-recursively.
-  (kind :fixed :type (member :delayed :fixed :unknown :unused))
+  ;;
+  ;; If this is :STACK, then this LVAR represents the stack pointer
+  ;; used to undo stack allocation of dynamic extent objects.
+  (kind :fixed :type (member :delayed :fixed :unknown :unused :stack))
   ;; The primitive-type of the first value of this LVAR. This is
   ;; primarily for internal use during LTN, but it also records the
   ;; type restriction on delayed references. In multiple-value
@@ -248,8 +251,7 @@
   ;; since type checking is the responsibility of the values receiver,
   ;; these TNs primitive type is only based on the proven type
   ;; information.
-  (locs nil :type list)
-  (stack-pointer nil :type (or tn null)))
+  (locs nil :type list))
 
 (defprinter (ir2-lvar)
   kind
@@ -292,6 +294,8 @@
   ;; POPPED. This slot is initialized by LTN-ANALYZE as an input to
   ;; STACK-ANALYZE.
   (values-receivers nil :type list)
+  ;; If this component stack allocates anything, this is true.
+  (stack-allocates-p nil :type boolean)
   ;; a list of all the blocks which mess up the stack with dynamic
   ;; extent allocated objects.
   (stack-mess-ups nil :type list)
