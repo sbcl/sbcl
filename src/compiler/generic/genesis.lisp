@@ -4332,13 +4332,15 @@ static inline uword_t word_has_stickymark(uword_t word) {
           (write-structure-object (layout-info (find-layout 'sb-brothertree::binary-node))
                                   stream "binary_node")
           (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
-        (dolist (class '(defstruct-description defstruct-slot-description
-                         package
+        (dolist (class '(defstruct-description package
                          ;; FIXME: probably these should be external?
                          sb-lockless::list-node sb-lockless::split-ordered-list
                          sb-vm::arena sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
+            (when (eq class 'defstruct-description)
+              (write-structure-object (layout-info (find-layout 'defstruct-slot-description))
+                                      stream))
             (write-structure-object (layout-info (find-layout class))
                                     stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)

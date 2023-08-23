@@ -357,7 +357,6 @@ static void brief_struct(lispobj obj)
 }
 
 #include "genesis/defstruct-description.h"
-#include "genesis/defstruct-slot-description.h"
 static bool tagged_slot_p(struct layout *layout, int slot_index)
 {
     if (instancep(layout->_info)) {
