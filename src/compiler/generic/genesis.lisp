@@ -3361,13 +3361,6 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
        (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
   s->name = ~A;~%}~%" name-assigner)))))
 
-(defun mangle-c-slot-name (obj-name slot-name)
-  ;; For data hiding purposes, change the name of vector->length to vector->length_.
-  ;; This helped me catch some erroneous C code.
-  (if (and (eq obj-name 'vector) (eq slot-name 'length))
-      "length_"
-      (c-name (string-downcase slot-name))))
-
 (defun write-genesis-thread-h-requisites ()
   (write-structure-object (layout-info (find-layout 'sb-thread::thread))
                           *standard-output* "thread_instance" nil)
@@ -3439,6 +3432,28 @@ do {                                                                \\
 } while (0)~%"
             sap-align)))
 
+(defun output-c-primitive-obj (obj &aux (name (sb-vm:primitive-object-name obj))
+                                        (slots (sb-vm:primitive-object-slots obj))
+                                        (rest-slot
+                                         (if (primitive-object-variable-length-p obj)
+                                             (aref slots (1- (length slots))))))
+  (format t "struct ~A {~%" (c-name (string-downcase name)))
+  (when (sb-vm:primitive-object-widetag obj)
+    (format t "    lispobj header;~%"))
+  ;; For data hiding purposes, change the name of vector->length to vector->length_.
+  ;; This helped catch C code that made assumptions about the length being stored at
+  ;; 1 word beyond the header as a fixnum, which it isn't if #+ubsan is enabled.
+  (flet ((mangle-c-slot-name (slot-name)
+           (if (and (eq name 'vector) (eq slot-name 'length))
+               "length_"
+               (c-name (string-downcase slot-name)))))
+    (dovector (slot slots)
+      (format t "    ~A ~A~@[[1]~];~%"
+              (getf (cddr slot) :c-type "lispobj")
+              (mangle-c-slot-name (sb-vm:slot-name slot))
+              (eq slot rest-slot))))
+  (format t "};~%"))
+
 (defun write-primitive-object (obj *standard-output*)
   (let* ((name (sb-vm:primitive-object-name obj))
          (c-name (c-name (string-downcase name)))
@@ -3460,16 +3475,7 @@ do {                                                                \\
                  #+(or sparc ppc ppc64) (format t "typedef char pa_bits_t[~d];~2%" sb-vm:n-word-bytes)
                  #-(or sparc ppc ppc64) (format t "typedef lispobj pa_bits_t;~2%"))
                (format t "extern struct thread *all_threads;~%"))
-             (format t "struct ~A {~%" c-name)
-             (when (sb-vm:primitive-object-widetag obj)
-               (format t "    lispobj header;~%"))
-             (dovector (slot slots)
-               (format t "    ~A ~A~@[[1]~];~%"
-                       (getf (cddr slot) :c-type "lispobj")
-                       (mangle-c-slot-name name (sb-vm:slot-name slot))
-                       (and (primitive-object-variable-length-p obj)
-                            (eq slot (aref slots (1- (length slots)))))))
-             (format t "};~%")
+             (output-c-primitive-obj obj)
              (when (eq name 'sb-vm::code)
                (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d
 static inline struct code* fun_code_header(struct simple_fun* fun) {
@@ -4253,6 +4259,16 @@ static inline uword_t word_has_stickymark(uword_t word) {
                 c-const (sb-kernel::choose-layout-id type nil))))
   (terpri stream))
 
+(defun get-primitive-obj (x)
+  (find x sb-vm:*primitive-objects* :key #'sb-vm:primitive-object-name))
+
+(defparameter numeric-primitive-objects
+  (remove nil ; SINGLE-FLOAT and/or the SIMD-PACKs might not exist
+          (mapcar #'get-primitive-obj
+                  '(bignum ratio single-float double-float
+                    complex complex-single-float complex-double-float
+                    simd-pack simd-pack-256))))
+
 (defun write-c-headers (c-header-dir-name)
   (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
                `(actually-out-to ,name (lambda (stream) ,@body))))
@@ -4293,16 +4309,17 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (out-to "cardmarks" (write-mark-array-operators stream))
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
-        (let* ((structs (sort (copy-list sb-vm:*primitive-objects*) #'string<
-                              :key #'sb-vm:primitive-object-name))
-               (funinstance (find 'funcallable-instance sb-vm:*primitive-objects*
-                                  :key #'sb-vm:primitive-object-name))
-               (code (find 'sb-vm::code sb-vm:*primitive-objects*
-                           :key #'sb-vm:primitive-object-name))
-               (ignore-objs `(,funinstance ,code)))
+        (let* ((funinstance (get-primitive-obj 'funcallable-instance))
+               (code (get-primitive-obj 'sb-vm::code))
+               (skip `(,funinstance ,code ,@numeric-primitive-objects))
+               (structs (sort (set-difference sb-vm:*primitive-objects* skip) #'string<
+                              :key #'sb-vm:primitive-object-name)))
+          (out-to "number-types"
+            (format stream "#include ~S~%" (lispobj-dot-h))
+            (let ((*standard-output* stream))
+              (mapc 'output-c-primitive-obj numeric-primitive-objects)))
           (dolist (obj structs)
-            (unless (member obj ignore-objs)
-              (out-to (string-downcase (sb-vm:primitive-object-name obj))
+            (out-to (string-downcase (sb-vm:primitive-object-name obj))
                 (write-primitive-object obj stream)
                 (case (sb-vm:primitive-object-name obj)
                   (instance
@@ -4315,12 +4332,12 @@ static inline uword_t word_has_stickymark(uword_t word) {
                    (format stream "#include ~S~%"
                            (namestring (merge-pathnames "instance.inc" (lispobj-dot-h)))))
                   (simple-fun
-                   (write-primitive-object code stream))))))
+                   (write-primitive-object code stream)))))
           (out-to "primitive-objects"
+            (format stream "~&#include \"number-types.h\"~%")
             (dolist (obj structs)
-              (unless (member obj ignore-objs)
-                (format stream "~&#include \"~A.h\"~%"
-                        (string-downcase (sb-vm:primitive-object-name obj)))))))
+              (format stream "~&#include \"~A.h\"~%"
+                      (string-downcase (sb-vm:primitive-object-name obj))))))
         ;; For purposes of the C code, cast all hash tables as general_hash_table
         ;; even if they lack the slots for weak tables.
         (out-to "hash-table"

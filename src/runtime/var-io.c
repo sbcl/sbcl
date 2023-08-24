@@ -9,10 +9,9 @@
  * files for more information.
  */
 
-#include "genesis/config.h"
-#include "genesis/bignum.h"
 #include "gc-assert.h"
 #include "var-io.h"
+#include "genesis/number-types.h"
 
 // Read a variable-length encoded 32-bit integer from SOURCE and
 // return its value.
