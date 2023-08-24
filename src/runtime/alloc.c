@@ -602,6 +602,9 @@ void gc_gen_report_to_file(int filedes, FILE *file)
                 case PAGE_TYPE_MIXED:   column = 5; break;
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_UNBOXED: column = 6; break;
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE:    column = 7; break;
+#ifdef LISP_FEATURE_MARK_REGION_GC // temporary KLUDGE
+                case SINGLE_OBJECT_FLAG|PAGE_TYPE_BOXED:
+#endif
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_MIXED:   column = 8; break;
                 default: lose("Invalid page type %#x (p%"PAGE_INDEX_FMT")", page_table[page].type, page);
                 }
