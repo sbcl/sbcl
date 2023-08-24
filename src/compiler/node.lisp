@@ -351,15 +351,6 @@
   (declare (type node node))
   (block-component (node-block node)))
 
-(defun %with-ir1-environment-from-node (node fun)
-  (declare (type node node) (type function fun))
-  (declare (dynamic-extent fun))
-  (let ((*current-component* (node-component node))
-        (*lexenv* (node-lexenv node))
-        (*current-path* (node-source-path node)))
-    (aver-live-component *current-component*)
-    (funcall fun)))
-
 (defstruct (valued-node (:conc-name node-)
                         (:include node)
                         (:constructor nil)
@@ -666,7 +657,6 @@
   ;; COMPILE-COMPONENT hasn't happened yet. Might it be even better
   ;; (certainly stricter, possibly also correct...) to assert that
   ;; IR1-FINALIZE hasn't happened yet?
-  #+sb-xc-host (declare (notinline component-info)) ; unknown type
   (aver (not (eql (component-info component) :dead))))
 
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks

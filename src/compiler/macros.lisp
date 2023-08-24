@@ -601,12 +601,15 @@
       (lambda (,cleanup-var) ,@body) ,block ,return-value)))
 
 ;;; Bind the IR1 context variables to the values associated with NODE,
-;;; so that new, extra IR1 conversion related to NODE can be done
-;;; after the original conversion pass has finished.
+;;; so that IR1 conversion can be done after the main conversion pass
+;;; has finished.
 (defmacro with-ir1-environment-from-node (node &rest forms)
-  `(%with-ir1-environment-from-node
-    ,node
-    (lambda () ,@forms)))
+  (once-only ((node node))
+    `(let ((*current-component* (node-component ,node))
+           (*lexenv* (node-lexenv ,node))
+           (*current-path* (node-source-path ,node)))
+       (aver-live-component *current-component*)
+       ,@forms)))
 
 ;;; *SOURCE-PATHS* is a hashtable from source code forms to the path
 ;;; taken through the source to reach the form. This provides a way to
