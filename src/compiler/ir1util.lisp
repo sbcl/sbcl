@@ -614,10 +614,6 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
-(defun node-component (node)
-  (declare (type node node))
-  (the component (block-component (node-block node))))
-
 (declaim (maybe-inline node-environment))
 (defun node-environment (node)
   (declare (type node node) #-sb-xc-host (inline node-home-lambda))

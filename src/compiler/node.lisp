@@ -346,6 +346,11 @@
 (defun node-block (node)
   (ctran-block (node-prev node)))
 
+(declaim (inline node-component))
+(defun node-component (node)
+  (declare (type node node))
+  (block-component (node-block node)))
+
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
   (declare (dynamic-extent fun))
