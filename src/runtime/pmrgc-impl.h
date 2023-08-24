@@ -13,6 +13,14 @@
 #error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
 #endif
 
+/* Use AVX2 versions of code when we can, since blasting bytes faster
+ * is always nice */
+#ifdef __linux__
+#define CPU_SPLIT __attribute__((target_clones("default,avx2")))
+#else
+#define CPU_SPLIT
+#endif
+
 /* One bit of page_words_t is the need_zerofill flag.
  * That leaves 15 bits to store page_words_used. This can represent
  * a page size of up to 64KiB on 32-bit and 128KiB on 64-bit.

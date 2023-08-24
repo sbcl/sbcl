@@ -78,7 +78,7 @@ static bool should_compact(char __attribute__((unused)) *why) {
 }
 
 static void pick_targets() {
-  uword_t bytes_moving = 0, pages_moving = 0;
+  uword_t bytes_moving = 0, __attribute__((unused)) pages_moving = 0;
   page_index_t p = page_table_pages - 1;
   /* Ideally we'd like to avoid selecting pinned pages here, but the phase
    * ordering is tricky. We need to know (an over-estimation of) the pages
@@ -258,7 +258,7 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
 }
 
 static void fix_slots() {
-  int c = 0;
+  __attribute__((unused)) int c = 0;
   for (; remset; remset = remset->next) {
     for (int n = 0; n < remset->count; n += 2) {
       lispobj *slot = slot_from_tagged(remset->elements[n]),

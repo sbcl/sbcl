@@ -81,7 +81,11 @@ struct verify_state {
     uword_t flags;
     generation_index_t object_gen;
     generation_index_t min_pointee_gen;
+#ifdef LISP_FEATURE_MARK_REGION_GC
     _Atomic(int) nerrors;
+#else
+    int nerrors;
+#endif
     lispobj err_objs[5];
 };
 void hexdump_spaces(struct verify_state*, char *reason);

@@ -288,14 +288,6 @@ page_index_t try_allocate_large(uword_t nbytes,
   return -1;
 }
 
-/* Use AVX2 versions of code when we can, since blasting bytes faster
- * is always nice */
-#ifdef __linux__
-#define CPU_SPLIT __attribute__((target_clones("default,avx2")))
-#else
-#define CPU_SPLIT
-#endif
-
 CPU_SPLIT
 void mr_update_closed_region(struct alloc_region *region, generation_index_t gen) {
   /* alloc_regions never span multiple pages. */
@@ -994,8 +986,7 @@ static void scavenge_root_object(generation_index_t gen, lispobj *where) {
 
 #define WORDS_PER_CARD (GENCGC_CARD_BYTES/N_WORD_BYTES)
 static _Atomic(uword_t) root_objects_checked = 0, dirty_root_objects = 0;
-CPU_SPLIT
-static void scavenge_root_gens_worker() {
+static void CPU_SPLIT scavenge_root_gens_worker(void) {
   page_index_t claim, limit;
   uword_t local_root_objects_checked = 0, local_dirty_root_objects = 0, prefixes_checked = 0;
   for_each_claim (claim, limit) {
@@ -1124,8 +1115,7 @@ static void __attribute__((noinline)) mr_scavenge_root_gens() {
   run_on_thread_pool(scavenge_root_gens_worker);
 }
 
-CPU_SPLIT
-static void raise_survivors() {
+static void CPU_SPLIT raise_survivors(void) {
   unsigned char *bytemap = line_bytemap;
   generation_index_t gen = generation_to_collect;
   unsigned char line = ENCODE_GEN((unsigned char)gen);
