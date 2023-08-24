@@ -729,3 +729,18 @@
       `(lambda (x)
          (aref x 0))
     ((#2A((1 2) (3 4))) (condition 'type-error))))
+
+(with-test (:name :aref-constant-type-derive)
+  (flet ((test (form type)
+           (assert
+            (type-specifiers-equal
+             (caddr
+              (sb-kernel:%simple-fun-type
+               (checked-compile
+                `(lambda (a)
+                   ,form))))
+             `(values ,type &optional)))))
+    (test `(aref #(1 2 3) a)
+          '(integer 1 3))
+    (test `(svref #(1 2 3.0) a)
+          '(or (integer 1 2) single-float))))
