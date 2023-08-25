@@ -14,10 +14,33 @@
 #endif
 
 /* Use AVX2 versions of code when we can, since blasting bytes faster
- * is always nice */
+ * is always nice.
+ * If used more widely, we should put these in runtime.h */
 #ifdef __linux__
 #define CPU_SPLIT __attribute__((target_clones("default,avx2")))
+/* clang on linux seems to demand that the prototype of a multi-versioned function
+ * have the same attribute as the definition. If omitted, then link errors occur such as
+ *   ld: error: undefined symbol: mr_update_closed_region
+ *    >>> referenced by pmrgc.c:331 (/path/to/sbcl/src/runtime/pmrgc.c:331)
+ *    >>>               pmrgc.o:(gc_close_region)
+ * I think this is because the call site has to reference 'name.ifunc' (indirection)
+ *
+ * gcc on the other hand seems to insist that the prototype NOT have the attribute,
+ * because if present then you get links errors like so:
+ *   /usr/bin/ld: /path/to/sbcl/src/runtime/pmrgc.c:2102:
+ *     undefined reference to `mr_update_closed_region.default'
+ *
+ * Maybe the syntax is supposed to depend on the compiler in use, but
+ * it definitely doesn't seem ideal. I'm not familiar enough with these attributes.
+ * I'm just doing the dumbest solution that generalizes easily to either toolchain.
+ */
+# ifdef __clang__
+#  define CPU_SPLIT_DECL CPU_SPLIT
+# else
+#  define CPU_SPLIT_DECL
+# endif
 #else
+// Apple clang does not seem to support this at all
 #define CPU_SPLIT
 #endif
 

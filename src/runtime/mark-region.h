@@ -58,7 +58,7 @@ extern page_index_t try_allocate_large(uword_t nbytes,
                                        int page_type, generation_index_t gen,
                                        page_index_t *start, page_index_t end,
                                        uword_t *largest_hole);
-extern void CPU_SPLIT mr_update_closed_region(struct alloc_region *region, generation_index_t gen);
+extern void CPU_SPLIT_DECL mr_update_closed_region(struct alloc_region *region, generation_index_t gen);
 
 /* Bitmaps */
 extern bool allocation_bit_marked(void *pointer);
