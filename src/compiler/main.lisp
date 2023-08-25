@@ -1583,8 +1583,6 @@ necessary, since type inference may take arbitrarily long to converge.")
           (compile-load-time-value-lambda lambdas)
           (compile-toplevel-lambdas lambdas top-level-closure)))
 
-    (dolist (component components)
-      (clear-ir1-info component))
     (clear-ir1-namespace))
   (values))
 
