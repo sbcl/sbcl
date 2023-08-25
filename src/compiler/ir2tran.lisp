@@ -1848,10 +1848,12 @@
 
 ;;; Save the current stack pointer into the specified stack lvar.
 (defoptimizer (%dynamic-extent-start ir2-convert) (() node block)
-  (let ((2lvar (lvar-info (node-lvar node))))
+  (let* ((lvar (node-lvar node))
+         (2lvar (lvar-info lvar)))
     (aver (eq (ir2-lvar-kind 2lvar) :stack))
-    (vop current-stack-pointer node block
-         (first (ir2-lvar-locs 2lvar)))))
+    (when (leaf-refs (find-constant lvar))
+      (vop current-stack-pointer node block
+           (first (ir2-lvar-locs 2lvar))))))
 
 ;;;; special binding
 

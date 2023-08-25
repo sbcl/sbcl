@@ -1024,22 +1024,17 @@
                                           tail-call tail-call-named
                                           static-tail-call-named))
                   (delete-vop vop)
-                  ;; Delete the VOP that saves the stack pointer too.
+                  ;; Delete the VOPs that save the stack pointer too.
                   (let ((tn (tn-ref-tn (vop-args vop))))
                     (unless (tn-reads tn)
-                      (aver (eq (vop-name (tn-ref-vop (tn-writes tn)))
-                                'current-stack-pointer))
-                      (delete-vop (tn-ref-vop (tn-writes tn)))))
+                      (do ((ref (tn-writes tn) (tn-ref-next ref)))
+                          ((null ref))
+                        (aver (eq (vop-name (tn-ref-vop ref))
+                                  'current-stack-pointer))
+                        (delete-vop (tn-ref-vop ref)))))
                   (return))
                  (t
                   (return)))))
-
-;;; stack-analyze may have avoided creating a cleanup
-;;; leaving this unused
-(defoptimizer (vop-optimize current-stack-pointer) (vop)
-  (let ((tn (tn-ref-tn (vop-results vop))))
-    (when (not (tn-reads tn))
-      (delete-vop vop))))
 
 ;;; Load the WIDETAG once for a series of type tests.
 (when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
