@@ -743,4 +743,6 @@
     (test `(aref #(1 2 3) a)
           '(integer 1 3))
     (test `(svref #(1 2 3.0) a)
+          '(or (integer 1 2) single-float))
+    (test `(aref ,(make-array 3 :fill-pointer 2 :initial-contents #(1 2 3.0)) a)
           '(or (integer 1 2) single-float))))

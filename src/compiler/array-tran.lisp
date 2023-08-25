@@ -152,9 +152,7 @@
                  min
                  max
                  union)
-             (loop for i below (if (vectorp array)
-                                   (length array)
-                                   (array-total-size array))
+             (loop for i below (array-total-size array)
                    for elt = (row-major-aref array i)
                    for type = (typecase elt ;; ctype-of gives too much detail
                                 (integer
