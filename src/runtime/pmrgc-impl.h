@@ -42,6 +42,7 @@
 #else
 // Apple clang does not seem to support this at all
 #define CPU_SPLIT
+#define CPU_SPLIT_DECL
 #endif
 
 /* One bit of page_words_t is the need_zerofill flag.
