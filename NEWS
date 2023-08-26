@@ -1,10 +1,39 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.7:
+  * enhancement: a mark-region parallel garbage collector is available as a
+    build-time option; it can be enabled by adding
+      `--without-gencgc --with-mark-region-gc`
+    to the build command line.  (Thanks to Hayley Patton)
   * enhancement: Stack allocation via DYNAMIC-EXTENT is now possible for
     conditionals even when not all branches are stack-allocatable. Previously
     all branches needed to be stack-allocatable for the otherwise-inaccessible
     subparts to get stack allocated.
+  * platform support:
+    ** on Mac OS X Sonoma, loading the memory image no longer fails.
+       (lp#2029430, reported by cladur)
+    ** on Darwin, we no longer reimplement nanosleep().
+    ** on PPC64, undefined function errors now work.
+    ** on ARM64/Linux, enable the GCC TLS feature.  (thanks to Sébastien Marie)
+    ** when building the system, only display a reasonable amount of timing
+       precision.  (thanks to Philipp Marek)
+  * bug fix: handling of inlining functions compiled to return unboxed values
+    no longer crashes the compiled.  (lp#2029020, reported by Pascal
+    J. Bourguignon)
+  * bug fix: the source location for code executed within a top-level
+    (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) form is now more useful.
+  * bug fix: address a race between user threads cancelling finalizers and the
+    finalizer thread executing them.  (lp#2029306)
+  * bug fix: complex division returns the same value when evaluated inline and
+    out-of-line.  (lp#2030097)
+  * bug fix: the pretty-printer no longer deletes syntactically-significant
+    whitespace immediately preceding a newline.  (lp#1985814, reported by Mark
+    David)
+  * optimization: the compiler is more aware of the result type of the
+    NUMERATOR function.
+  * optimization: EQUAL and EQUALP compile to more efficient code when the two
+    arguments are known to be of the same nullable type.
+  * optimization: converting bignums to floats uses less intermediate memory.
 
 changes in sbcl-2.3.7 relative to sbcl-2.3.6:
   * minor incompatible change: MACROLET macro functions are now compiled with
