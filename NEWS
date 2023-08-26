@@ -14,11 +14,12 @@ changes relative to sbcl-2.3.7:
        (lp#2029430, reported by cladur)
     ** on Darwin, we no longer reimplement nanosleep().
     ** on PPC64, undefined function errors now work.
-    ** on ARM64/Linux, enable the GCC TLS feature.  (thanks to Sébastien Marie)
+    ** on ARM64/OpenBSD, enable the GCC TLS feature. (thanks to Sébastien
+       Marie)
     ** when building the system, only display a reasonable amount of timing
        precision.  (thanks to Philipp Marek)
   * bug fix: handling of inlining functions compiled to return unboxed values
-    no longer crashes the compiled.  (lp#2029020, reported by Pascal
+    no longer crashes the compiler.  (lp#2029020, reported by Pascal
     J. Bourguignon)
   * bug fix: the source location for code executed within a top-level
     (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) form is now more useful.
@@ -33,7 +34,7 @@ changes relative to sbcl-2.3.7:
     NUMERATOR function.
   * optimization: EQUAL and EQUALP compile to more efficient code when the two
     arguments are known to be of the same nullable type.
-  * optimization: converting bignums to floats uses less intermediate memory.
+  * optimization: converting bignums to floats uses no intermediate memory.
 
 changes in sbcl-2.3.7 relative to sbcl-2.3.6:
   * minor incompatible change: MACROLET macro functions are now compiled with
