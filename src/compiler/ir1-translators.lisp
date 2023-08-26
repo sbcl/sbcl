@@ -1543,8 +1543,8 @@ values from the first VALUES-FORM making up the first argument, etc."
 ;;; to interpose a DELAY node using RESULT immediately so that the
 ;;; result continuation can assume that it is immediately used. This
 ;;; is important here because MULTIPLE-VALUE-PROG1 is the only special
-;;; form which receives unknown values with multiple uses, some (in
-;;; this case one) of which are not immediate.
+;;; form that produces code where lvar substitution is potentially
+;;; incorrect.
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
   "MULTIPLE-VALUE-PROG1 values-form form*

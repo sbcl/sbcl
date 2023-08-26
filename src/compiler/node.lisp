@@ -1618,10 +1618,9 @@
   type-to-check)
 
 ;;; The DELAY node is interposed between a VALUE's USE and its DEST in
-;;; order to allow the value to be immediately used. This is necessary
-;;; for implementing multiple-use unknown values LVARs, as otherwise,
-;;; a non-moveable dynamic extent object may be allocated between the
-;;; DEST and one of the LVAR's uses but not the others.
+;;; order to allow the value to be immediately used. This allows us to
+;;; do substitution of lvars without doing flow analysis to check the
+;;; validity of the substitution in certain cases.
 (defstruct (delay (:include cast
                    (%type-check nil)
                    (asserted-type *wild-type*)
