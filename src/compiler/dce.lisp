@@ -1,8 +1,7 @@
 ;;;; This file implements a dead-code elimination phase for the
-;;;; compiler.  We perform a flow-sensitive analysis of a component
-;;;; from a set of externally-referenced CLAMBDAs, finding all
-;;;; reachable blocks, and delete any unreferenced CLAMBDAs and
-;;;; blocks.
+;;;; compiler.  We do a graph walk of a component from a set of
+;;;; externally-referenced CLAMBDAs, finding all reachable blocks, and
+;;;; delete any unreferenced CLAMBDAs and blocks.
 
 (in-package "SB-C")
 
@@ -31,34 +30,6 @@
                               home-component))))
               (lambda-refs clambda)))))
 
-(defun dce-analyze-ref (ref)
-  (let ((leaf (ref-leaf ref)))
-    (typecase leaf
-      (clambda
-       ;; If a CLAMBDA points to this component, mark its blocks as
-       ;; being live.
-       ;;
-       ;; FLUSH-DEAD-CODE is supposed to have killed :ZOMBIE CLAMBDAs
-       ;; (see commentary on DELETE-LET in IR1OPT), but may not have
-       ;; run yet, or may not have been able to kill the CLAMBDA in
-       ;; question, but the LAMBDA-BIND would be NIL, so just ignore
-       ;; :DELETED and :ZOMBIE CLAMBDAs here.
-       (unless (member (functional-kind leaf)
-                       '(:deleted :zombie
-                         ;; Follow actual combinations, not refs
-                         :mv-let :let :assignment))
-         (when (eq (lambda-component leaf)
-                   (node-component ref))
-           (dce-analyze-one-fun leaf))))
-      ;; KLUDGE: Pick off CONSTANTs that have an NLX-INFO as the value
-      ;; in order to find the NLX entry blocks.  Should probably be
-      ;; checking for COMBINATIONs of %UNWIND-PROTECT and %CATCH
-      ;; instead.
-      (constant
-       (let ((value (constant-value leaf)))
-         (when (and (nlx-info-p value)
-                    (nlx-info-target value))
-           (dce-analyze-block (nlx-info-target value))))))))
 
 (defun dce-analyze-block (block)
   (unless (block-flag block)
@@ -67,10 +38,27 @@
     (do-nodes (node nil block)
       (typecase node
         (ref
-         (dce-analyze-ref node))
+         (let ((leaf (ref-leaf node)))
+           (when (lambda-p leaf)
+             ;; If a lambda points to this component, mark its blocks
+             ;; as being live.
+             ;;
+             ;; FLUSH-DEAD-CODE is supposed to have killed :ZOMBIE
+             ;; CLAMBDAs (see commentary on DELETE-LET in IR1OPT), but
+             ;; may not have run yet, or may not have been able to
+             ;; kill the lambda in question, but the LAMBDA-BIND would
+             ;; be NIL, so just ignore :DELETED and :ZOMBIE CLAMBDAs
+             ;; here.
+             (unless (member (functional-kind leaf)
+                             '(:deleted :zombie
+                               ;; Follow actual combinations, not refs
+                               :mv-let :let :assignment))
+               (when (eq (lambda-component leaf)
+                         (node-component node))
+                 (dce-analyze-one-fun leaf))))))
         (basic-combination
          (when (eq (basic-combination-kind node) :local)
-           (let ((fun (ref-leaf (lvar-use (basic-combination-fun node)))))
+           (let ((fun (combination-lambda node)))
              (unless (memq (functional-kind fun) '(:deleted :zombie))
                (dce-analyze-one-fun fun)))))))
     (loop for (succ . next) on (block-succ block)
