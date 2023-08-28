@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.7:
+changes in sbcl-2.3.8 relative to sbcl-2.3.7:
   * enhancement: a mark-region parallel garbage collector is available as a
     build-time option; it can be enabled by adding
       `--without-gencgc --with-mark-region-gc`
