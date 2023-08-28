@@ -1413,6 +1413,8 @@
                     (package-symbolicate :sb-vm type '- name))))
          `(defun ,(symbolicate 'bignum-to- type) (bignum)
             (let ((bignum-length (%bignum-length bignum)))
+              ;; word-sized bignums shouldn't reach here
+              (declare ((integer 2) bignum-length))
               (,(case type
                   (single-float 'make-single-float)
                   (double-float '%make-double-float))
