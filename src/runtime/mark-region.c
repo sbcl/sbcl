@@ -539,6 +539,8 @@ static void trace_step() {
     if (!work_to_do(&block)) {
       usleep(backoff);
       backoff *= 2;
+      /* Don't wait too long. */
+      if (backoff > 100) backoff = 100;
       continue;
     }
     uword_t trace_start = get_time();
