@@ -12,6 +12,42 @@
 
 (in-package "SB-C")
 
+;;; An entry point is reachable if:
+;;;   - Its home lambda is of KIND :TOPLEVEL.
+;;;   - Its home lambda is LAMBDA-HAS-EXTERNAL-REFERENCES-P true (from
+;;;     COMPILE or possibly other causes).
+;;;   - Its home lambda is either referenced from a reachable block in
+;;;     the same component or referenced from a different component.
+(defun entry-point-reached-p (ep)
+  (declare (type cblock ep))
+  (let ((start-node (block-start-node ep)))
+    (if (bind-p start-node)
+        (let ((fun (bind-lambda start-node)))
+          (or (eq (functional-kind fun) :toplevel)
+              (lambda-has-external-references-p fun)
+              (let ((component (block-component ep)))
+                (some (lambda (ref)
+                        ;; The REF could have been deleted, in which
+                        ;; case we don't count that as an external
+                        ;; reference from another component.
+                        (and (not (node-to-be-deleted-p ref))
+                             (or (block-flag (node-block ref))
+                                 (not (eq (node-component ref) component)))))
+                      (leaf-refs fun)))
+              (and (eq (functional-kind fun) :optional)
+                   (flet ((reachable-p (fun)
+                            (some (lambda (ref)
+                                    (and (not (node-to-be-deleted-p ref))
+                                         (block-flag (node-block ref))))
+                                  (leaf-refs fun))))
+                     (let ((optional-dispatch (lambda-optional-dispatch fun)))
+                       (or (reachable-p optional-dispatch)
+                           (reachable-p
+                            (optional-dispatch-main-entry optional-dispatch))))))))
+        (let ((cleanup (block-start-cleanup ep)))
+          (aver cleanup)
+          (block-flag (node-block (cleanup-mess-up cleanup)))))))
+
 ;;; Find the DFO for a component, deleting any unreached blocks and
 ;;; merging any other components we reach. We repeatedly iterate over
 ;;; the entry points, since new ones may show up during the walk.
@@ -23,7 +59,8 @@
     (do ()
         ((dolist (ep (block-succ head) t)
            (unless (or (block-flag ep)
-                       (block-to-be-deleted-p ep))
+                       (block-to-be-deleted-p ep)
+                       (not (entry-point-reached-p ep)))
              (find-dfo-aux ep head component)
              (return nil))))))
   (let ((num 0))

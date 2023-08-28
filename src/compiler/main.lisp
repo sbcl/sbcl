@@ -472,7 +472,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                ;; information didn't lead to any new optimizations.
                ;; Don't run constraint-propagate again.
                (return)))
-        (eliminate-dead-code component)
         (dfo-as-needed component)
         (when constraint-propagate
           (maybe-mumble "Constraint ")
@@ -713,10 +712,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (ir1-phases component)
 
-    ;; This should happen at some point before ENVIRONMENT-ANALYZE,
-    ;; and after RECORD-COMPONENT-XREFS.  Beyond that, I haven't
-    ;; really thought things through.  -- AJB, 2014-Jun-08
-    (eliminate-dead-code component)
+    ;; KLUDGE: We should instead set COMPONENT-REOPTIMIZE to T
+    ;; whenever a REF gets deleted so that DFO-AS-NEEDED kicks in only
+    ;; when needed, and we don't need this call to do a final
+    ;; unreachable entry point scan.
+    (find-dfo component)
 
     (dfo-as-needed component)
     (maybe-mumble "Dom ")

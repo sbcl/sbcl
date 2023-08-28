@@ -378,7 +378,6 @@
  ("src/compiler/bitops-derive-type")
 
  ("src/compiler/dfo")
- ("src/compiler/dce")
  ("src/compiler/checkgen")
 
  ("src/compiler/tn")
