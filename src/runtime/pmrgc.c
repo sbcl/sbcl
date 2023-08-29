@@ -2111,3 +2111,64 @@ int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 {
     return verify_heap(cur_thread_approx_stackptr, flags);
 }
+
+/* The other implementation of gc_gen_report_to_file gets the generations
+ * of small objects wrong, as it only checks the generations of pages. */
+void gc_gen_report_to_file(int filedes, FILE *file) {
+  uword_t small_generation_type[PSEUDO_STATIC_GENERATION + 1][8] = { 0 };
+  uword_t small_generation_total[8] = { 0 };
+  uword_t large_generation_type[PSEUDO_STATIC_GENERATION + 1][8] = { 0 };
+  uword_t large_generation_total[8] = { 0 };
+  for (page_index_t p = 0; p < page_table_pages; p++) {
+    unsigned char type = page_table[p].type & PAGE_TYPE_MASK;
+    if (page_free_p(p)) continue;
+    else if (page_single_obj_p(p)) {
+      generation_index_t gen = page_table[p].gen;
+      large_generation_type[gen][type] += GENCGC_PAGE_BYTES;
+      large_generation_total[gen] += GENCGC_PAGE_BYTES;
+    } else {
+      for_lines_in_page (l, p) {
+        if (line_bytemap[l]) {
+          generation_index_t gen = DECODE_GEN(line_bytemap[l]);
+          small_generation_type[gen][type] += LINE_SIZE;
+          small_generation_total[gen] += LINE_SIZE;
+        }
+      }
+    }
+  }
+#define OUTPUT(str) \
+  {if (file) fwrite(str, 1, strlen(str), file); if (filedes>=0) ignore_value(write(filedes, str, strlen(str)));}
+  char buffer[180];
+#define FORMAT(control, ...) snprintf(buffer, sizeof(buffer), control, __VA_ARGS__); OUTPUT(buffer)
+#define MB(n) (int)((n) >> 20)
+  FORMAT("  %4s %6s %6s %6s %6s %6s %6s\n",
+         "Gen#", "Raw", "Boxed", "Mixed", "Cons", "Code", "Total");
+  OUTPUT("Small objects (in MiB):\n");
+  for (generation_index_t g = 0; g <= HIGHEST_NORMAL_GENERATION; g++)
+    if (small_generation_total[g]) {
+      uword_t *gen = small_generation_type[g];
+      FORMAT("  %4d %6d %6d %6d %6d %6d %6d\n",
+             g,
+             MB(gen[PAGE_TYPE_UNBOXED]),
+             MB(gen[PAGE_TYPE_BOXED]),
+             MB(gen[PAGE_TYPE_MIXED]),
+             MB(gen[PAGE_TYPE_CONS]),
+             MB(gen[PAGE_TYPE_CODE]),
+             MB(small_generation_total[g]));
+    }
+  OUTPUT("Large objects:\n");
+  for (generation_index_t g = 0; g <= PSEUDO_STATIC_GENERATION; g++)
+    if (large_generation_total[g]) {
+      uword_t *gen = large_generation_type[g];
+      FORMAT("  %4d %6d %6d %6d %6d %6d %6d\n",
+             g,
+             MB(gen[PAGE_TYPE_UNBOXED]),
+             MB(gen[PAGE_TYPE_BOXED]),
+             MB(gen[PAGE_TYPE_MIXED]),
+             MB(gen[PAGE_TYPE_CONS]),
+             MB(gen[PAGE_TYPE_CODE]),
+             MB(large_generation_total[g]));
+    }
+#undef FORMAT
+#undef OUTPUT
+}
