@@ -26,7 +26,7 @@
 #include "code.h"
 #include "gc.h"
 #include "genesis/gc-tables.h"
-#include "thread.h"              /* genesis/primitive-objects.h needs this */
+#include "thread.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <inttypes.h>

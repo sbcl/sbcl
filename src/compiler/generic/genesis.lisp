@@ -3359,7 +3359,9 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
                package-id-getter)
        (format stream "#define decode_symbol_name(ptr) ~A~%" name-bits-extractor)
        (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
-  s->name = ~A;~%}~%" name-assigner)))))
+  s->name = ~A;~%}~%#include ~S~%"
+               name-assigner
+               (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h))))))))
 
 (defun write-genesis-thread-h-requisites ()
   (write-structure-object (layout-info (find-layout 'sb-thread::thread))
