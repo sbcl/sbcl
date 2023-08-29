@@ -1408,42 +1408,39 @@
 (defun join-type-constraints (in block)
   (let ((vars '())
         (predecessors (block-pred block)))
-    (progn
-      ;;unless (singleton-p predecessors) for some reason it makes the whole thing loop infinitely
-      ;; Find some set of constrained variables in the predecessors.
-      (dolist (pred predecessors)
-        (let ((out (block-out-for-successor pred block)))
-          (when out
-            (do-conset-elements (con out)
-              (let ((kind  (constraint-kind con))
-                    (y     (constraint-y con))
-                    (not-p (constraint-not-p con)))
-                (when (or (member kind '(typep < >))
-                          (and (eq kind 'eql) (or (not not-p)
-                                                  (constant-p y)))
-                          (and (eq kind '=) (and (numeric-type-p y)
-                                                 (not not-p))))
-                  (pushnew (constraint-x con) vars))))
-            (return))))
-      (dolist (var vars)
-        (let ((in-var-type *empty-type*))
-          (dolist (pred (block-pred block))
-            (let ((out (block-out-for-successor pred block)))
-              (when out
-                (setq in-var-type
-                      (type-union in-var-type
-                                  (type-from-constraints var out *universal-type*))))))
+    (dolist (pred predecessors)
+      (let ((out (block-out-for-successor pred block)))
+        (when out
+          (do-conset-elements (con out)
+            (let ((kind  (constraint-kind con))
+                  (y     (constraint-y con))
+                  (not-p (constraint-not-p con)))
+              (when (or (member kind '(typep < >))
+                        (and (eq kind 'eql) (or (not not-p)
+                                                (constant-p y)))
+                        (and (eq kind '=) (and (numeric-type-p y)
+                                               (not not-p))))
+                (pushnew (constraint-x con) vars))))
+          (return))))
+    (dolist (var vars)
+      (let ((in-var-type *empty-type*))
+        (dolist (pred (block-pred block))
+          (let ((out (block-out-for-successor pred block)))
+            (when out
+              (setq in-var-type
+                    (type-union in-var-type
+                                (type-from-constraints var out *universal-type*))))))
 
-          (unless (eq in-var-type *universal-type*)
-            ;; Remove the existing constraints to avoid joining them again later.
-            (do-propagatable-constraints (con (in var))
-              (when (eq (constraint-kind con) 'typep)
-                (conset-delete con in)))
-            (conset-adjoin (find-or-create-constraint 'typep
-                                                      var
-                                                      in-var-type
-                                                      nil)
-                           in)))))))
+        (unless (eq in-var-type *universal-type*)
+          ;; Remove the existing constraints to avoid joining them again later.
+          (do-propagatable-constraints (con (in var))
+            (when (eq (constraint-kind con) 'typep)
+              (conset-delete con in)))
+          (conset-adjoin (find-or-create-constraint 'typep
+                                                    var
+                                                    in-var-type
+                                                    nil)
+                         in))))))
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil))
@@ -1455,7 +1452,7 @@
           (if in
               (conset-intersection in out)
               (setq in (copy-conset out))))))
-    (when join-types-p
+    (when (and join-types-p (rest (block-pred block)))
       (join-type-constraints in block))
     (or in (make-conset))))
 
