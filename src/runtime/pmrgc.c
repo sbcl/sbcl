@@ -343,6 +343,7 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
                                                    &alloc_start, page_table_pages, &largest_hole);
         if (new_page == -1) gc_heap_exhausted_error_or_lose(largest_hole, nbytes);
         new_obj = page_address(new_page);
+        set_allocation_bit_mark(new_obj);
     } else {
         ensure_region_closed(region, page_type);
         bool success =
@@ -1424,6 +1425,7 @@ lisp_alloc(__attribute__((unused)) int flags,
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = page_address(new_page);
+        set_allocation_bit_mark(new_obj);
         memset(new_obj, 0, nbytes);
     } else {
         if (!gc_active_p) small_allocation_count++;
@@ -1976,6 +1978,16 @@ static void parallel_walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     os_deallocate((char*)span_table, table_size);
 }
 
+static void check_free_pages()
+{
+    unsigned char *allocs = (unsigned char*)allocation_bitmap;
+    for (page_index_t p = 0; p < page_table_pages; p++)
+        if (page_free_p(p))
+            for_lines_in_page(l, p)
+                if (allocs[l])
+                    lose("You call page #%ld free, despite the fact it's obviously got allocation bits.", p);
+}
+
 /* Return the number of verification errors found.
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
@@ -2045,6 +2057,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     state.flags |= VERIFYING_GENERATIONAL;
     parallel_walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_range,
                              -1, (uword_t)&state);
+    check_free_pages();
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");
  out:
     if (state.nerrors && !(flags & VERIFY_DONT_LOSE)) {

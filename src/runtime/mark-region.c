@@ -271,7 +271,6 @@ page_index_t try_allocate_large(uword_t nbytes,
                                    GENCGC_PAGE_BYTES * (p - chunk_start));
       }
       *start = chunk_start + pages_needed;
-      set_allocation_bit_mark(page_address(chunk_start));
       bytes_allocated += nbytes;
       generations[gen].bytes_allocated += nbytes;
       if (last_page + 1 > next_free_page) next_free_page = last_page + 1;
@@ -1276,6 +1275,9 @@ void find_references_to(lispobj something) {
  * Colour indicates page type, letter type and flags,
  * numbers generation and occupancy. */
 void draw_page_table(int from, int to) {
+  fprintf(stderr, "\n       ");
+  for (int i = 0; i < 50; i++)
+    fprintf(stderr, "%3d", i);
   for (int i = from; i < to; i++) {
     if (i % 50 == 0) fprintf(stderr, "\n%6d ", i);
     fprintf(stderr,
