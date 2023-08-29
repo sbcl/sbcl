@@ -1837,13 +1837,6 @@ static __attribute__((unused)) bool acceptable_filler_cons_p(lispobj* where)
 static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
 {
     lispobj* where = start;
-    if (state->flags & VERIFYING_GENERATIONAL && find_page_index(start)>=0) {
-#ifndef LISP_FEATURE_MARK_REGION_GC /* We use a global bitmap */
-        page_index_t page = find_page_index(start);
-        if (page_table[page].type == PAGE_TYPE_CONS)
-            gc_assert(page_words_used(page) <=  MAX_CONSES_PER_PAGE*CONS_SIZE);
-#endif
-    }
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {
             if (*where != NO_TLS_VALUE_MARKER) {
@@ -1861,6 +1854,11 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
          * tests before calling the sizer.  Otherwise the lossage message would
          * not be as good as it could be. I guess that failure doesn't happen much */
         sword_t nwords = object_size(where);
+        if (find_page_index(where) != -1)
+          /* Check that no allocation bits are interior to this object  */
+          for (lispobj *interior = where + 2; interior < where + nwords; interior += 2)
+            if (allocation_bit_marked(interior))
+                lose("object @ %p has an allocation marked interior to it @ %p", where, interior);
         state->object_addr = where;
         state->object_header = is_cons_half(*where) ? 0 : *where;
         if (state->flags & VERIFYING_GENERATIONAL) {
