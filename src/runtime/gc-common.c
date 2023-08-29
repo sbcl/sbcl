@@ -41,7 +41,7 @@
 #include "hopscotch.h"
 #include "code.h"
 #include "genesis/primitive-objects.h"
-#include "genesis/static-symbols.h"
+#include "genesis/binding.h"
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"
 #include "genesis/split-ordered-list.h"

@@ -11,7 +11,7 @@
 #if !defined LISP_FEATURE_X86 && !defined LISP_FEATURE_X86_64
 #include "callframe.inc"
 #endif
-#include "genesis/compiled-debug-fun.h"
+#include "genesis/compiled-debug-info.h"
 
 #ifdef MEMORY_SANITIZER
 #include <sanitizer/msan_interface.h>

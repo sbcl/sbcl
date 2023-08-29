@@ -37,6 +37,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
+#include "genesis/unwind-block.h"
 #include "gc.h"
 #include "../../tlsf-bsd/tlsf/tlsf.h"
 extern void* tlsf_control;

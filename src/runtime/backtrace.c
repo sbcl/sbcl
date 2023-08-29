@@ -27,7 +27,6 @@
 #include "lispregs.h"
 #include <wchar.h>
 #include "arch.h"
-#include "genesis/compiled-debug-fun.h"
 #include "genesis/compiled-debug-info.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"

@@ -4312,8 +4312,9 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
         (let* ((funinstance (get-primitive-obj 'funcallable-instance))
+               (catch-block (get-primitive-obj 'sb-vm::catch-block))
                (code (get-primitive-obj 'sb-vm::code))
-               (skip `(,funinstance ,code ,@numeric-primitive-objects))
+               (skip `(,funinstance ,catch-block ,code ,@numeric-primitive-objects))
                (structs (sort (set-difference sb-vm:*primitive-objects* skip) #'string<
                               :key #'sb-vm:primitive-object-name)))
           (out-to "number-types"
@@ -4333,13 +4334,18 @@ static inline uword_t word_has_stickymark(uword_t word) {
                                         sb-vm:instance-pointer-lowtag stream)
                    (format stream "#include ~S~%"
                            (namestring (merge-pathnames "instance.inc" (lispobj-dot-h)))))
+                  (sb-vm::unwind-block
+                   (write-primitive-object catch-block stream))
                   (simple-fun
                    (write-primitive-object code stream)))))
           (out-to "primitive-objects"
             (format stream "~&#include \"number-types.h\"~%")
             (dolist (obj structs)
-              (format stream "~&#include \"~A.h\"~%"
-                      (string-downcase (sb-vm:primitive-object-name obj))))))
+              ;; exclude some not-really-object types
+              (unless (member (sb-vm:primitive-object-name obj)
+                              '(sb-vm::unwind-block sb-vm::binding))
+                (format stream "~&#include \"~A.h\"~%"
+                        (string-downcase (sb-vm:primitive-object-name obj)))))))
         ;; For purposes of the C code, cast all hash tables as general_hash_table
         ;; even if they lack the slots for weak tables.
         (out-to "hash-table"
@@ -4355,11 +4361,14 @@ static inline uword_t word_has_stickymark(uword_t word) {
                          ;; FIXME: probably these should be external?
                          sb-lockless::list-node sb-lockless::split-ordered-list
                          sb-vm::arena sb-thread::avlnode sb-thread::mutex
-                         sb-c::compiled-debug-info sb-c::compiled-debug-fun))
+                         sb-c::compiled-debug-info))
           (out-to (string-downcase class)
-            (when (eq class 'defstruct-description)
-              (write-structure-object (layout-info (find-layout 'defstruct-slot-description))
-                                      stream))
+            ;; parent/child structs like to be output as one header, child first
+            (let ((child (case class
+                           (sb-c::compiled-debug-info 'sb-c::compiled-debug-fun)
+                           (defstruct-description 'defstruct-slot-description))))
+              (when child
+                (write-structure-object (layout-info (find-layout child)) stream)))
             (write-structure-object (layout-info (find-layout class))
                                     stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
