@@ -15,6 +15,12 @@
 
 #+ecl (ext:quit) ; avoids 'Unexpected end of file on #<input file "stdin">.'
 
+;; The last available build of SBCL for PowerPC is 1.0.47
+;; and sb-ext:map-directory were introduced at 1.1.5
+#+sbcl
+(if (not (apropos-list "map-directory" 'sb-ext))
+  (quit))
+
 #+sbcl
 (progn
 
