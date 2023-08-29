@@ -3,7 +3,8 @@
   ;; we need a few very internal symbols
   (:import-from "SB-BIGNUM"
                 "%BIGNUM-0-OR-PLUSP" "%NORMALIZE-BIGNUM"
-                "NEGATE-BIGNUM-IN-PLACE")
+                "NEGATE-BIGNUM-IN-PLACE"
+                "NEGATE-BIGNUM-NOT-FULLY-NORMALIZED")
   (:export
    ;; bignum integer operations
    #:mpz-add
@@ -377,7 +378,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         collect `(,ga (struct gmpint)) into declares
         collect `(,barg (bassert ,a)) into gmpinits
         collect `(,plusp (%bignum-0-or-plusp ,barg (%bignum-length ,barg))) into gmpinits
-        collect `(,arg (if ,plusp ,barg (negate-bignum ,barg nil))) into gmpinits
+        collect `(,arg (if ,plusp ,barg (negate-bignum-not-fully-normalized ,barg))) into gmpinits
         collect `(,length (%bignum-length ,arg)) into gmpinits
         collect arg into vars
         collect `(setf (slot ,ga 'mp_alloc) ,length
@@ -761,7 +762,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
             (ad (bassert (denominator ,var)))
             (asign (not (%bignum-0-or-plusp an (%bignum-length an)))))
        (when asign
-           (setf an (negate-bignum an nil)))
+           (setf an (negate-bignum-not-fully-normalized an)))
        (let* ((anlen (%lsize asign an))
               (adlen (%lsize NIL ad)))
            (with-alien ((,mpqvar (struct gmprat)))
@@ -816,9 +817,9 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                       (bd (bassert (denominator b)))
                       (bsign (not (%bignum-0-or-plusp bn (%bignum-length bn)))))
                  (when asign
-                   (setf an (negate-bignum an nil)))
+                   (setf an (negate-bignum-not-fully-normalized an)))
                  (when bsign
-                   (setf bn (negate-bignum bn nil)))
+                   (setf bn (negate-bignum-not-fully-normalized bn)))
                  (let* ((anlen (%lsize asign an))
                         (adlen (%lsize NIL ad))
                         (bnlen (%lsize bsign bn))
