@@ -1769,6 +1769,10 @@
                 'system-area-pointer)
                (sb-vm::descriptor-reg
                 t)
+               (sb-vm::single-reg
+                'single-float)
+               (sb-vm::double-reg
+                'double-float)
                (sb-vm::complex-double-reg
                 'complex-double-float)
                (sb-vm::complex-single-reg
@@ -1787,6 +1791,10 @@
                 '(complex double-float))
                (complex-single-float
                 '(complex single-float))
+               (single-float
+                'sb-vm::single-reg)
+               (double-float
+                'sb-vm::double-reg)
                (* t)
                (t (primitive-type-specifier (primitive-type-or-lose type))))))
       (loop for (var arg) in vars

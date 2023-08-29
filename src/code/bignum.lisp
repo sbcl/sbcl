@@ -456,8 +456,8 @@
   (declare (type bignum a b))
   (let* ((a-plusp (bignum-plus-p a))
          (b-plusp (bignum-plus-p b))
-         (a (if a-plusp a (negate-bignum a)))
-         (b (if b-plusp b (negate-bignum b)))
+         (a (if a-plusp a (negate-bignum-not-fully-normalized a)))
+         (b (if b-plusp b (negate-bignum-not-fully-normalized b)))
          (len-a (%bignum-length a))
          (len-b (%bignum-length b))
          (len-res (+ len-a len-b))
@@ -489,7 +489,7 @@
   (declare (type bignum bignum) (type fixnum fixnum))
   (let* ((bignum-plus-p (bignum-plus-p bignum))
          (fixnum-plus-p (not (minusp fixnum)))
-         (bignum (if bignum-plus-p bignum (negate-bignum bignum)))
+         (bignum (if bignum-plus-p bignum (negate-bignum-not-fully-normalized bignum)))
          (bignum-len (%bignum-length bignum))
          (fixnum (if fixnum-plus-p fixnum (- fixnum)))
          (result (%allocate-bignum (1+ bignum-len)))
@@ -759,10 +759,10 @@
   (declare (type bignum u0 v0))
   (let* ((u1 (if (bignum-plus-p u0)
                  u0
-                 (negate-bignum u0 nil)))
+                 (negate-bignum-not-fully-normalized u0)))
          (v1 (if (bignum-plus-p v0)
                  v0
-                 (negate-bignum v0 nil))))
+                 (negate-bignum-not-fully-normalized v0))))
     (when (plusp (bignum-compare u1 v1))
       (rotatef u1 v1))
     (let ((n (rem v1 u1)))
@@ -983,27 +983,45 @@
          (incf i))
        ,(if resultp carry `(values ,carry ,last)))))
 
-;;; Fully-normalize is an internal optional. It cause this to always return
-;;; a bignum, without any extraneous digits, and it never returns a fixnum.
+(declaim (inline negate-bignum))
 (defun negate-bignum (x &optional (fully-normalize t))
-  (declare (type bignum x))
+  (declare (type bignum x)
+           (optimize (safety 0)))
   (let* ((len-x (%bignum-length x))
-         (len-res (1+ len-x))
-         (res (%allocate-bignum len-res)))
-    (declare (type bignum-length len-x len-res)) ;Test len-res for range?
-    (let ((carry (bignum-negate-loop x len-x res)))
-      (setf (%bignum-ref res len-x)
-            (%add-with-carry (%lognot (%sign-digit x len-x)) 0 carry)))
-    (if fully-normalize
-        (%normalize-bignum res len-res)
-        ;; This drops the last digit if it is unnecessary sign information. It
-        ;; repeats this as needed, possibly ending with a fixnum magnitude but never
-        ;; returning a fixnum.
-        (locally (declare (inline %normalize-bignum-buffer))
-          (let ((newlen (%normalize-bignum-buffer res len-res)))
-            (clear-padding-word res len-res newlen)
-            (%bignum-set-length res newlen))
-          res))))
+         (msd (%bignum-ref x (1- len-x))))
+    (cond ((and fully-normalize
+                (= len-x 1)
+                (= msd (1+ most-positive-fixnum)))
+           most-negative-fixnum)
+          (t
+           (let* ((len-res (if (= msd (ash 1 (1- digit-size)))
+                               ;; only this can overflow, but not necessarily when (> len-x 1)
+                               (1+ len-x)
+                               len-x))
+                  (res (%allocate-bignum len-res))
+                  (last1 0)
+                  (last2 0)
+                  (carry 1)
+                  (i 0))
+             (loop (when (= i len-x)
+                     (return))
+                   (setf last1 last2)
+                   (setf (values last2 carry)
+                         (%add-with-carry (%lognot (%bignum-ref x i)) 0 carry))
+                   (setf (%bignum-ref res i) last2)
+                   (incf i))
+             (when (/= len-res len-x)
+               (setf (%bignum-ref res (1- len-res)) 0)
+               (shiftf last1 last2 0))
+             (when (= last2 (%ashr last1 (1- digit-size)))
+               (let ((newlen (1- len-res)))
+                 (clear-padding-word res len-res newlen)
+                 (%bignum-set-length res newlen)))
+             res)))))
+
+;;; Always return a bignum, without any extraneous digits, and it never returns a fixnum.
+(defun negate-bignum-not-fully-normalized (x)
+  (negate-bignum x nil))
 
 ;;; This assumes bignum is positive; that is, the result of negating it will
 ;;; stay in the provided allocated bignum.
@@ -1333,7 +1351,7 @@
 (macrolet ((def (type)
              `(defun ,(symbolicate 'bignum-to- type) (bignum)
                (let* ((plusp (bignum-plus-p bignum))
-                      (x (if plusp bignum (negate-bignum bignum)))
+                      (x (if plusp bignum (negate-bignum-not-fully-normalized bignum)))
                       (len (bignum-integer-length x))
                       (digits ,(package-symbolicate :sb-vm type '-digits))
                       (keep (+ digits digit-size))
@@ -2017,8 +2035,8 @@
       ;; return the normalized results.
       (let* ((x-plusp (bignum-plus-p x))
              (y-plusp (bignum-plus-p y))
-             (x (if x-plusp x (negate-bignum x nil)))
-             (y (if y-plusp y (negate-bignum y nil)))
+             (x (if x-plusp x (negate-bignum-not-fully-normalized x)))
+             (y (if y-plusp y (negate-bignum-not-fully-normalized y)))
              (len-x (%bignum-length x))
              (len-y (%bignum-length y)))
         (multiple-value-bind (q r)
@@ -2130,7 +2148,7 @@
                         (setf r r-digit))))))))
     (let* ((x-plusp (bignum-plus-p x))
            (y-plusp t)
-           (x (if x-plusp x (negate-bignum x nil)))
+           (x (if x-plusp x (negate-bignum-not-fully-normalized x)))
            (y (typecase y
                 (fixnum
                  (cond ((minusp y)
