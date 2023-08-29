@@ -737,9 +737,9 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
 
+#ifdef LISP_FEATURE_64_BIT
 void gcbarrier_patch_code(void* where, int nbits)
 {
-#ifdef LISP_FEATURE_64_BIT
     int m_operand = 64 - nbits;
     // the M field has a kooky encoding
     int m_encoded = ((m_operand & 0x1F) << 1) | (m_operand >> 5);
@@ -748,7 +748,5 @@ void gcbarrier_patch_code(void* where, int nbits)
     // .... ____ _xxx xxx_ ____ = 0x7E0;
     //                  ^ deposit it here, in (BYTE 6 5) of the instruction.
     *pc = (inst & ~0x7E0) | (m_encoded << 5);
-#else
-    lose("can't patch rldicl in 32-bit"); // illegal instruction
-#endif
 }
+#endif
