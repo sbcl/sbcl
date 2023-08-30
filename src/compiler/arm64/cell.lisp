@@ -650,8 +650,6 @@
   (:temporary (:scs (non-descriptor-reg)) temp card)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 10
-    (load-foreign-symbol temp "gc_card_table_mask" :dataref t)
-    (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
     (pseudo-atomic (pa-flag)
       #+immobile-space
       (progn
@@ -686,6 +684,8 @@
                  (inst cbnz (32-bit-reg pa-flag) LOOP))))
         (inst b store))
       TRY-DYNAMIC-SPACE
+      (load-foreign-symbol temp "gc_card_table_mask" :dataref t)
+      (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
       ;; Compute card mark index
       (inst lsr card object gencgc-card-shift)
       (inst and card card temp)
