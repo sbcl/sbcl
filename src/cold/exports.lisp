@@ -1682,7 +1682,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
            "DEREF" "DOUBLE-FLOAT" "DOUBLE" "ENUM" "EXTERN-ALIEN"
            "FLOAT" "FREE-ALIEN" "FUNCTION"
            "LONG-FLOAT"
-           "GET-ERRNO"
+           "GET-ERRNO" "SET-ERRNO"
            "INT"
            "INTEGER"
            "LOAD-1-FOREIGN" "LOAD-FOREIGN" "LOAD-SHARED-OBJECT" "LONG" "LONG-LONG"

@@ -120,6 +120,12 @@ os_get_errno(void)
     return errno;
 }
 
+void
+os_set_errno(int new_errno)
+{
+    errno = new_errno;
+}
+
 #if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_UNIX && !defined USE_DARWIN_GCD_SEMAPHORES && !defined CANNOT_USE_POSIX_SEM_T
 void
 os_sem_init(os_sem_t *sem, unsigned int value)

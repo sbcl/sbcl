@@ -85,6 +85,10 @@
 (setf (documentation 'get-errno 'function)
       "Return the value of the C library pseudo-variable named \"errno\".")
 
+(define-alien-routine ("os_set_errno" set-errno) void (new-errno int))
+(setf (documentation 'set-errno 'function)
+      "Set the C library pseudo-variable named \"errno\", for obscure syscalls.")
+
 ;;; Decode errno into a string.
 #-win32
 (defun strerror (&optional (errno (get-errno)))
