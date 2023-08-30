@@ -158,12 +158,14 @@ base_pointer(lispobj ptr)
 }
 
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
+# define FUN_SELF_FIXNUM_TAGGED 1
 # define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
 # define fun_self_from_taggedptr(funptr) \
     funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
 # define fun_taggedptr_from_self(self) \
     self - 2*N_WORD_BYTES + FUN_POINTER_LOWTAG
 #else
+# define FUN_SELF_FIXNUM_TAGGED 0
 # define fun_self_from_baseptr(simple_fun) \
     make_lispobj(simple_fun,FUN_POINTER_LOWTAG)
 # define fun_self_from_taggedptr(funptr) funptr
@@ -185,14 +187,6 @@ extern int simple_fun_index(struct code*, struct simple_fun*);
 #define FUN_RAW_ADDR_OFFSET 0
 #else
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, insts) - FUN_POINTER_LOWTAG)
-#endif
-
-// For x86[-64], arm64, a simple-fun or closure's "self" slot is a fixum
-// On other backends, it is a lisp ointer.
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
-#define FUN_SELF_FIXNUM_TAGGED 1
-#else
-#define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
 // for code ojects, this bit signifies that this object is in the remembered set.

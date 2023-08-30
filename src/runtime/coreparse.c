@@ -1635,7 +1635,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
                    v[0].headers[i].count, v[0].headers[i].words,
                    v[1].headers[i].count, v[1].headers[i].words,
                    i<64 ? (i ? widetag_names[i] : "cons") : "TOTAL",
-                   mismatch ? " <<<<" : "");
+                   mismatch ? " ****" : "");
             if (i == SIMPLE_VECTOR_WIDETAG>>2) {
                 int j;
                 for(j=1; j <= 2; ++j)

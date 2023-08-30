@@ -50,12 +50,6 @@
 #include "murmur_hash.h"
 #include "incremental-compact.h"
 
-#ifdef LISP_FEATURE_SPARC
-#define LONG_FLOAT_SIZE 4
-#elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-#define LONG_FLOAT_SIZE 3
-#endif
-
 os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
@@ -1165,10 +1159,6 @@ DEF_SCAV_TRANS_SIZE_UB(16)
 DEF_SCAV_TRANS_SIZE_UB(32)
 DEF_SCAV_TRANS_SIZE_UB(64)
 DEF_SCAV_TRANS_SIZE_UB(128)
-#ifdef LONG_FLOAT_SIZE
-DEF_SPECIALIZED_VECTOR(vector_long_float, length * LONG_FLOAT_SIZE)
-DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE))
-#endif
 
 /* Weak-pointer has two variants. If the header data indicate 0 payload words,
  * then it's a vector of lispobj with a widetag outside the the range of vector widetags.

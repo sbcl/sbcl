@@ -7,7 +7,7 @@
 static inline unsigned int
 tls_index_of(struct symbol *symbol) // untagged pointer
 {
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
   return ((unsigned int*)symbol)[1];
 #else
   return symbol->header >> 32;
