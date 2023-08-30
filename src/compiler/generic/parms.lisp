@@ -401,17 +401,16 @@
 (defconstant single-float-hidden-bit (ash 1 23))
 
 (defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
+(defconstant-eqx double-float-exponent-byte (byte 11 52) #'equalp)
+(defconstant-eqx double-float-significand-byte (byte 52 0) #'equalp)
+(defconstant-eqx double-float-hi-exponent-byte (byte 11 20) #'equalp)
+(defconstant-eqx double-float-hi-significand-byte (byte 20 0) #'equalp)
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 52))
 
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) 32 1))
+(defconstant single-float-digits 24)
+(defconstant double-float-digits 53)
 )
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)

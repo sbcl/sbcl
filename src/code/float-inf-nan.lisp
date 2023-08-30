@@ -22,15 +22,10 @@
   `(zerop (ldb sb-vm:single-float-exponent-byte ,bits)))
 #-64-bit
 (defmacro dfloat-high-bits-subnormalp (bits)
-  `(zerop (ldb sb-vm:double-float-exponent-byte ,bits)))
+  `(zerop (ldb sb-vm:double-float-hi-exponent-byte ,bits)))
 #+64-bit
-(progn
-(defmacro dfloat-exponent-from-bits (bits)
-  `(ldb (byte ,(byte-size sb-vm:double-float-exponent-byte)
-              ,(+ 32 (byte-position sb-vm:double-float-exponent-byte)))
-        ,bits))
 (defmacro dfloat-bits-subnormalp (bits)
-  `(zerop (dfloat-exponent-from-bits ,bits))))
+  `(zerop (ldb sb-vm:double-float-exponent-byte ,bits)))
 
 (defun float-denormalized-p (x)
   "Return true if the float X is denormalized."
@@ -51,7 +46,7 @@
        (and (not (zerop (logand (ash bits 1) most-positive-word)))
             (dfloat-bits-subnormalp bits)))
      #-64-bit
-     (and (zerop (ldb sb-vm:double-float-exponent-byte
+     (and (zerop (ldb sb-vm:double-float-hi-exponent-byte
                       (double-float-high-bits x)))
           (not (zerop x))))
     #+(and long-float x86)
@@ -68,17 +63,15 @@
              ,single)))
      ((double-float)
       #+64-bit
-      ;; With 64-bit words, all the FOO-float-byte constants need to be reworked
-      ;; to refer to a byte position in the whole word. I think we can reasonably
-      ;; get away with writing the well-known values here.
       (let ((bits (double-float-bits ,var)))
-        (and (> (ldb (byte 11 52) bits) sb-vm:double-float-normal-exponent-max)
+        (and (> (ldb sb-vm:double-float-exponent-byte bits)
+                sb-vm:double-float-normal-exponent-max)
              ,double))
       #-64-bit
       (let ((hi (double-float-high-bits ,var))
             (lo (double-float-low-bits ,var)))
         (declare (ignorable lo))
-        (and (> (ldb sb-vm:double-float-exponent-byte hi)
+        (and (> (ldb sb-vm:double-float-hi-exponent-byte hi)
                 sb-vm:double-float-normal-exponent-max)
              ,double)))
      #+(and long-float x86)
@@ -102,8 +95,8 @@
    x
    (zerop (ldb sb-vm:single-float-significand-byte bits))
 
-   #+64-bit (zerop (ldb (byte 52 0) bits))
-   #-64-bit (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo))
+   #+64-bit (zerop (ldb sb-vm:double-float-significand-byte bits))
+   #-64-bit (zerop (logior (ldb sb-vm:double-float-hi-significand-byte hi) lo))
 
    #+(and long-float x86)
    (and (zerop (ldb sb-vm:long-float-significand-byte hi))
@@ -116,8 +109,8 @@
    x
    (not (zerop (ldb sb-vm:single-float-significand-byte bits)))
 
-   #+64-bit (not (zerop (ldb (byte 52 0) bits)))
-   #-64-bit (not (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo)))
+   #+64-bit (not (zerop (ldb sb-vm:double-float-significand-byte bits)))
+   #-64-bit (not (zerop (logior (ldb sb-vm:double-float-hi-significand-byte hi) lo)))
 
    #+(and long-float x86)
    (or (not (zerop (ldb sb-vm:long-float-significand-byte hi)))
@@ -135,8 +128,8 @@
             (if (zerop (ldb sb-vm:single-float-significand-byte bits))
                 (return ,infinity)
                 (return ,nan))
-            (if #+64-bit (zerop (ldb (byte 52 0) bits))
-                #-64-bit (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo))
+            (if #+64-bit (zerop (ldb sb-vm:double-float-significand-byte bits))
+                #-64-bit (zerop (logior (ldb sb-vm:double-float-hi-significand-byte hi) lo))
                 (return ,infinity)
                 (return ,nan))))
      ,normal))

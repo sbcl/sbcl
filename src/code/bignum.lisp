@@ -1325,7 +1325,7 @@
   ;; "float to pointer coercion -> return value"
   (declare (muffle-conditions compiler-note))
   (let ((hi (dpb exp
-                 sb-vm:double-float-exponent-byte
+                 sb-vm:double-float-hi-exponent-byte
                  (logandc2 (ecase sb-vm:n-word-bits
                              (32 (%bignum-ref bits 2))
                              (64 (ash (%bignum-ref bits 1) -32)))
@@ -1422,13 +1422,7 @@
 (macrolet
     ((def (type)
        (flet ((const (name)
-                ;; The constants are for hi and low bits,
-                ;; which should probably be changed
-                (or (and (eq type 'double-float)
-                         (case name
-                           (significand-byte '(byte 52 0))
-                           (exponent-byte '(byte 11 52))))
-                    (package-symbolicate :sb-vm type '- name))))
+                (package-symbolicate :sb-vm type '- name)))
          `(defun ,(symbolicate 'bignum-to- type) (bignum)
             (let ((bignum-length (%bignum-length bignum)))
               ;; word-sized bignums shouldn't reach here

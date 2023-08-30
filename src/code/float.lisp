@@ -36,13 +36,13 @@
       #+64-bit
       (let ((bits (double-float-bits f)))
         (if (dfloat-bits-subnormalp bits)
-            (ldb (byte 52 0) bits)
+            (ldb sb-vm:double-float-significand-byte bits)
             (return-from float-precision sb-vm:double-float-digits)))
       #-64-bit
       (let ((high (double-float-high-bits f)))
         (if (not (dfloat-high-bits-subnormalp high))
             (return-from float-precision sb-vm:double-float-digits)
-            (let ((n (integer-length (ldb sb-vm:double-float-significand-byte high))))
+            (let ((n (integer-length (ldb sb-vm:double-float-hi-significand-byte high))))
               (if (/= 0 n)
                   (return-from float-precision (+ n 32))
                   (double-float-low-bits f)))))))))
@@ -134,8 +134,8 @@
   (let* ((hi (double-float-high-bits x))
          (sign (if (minusp hi) -1 1))
          (lo (double-float-low-bits x))
-         (mantissa (logior (ash (ldb sb-vm:double-float-significand-byte hi) 32) lo))
-         (exp (ldb sb-vm:double-float-exponent-byte hi)))
+         (mantissa (logior (ash (ldb sb-vm:double-float-hi-significand-byte hi) 32) lo))
+         (exp (ldb sb-vm:double-float-hi-exponent-byte hi)))
     (cond ((zerop (logior (ldb (byte 31 0) hi) lo))
            (values 0 0 sign))
           ((< exp sb-vm:double-float-normal-exponent-min)
@@ -148,9 +148,9 @@
                    sign))))
   #+64-bit ; don't split the high and low bits
   (let* ((bits (double-float-bits x))
-         (frac (ldb (byte 52 0) bits))
+         (frac (ldb sb-vm:double-float-significand-byte bits))
          (sign (if (minusp bits) -1 1))
-         (exp (dfloat-exponent-from-bits bits)))
+         (exp (ldb sb-vm:double-float-exponent-byte bits)))
     (cond ((= exp 0)
            (values frac (if (= frac 0) 0 subnormal-dfloat-exponent) sign))
           ((> exp sb-vm:double-float-normal-exponent-max)
@@ -211,13 +211,13 @@
   (declare (double-float x))
   (multiple-value-bind (high-bits low-bits exp)
       (let* #+64-bit ((bits (double-float-bits x))
-                      (biased-exp (dfloat-exponent-from-bits bits)))
+                      (biased-exp (ldb sb-vm:double-float-exponent-byte bits)))
             #-64-bit ((high (double-float-high-bits x))
-                      (biased-exp (ldb sb-vm:double-float-exponent-byte high)))
+                      (biased-exp (ldb sb-vm:double-float-hi-exponent-byte high)))
         (if (> biased-exp sb-vm:double-float-normal-exponent-max)
             (error float-decoding-error x)
-            (let ((frac #+64-bit (ldb (byte 52 0) bits)
-                        #-64-bit (logior (ash (ldb sb-vm:double-float-significand-byte high) 32)
+            (let ((frac #+64-bit (ldb sb-vm:double-float-significand-byte bits)
+                        #-64-bit (logior (ash (ldb sb-vm:double-float-hi-significand-byte high) 32)
                                          (double-float-low-bits x))))
                (multiple-value-bind (new-exp new-frac lisp-exponent)
                    (cond ((/= biased-exp 0) ; normal
@@ -234,7 +234,7 @@
                                     (+ subnormal-dfloat-exponent prec)))))
                  ;; Now comes the dumb part for 64-bit machines -
                  ;; splitting the fraction into halves for no good reason.
-                 (values (dpb new-exp sb-vm:double-float-exponent-byte
+                 (values (dpb new-exp sb-vm:double-float-hi-exponent-byte
                               (ldb (byte 32 32) new-frac))
                          (ldb (byte 32 0) new-frac)
                          lisp-exponent)))))
@@ -361,8 +361,7 @@
     (fixnum
      #+64-bit
      (let* ((bits (double-float-bits x))
-            (old-exp (ldb (byte (byte-size sb-vm:double-float-exponent-byte)
-                                (+ (byte-position sb-vm:double-float-exponent-byte) 32)) bits))
+            (old-exp (ldb sb-vm:double-float-exponent-byte bits))
             (new-exp (+ old-exp exp)))
        (cond
          ((zerop x) x)
@@ -373,13 +372,11 @@
               (> new-exp sb-vm:double-float-normal-exponent-max))
           (scale-double-float-maybe-overflow x exp))
          (t
-          (%make-double-float (dpb new-exp (byte (byte-size sb-vm:double-float-exponent-byte)
-                                                 (+ (byte-position sb-vm:double-float-exponent-byte) 32))
-                                   bits)))))
+          (%make-double-float (dpb new-exp sb-vm:double-float-exponent-byte bits)))))
      #-64-bit
      (let* ((hi (double-float-high-bits x))
             (lo (double-float-low-bits x))
-            (old-exp (ldb sb-vm:double-float-exponent-byte hi))
+            (old-exp (ldb sb-vm:double-float-hi-exponent-byte hi))
             (new-exp (+ old-exp exp)))
        (cond
          ((zerop x) x)
@@ -390,7 +387,7 @@
               (> new-exp sb-vm:double-float-normal-exponent-max))
           (scale-double-float-maybe-overflow x exp))
          (t
-          (make-double-float (dpb new-exp sb-vm:double-float-exponent-byte hi)
+          (make-double-float (dpb new-exp sb-vm:double-float-hi-exponent-byte hi)
                              lo)))))
     (unsigned-byte (scale-double-float-maybe-overflow x exp))
     ((integer * 0) (scale-double-float-maybe-underflow x exp))))
@@ -509,59 +506,6 @@
                          (incf scale)))))))))
   (def double-float)
   (def single-float))
-
-;;; These might be useful if we ever have a machine without float/integer
-;;; conversion hardware. For now, we'll use special ops that
-;;; uninterruptibly frob the rounding modes & do ieee round-to-integer.
-#+nil
-(progn
-  ;; The compiler compiles a call to this when we are doing %UNARY-TRUNCATE
-  ;; and the result is known to be a fixnum. We can avoid some generic
-  ;; arithmetic in this case.
-  (defun %unary-truncate-single-float/fixnum (x)
-    (declare (single-float x) (values fixnum))
-    (locally (declare (optimize (speed 3) (safety 0)))
-      (let* ((bits (single-float-bits x))
-             (exp (ldb sb-vm:single-float-exponent-byte bits))
-             (frac (logior (ldb sb-vm:single-float-significand-byte bits)
-                           sb-vm:single-float-hidden-bit))
-             (shift (- exp sb-vm:single-float-digits sb-vm:single-float-bias)))
-        (when (> exp sb-vm:single-float-normal-exponent-max)
-          (error 'floating-point-invalid-operation :operator 'truncate
-                 :operands (list x)))
-        (if (<= shift (- sb-vm:single-float-digits))
-            0
-            (let ((res (ash frac shift)))
-              (declare (type (unsigned-byte 31) res))
-              (if (minusp bits)
-                  (- res)
-                  res))))))
-  ;; Double-float version of this operation (see above single op).
-  (defun %unary-truncate-double-float/fixnum (x)
-    (declare (double-float x) (values fixnum))
-    (locally (declare (optimize (speed 3) (safety 0)))
-      (let* ((hi-bits (double-float-high-bits x))
-             (exp (ldb sb-vm:double-float-exponent-byte hi-bits))
-             (frac (logior (ldb sb-vm:double-float-significand-byte hi-bits)
-                           sb-vm:double-float-hidden-bit))
-             (shift (- exp (- sb-vm:double-float-digits sb-vm:n-word-bits)
-                       sb-vm:double-float-bias)))
-        (when (> exp sb-vm:double-float-normal-exponent-max)
-          (error 'floating-point-invalid-operation :operator 'truncate
-                 :operands (list x)))
-        (if (<= shift (- sb-vm:n-word-bits sb-vm:double-float-digits))
-            0
-            (let* ((res-hi (ash frac shift))
-                   (res (if (plusp shift)
-                            (logior res-hi
-                                    (the fixnum
-                                      (ash (double-float-low-bits x)
-                                           (- shift sb-vm:n-word-bits))))
-                            res-hi)))
-              (declare (type (unsigned-byte 31) res-hi res))
-              (if (minusp hi-bits)
-                  (- res)
-                  res)))))))
 
 ;;; This function is called when we are doing a truncate without any funky
 ;;; divisor, i.e. converting a float or ratio to an integer. Note that we do

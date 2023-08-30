@@ -357,7 +357,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
              (- (sb-impl::make-double-float
                  (dpb (ash (random-chunk state)
                            (- sb-vm:double-float-digits n-random-chunk-bits 32))
-                      sb-vm:double-float-significand-byte
+                      sb-vm:double-float-hi-significand-byte
                       (sb-impl::double-float-high-bits $1d0))
                  (random-chunk state))
                 $1d0))
@@ -376,7 +376,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                    (dpb (ash (sb-vm::random-mt19937 state-vector)
                              (- sb-vm:double-float-digits n-random-chunk-bits
                                 sb-vm:n-word-bits))
-                        sb-vm:double-float-significand-byte
+                        sb-vm:double-float-hi-significand-byte
                         (sb-impl::double-float-high-bits $1d0))
                    (sb-vm::random-mt19937 state-vector))
                   $1d0))

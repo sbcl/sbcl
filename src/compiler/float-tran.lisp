@@ -1850,7 +1850,7 @@
     (declare (optimize speed (safety 0)))
     (let* ((high (double-float-high-bits x))
            (low (double-float-low-bits x))
-           (exp (ldb sb-vm:double-float-exponent-byte high))
+           (exp (ldb sb-vm:double-float-hi-exponent-byte high))
            (biased (the double-float-exponent
                         (- exp sb-vm:double-float-bias))))
       (declare (type (signed-byte 32) high)
