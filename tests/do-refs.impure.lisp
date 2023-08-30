@@ -76,12 +76,12 @@
     (walk-slots-test*
      (sb-int:find-fdefn fname)
      (lambda (slots)
-       #+immobile-code
+       #+(and immobile-code x86-64)
        (and (= (length slots) 3)
             (equal (first slots) fname)
             (closurep (second slots))
             (code-component-p (third slots)))
-       #-immobile-code
+       #-(and immobile-code x86-64)
        (and (= (length slots) 2)
             (equal (first slots) fname)
             (closurep (second slots)))))))
