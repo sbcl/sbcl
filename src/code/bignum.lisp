@@ -1329,7 +1329,7 @@
                  (logandc2 (ecase sb-vm:n-word-bits
                              (32 (%bignum-ref bits 2))
                              (64 (ash (%bignum-ref bits 1) -32)))
-                           (- sb-vm:double-float-hidden-bit 32))))
+                           (ash sb-vm:double-float-hidden-bit -32))))
         (lo (logand #xffffffff (%bignum-ref bits 1))))
     (make-double-float (if plusp
                            hi
