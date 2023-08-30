@@ -1001,7 +1001,7 @@ We could try a few things to mitigate this:
                ;; comment in conservative_root_p() in gencgc as to why that alone
                ;; would be inadequate- we require a properly tagged descriptor
                ;; to enliven any object other than code.
-               #+immobile-code
+               #+(and immobile-code x86-64)
                `(%make-lisp-obj
                  (alien-funcall (extern-alien "decode_fdefn_rawfun" (function unsigned unsigned))
                                 (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
