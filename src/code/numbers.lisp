@@ -745,6 +745,91 @@ the first."
       (when (< arg n)
         (setf n arg)))))
 
+#+64-bit
+(defmacro float-bignum-= (float bignum type)
+  (macrolet ((sym (name)
+               `(package-symbolicate :sb-vm type '- ',name)))
+    `(let* ((float ,float)
+            (bignum ,bignum)
+            (bignum-length (%bignum-length bignum))
+            (bits (,(sym bits) float))
+            (exp (ldb ,(sym exponent-byte) bits)))
+       (cond ((< exp (+ sb-vm:n-fixnum-bits ,(sym bias)))
+              nil)
+             (t
+              (let* ((exp (- exp ,(sym bias) ,(sym digits)))
+                     (sig (logior ,(sym hidden-bit)
+                                  (ldb ,(sym significand-byte) bits)))
+                     (int (if (minusp bits)
+                              (- sig)
+                              sig)))
+                (and (= (truly-the bignum-length (sb-bignum::bignum-buffer-integer-length bignum bignum-length))
+                        (+ (integer-length int) exp))
+                     (sb-bignum::bignum-lower-bits-zero-p bignum exp)
+                     (= int
+                        (truly-the fixnum
+                                   (sb-bignum::last-bignum-part=>fixnum exp bignum))))))))))
+
+#+64-bit
+(defmacro float-bignum-< (float bignum type)
+  (macrolet ((sym (name)
+               `(package-symbolicate :sb-vm type '- ',name)))
+    `(let* ((float ,float)
+            (bignum ,bignum)
+            (bignum-length (%bignum-length bignum))
+            (bits (,(sym bits) float))
+            (exp (ldb ,(sym exponent-byte) bits)))
+       (cond ((< exp (+ sb-vm:n-fixnum-bits ,(sym bias)))
+              (sb-bignum::%bignum-0-or-plusp bignum bignum-length))
+             (t
+              (let ((sig (logior ,(sym hidden-bit)
+                                  (ldb ,(sym significand-byte) bits)))
+                    (exp (- exp ,(sym bias) ,(sym digits))))
+                (let* ((int (if (minusp bits)
+                                (- sig)
+                                sig))
+                       (length-diff (- (truly-the bignum-length (sb-bignum::bignum-buffer-integer-length bignum bignum-length))
+                                       (+ (integer-length int) exp))))
+                  (cond
+                    ((plusp length-diff) (sb-bignum::%bignum-0-or-plusp bignum bignum-length))
+                    ((minusp length-diff) (minusp float))
+                    (t
+                     (let ((diff (- (truly-the fixnum
+                                               (sb-bignum::last-bignum-part=>fixnum exp bignum))
+                                    int)))
+                       (cond ((plusp diff) t)
+                             ((minusp diff) nil)
+                             (t
+                              (not (sb-bignum::bignum-lower-bits-zero-p bignum exp))))))))))))))
+
+#+64-bit
+(defmacro float-bignum-> (float bignum type)
+  (macrolet ((sym (name)
+               `(package-symbolicate :sb-vm type '- ',name)))
+    `(let* ((float ,float)
+            (bignum ,bignum)
+            (bignum-length (%bignum-length bignum))
+            (bits (,(sym bits) float))
+            (exp (ldb ,(sym exponent-byte) bits)))
+       (cond ((< exp (+ sb-vm:n-fixnum-bits ,(sym bias)))
+              (not (sb-bignum::%bignum-0-or-plusp bignum bignum-length)))
+             (t
+              (let ((sig (logior ,(sym hidden-bit)
+                                 (ldb ,(sym significand-byte) bits)))
+                    (exp (- exp ,(sym bias) ,(sym digits))))
+                (let* ((int
+                         (if (minusp bits)
+                             (- sig)
+                             sig))
+                       (length-diff (- (truly-the bignum-length (sb-bignum::bignum-buffer-integer-length bignum bignum-length))
+                                       (+ (integer-length int) exp))))
+                  (cond ((plusp length-diff)
+                         (not (sb-bignum::%bignum-0-or-plusp bignum bignum-length)))
+                        ((minusp length-diff)
+                         (not (minusp float)))
+                        (t
+                         (< (truly-the fixnum (sb-bignum::last-bignum-part=>fixnum exp bignum)) int))))))))))
+
 (defmacro make-fixnum-float-comparer (operation integer float float-type)
   (multiple-value-bind (min max)
       (ecase float-type
@@ -884,24 +969,24 @@ the first."
          nil
          #+64-bit
          ,(case op
-            (> '(float-bignum-> x y))
-            (< '(float-bignum-< x y))
-            (>= '(not (float-bignum-< x y)))
-            (<= '(not (float-bignum-> x y)))
-            (= '(float-bignum-= x y)))
+            (> '(float-bignum-> x y (dispatch-type x)))
+            (< '(float-bignum-< x y (dispatch-type x)))
+            (>= '(not (float-bignum-< x y (dispatch-type x))))
+            (<= '(not (float-bignum-> x y (dispatch-type x))))
+            (= '(float-bignum-= x y (dispatch-type x))))
          #-64-bit
          (,op (rational x) y)))
-      ((bignum float)
+      ((bignum (foreach single-float double-float))
        (with-float-inf-or-nan-test y
          ,infinite-y-finite-x
          nil
          #+64-bit
          ,(case op
-            (> '(float-bignum-< y x))
-            (< '(float-bignum-> y x))
-            (>= '(not (float-bignum-> y x)))
-            (<= '(not (float-bignum-< y x)))
-            (= '(float-bignum-= y x)))
+            (> '(float-bignum-< y x (dispatch-type y)))
+            (< '(float-bignum-> y x (dispatch-type y)))
+            (>= '(not (float-bignum-> y x (dispatch-type y))))
+            (<= '(not (float-bignum-< y x (dispatch-type y))))
+            (= '(float-bignum-= y x (dispatch-type y))))
          #-64-bit
          (,op x (rational y))))))
   )                                     ; EVAL-WHEN
