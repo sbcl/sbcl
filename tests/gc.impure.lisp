@@ -161,7 +161,7 @@
 (with-test (:name :static-fdefn-space)
   (sb-int:dovector (name sb-vm:+static-fdefns+)
     (assert (eq (sb-ext:heap-allocated-p (sb-int:find-fdefn name))
-                (or #+immobile-code :immobile :static)))))
+                (or #+(and immobile-code x86-64) :immobile :static)))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
 (with-test (:name :bug-529014)

@@ -1,5 +1,5 @@
 
-#-immobile-space (invoke-restart 'run-tests::skip-file)
+#-(and immobile-space x86-64) (invoke-restart 'run-tests::skip-file)
 
 (defun make-page-full-of-fdefns ()
   ;; Make a bunch of fdefns until we're aligned at a page boundary.
