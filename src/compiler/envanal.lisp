@@ -377,33 +377,35 @@
       (dolist (lvar (dynamic-extent-values dynamic-extent))
         (aver (eq dynamic-extent (lvar-dynamic-extent lvar)))
         (labels ((mark-dx (lvar)
-                   (setf (lvar-dynamic-extent lvar) dynamic-extent)
+                   (unless (lvar-dynamic-extent lvar)
+                     (setf (lvar-dynamic-extent lvar) dynamic-extent))
                    ;; Now look to see if there are otherwise
                    ;; inaccessible parts of the value in LVAR.
-                   (do-uses (use lvar)
-                     (when (use-good-for-dx-p use dynamic-extent)
-                       (etypecase use
-                         (cast (mark-dx (cast-value use)))
-                         (combination
-                          ;; Don't propagate through &REST, for
-                          ;; sanity.
-                          (unless (eq (combination-fun-source-name use nil)
-                                      '%listify-rest-args)
-                            (dolist (arg (combination-args use))
-                              (when (and arg
-                                         (lvar-good-for-dx-p arg dynamic-extent))
-                                (mark-dx arg)))))
-                         (ref
-                          (let ((leaf (ref-leaf use)))
-                            (typecase leaf
-                              (lambda-var
-                               (mark-dx (let-var-initial-value leaf)))
-                              (clambda
-                               (let ((fun (functional-entry-fun leaf)))
-                                 (setf (enclose-dynamic-extent (functional-enclose fun))
-                                       dynamic-extent)
-                                 (setf (leaf-dynamic-extent fun)
-                                       (dynamic-extent-kind dynamic-extent))))))))))))
+                   (when (eq (lvar-dynamic-extent lvar) dynamic-extent)
+                     (do-uses (use lvar)
+                       (when (use-good-for-dx-p use dynamic-extent)
+                         (etypecase use
+                           (cast (mark-dx (cast-value use)))
+                           (combination
+                            ;; Don't propagate through &REST, for
+                            ;; sanity.
+                            (unless (eq (combination-fun-source-name use nil)
+                                        '%listify-rest-args)
+                              (dolist (arg (combination-args use))
+                                (when (and arg
+                                           (lvar-good-for-dx-p arg dynamic-extent))
+                                  (mark-dx arg)))))
+                           (ref
+                            (let ((leaf (ref-leaf use)))
+                              (typecase leaf
+                                (lambda-var
+                                 (mark-dx (let-var-initial-value leaf)))
+                                (clambda
+                                 (let ((fun (functional-entry-fun leaf)))
+                                   (setf (enclose-dynamic-extent (functional-enclose fun))
+                                         dynamic-extent)
+                                   (setf (leaf-dynamic-extent fun)
+                                         (dynamic-extent-kind dynamic-extent)))))))))))))
           ;; Check that the value hasn't been flushed somehow.
           (when (lvar-uses lvar)
             (cond ((lvar-good-for-dx-p lvar dynamic-extent)

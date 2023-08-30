@@ -1972,3 +1972,23 @@
             (let ((m (list 2)))
               (declare (dynamic-extent m))
               (eval m))))))))
+
+(defstruct thing
+  (times-v nil :type simple-vector :read-only t)
+  (fringe nil))
+
+(with-test (:name :dx-propagation-existing-dynamic-extent)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda ()
+       (declare (inline make-thing))
+       (let ((times-v (make-array 2))
+             (result nil))
+         (declare (dynamic-extent times-v))
+         (dolist (portion '(1 2 3))
+           (let ((scratchpad (make-thing :times-v times-v)))
+             (declare (dynamic-extent scratchpad))
+             (setq result (nconc result (thing-fringe scratchpad)))))
+         result))
+     (() nil))))
