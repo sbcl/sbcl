@@ -34,11 +34,17 @@
 (defun double-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 53) sig)
            (type (unsigned-byte 11) exp))
+  #-64-bit
   (make-double-float (dpb exp sb-vm:double-float-hi-exponent-byte
                           (dpb (ash sig -32)
                                sb-vm:double-float-hi-significand-byte
                                (if (zerop sign) 0 -1)))
-                     (ldb (byte 32 0) sig)))
+                     (ldb (byte 32 0) sig))
+  #+64-bit
+  (%make-double-float
+   (dpb exp sb-vm:double-float-exponent-byte
+        (dpb sig sb-vm:double-float-significand-byte
+             (if (zerop sign) 0 -1)))))
 #+(and long-float x86)
 (defun long-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 64) sig)
