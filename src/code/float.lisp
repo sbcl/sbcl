@@ -143,10 +143,7 @@
           ((> exp sb-vm:double-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
-           ;; DOUBLE-FLOAT-HIDDEN-BIT is nonsense. It's 20 because it's the index
-           ;; within the high half. It should be an index within the entire fraction.
-           ;; If you want to manipulate the fraction as two 4-byte parts, that's on you.
-           (values (logior (ash sb-vm:double-float-hidden-bit 32) mantissa)
+           (values (logior sb-vm:double-float-hidden-bit mantissa)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
                    sign))))
   #+64-bit ; don't split the high and low bits
@@ -159,7 +156,7 @@
           ((> exp sb-vm:double-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
-           (values (logior (ash sb-vm:double-float-hidden-bit 32) frac)
+           (values (logior sb-vm:double-float-hidden-bit frac)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
                    sign)))))
 

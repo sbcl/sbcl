@@ -405,7 +405,7 @@
 (defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
+(defconstant double-float-hidden-bit (ash 1 52))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
