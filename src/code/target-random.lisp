@@ -340,14 +340,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                           (double-float $0d0))
                 %random-double-float))
 
-;;; 32-bit version
-#+nil
-(defun %random-double-float (arg state)
-  (declare (type (double-float ($0d0)) arg)
-           (type random-state state))
-  (* (float (random-chunk state) $1d0) (/ $1d0 (expt 2 32))))
-
-;;; 53-bit version
 #-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float ($0d0)) arg)

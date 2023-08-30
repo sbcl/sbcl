@@ -181,64 +181,63 @@
 ;;; that is FLOAT-DIGITS wide, and decrease the exponent.
 (defun decode-single-float (x)
   (declare (single-float x))
-  (multiple-value-bind (bits exp)
-      (let* ((bits (single-float-bits x))
-             (biased-exp (ldb sb-vm:single-float-exponent-byte bits)))
-        (if (> biased-exp sb-vm:single-float-normal-exponent-max)
-            (error float-decoding-error x)
-            (let ((frac (ldb sb-vm:single-float-significand-byte bits)))
-               (multiple-value-bind (new-exp new-frac lisp-exponent)
-                   (cond ((/= biased-exp 0) ; normal
-                          ;; SINGLE-FLOAT-BIAS as the stored exponent yields
-                          ;; an effective exponent of -1.
-                          (values sb-vm:single-float-bias frac
-                                  (- biased-exp sb-vm:single-float-bias)))
-                         ((= frac 0) (values 0 0 0))
-                         (t ; subnormal. Normalize it and unset the implied 1 bit
-                          (let ((prec (integer-length frac)))
-                            (values sb-vm:single-float-bias
-                                    (ldb (byte (1- sb-vm:single-float-digits) 0)
-                                         (ash frac (- sb-vm:single-float-digits prec)))
-                                    (+ subnormal-sfloat-exponent prec)))))
-                 (values (dpb new-exp sb-vm:single-float-exponent-byte new-frac)
-                         lisp-exponent)))))
-    (values (make-single-float bits) exp (float-sign x))))
+  (let* ((bits (single-float-bits x))
+         (biased-exp (ldb sb-vm:single-float-exponent-byte bits)))
+    (if (> biased-exp sb-vm:single-float-normal-exponent-max)
+        (error float-decoding-error x)
+        (let ((frac (ldb sb-vm:single-float-significand-byte bits)))
+          (multiple-value-bind (new-exp new-frac lisp-exponent)
+              (cond ((/= biased-exp 0) ; normal
+                     ;; SINGLE-FLOAT-BIAS as the stored exponent yields
+                     ;; an effective exponent of -1.
+                     (values sb-vm:single-float-bias frac
+                             (- biased-exp sb-vm:single-float-bias)))
+                    ((= frac 0) (values 0 0 0))
+                    (t ; subnormal. Normalize it and unset the implied 1 bit
+                     (let ((prec (integer-length frac)))
+                       (values sb-vm:single-float-bias
+                               (ldb (byte (1- sb-vm:single-float-digits) 0)
+                                    (ash frac (- sb-vm:single-float-digits prec)))
+                               (+ subnormal-sfloat-exponent prec)))))
+            (values (make-single-float (dpb new-exp sb-vm:single-float-exponent-byte new-frac))
+                    lisp-exponent
+                    (float-sign x)))))))
 
 ;;; The double-float logic mostly follows the skeleton of the above code,
 ;;; but there is a consed bignum or two on 32-bit architectures.
 ;;; Consing for the sake of code clarity is worth it as far as I'm concerned.
 (defun decode-double-float (x)
   (declare (double-float x))
-  (multiple-value-bind (high-bits low-bits exp)
-      (let* #+64-bit ((bits (double-float-bits x))
-                      (biased-exp (ldb sb-vm:double-float-exponent-byte bits)))
-            #-64-bit ((high (double-float-high-bits x))
-                      (biased-exp (ldb sb-vm:double-float-hi-exponent-byte high)))
-        (if (> biased-exp sb-vm:double-float-normal-exponent-max)
-            (error float-decoding-error x)
-            (let ((frac #+64-bit (ldb sb-vm:double-float-significand-byte bits)
-                        #-64-bit (logior (ash (ldb sb-vm:double-float-hi-significand-byte high) 32)
-                                         (double-float-low-bits x))))
-               (multiple-value-bind (new-exp new-frac lisp-exponent)
-                   (cond ((/= biased-exp 0) ; normal
-                          ;; DOUBLE-FLOAT-BIAS as the stored exponent yields
-                          ;; an effective exponent of -1.
-                          (values sb-vm:double-float-bias frac
-                                  (- biased-exp sb-vm:double-float-bias)))
-                         ((= frac 0) (values 0 0 0))
-                         (t ; subnormal. Normalize it and unset the implied 1 bit
-                          (let ((prec (integer-length frac)))
-                            (values sb-vm:double-float-bias
-                                    (ldb (byte (1- sb-vm:double-float-digits) 0)
-                                         (ash frac (- sb-vm:double-float-digits prec)))
-                                    (+ subnormal-dfloat-exponent prec)))))
-                 ;; Now comes the dumb part for 64-bit machines -
-                 ;; splitting the fraction into halves for no good reason.
-                 (values (dpb new-exp sb-vm:double-float-hi-exponent-byte
-                              (ldb (byte 32 32) new-frac))
-                         (ldb (byte 32 0) new-frac)
-                         lisp-exponent)))))
-    (values (make-double-float high-bits low-bits) exp (float-sign x))))
+  (let* #+64-bit ((bits (double-float-bits x))
+                  (biased-exp (ldb sb-vm:double-float-exponent-byte bits)))
+        #-64-bit ((high (double-float-high-bits x))
+                  (biased-exp (ldb sb-vm:double-float-hi-exponent-byte high)))
+    (if (> biased-exp sb-vm:double-float-normal-exponent-max)
+        (error float-decoding-error x)
+        (let ((frac #+64-bit (ldb sb-vm:double-float-significand-byte bits)
+                    #-64-bit (logior (ash (ldb sb-vm:double-float-hi-significand-byte high) 32)
+                                     (double-float-low-bits x))))
+          (multiple-value-bind (new-exp new-frac lisp-exponent)
+              (cond ((/= biased-exp 0)  ; normal
+                     ;; DOUBLE-FLOAT-BIAS as the stored exponent yields
+                     ;; an effective exponent of -1.
+                     (values sb-vm:double-float-bias frac
+                             (- biased-exp sb-vm:double-float-bias)))
+                    ((= frac 0) (values 0 0 0))
+                    (t ; subnormal. Normalize it and unset the implied 1 bit
+                     (let ((prec (integer-length frac)))
+                       (values sb-vm:double-float-bias
+                               (ldb (byte (1- sb-vm:double-float-digits) 0)
+                                    (ash frac (- sb-vm:double-float-digits prec)))
+                               (+ subnormal-dfloat-exponent prec)))))
+            (values #-64-bit
+                    (make-double-float (dpb new-exp sb-vm:double-float-hi-exponent-byte
+                                            (ldb (byte 32 32) new-frac))
+                                       (ldb (byte 32 0) new-frac))
+                    #+64-bit
+                    (%make-double-float (dpb new-exp sb-vm:double-float-exponent-byte new-frac))
+                    lisp-exponent
+                    (float-sign x)))))))
 
 ;;; Dispatch to the appropriate type-specific function.
 (defun decode-float (f)
