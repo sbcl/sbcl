@@ -765,10 +765,10 @@ the first."
                               sig)))
                 (and (= (truly-the bignum-length (sb-bignum::bignum-buffer-integer-length bignum bignum-length))
                         (+ (integer-length int) exp))
-                     (sb-bignum::bignum-lower-bits-zero-p bignum exp)
+                     (sb-bignum::bignum-lower-bits-zero-p bignum exp bignum-length)
                      (= int
                         (truly-the fixnum
-                                   (sb-bignum::last-bignum-part=>fixnum exp bignum))))))))))
+                                   (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))))))))))
 
 #+64-bit
 (defmacro float-bignum-< (float bignum type)
@@ -795,12 +795,12 @@ the first."
                     ((minusp length-diff) (minusp float))
                     (t
                      (let ((diff (- (truly-the fixnum
-                                               (sb-bignum::last-bignum-part=>fixnum exp bignum))
+                                               (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))
                                     int)))
                        (cond ((plusp diff) t)
                              ((minusp diff) nil)
                              (t
-                              (not (sb-bignum::bignum-lower-bits-zero-p bignum exp))))))))))))))
+                              (not (sb-bignum::bignum-lower-bits-zero-p bignum exp bignum-length))))))))))))))
 
 #+64-bit
 (defmacro float-bignum-> (float bignum type)
@@ -828,7 +828,8 @@ the first."
                         ((minusp length-diff)
                          (not (minusp float)))
                         (t
-                         (< (truly-the fixnum (sb-bignum::last-bignum-part=>fixnum exp bignum)) int))))))))))
+                         (< (truly-the fixnum (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))
+                            int))))))))))
 
 (defmacro make-fixnum-float-comparer (operation integer float float-type)
   (multiple-value-bind (min max)

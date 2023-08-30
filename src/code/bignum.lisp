@@ -1270,13 +1270,14 @@
 ;;; zero, else NIL. If the integer-length of BIGNUM is less than N-BITS,
 ;;; the result is NIL, too.
 (declaim (inline bignum-lower-bits-zero-p))
-(defun bignum-lower-bits-zero-p (bignum n-bits)
+(defun bignum-lower-bits-zero-p (bignum n-bits length)
   (declare (type bignum bignum)
+           ((and (integer 1) bignum-length) length)
            (type bit-index n-bits))
   (multiple-value-bind (n-full-digits n-bits-partial-digit)
       (floor n-bits digit-size)
     (declare (type bignum-length n-full-digits))
-    (when (> (%bignum-length bignum) n-full-digits)
+    (when (> length n-full-digits)
       (dotimes (index n-full-digits)
         (declare (type bignum-index index))
         (unless (zerop (%bignum-ref bignum index))
@@ -1435,7 +1436,7 @@
                           (shift (- length ,(const 'digits)))
                           ;; Get one more bit for rounding
                           (shifted (truly-the fixnum
-                                              (last-bignum-part=>fixnum (1- shift) bignum)))
+                                              (last-bignum-part=>fixnum (1- shift) bignum bignum-length)))
                           ;; Cut off the hidden bit
                           (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
                           (exp (truly-the (unsigned-byte ,(byte-size sb-vm:double-float-exponent-byte))
@@ -1444,7 +1445,7 @@
                                      (byte-position ,(const 'exponent-byte)))))
                      (when (and (logtest shifted 1)
                                 (or (logtest signif 1)
-                                    (not (bignum-lower-bits-zero-p bignum shift))))
+                                    (not (bignum-lower-bits-zero-p bignum shift bignum-length))))
                        ;; Round up
                        (incf signif))
                      ;; If rounding up overflows this will increase the exponent too
@@ -1474,7 +1475,7 @@
                             (bits (ash exp (byte-position ,(const 'exponent-byte)))))
                        (when (and (logtest shifted 1)
                                   (or (logtest signif 1)
-                                      (not (bignum-lower-bits-zero-p bignum shift))))
+                                      (not (bignum-lower-bits-zero-p bignum shift bignum-length))))
                          (incf signif))
                        (let ((bits (+ bits signif)))
                          (when (or (> exp ,(const 'normal-exponent-max))
@@ -1711,30 +1712,30 @@
 
 ;;; Basically shift the bignum right by byte-pos, but assumes it's
 ;;; right at the end of the bignum.
-(defun last-bignum-part=>fixnum (byte-pos bignum)
+(defun last-bignum-part=>fixnum (byte-pos bignum length)
   (declare (type bit-index byte-pos)
+           ((and (integer 1) bignum-length) length)
            (bignum bignum)
            (optimize speed))
-  (let ((n-digits (%bignum-length bignum)))
-    (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
-      (cond ((<= bit-index (- digit-size sb-vm:n-fixnum-bits)) ; contained in one word
+  (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
+    (cond ((<= bit-index (- digit-size sb-vm:n-fixnum-bits)) ; contained in one word
+           (sb-c::mask-signed-field sb-vm:n-fixnum-bits
+                                    (ash (%bignum-ref bignum word-index) (- bit-index))))
+          (t
+           ;; At least one bit is obtained from each of two words,
+           ;; and not more than two words.
+           (let* ((low-part-size
+                    (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
+                               (- digit-size bit-index))))
              (sb-c::mask-signed-field sb-vm:n-fixnum-bits
-                                      (ash (%bignum-ref bignum word-index) (- bit-index))))
-            (t
-             ;; At least one bit is obtained from each of two words,
-             ;; and not more than two words.
-             (let* ((low-part-size
-                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
-                                 (- digit-size bit-index))))
-               (sb-c::mask-signed-field sb-vm:n-fixnum-bits
-                                        (logior
-                                         (let ((word-index (1+ word-index)))
-                                           (ash (if (< word-index n-digits) ; next word exists
-                                                    (%bignum-ref bignum word-index)
-                                                    (%sign-digit bignum n-digits))
-                                                low-part-size))
-                                         (ash (%bignum-ref bignum word-index)
-                                              (- bit-index))))))))))
+                                      (logior
+                                       (let ((word-index (1+ word-index)))
+                                         (ash (if (< word-index length) ; next word exists
+                                                  (%bignum-ref bignum word-index)
+                                                  (%sign-digit bignum length))
+                                              low-part-size))
+                                       (ash (%bignum-ref bignum word-index)
+                                            (- bit-index)))))))))
 
 ;;;; TRUNCATE
 
