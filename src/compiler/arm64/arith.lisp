@@ -1528,7 +1528,7 @@
   (:generator 1
     (if (sc-is res any-reg)
         (inst lsl res digit n-fixnum-tag-bits)
-        (inst mov res digit))))
+        (move res digit))))
 
 (define-vop (digit-ashr)
   (:translate sb-bignum:%ashr)
