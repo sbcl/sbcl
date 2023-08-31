@@ -1322,7 +1322,7 @@ and the number of 0 bits if INTEGER is negative."
 (defun logbitp (index integer)
   "Predicate returns T if bit index of integer is a 1."
   (declare (explicit-check))
-  (number-dispatch ((index integer) (integer integer))
+  (number-dispatch ((index unsigned-byte) (integer integer))
     ((fixnum fixnum) (if (< index sb-vm:n-positive-fixnum-bits)
                          (not (zerop (logand integer (ash 1 index))))
                          (minusp integer)))

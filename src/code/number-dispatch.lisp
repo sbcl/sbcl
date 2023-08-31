@@ -114,9 +114,12 @@
               (test-type-pairs (if (cdr vars)
                                    #'error-if-sub-or-supertype
                                    #'error-if-supertype)))
-            `((typecase ,var
+            `((typecase ,(car var)
                 ,@(mapcar (lambda (case)
                             `(,(first case)
+                              ,@(when (eq (cadr var) 'unsigned-byte)
+                                  `((when (minusp ,(car var))
+                                      (go ,(car error-tags)))))
                               ,@(generate-number-dispatch (rest vars)
                                                           (rest error-tags)
                                                           (cdr case))))
@@ -186,7 +189,7 @@
       `(block ,block
          (tagbody
             (return-from ,block
-              ,@(generate-number-dispatch vars (error-tags)
+              ,@(generate-number-dispatch var-specs (error-tags)
                                           (cdr res)))
             ,@(errors))))))
 

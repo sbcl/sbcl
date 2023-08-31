@@ -176,3 +176,12 @@
       `(lambda (x y)
          (truly-the fixnum (ldb (byte x y) 100)))
     ((100 0) 100)))
+
+(with-test (:name :logbitp-negative-error)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (x y)
+         (logbitp x y))
+    ((-1 0) (condition 'type-error))
+    ((-2 (1+ most-positive-fixnum)) (condition 'type-error))
+    (((1- most-negative-fixnum) 1) (condition 'type-error))))
