@@ -178,6 +178,9 @@ slots for those structures.
 @item passwd
 @include class-sb-posix-passwd.texinfo
 
+@item passwd
+@include class-sb-posix-group.texinfo
+
 @item stat
 @include class-sb-posix-stat.texinfo
 

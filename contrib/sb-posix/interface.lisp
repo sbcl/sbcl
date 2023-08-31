@@ -7,13 +7,17 @@
     `(progn
       (export ',name :sb-posix)
       (defclass ,name ,superclasses
+         ;; KLUDGE: Splice out some slot options (they're
+         ;; for the conversion functions, not for DEFCLASS).
         ,(loop for slotd in slots
-               ;; KLUDGE: Splice out :ARRAY-LENGTH options (they're
-               ;; for the conversion functions, not for DEFCLASS).
-               for array-length-option = (member :array-length slotd)
-               collect (append (ldiff slotd array-length-option)
-                               (cddr array-length-option)))
+               collect
+               (let ((slotd (copy-list slotd)))
+                 (dolist (keyword '(:array-length :from-alien) slotd)
+                   (remf (cdr slotd) keyword))))
         ,@options)
+      ;; TODO (maybe): there's no reason to define to-alien routines
+      ;; struct stat, passwd, or group: OS interfaces only ever write
+      ;; into them, never read from them.
       (declaim (inline ,to-alien ,to-protocol))
       (declaim (inline ,to-protocol ,to-alien))
       (defun ,to-protocol (alien &optional instance)
@@ -26,6 +30,7 @@
                 ;;
                 ;; FIXME: baroque construction of intricate fragility
                 for array-length = (getf (cdr slotd) :array-length)
+                for from-alien = (getf (cdr slotd) :from-alien)
                 if array-length
                   collect `(progn
                              (let ((array (make-array ,array-length)))
@@ -37,8 +42,14 @@
                                         (sb-alien:slot alien ',(car slotd))
                                         i)))))
                 else
-                  collect `(setf (slot-value instance ',(car slotd))
-                                 (sb-alien:slot alien ',(car slotd))))
+                  collect (if from-alien
+                              ;; FROM-ALIEN is for any ad-hoc conversions that
+                              ;; SB-ALIEN doesn't automatically handle, such as
+                              ;; char** to list of strings.
+                              `(setf (slot-value instance ',(car slotd))
+                                     (,from-alien (sb-alien:slot alien ',(car slotd))))
+                              `(setf (slot-value instance ',(car slotd))
+                                     (sb-alien:slot alien ',(car slotd)))))
         instance)
       (defun ,to-alien (instance &optional alien)
         (declare (type (or null (sb-alien:alien (* ,alien-type))) alien)
@@ -55,6 +66,8 @@
                                         (sb-alien:slot alien ',(car slotd))
                                         i)
                                        (aref array i)))))
+                ;; N.B., nothing turns out to need a :TO-ALIEN
+                ;; counterpart of :FROM-ALIEN so far.
                 else
                   collect `(setf (sb-alien:slot alien ',(car slotd))
                                  (slot-value instance ',(car slotd)))))
@@ -554,9 +567,20 @@ not supported."
 ;;; group database
 #-(or android win32)
 (define-protocol-class group alien-group ()
-  ((name :initarg :name :accessor group-name)
-   (passwd :initarg :passwd :accessor group-passwd)
-   (gid :initarg :gid :accessor group-gid)))
+  ((name :initarg :name :accessor group-name
+         :documentation "The name of the group.")
+   ;; Note: SUSv4 doesn't require this member
+   (passwd :initarg :passwd :accessor group-passwd
+           :documentation "The group's encrypted password.")
+   (gid :initarg :gid :accessor group-gid
+        :documentation "Numerical group ID.")
+   (mem :initarg :mem :accessor group-mem
+        ;; N.B., omitting any :TO-ALIEN because no alien interface
+        ;; reads from a filled-in struct group.
+        :from-alien sb-int:c-strings->string-list
+        :documentation "A list of strings naming members of the group."))
+  (:documentation
+   "Instances of this class represent entries in the system's group database."))
 
 #-(or win32 android)
 (macrolet ((define-obj-call (name arg type conv)

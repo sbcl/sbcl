@@ -307,7 +307,8 @@
              ("struct group"
               (c-string-pointer name "char *" "gr_name")
               (c-string-pointer passwd "char *" "gr_passwd")
-              (gid-t gid "gid_t" "gr_gid")))
+              (gid-t gid "gid_t" "gr_gid")
+              ((* c-string) mem "char **" "gr_mem")))
 
  (:structure alien-stat
              ("struct stat"
