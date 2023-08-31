@@ -1342,8 +1342,13 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun fun)
-  (declare (type function derive-fun fun))
+(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun)
+  (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
+                        derive-fun member-fun
+                        (same-leaf-ref-p arg1 arg2)))
+
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf)
+  (declare (type function derive-fun member-fun))
   (labels ((deriver (x y same-arg)
              (cond ((and (member-type-p x) (member-type-p y))
                     (let* ((x (first (member-type-members x)))
@@ -1352,7 +1357,7 @@
                                     (with-float-traps-masked
                                         (:underflow :overflow :divide-by-zero
                                                     :invalid)
-                                      (funcall fun x y)))))
+                                      (funcall member-fun x y)))))
                       (cond ((null result) *empty-type*)
                             ((and (floatp result) (float-nan-p result))
                              (make-numeric-type :class 'float
@@ -1371,29 +1376,28 @@
            (derive (type1 type2 same-arg)
              (let ((a1 (prepare-arg-for-derive-type type1))
                    (a2 (prepare-arg-for-derive-type type2)))
-              (when (and a1 a2)
-                (let ((results nil))
-                  (if same-arg
-                      ;; Since the args are the same LVARs, just run down the
-                      ;; lists.
-                      (dolist (x a1)
-                        (let ((result (deriver x x same-arg)))
-                          (if (listp result)
-                              (setf results (append results result))
-                              (push result results))))
-                      ;; Try all pairwise combinations.
-                      (dolist (x a1)
-                        (dolist (y a2)
-                          (let ((result (or (deriver x y same-arg)
-                                            (numeric-contagion x y))))
-                            (if (listp result)
-                                (setf results (append results result))
-                                (push result results))))))
-                  (if (rest results)
-                      (make-derived-union-type results)
-                      (first results)))))))
-    (derive (lvar-type arg1) (lvar-type arg2)
-            (same-leaf-ref-p arg1 arg2))))
+               (when (and a1 a2)
+                 (let ((results nil))
+                   (if same-arg
+                       ;; Since the args are the same LVARs, just run down the
+                       ;; lists.
+                       (dolist (x a1)
+                         (let ((result (deriver x x same-arg)))
+                           (if (listp result)
+                               (setf results (append results result))
+                               (push result results))))
+                       ;; Try all pairwise combinations.
+                       (dolist (x a1)
+                         (dolist (y a2)
+                           (let ((result (or (deriver x y same-arg)
+                                             (numeric-contagion x y))))
+                             (if (listp result)
+                                 (setf results (append results result))
+                                 (push result results))))))
+                   (if (rest results)
+                       (make-derived-union-type results)
+                       (first results)))))))
+    (derive arg1-type arg2-type same-leaf)))
 
 (defun +-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
@@ -1589,18 +1593,19 @@
 (defoptimizer (lognot derive-type) ((int))
   (one-arg-derive-type int #'lognot-derive-type-aux #'lognot))
 
-(defoptimizer (%negate derive-type) ((num))
+
+(defun %negate-derive-type-aux (type)
   (flet ((negate-bound (b)
            (and b
                 (set-bound (sb-xc:- (type-bound-number b))
                            (consp b)))))
-    (one-arg-derive-type num
-                         (lambda (type)
-                           (modified-numeric-type
-                            type
-                            :low (negate-bound (numeric-type-high type))
-                            :high (negate-bound (numeric-type-low type))))
-                         #'sb-xc:-)))
+    (modified-numeric-type
+     type
+     :low (negate-bound (numeric-type-high type))
+     :high (negate-bound (numeric-type-low type)))))
+
+(defoptimizer (%negate derive-type) ((num))
+  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:-))
 
 (defun abs-derive-type-aux (type)
   (cond ((eq (numeric-type-complexp type) :complex)
@@ -2514,12 +2519,21 @@
     (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size)))))
-    (if size-high
-        (if (<= size-high sb-vm:n-word-bits)
-            (specifier-type `(unsigned-byte* ,size-high))
-            (specifier-type 'unsigned-byte))
-        *universal-type*)))
+  ;; (logand (ash num (- posn)) (lognot (ash -1 size)))
+  (let* ((shifted (two-arg-derive-type num posn
+                                       (lambda (num posn same)
+                                         (declare (ignore same))
+                                         (ash-derive-type-aux num (%negate-derive-type-aux posn) nil))
+                                       (lambda (num posn)
+                                         (ash num (- posn)))))
+         (minus-one (specifier-type '(eql -1)))
+         (mask (one-arg-derive-type size
+                                    (lambda (x)
+                                      (lognot-derive-type-aux
+                                       (ash-derive-type-aux minus-one x nil)))
+                                    (lambda (x)
+                                      (lognot (ash -1 x))))))
+    (%two-arg-derive-type shifted mask #'logand-derive-type-aux #'logand)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
   (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
