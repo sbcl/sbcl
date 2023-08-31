@@ -1144,24 +1144,6 @@ necessary, since type inference may take arbitrarily long to converge.")
           (intersection '(:load-toplevel load) situations)
           (intersection '(:execute eval) situations)))
 
-
-;;; utilities for extracting COMPONENTs of FUNCTIONALs
-(defun functional-components (f)
-  (declare (type functional f))
-  (etypecase f
-    (clambda (list (lambda-component f)))
-    (optional-dispatch (let ((result nil))
-                         (flet ((maybe-frob (maybe-clambda)
-                                  (when (and maybe-clambda
-                                             (promise-ready-p maybe-clambda))
-                                    (pushnew (lambda-component
-                                              (force maybe-clambda))
-                                             result))))
-                           (map nil #'maybe-frob (optional-dispatch-entry-points f))
-                           (maybe-frob (optional-dispatch-more-entry f))
-                           (maybe-frob (optional-dispatch-main-entry f)))
-                         result))))
-
 ;;; Print some noise about FORM if *COMPILE-PRINT* is true.
 (defun note-top-level-form (form)
   (when *compile-print*

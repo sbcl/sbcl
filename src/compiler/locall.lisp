@@ -403,10 +403,6 @@
    (let ((did-something nil))
      (dolist (clambda clambdas)
        (let ((component (lambda-component clambda)))
-         ;; The original CMU CL code seemed to implicitly assume that
-         ;; COMPONENT is the only one here. Let's make that explicit.
-         (aver (= 1 (length (functional-components clambda))))
-         (aver (eql component (first (functional-components clambda))))
          (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
            (setf did-something t)
