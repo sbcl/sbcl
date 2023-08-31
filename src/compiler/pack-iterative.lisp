@@ -660,7 +660,6 @@
       ;; which the spill cost is non-negative (i.e. not live across so
       ;; many calls that it's simpler to just leave them on the stack)
       (when (and (not (tn-offset tn))
-                 (neq (tn-kind tn) :more)
                  (not (unbounded-tn-p tn))
                  (not (and (sc-save-p (tn-sc tn))   ; SC is caller-save, and
                            (minusp (tn-cost tn))))) ; TN lives in many calls

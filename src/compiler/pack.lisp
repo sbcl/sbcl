@@ -1788,7 +1788,6 @@
            (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
                ((null tn))
              (unless (or (tn-offset tn)
-                         (eq (tn-kind tn) :more)
                          (unbounded-tn-p tn)
                          (and (sc-save-p (tn-sc tn))  ; SC caller-save, but TN
                               (minusp (tn-cost tn)))) ; lives over many calls
