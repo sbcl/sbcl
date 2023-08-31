@@ -580,7 +580,7 @@
       (t (cond) (declare (ignore cond)) t))
   nil)
 
-#-(or android win32 sb-thread)
+#-(or android win32 (not sb-thread))
 (deftest do-passwds.concurrency
     (let* (thread1 thread2
            (t1
@@ -638,7 +638,7 @@
       (t (cond) (declare (ignore cond)) t))
   nil)
 
-#-(or android win32 sb-thread)
+#-(or android win32 (not sb-thread))
 (deftest do-group-database/getgrnam/getgruid.concurrency
     (let* (thread1 thread2
            (group-name (let ((group (sb-posix:getgrgid 0)))
