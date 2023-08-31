@@ -583,28 +583,41 @@ not supported."
    "Instances of this class represent entries in the system's group database."))
 
 #-(or win32 android)
-(macrolet ((define-obj-call (name arg type conv)
+(macrolet ((define-obj-call (name result-type conv &optional arg arg-type)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
     `(progn
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
-      (defun ,lisp-name (,arg)
+      (defun ,lisp-name (,@(when arg `(,arg)))
         (set-errno 0)
-        (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
+        (let ((r (alien-funcall
+                  (extern-alien
+                   ,name (function ,result-type ,@(when arg-type `(,arg-type))))
+                  ,@(when arg `(,arg)))))
           (if (null-alien r)
               (when (plusp (get-errno))
                 (syscall-error ',lisp-name))
               (,conv r))))))))
 
-(define-obj-call "getpwnam" login-name (function (* alien-passwd) (c-string :not-null t))
-                 alien-to-passwd)
-(define-obj-call "getpwuid" uid (function (* alien-passwd) uid-t)
-                 alien-to-passwd)
-(define-obj-call "getgrnam" login-name (function (* alien-group) (c-string :not-null t))
-                 alien-to-group)
-(define-obj-call "getgrgid" gid (function (* alien-group) gid-t)
-                 alien-to-group)
+;; passwd database
+(define-obj-call "getpwnam" (* alien-passwd) alien-to-passwd
+                 login-name (c-string :not-null t))
+(define-obj-call "getpwuid" (* alien-passwd) alien-to-passwd
+                 uid uid-t)
+(define-obj-call "getpwent" (* alien-passwd) alien-to-passwd)
+;; Including these here for thematic grouping.
+(define-call "setpwent" void never-fails)
+(define-call "endpwent" void never-fails)
+
+;; Same thing, but for the group database.
+(define-obj-call "getgrnam" (* alien-group) alien-to-group
+                 group-name (c-string :not-null t))
+(define-obj-call "getgrgid" (* alien-group) alien-to-group
+                 gid gid-t)
+(define-obj-call "getgrent" (* alien-group) alien-to-group)
+(define-call "setgrent" void never-fails)
+(define-call "endgrent" void never-fails)
 ) ; end MACROLET
 
 #-win32
