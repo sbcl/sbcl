@@ -582,6 +582,55 @@ not supported."
   (:documentation
    "Instances of this class represent entries in the system's group database."))
 
+;; None of the standardized interfaces to the user or group database
+;; is thread-safe or reentrant, at least with respect to getpwent or
+;; getgrent. The following two macros are for users to wrap around all
+;; getpw* or getgr* calls if they want to do things safely. (Note that
+;; on #-sb-thread, this still protects against reentrancy, but doesn't
+;; grab a lock.)
+#-(or android win32)
+(macrolet ((define-database-protection-form (dbname calls)
+  (let* ((macro-name (intern (format nil "WITH-~A-DATABASE" dbname) :sb-posix))
+         (macro-docstring
+          (format
+           nil
+           "~@<Establish a dynamic environment in which the calling thread ~
+            may safely access the ~(~A~) database. It is an error ~
+            to execute ~A within the dynamic extent of another ~:*~A. ~
+            For use by callers of ~{~#[~;and ~A~:;~A,~^ ~]~}. ~
+            The consequences are undefined if any other thread calls ~
+            any of ~:*~{~#[~;or ~A~:;~A,~^ ~]~} during the execution of ~
+            ~1@*~A.~:@>"
+           dbname macro-name calls))
+         (lock-var (intern (format nil "*~A-DATABASE-LOCK*" dbname) :sb-posix))
+         (lock-name (format nil "~A database lock" dbname))
+         (special-var (intern (format nil "*WITH-~A-DATABASE*" dbname) :sb-posix))
+         (reentrancy-error-message
+          (format nil "~@(~A~) database access is not reentrant." dbname)))
+    #-sb-thread (declare (ignore lock-var lock-name))
+    `(progn
+       #+sb-thread
+       (sb-ext:defglobal ,lock-var
+        (sb-thread:make-mutex :name ,lock-name))
+       (defvar ,special-var nil)
+       (export ',macro-name :sb-posix)
+       (defmacro ,macro-name (&body body)
+         ,macro-docstring
+         `(progn
+            (when ,',special-var
+              (error ,',reentrancy-error-message))
+            #+sb-thread
+            (sb-thread:with-mutex (,',lock-var)
+             (let ((,',special-var t))
+               ,@body))
+            #-sb-thread
+            (let ((,',special-var t))
+              ,@body)))))))
+(define-database-protection-form
+    passwd (getpwnam getpwuid getpwent setpwent endpwent))
+(define-database-protection-form
+    group (getgrnam getgruid getgrent setgrent endgrent)))
+
 #-(or win32 android)
 (macrolet ((define-obj-call (name result-type conv &optional arg arg-type)
   ;; FIXME: this isn't the documented way of doing this, surely?

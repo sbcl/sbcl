@@ -22,12 +22,13 @@ use over some portable function, or would be actively dangerous to the
 consistency of Lisp.  Not all functions are available on all
 platforms.
 
-Sb-posix functions do not take any measures to provide thread-safety
+Sb-posix functions do not implicitly take measures to provide thread-safety
 or reentrancy beyond whatever the underlying C library does, except in
 cases where doing so is necessary to maintain the consistency of the
 Lisp image. For example, the bindings to the user and group database
 accessing functions are neither thread-safe nor reentrant unless the
-underlying libc happens to make them so.
+underlying libc happens to make them so (but @pxref{Extensions to
+POSIX}).
 
 @menu
 * Lisp names for C names::
@@ -36,6 +37,7 @@ underlying libc happens to make them so.
 * Function Return Values::
 * Lisp objects and C structures::
 * Functions with idiosyncratic bindings::
+* Extensions to POSIX::
 @end menu
 
 
@@ -211,4 +213,28 @@ counterparts.
 @include fun-sb-posix-readlink.texinfo
 @item syslog
 @include fun-sb-posix-syslog.texinfo
+@end itemize
+
+
+@node Extensions to POSIX
+@subsection Extensions to POSIX
+
+Some of POSIX's standardized operators are not safe to use on their
+own, so @code{SB-POSIX} exports a few ``helpers'' that do not
+correspond exactly to functionality present in the POSIX standard.
+
+The user and group database accessing routines are not required to be
+thread-safe or reentrant, and so can only be used safely if all
+clients coordinate around their use. Since it would be logically
+impossible for independently developed programs to coordinate,
+@code{SB-POSIX} exports two macros,
+@code{SB-POSIX:WITH-PASSWD-DATABASE} and
+@code{SB-POSIX:WITH-GROUP-DATABASE}, that programs should use to
+coordinate access to the respective database.
+
+@itemize
+@item with-passwd-database
+@include macro-sb-posix-with-passwd-database.texinfo
+@item with-group-database
+@include macro-sb-posix-with-group-database.texinfo
 @end itemize
