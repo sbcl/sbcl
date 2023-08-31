@@ -1063,7 +1063,7 @@ bool gc_allocate_ptes()
 }
 
 extern void gcbarrier_patch_code(void*, int);
-#if !(defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 \
+#if !(defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64   \
       || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64)
 void gcbarrier_patch_code(void* __attribute__((unused)) where, int __attribute__((unused)) nbits)
 {
