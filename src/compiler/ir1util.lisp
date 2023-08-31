@@ -1342,7 +1342,6 @@
   (let* ((block (node-block node))
          (start (node-next node))
          (last (block-last block)))
-    (check-type last node)
     (unless (eq last node)
       (aver (and (eq (ctran-kind start) :inside-block)
                  (not (block-delete-p block))))
