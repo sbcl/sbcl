@@ -589,21 +589,8 @@ not supported."
 ;; on #-sb-thread, this still protects against reentrancy, but doesn't
 ;; grab a lock.)
 #-(or android win32)
-(macrolet ((define-database-protection-form (dbname calls implicit-users)
+(macrolet ((define-database-protection-form (dbname)
   (let* ((macro-name (intern (format nil "WITH-~A-DATABASE" dbname) :sb-posix))
-         (macro-docstring
-          (let ((*print-right-margin* 70)) ;; leave room for indentation
-            (format
-             nil
-             "~@<Establish a dynamic environment in which the calling thread ~
-              may safely access the ~(~A~) database. It is an error ~
-              to execute ~A within the dynamic extent of another ~:*~A. ~
-              ~{~A and ~A~} use this implicitly. ~
-              For use by callers of ~{~#[~;and ~A~:;~A,~^ ~]~}. ~
-              The consequences are undefined if any other thread calls ~
-              any of ~:*~{~#[~;or ~A~:;~A,~^ ~]~} during the execution of ~
-              ~1@*~A.~:@>"
-             dbname macro-name implicit-users calls)))
          (lock-var (intern (format nil "*~A-DATABASE-LOCK*" dbname) :sb-posix))
          (lock-name (format nil "~A database lock" dbname))
          (special-var (intern (format nil "*WITH-~A-DATABASE*" dbname) :sb-posix))
@@ -616,9 +603,7 @@ not supported."
        (sb-ext:defglobal ,lock-var
         (sb-thread:make-mutex :name ,lock-name))
        (defvar ,special-var nil)
-       (export ',macro-name :sb-posix)
        (defmacro ,macro-name (&body body)
-         ,macro-docstring
          `(progn
             (when ,',special-var
               (error ,',reentrancy-error-message))
@@ -633,10 +618,8 @@ not supported."
          `(unless ,',special-var
             (error "~A may only be called during ~A."
                     ',function ',',macro-name)))))))
-(define-database-protection-form
-    passwd (getpwent setpwent endpwent) (getpwnam getpwuid))
-(define-database-protection-form
-    group (getgrent setgrent endgrent) (getgrnam getgrgid)))
+(define-database-protection-form passwd)
+(define-database-protection-form group))
 
 #-(or win32 android)
 (macrolet ((define-obj-call (name result-type conv with-macro assertion
@@ -644,7 +627,9 @@ not supported."
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
     `(progn
-      (export ',lisp-name :sb-posix)
+      ;; Don't export GET/SET/END/??ENT bindings; the iteration
+      ;; macros are less error-prone.
+      ,@(when arg `((export ',lisp-name :sb-posix)))
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,@(when arg `(,arg)))
         ,@(unless arg
@@ -662,7 +647,6 @@ not supported."
   (define-enumerator-call (name assertion)
       (let ((lisp-name (intern (string-upcase name) :sb-posix)))
         `(progn
-           (export ',lisp-name :sb-posix)
            (declaim (inline ,lisp-name))
            (defun ,lisp-name ()
              (,assertion ',lisp-name)
@@ -708,11 +692,8 @@ not supported."
               It is unspecified whether ~:*~A is assigned, rebound, or ~
               destructively modified upon each iteration. ~
               It is an error to use any operator that accesses the ~
-              ~0@*~A database during the dynamic extent of ~A. ~
-              During the execution of ~:*~A, the consequences are ~
-              undefined if any other thread calls ~
-              ~@{~#[~;or ~A~:;~A,~^ ~]~}.~:@>"
-             dbname name set get end))))
+              ~0@*~A database during the dynamic extent of ~A.~:@>"
+             dbname name))))
     `(progn
        (export ',name :sb-posix)
        (defmacro ,name ((,dbname &optional result) &body body)

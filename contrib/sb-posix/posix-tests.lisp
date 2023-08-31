@@ -581,10 +581,10 @@
   nil)
 
 #-(or android win32)
-(deftest with-passwd-database/getpwnam/getpwuid.concurrency
+(deftest do-passwds.concurrency
     (let* (thread1 thread2
            (t1
-            (sb-posix:with-passwd-database
+            (sb-posix:do-passwds (passwd)
               ;; Both the two following threads should wait
               ;; for WITH-PASSWD-DATABASE to exit.
               (setq
@@ -598,22 +598,13 @@
                 (lambda ()
                   (sb-posix:getpwuid 0)
                   (get-universal-time))))
-              (prog1 (get-universal-time)
-                     (sleep 1.1))))
+             (let ((ut (get-universal-time)))
+               (sleep 1.1)
+               (return ut))))
            (t2 (sb-thread:join-thread thread1))
            (t3 (sb-thread:join-thread thread2)))
       (values (> t2 t1) (> t3 t1)))
   t t)
-
-#-(or android win32)
-(deftest getpwent/setpwent/endpwent.only-with-passwd-database
-    (values (handler-case (sb-posix:getpwent)
-              (error () :error))
-            (handler-case (sb-posix:setpwent)
-              (error () :error))
-            (handler-case (sb-posix:endpwent)
-              (error () :error)))
-  :error :error :error)
 
 #-(or android win32)
 (deftest do-passwds.1
@@ -648,13 +639,13 @@
   nil)
 
 #-(or android win32)
-(deftest with-passwd-database/getgrnam/getgruid.concurrency
+(deftest do-group-database/getgrnam/getgruid.concurrency
     (let* (thread1 thread2
            (group-name (let ((group (sb-posix:getgrgid 0)))
                          (assert group) ;; see test grent.1
                          (sb-posix:group-name group)))
            (t1
-            (sb-posix:with-group-database
+            (sb-posix:do-groups (group)
               ;; Both the two following threads should wait
               ;; for WITH-PASSWD-DATABASE to exit.
               (setq
@@ -668,22 +659,13 @@
                 (lambda ()
                   (sb-posix:getgrgid 0)
                   (get-universal-time))))
-              (prog1 (get-universal-time)
-                     (sleep 1.1))))
+              (let ((ut (get-universal-time)))
+                (sleep 1.1)
+                (return ut))))
            (t2 (sb-thread:join-thread thread1))
            (t3 (sb-thread:join-thread thread2)))
       (values (> t2 t1) (> t3 t1)))
   t t)
-
-#-(or android win32)
-(deftest getgrent/setgrent/endgrent.only-with-group-database
-    (values (handler-case (sb-posix:getgrent)
-              (error () :error))
-            (handler-case (sb-posix:setgrent)
-              (error () :error))
-            (handler-case (sb-posix:endgrent)
-              (error () :error)))
-  :error :error :error)
 
 #-(or android win32)
 (deftest do-groups.1

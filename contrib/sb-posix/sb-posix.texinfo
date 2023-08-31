@@ -227,26 +227,17 @@ The user and group database accessing routines are not required to be
 thread-safe or reentrant, and so can only be used safely if all
 clients coordinate around their use. Since it would be logically
 impossible for independently developed programs to coordinate,
-@code{SB-POSIX} exports two macros,
-@code{SB-POSIX:WITH-PASSWD-DATABASE} and
-@code{SB-POSIX:WITH-GROUP-DATABASE}, that callers of the respective
-database's enumerating routines (@code{SB-POSIX:GETPWENT},
-@code{SB-POSIX:GETGRENT}, and so forth) may use, as well as two
-iteration macros, @code{SB-POSIX:DO-PASSWDS} and
+@code{SB-POSIX} exports two iteration macros,
+@code{SB-POSIX:DO-PASSWDS} and
 @code{SB-POSIX:DO-GROUPS}, each of which iterates over the respective
-database while preventing any other threads from accessing that database.
-Note that keyed database accesses (@code{SB-POSIX:GETPWNAM},
+database while preventing the keyed accesses (@code{SB-POSIX:GETPWNAM},
 @code{SB-POSIX:GETPWUID}, @code{SB-POSIX:GETGRNAM},
-@code{SB-POSIX:GETGRGID}) may not be called during the dynamic
-extent of any of these four macros.
+@code{SB-POSIX:GETGRGID})
+from running until iteration completes.
 
 @itemize
-@item with-passwd-database
-@include macro-sb-posix-with-passwd-database.texinfo
 @item do-passwds
 @include macro-sb-posix-do-passwds.texinfo
-@item with-group-database
-@include macro-sb-posix-with-group-database.texinfo
 @item do-groups
 @include macro-sb-posix-do-groups.texinfo
 @end itemize
