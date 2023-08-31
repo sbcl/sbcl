@@ -616,6 +616,15 @@
   :error :error :error)
 
 #-(or android win32)
+(deftest do-passwds.1
+    ;; Just check that we get something back.
+    (typep
+     (sb-posix:do-passwds (passwd)
+      (return passwd))
+     'sb-posix:passwd)
+  t)
+
+#-(or android win32)
 (deftest grent.1
   ;; make sure that we found something
   (not (sb-posix:getgrgid 0))
@@ -675,6 +684,15 @@
             (handler-case (sb-posix:endgrent)
               (error () :error)))
   :error :error :error)
+
+#-(or android win32)
+(deftest do-groups.1
+    ;; Just check that we get something back.
+    (typep
+     (sb-posix:do-groups (group)
+      (return group))
+     'sb-posix:group)
+  t)
 
 #+nil
 ;; Requires root or special group + plus a sensible thing on the port

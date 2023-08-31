@@ -231,14 +231,22 @@ impossible for independently developed programs to coordinate,
 @code{SB-POSIX:WITH-PASSWD-DATABASE} and
 @code{SB-POSIX:WITH-GROUP-DATABASE}, that callers of the respective
 database's enumerating routines (@code{SB-POSIX:GETPWENT},
-@code{SB-POSIX:GETGRENT}, and so forth) should use. Note that keyed
-database lookups (@code{SB-POSIX:GETPWNAM}, and so forth) implicitly
-use these macros, so those routines should not be called during the
-dynamic extent of the respective macro.
+@code{SB-POSIX:GETGRENT}, and so forth) may use, as well as two
+iteration macros, @code{SB-POSIX:DO-PASSWDS} and
+@code{SB-POSIX:DO-GROUPS}, each of which iterates over the respective
+database while preventing any other threads from accessing that database.
+Note that keyed database accesses (@code{SB-POSIX:GETPWNAM},
+@code{SB-POSIX:GETPWUID}, @code{SB-POSIX:GETGRNAM},
+@code{SB-POSIX:GETGRGID}) may not be called during the dynamic
+extent of any of these four macros.
 
 @itemize
 @item with-passwd-database
 @include macro-sb-posix-with-passwd-database.texinfo
+@item do-passwds
+@include macro-sb-posix-do-passwds.texinfo
 @item with-group-database
 @include macro-sb-posix-with-group-database.texinfo
+@item do-groups
+@include macro-sb-posix-do-groups.texinfo
 @end itemize

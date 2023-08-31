@@ -694,6 +694,39 @@ not supported."
 (define-enumerator-call "endgrent" assert-with-group-database)
 ) ; end MACROLET
 
+#-(or android win32)
+(macrolet ((define-database-iterator (dbname with set get end)
+  (let* ((name (intern (format nil "DO-~AS" dbname) :sb-posix))
+         (docstring
+          (let ((*print-right-margin* 70))
+            (format
+             nil
+             "~@<Evaluate BODY with ~A bound to successive entries from ~
+              the ~:*~(~A~) database, and return RESULT. ~
+              An implicit block named NIL surrounds the form; ~
+              an implicit TAGBODY surrounds BODY. ~
+              It is unspecified whether ~:*~A is assigned, rebound, or ~
+              destructively modified upon each iteration. ~
+              It is an error to use any operator that accesses the ~
+              ~0@*~A database during the dynamic extent of ~A. ~
+              During the execution of ~:*~A, the consequences are ~
+              undefined if any other thread calls ~
+              ~@{~#[~;or ~A~:;~A,~^ ~]~}.~:@>"
+             dbname name set get end))))
+    `(progn
+       (export ',name :sb-posix)
+       (defmacro ,name ((,dbname &optional result) &body body)
+         ,docstring
+         `(,',with
+           (,',set)
+           (do ((,,dbname (,',get) (,',get)))
+               ((null ,,dbname) (,',end) ,result)
+             ,@body)))))))
+  (define-database-iterator passwd with-passwd-database
+                            setpwent getpwent endpwent)
+  (define-database-iterator group with-group-database
+                            setgrent getgrent endgrent))
+
 #-win32
 (define-protocol-class timeval alien-timeval ()
   ((sec :initarg :tv-sec :accessor timeval-sec
