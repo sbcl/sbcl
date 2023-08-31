@@ -322,7 +322,9 @@
     (case (sb-c::combination-fun-source-name node)
       (logtest
        (if (or (valid-funtype '(signed-word signed-word) '*)
-               (valid-funtype '(word word) '*))
+               (valid-funtype '(word word) '*)
+               (valid-funtype '(signed-word word) '*)
+               (valid-funtype '(word signed-word) '*))
            (values :maybe nil)
            (values :default nil)))
       (logbitp

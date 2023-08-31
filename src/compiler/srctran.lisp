@@ -384,6 +384,7 @@
              ((neq :default (combination-implementation-style node))
               (give-up-ir1-transform))
              (t
+              (delay-ir1-transform node :ir1-phases)
               `(not (zerop (logand x y)))))))))
 
 (deftransform logbitp ((index integer))

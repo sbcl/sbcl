@@ -454,6 +454,12 @@
   (:arg-types signed-num unsigned-num)
   (:translate logand))
 
+(define-vop (fast-logand/unsigned-signed=>unsigned fast-logand/unsigned=>unsigned)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num)
+  (:translate logand))
+
 (defun logical-immediate-or-word-mask (x)
   (and (integerp x)
        (or (encode-logical-immediate x)
@@ -1185,18 +1191,23 @@
   (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:variant-cost 6))
 
-(macrolet ((define-logtest-vops ()
-             `(progn
-                ,@(loop for suffix in '(/fixnum /signed /unsigned)
-                        for cost in '(4 6 6)
-                        collect
-                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
-                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
-                           (:translate logtest)
-                           (:conditional :ne)
-                           (:generator ,cost
-                             (inst tst x y)))))))
-  (define-logtest-vops))
+(define-vop (fast-logtest)
+  (:translate logtest)
+  (:args (x :scs (signed-reg unsigned-reg any-reg))
+         (y :scs (signed-reg unsigned-reg any-reg)))
+  (:arg-types (:or signed-num unsigned-num tagged-num)
+              (:or signed-num unsigned-num tagged-num))
+  (:policy :fast-safe)
+  (:conditional :ne)
+  (:generator 3
+    (cond ((and (sc-is x any-reg)
+                (not (sc-is y any-reg)))
+           (inst tst y (asr x n-fixnum-tag-bits)))
+          ((and (sc-is y any-reg)
+                (not (sc-is x any-reg)))
+           (inst tst x (asr y n-fixnum-tag-bits)))
+          (t
+           (inst tst x y)))))
 
 (define-vop (fast-logtest-c)
   (:translate logtest)
