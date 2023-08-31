@@ -400,7 +400,7 @@
            (delay-ir1-transform node :ir1-phases)
            `(if (>= index ,sb-vm:n-word-bits)
                 (minusp integer)
-                (logtest integer (ash 1 index))))
+                (logtest integer (ash 1 (truly-the (integer 0 (,sb-vm:n-word-bits)) index)))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
                           (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
