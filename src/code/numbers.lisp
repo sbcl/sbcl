@@ -768,7 +768,7 @@ the first."
                      (sb-bignum::bignum-lower-bits-zero-p bignum exp bignum-length)
                      (= int
                         (truly-the fixnum
-                                   (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))))))))))
+                                   (sb-bignum::last-bignum-part=>fixnum (- sb-bignum::digit-size (1+ ,(sym digits))) exp bignum))))))))))
 
 #+64-bit
 (defmacro float-bignum-< (float bignum type)
@@ -795,7 +795,7 @@ the first."
                     ((minusp length-diff) (minusp float))
                     (t
                      (let ((diff (- (truly-the fixnum
-                                               (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))
+                                               (sb-bignum::last-bignum-part=>fixnum (- sb-bignum::digit-size (1+ ,(sym digits))) exp bignum))
                                     int)))
                        (cond ((plusp diff) t)
                              ((minusp diff) nil)
@@ -828,7 +828,7 @@ the first."
                         ((minusp length-diff)
                          (not (minusp float)))
                         (t
-                         (< (truly-the fixnum (sb-bignum::last-bignum-part=>fixnum exp bignum bignum-length))
+                         (< (truly-the fixnum (sb-bignum::last-bignum-part=>fixnum (- sb-bignum::digit-size (1+ ,(sym digits))) exp bignum))
                             int))))))))))
 
 (defmacro make-fixnum-float-comparer (operation integer float float-type)
