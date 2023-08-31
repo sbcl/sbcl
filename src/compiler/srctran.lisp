@@ -399,7 +399,7 @@
                                                      sb-vm:signed-word)))
            `(if (>= index ,sb-vm:n-word-bits)
                 (minusp integer)
-                (not (zerop (logand integer (ash 1 index))))))
+                (logtest integer (ash 1 index))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
                           (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
