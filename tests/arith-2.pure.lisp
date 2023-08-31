@@ -1,4 +1,4 @@
-;;;; arithmetic tests with side effects
+;;;; arithmetic tests without side effects
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -169,4 +169,10 @@
    (ppc-ldb-1 (lambda (x)
                 (push x acc)))
    (assert (equal acc '(#xff #xff #xff #xff)))))
-
+
+(with-test (:name :ldb-word-cast)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (truly-the fixnum (ldb (byte x y) 100)))
+    ((100 0) 100)))
