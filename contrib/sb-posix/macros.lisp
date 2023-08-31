@@ -100,6 +100,10 @@ a FILE-STREAM designating the underlying file-descriptor."
       `(progn
         (declaim (inline ,lisp-name))
         (defun ,lisp-name ,(mapcar #'car (remove '&optional arguments))
+          ;; Special case for readdir's (and in principle, others')
+          ;; return-NULL-and-change-errno error convention.
+          ,@(case error-predicate
+              (null-alien-and-errno-plusp '((set-errno 0))))
           (let ((r (alien-funcall
                     (extern-alien
                      ,c-name

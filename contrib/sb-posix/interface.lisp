@@ -147,17 +147,25 @@
 (define-call* "write" ssize-t minusp
   (fd file-descriptor) (buf (* t)) (count size-t))
 
-;;; FIXME: to detect errors in readdir errno needs to be set to 0 and
-;;; then checked, like it's done in sb-unix:readdir.
+(declaim (inline null-alien-and-errno-plusp))
+(defun null-alien-and-errno-plusp (alien)
+  (and (null-alien alien) (plusp (get-errno))))
+
+;; Slight wart: READDIR returns a null alien at the end of the
+;; directory; most other SB-POSIX interfaces (e.g., GETENV, GETPWNAM,
+;; GETGRGID, etc) return NIL instead of a null pointer for a non-error
+;; return. This might be the only detail in SB-POSIX that makes a user
+;; reach for SB-ALIEN, but it'd be an incompatible change to do
+;; anything about it.
 #+inode64
 (define-call ("readdir" :c-name "readdir$INODE64" :options :largefile)
   (* dirent)
-  not
+  null-alien-and-errno-plusp
   (dir (* t)))
 #-inode64
 (define-call (#-netbsd "readdir" #+netbsd "_readdir" :options :largefile)
   (* dirent)
-  not
+  null-alien-and-errno-plusp
   (dir (* t)))
 (define-call "closedir" int minusp (dir (* t)))
 ;; need to do this here because we can't do it in the DEFPACKAGE
@@ -558,9 +566,11 @@ not supported."
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg)
+        (set-errno 0)
         (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
           (if (null-alien r)
-              nil
+              (when (plusp (get-errno))
+                (syscall-error ',lisp-name))
               (,conv r))))))))
 
 (define-obj-call "getpwnam" login-name (function (* alien-passwd) (c-string :not-null t))
@@ -829,12 +839,16 @@ not supported."
 ;;; environment
 
 (defun getenv (name)
+  ;; SUSv4 doesn't define any errors for getenv, but some systems do.
+  (set-errno 0)
   (let ((r (alien-funcall
             (extern-alien "getenv" (function (* char) (c-string :not-null t)))
             name)))
     (declare (type (alien (* char)) r))
-    (unless (null-alien r)
-      (cast r c-string))))
+    (if (null-alien r)
+        (when (plusp (get-errno))
+          (syscall-error 'getenv))
+        (cast r c-string))))
 #-win32
 (progn
   (define-call "setenv" int minusp
