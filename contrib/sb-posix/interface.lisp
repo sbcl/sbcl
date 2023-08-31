@@ -589,24 +589,27 @@ not supported."
 ;; on #-sb-thread, this still protects against reentrancy, but doesn't
 ;; grab a lock.)
 #-(or android win32)
-(macrolet ((define-database-protection-form (dbname calls)
+(macrolet ((define-database-protection-form (dbname calls implicit-users)
   (let* ((macro-name (intern (format nil "WITH-~A-DATABASE" dbname) :sb-posix))
          (macro-docstring
-          (format
-           nil
-           "~@<Establish a dynamic environment in which the calling thread ~
-            may safely access the ~(~A~) database. It is an error ~
-            to execute ~A within the dynamic extent of another ~:*~A. ~
-            For use by callers of ~{~#[~;and ~A~:;~A,~^ ~]~}. ~
-            The consequences are undefined if any other thread calls ~
-            any of ~:*~{~#[~;or ~A~:;~A,~^ ~]~} during the execution of ~
-            ~1@*~A.~:@>"
-           dbname macro-name calls))
+          (let ((*print-right-margin* 70)) ;; leave room for indentation
+            (format
+             nil
+             "~@<Establish a dynamic environment in which the calling thread ~
+              may safely access the ~(~A~) database. It is an error ~
+              to execute ~A within the dynamic extent of another ~:*~A. ~
+              ~{~A and ~A~} use this implicitly. ~
+              For use by callers of ~{~#[~;and ~A~:;~A,~^ ~]~}. ~
+              The consequences are undefined if any other thread calls ~
+              any of ~:*~{~#[~;or ~A~:;~A,~^ ~]~} during the execution of ~
+              ~1@*~A.~:@>"
+             dbname macro-name implicit-users calls)))
          (lock-var (intern (format nil "*~A-DATABASE-LOCK*" dbname) :sb-posix))
          (lock-name (format nil "~A database lock" dbname))
          (special-var (intern (format nil "*WITH-~A-DATABASE*" dbname) :sb-posix))
          (reentrancy-error-message
-          (format nil "~@(~A~) database access is not reentrant." dbname)))
+          (format nil "~@(~A~) database access is not reentrant." dbname))
+         (assertion (intern (format nil "ASSERT-~A" macro-name) :sb-posix)))
     #-sb-thread (declare (ignore lock-var lock-name))
     `(progn
        #+sb-thread
@@ -625,48 +628,70 @@ not supported."
                ,@body))
             #-sb-thread
             (let ((,',special-var t))
-              ,@body)))))))
+              ,@body)))
+       (defmacro ,assertion (function)
+         `(unless ,',special-var
+            (error "~A may only be called during ~A."
+                    ',function ',',macro-name)))))))
 (define-database-protection-form
-    passwd (getpwnam getpwuid getpwent setpwent endpwent))
+    passwd (getpwent setpwent endpwent) (getpwnam getpwuid))
 (define-database-protection-form
-    group (getgrnam getgruid getgrent setgrent endgrent)))
+    group (getgrent setgrent endgrent) (getgrnam getgrgid)))
 
 #-(or win32 android)
-(macrolet ((define-obj-call (name result-type conv &optional arg arg-type)
+(macrolet ((define-obj-call (name result-type conv with-macro assertion
+                             &optional arg arg-type)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
     `(progn
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,@(when arg `(,arg)))
+        ,@(unless arg
+            `((,assertion ',lisp-name)))
         (set-errno 0)
-        (let ((r (alien-funcall
-                  (extern-alien
-                   ,name (function ,result-type ,@(when arg-type `(,arg-type))))
-                  ,@(when arg `(,arg)))))
+        (let ((r (,@(if arg `(,with-macro) '(progn))
+                    (alien-funcall
+                     (extern-alien
+                      ,name (function ,result-type ,@(when arg-type `(,arg-type))))
+                   ,@(when arg `(,arg))))))
           (if (null-alien r)
               (when (plusp (get-errno))
                 (syscall-error ',lisp-name))
-              (,conv r))))))))
+              (,conv r)))))))
+  (define-enumerator-call (name assertion)
+      (let ((lisp-name (intern (string-upcase name) :sb-posix)))
+        `(progn
+           (export ',lisp-name :sb-posix)
+           (declaim (inline ,lisp-name))
+           (defun ,lisp-name ()
+             (,assertion ',lisp-name)
+             (alien-funcall (extern-alien ,name (function void))))))))
 
 ;; passwd database
 (define-obj-call "getpwnam" (* alien-passwd) alien-to-passwd
+                 with-passwd-database assert-with-passwd-database
                  login-name (c-string :not-null t))
 (define-obj-call "getpwuid" (* alien-passwd) alien-to-passwd
+                 with-passwd-database assert-with-passwd-database
                  uid uid-t)
-(define-obj-call "getpwent" (* alien-passwd) alien-to-passwd)
+(define-obj-call "getpwent" (* alien-passwd) alien-to-passwd
+                 with-passwd-database assert-with-passwd-database)
 ;; Including these here for thematic grouping.
-(define-call "setpwent" void never-fails)
-(define-call "endpwent" void never-fails)
+(define-enumerator-call "setpwent" assert-with-passwd-database)
+(define-enumerator-call "endpwent" assert-with-passwd-database)
 
 ;; Same thing, but for the group database.
 (define-obj-call "getgrnam" (* alien-group) alien-to-group
+                 with-group-database assert-with-group-database
                  group-name (c-string :not-null t))
 (define-obj-call "getgrgid" (* alien-group) alien-to-group
+                 with-group-database assert-with-group-database
                  gid gid-t)
-(define-obj-call "getgrent" (* alien-group) alien-to-group)
-(define-call "setgrent" void never-fails)
-(define-call "endgrent" void never-fails)
+(define-obj-call "getgrent" (* alien-group) alien-to-group
+                 with-group-database assert-with-group-database)
+(define-enumerator-call "setgrent" assert-with-group-database)
+(define-enumerator-call "endgrent" assert-with-group-database)
 ) ; end MACROLET
 
 #-win32

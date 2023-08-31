@@ -581,6 +581,41 @@
   nil)
 
 #-(or android win32)
+(deftest with-passwd-database/getpwnam/getpwuid.concurrency
+    (let* (thread1 thread2
+           (t1
+            (sb-posix:with-passwd-database
+              ;; Both the two following threads should wait
+              ;; for WITH-PASSWD-DATABASE to exit.
+              (setq
+               thread1
+               (sb-thread:make-thread
+                (lambda ()
+                  (sb-posix:getpwnam "root")
+                  (get-universal-time)))
+               thread2
+               (sb-thread:make-thread
+                (lambda ()
+                  (sb-posix:getpwuid 0)
+                  (get-universal-time))))
+              (prog1 (get-universal-time)
+                     (sleep 1.1))))
+           (t2 (sb-thread:join-thread thread1))
+           (t3 (sb-thread:join-thread thread2)))
+      (values (> t2 t1) (> t3 t1)))
+  t t)
+
+#-(or android win32)
+(deftest getpwent/setpwent/endpwent.only-with-passwd-database
+    (values (handler-case (sb-posix:getpwent)
+              (error () :error))
+            (handler-case (sb-posix:setpwent)
+              (error () :error))
+            (handler-case (sb-posix:endpwent)
+              (error () :error)))
+  :error :error :error)
+
+#-(or android win32)
 (deftest grent.1
   ;; make sure that we found something
   (not (sb-posix:getgrgid 0))
@@ -602,6 +637,44 @@
                          nil)
       (t (cond) (declare (ignore cond)) t))
   nil)
+
+#-(or android win32)
+(deftest with-passwd-database/getgrnam/getgruid.concurrency
+    (let* (thread1 thread2
+           (group-name (let ((group (sb-posix:getgrgid 0)))
+                         (assert group) ;; see test grent.1
+                         (sb-posix:group-name group)))
+           (t1
+            (sb-posix:with-group-database
+              ;; Both the two following threads should wait
+              ;; for WITH-PASSWD-DATABASE to exit.
+              (setq
+               thread1
+               (sb-thread:make-thread
+                (lambda ()
+                  (sb-posix:getgrnam group-name)
+                  (get-universal-time)))
+               thread2
+               (sb-thread:make-thread
+                (lambda ()
+                  (sb-posix:getgrgid 0)
+                  (get-universal-time))))
+              (prog1 (get-universal-time)
+                     (sleep 1.1))))
+           (t2 (sb-thread:join-thread thread1))
+           (t3 (sb-thread:join-thread thread2)))
+      (values (> t2 t1) (> t3 t1)))
+  t t)
+
+#-(or android win32)
+(deftest getgrent/setgrent/endgrent.only-with-group-database
+    (values (handler-case (sb-posix:getgrent)
+              (error () :error))
+            (handler-case (sb-posix:setgrent)
+              (error () :error))
+            (handler-case (sb-posix:endgrent)
+              (error () :error)))
+  :error :error :error)
 
 #+nil
 ;; Requires root or special group + plus a sensible thing on the port
