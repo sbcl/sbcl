@@ -550,8 +550,7 @@
           (inst call rax)
 
           ;; Back! Restore frame
-          (inst mov rsp rbp)
-          (inst pop rbp))
+          (inst leave))
 
         #+sb-thread
         (progn
@@ -577,8 +576,7 @@
           #-immobile-space
           (inst call (ea (+ (foreign-symbol-address "callback_wrapper_trampoline") 8)))
           ;; Back! Restore frame
-          (inst mov rsp rbp)
-          (inst pop rbp))
+          (inst leave))
 
         ;; Result now on top of stack, put it in the right register
         (cond

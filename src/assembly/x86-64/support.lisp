@@ -140,9 +140,11 @@
          (call-fpr-save/restore-routine :restore)
          (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
          (regs-poplist ,@gprs)
-         ,@(when frame-tn
-             `((inst mov rsp-tn ,frame-tn)
-               (inst pop ,frame-tn)))))))
+        ,@(cond ((eq frame-tn 'rbp)
+                  '((inst leave)))
+                 (frame-tn
+                  `((inst mov rsp-tn ,frame-tn)
+                    (inst pop ,frame-tn))))))))
 
 (defmacro call-c (fun &rest args)
   `(progn
