@@ -159,6 +159,7 @@
                         (or
                          #-sb-xc-host
                          (flet ((int-min-max (array min max)
+                                  (declare (optimize (insert-array-bounds-checks 0)))
                                   (with-array-data ((array array) (start) (end))
                                     (let* ((min min)
                                            (max max))
