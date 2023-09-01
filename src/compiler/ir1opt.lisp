@@ -37,6 +37,18 @@
         ;; check for EQL types and singleton numeric types
         (values (type-singleton-p type)))))
 
+(defun lvar-constant (lvar)
+  (declare (type lvar lvar))
+  (let* ((type (lvar-type lvar))
+         (principal-lvar (principal-lvar lvar))
+         (principal-use (lvar-uses principal-lvar))
+         leaf)
+    (and (ref-p principal-use)
+         (constant-p (setf leaf (ref-leaf principal-use)))
+         (or (not (lvar-reoptimize principal-lvar))
+             (ctypep (constant-value leaf) type))
+         leaf)))
+
 (defun constant-lvar-ignore-types-p (lvar &optional (singleton-types t))
   (declare (type lvar lvar))
   (let ((use (principal-lvar-use lvar)))

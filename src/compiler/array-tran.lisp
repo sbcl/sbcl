@@ -147,47 +147,50 @@
 ;;;; DERIVE-TYPE optimizers
 
 (defun derive-aref-type (array)
-  (or (and (constant-lvar-p array)
-           (let ((array (lvar-value array))
-                 min
-                 max
-                 union)
-             (loop for i below (array-total-size array)
-                   for elt = (row-major-aref array i)
-                   for type = (typecase elt ;; ctype-of gives too much detail
-                                (integer
-                                 (if min
-                                     (setf min (min min elt)
-                                           max (max max elt))
-                                     (setf min elt
-                                           max elt))
-                                 nil)
-                                (cons
-                                 (specifier-type 'cons))
-                                (vector
-                                 (specifier-type 'vector))
-                                (array
-                                 (specifier-type 'array))
-                                (character
-                                 (specifier-type 'character))
-                                (symbol
-                                 (specifier-type 'symbol))
-                                (double-float
-                                 (specifier-type 'double-float))
-                                (single-float
-                                 (specifier-type 'single-float))
-                                (t (return)))
-                   do (when type
-                        (setf union
-                              (if union
-                                  (type-union union type)
-                                  type)))
-                   finally (return (if min
-                                       (let ((int (make-numeric-type :class 'integer :low min :high max)))
-                                         (if union
-                                             (type-union union int)
-                                             int))
-                                       union)))))
+  (or (let ((constant (lvar-constant array))
+            min
+            max
+            union)
+        (when constant
+          (or (leaf-info constant)
+              (setf (leaf-info constant)
+                    (loop with array = (constant-value constant)
+                          for i below (array-total-size array)
+                          for elt = (row-major-aref array i)
+                          for type = (typecase elt ;; ctype-of gives too much detail
+                                       (integer
+                                        (if min
+                                            (setf min (min min elt)
+                                                  max (max max elt))
+                                            (setf min elt
+                                                  max elt))
+                                        nil)
+                                       (cons
+                                        (specifier-type 'cons))
+                                       (vector
+                                        (specifier-type 'vector))
+                                       (array
+                                        (specifier-type 'array))
+                                       (character
+                                        (specifier-type 'character))
+                                       (symbol
+                                        (specifier-type 'symbol))
+                                       (double-float
+                                        (specifier-type 'double-float))
+                                       (single-float
+                                        (specifier-type 'single-float))
+                                       (t (return)))
+                          do (when type
+                               (setf union
+                                     (if union
+                                         (type-union union type)
+                                         type)))
+                          finally (return (if min
+                                              (let ((int (make-numeric-type :class 'integer :low min :high max)))
+                                                (if union
+                                                    (type-union union int)
+                                                    int))
+                                              union)))))))
       (type-array-element-type (lvar-type array))))
 
 (deftransform array-in-bounds-p ((array &rest subscripts))

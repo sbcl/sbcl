@@ -222,7 +222,8 @@
 ;;; EMIT-MOVES-AND-COERCIONS. That's wasteful.
 (defun make-constant-tn (constant &optional force-boxed)
   (declare (type constant constant))
-  (or (leaf-info constant)
+  (or (and (tn-p (leaf-info constant))
+           (leaf-info constant))
       (multiple-value-bind (immed null-offset)
           (immediate-constant-sc (constant-value constant))
         ;; currently NULL-OFFSET is used only on ARM64
