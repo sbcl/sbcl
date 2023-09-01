@@ -3107,11 +3107,11 @@
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow+ x y node))
 
-(deftransform * ((x y) (t (or word sb-vm:signed-word))
+(deftransform * ((x y) ((not ratio) (or word sb-vm:signed-word))
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow* x y node))
 
-(deftransform * ((y x) ((or word sb-vm:signed-word) t)
+(deftransform * ((y x) ((or word sb-vm:signed-word) (not ratio))
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow* x y node))
 

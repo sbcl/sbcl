@@ -185,3 +185,10 @@
     ((-1 0) (condition 'type-error))
     ((-2 (1+ most-positive-fixnum)) (condition 'type-error))
     (((1- most-negative-fixnum) 1) (condition 'type-error))))
+
+(with-test (:name :*-overflow-ratio)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (the fixnum (* 8 a)))
+    ((1/8) 1)))
