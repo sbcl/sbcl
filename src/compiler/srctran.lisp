@@ -1181,6 +1181,7 @@
              (<= (car high) n)
              (< high n)))))
 
+;;; Does it contain integers?
 (defun interval-ratio-p (interval)
   (let ((low (interval-low interval))
         (high (interval-high interval)))
@@ -1194,6 +1195,13 @@
                             (1- (car high))
                             (car high)))))
          (= (floor low) (floor high)))))
+
+(defun interval-constant-p (interval)
+  (let ((low (interval-low interval))
+        (high (interval-high interval)))
+    (and (numberp low)
+         (eql low high)
+         low)))
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -1536,13 +1544,16 @@
 (defun *-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
-      (let ((result
-              ;; (* X X) is always positive, so take care to do it right.
-              (if same-arg
-                  (interval-sqr (numeric-type->interval x))
-                  (interval-mul (numeric-type->interval x)
-                                (numeric-type->interval y))))
-            (result-type (numeric-contagion x y)))
+      (let* ((x-interval (numeric-type->interval x))
+             (y-interval (if same-arg
+                             x-interval
+                             (numeric-type->interval y)))
+             (result
+               ;; (* X X) is always positive, so take care to do it right.
+               (if same-arg
+                   (interval-sqr x-interval)
+                   (interval-mul x-interval y-interval)))
+             (result-type (numeric-contagion x y)))
         ;; If the result type is a float, we need to be sure to coerce
         ;; the bounds into the correct type.
         (when (eq (numeric-type-class result-type) 'float)
@@ -1551,15 +1562,33 @@
                             (coerce-for-bound x (or (numeric-type-format result-type)
                                                     'float)))
                         result)))
-        (make-numeric-type
-         :class (if (and (eq (numeric-type-class x) 'integer)
-                         (eq (numeric-type-class y) 'integer))
-                    ;; The product of integers is always an integer.
-                    'integer
-                    (numeric-type-class result-type))
-         :format (numeric-type-format result-type)
-         :low (interval-low result)
-         :high (interval-high result)))
+        (let ((numeric
+                (make-numeric-type
+                 :class (if (and (eq (numeric-type-class x) 'integer)
+                                 (eq (numeric-type-class y) 'integer))
+                            ;; The product of integers is always an integer.
+                            'integer
+                            (numeric-type-class result-type))
+                 :format (numeric-type-format result-type)
+                 :low (interval-low result)
+                 :high (interval-high result))))
+          (flet ((ratio-result-p (a a-interval b-interval)
+                   (let (ratio)
+                     (and (eq (numeric-type-class a) 'integer)
+                          (ratiop (setf ratio (interval-constant-p b-interval)))
+                          (interval-bounded-p a-interval 'both)
+                          ;; Is the integer between two adjecents
+                          ;; powers of denominator?
+                          (let* ((low (interval-low a-interval))
+                                 (high (interval-high a-interval))
+                                 (den (denominator ratio))
+                                 (rem (nth-value 1 (ceiling low den))))
+                            (and (not (zerop rem))
+                                 (< high (- low rem))))))))
+            (if (or (ratio-result-p x x-interval y-interval)
+                    (ratio-result-p y y-interval x-interval))
+                (type-intersection numeric (specifier-type 'ratio))
+                numeric))))
       (numeric-contagion x y)))
 
 (defoptimizer (* derive-type) ((x y))
