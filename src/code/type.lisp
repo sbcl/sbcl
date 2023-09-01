@@ -3362,56 +3362,61 @@ used for a COMPLEX component.~:@>"
 ;;; but not a NUMERIC-TYPE.
 (defun numeric-contagion (type1 type2 &key (rational t)
                                            unsigned)
-  (if (and (numeric-type-p type1) (numeric-type-p type2))
-      (let ((class1 (numeric-type-class type1))
-            (class2 (numeric-type-class type2))
-            (format1 (numeric-type-format type1))
-            (format2 (numeric-type-format type2))
-            (complexp1 (numeric-type-complexp type1))
-            (complexp2 (numeric-type-complexp type2)))
-        (cond ((eq class1 'float)
-               (make-numeric-type
-                :class 'float
-                :format (ecase class2
-                          (float (float-format-max format1 format2))
-                          ((integer rational) format1)
-                          ((nil)
-                           ;; A double-float with any real number is a
-                           ;; double-float.
-                           #-long-float
-                           (if (eq format1 'double-float)
-                             'double-float
-                             nil)
-                           ;; A long-float with any real number is a
-                           ;; long-float.
-                           #+long-float
-                           (if (eq format1 'long-float)
-                             'long-float
-                             nil)))
-                :complexp (cond ((and (eq complexp1 :real)
-                                      (eq complexp2 :real))
-                                 :real)
-                                ((or (null complexp1) (null complexp2))
-                                 nil)
-                                (t :complex))))
-              ((eq class2 'float) (numeric-contagion type2 type1))
-              ((and (eq complexp1 :real) (eq complexp2 :real))
-               (if (or rational
-                       (or (neq class1 'integer)
-                           (neq class2 'integer)))
-                   (make-numeric-type
-                    :class (and class1 class2 'rational)
-                    :complexp :real)
-                   (make-numeric-type
-                    :class 'integer
-                    :complexp :real
-                    :low (and unsigned
-                              (typep (numeric-type-low type1) 'unsigned-byte)
-                              (typep (numeric-type-low type2) 'unsigned-byte)
-                              0))))
-              (t
-               (specifier-type 'number))))
-      (specifier-type 'number)))
+  (cond ((and (numeric-type-p type1) (numeric-type-p type2))
+         (let ((class1 (numeric-type-class type1))
+               (class2 (numeric-type-class type2))
+               (format1 (numeric-type-format type1))
+               (format2 (numeric-type-format type2))
+               (complexp1 (numeric-type-complexp type1))
+               (complexp2 (numeric-type-complexp type2)))
+           (cond ((eq class1 'float)
+                  (make-numeric-type
+                   :class 'float
+                   :format (ecase class2
+                             (float (float-format-max format1 format2))
+                             ((integer rational) format1)
+                             ((nil)
+                              ;; A double-float with any real number is a
+                              ;; double-float.
+                              #-long-float
+                              (if (eq format1 'double-float)
+                                  'double-float
+                                  nil)
+                              ;; A long-float with any real number is a
+                              ;; long-float.
+                              #+long-float
+                              (if (eq format1 'long-float)
+                                  'long-float
+                                  nil)))
+                   :complexp (cond ((and (eq complexp1 :real)
+                                         (eq complexp2 :real))
+                                    :real)
+                                   ((or (null complexp1) (null complexp2))
+                                    nil)
+                                   (t :complex))))
+                 ((eq class2 'float) (numeric-contagion type2 type1))
+                 ((and (eq complexp1 :real) (eq complexp2 :real))
+                  (if (or rational
+                          (or (neq class1 'integer)
+                              (neq class2 'integer)))
+                      (make-numeric-type
+                       :class (and class1 class2 'rational)
+                       :complexp :real)
+                      (make-numeric-type
+                       :class 'integer
+                       :complexp :real
+                       :low (and unsigned
+                                 (typep (numeric-type-low type1) 'unsigned-byte)
+                                 (typep (numeric-type-low type2) 'unsigned-byte)
+                                 0))))
+                 (t
+                  (specifier-type 'number)))))
+        ((eq type1 (specifier-type 'ratio))
+         (numeric-contagion (specifier-type 'rational) type2))
+        ((eq type2 (specifier-type 'ratio))
+         (numeric-contagion type1 (specifier-type 'rational)))
+        (t
+         (specifier-type 'number))))
 
 ;;;; array types
 

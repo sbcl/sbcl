@@ -85,6 +85,9 @@
 (declaim (inline numberp))
 (defun numberp (x) (cl:typep x 'number))
 
+(declaim (inline ratiop))
+(defun ratiop (x) (cl:typep x 'ratio))
+
 ;;; ZEROP is needer sooner than the rest of the cross-float. (Not sure why exactly)
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (xfloat-zerop x)))
