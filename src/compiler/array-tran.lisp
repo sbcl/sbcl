@@ -151,46 +151,87 @@
             min
             max
             union)
-        (when constant
-          (or (leaf-info constant)
-              (setf (leaf-info constant)
-                    (loop with array = (constant-value constant)
-                          for i below (array-total-size array)
-                          for elt = (row-major-aref array i)
-                          for type = (typecase elt ;; ctype-of gives too much detail
-                                       (integer
-                                        (if min
-                                            (setf min (min min elt)
-                                                  max (max max elt))
-                                            (setf min elt
-                                                  max elt))
-                                        nil)
-                                       (cons
-                                        (specifier-type 'cons))
-                                       (vector
-                                        (specifier-type 'vector))
-                                       (array
-                                        (specifier-type 'array))
-                                       (character
-                                        (specifier-type 'character))
-                                       (symbol
-                                        (specifier-type 'symbol))
-                                       (double-float
-                                        (specifier-type 'double-float))
-                                       (single-float
-                                        (specifier-type 'single-float))
-                                       (t (return)))
-                          do (when type
-                               (setf union
-                                     (if union
-                                         (type-union union type)
-                                         type)))
-                          finally (return (if min
-                                              (let ((int (make-numeric-type :class 'integer :low min :high max)))
-                                                (if union
-                                                    (type-union union int)
-                                                    int))
-                                              union)))))))
+        (block nil
+          (when constant
+            (or (leaf-info constant)
+                (setf (leaf-info constant)
+                      (let ((array (constant-value constant)))
+                        (or
+                         #-sb-xc-host
+                         (flet ((int-min-max (array min max)
+                                  (with-array-data ((array array) (start) (end))
+                                    (let* ((min min)
+                                           (max max))
+                                      (cond ((= start end)
+                                             *wild-type*)
+                                            (t
+                                             (loop for i from start below end
+                                                   do
+                                                   (let ((elt (aref array i)))
+                                                     (when (> elt max)
+                                                       (setf max elt))
+                                                     (when (< elt min)
+                                                       (setf min elt))))
+                                             (make-numeric-type :class 'integer :low min :high max)))))))
+                           (declare (inline int-min-max))
+                           (macrolet ((test (type)
+                                        (let ((ctype (specifier-type type)))
+                                          `(and (typep array '(array ,type))
+                                                (int-min-max (the (array ,type) array)
+                                                             ,(numeric-type-high ctype)
+                                                             ,(numeric-type-low ctype))))))
+                             (cond
+                               ((test word))
+                               ((test sb-vm:signed-word))
+                               ((test (unsigned-byte 8)))
+                               ((test (signed-byte 8)))
+                               ((test (unsigned-byte 16)))
+                               ((test (signed-byte 16)))
+                               #+64-bit
+                               ((test (unsigned-byte 32)))
+                               #+64-bit
+                               ((test (signed-byte 32)))
+                               ((test fixnum))
+                               ((test bit))
+                               ((csubtypep (array-type-specialized-element-type (leaf-type constant))
+                                           (specifier-type '(or float complex character)))
+                                (return)))))
+                         (loop for i below (array-total-size array)
+                               for elt = (row-major-aref array i)
+                               for type = (typecase elt ;; ctype-of gives too much detail
+                                            (integer
+                                             (if min
+                                                 (setf min (min min elt)
+                                                       max (max max elt))
+                                                 (setf min elt
+                                                       max elt))
+                                             nil)
+                                            (cons
+                                             (specifier-type 'cons))
+                                            (vector
+                                             (specifier-type 'vector))
+                                            (array
+                                             (specifier-type 'array))
+                                            (character
+                                             (specifier-type 'character))
+                                            (symbol
+                                             (specifier-type 'symbol))
+                                            (double-float
+                                             (specifier-type 'double-float))
+                                            (single-float
+                                             (specifier-type 'single-float))
+                                            (t (return)))
+                               do (when type
+                                    (setf union
+                                          (if union
+                                              (type-union union type)
+                                              type)))
+                               finally (return (if min
+                                                   (let ((int (make-numeric-type :class 'integer :low min :high max)))
+                                                     (if union
+                                                         (type-union union int)
+                                                         int))
+                                                   union))))))))))
       (type-array-element-type (lvar-type array))))
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
