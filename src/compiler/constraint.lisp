@@ -1256,11 +1256,17 @@
            (constrain-ref-type node gen))))
       (cast
        (let* ((lvar (cast-value node))
-              (var (ok-lvar-lambda-var lvar gen)))
-         (when var
-           (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
-             (unless (eq atype *universal-type*)
-               (conset-add-constraint-to-eql gen 'typep var atype nil))))
+              (var (ok-lvar-lambda-var lvar gen))
+              (atype (single-value-type (cast-derived-type node))))
+         (cond ((eq atype *universal-type*))
+               (var
+                (conset-add-constraint-to-eql gen 'typep var atype nil))
+               ((let ((uses (lvar-uses lvar)))
+                  (when (combination-p uses)
+                    (binding* ((info (combination-fun-info uses) :exit-if-null)
+                               (propagate (fun-info-constraint-propagate-back info)
+                                          :exit-if-null))
+                      (funcall propagate uses gen 'typep atype nil))))))
          (when (and (bound-cast-p node)
                     (bound-cast-check node)
                     (not (node-deleted (bound-cast-check node))))

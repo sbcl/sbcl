@@ -371,6 +371,7 @@
 
  ("src/compiler/constraint")
  ("src/compiler/equality-constraints")
+ ("src/compiler/constraint-back")
  ("src/compiler/saptran")
  ("src/compiler/modarith")
  ("src/compiler/sxhash")

@@ -152,6 +152,9 @@
   ;; each constraint flips the meaning of the constraint if it is
   ;; non-NIL.
   (constraint-propagate nil :type (or function null))
+  ;; Propagating stuff back to the arguments based on the constraints on
+  ;; the result of this combination.
+  (constraint-propagate-back nil :type (or function null))
   ;; If true, the function can add flow-sensitive type information
   ;; depending on the truthiness of its return value.  Returns two
   ;; values, a LVAR and a CTYPE. The LVAR is of that CTYPE iff the

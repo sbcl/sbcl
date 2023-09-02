@@ -506,3 +506,15 @@
               (error "")
               s)))))
     '(values array &optional))))
+
+(with-test (:name :+integer-argument-constarint)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a x y)
+          (declare (fixnum x))
+          (aref a (+ x y))
+          y))))
+    '(values integer &optional))))
