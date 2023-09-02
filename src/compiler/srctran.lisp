@@ -3310,6 +3310,20 @@
 (deftransform mod ((number divisor))
   `(nth-value 1 (floor number divisor)))
 
+(deftransform ceiling ((number divisor) ((real (0) (1)) (integer * (0))))
+  `(values 0 number))
+(deftransform ceiling ((number divisor) ((real (-1) (0)) (integer (0) *)))
+  `(values 0 number))
+
+(deftransform floor ((number divisor) ((real (-1) (0)) (integer * (0))))
+  `(values 0 number))
+(deftransform floor ((number divisor) ((real (0) (1)) (integer (0) *)))
+  `(values 0 number))
+
+(deftransform truncate ((number divisor) ((and (real (-1) (1)) (not (eql $-0d0)) (not (eql $-0f0)))
+                                          (and integer (not (eql 0)))))
+  `(values 0 number))
+
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
 ;;; remainder.
