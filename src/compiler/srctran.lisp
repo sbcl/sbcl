@@ -1542,6 +1542,9 @@
               (numeric-type-p x)
               (eq (numeric-type-class x) 'integer))
          (specifier-type 'ratio))
+        ((and same-arg
+              (eq x (specifier-type 'ratio)))
+         (specifier-type '(integer 0 0)))
         (t
          (numeric-contagion x y))))
 
