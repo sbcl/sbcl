@@ -1343,7 +1343,7 @@
 ;;; For the case of member types, if a MEMBER-FUN is given it is
 ;;; called to compute the result otherwise the member type is first
 ;;; converted to a numeric type and the DERIVE-FUN is called.
-(defun one-arg-derive-type (arg derive-fun member-fun)
+(defun one-arg-derive-type (arg derive-fun member-fun &optional (ratio-to-rational t))
   (declare (type function derive-fun)
            (type (or null function) member-fun))
   (let ((arg-list (prepare-arg-for-derive-type (lvar-type arg))))
@@ -1360,7 +1360,8 @@
                         ;; Otherwise convert to a numeric type.
                         (funcall derive-fun (convert-member-type x))))
                    ((or (numeric-type-p x)
-                        (eq x (specifier-type 'ratio)))
+                        (and (not ratio-to-rational)
+                             (eq x (specifier-type 'ratio))))
                     (funcall derive-fun x))
                    (t
                     (if (eq x (specifier-type 'ratio))
@@ -1384,17 +1385,23 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun)
+(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun &optional (ratio-to-rational t))
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
                         derive-fun member-fun
-                        (same-leaf-ref-p arg1 arg2)))
+                        (same-leaf-ref-p arg1 arg2)
+                        ratio-to-rational))
 
-(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf)
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf (ratio-to-rational t))
   (declare (type function derive-fun member-fun))
   (labels ((numeric-or-ratio-p (x)
              (or (numeric-type-p x)
                  (eq x (specifier-type 'ratio))))
            (deriver (x y same-arg)
+             (when ratio-to-rational
+               (when (eq x (specifier-type 'ratio))
+                 (setf x (specifier-type 'rational)))
+               (when (eq y (specifier-type 'ratio))
+                 (setf y (specifier-type 'rational))))
              (cond ((and (member-type-p x) (member-type-p y))
                     (let* ((x (first (member-type-members x)))
                            (y (first (member-type-members y)))
@@ -1488,7 +1495,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (+ derive-type) ((x y))
-  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+))
+  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+ nil))
 
 (defun --derive-type-aux (x y same-arg)
   (cond ((and (numeric-type-real-p x)
@@ -1539,7 +1546,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (- derive-type) ((x y))
-  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:-))
+  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:- nil))
 
 (defun *-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
@@ -1592,7 +1599,7 @@
       (numeric-contagion x y)))
 
 (defoptimizer (* derive-type) ((x y))
-  (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
+  (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:* nil))
 
 (defoptimizer (%signed-multiply-high derive-type) ((x y))
   (two-arg-derive-type x y
@@ -1651,7 +1658,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (/ derive-type) ((x y))
-  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/))
+  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/ nil))
 
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
@@ -1716,7 +1723,7 @@
          :high (negate-bound (numeric-type-low type))))))
 
 (defoptimizer (%negate derive-type) ((num))
-  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:-))
+  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:- nil))
 
 (defun abs-derive-type-aux (type)
   (cond ((eq type (specifier-type 'ratio))
@@ -1749,7 +1756,7 @@
                    (interval-high abs-bnd) bound-type))))))
 
 (defoptimizer (abs derive-type) ((num))
-  (one-arg-derive-type num #'abs-derive-type-aux #'abs))
+  (one-arg-derive-type num #'abs-derive-type-aux #'abs nil))
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -2540,8 +2547,10 @@
   (make-values-type (mapcar #'lvar-type values)))
 
 (defun signum-derive-type-aux (type)
-  (if (eq (numeric-type-complexp type) :complex)
-      (let* ((format (case (numeric-type-class type)
+  (cond ((eq type (specifier-type 'ratio))
+         (specifier-type '(or (eql 1) (eql -1))))
+        ((eq (numeric-type-complexp type) :complex)
+         (let* ((format (case (numeric-type-class type)
                           ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
@@ -2549,38 +2558,39 @@
                               :format format
                               :complexp :complex
                               :low (coerce -1 bound-format)
-                              :high (coerce 1 bound-format)))
-      (let* ((interval (numeric-type->interval type))
-             (range-info (interval-range-info interval))
-             (contains-0-p (interval-contains-p 0 interval))
-             (class (numeric-type-class type))
-             (format (numeric-type-format type))
-             (one (coerce 1 (or format class 'real)))
-             (zero (coerce 0 (or format class 'real)))
-             (minus-one (coerce -1 (or format class 'real)))
-             (plus (make-numeric-type :class class :format format
-                                      :low one :high one))
-             (minus (make-numeric-type :class class :format format
-                                       :low minus-one :high minus-one))
-             ;; KLUDGE: here we have a fairly horrible hack to deal
-             ;; with the schizophrenia in the type derivation engine.
-             ;; The problem is that the type derivers reinterpret
-             ;; numeric types as being exact; so (DOUBLE-FLOAT 0d0
-             ;; 0d0) within the derivation mechanism doesn't include
-             ;; -0d0.  Ugh.  So force it in here, instead.
-             (zero (make-numeric-type :class class :format format
-                                      :low (sb-xc:- zero) :high zero)))
-        (let ((result
-                (case range-info
-                  (+ (if contains-0-p (type-union plus zero) plus))
-                  (- (if contains-0-p (type-union minus zero) minus))
-                  (t (type-union minus zero plus)))))
-          (if (eq (numeric-type-complexp type) :real)
-              result
-              (type-union result (make-numeric-type :class 'float
-                                                    :complexp :complex
-                                                    :low -1
-                                                    :high 1)))))))
+                              :high (coerce 1 bound-format))))
+        (t
+         (let* ((interval (numeric-type->interval type))
+                (range-info (interval-range-info interval))
+                (contains-0-p (interval-contains-p 0 interval))
+                (class (numeric-type-class type))
+                (format (numeric-type-format type))
+                (one (coerce 1 (or format class 'real)))
+                (zero (coerce 0 (or format class 'real)))
+                (minus-one (coerce -1 (or format class 'real)))
+                (plus (make-numeric-type :class class :format format
+                                         :low one :high one))
+                (minus (make-numeric-type :class class :format format
+                                          :low minus-one :high minus-one))
+                ;; KLUDGE: here we have a fairly horrible hack to deal
+                ;; with the schizophrenia in the type derivation engine.
+                ;; The problem is that the type derivers reinterpret
+                ;; numeric types as being exact; so (DOUBLE-FLOAT 0d0
+                ;; 0d0) within the derivation mechanism doesn't include
+                ;; -0d0.  Ugh.  So force it in here, instead.
+                (zero (make-numeric-type :class class :format format
+                                         :low (sb-xc:- zero) :high zero)))
+           (let ((result
+                   (case range-info
+                     (+ (if contains-0-p (type-union plus zero) plus))
+                     (- (if contains-0-p (type-union minus zero) minus))
+                     (t (type-union minus zero plus)))))
+             (if (eq (numeric-type-complexp type) :real)
+                 result
+                 (type-union result (make-numeric-type :class 'float
+                                                       :complexp :complex
+                                                       :low -1
+                                                       :high 1))))))))
 
 (defoptimizer (signum derive-type) ((num))
   (one-arg-derive-type num #'signum-derive-type-aux nil))

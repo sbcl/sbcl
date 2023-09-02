@@ -672,8 +672,6 @@
                                      default-low default-high
                                      &optional (increasingp t))
   (declare (type (or null real) domain-low domain-high))
-  (when (eq arg (specifier-type 'ratio))
-    (setf arg (specifier-type 'rational)))
   (etypecase arg
     (numeric-type
      (cond ((eq (numeric-type-complexp arg) :complex)
