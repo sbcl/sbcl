@@ -701,12 +701,14 @@
     (let ((consequent-constraints (make-conset))
           (alternative-constraints (make-conset))
           (quick-p (policy if (> compilation-speed speed))))
-      (labels ((add (fun x y not-p)
+      (labels ((add (fun x y not-p &optional lvar)
                  (add-complement-constraints quick-p
                                              fun x y not-p
                                              constraints
                                              consequent-constraints
-                                             alternative-constraints))
+                                             alternative-constraints)
+                 (when lvar
+                  (constraint-propagate-back lvar fun y constraints consequent-constraints alternative-constraints)))
                (process-node (node)
                  (typecase node
                    (ref
@@ -759,7 +761,8 @@
                                    ((constant-lvar-p arg2)
                                     (add 'eql var1
                                          (nth-value 1 (lvar-value arg2))
-                                         nil))
+                                         nil
+                                         arg1))
                                    (t
                                     (add-test-constraint quick-p
                                                          'typep var1 (lvar-type arg2)

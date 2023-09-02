@@ -10,15 +10,15 @@
 (in-package "SB-C")
 
 (defun constraint-propagate-back (lvar kind constraint gen consequent alternative)
-  (let ((node (principal-lvar-ref-use lvar)))
+  (multiple-value-bind (node nth-value) (mv-principal-lvar-ref-use lvar)
     (when (combination-p node)
       (binding* ((info (combination-fun-info node) :exit-if-null)
                  (propagate (fun-info-constraint-propagate-back info)
                             :exit-if-null))
-        (funcall propagate node kind constraint gen consequent alternative)))))
+        (funcall propagate node nth-value kind constraint gen consequent alternative)))))
 
-(defoptimizer (+ constraint-propagate-back) ((x y) node kind constraint gen consequent alternative)
-  (declare (ignore alternative))
+(defoptimizer (+ constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
   (case kind
     (typep
      ;; (integerp (+ integer y)) means Y is an integer too.
@@ -35,3 +35,18 @@
                  ((and y-integerp
                        (not x-integerp))
                   (add x)))))))))
+
+(defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore consequent))
+  (case kind
+    (eql
+     ;; If the remainder is non-zero then X can't be zero.
+     (when (and (eql nth-value 1)
+                (constant-p constraint)
+                (eql (constant-value constraint) 0)
+                alternative
+                (csubtypep (lvar-type x) (specifier-type 'integer))
+                (csubtypep (lvar-type y) (specifier-type 'integer)))
+       (let ((var (ok-lvar-lambda-var x gen)))
+         (when var
+           (conset-add-constraint-to-eql alternative 'typep var (specifier-type '(and integer (not (eql 0)))) nil)))))))

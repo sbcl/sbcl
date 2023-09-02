@@ -119,6 +119,33 @@
                    ref))))
     (recurse lvar nil)))
 
+(defun mv-principal-lvar-ref-use (lvar)
+  (labels ((recurse (lvar)
+             (let ((use (lvar-uses lvar)))
+               (if (ref-p use)
+                   (let ((var (ref-leaf use)))
+                     (if (and (lambda-var-p var)
+                              (null (lambda-var-sets var)))
+                         (case (functional-kind (lambda-var-home var))
+                           (:mv-let
+                            (let* ((fun (lambda-var-home var))
+                                   (n-value (position-or-lose var (lambda-vars fun))))
+                              (loop for arg in (basic-combination-args (let-combination fun))
+                                    for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
+                                    when (eq nvals :unknown) return nil
+                                    when (<= n-value nvals) do (return-from mv-principal-lvar-ref-use
+                                                                 (values (lvar-uses arg) n-value))
+                                    do (decf n-value nvals))
+                              use))
+                           (:let
+                               (recurse (let-var-initial-value var)))
+                           (t
+                            use))
+                         use))
+                   use))))
+    (recurse lvar)))
+
+
 (defun map-lvar-dest-casts (fun lvar)
   (labels ((pld (lvar)
              (and lvar

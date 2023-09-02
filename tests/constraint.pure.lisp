@@ -544,3 +544,17 @@
                 (+ m x)
                 2))))))
     '(values integer &optional))))
+
+(with-test (:name :truncate-zero-remainder)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x y)
+          (declare (integer x y))
+          (multiple-value-bind (q r) (truncate x y)
+            (if (zerop r)
+                (error "~a" q)
+                x))))))
+    '(values (or (integer * -1) (integer 1)) &optional))))
