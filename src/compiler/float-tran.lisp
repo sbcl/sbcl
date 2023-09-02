@@ -1126,10 +1126,17 @@
 (defoptimizer (phase derive-type) ((num))
   (one-arg-derive-type num #'phase-derive-type-aux #'phase))
 
-(deftransform realpart ((x) ((complex rational)) *)
+(deftransform realpart ((x) ((complex rational)))
   '(%realpart x))
-(deftransform imagpart ((x) ((complex rational)) *)
+(deftransform imagpart ((x) ((complex rational)))
   '(%imagpart x))
+
+(deftransform realpart ((x) (real))
+  'x)
+(deftransform imagpart ((x) ((and single-float (not (eql $-0f0)))))
+  $0f0)
+(deftransform imagpart ((x) ((and double-float (not (eql $-0d0)))))
+  $0d0)
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
