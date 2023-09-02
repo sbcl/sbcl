@@ -646,17 +646,21 @@
                                          consequent-constraints
                                          alternative-constraints
                                          quick-p)
-  (flet ((add (fun x y &optional no-complement)
-           (if no-complement
-               (when x
-                 (add-test-constraint quick-p
-                                      fun x y nil
-                                      constraints
-                                      consequent-constraints))
-               (add-complement-constraints quick-p
-                                           fun x y nil
-                                           constraints
-                                           consequent-constraints
+  (flet ((add (fun lvar y &optional no-complement)
+           (let ((x (ok-lvar-lambda-var lvar constraints)))
+             (if no-complement
+                 (when x
+                   (add-test-constraint quick-p
+                                        fun x y nil
+                                        constraints
+                                        consequent-constraints))
+                 (add-complement-constraints quick-p
+                                             fun x y nil
+                                             constraints
+                                             consequent-constraints
+                                             alternative-constraints)))
+           (constraint-propagate-back lvar fun y constraints consequent-constraints
+                                      (and (not no-complement)
                                            alternative-constraints)))
          (prop (triples target)
            (map nil (lambda (constraint)
@@ -670,25 +674,20 @@
                 triples)))
     (when (eq (combination-kind use) :known)
       (binding* ((info (combination-fun-info use) :exit-if-null)
-                 (propagate (fun-info-constraint-propagate-if
-                             info)
-                            :exit-if-null))
+                 (propagate (fun-info-constraint-propagate-if info) :exit-if-null))
         (multiple-value-bind (lvar type if else no-complement)
             (funcall propagate use constraints)
           (prop if consequent-constraints)
           (prop else alternative-constraints)
           (when (and lvar type)
-            (add 'typep (ok-lvar-lambda-var lvar constraints)
-                 type no-complement)
+            (add 'typep lvar type no-complement)
             (return-from add-combination-test-constraints)))))
     (let* ((name (lvar-fun-name
                   (basic-combination-fun use)))
            (args (basic-combination-args use))
            (ptype (gethash name *backend-predicate-types*)))
       (when ptype
-        (add 'typep (ok-lvar-lambda-var (first args)
-                                        constraints)
-             ptype)))))
+        (add 'typep (first args) ptype)))))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.

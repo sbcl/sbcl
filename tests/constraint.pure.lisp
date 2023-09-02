@@ -529,5 +529,18 @@
           (declare (fixnum x))
           (let ((m (+ x y)))
             (aref a (+ m (aref a m)))
-           y)))))
+            y)))))
+    '(values integer &optional))))
+
+(with-test (:name :+integer-argument-constarint.typep)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (let ((m (+ 1 x)))
+            (if (integerp m)
+                (+ m x)
+                2))))))
     '(values integer &optional))))
