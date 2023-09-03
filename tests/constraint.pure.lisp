@@ -571,3 +571,26 @@
               (length x)
               (error ""))))))
     '(values (integer 4 4) &optional))))
+
+(with-test (:name :ash)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (declare ((integer 1) x))
+          (let ((d (ash x -1)))
+            (< d x))))))
+    '(values (member t) &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (declare ((integer 1) x))
+          (let ((d (ash x -1)))
+            (print d)
+            (< d x))))))
+    '(values (member t) &optional))))

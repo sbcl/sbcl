@@ -1301,12 +1301,16 @@
                                   #'conset-add-constraint
                                   #'conset-add-constraint-to-eql)))
            (map nil (lambda (constraint)
-                      (destructuring-bind (kind x y &optional not-p)
-                          constraint
-                        (when (and kind x y)
-                          (funcall register gen
-                                   kind x y
-                                   not-p))))
+                      (if (eq (car constraint) 'equality)
+                          (destructuring-bind (op x y &optional not-p) (cdr constraint)
+                            (when (and op x y)
+                              (conset-add-equality-constraint gen op x y not-p)))
+                          (destructuring-bind (kind x y &optional not-p)
+                              constraint
+                            (when (and kind x y)
+                              (funcall register gen
+                                       kind x y
+                                       not-p)))))
                 constraints))))))
   gen)
 

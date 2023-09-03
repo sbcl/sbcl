@@ -66,6 +66,10 @@
     (and array-var
          (make-vector-length-constraint array-var))))
 
+(defun conset-add-equality-constraint (conset operator x y not-p)
+  (conset-adjoin (find-or-create-equality-constraint operator x y not-p)
+                 conset))
+
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
                                  alternative-constraints)
@@ -116,11 +120,9 @@
                          (when (ctype-p x)
                            (rotatef x y)
                            (setf operator (invert-operator)))
-                         (conset-adjoin (find-or-create-equality-constraint operator x y nil)
-                                        consequent-constraints)
+                         (conset-add-equality-constraint consequent-constraints operator x y nil)
                          (when alternative-constraints
-                           (conset-adjoin (find-or-create-equality-constraint operator x y t)
-                                          alternative-constraints)))))
+                           (conset-add-equality-constraint alternative-constraints operator x y t)))))
                 (do-eql-vars (eql-x ((constraint-var x) constraints))
                   (let ((x (replace-var x eql-x)))
                     (add x y)
@@ -176,52 +178,79 @@
                            (let ((use (principal-lvar-use arg)))
                              (and (ref-p use)
                                   (values use t)))))))))
-         (constraint-eq-p (leaf vector-length-p x)
-           (if vector-length-p
-               (and (vector-length-constraint-p x)
-                    (eq (vector-length-constraint-var x) leaf))
-               (eq leaf x))))
+         (constraint-eq-p (ref leaf vector-length-p x)
+           (cond (vector-length-p
+                  (and (vector-length-constraint-p x)
+                       (eq (vector-length-constraint-var x) leaf)))
+                 ((eq leaf x))
+                 ((and (lvar-p x)
+                       (ref-p ref))
+                  (eq (node-lvar (principal-lvar-ref-use (node-lvar ref)))
+                      x)))))
     (multiple-value-bind (ref1 vector-length-p1) (ref lvar1)
       (multiple-value-bind (ref2 vector-length-p2) (ref lvar2)
-        (when (and (ref-p ref1)
-                   ref2)
-          (let ((leaf1 (ref-leaf ref1))
-                (leaf2 (if (constant-p ref2)
-                           ref2
-                           (ref-leaf ref2))))
-            (flet ((find-constraint (ref)
-                     (loop for con in (ref-constraints ref)
-                           when (and (equality-constraint-p con)
-                                     (or
-                                      (and (eq (equality-constraint-operator con) operator)
-                                           (or (and (constraint-eq-p leaf1 vector-length-p1 (constraint-x con))
-                                                    (constraint-eq-p leaf2 vector-length-p2 (constraint-y con)))
-                                               (and commutative
-                                                    (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
-                                                    (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
-                                      (and (eq (equality-constraint-operator con)
-                                               (case operator
-                                                 (< '>)
-                                                 (> '<)
-                                                 (<= '>=)
-                                                 (>= '<=)))
-                                           (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
-                                           (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
-                           return con))
-                   (has-sets (leaf)
-                     (and (lambda-var-p leaf)
-                          (lambda-var-sets leaf))))
-              (let ((ref1-con (find-constraint ref1)))
-                (when (and ref1-con
-                           ;; If the variables are set both references
-                           ;; need to have the same constraint, otherwise
-                           ;; one of the references may be done before the
-                           ;; set.
-                           (or (constant-p leaf2)
-                               (and (not (has-sets leaf1))
-                                    (not (has-sets leaf2)))
-                               (eq ref1-con (find-constraint ref2))))
-                  ref1-con)))))))))
+        (cond ((and (ref-p ref1) ref2))
+              ((and (ref-p ref1) (not ref2))
+               (setf ref2 lvar2))
+              ((and (ref-p ref2) (not ref1))
+               (setf ref1 ref2
+                     ref2 lvar1
+                     operator (case operator
+                                (< '>)
+                                (> '<)
+                                (<= '>=)
+                                (>= '<=))))
+              (t
+               (return-from find-ref-equality-constraint)))
+        (let ((leaf1 (ref-leaf ref1))
+              (leaf2 (cond ((constant-p ref2)
+                            ref2)
+                           ((lvar-p ref2) ref2)
+                           (t
+                            (ref-leaf ref2)))))
+          (flet ((find-constraint (ref)
+                   (loop for con in (ref-constraints ref)
+                         when (and (equality-constraint-p con)
+                                   (or
+                                    (and (eq (equality-constraint-operator con) operator)
+                                         (or (and (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-x con))
+                                                  (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-y con)))
+                                             (and commutative
+                                                  (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
+                                                  (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
+                                    (and (eq (equality-constraint-operator con)
+                                             (case operator
+                                               (< '>)
+                                               (> '<)
+                                               (<= '>=)
+                                               (>= '<=)))
+                                         (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
+                                         (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
+                         return con))
+                 (has-sets (leaf)
+                   (and (lambda-var-p leaf)
+                        (lambda-var-sets leaf))))
+            (let ((ref1-con (find-constraint ref1)))
+              (cond (ref1-con
+                     (when (and
+                            ;; If the variables are set both references
+                            ;; need to have the same constraint, otherwise
+                            ;; one of the references may be done before the
+                            ;; set.
+                            (or (constant-p leaf2)
+                                (lvar-p leaf2)
+                                (and (not (has-sets leaf1))
+                                     (not (has-sets leaf2)))
+                                (eq ref1-con (find-constraint ref2))))
+                       ref1-con))
+                    ((ref-p ref2)
+                     (let ((ref2-con (find-constraint ref2)))
+                       (when (and ref2-con
+                                  (or (constant-p leaf1)
+                                      (lvar-p leaf1)
+                                      (and (not (has-sets leaf1))
+                                           (not (has-sets leaf2)))))
+                         ref2-con)))))))))))
 
 (defun try-equality-constraint (call)
   (let ((constraint (fun-info-equality-constraint (basic-combination-fun-info call)))
@@ -433,3 +462,16 @@
       (give-up-ir1-transform)))
   ;; It's in bounds but it may be of the wrong type
   `(the (and fixnum unsigned-byte) index))
+
+;;; (ash x -y) <= x
+(defoptimizer (ash constraint-propagate) ((x y) node gen)
+  (cond ((and (csubtypep (lvar-type x) (specifier-type '(integer 1)))
+              (csubtypep (lvar-type y) (specifier-type '(integer * -1))))
+         (let ((var (ok-lvar-lambda-var x gen)))
+           (when var
+             (list (list 'equality '> var (node-lvar node))))))
+        ((and (csubtypep (lvar-type x) (specifier-type '(integer 0)))
+              (csubtypep (lvar-type y) (specifier-type '(integer * 0))))
+         (let ((var (ok-lvar-lambda-var x gen)))
+           (when var
+             (list (list 'equality '>= var (node-lvar node))))))))
