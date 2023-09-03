@@ -1299,7 +1299,8 @@
                           (eq (vop-name dest) 'sb-vm::move-to-word/integer))
                  (vop-bind (in2) () dest
                    (when (eq in in2)
-                     (cond ((and (eq (vop-name vop2) not-vop)
+                     (cond ((and vop2
+                                 (eq (vop-name vop2) not-vop)
                                  (singleton-p (ir2block-predecessors (vop-block dest)))
                                  (let ((dest2 (branch-destination vop2)))
                                    (when (and dest2
@@ -1307,24 +1308,24 @@
                                               (eq (vop-name dest2) 'sb-vm::move-to-word/integer))
                                      (vop-bind (in21) () vop2
                                        (vop-bind (in22) () dest2
-                                        (when (and (eq in21 in)
-                                                   (eq in22 in))
-                                          (emit-and-insert-vop
-                                           (vop-node vop) (vop-block vop)
-                                           (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
-                                           (reference-tn-refs (vop-args vop) nil)
-                                           (reference-tn-ref-list (list (vop-results dest)
-                                                                        (vop-results dest2))
-                                                                  t)
-                                           vop
-                                           (append (vop-codegen-info vop)
-                                                   (vop-codegen-info vop2)
-                                                   (list (vop-label (branch-destination vop2 nil)))))
-                                          (delete-vop vop)
-                                          (delete-vop vop2)
-                                          (delete-vop dest)
-                                          (delete-vop dest2)
-                                          t)))))))
+                                         (when (and (eq in21 in)
+                                                    (eq in22 in))
+                                           (emit-and-insert-vop
+                                            (vop-node vop) (vop-block vop)
+                                            (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
+                                            (reference-tn-refs (vop-args vop) nil)
+                                            (reference-tn-ref-list (list (vop-results dest)
+                                                                         (vop-results dest2))
+                                                                   t)
+                                            vop
+                                            (append (vop-codegen-info vop)
+                                                    (vop-codegen-info vop2)
+                                                    (list (vop-label (branch-destination vop2 nil)))))
+                                           (delete-vop vop)
+                                           (delete-vop vop2)
+                                           (delete-vop dest)
+                                           (delete-vop dest2)
+                                           t)))))))
                            (t
                             (emit-and-insert-vop
                              (vop-node vop) (vop-block vop)
