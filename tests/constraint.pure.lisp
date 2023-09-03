@@ -593,4 +593,15 @@
           (let ((d (ash x -1)))
             (print d)
             (< d x))))))
-    '(values (member t) &optional))))
+    '(values (member t) &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x y)
+          (declare (unsigned-byte x)
+                   ((integer * 0) y))
+          (let ((d (ash x y)))
+            (> d x))))))
+    '(values null &optional))))
