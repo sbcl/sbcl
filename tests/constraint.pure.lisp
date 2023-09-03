@@ -558,3 +558,16 @@
                 (error "~a" q)
                 x))))))
     '(values (or (integer * -1) (integer 1)) &optional))))
+
+(with-test (:name :vector-length-var)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (declare (simple-vector x))
+          (if (< 3 (length x) 5)
+              (length x)
+              (error ""))))))
+    '(values (integer 4 4) &optional))))

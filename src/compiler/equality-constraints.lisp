@@ -54,6 +54,18 @@
     (when var2
       (conset-adjoin (find-or-create-equality-constraint 'eq var var2 nil) gen))))
 
+(defun vector-length-var-p (lvar constraints)
+  (let* ((use (principal-lvar-ref-use lvar))
+         (array-lvar
+           (and (combination-p use)
+                (lvar-fun-is (combination-fun use)
+                             '(vector-length length))
+                (car (combination-args use))))
+         (array-var (and array-lvar
+                         (ok-lvar-lambda-var array-lvar constraints))))
+    (and array-var
+         (make-vector-length-constraint array-var))))
+
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
                                  alternative-constraints)
@@ -62,17 +74,8 @@
       > < = <= >=)
      (when (= (length args) 2)
        (flet ((ok-lvar-p (lvar)
-                (or (ok-lvar-lambda-var lvar constraints)
-                    (let* ((use (principal-lvar-ref-use lvar))
-                           (array-lvar
-                             (and (combination-p use)
-                                  (lvar-fun-is (combination-fun use)
-                                               '(vector-length length))
-                                  (car (combination-args use))))
-                           (array-var (and array-lvar
-                                           (ok-lvar-lambda-var array-lvar constraints))))
-                      (and array-var
-                           (make-vector-length-constraint array-var))))))
+                (or (vector-length-var-p lvar constraints)
+                    (ok-lvar-lambda-var lvar constraints))))
          (let* ((first (first args))
                 (second (second args))
                 (constant-x (constant-lvar-p first))
