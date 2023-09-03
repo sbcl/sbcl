@@ -605,3 +605,25 @@
           (let ((d (ash x y)))
             (> d x))))))
     '(values null &optional))))
+
+(with-test (:name :/)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x)
+          (declare ((integer 1) x))
+          (let ((d (truncate x 4)))
+            (< d x))))))
+    '(values (member t) &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (x y)
+          (declare ((integer 0) x y))
+          (let ((d (/ x y)))
+            (> d x))))))
+    '(values null &optional))))

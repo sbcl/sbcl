@@ -476,3 +476,24 @@
          (let ((var (ok-lvar-lambda-var x gen)))
            (when var
              (list (list 'equality '>= var (node-lvar node))))))))
+
+;;; (/ positive-x positive-y) <= positive-x
+(defun div-constraints (x y node gen)
+  (when (csubtypep (lvar-type y) (specifier-type 'rational))
+    (list* (list 'typep (ok-lvar-lambda-var y gen) (specifier-type '(eql 0)) t)
+           (cond ((and (csubtypep (lvar-type x) (specifier-type '(integer 1)))
+                       (csubtypep (lvar-type y) (specifier-type '(integer 1))))
+                  (let ((var (ok-lvar-lambda-var x gen)))
+                    (when var
+                      (list (list 'equality '> var (node-lvar node))))))
+                 ((and (csubtypep (lvar-type x) (specifier-type '(integer 0)))
+                       (csubtypep (lvar-type y) (specifier-type '(integer 0))))
+                  (let ((var (ok-lvar-lambda-var x gen)))
+                    (when var
+                      (list (list 'equality '>= var (node-lvar node))))))))))
+
+(defoptimizer (truncate constraint-propagate) ((x y) node gen)
+  (div-constraints x y node gen))
+
+(defoptimizer (/ constraint-propagate) ((x y) node gen)
+  (div-constraints x y node gen))
