@@ -641,3 +641,18 @@
               a
               (loop))))))
     '(values (integer -2) &optional))))
+
+(with-test (:name :eq-vector-lengths)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b j)
+          (declare (simple-vector a b)
+                   ((integer 10 20) j)
+                   (optimize (debug 1)))
+          (when (and (= (length a) (length b))
+                     (= j (length a)))
+            (length b))))))
+    '(values (or null (integer 10 20)) &optional))))

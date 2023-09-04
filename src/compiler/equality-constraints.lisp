@@ -70,6 +70,12 @@
   (conset-adjoin (find-or-create-equality-constraint operator x y not-p)
                  conset))
 
+(defun vector-constraint-eq-p (con1 con2)
+  (and (vector-length-constraint-p con1)
+       (vector-length-constraint-p con2)
+       (eq (vector-length-constraint-var con1)
+           (vector-length-constraint-var con2))))
+
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
                                  alternative-constraints)
@@ -142,7 +148,28 @@
                         (when (and (vector-length-constraint-p y)
                                    (not constant-x)
                                    (neq x-type *universal-type*))
-                          (add x-type y))))))))))))))
+                          (add x-type y)))))
+                (cond ((vector-length-constraint-p x)
+                       (unless (vector-length-constraint-p y)
+                         (do-conset-constraints-intersection
+                             (con (constraints (lambda-var-equality-constraints (constraint-var x))))
+                           (let ((con-y (if (vector-constraint-eq-p (constraint-x con) x)
+                                            (constraint-y con)
+                                            (constraint-x con))))
+                             (when (and (vector-length-constraint-p con-y)
+                                        (eq (equality-constraint-operator con) 'eq))
+                               (add con-y y)
+                               (add con-y y-type))))))
+                      ((vector-length-constraint-p y)
+                       (do-conset-constraints-intersection
+                           (con (constraints (lambda-var-equality-constraints (constraint-var y))))
+                         (let ((con-x (if (vector-constraint-eq-p (constraint-y con) y)
+                                          (constraint-x con)
+                                          (constraint-y con))))
+                           (when (and (vector-length-constraint-p con-x)
+                                      (eq (equality-constraint-operator con) 'eq))
+                             (add x con-x)
+                             (add x-type con-x)))))))))))))))
 
 (defun inherit-equality-constraints (vars from-var constraints target)
   (do-conset-constraints-intersection
