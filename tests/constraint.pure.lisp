@@ -627,3 +627,17 @@
           (let ((d (/ x y)))
             (> d x))))))
     '(values null &optional))))
+
+(with-test (:name :negate-<)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b)
+          (declare (type integer a)
+                   ((integer 2 3) b))
+          (if (< (- a) b)
+              a
+              (loop))))))
+    '(values (integer -2) &optional))))

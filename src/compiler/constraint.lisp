@@ -457,8 +457,7 @@
       `(flet ((body (,symbol)
                 (declare (type constraint ,symbol))
                 ,@body))
-         (declare (optimize speed)
-                  (inline body))
+         (declare (inline body))
          (when ,constraints
            (let ((,min (conset-min ,conset))
                  (,max (conset-max ,conset)))
@@ -708,7 +707,7 @@
                                              consequent-constraints
                                              alternative-constraints)
                  (when lvar
-                  (constraint-propagate-back lvar fun y constraints consequent-constraints alternative-constraints)))
+                   (constraint-propagate-back lvar fun y constraints consequent-constraints alternative-constraints)))
                (process-node (node)
                  (typecase node
                    (ref

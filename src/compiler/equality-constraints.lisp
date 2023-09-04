@@ -92,6 +92,10 @@
                        (ok-lvar-p second)))
                 (x-type (lvar-type first))
                 (y-type (lvar-type second)))
+           (constraint-propagate-back first operator second
+                                      constraints
+                                      consequent-constraints
+                                      alternative-constraints)
            (flet ((invert-operator ()
                     (case operator
                       (< '>)

@@ -50,3 +50,16 @@
        (let ((var (ok-lvar-lambda-var x gen)))
          (when var
            (conset-add-constraint-to-eql alternative 'typep var (specifier-type '(and integer (not (eql 0)))) nil)))))))
+
+(defoptimizer (%negate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
+  (case kind
+    (<
+     (when (and (csubtypep (lvar-type x) (specifier-type 'rational))
+                (csubtypep (lvar-type constraint) (specifier-type 'rational)))
+       (let ((range (type-approximate-interval (lvar-type constraint))))
+         (when (numberp (interval-high range))
+           (let ((var (ok-lvar-lambda-var x gen)))
+             (when var
+               (conset-add-constraint-to-eql consequent 'typep var (specifier-type `(rational (,(- (interval-high range)))))
+                                             nil)))))))))
