@@ -5,7 +5,7 @@
 
 @menu
 * Slot access::
-* Dynamic-extent allocation::
+* Stack allocation::
 * Modular arithmetic::
 * Global and Always-Bound variables::
 * Miscellaneous Efficiency Issues::
@@ -67,83 +67,48 @@ Note that when profiling code such as this, the first few calls to the
 generic function are not representative, as the dispatch mechanism is
 lazily set up during those calls.
 
-@node  Dynamic-extent allocation
+@node  Stack allocation
 @comment  node-name,  next,  previous,  up
-@section Dynamic-extent allocation
+@section Stack allocation
 @cindex @code{dynamic-extent} declaration
 @cindex declaration, @code{dynamic-extent}
 
-SBCL has fairly extensive support for performing allocation on the
-stack when a variable is declared @code{dynamic-extent}. The
+SBCL has fairly extensive support for performing allocations on the
+stack when a variable or function is declared @code{dynamic-extent}. The
 @code{dynamic-extent} declarations are not verified, but are simply
 trusted as long as @code{sb-ext:*stack-allocate-dynamic-extent*} is
 true.
 
 @include var-sb-ext-star-stack-allocate-dynamic-extent-star.texinfo
 
-If dynamic extent constraints specified in the Common Lisp standard
-are violated, the best that can happen is for the program to have
-garbage in variables and return values; more commonly, the system will
-crash.
+SBCL recognizes any value which a variable declared
+@code{dynamic-extent} can take on as having dynamic extent. This means
+that, in addition to the value a variable is bound to initially, a value
+assigned to a variable by @code{setq} is also recognized as having
+dynamic extent when the variable is declared
+@code{dynamic-extent}. Users can thus build complex structures on the
+stack using iteration and @code{setq}.
 
-In particular, it is important to realize that dynamic extend is
-contagious:
-
-@lisp
-(let* ((a (list 1 2 3))
-       (b (cons a a)))
-   (declare (dynamic-extent b))
-   ;; Unless A is accessed elsewhere as well, SBCL will consider
-   ;; it to be otherwise inaccessible -- it can only be accessed
-   ;; through B, after all -- and stack allocate it as well.
-   ;;
-   ;; Hence returning (CAR B) here is unsafe.
-   ...)
-@end lisp
-
-This allows stack allocation of complex structures. As a notable
-exception to this, SBCL does not as of 1.0.48.21 propagate
-dynamic-extentness through @code{&rest} arguments -- but another
-conforming implementation might, so portable code should not rely on
-this.
-
-@lisp
-(declaim (inline foo))
-(defun foo (fun &rest arguments)
-  (declare (dynamic-extent arguments))
-  (apply fun arguments))
-
-(defun bar (a)
-  ;; SBCL will heap allocate the result of (LIST A), and stack allocate
-  ;; only the spine of the &rest list -- so this is safe, but unportable.
-  ;;
-  ;; Another implementation, including earlier versions of SBCL might consider
-  ;; (LIST A) to be otherwise inaccessible and stack-allocate it as well!
-  (foo #'car (list a)))
-@end lisp
-
-There are many cases when @code{dynamic-extent} declarations could be
-useful. At present, SBCL implements stack allocation for
+At present, SBCL implements stack allocation for the following kinds of
+values when they are recognized as having dynamic extent:
 
 @itemize
 
 @item
-@code{&rest} lists, when these are declared @code{dynamic-extent}.
+@code{&rest} lists
 
 @item
 @findex @cl{cons}
 @findex @cl{list}
 @findex @cl{list*}
 @findex @cl{vector}
-@code{cons}, @code{list}, @code{list*}, and @code{vector} when the
-result is bound to a variable declared @code{dynamic-extent}.
+the results of @code{cons}, @code{list}, @code{list*}, and @code{vector}
 
 @item
 @findex @cl{make-array}
-simple forms of @code{make-array}, whose result is bound to a variable
-declared @code{dynamic-extent}: stack allocation is possible only if
-the resulting array is known to be both simple and one-dimensional,
-and has a constant @code{:element-type}.
+the result of simple forms of @code{make-array}: stack allocation is
+possible only if the resulting array is known to be both simple and
+one-dimensional, and has a constant @code{:element-type}.
 
 @cindex Safety optimization quality
 @strong{Note}: stack space is limited, so allocation of a large vector
@@ -156,19 +121,15 @@ only in zero @code{safety} policies.
 @findex @cl{labels}
 @cindex @code{safety} optimization quality
 @cindex optimization quality, @code{safety}
-closures defined with @code{flet} or @code{labels}, with a bound
+closures defined with @code{flet} or @code{labels} with a bound
 @code{dynamic-extent} declaration.
 
 @item
-anonymous closures defined with @code{lambda} bound to a variable with
-@code{let}, where the variable has a bound @code{dynamic-extent}
-declaration.
+anonymous closures defined with @code{lambda}
 
 @item
 user-defined structures when the structure constructor defined using
-@code{defstruct} has been declared @code{inline} and the result of the
-call to the constructor is bound to a variable declared
-@code{dynamic-extent}.
+@code{defstruct} has been declared @code{inline}
 
 @strong{Note}: structures with ``raw'' slots can currently be
 stack-allocated only on x86 and x86-64. A ``raw'' slot is one whose
@@ -179,8 +140,12 @@ of @code{fixnum} is not stored as raw despite also being a subtype
 of @code{sb-ext:word}.
 
 @item
-all of the above when they appear as initial parts of another
-stack-allocated object.
+otherwise-inaccessible parts of objects recognized to be dynamic
+extent. The support for detecting when this applies is very
+sophisticated. The compiler can do this detection when any value form
+for a variable contains conditional allocations, function calls, inlined
+functions, anonymous closures, or even other variables. This allows
+stack allocation of complex structures.
 
 @end itemize
 
@@ -198,8 +163,17 @@ Examples:
        (nested (cons (list 1 2) (list* 3 4 (list 5))))
        (vector (make-array 3 :element-type 'single-float))
        (thing (make-thing :obj list
-                          :next (make-thing :obj (make-array 3)))))
-  (declare (dynamic-extent list nested vector thing))
+                          :next (make-thing :obj (make-array 3))))
+       (closure (let ((y ...)) (lambda () y))))
+  (declare (dynamic-extent list nested vector thing closure))
+  ...)
+
+;;; Stack allocation of objects assigned to DYNAMIC-EXTENT variables.
+(let ((x nil))
+  (declare (dynamic-extent x))
+  (setq x (list 1 2 3))
+  (dotimes (i 10)
+    (setq x (cons i x)))
   ...)
 
 ;;; Stack allocation of arguments to a local function is equivalent
@@ -218,15 +192,46 @@ Examples:
   ...)
 @end lisp
 
-Future plans include
+As a notable exception to recognizing otherwise inaccessible parts of
+other recognized dynamic extent values, SBCL does not as of 1.0.48.21
+propagate dynamic-extentness through @code{&rest} arguments -- but
+another conforming implementation might, so portable code should not
+rely on this.
 
-@itemize
+@lisp
+(declaim (inline foo))
+(defun foo (fun &rest arguments)
+  (declare (dynamic-extent arguments))
+  (apply fun arguments))
 
-@item
-Automatic detection of the common idiom of calling quantifiers with a
-closure, even when the closure is not declared @code{dynamic-extent}.
+(defun bar (a)
+  ;; SBCL will heap allocate the result of (LIST A), and stack allocate
+  ;; only the spine of the &rest list -- so this is safe, but unportable.
+  ;;
+  ;; Another implementation, including earlier versions of SBCL might consider
+  ;; (LIST A) to be otherwise inaccessible and stack-allocate it as well!
+  (foo #'car (list a)))
+@end lisp
 
-@end itemize
+If dynamic extent constraints specified in the Common Lisp standard
+are violated, the best that can happen is for the program to have
+garbage in variables and return values; more commonly, the system will
+crash.
+
+In particular, it is important to realize that this can interact in
+suprising ways with the otherwise inaccessible parts criterion:
+
+@lisp
+(let* ((a (list 1 2 3))
+       (b (cons a a)))
+   (declare (dynamic-extent b))
+   ;; Unless A is accessed elsewhere as well, SBCL will consider
+   ;; it to be otherwise inaccessible -- it can only be accessed
+   ;; through B, after all -- and stack allocate it as well.
+   ;;
+   ;; Hence returning (CAR B) here is unsafe.
+   ...)
+@end lisp
 
 @node  Modular arithmetic
 @comment  node-name,  next,  previous,  up

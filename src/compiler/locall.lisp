@@ -59,16 +59,19 @@
 
   (values))
 
-;;; Given a local call CALL to FUN, mark the associated args of CALL
-;;; corresponding to declared dynamic extent LAMBDA-VARs as dynamic
-;;; extent, setting up the corresponding cleanup. We do this now so
-;;; that the cleanup has the right scope. Environment analysis is
-;;; responsible for actually deciding if the arguments can be
-;;; dynamic-extent allocated, and deals with transitively marking the
-;;; otherwise-inaccessible parts of these values as dynamic extent as
-;;; well. We do this because environment analysis happens after all
-;;; major changes to the dataflow in IR1 have been done and it is
-;;; clear whether a combination can actually stack allocate it's value.
+;;; Given a local call CALL to FUN, set up the correct dynamic extent
+;;; for the associated args of CALL corresponding to declared dynamic
+;;; extent LAMBDA-VARs. We do this now so that we can find the right
+;;; dynamic extent even when variables are substituted. Environment
+;;; analysis is responsible for marking each of the other values that
+;;; a dynamic extent declared variable can take on (via assignment) as
+;;; dynamic extent. It also determines whether values which have
+;;; dynamic extent can actually be stack-allocated and transitively
+;;; marks the otherwise-inaccessible parts of these values as stack
+;;; allocatable as well. This is because environment analysis happens
+;;; after all major changes to the dataflow in IR1 have been done and
+;;; it is clear by then whether a combination can actually stack
+;;; allocate its value.
 (defun mark-dynamic-extent-args (call fun)
   (declare (type combination call) (type clambda fun))
   (let (dynamic-extent)

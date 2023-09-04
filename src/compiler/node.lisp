@@ -1703,7 +1703,8 @@
   (kind (missing-arg) :type (member dynamic-extent truly-dynamic-extent))
   ;; the values explicitly declared with this dynamic extent.
   (values nil :type list)
-  ;; the cleanup for this extent. NULL only temporarily.
+  ;; the cleanup for this extent. NULL indicates that this dynamic
+  ;; extent is over the environment and hence needs no cleanup code.
   (cleanup nil :type (or cleanup null))
   ;; some kind of info used by the back end
   (info nil))

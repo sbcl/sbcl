@@ -354,12 +354,11 @@
                            (setf (lvar-dynamic-extent arg) dynamic-extent)
                            (push arg (dynamic-extent-values dynamic-extent))))))))))))
 
-;;; Starting from the potentially (declared) dynamic extent lvars
-;;; recognized during local call analysis and declared dynamic extent
-;;; functions recognized during IR1tran, determine if these are
-;;; actually eligible for dynamic-extent allocation. If so, we also
-;;; transitively mark the otherwise-inaccessible parts of these values
-;;; as dynamic extent.
+;;; Starting from values which had their dynamic extents recognized
+;;; during local call analysis and from functions declared dynamic
+;;; extent, determine if these are actually eligible for stack
+;;; allocation. If so, we also transitively mark the
+;;; otherwise-inaccessible parts of these values as dynamic extent.
 (defun find-dynamic-extent-lvars (component)
   (declare (type component component))
   (do-blocks (block component)
@@ -372,6 +371,34 @@
             (let ((dxable-args (fun-name-dx-args name)))
               (when dxable-args
                 (dxify-downward-funargs node dxable-args name))))))))
+  ;; For each dynamic extent declared variable, each value that the
+  ;; variable can take on is also dynamic extent.
+  (dolist (lambda (component-lambdas component))
+    (dolist (var (lambda-vars lambda))
+      (let ((kind (leaf-dynamic-extent var)))
+        (when kind
+          (let ((values (mapcar #'set-value (basic-var-sets var))))
+            (when values
+              ;; This dynamic extent is over the whole environment and
+              ;; needs no cleanup code.
+              (let ((dynamic-extent (make-dynamic-extent :values values
+                                                         :cleanup nil
+                                                         :kind kind)))
+                (push dynamic-extent (lambda-dynamic-extents lambda))
+                (dolist (value values)
+                  (setf (lvar-dynamic-extent value) dynamic-extent))))))))
+    (dolist (let (lambda-lets lambda))
+      (dolist (var (lambda-vars let))
+        (when (leaf-dynamic-extent var)
+          (let ((initial-value (let-var-initial-value var)))
+            ;; FIXME: This is overly pessimistic; a flushed initial
+            ;; value should not inhibit stack allocation.
+            (when initial-value
+              (let ((dynamic-extent (lvar-dynamic-extent initial-value)))
+                (dolist (set (basic-var-sets var))
+                  (let ((set-value (set-value set)))
+                    (setf (lvar-dynamic-extent set-value) dynamic-extent)
+                    (push set-value (dynamic-extent-values dynamic-extent)))))))))))
   (dolist (lambda (component-lambdas component))
     (dolist (dynamic-extent (lambda-dynamic-extents lambda))
       (dolist (lvar (dynamic-extent-values dynamic-extent))
@@ -410,7 +437,8 @@
           (when (lvar-uses lvar)
             (cond ((lvar-good-for-dx-p lvar dynamic-extent)
                    (mark-dx lvar)
-                   (unless (dynamic-extent-info dynamic-extent)
+                   (unless (or (dynamic-extent-info dynamic-extent)
+                               (null (dynamic-extent-cleanup dynamic-extent)))
                      (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
                   (t
                    (setf (lvar-dynamic-extent lvar) nil))))))))

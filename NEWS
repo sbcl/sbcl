@@ -1,6 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.3.8:
+  * enhancement: stack allocation via DYNAMIC-EXTENT now applies to all values
+    that a variable can take on (for example via SETQ), not just the initial
+    binding. This permits for example building complex or recursive structures
+    on the stack more easily via iteration. See the updated manual entry for
+    more details.
   * minor incompatible change: some SB-POSIX interfaces adhere to the spec
     that a NULL result from the C library is an error if and only if errno
     was altered by the call. SYSCALL-ERROR will be signaled if so.
