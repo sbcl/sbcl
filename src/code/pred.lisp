@@ -238,20 +238,6 @@
 (defun eq (obj1 obj2)
   "Return T if OBJ1 and OBJ2 are the same object, otherwise NIL."
   (eq obj1 obj2))
-;;; and this too, but it's only needed for backends on which
-;;; IR1 might potentially transform EQL into %EQL/INTEGER.
-#+integer-eql-vop
-(defun %eql/integer (obj1 obj2)
-  ;; This is just for constant folding, there's no real need to transform
-  ;; into the %EQL/INTEGER VOP. But it's confusing if it becomes identical to
-  ;; EQL, and then due to ICF we find that #'EQL => #<FUNCTION %EQL/INTEGER>.
-  ;; Type declarations don't suffice because we don't know which arg is an integer
-  ;; (if not both). We could ensure selection of the vop by using %PRIMITIVE.
-  ;; Anyway it suffices to disable type checking and pretend its the always
-  ;; the first arg that's an integer, but that won't work on the host because
-  ;; it might enforce the type since we can't portably unenforce after declaring.
-  (declare (optimize (sb-c::type-check 0)))
-  (eql (the integer obj1) obj2))
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)

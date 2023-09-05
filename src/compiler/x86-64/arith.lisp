@@ -2907,7 +2907,7 @@
     (inst cmp temp unsigned)))
 
 (define-vop (eql-unsigned-signed)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:args (unsigned :scs (unsigned-reg))
          (signed :scs (signed-reg)))
   (:arg-types unsigned-num signed-num)
@@ -2925,19 +2925,19 @@
   (:arg-types signed-num unsigned-num))
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:generator 6 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:generator 5 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:generator 6 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:generator 5 (emit-optimized-cmp x y temp)))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
@@ -2954,7 +2954,7 @@
          (y :scs (any-reg control-stack)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:generator 4 (emit-optimized-cmp x y temp)))
 
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
@@ -2969,7 +2969,7 @@
   (:info y)
   (:conditional :e)
   (:policy :fast-safe)
-  (:translate eql %eql/integer)
+  (:translate eql)
   (:arg-refs x-tn-ref)
   (:generator 2 (emit-optimized-cmp x (fixnumize y) temp (tn-ref-type x-tn-ref))))
 

@@ -511,14 +511,15 @@
 ;; the same widetag, but not bignum-widetag, the behavior is undefined.
 ;;
 (define-assembly-routine (%eql/integer
-                          (:translate %eql/integer)
+                          (:translate eql)
                           ;; :safe would imply signaling an error
                           ;; if the args are not integer, which this doesn't.
                           (:policy :fast-safe)
                           (:conditional :e)
-                          (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:arg y (descriptor-reg any-reg) rdi-offset)
+                          (:cost 10)
+                          (:arg-types (:or integer bignum) *))
+                         ((:arg x (descriptor-reg) rdx-offset)
+                          (:arg y (descriptor-reg) rdi-offset)
                           (:temp rcx unsigned-reg rcx-offset)
                           (:temp rax unsigned-reg rax-offset))
   (inst cmp x y)
@@ -547,3 +548,7 @@
   (inst jmp :ne loop)
   ;; If the Z flag is set, the integers were EQL
   done)
+
+#-sb-assembling
+(define-vop (%eql/integer2 %eql/integer)
+  (:arg-types * (:or integer bignum)))

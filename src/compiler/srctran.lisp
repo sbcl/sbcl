@@ -3995,7 +3995,6 @@
   "convert to simpler equality predicate"
   (let* ((x-type (lvar-type x))
          (y-type (lvar-type y))
-         #+integer-eql-vop (int-type (specifier-type 'integer))
          (char-type (specifier-type 'character)))
     (cond
       ((same-leaf-ref-p x y) t)
@@ -4004,22 +4003,6 @@
       ((and (csubtypep x-type char-type)
             (csubtypep y-type char-type))
        '(char= x y))
-      ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
-       '(eq y x))
-      #+integer-eql-vop
-      ((or (csubtypep x-type int-type) (csubtypep y-type int-type))
-       '(%eql/integer x y))
-      (t
-       (give-up-ir1-transform)))))
-
-#+integer-eql-vop
-(deftransform %eql/integer ((x y) * * :node node)
-  (let* ((x-type (lvar-type x))
-         (y-type (lvar-type y)))
-    (cond
-      ((same-leaf-ref-p x y) t)
-      ((not (types-equal-or-intersect x-type y-type))
-       nil)
       ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
        '(eq y x))
       (t

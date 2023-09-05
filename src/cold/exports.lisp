@@ -1872,7 +1872,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "CONTAINS-UNKNOWN-TYPE-P"
            "%COS" "%COS-QUICK"
            "%COSH" "%DATA-VECTOR-AND-INDEX" "%DEPOSIT-FIELD"
-           "%DOUBLE-FLOAT" "%DPB" "%EQL" "%EQL/INTEGER"
+           "%DOUBLE-FLOAT" "%DPB" "%EQL"
            "%EXIT"
            "%EXP" "%EXPM1"
            "%FIND-POSITION"
