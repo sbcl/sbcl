@@ -10,7 +10,6 @@
 :fp-and-pc-standard-save
 :alien-callbacks
 :cycle-counter
-:integer-eql-vop
 :undefined-fun-restarts
 :call-symbol
 :executable-funinstances
