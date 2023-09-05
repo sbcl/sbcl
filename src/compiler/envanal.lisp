@@ -396,9 +396,14 @@
             (when initial-value
               (let ((dynamic-extent (lvar-dynamic-extent initial-value)))
                 (dolist (set (basic-var-sets var))
-                  (let ((set-value (set-value set)))
-                    (setf (lvar-dynamic-extent set-value) dynamic-extent)
-                    (push set-value (dynamic-extent-values dynamic-extent)))))))))))
+                  ;; The environments of the SET and the dynamic
+                  ;; extent must be the same to ensure the set value
+                  ;; lives on the stack long enough.
+                  (when (eq (node-environment set)
+                            (node-environment dynamic-extent))
+                    (let ((set-value (set-value set)))
+                      (setf (lvar-dynamic-extent set-value) dynamic-extent)
+                      (push set-value (dynamic-extent-values dynamic-extent))))))))))))
   (dolist (lambda (component-lambdas component))
     (dolist (dynamic-extent (lambda-dynamic-extents lambda))
       (dolist (lvar (dynamic-extent-values dynamic-extent))

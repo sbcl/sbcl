@@ -2036,3 +2036,20 @@
                   (print-nothing y))))))
      ((nil 2) nil)
      ((t 2) nil))))
+
+(with-test (:name :dynamic-extent-setq-different-environments)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (test)
+       (let ((list nil))
+         (declare (dynamic-extent list))
+         (flet ((body ()
+                  (setq list (cons nil list))))
+           (if test
+               (progn
+                 (body)
+                 (print-nothing 'foo))
+               (body)))))
+     ((t) 'foo)
+     ((nil) '(nil)))))
