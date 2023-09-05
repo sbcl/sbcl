@@ -263,10 +263,10 @@
              #+long-float
              (long-float eql)
              (bignum
-              (lambda (x y)
-                (sb-c::if-vop-existsp (:named sb-vm::%eql/integer)
-                   (eql x y)
-                   (zerop (bignum-compare x y)))))
+              #.(sb-c::if-vop-existsp (:named sb-vm::%eql/integer)
+                  'eql
+                  '(lambda (x y)
+                    (zerop (bignum-compare x y)))))
              (ratio
               (lambda (x y)
                 (and (eql (numerator x) (numerator y))
