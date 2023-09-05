@@ -30,6 +30,14 @@
                        (constraints-eq-p (constraint-y con) y))
              return con)))))
 
+(defun invert-operator (operator)
+  (case operator
+    (< '>)
+    (> '<)
+    (<= '>=)
+    (>= '<=)
+    (t operator)))
+
 (defun find-or-create-equality-constraint (operator x y not-p)
   (or (find-equality-constraint operator x y not-p)
       (let ((new (make-equality-constraint (length *constraint-universe*)
@@ -103,12 +111,7 @@
                                       consequent-constraints
                                       alternative-constraints)
            (flet ((invert-operator ()
-                    (case operator
-                      (< '>)
-                      (> '<)
-                      (<= '>=)
-                      (>= '<=)
-                      (t operator))))
+                    (invert-operator operator)))
             (when constant-x
               (when constant-y
                 (return-from add-equality-constraints))
@@ -226,11 +229,7 @@
               ((and (ref-p ref2) (not ref1))
                (setf ref1 ref2
                      ref2 lvar1
-                     operator (case operator
-                                (< '>)
-                                (> '<)
-                                (<= '>=)
-                                (>= '<=))))
+                     operator (invert-operator operator)))
               (t
                (return-from find-ref-equality-constraint)))
         (let ((leaf1 (ref-leaf ref1))
@@ -250,11 +249,7 @@
                                                   (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
                                                   (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
                                     (and (eq (equality-constraint-operator con)
-                                             (case operator
-                                               (< '>)
-                                               (> '<)
-                                               (<= '>=)
-                                               (>= '<=)))
+                                             (invert-operator operator))
                                          (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
                                          (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
                          return con))
@@ -402,7 +397,7 @@
      (equality-constraint eq inverse-true)
      (equality-constraint eql inverse-true)
      (equality-constraint = inverse-true)
-     (equality-constraint >= not-true nil)
+     (equality-constraint >= inverse nil)
      (equality-constraint <= false nil))
     result))
 
@@ -528,3 +523,53 @@
 
 (defoptimizer (/ constraint-propagate) ((x y) node gen)
   (div-constraints x y node gen))
+
+(defmacro do-equality-constraints ((con op not-p) var constraints &body body)
+  (once-only ((var var)
+              (constraints constraints))
+    `(do-conset-constraints-intersection
+         (,con (,constraints (lambda-var-equality-constraints (constraint-var ,var))))
+       (flet ((body (,con ,op ,not-p) ,@body))
+         (cond ((eq (constraint-x ,con) ,var)
+                (body (constraint-y ,con)
+                      (equality-constraint-operator ,con)
+                      (equality-constraint-not-p ,con)))
+               ((eq (constraint-y ,con) ,var)
+                (body (constraint-x ,con)
+                      (invert-operator (equality-constraint-operator ,con))
+                      (equality-constraint-not-p ,con))))))))
+
+(defoptimizer (+ constraint-propagate) ((x y) node gen)
+  (flet ((try (a b)
+           (and (csubtypep (lvar-type a) (specifier-type 'integer))
+                (csubtypep (lvar-type b) (specifier-type '(integer 0)))
+                (let ((var (ok-lvar-lambda-var a gen)))
+                  (when var
+                    (let ((plusp (csubtypep (lvar-type b) (specifier-type '(integer 1))))
+                          r)
+                      (push (list 'equality (if plusp
+                                                '<
+                                                '<=)
+                                  var (node-lvar node))
+                            r)
+                      (do-equality-constraints (con op not-p) var gen
+                        (cond
+                          ((not (lambda-var-p con)))
+                          ((or (and (eq op '>)
+                                    (not not-p))
+                               (and (eq op '<=)
+                                    not-p))
+                           (push (list 'equality '< con (node-lvar node))
+                                 r))
+                          ((or (and (memq op '(>= = eq eql))
+                                    (not not-p))
+                               (and (eq op '<)
+                                    not-p))
+                           (push (list 'equality (if plusp
+                                                     '<
+                                                     '<=)
+                                       con (node-lvar node))
+                                 r))))
+                      r))))))
+    (or (try x y)
+        (try y x))))

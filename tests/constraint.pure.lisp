@@ -656,3 +656,64 @@
                      (= j (length a)))
             (length b))))))
     '(values (or null (integer 10 20)) &optional))))
+
+(with-test (:name :+>)
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a j)
+          (declare (integer a)
+                   ((integer 1) j))
+          (> (+ a j) a)))))
+    '(values (member t) &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a j)
+          (declare (integer a)
+                   ((integer 0) j))
+          (> (+ j a) a)))))
+    '(values boolean &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b j)
+          (declare (integer a b)
+                   ((integer 1) j))
+          (if (= b a)
+              (let ((d (+ b j)))
+                (> a d))
+              (loop))))))
+    '(values null &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b j)
+          (declare (integer a b)
+                   ((integer 0) j))
+          (if (<= a b)
+              (let ((d (+ b j)))
+                (>= a d))
+              (loop))))))
+    '(values boolean &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b j)
+          (declare (integer a b)
+                   ((integer 1) j))
+          (if (<= a b)
+              (let ((d (+ b j)))
+                (>= a d))
+              (loop))))))
+    '(values null &optional))))
