@@ -235,7 +235,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                                             :if-exists :supersede)
               (dolist (cell (sort list #'> :key #'car))
                 (format output "~7d ~s~%" (car cell) (cdr cell)))))
-          (sum-vop-usage "../output/warm-vop-usage.txt" nil)))
+          (sum-vop-usage "../obj/from-self/warm-vop-usage.txt" nil)))
 
       (format t "~&Total realtime: ~d msec~%" (elapsed-time-from start-time))
       (when missing-usage

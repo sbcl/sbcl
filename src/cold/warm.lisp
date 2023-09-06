@@ -254,7 +254,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
 
 (sb-c::dump/restore-interesting-types 'write)
 (when (hash-table-p sb-c::*static-vop-usage-counts*)
-  (with-open-file (output "output/warm-vop-usage.txt"
+  (with-open-file (output (merge-pathnames "warm-vop-usage.txt" *objfile-prefix*)
                           :direction :output :if-exists :supersede)
     (let (list)
       (sb-int:dohash ((name vop) sb-c::*backend-parsed-vops*)
