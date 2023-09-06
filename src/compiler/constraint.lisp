@@ -1249,7 +1249,8 @@
                  do (let ((type (lvar-type val)))
                       (unless (eq type *universal-type*)
                         (conset-add-constraint gen 'typep var type nil)))
-                    (maybe-add-eql-var-var-constraint var val gen)))))
+                    (maybe-add-eql-var-var-constraint var val gen)
+                    (add-var-result-constraints var val gen)))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)

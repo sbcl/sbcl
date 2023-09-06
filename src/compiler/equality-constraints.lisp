@@ -38,6 +38,21 @@
     (>= '<=)
     (t operator)))
 
+(defmacro do-equality-constraints ((con op not-p) var constraints &body body)
+  (once-only ((var var)
+              (constraints constraints))
+    `(do-conset-constraints-intersection
+         (,con (,constraints (lambda-var-equality-constraints (constraint-var ,var))))
+       (flet ((body (,con ,op ,not-p) ,@body))
+         (cond ((vector-constraint-eq-p (constraint-x ,con) ,var)
+                (body (constraint-y ,con)
+                      (equality-constraint-operator ,con)
+                      (equality-constraint-not-p ,con)))
+               ((vector-constraint-eq-p (constraint-y ,con) ,var)
+                (body (constraint-x ,con)
+                      (invert-operator (equality-constraint-operator ,con))
+                      (equality-constraint-not-p ,con))))))))
+
 (defun find-or-create-equality-constraint (operator x y not-p)
   (or (find-equality-constraint operator x y not-p)
       (let ((new (make-equality-constraint (length *constraint-universe*)
@@ -79,100 +94,111 @@
                  conset))
 
 (defun vector-constraint-eq-p (con1 con2)
-  (and (vector-length-constraint-p con1)
-       (vector-length-constraint-p con2)
-       (eq (vector-length-constraint-var con1)
-           (vector-length-constraint-var con2))))
+  (or (eq con1 con2)
+      (and (vector-length-constraint-p con1)
+           (vector-length-constraint-p con2)
+           (eq (vector-length-constraint-var con1)
+               (vector-length-constraint-var con2)))))
+
+(defun ok-lvar-lambda-var/vector-length (lvar constraints)
+  (or (vector-length-var-p lvar constraints)
+      (ok-lvar-lambda-var lvar constraints)))
+
+(defconstant-eqx +eq-ops+ '(eq eql =) #'equal)
+
+(defun inherit-equality-p (new from not-p)
+  (case new
+    ((char= two-arg-char-equal . #.+eq-ops+)
+     (unless not-p
+       from))
+    (<
+     (if not-p
+         (case from
+           ((> >=) '<))
+         (case from
+           ((< <= . #.+eq-ops+) '<))))
+    (>
+     (if not-p
+         (case from
+           ((< <=) '>))
+         (case from
+           ((> >= . #.+eq-ops+) '>))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
                                  alternative-constraints)
   (case operator
-    ((eq eql char= two-arg-char-equal
-      > < = <= >=)
+    ((char= two-arg-char-equal > <  <= >=
+            . #.+eq-ops+)
      (when (= (length args) 2)
-       (flet ((ok-lvar-p (lvar)
-                (or (vector-length-var-p lvar constraints)
-                    (ok-lvar-lambda-var lvar constraints))))
-         (let* ((first (first args))
-                (second (second args))
-                (constant-x (constant-lvar-p first))
-                (constant-y (constant-lvar-p second))
-                (x (if constant-x
-                       (nth-value 1 (lvar-value first))
-                       (ok-lvar-p first)))
-                (y (if constant-y
-                       (nth-value 1 (lvar-value second))
-                       (ok-lvar-p second)))
-                (x-type (lvar-type first))
-                (y-type (lvar-type second)))
-           (constraint-propagate-back first operator second
-                                      constraints
-                                      consequent-constraints
-                                      alternative-constraints)
-           (flet ((invert-operator ()
-                    (invert-operator operator)))
-            (when constant-x
-              (when constant-y
-                (return-from add-equality-constraints))
-              (rotatef x y)
-              (rotatef x-type y-type)
-              (rotatef constant-x constant-y)
-              (setf operator (invert-operator)))
-            (when (and x y)
-              ;; TODO: inherit more than just EQL constraints
-              (flet ((replace-var (var with)
-                       (cond ((eq var with)
-                              var)
-                             ((vector-length-constraint-p var)
-                              (make-vector-length-constraint with))
-                             (t
-                              with)))
-                     (add (x y)
-                       (let ((operator operator))
-                         (when (ctype-p x)
-                           (rotatef x y)
-                           (setf operator (invert-operator)))
-                         (conset-add-equality-constraint consequent-constraints operator x y nil)
-                         (when alternative-constraints
-                           (conset-add-equality-constraint alternative-constraints operator x y t)))))
-                (do-eql-vars (eql-x ((constraint-var x) constraints))
-                  (let ((x (replace-var x eql-x)))
-                    (add x y)
-                    (when (and (vector-length-constraint-p x)
-                               (not constant-y)
-                               (neq y-type *universal-type*))
-                      (add x y-type))))
-                (if constant-y
-                    (add x y)
-                    (do-eql-vars (eql-y ((constraint-var y) constraints))
-                      (let ((y (replace-var y eql-y)))
-                        (add x y)
-                        (when (and (vector-length-constraint-p y)
-                                   (not constant-x)
-                                   (neq x-type *universal-type*))
-                          (add x-type y)))))
-                (cond ((vector-length-constraint-p x)
-                       (unless (vector-length-constraint-p y)
-                         (do-conset-constraints-intersection
-                             (con (constraints (lambda-var-equality-constraints (constraint-var x))))
-                           (let ((con-y (if (vector-constraint-eq-p (constraint-x con) x)
-                                            (constraint-y con)
-                                            (constraint-x con))))
-                             (when (and (vector-length-constraint-p con-y)
-                                        (eq (equality-constraint-operator con) 'eq))
-                               (add con-y y)
-                               (add con-y y-type))))))
-                      ((vector-length-constraint-p y)
-                       (do-conset-constraints-intersection
-                           (con (constraints (lambda-var-equality-constraints (constraint-var y))))
-                         (let ((con-x (if (vector-constraint-eq-p (constraint-y con) y)
-                                          (constraint-x con)
-                                          (constraint-y con))))
-                           (when (and (vector-length-constraint-p con-x)
-                                      (eq (equality-constraint-operator con) 'eq))
-                             (add x con-x)
-                             (add x-type con-x)))))))))))))))
+       (let* ((first (first args))
+              (second (second args))
+              (constant-x (constant-lvar-p first))
+              (constant-y (constant-lvar-p second))
+              (x (if constant-x
+                     (nth-value 1 (lvar-value first))
+                     (ok-lvar-lambda-var/vector-length first constraints)))
+              (y (if constant-y
+                     (nth-value 1 (lvar-value second))
+                     (ok-lvar-lambda-var/vector-length second constraints)))
+              (x-type (lvar-type first))
+              (y-type (lvar-type second)))
+         (constraint-propagate-back first operator second
+                                    constraints
+                                    consequent-constraints
+                                    alternative-constraints)
+         (when constant-x
+           (when constant-y
+             (return-from add-equality-constraints))
+           (rotatef x y)
+           (rotatef x-type y-type)
+           (rotatef constant-x constant-y)
+           (setf operator (invert-operator operator)))
+         (when (and x y)
+           (flet ((replace-var (var with)
+                    (cond ((eq var with)
+                           var)
+                          ((vector-length-constraint-p var)
+                           (make-vector-length-constraint with))
+                          (t
+                           with)))
+                  (add (x y &optional (operator operator) (alternative-constraints alternative-constraints))
+                    (when (ctype-p x)
+                      (rotatef x y)
+                      (setf operator (invert-operator operator)))
+                    (conset-add-equality-constraint consequent-constraints operator x y nil)
+                    (when alternative-constraints
+                      (conset-add-equality-constraint alternative-constraints operator x y t))))
+             (do-eql-vars (eql-x ((constraint-var x) constraints))
+               (let ((x (replace-var x eql-x)))
+                 (add x y)
+                 (when (and (vector-length-constraint-p x)
+                            (not constant-y)
+                            (neq y-type *universal-type*))
+                   (add x y-type))))
+             (if constant-y
+                 (add x y)
+                 (do-eql-vars (eql-y ((constraint-var y) constraints))
+                   (let ((y (replace-var y eql-y)))
+                     (add x y)
+                     (when (and (vector-length-constraint-p y)
+                                (not constant-x)
+                                (neq x-type *universal-type*))
+                       (add x-type y)))))
+             (flet ((inherit (x y x-type operator)
+                      (when (or (lambda-var-p y)
+                                (vector-length-constraint-p y))
+                        (do-equality-constraints (in-y in-op in-not-p) y constraints
+                          (unless (eq in-y y)
+                            (let ((inherit (inherit-equality-p operator in-op in-not-p)))
+                              (when inherit
+                                (add x in-y inherit nil)
+                                (when (and (vector-length-constraint-p in-y)
+                                           (not (constant-p x)))
+                                  (add x-type in-y inherit nil)))))))))
+               (inherit x y x-type operator)
+               (unless constant-y
+                 (inherit y x y-type (invert-operator operator)))))))))))
 
 (defun inherit-equality-constraints (vars from-var constraints target)
   (do-conset-constraints-intersection
@@ -227,6 +253,7 @@
               ((and (ref-p ref1) (not ref2))
                (setf ref2 lvar2))
               ((and (ref-p ref2) (not ref1))
+               (rotatef vector-length-p1 vector-length-p2)
                (setf ref1 ref2
                      ref2 lvar1
                      operator (invert-operator operator)))
@@ -524,21 +551,6 @@
 (defoptimizer (/ constraint-propagate) ((x y) node gen)
   (div-constraints x y node gen))
 
-(defmacro do-equality-constraints ((con op not-p) var constraints &body body)
-  (once-only ((var var)
-              (constraints constraints))
-    `(do-conset-constraints-intersection
-         (,con (,constraints (lambda-var-equality-constraints (constraint-var ,var))))
-       (flet ((body (,con ,op ,not-p) ,@body))
-         (cond ((eq (constraint-x ,con) ,var)
-                (body (constraint-y ,con)
-                      (equality-constraint-operator ,con)
-                      (equality-constraint-not-p ,con)))
-               ((eq (constraint-y ,con) ,var)
-                (body (constraint-x ,con)
-                      (invert-operator (equality-constraint-operator ,con))
-                      (equality-constraint-not-p ,con))))))))
-
 (defoptimizer (+ constraint-propagate) ((x y) node gen)
   (flet ((try (a b)
            (and (csubtypep (lvar-type a) (specifier-type 'integer))
@@ -573,3 +585,26 @@
                       r))))))
     (or (try x y)
         (try y x))))
+
+(defun add-var-result-constraints (var lvar gen)
+  (let ((uses (lvar-uses lvar)))
+    (when (combination-p uses)
+      (binding* ((info (combination-fun-info uses) :exit-if-null)
+                 (propagate (fun-info-constraint-propagate-result info)
+                            :exit-if-null))
+        (loop for (op constraint not-p) in (funcall propagate uses gen)
+              do (conset-add-equality-constraint gen op var constraint not-p))))))
+
+(defoptimizer (- constraint-propagate-result) ((a b) node gen)
+  (and (csubtypep (lvar-type a) (specifier-type 'integer))
+       (csubtypep (lvar-type b) (specifier-type '(integer 0)))
+       (let ((var (ok-lvar-lambda-var/vector-length a gen)))
+         (when var
+           (let ((plusp (csubtypep (lvar-type b) (specifier-type '(integer 1))))
+                 r)
+             (push (list (if plusp
+                             '<
+                             '<=)
+                         var)
+                   r)
+             r)))))
