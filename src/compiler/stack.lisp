@@ -201,9 +201,9 @@
                                      (dynamic-extent-preserve-info dynamic-extent))))
                             (t
                              (ir1-convert (node-prev node) ctran info
-                                          '(%dynamic-extent-start))
-                             (push info stack))))
-                    (link-node-to-previous-ctran node ctran)))))))
+                                          '(%dynamic-extent-start)))))
+                    (link-node-to-previous-ctran node ctran))
+                  (push info stack))))))
         (when (entry-p node)
           (dolist (nlx-info (cleanup-nlx-info (entry-cleanup node)))
             (stack-mess-up-walk (nlx-info-target nlx-info) stack)))))
