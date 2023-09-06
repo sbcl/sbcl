@@ -157,19 +157,6 @@ sbcl-0.8.12.30, this affects at least DUMP-OBJECT through
 COMPOUND-OBJECT-P, and (LABELS MAYBE-EMIT-MAKE-LOAD-FORMS GROVEL)
 through TYPEP UNBOXED-ARRAY, within the compiler itself.
 --------------------------------------------------------------------------------
-#20
-(defun-with-dx foo (x)
-  (flet ((make (x)
-           (let ((l (list nil nil)))
-             (setf (first l) x)
-             (setf (second l) (1- x))
-             l)))
-    (let ((l (make x)))
-      (declare (dynamic-extent l))
-      (mapc #'print l))))
-
-Result of MAKE is not stack allocated.
---------------------------------------------------------------------------------
 #22
 IR2 does not perform unused code flushing.
 --------------------------------------------------------------------------------
