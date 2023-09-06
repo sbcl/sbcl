@@ -1895,6 +1895,7 @@
 
 (defknown %cleanup-point (&rest t) t (reoptimize-when-unlinking))
 (defknown %dynamic-extent-start () t)
+(defknown %preserve-dynamic-extent () t)
 (defknown %special-bind (t t) t)
 (defknown %special-unbind (&rest symbol) t)
 (defknown %listify-rest-args (t index) list (flushable))

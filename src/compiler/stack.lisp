@@ -126,7 +126,11 @@
                (do ((tail stack (cdr tail)))
                    ((null tail) (prefix))
                  (let ((lvar (car tail)))
-                   (when (memq lvar start)
+                   (when (or (memq lvar start)
+                             (and (lvar-dynamic-extent lvar)
+                                  (member (dynamic-extent-info
+                                           (lvar-dynamic-extent lvar))
+                                          start)))
                      (when (eq (ir2-lvar-kind (lvar-info lvar)) :stack)
                        (return (append (prefix) tail)))
                      (prefix lvar)))))))
@@ -178,15 +182,28 @@
           (when dynamic-extent
             (let ((info (dynamic-extent-info dynamic-extent)))
               (when info
-                (unless (memq info stack)
-                  (push info stack)
+                (unless (eq info (first stack))
                   (pushnew block (ir2-component-stack-mess-ups 2comp))
                   (setf (ctran-next (node-prev node)) nil)
                   (let ((ctran (make-ctran)))
                     (with-ir1-environment-from-node node
-                      (ir1-convert (node-prev node) ctran info
-                                   `(%dynamic-extent-start))
-                      (link-node-to-previous-ctran node ctran))))))))
+                      (cond ((memq info stack)
+                             (let ((preserve (make-lvar))
+                                   (2preserve
+                                     (make-ir2-lvar *backend-t-primitive-type*)))
+                               (ir1-convert (node-prev node) ctran preserve
+                                            '(%preserve-dynamic-extent))
+                               (setf (lvar-info preserve) 2preserve)
+                               (setf (ir2-lvar-kind 2preserve) :stack)
+                               (setf (lvar-dynamic-extent preserve) dynamic-extent)
+                               (setf (lvar-dest preserve) dynamic-extent)
+                               (push preserve
+                                     (dynamic-extent-preserve-info dynamic-extent))))
+                            (t
+                             (ir1-convert (node-prev node) ctran info
+                                          '(%dynamic-extent-start))
+                             (push info stack))))
+                    (link-node-to-previous-ctran node ctran)))))))
         (when (entry-p node)
           (dolist (nlx-info (cleanup-nlx-info (entry-cleanup node)))
             (stack-mess-up-walk (nlx-info-target nlx-info) stack)))))
