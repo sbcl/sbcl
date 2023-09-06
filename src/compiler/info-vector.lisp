@@ -757,6 +757,7 @@ This is interpreted as
 ;; (compared by EQ) when there was one, then no globaldb update is made.
 (defun %atomic-set-info-value (name info-number new-value-fun)
   (declare (function new-value-fun))
+  (declare (dynamic-extent new-value-fun))
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
   (when (pcl-methodfn-name-p name)
@@ -800,6 +801,7 @@ This is interpreted as
 ;; followed up by a double-checking get-or-set operation. It is assumed that
 ;; the user of this already did an initial check, if such is warranted.
 (defun %get-info-value-initializing (info-number name creation-thunk)
+  (declare (dynamic-extent creation-thunk))
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name))
