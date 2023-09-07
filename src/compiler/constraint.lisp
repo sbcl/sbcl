@@ -1292,25 +1292,23 @@
          (add-eq-constraint var (set-value node) gen)))
       (combination
        (when (eq (combination-kind node) :known)
+         (let ((lvar (node-lvar node)))
+           (when lvar
+             (add-var-result-constraints lvar lvar gen)))
          (binding* ((info (combination-fun-info node) :exit-if-null)
                     (propagate (fun-info-constraint-propagate info)
                                :exit-if-null)
                     (constraints (funcall propagate node gen))
                     (register (if (policy node
-                                          (> compilation-speed speed))
+                                      (> compilation-speed speed))
                                   #'conset-add-constraint
                                   #'conset-add-constraint-to-eql)))
            (map nil (lambda (constraint)
-                      (if (eq (car constraint) 'equality)
-                          (destructuring-bind (op x y &optional not-p) (cdr constraint)
-                            (when (and op x y)
-                              (conset-add-equality-constraint gen op x y not-p)))
-                          (destructuring-bind (kind x y &optional not-p)
-                              constraint
-                            (when (and kind x y)
-                              (funcall register gen
-                                       kind x y
-                                       not-p)))))
+                      (destructuring-bind (kind x y &optional not-p) constraint
+                        (when (and kind x y)
+                          (funcall register gen
+                                   kind x y
+                                   not-p))))
                 constraints))))))
   gen)
 

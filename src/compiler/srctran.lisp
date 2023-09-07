@@ -3413,6 +3413,20 @@
            (- (logand (- x) ,mask))
            (logand x ,mask)))))
 
+(defoptimizer (truncate constraint-propagate)
+    ((x y) node gen)
+  (when (csubtypep (lvar-type y) (specifier-type 'rational))
+    (let ((var (ok-lvar-lambda-var y gen)))
+      (when var
+        (list (list 'typep var (specifier-type '(eql 0)) t))))))
+
+(defoptimizer (/ constraint-propagate)
+    ((x y) node gen)
+  (when (csubtypep (lvar-type y) (specifier-type 'rational))
+    (let ((var (ok-lvar-lambda-var y gen)))
+      (when var
+        (list (list 'typep var (specifier-type '(eql 0)) t))))))
+
 ;;; Return an expression to calculate the integer quotient of X and
 ;;; constant Y, using multiplication, shift and add/sub instead of
 ;;; division. Both arguments must be unsigned, fit in a machine word and
