@@ -176,9 +176,10 @@
     (let ((2comp (component-info (block-component block))))
       (do-nodes (node lvar block)
         (let ((dynamic-extent
-                (if (enclose-p node)
-                    (enclose-dynamic-extent node)
-                    (and lvar (lvar-dynamic-extent lvar)))))
+                (typecase node
+                  (enclose (enclose-dynamic-extent node))
+                  (cdynamic-extent node)
+                  (t (and lvar (lvar-dynamic-extent lvar))))))
           (when dynamic-extent
             (let ((info (dynamic-extent-info dynamic-extent)))
               (when info
