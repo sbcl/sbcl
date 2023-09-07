@@ -202,9 +202,7 @@
                                (setf (lvar-info preserve) 2preserve)
                                (setf (ir2-lvar-kind 2preserve) :stack)
                                (setf (lvar-dynamic-extent preserve) dynamic-extent)
-                               (setf (lvar-dest preserve) dynamic-extent)
-                               (push preserve
-                                     (dynamic-extent-preserve-info dynamic-extent))))
+                               (setf (lvar-dest preserve) dynamic-extent)))
                             (t
                              (ir1-convert (node-prev node) ctran info
                                           '(%dynamic-extent-start)))))
