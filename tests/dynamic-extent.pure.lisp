@@ -2065,7 +2065,7 @@
                         (print x)
                         (list 1 2)))))
          (declare (dynamic-extent v))
-         (elt v a)))
+         (copy-list (elt v a))))
      ((1) '(1 2)))))
 
 (with-test (:name :dynamic-extent-setq-nested)
