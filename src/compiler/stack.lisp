@@ -147,7 +147,12 @@
           (pop end-stack))
         (dolist (push (ir2-block-pushed 2block))
           (aver (not (memq push end-stack)))
-          (push push end-stack))
+          (unless (and (lvar-dynamic-extent push)
+                       ;; Double-check for interleavedness.
+                       (eq (car end-stack)
+                           (dynamic-extent-info
+                            (lvar-dynamic-extent push))))
+            (push push end-stack)))
         (aver (subsetp (ir2-block-end-stack 2block) end-stack))
         (when (and tailp-lvar
                    (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))

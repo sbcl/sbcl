@@ -2107,3 +2107,33 @@
          nil))
      ((t) nil)
      ((nil) nil))))
+
+(with-test (:name :dynamic-extent-preserve.unreferenced-tn)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (b)
+       (let ((v nil))
+         (declare (dynamic-extent v))
+         (case b
+           (0 (setq v (vector 3)))
+           (1 (setq v (vector 0 (let ((x (cons 1 2)))
+                                  (declare (dynamic-extent x))
+                                  (print-nothing x)
+                                  2)))))
+         (elt v 0)))
+     ((0) 3)
+     ((1) 0))))
+
+(with-test (:name :dynamic-extent-preserve.heap-exhaustion)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (a b c)
+       (let ((v nil))
+         (declare (dynamic-extent v))
+         (case a
+           (0 (setq v (list (prog2 b (restart-bind nil -17607) c) 17632849286127)))
+           (1 (setq v (list -17532189700714087747 b c))))
+         (case a (0 (elt v 1)) (1 (elt v 2)))))
+     ((1 2 3) 3))))
