@@ -16,8 +16,7 @@
 ;;; to CALL-WITH-FOO less ugly.
 (defmacro dx-flet (functions &body forms)
   `(flet ,functions
-     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
-               ,@(mapcar (lambda (func) `#',(car func)) functions)))
+     (declare (dynamic-extent ,@(mapcar (lambda (func) `#',(car func)) functions)))
      ,@forms))
 
 ;;; Another similar one.
