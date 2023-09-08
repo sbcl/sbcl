@@ -1760,28 +1760,25 @@
     (vop reset-stack-pointer node block
          (first (ir2-lvar-locs 2lvar)))))
 
+;;; MOVED is in reverse order.
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
                                                       &rest moved)
                                          node block)
-  (let* ( ;; pointer immediately after the nipped block
+  (let* (;; pointer immediately after the nipped block
          (after (lvar-value last-nipped))
          (2after (lvar-info after))
          ;; pointer to the first nipped word
          (first (lvar-value last-preserved))
          (2first (lvar-info first))
 
-         (moved-tns (loop for lvar-ref in moved
-                          for lvar = (lvar-value lvar-ref)
-                          for 2lvar = (lvar-info lvar)
-                                        ;when 2lvar
-                          collect (first (ir2-lvar-locs 2lvar)))))
+         (moved-tns '()))
+    (dolist (moved-lvar moved)
+      (let ((2lvar (lvar-info (lvar-value moved-lvar))))
+        ;; we cannot move stack-allocated DX objects
+        (aver (eq (ir2-lvar-kind 2lvar) :unknown))
+        (push (first (ir2-lvar-locs 2lvar)) moved-tns)))
     (aver (memq (ir2-lvar-kind 2after) '(:unknown :stack)))
     (aver (eq (ir2-lvar-kind 2first) :unknown))
-    (when *check-consistency*
-      ;; we cannot move stack-allocated DX objects
-      (dolist (moved-lvar moved)
-        (aver (eq (ir2-lvar-kind (lvar-info (lvar-value moved-lvar)))
-                  :unknown))))
     (vop* %%nip-values node block
           ((first (ir2-lvar-locs 2after))
            (first (ir2-lvar-locs 2first))
