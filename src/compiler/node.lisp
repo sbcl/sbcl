@@ -693,13 +693,8 @@
 (defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (lambda (missing-arg) :type clambda :read-only t)
-  ;; This ultimately converges to a list of all the LAMBDA-VARs and
-  ;; NLX-INFOs needed from enclosing environments by code in this
-  ;; environment. In the meantime, it may be
-  ;;   * NIL at object creation time
-  ;;   * a superset of the correct result, generated somewhat later
-  ;;   * smaller and smaller sets converging to the correct result as
-  ;;     we notice and delete unused elements in the superset
+  ;; a list of all the LAMBDA-VARs and NLX-INFOs needed from enclosing
+  ;; environments by code in this environment.
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
   ;; into this environment
