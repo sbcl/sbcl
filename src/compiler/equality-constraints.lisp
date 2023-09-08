@@ -78,7 +78,7 @@
       (conset-adjoin (find-or-create-equality-constraint 'eq var var2 nil) gen))))
 
 (defun vector-length-var-p (lvar constraints)
-  (let* ((use (principal-lvar-ref-use lvar))
+  (let* ((use (principal-lvar-use lvar))
          (array-lvar
            (and (combination-p use)
                 (lvar-fun-is (combination-fun use)
@@ -126,7 +126,19 @@
          (case from
            ((< <=) '>))
          (case from
-           ((> >= . #.+eq-ops+) '>))))))
+           ((> >= . #.+eq-ops+) '>))))
+    (<=
+     (if not-p
+         (case from
+           ((> >=) '<=))
+         (case from
+           ((< <= . #.+eq-ops+) '<=))))
+    (>=
+     (if not-p
+         (case from
+           ((< <=) '>=))
+         (case from
+           ((> >= . #.+eq-ops+) '>=))))))
 
 (defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints)
   (let* ((constant-x (and (lvar-p first)
@@ -211,8 +223,7 @@
                                     (not (constant-p x)))
                            (add x-type in-y inherit nil)))))))))
         (inherit x y x-type operator)
-        (unless constant-y
-          (inherit y x y-type (invert-operator operator)))
+        (inherit y x y-type (invert-operator operator))
         (when (lvar-p y)
           (loop for (in-op in-lvar) in (lvar-result-constraints y)
                 do
@@ -550,16 +561,61 @@
 
 (defun lvar-result-constraints (lvar)
   (let ((uses (lvar-uses lvar)))
-    (when (combination-p uses)
-      (binding* ((info (combination-fun-info uses) :exit-if-null)
-                 (propagate (fun-info-constraint-propagate-result info)
-                            :exit-if-null))
-        (funcall propagate uses)))))
+    (cond ((combination-p uses)
+           (binding* ((info (combination-fun-info uses) :exit-if-null)
+                      (propagate (fun-info-constraint-propagate-result info)
+                                 :exit-if-null))
+             (funcall propagate uses)))
+          ((proper-list-of-length-p uses 2)
+           (let (r)
+               ;; Detect MIN/MAX variables.
+               (destructuring-bind (ref1 ref2) uses
+                 (when (and (ref-p ref1) (ref-p ref2))
+                   (let ((var1 (ref-leaf ref1))
+                         (var2 (ref-leaf ref2)))
+                     (when (and (lambda-var-p var1)
+                                (lambda-var-p var2))
+                       (labels ((normalize-not (op not)
+                                  (if not
+                                      (case op
+                                        (< '>=)
+                                        (> '<=))
+                                      op))
+                                (relations (x y con)
+                                  (cond ((vector-constraint-eq-p (constraint-x con) x)
+                                         (and (vector-constraint-eq-p (constraint-y con) y)
+                                              (normalize-not (equality-constraint-operator con)
+                                                             (equality-constraint-not-p con))))
+                                        ((vector-constraint-eq-p (constraint-y con) x)
+                                         (and (vector-constraint-eq-p (constraint-x con) y)
+                                              (normalize-not (invert-operator (equality-constraint-operator con))
+                                                             (equality-constraint-not-p con))))))
+                                (find-constraint (var1 var2 ref)
+                                  (loop for con in (ref-constraints ref)
+                                        do (multiple-value-bind (op not)
+                                               (relations var1 var2 con)
+                                             (when op
+                                               (return (values op not)))))))
+                         (let ((op1 (find-constraint var1 var2 ref1))
+                               (op2 (find-constraint var2 var1 ref2)))
+                           (case op1
+                             ((< <=) (and (memq op2 '(<= <))
+                                          (push (list '<= var1) r)
+                                          (push (list '<= var2) r)))
+                             ((> >=) (and (memq op2 '(> >=))
+                                          (push (list '>= var1) r)
+                                          (push (list '>= var2) r))))))))
+
+                   r)))))))
 
 (defun add-var-result-constraints (var lvar constraints &optional (target constraints))
   (loop for (operator second) in (lvar-result-constraints lvar)
         do
-        (add-equality-constraint operator var second constraints target nil)))
+        (add-equality-constraint operator var second constraints target nil))
+  (when (lambda-var-p var)
+    (let ((vector-length (vector-length-var-p lvar constraints)))
+      (when vector-length
+        (conset-add-equality-constraint target 'eq var vector-length nil)))))
 
 (defoptimizer (- constraint-propagate-result) ((a b) node)
   (and (csubtypep (lvar-type a) (specifier-type 'integer))

@@ -124,6 +124,29 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              0)))
 
+
+(with-test (:name :bounds-check-min-length)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x v)
+                        (declare (integer x)
+                                 (simple-vector v)
+                                 (optimize (debug 2)))
+                        (loop for i below (min x (1- (length v)))
+                              sum (aref v i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0))
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x v)
+                        (declare (integer x)
+                                 (simple-vector v)
+                                 (optimize (debug 1)))
+                        (loop for i below (min x (length v))
+                              sum (aref v i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0)))
+
 (with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda ()
