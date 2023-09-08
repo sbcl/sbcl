@@ -264,7 +264,7 @@ void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
 unsigned int
 arch_install_breakpoint(void *pc)
 {
-    unsigned int result = *(unsigned int*)pc;
+    unsigned int result = UNALIGNED_LOAD32(pc);
 #ifdef LISP_FEATURE_INT4_BREAKPOINTS
     *(char*)pc = INTO_INST;
 #else
@@ -417,7 +417,7 @@ sigill_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *siginfo,
                os_context_t *context) {
     unsigned char* pc = (void*)OS_CONTEXT_PC(context);
-    if (*(unsigned short *)pc == UD2_INST) {
+    if (UNALIGNED_LOAD16(pc) == UD2_INST) {
         OS_CONTEXT_PC(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
     }

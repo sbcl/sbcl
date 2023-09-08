@@ -12,8 +12,15 @@
 #ifndef _SBCL_UNALIGNED_H_
 #define _SBCL_UNALIGNED_H_
 
+#include <stdint.h>
+
 // For CPUs that can do unaligned memory operations, the C compiler
 // is generally smart enough to not actually do a memcpy()
+static inline uint16_t UNALIGNED_LOAD16(void* p) {
+    uint16_t val;
+    memcpy(&val, p, 2);
+    return val;
+}
 static inline uint32_t UNALIGNED_LOAD32(void* p) {
     uint32_t val;
     memcpy(&val, p, 4);
