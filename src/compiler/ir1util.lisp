@@ -2197,7 +2197,7 @@ is :ANY, the function name is not checked."
 ;;; whether to substitute
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
-  #-sb-xc-host (declare (dynamic-extent test)) ; "unable"
+  (declare (dynamic-extent test))
   (dolist (ref (leaf-refs old-leaf))
     (when (funcall test ref)
       (change-ref-leaf ref new-leaf)))
@@ -2695,16 +2695,6 @@ is :ANY, the function name is not checked."
         return nil
         do (setf lvar (combination-lvar dest))
         finally (return t)))
-
-;;; True if the optional has a rest-argument.
-(defun optional-rest-p (opt)
-  (dolist (var (optional-dispatch-arglist opt) nil)
-    (let* ((info (when (lambda-var-p var)
-                   (lambda-var-arg-info var)))
-           (kind (when info
-                   (arg-info-kind info))))
-      (when (eq :rest kind)
-        (return t)))))
 
 ;;; Don't substitute single-ref variables on high-debug / low speed,
 ;;; to improve the debugging experience, unless it is a special
