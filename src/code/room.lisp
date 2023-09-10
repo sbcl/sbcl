@@ -1267,7 +1267,8 @@ We could try a few things to mitigate this:
          ;; gen0 conses on MIXED pages, but even that is not enough- pinned conses
          ;; will promote but keep their MIXED page type. So don't bother with this.
          #+use-cons-region
-         (let* ((type (slot (deref page-table (find-page-index obj-addr)) 'flags))
+         (let* ((type (logandc2 (slot (deref page-table (find-page-index obj-addr)) 'flags)
+                                32)) ; OPEN_REGION_PAGE_FLAG (due to finalizer thread perhaps)
                 (ok (if (consp obj)
                         (or (= type #b101) ; PAGE_TYPE_CONS
                             (and (eq (car obj) 0) (eq (cdr obj) 0)))
