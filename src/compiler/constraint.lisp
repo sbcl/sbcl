@@ -457,7 +457,6 @@
       `(flet ((body (,symbol)
                 (declare (type constraint ,symbol))
                 ,@body))
-         (declare (inline body))
          (when ,constraints
            (let ((,min (conset-min ,conset))
                  (,max (conset-max ,conset)))
