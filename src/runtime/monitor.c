@@ -234,7 +234,7 @@ static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, catchers_cmd;
-static cmd threads_cmd, findpath_cmd;
+static cmd threads_cmd, findpath_cmd, layouts_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
 static void suspend_other_threads() {
@@ -400,6 +400,7 @@ static struct cmd {
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
+    {"layouts", "Dump LAYOUT instance.", layouts_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
     {"pte", "Page table entry for address", pte_cmd},
@@ -802,6 +803,70 @@ catchers_cmd(char __attribute__((unused)) **ptr)
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;
         }
+    }
+    return 0;
+}
+
+struct layout_collection {
+    struct cons* list;
+    int passno;
+};
+static int count_layout_occurs(lispobj x, struct cons* list)
+{
+    int ct = 0;
+    for ( ; list ; list = (void*)list->cdr ) if (list->car == x) ++ct;
+    return ct;
+}
+
+static uword_t display_layouts(lispobj* where, lispobj* limit, uword_t arg)
+{
+    extern struct vector * classoid_name(lispobj * classoid);
+    struct layout_collection *lc = (void*)arg;
+    where = next_object(where, 0, limit); /* find first marked object */
+    for ( ; where ; where = next_object(where, object_size(where), limit) ) {
+        if (widetag_of(where) == INSTANCE_WIDETAG &&
+            instance_layout(where) != 0 &&
+            layout_depth2_id(LAYOUT(instance_layout(where))) == LAYOUT_LAYOUT_ID) {
+            struct layout* l = (void*)where;
+            struct classoid* c = (void*)native_pointer(l->classoid);
+            if (lc->passno == 1) {
+                // on the first pass, just collect the classoids;
+                struct cons* cons = malloc(sizeof (struct cons));
+                cons->car = (lispobj)c;
+                cons->cdr = (lispobj)lc->list;
+                lc->list = cons;
+            } else {
+                // print some information preceded by a '*' if more than one
+                // layout points to the classoid of this layout
+                int count = count_layout_occurs((lispobj)c, lc->list);
+                struct vector* v = classoid_name((lispobj*)c);
+                char* name =
+                  header_widetag(v->header)==SIMPLE_BASE_STRING_WIDETAG ? (char*)v->data : "?";
+                fprintf(stderr, "%c %p %16" OBJ_FMTX " %16" OBJ_FMTX " %p %" OBJ_FMTX " %s\n",
+                        count>1 ? '*' : ' ', l, l->clos_hash, l->uw_id_word0,
+                        c, l->invalid, name);
+
+            }
+        }
+    }
+   return 0;
+}
+
+static int layouts_cmd(char __attribute__((unused)) **ptr)
+{
+    fprintf(stderr, "Dup, Layout, Hash, ID_Word, Classoid, Invalid, Name\n");
+    struct layout_collection lc;
+    lc.list = 0;
+    for (lc.passno = 1; lc.passno <= 2; ++lc.passno) {
+        walk_generation(display_layouts, -1, (uword_t)&lc);
+        display_layouts((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer,
+                        (uword_t)&lc);
+    }
+    struct cons* l = lc.list;
+    while (l) {
+        struct cons* next = (struct cons*)l->cdr;
+        free(l);
+        l = next;
     }
     return 0;
 }
