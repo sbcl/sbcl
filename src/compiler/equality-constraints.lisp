@@ -308,11 +308,13 @@
                      (constant-p in-y)
                      (let ((a (constant-value in-y))
                            (b (constant-value y)))
-                       (case op
-                         (< (unless not-p
-                              (sb-xc:< a b)))
-                         (> (unless not-p
-                              (sb-xc:> a b)))))))
+                       (and (numberp a)
+                            (numberp b)
+                            (case op
+                              (< (unless not-p
+                                   (sb-xc:< a b)))
+                              (> (unless not-p
+                                   (sb-xc:> a b))))))))
         (funcall function (if invert
                               (invert-operator op)
                               op)
