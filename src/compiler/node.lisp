@@ -1433,9 +1433,7 @@
   ;; The leaf referenced.
   (leaf nil :type leaf)
   ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
-  (%source-name (missing-arg) :type symbol :read-only t)
-  ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
-  (constraints nil))
+  (%source-name (missing-arg) :type symbol :read-only t))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)

@@ -507,9 +507,6 @@
            (body-fun con))
          (do-conset-constraints-intersection
              (con (,conset (lambda-var-inheritable-constraints ,variable)) ,result)
-           (body-fun con))
-         (do-conset-constraints-intersection
-             (con (,conset (lambda-var-equality-constraints ,variable)) ,result)
            (body-fun con))))))
 
 (declaim (inline conset-lvar-lambda-var-eql-p conset-add-lvar-lambda-var-eql))
@@ -1120,29 +1117,6 @@
                (other (if (eq x leaf) y x))
                (kind (constraint-kind con)))
           (case kind
-            (equality
-             (unless (eq (ref-constraints ref)
-                         (pushnew con (ref-constraints ref)))
-               (labels ((reoptimize (node)
-                          (when (valued-node-p node)
-                            (let ((lvar (node-lvar node))
-                                  (principal-lvar (nth-value 1 (principal-lvar-end (node-lvar ref)))))
-                              (reoptimize-lvar lvar)
-                              (unless (eq lvar principal-lvar)
-                                (reoptimize-lvar principal-lvar)))))
-                        (try (x y)
-                          (when (and (vector-length-constraint-p x)
-                                     (eq (vector-length-constraint-var x) leaf))
-                            (when (and (constant-p y)
-                                       (not not-p)
-                                       (eq (equality-constraint-operator con) 'eq)
-                                       (not (types-equal-or-intersect res (specifier-type '(not simple-array)))))
-                              (setf res (type-intersection res (specifier-type `(simple-array * (,(constant-value y)))))))
-                            (reoptimize (node-dest ref))
-                            t)))
-                 (or (try x y)
-                     (try y x)
-                     (reoptimize ref)))))
             (typep
              (if not-p
                  (if (member-type-p other)
@@ -1292,24 +1266,26 @@
          (add-eq-constraint var (set-value node) gen)))
       (combination
        (when (eq (combination-kind node) :known)
-         (let ((lvar (node-lvar node)))
-           (when lvar
-             (add-var-result-constraints lvar lvar gen)))
-         (binding* ((info (combination-fun-info node) :exit-if-null)
-                    (propagate (fun-info-constraint-propagate info)
-                               :exit-if-null)
-                    (constraints (funcall propagate node gen))
-                    (register (if (policy node
-                                      (> compilation-speed speed))
-                                  #'conset-add-constraint
-                                  #'conset-add-constraint-to-eql)))
-           (map nil (lambda (constraint)
-                      (destructuring-bind (kind x y &optional not-p) constraint
-                        (when (and kind x y)
-                          (funcall register gen
-                                   kind x y
-                                   not-p))))
-                constraints))))))
+         (unless (and preprocess-refs-p
+                      (try-equality-constraint node gen))
+           (let ((lvar (node-lvar node)))
+             (when lvar
+               (add-var-result-constraints lvar lvar gen)))
+           (binding* ((info (combination-fun-info node) :exit-if-null)
+                      (propagate (fun-info-constraint-propagate info)
+                                 :exit-if-null)
+                      (constraints (funcall propagate node gen))
+                      (register (if (policy node
+                                        (> compilation-speed speed))
+                                    #'conset-add-constraint
+                                    #'conset-add-constraint-to-eql)))
+             (map nil (lambda (constraint)
+                        (destructuring-bind (kind x y &optional not-p) constraint
+                          (when (and kind x y)
+                            (funcall register gen
+                                     kind x y
+                                     not-p))))
+                  constraints)))))))
   gen)
 
 (defun constraint-propagate-if (block gen)

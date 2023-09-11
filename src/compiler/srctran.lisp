@@ -4140,13 +4140,8 @@
 (deftransform equal ((x y) * *)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
-        (y-type (lvar-type y))
-        (constraint (or (find-ref-equality-constraint 'eql x y)
-                        (find-ref-equality-constraint 'eq x y))))
-    (cond ((and constraint
-                (not (constraint-not-p constraint)))
-           t)
-          ((same-leaf-ref-p x y) t)
+        (y-type (lvar-type y)))
+    (cond ((same-leaf-ref-p x y) t)
           ((array-type-dimensions-mismatch x-type y-type)
            nil)
           (t
@@ -4228,13 +4223,8 @@
 (deftransform equalp ((x y) * *)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
-        (y-type (lvar-type y))
-        (constraint (or (find-ref-equality-constraint 'eql x y)
-                        (find-ref-equality-constraint 'eq x y))))
-    (cond ((and constraint
-                (not (constraint-not-p constraint)))
-           t)
-          ((same-leaf-ref-p x y) t)
+        (y-type (lvar-type y)))
+    (cond ((same-leaf-ref-p x y) t)
           ((array-type-dimensions-mismatch x-type y-type)
            nil)
           (t

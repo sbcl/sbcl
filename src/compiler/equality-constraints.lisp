@@ -77,7 +77,7 @@
     (when var2
       (conset-adjoin (find-or-create-equality-constraint 'eq var var2 nil) gen))))
 
-(defun vector-length-var-p (lvar constraints)
+(defun vector-length-var-p (lvar constraints &optional simple)
   (let* ((use (principal-lvar-use lvar))
          (array-lvar
            (and (combination-p use)
@@ -85,6 +85,8 @@
                              '(vector-length length))
                 (car (combination-args use))))
          (array-var (and array-lvar
+                         (or (not simple)
+                             (csubtypep (lvar-type array-lvar) (specifier-type 'simple-array)))
                          (ok-lvar-lambda-var array-lvar constraints))))
     (and array-var
          (make-vector-length-constraint array-var))))
@@ -100,8 +102,8 @@
            (eq (vector-length-constraint-var con1)
                (vector-length-constraint-var con2)))))
 
-(defun ok-lvar-lambda-var/vector-length (lvar constraints)
-  (or (vector-length-var-p lvar constraints)
+(defun ok-lvar-lambda-var/vector-length (lvar constraints &optional simple)
+  (or (vector-length-var-p lvar constraints simple)
       (ok-lvar-lambda-var lvar constraints)))
 
 (defun lambda-var/vector-length-p (x)
@@ -264,300 +266,284 @@
                                               (constraint-not-p con))
           target))))))
 
-
-(defun find-ref-equality-constraint (operator lvar1 lvar2 &optional (commutative t))
-  (flet ((ref (lvar)
-           (let ((use (principal-lvar-use lvar)))
-             (cond ((ref-p use)
-                    (if (constant-lvar-p lvar)
-                        (values (nth-value 1 (lvar-value lvar)) nil)
-                        (values use nil)))
-                   ((and (combination-p use)
-                         (lvar-fun-is (combination-fun use)
-                                      '(vector-length length)))
-                    (let ((arg (car (combination-args use))))
-                      (and (csubtypep (lvar-type arg) (specifier-type 'simple-array))
-                           (let ((use (principal-lvar-use arg)))
-                             (and (ref-p use)
-                                  (values use t)))))))))
-         (constraint-eq-p (ref leaf vector-length-p x)
-           (cond (vector-length-p
-                  (and (vector-length-constraint-p x)
-                       (eq (vector-length-constraint-var x) leaf)))
-                 ((eq leaf x))
-                 ((and (lvar-p x)
-                       (ref-p ref))
-                  (eq (principal-lvar-ref-use (node-lvar ref))
-                      (lvar-uses x))))))
-    (multiple-value-bind (ref1 vector-length-p1) (ref lvar1)
-      (multiple-value-bind (ref2 vector-length-p2) (ref lvar2)
-        (cond ((and (ref-p ref1) ref2))
-              ((and (ref-p ref1) (not ref2))
-               (setf ref2 lvar2))
-              ((and (ref-p ref2) (not ref1))
-               (rotatef vector-length-p1 vector-length-p2)
-               (setf ref1 ref2
-                     ref2 lvar1
-                     operator (invert-operator operator)))
-              (t
-               (return-from find-ref-equality-constraint)))
-        (let ((leaf1 (ref-leaf ref1))
-              (leaf2 (cond ((constant-p ref2)
-                            ref2)
-                           ((lvar-p ref2) ref2)
-                           (t
-                            (ref-leaf ref2)))))
-          (flet ((find-constraint (ref)
-                   (loop for con in (ref-constraints ref)
-                         when (and (equality-constraint-p con)
-                                   (or
-                                    (and (eq (equality-constraint-operator con) operator)
-                                         (or (and (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-x con))
-                                                  (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-y con)))
-                                             (and commutative
-                                                  (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
-                                                  (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
-                                    (and (eq (equality-constraint-operator con)
-                                             (invert-operator operator))
-                                         (constraint-eq-p ref2 leaf2 vector-length-p2 (constraint-x con))
-                                         (constraint-eq-p ref1 leaf1 vector-length-p1 (constraint-y con)))))
-                         return con))
-                 (has-sets (leaf)
-                   (and (lambda-var-p leaf)
-                        (lambda-var-sets leaf))))
-            (let ((ref1-con (find-constraint ref1)))
-              (cond (ref1-con
-                     (when (and
-                            ;; If the variables are set both references
-                            ;; need to have the same constraint, otherwise
-                            ;; one of the references may be done before the
-                            ;; set.
-                            (or (constant-p leaf2)
-                                (lvar-p leaf2)
-                                (and (not (has-sets leaf1))
-                                     (not (has-sets leaf2)))
-                                (eq ref1-con (find-constraint ref2))))
-                       ref1-con))
-                    ((ref-p ref2)
-                     (let ((ref2-con (find-constraint ref2)))
-                       (when (and ref2-con
-                                  (or (constant-p leaf1)
-                                      (lvar-p leaf1)
-                                      (and (not (has-sets leaf1))
-                                           (not (has-sets leaf2)))))
-                         ref2-con)))))))))))
-
-(defun try-equality-constraint (call)
+(defun try-equality-constraint (call gen)
   (let ((constraint (fun-info-equality-constraint (basic-combination-fun-info call)))
         (lvar (node-lvar call)))
-    (when (and constraint
-               lvar)
-      (let ((result (funcall constraint call)))
+    (when constraint
+      (let ((result (funcall constraint call gen)))
         (unless (eq result :give-up)
-          (replace-combination-with-constant result call)
+          (when lvar
+            (replace-combination-with-constant result call))
           t)))))
 
-(defmacro equality-constraint (operator &optional type (commutative t))
-  `(let ((constraint (find-ref-equality-constraint ',operator x y ,commutative)))
-     ,(ecase type
-        ((nil)
-         `(when constraint
-            (setf result (not (constraint-not-p constraint)))
-            t))
-        (true
-         `(when (and constraint
-                     (not (constraint-not-p constraint)))
-            (setf result t)))
-        (false
-         `(when (and constraint
-                     (constraint-not-p constraint))
-            (setf result nil)
-            t))
-        (not-true
-         `(when (and constraint
-                     (constraint-not-p constraint))
-            (setf result t)
-            t))
-        (inverse-true
-         `(when (and constraint
-                     (not (constraint-not-p constraint)))
-            (setf result nil)
-            t))
-        (inverse
-         `(when constraint
-            (setf result (constraint-not-p constraint))
-            t)))))
+(defun map-equality-constraints (x y constraints
+                                 function)
+  (let* ((constant-x (and (lvar-p x)
+                          (constant-lvar-p x)))
+         (constant-y (and (lvar-p y)
+                          (constant-lvar-p y)))
+         (x (cond (constant-x
+                   (nth-value 1 (lvar-value x)))
+                  ((lambda-var/vector-length-p x)
+                   x)
+                  ((ok-lvar-lambda-var/vector-length x constraints t))
+                  (t
+                   x)))
+         (y (cond (constant-y
+                   (nth-value 1 (lvar-value y)))
+                  ((ok-lvar-lambda-var/vector-length y constraints t))
+                  (t
+                   y)))
+         (invert))
+    (unless (lambda-var/vector-length-p x)
+      (unless (lambda-var/vector-length-p y)
+        (return-from map-equality-constraints))
 
-(defoptimizer (eql equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint eq true)
-     (equality-constraint eql)
-     (equality-constraint char=)
-     (equality-constraint two-arg-char-equal false)
-     (equality-constraint > inverse-true)
-     (equality-constraint < inverse-true)
-     (equality-constraint = false)
-     (equality-constraint <= false)
-     (equality-constraint >= false))
-    result))
+      (rotatef x y)
+      (rotatef constant-x constant-y)
+      (setf invert t))
+    (do-equality-constraints (in-y op not-p) x constraints
+      (when (or (vector-constraint-eq-p in-y y)
+                (and constant-y
+                     (constant-p in-y)
+                     (let ((a (constant-value in-y))
+                           (b (constant-value y)))
+                       (case op
+                         (< (unless not-p
+                              (sb-xc:< a b)))
+                         (> (unless not-p
+                              (sb-xc:> a b)))))))
+        (funcall function (if invert
+                              (invert-operator op)
+                              op)
+                 not-p)))))
 
-(defoptimizer (eq equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint eq)
-     (equality-constraint eql)
-     (equality-constraint char=)
-     (equality-constraint two-arg-char-equal false)
-     (equality-constraint > inverse-true)
-     (equality-constraint < inverse-true)
-     (equality-constraint = false)
-     (equality-constraint <= false)
-     (equality-constraint >= false))
-    result))
+(defoptimizer (eql equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  ((eql char=)
+                                   (return (not not-p)))
+                                  (eq
+                                   (unless not-p
+                                     (return t)))
+                                  ((> <)
+                                   (unless not-p
+                                     (return nil)))
+                                  ((= <= >= two-arg-char-equal)
+                                   (when not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (= equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint =)
-     (equality-constraint eq true)
-     (equality-constraint eql true)
-     (equality-constraint > inverse-true)
-     (equality-constraint < inverse-true)
-     (equality-constraint <= false)
-     (equality-constraint >= false))
-    result))
+(defoptimizer (eq equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  ((eq eql char=)
+                                   (return (not not-p)))
+                                  ((> <)
+                                   (unless not-p
+                                     (return nil)))
+                                  ((= <= >= two-arg-char-equal)
+                                   (when not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (char= equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint char=)
-     (equality-constraint eq)
-     (equality-constraint eql)
-     (equality-constraint two-arg-char-equal false))
-    result))
+(defoptimizer (= equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (=
+                                   (return (not not-p)))
+                                  ((eq eql)
+                                   (unless not-p
+                                     (return t)))
+                                  ((< >)
+                                   (unless not-p
+                                     (return nil)))
+                                  ((<= >=)
+                                   (when not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (two-arg-char-equal equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint two-arg-char-equal)
-     (equality-constraint char= true)
-     (equality-constraint eq true)
-     (equality-constraint eql true))
-    result))
+(defoptimizer (char= equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  ((char= eq eql)
+                                   (return (not not-p)))
+                                  (two-arg-char-equal
+                                   (when not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (> equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint > nil nil)
-     (equality-constraint < inverse-true nil)
-     (equality-constraint eq inverse-true)
-     (equality-constraint eql inverse-true)
-     (equality-constraint = inverse-true)
-     (equality-constraint <= inverse nil)
-     (equality-constraint >= false nil))
-    result))
+(defoptimizer (two-arg-char-equal equality-constraint) ((x y)  node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (two-arg-char-equal
+                                   (return (not not-p)))
+                                  ((char= eq eql)
+                                   (unless not-p
+                                     (return t))))))
+    :give-up))
 
-(defoptimizer (< equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint < nil nil)
-     (equality-constraint > inverse-true nil)
-     (equality-constraint eq inverse-true)
-     (equality-constraint eql inverse-true)
-     (equality-constraint = inverse-true)
-     (equality-constraint >= inverse nil)
-     (equality-constraint <= false nil))
-    result))
+(defoptimizer (> equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (>
+                                   (return (not not-p)))
+                                  (>=
+                                   (when not-p
+                                     (return nil)))
+                                  (<=
+                                   (return not-p))
+                                  ((< . #.+eq-ops+)
+                                   (unless not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (>= equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint >= nil nil)
-     (equality-constraint > true nil)
-     (equality-constraint = true)
-     (equality-constraint < not-true nil)
-     (equality-constraint <= not-true nil))
-    result))
+(defoptimizer (< equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (<
+                                   (return (not not-p)))
+                                  (<=
+                                   (when not-p
+                                     (return nil)))
+                                  (>=
+                                   (return not-p))
+                                  ((> . #.+eq-ops+)
+                                   (unless not-p
+                                     (return nil))))))
+    :give-up))
 
-(defoptimizer (<= equality-constraint) ((x y))
-  (let ((result :give-up))
-    (or
-     (equality-constraint < true nil)
-     (equality-constraint <= nil nil)
-     (equality-constraint = true)
-     (equality-constraint > not-true nil)
-     (equality-constraint >= not-true nil))
-    result))
+(defoptimizer (>= equality-constraint) ((x y)  node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (>=
+                                   (return (not not-p)))
+                                  (<
+                                   (return not-p))
+                                  (<=
+                                   (when not-p
+                                    (return t)))
+                                  (>
+                                   (unless not-p
+                                     (return t)))
+                                  (#.+eq-ops+
+                                   (unless not-p
+                                     (return t))))))
+    :give-up))
 
-(defoptimizer (- equality-constraint) ((x y) node)
-  (let ((integer (specifier-type 'integer)))
-    (when (and (csubtypep (lvar-type x) integer)
-               (csubtypep (lvar-type y) integer))
-      (macrolet ((f (op x y pos)
-                   `(let ((constr (find-ref-equality-constraint ',op ,x ,y nil)))
-                      (when constr
-                        (if (constraint-not-p constr)
-                            ,@(if pos
-                                  `((go GTEZ) (go LTZ))
-                                  `((go LTEZ) (go GTZ)))))))
-                 (derive (type)
+(defoptimizer (<= equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  (<=
+                                   (return (not not-p)))
+                                  (>
+                                   (return not-p))
+                                  (>=
+                                   (when not-p
+                                     (return t)))
+                                  (<
+                                   (unless not-p
+                                     (return t)))
+                                  (#.+eq-ops+
+                                   (unless not-p
+                                     (return t))))))
+    :give-up))
+
+(defoptimizer (- equality-constraint) ((x y) node gen)
+  gen
+  (when (and (csubtypep (lvar-type x) (specifier-type 'integer))
+             (csubtypep (lvar-type y) (specifier-type 'integer)))
+    (block nil
+      (macrolet ((derive (type)
                    `(progn
                       (derive-node-type node (specifier-type ',type))
-                      (go DONE))))
-        (tagbody
-           (f < x y t)
-           (f > x y nil)
-           (f > y x t)
-           (f < y x nil)
-           (go DONE)
-         GTZ
-           (derive (integer (0)))
-         LTZ
-           (derive (integer * (0)))
-         GTEZ
-           (derive (integer 0))
-         LTEZ
-           (derive (integer * 0))
-         DONE))))
+                      (return))))
+        (map-equality-constraints
+         x y gen
+         (lambda (op not-p)
+           (if not-p
+               (case op
+                 (< (derive (integer 0)))   ; >=
+                 (> (derive (integer * 0)))) ; <=
+               (case op
+                 (> (derive (integer (0))))
+                 (< (derive (integer * (0)))))))))))
   :give-up)
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
-  (let ((array-ref (lvar-uses array))
-        (index-ref (lvar-uses index)))
+(defoptimizer (%check-bound equality-constraint) ((array dimension index) node gen)
+  (let ((array-var (ok-lvar-lambda-var array gen)))
+    (when (and array-var
+               (csubtypep (lvar-type array) (specifier-type '(simple-array * (*))))
+               (block nil
+                 (map-equality-constraints (make-vector-length-constraint array-var) index gen
+                                           (lambda (op not-p)
+                                             (when (and (eq op '>)
+                                                        (not not-p))
+                                               (return t))))))
+      ;; It's in bounds but it may be of the wrong type
+      (transform-call node
+                      `(lambda (array dimension index)
+                         (declare (ignore array dimension))
+                         (the (and fixnum unsigned-byte) index))
+                      '%check-bound)))
+  :give-up)
 
-    (unless (and
-             (ref-p array-ref)
-             (ref-p index-ref)
-             (or
-              (let* ((index-leaf (ref-leaf index-ref))
-                     (index-value (and (constant-p index-leaf)
-                                       (constant-value index-leaf)))
-                     (index-value (and (integerp index-value)
-                                       index-value)))
-                (flet ((matches-p (operator constraint x-p)
-                         (and (eq (equality-constraint-operator constraint) operator)
-                              (null (equality-constraint-not-p constraint))
-                              (eq (if x-p
-                                      (constraint-x constraint)
-                                      (constraint-y constraint))
-                                  index-leaf))))
-                  (or
-                   (loop for constraint in (ref-constraints array-ref)
-                         for y = (constraint-y constraint)
-                         thereis (and
-                                  (eq (constraint-kind constraint) 'equality)
-                                  (if index-value
-                                      (and (eq (equality-constraint-operator constraint) '>)
-                                           (null (equality-constraint-not-p constraint))
-                                           (constant-p y)
-                                           (<= index-value (constant-value y)))
-                                      (or
-                                       (matches-p '< constraint t)
-                                       (matches-p '> constraint nil))))))))))
-      (give-up-ir1-transform)))
-  ;; It's in bounds but it may be of the wrong type
-  `(the (and fixnum unsigned-byte) index))
+(defoptimizer (vector-length equality-constraint) ((vector) node gen)
+  (let (type
+        (vector-var (ok-lvar-lambda-var vector gen)))
+    (when (and vector-var
+               (csubtypep (lvar-type vector) (specifier-type 'simple-array)))
+      (block nil
+        (do-equality-constraints (y op not-p) (make-vector-length-constraint vector-var) gen
+          (let ((constant (and (constant-p y)
+                               (constant-value y))))
+            (cond (constant
+                   (case op
+                     (eq
+                      (unless not-p
+                        (setf type (specifier-type `(eql ,constant)))
+                        (return)))
+                     (>
+                      (let ((p (specifier-type (if not-p
+                                                   `(integer 0 ,constant)
+                                                   `(integer (,constant))))))
+                        (setf type
+                              (if type
+                                  (type-intersection type p)
+                                  p))))
+                     (<
+                      (let ((p (specifier-type (if not-p
+                                                   `(integer ,constant)
+                                                   `(integer 0 (,constant))))))
+                        (setf type
+                              (if type
+                                  (type-intersection type p)
+                                  p))))))
+                  (t
+                   (when (ctype-p y)
+                     (setf type
+                           (type-after-comparison op not-p (or type (specifier-type 'index)) y))))))))
+      (when type
+        (derive-node-type node type))))
+  :give-up)
 
 (defun lvar-result-constraints (lvar)
   (let ((uses (lvar-uses lvar)))
@@ -568,45 +554,48 @@
              (funcall propagate uses)))
           ((proper-list-of-length-p uses 2)
            (let (r)
-               ;; Detect MIN/MAX variables.
-               (destructuring-bind (ref1 ref2) uses
-                 (when (and (ref-p ref1) (ref-p ref2))
-                   (let ((var1 (ref-leaf ref1))
-                         (var2 (ref-leaf ref2)))
-                     (when (and (lambda-var-p var1)
-                                (lambda-var-p var2))
-                       (labels ((normalize-not (op not)
-                                  (if not
-                                      (case op
-                                        (< '>=)
-                                        (> '<=))
-                                      op))
-                                (relations (x y con)
-                                  (cond ((vector-constraint-eq-p (constraint-x con) x)
-                                         (and (vector-constraint-eq-p (constraint-y con) y)
-                                              (normalize-not (equality-constraint-operator con)
-                                                             (equality-constraint-not-p con))))
-                                        ((vector-constraint-eq-p (constraint-y con) x)
-                                         (and (vector-constraint-eq-p (constraint-x con) y)
-                                              (normalize-not (invert-operator (equality-constraint-operator con))
-                                                             (equality-constraint-not-p con))))))
-                                (find-constraint (var1 var2 ref)
-                                  (loop for con in (ref-constraints ref)
-                                        do (multiple-value-bind (op not)
-                                               (relations var1 var2 con)
-                                             (when op
-                                               (return (values op not)))))))
-                         (let ((op1 (find-constraint var1 var2 ref1))
-                               (op2 (find-constraint var2 var1 ref2)))
-                           (case op1
-                             ((< <=) (and (memq op2 '(<= <))
-                                          (push (list '<= var1) r)
-                                          (push (list '<= var2) r)))
-                             ((> >=) (and (memq op2 '(> >=))
-                                          (push (list '>= var1) r)
-                                          (push (list '>= var2) r))))))))
+             ;; Detect MIN/MAX variables.
+             (destructuring-bind (ref1 ref2) uses
+               (when (and (ref-p ref1) (ref-p ref2))
+                 (let ((var1 (ok-ref-lambda-var ref1))
+                       (var2 (ok-ref-lambda-var ref2)))
+                   (when (and var1 var2)
+                     (labels ((normalize-not (op not)
+                                (if not
+                                    (case op
+                                      (< '>=)
+                                      (> '<=))
+                                    op))
+                              (relations (x y con)
+                                (cond ((vector-constraint-eq-p (constraint-x con) x)
+                                       (and (vector-constraint-eq-p (constraint-y con) y)
+                                            (normalize-not (equality-constraint-operator con)
+                                                           (equality-constraint-not-p con))))
+                                      ((vector-constraint-eq-p (constraint-y con) x)
+                                       (and (vector-constraint-eq-p (constraint-x con) y)
+                                            (normalize-not (invert-operator (equality-constraint-operator con))
+                                                           (equality-constraint-not-p con))))))
+                              (find-constraint (var1 var2 ref)
+                                (block nil
+                                  (let ((constraints (block-out (node-block ref))))
+                                    (when constraints
+                                      (do-conset-constraints-intersection (con (constraints
+                                                                                (lambda-var-equality-constraints var1)))
+                                        (multiple-value-bind (op not)
+                                            (relations var1 var2 con)
+                                          (when op
+                                            (return (values op not))))))))))
+                       (let ((op1 (find-constraint var1 var2 ref1))
+                             (op2 (find-constraint var2 var1 ref2)))
+                         (case op1
+                           ((< <=) (and (memq op2 '(<= <))
+                                        (push (list '<= var1) r)
+                                        (push (list '<= var2) r)))
+                           ((> >=) (and (memq op2 '(> >=))
+                                        (push (list '>= var1) r)
+                                        (push (list '>= var2) r))))))))
 
-                   r)))))))
+                 r)))))))
 
 (defun add-var-result-constraints (var lvar constraints &optional (target constraints))
   (loop for (operator second) in (lvar-result-constraints lvar)
