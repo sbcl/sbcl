@@ -498,13 +498,15 @@
                                              (when (and (eq op '>)
                                                         (not not-p))
                                                (return t))))))
-      ;; It's in bounds but it may be of the wrong type
-      (transform-call node
-                      `(lambda (array dimension index)
-                         (declare (ignore array dimension))
-                         (the (and fixnum unsigned-byte) index))
-                      '%check-bound)))
+      (reoptimize-node node)
+      (setf (combination-info node) 'array-in-bounds-p)))
   :give-up)
+
+(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t) * :node node)
+  (if (eq (combination-info node) 'array-in-bounds-p)
+      ;; It's in bounds but it may be of the wrong type
+      `(the (and fixnum unsigned-byte) index)
+      (give-up-ir1-transform)))
 
 (defoptimizer (vector-length equality-constraint) ((vector) node gen)
   (let (type
