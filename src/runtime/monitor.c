@@ -400,7 +400,7 @@ static struct cmd {
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
-    {"layouts", "Dump LAYOUT instance.", layouts_cmd},
+    {"layouts", "Dump LAYOUT instances.", layouts_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
     {"pte", "Page table entry for address", pte_cmd},
@@ -859,8 +859,10 @@ static int layouts_cmd(char __attribute__((unused)) **ptr)
     lc.list = 0;
     for (lc.passno = 1; lc.passno <= 2; ++lc.passno) {
         walk_generation(display_layouts, -1, (uword_t)&lc);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
         display_layouts((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer,
                         (uword_t)&lc);
+#endif
     }
     struct cons* l = lc.list;
     while (l) {
