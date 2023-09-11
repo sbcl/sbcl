@@ -2137,3 +2137,17 @@
            (1 (setq v (list -17532189700714087747 b c))))
          (case a (0 (elt v 1)) (1 (elt v 2)))))
      ((1 2 3) 3))))
+
+(with-test (:name :dynamic-extent-setq-already-existing)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (a)
+       (let ((x (eval a)))
+         (declare (dynamic-extent x))
+         (let ((y 0))
+           (declare (dynamic-extent y))
+           (let ((z y))
+             (setq y x)
+             (values z)))))
+     ((1) 0))))
