@@ -308,8 +308,8 @@
                      (constant-p in-y)
                      (let ((a (constant-value in-y))
                            (b (constant-value y)))
-                       (and (numberp a)
-                            (numberp b)
+                       (and (realp a)
+                            (realp b)
                             (case op
                               (< (unless not-p
                                    (sb-xc:< a b)))
