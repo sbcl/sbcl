@@ -9,7 +9,6 @@
 #include "sbcl.h"
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"
-#include "genesis/simple-fun.h"
 #include "genesis/thread.h"
 
 #define load(sym, reg) \

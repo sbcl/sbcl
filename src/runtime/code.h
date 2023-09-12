@@ -12,7 +12,7 @@
 #ifndef _CODE_H_
 #define _CODE_H_
 
-#include "genesis/simple-fun.h"
+#include "genesis/closure.h"
 #include "gc-assert.h"
 
 static inline int code_total_nwords(struct code* c) {

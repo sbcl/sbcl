@@ -4,7 +4,6 @@
 
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"
-#include "genesis/simple-fun.h"
 #include "genesis/symbol.h"
 
 #define STATIC_SYMBOL_VALUE(sym) [reg_NULL, #(((sym)-NIL)+SYMBOL_VALUE_OFFSET)]

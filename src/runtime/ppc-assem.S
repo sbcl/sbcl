@@ -5,7 +5,7 @@
 
 #include "sbcl.h"
 #include "lispregs.h"
-#include "genesis/simple-fun.h"
+#include "genesis/closure.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 

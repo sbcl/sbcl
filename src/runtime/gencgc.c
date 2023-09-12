@@ -44,7 +44,6 @@
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/fdefn.h"
-#include "genesis/simple-fun.h"
 #include "save.h"
 #include "genesis/hash-table.h"
 #include "genesis/list-node.h"

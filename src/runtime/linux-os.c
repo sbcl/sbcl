@@ -65,7 +65,6 @@ int personality (unsigned long);
 #include <errno.h>
 
 #ifdef MUTEX_EVENTRECORDING
-#include "genesis/mutex.h"
 #define MAXEVENTS 200
 static struct {
     struct thread* th;

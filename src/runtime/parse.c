@@ -34,7 +34,7 @@
 #include "search.h"
 #include "thread.h"
 
-#include "genesis/simple-fun.h"
+#include "genesis/closure.h"
 #include "genesis/fdefn.h"
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
