@@ -353,6 +353,19 @@
                                      (return nil))))))
     :give-up))
 
+(defoptimizer (equal equality-constraint) ((x y) node gen)
+  (block nil
+    (map-equality-constraints x y gen
+                              (lambda (op not-p)
+                                (case op
+                                  ((eq eql)
+                                   (unless not-p
+                                     (return t))))))
+    :give-up))
+
+(setf (fun-info-equality-constraint (fun-info-or-lose 'equalp))
+      #'equal-equality-constraint-optimizer)
+
 (defoptimizer (= equality-constraint) ((x y) node gen)
   (block nil
     (map-equality-constraints x y gen

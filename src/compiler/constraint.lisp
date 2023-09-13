@@ -1244,7 +1244,7 @@
              (destructuring-bind (array dim index)
                  (combination-args check-bound)
                (declare (ignore array))
-               (add-equality-constraints '< (list index dim) gen gen nil))))))
+               (add-equality-constraint '< index dim gen gen nil))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
