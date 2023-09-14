@@ -51,6 +51,7 @@
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "genesis/brothertree.h"
+#include "genesis/split-ordered-list.h"
 #include "var-io.h"
 
 /* forward declarations */
@@ -4929,7 +4930,13 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
 }
 #define CHECK(pointer, where) if (verify_pointer(pointer, where, state)) return 1
 
-/* Return 0 if good, 1 if bad */
+/* Return 0 if good, 1 if bad.
+ * Take extra pains to process weak SOLIST nodes - Finalizer list nodes weakly point
+ * to a referent via an untagged pointer, so the GC doesn't even have to know that
+ * the reference is weak - it simply is ignored as a non-pointer.
+ * This makes invariant verification a little tricky. We want to restore the tagged
+ * pointer, but only if the list is the finalizer list. */
+extern bool finalizer_list_node_p(struct instance*);
 static int verify_headered_object(lispobj* object, sword_t nwords,
                                   struct verify_state *state)
 {
@@ -4946,10 +4953,22 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
             }
             if (lockfree_list_node_layout_p(LAYOUT(layout))) {
+                // These objects might have _two_ untagged references -
+                //  1) the 'next' slot may or may not have tag bits
+                //  2) finalizer list node always stores its referent as untagged
                 struct list_node* node = (void*)object;
                 lispobj next = node->_node_next;
                 if (fixnump(next) && next)
                   CHECK(next | INSTANCE_POINTER_LOWTAG, &node->_node_next);
+                // SO-KEY-NODE is-a SO-NODE is-a LIST-NODE
+                if (layout_depth4_id(LAYOUT(layout)) == SO_KEY_NODE_LAYOUT_ID) {
+                    struct split_ordered_list_node* node = (void*)object;
+                    if (node->so_key) {
+                        gc_assert(fixnump(node->so_key));
+                        lispobj key = compute_lispobj((lispobj*)node->so_key);
+                        CHECK(key, &node->so_key);
+                    }
+                }
             }
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) CHECK(object[1+i], object+1+i);

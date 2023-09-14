@@ -182,6 +182,7 @@ Examples:
       (if (eq space :static)
           (error "Cannot finalize ~S." object)
           ;; silently discard finalizers on file streams in arenas I guess
+          ;; and also silently do nothing on fixnum/character.
           (progn ; (warn "Will not finalize ~S." object)
             (return-from finalize object)))))
   ;; Wrapping a VALUE-CELL around FUNCTION indicates the :DONT-SAVE option without

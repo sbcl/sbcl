@@ -81,7 +81,7 @@
                    (:include so-node)
                    (:copier nil)
                    (:constructor %make-so-set-node (node-hash so-key)))
-  (so-key (missing-arg))) ; should be readonly. DO NOT MUTATE without extreme care
+  (so-key (missing-arg) :read-only t))
 (sb-xc:defstruct (so-data-node
                    (:conc-name nil)
                    (:include so-key-node)
