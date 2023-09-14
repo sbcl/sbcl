@@ -192,3 +192,16 @@
       `(lambda (a)
          (the fixnum (* 8 a)))
     ((1/8) 1)))
+
+#+64-bit
+(with-test (:name :bignum-float)
+  (checked-compile-and-assert
+      ()
+      `(lambda (d)
+         (< (let ((res (sb-bignum:%allocate-bignum 1)))
+              (setf (sb-bignum:%bignum-ref res 1) 529
+                    (sb-bignum:%bignum-ref res 0) 9223372036854775807)
+              res)
+            d))
+    ((-9.223372036854776d18) nil)
+    ((9.223372036854776d18) t)))
