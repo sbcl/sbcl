@@ -198,9 +198,10 @@
   (checked-compile-and-assert
       ()
       `(lambda (d)
-         (< (let ((res (sb-bignum:%allocate-bignum 1)))
+         (< (let ((res (sb-bignum:%allocate-bignum 2)))
               (setf (sb-bignum:%bignum-ref res 1) 529
                     (sb-bignum:%bignum-ref res 0) 9223372036854775807)
+              (sb-bignum:%bignum-set-length res 1)
               res)
             d))
     ((-9.223372036854776d18) nil)
