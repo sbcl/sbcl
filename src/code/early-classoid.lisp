@@ -341,6 +341,10 @@
            ;; Give T a 0 bitmap. It's arbitrary, but when we need some layout
            ;; that has this bitmap we can use the layout of T.
            ((eq layout (find-layout t)) 0)
+           ;; KLUDGE: PROMISE-COMPILE stuffs the layout of FUNCTION into the
+           ;; funcallable-instance it produces.  gencgc verifies that funcallable-instances
+           ;; have a bitmap with 0 bits where the trampoline word and layout are.
+           #-compact-instance-header ((eq layout (find-layout 'function)) -4)
            (t
             +layout-all-tagged+)))
   (defun %layout-bitmap (layout) (layout-bitmap layout))
