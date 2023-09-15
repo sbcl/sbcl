@@ -496,9 +496,13 @@
          (lambda (op not-p)
            (if not-p
                (case op
-                 (< (derive (integer 0)))   ; >=
-                 (> (derive (integer * 0)))) ; <=
+                 (< (derive (integer 0)))       ; >=
+                 (> (derive (integer * 0)))     ; <=
+                 (<= (derive (integer (0))))    ; >
+                 (>= (derive (integer * (0))))) ; <
                (case op
+                 (>= (derive (integer 0)))
+                 (<= (derive (integer * 0)))
                  (> (derive (integer (0))))
                  (< (derive (integer * (0)))))))))))
   :give-up)

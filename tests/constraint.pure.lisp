@@ -736,3 +736,10 @@
      (let ((l (1- (length v))))
        (< l (length v))))
    (member t)))
+
+(with-test (:name :sub-sign)
+  (assert-type
+   (lambda (x)
+     (declare (unsigned-byte x))
+     (- x (truncate x 2)))
+   unsigned-byte))
