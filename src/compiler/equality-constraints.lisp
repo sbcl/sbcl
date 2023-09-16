@@ -664,7 +664,7 @@
 (defun div-constraints (x y)
   (when (csubtypep (lvar-type y) (specifier-type 'rational))
     (cond ((and (csubtypep (lvar-type x) (specifier-type '(integer 1)))
-                (csubtypep (lvar-type y) (specifier-type '(integer 1))))
+                (csubtypep (lvar-type y) (specifier-type '(integer (1)))))
            (list (list '< x)))
           ((and (csubtypep (lvar-type x) (specifier-type '(integer 0)))
                 (csubtypep (lvar-type y) (specifier-type '(integer 0))))

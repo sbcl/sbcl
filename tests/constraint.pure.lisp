@@ -626,7 +626,16 @@
           (declare ((integer 0) x y))
           (let ((d (/ x y)))
             (> d x))))))
-    '(values null &optional))))
+    '(values null &optional)))
+  (assert
+   (type-specifiers-equal
+    (caddr
+     (sb-kernel:%simple-fun-type
+      (checked-compile
+       `(lambda (a b)
+          (declare ((integer 1) a b))
+          (< (/ a b) a)))))
+    '(values boolean &optional))))
 
 (with-test (:name :negate-<)
   (assert
