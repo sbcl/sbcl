@@ -169,8 +169,8 @@
                    (lvar (lvar-type second))
                    (lambda-var (lambda-var-type second))
                    (vector-length-constraint (specifier-type 'index)))))
-    (when (lvar-p x)
-      (constraint-propagate-back x operator second
+    (when (lvar-p first)
+      (constraint-propagate-back first operator second
                                  constraints
                                  consequent-constraints
                                  alternative-constraints))

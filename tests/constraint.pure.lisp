@@ -16,6 +16,15 @@
 ;;;; in addition to which it is near impossible to wade through the
 ;;;; ton of nameless, slow, and noisy tests.
 
+(defmacro assert-type (lambda type)
+  `(assert
+    (type-specifiers-equal
+     (caddr
+      (sb-kernel:%simple-fun-type
+       (checked-compile
+        ',lambda)))
+     '(values ,type &optional))))
+
 #+sb-unicode
 (with-test (:name :base-char-p)
   (assert
@@ -607,35 +616,30 @@
     '(values null &optional))))
 
 (with-test (:name :/)
-  (assert
-   (type-specifiers-equal
-    (caddr
-     (sb-kernel:%simple-fun-type
-      (checked-compile
-       `(lambda (x)
-          (declare ((integer 1) x))
-          (let ((d (truncate x 4)))
-            (< d x))))))
-    '(values (member t) &optional)))
-  (assert
-   (type-specifiers-equal
-    (caddr
-     (sb-kernel:%simple-fun-type
-      (checked-compile
-       `(lambda (x y)
-          (declare ((integer 0) x y))
-          (let ((d (/ x y)))
-            (> d x))))))
-    '(values null &optional)))
-  (assert
-   (type-specifiers-equal
-    (caddr
-     (sb-kernel:%simple-fun-type
-      (checked-compile
-       `(lambda (a b)
-          (declare ((integer 1) a b))
-          (< (/ a b) a)))))
-    '(values boolean &optional))))
+  (assert-type
+   (lambda (x)
+     (declare ((integer 1) x))
+     (let ((d (truncate x 4)))
+       (< d x)))
+   (member t))
+  (assert-type
+   (lambda (x y)
+     (declare ((integer 0) x y))
+     (let ((d (/ x y)))
+       (> d x)))
+   null)
+  (assert-type
+   (lambda (a b)
+     (declare ((integer 1) a b))
+     (< (/ a b) a))
+   boolean)
+  (assert-type
+   (lambda (x y)
+     (declare (integer x y))
+     (if (plusp (rem x y))
+         x
+         1))
+   (integer 1)))
 
 (with-test (:name :negate-<)
   (assert
@@ -665,15 +669,6 @@
                      (= j (length a)))
             (length b))))))
     '(values (or null (integer 10 20)) &optional))))
-
-(defmacro assert-type (lambda type)
-  `(assert
-    (type-specifiers-equal
-     (caddr
-      (sb-kernel:%simple-fun-type
-       (checked-compile
-        ',lambda)))
-     '(values ,type &optional))))
 
 (with-test (:name :+>)
   (assert-type
