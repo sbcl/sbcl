@@ -38,6 +38,21 @@
 (deftransform %double-float ((n) (ratio) *)
   '(sb-kernel::double-float-ratio n))
 
+(macrolet ((def (type from-type)
+             `(deftransform ,(symbolicate "%" type) ((n) ((or ,type ,from-type)))
+                (when (or (csubtypep (lvar-type n) (specifier-type ',type))
+                          (csubtypep (lvar-type n) (specifier-type ',from-type)))
+                  (give-up-ir1-transform))
+                `(if (,',(symbolicate type "-P") n)
+                     (truly-the ,',type n)
+                     (,',(symbolicate "%" type) (truly-the ,',from-type n))))))
+  (def single-float double-float)
+  (def single-float sb-vm:signed-word)
+  (def single-float word)
+  (def double-float single-float)
+  (def double-float sb-vm:signed-word)
+  (def double-float word))
+
 ;;; RANDOM
 (macrolet ((frob (fun type)
              `(deftransform random ((num &optional state)
