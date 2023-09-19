@@ -26,20 +26,20 @@
        n
        (%single-float n)))
 
-(deftransform %single-float ((n) (single-float) *)
+(deftransform %single-float ((n) (single-float) * :important nil)
   'n)
 
-(deftransform %double-float ((n) (double-float) *)
+(deftransform %double-float ((n) (double-float) * :important nil)
   'n)
 
-(deftransform %single-float ((n) (ratio) *)
+(deftransform %single-float ((n) (ratio) * :important nil)
   '(sb-kernel::single-float-ratio n))
 
-(deftransform %double-float ((n) (ratio) *)
+(deftransform %double-float ((n) (ratio) * :important nil)
   '(sb-kernel::double-float-ratio n))
 
 (macrolet ((def (type from-type)
-             `(deftransform ,(symbolicate "%" type) ((n) ((or ,type ,from-type)))
+             `(deftransform ,(symbolicate "%" type) ((n) ((or ,type ,from-type)) * :important nil)
                 (when (or (csubtypep (lvar-type n) (specifier-type ',type))
                           (csubtypep (lvar-type n) (specifier-type ',from-type)))
                   (give-up-ir1-transform))
