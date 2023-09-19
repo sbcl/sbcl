@@ -64,13 +64,11 @@ static inline int layout_depth2_id(struct layout* layout) {
     int32_t* vector = (int32_t*)&layout->uw_id_word0;
     return vector[0];
 }
-static inline int layout_depth3_id(struct layout* layout) {
+static inline int layout_depthN_id(int n, struct layout* layout) {
     int32_t* vector = (int32_t*)&layout->uw_id_word0;
-    return vector[1];
-}
-static inline int layout_depth4_id(struct layout* layout) {
-    int32_t* vector = (int32_t*)&layout->uw_id_word0;
-    return vector[2];
+    // depthoids 0 and 1 are not stored because they have to be T and STRUCTURE-OBJECT,
+    // so the array index is off by 2.
+    return vector[n-2];
 }
 
 /// Return true if 'thing' is a layout.

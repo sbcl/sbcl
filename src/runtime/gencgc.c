@@ -4960,8 +4960,10 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
                 lispobj next = node->_node_next;
                 if (fixnump(next) && next)
                   CHECK(next | INSTANCE_POINTER_LOWTAG, &node->_node_next);
-                // SO-KEY-NODE is-a SO-NODE is-a LIST-NODE
-                if (layout_depth4_id(LAYOUT(layout)) == SO_KEY_NODE_LAYOUT_ID) {
+                // layout depthoid 6 is the one to check the ID of.
+                // FINALIZER-NODE is-a SO-DATA-NODE is-a SO-KEY-NODE is-a SO-NODE is-a
+                //    LIST-NODE is-a STRUCTURE-OBJECT
+                if (layout_depthN_id(6, LAYOUT(layout)) == FINALIZER_NODE_LAYOUT_ID) {
                     struct split_ordered_list_node* node = (void*)object;
                     if (node->so_key) {
                         gc_assert(fixnump(node->so_key));

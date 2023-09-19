@@ -68,7 +68,12 @@
        `(%make-lisp-obj (logandc2 (get-lisp-obj-address ,k) sb-vm:lowtag-mask)))
      (insert (k v)
        `(with-pinned-objects (,k)
-          (prog1 (sb-lockless:so-insert table (base-pointer ,k) ,v)
+          (prog1 (let ((node (sb-lockless:so-insert table (base-pointer ,k) ,v)))
+                   ;; I didn't feel like changing INSERT to return a FINALIZER-NODE, though I should.
+                   ;; Having the right type enables an extra verification in GC but it's not critical
+                   ;; for correctness.
+                   (%set-instance-layout node ,(sb-kernel:find-layout 'sb-lockless::finalizer-node))
+                   node)
             (sb-thread:barrier (:write)))))
      (get-table ()
        ;; The global var itself is actually invariant, but I suspect that lookups

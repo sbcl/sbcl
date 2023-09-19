@@ -2723,26 +2723,6 @@ void scan_finalizers()
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
 }
 
-/* Return true if 'x' is a node in the finalizer list (NOT the key of a node)
- * This entails linear search, but it's a small enough price to pay for sanity.
- * We could add a WEAK-SO-DATA-NODE structure type to avoid searching for 'x'
- * but it shouldn't matter- verification during save should not save many finalizers
- * (if you save finalizers, you're probably doing something wrong),
- * and verification is otherwise for SBCL developer use only */
-bool finalizer_list_node_p(struct instance* x)
-{
-    lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
-    struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
-    lispobj list = solist->head;
-    while (list != LFLIST_TAIL_ATOM) {
-        if (INSTANCE(list) == x) return 1;
-        so_node* this = (so_node*)INSTANCE(list);
-        // retag 'next' just in case 'this' is in mid-deletion state
-        list = this->lfnode._node_next | INSTANCE_POINTER_LOWTAG;
-    }
-    return 0;
-}
-
 /* Our own implementation of heapsort, because some C libraries have a qsort()
  * that calls malloc() apparently, which we MUST NOT do. */
 

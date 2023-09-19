@@ -4259,7 +4259,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
                (sb-impl::robinhood-hashset "HASHSET")
                (sb-impl::robinhood-hashset-storage "HASHSET_STORAGE")
                (sb-lockless::list-node "LFLIST_NODE")
-               (sb-lockless::so-key-node "SO_KEY_NODE")
+               (sb-lockless::finalizer-node "FINALIZER_NODE")
                (sb-brothertree::unary-node "BROTHERTREE_UNARY_NODE")
                (hash-table "HASH_TABLE")))
     (destructuring-bind (type c-const) x

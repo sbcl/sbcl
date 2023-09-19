@@ -88,3 +88,10 @@
                    (:copier nil)
                    (:constructor %make-so-map-node (node-hash so-key so-data)))
   (so-data nil))
+
+;;; Nodes inserted into the list held in *FINALIZER-STORE* get their %INSTANCE-LAYOUT
+;;; changed to this mainly for a GC heap invariant check.
+(sb-xc:defstruct (finalizer-node
+                   (:conc-name nil)
+                   (:include so-data-node)
+                   (:copier nil)))
