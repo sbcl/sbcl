@@ -142,7 +142,6 @@ lispobj symbol_package(struct symbol* s)
 static void
 print_entry_name (lispobj name, FILE *f)
 {
-    name = follow_maybe_fp(name);
     if (listp(name)) {
         putc('(', f);
         while (name != NIL) {
@@ -151,8 +150,8 @@ print_entry_name (lispobj name, FILE *f)
                        (void*)name);
                 return;
             }
-            print_entry_name(CONS(name)->car, f);
-            name = follow_maybe_fp(CONS(name)->cdr);
+            print_entry_name(barrier_load(&CONS(name)->car), f);
+            name = barrier_load(&CONS(name)->cdr);
             if (name != NIL)
                 putc(' ', f);
         }
@@ -172,7 +171,7 @@ print_entry_name (lispobj name, FILE *f)
             if (prefix) fputs(prefix, f); else {
                 struct package *pkg
                     = (struct package *)native_pointer(symbol_package(symbol));
-                lispobj name_ptr = follow_maybe_fp(pkg->_name);
+                lispobj name_ptr = barrier_load(&pkg->_name);
                 if (name_ptr) {
                     print_string(VECTOR(name_ptr), f);
                 }
@@ -207,7 +206,8 @@ print_entry_points (struct code *code, FILE *f)
             fprintf(f, "%p: bogus function entry", fun);
             return;
         }
-        print_entry_name(code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index], f);
+        print_entry_name(barrier_load(&code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index]),
+                         f);
         if ((index + 1) < n_funs) fprintf(f, ", ");
     });
 }
@@ -412,7 +412,7 @@ lisp_backtrace(int nframes)
             struct compiled_debug_fun *df;
             if (absolute_pc &&
                 (df = debug_function_from_pc((struct code *)info.code, absolute_pc)))
-                print_entry_name(df->name, stdout);
+                print_entry_name(barrier_load(&df->name), stdout);
             else
                 // I can't imagine a scenario where we have info.code
                 // but do not have an absolute_pc, or debug-fun can't be found.
@@ -560,7 +560,7 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
     if (code) {
         struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
         if (df)
-            print_entry_name(df->name, f);
+            print_entry_name(barrier_load(&df->name), f);
         else if (pc >= (char*)asm_routines_start && pc < (char*)asm_routines_end)
             fprintf(f, "%s (asm)", asm_routine_name(pc));
         else
@@ -664,7 +664,7 @@ static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
       struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
       if (df) {
           fprintf(stderr, " %p [", pc);
-          print_entry_name(df->name, stderr);
+          print_entry_name(barrier_load(&df->name), stderr);
           fprintf(stderr, "]\n");
           return 1;
       }

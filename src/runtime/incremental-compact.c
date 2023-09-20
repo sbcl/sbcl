@@ -216,7 +216,7 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
   }
   switch (source_type) {
   case SOURCE_NORMAL:
-    *slot = follow_maybe_fp(*slot);
+    *slot = barrier_load(slot);
     if (source &&
         widetag_of(source) == SIMPLE_VECTOR_WIDETAG &&
         vector_flagp(*source, VectorHashing)) {
@@ -229,9 +229,11 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
     }
     break;
   case SOURCE_ZERO_TAG:
-    /* follow_maybe_fp doesn't care what the tag is, just that it
-     * satisfies is_lisp_pointer. */
-    *slot = (lispobj)native_pointer(follow_maybe_fp(*slot | INSTANCE_POINTER_LOWTAG));
+    /* I'm only guessing that this line is right. It's hard to test because compaction
+     * is unlikely to occur when there are lockfree lists containing logically-deleted nodes.
+     * The only other use of zero tag is for #+UNTAGGED-FDEFNS on ppc64, but soft marking
+     * and hence mark-region are not supported on that architecture */
+    *slot = (lispobj)native_pointer(follow_fp(*slot));
     break;
   case SOURCE_CLOSURE: {
     /* SOURCE_CLOSURE can only be the source type of the taggedptr of

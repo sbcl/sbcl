@@ -158,10 +158,10 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 
 lispobj get_package_by_id(int id) {
     // lisp_package_vector is a tagged pointer to SIMPLE-VECTOR
-    lispobj vector = lisp_package_vector;
+    lispobj vector = barrier_load(&lisp_package_vector);
     if (!vector) lose("get_package_by_id: no package vector");
     if (id >= vector_len(VECTOR(vector))) lose("can't decode package ID %d", id);
-    return VECTOR(vector)->data[id];
+    return barrier_load(&VECTOR(vector)->data[id]);
 }
 
 static bool sym_stringeq(lispobj sym, const char *string, int len)
@@ -180,12 +180,13 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name)
     int pass;
     for (pass = 0; pass <= 1; ++pass) {
         struct symbol_hashset* table = (void*)
-          INSTANCE(pass ? pkg->external_symbols : pkg->internal_symbols);
+          INSTANCE(barrier_load(pass ? &pkg->external_symbols : &pkg->internal_symbols));
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
-        gc_assert(listp(table->_cells));
-        struct cons* cells = (void*)native_pointer(table->_cells);
-        gc_assert(simple_vector_p(cells->cdr));
-        struct vector* v = VECTOR(cells->cdr);
+        lispobj cells = barrier_load(&table->_cells);
+        gc_assert(listp(cells));
+        lispobj symbols = barrier_load(&CONS(cells)->cdr);
+        gc_assert(simple_vector_p(symbols));
+        struct vector* v = VECTOR(symbols);
         lispobj namelen = strlen(symbol_name);
         int index;
         for (index = vector_len(v)-1; index >= 0 ; --index) {

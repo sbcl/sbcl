@@ -833,7 +833,7 @@ struct vector * symbol_name(struct symbol* sym)
   lispobj name = sym->name;
   if (lowtag_of(name) != OTHER_POINTER_LOWTAG) return NULL;
   lispobj string = decode_symbol_name(name);
-  return VECTOR(follow_maybe_fp(string));
+  return VECTOR(follow_fp(string)); // can't have a nameless symbol
 }
 struct vector * classoid_name(lispobj * classoid)
 {
