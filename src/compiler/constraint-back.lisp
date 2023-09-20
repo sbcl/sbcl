@@ -60,7 +60,8 @@
      (when (and (csubtypep (lvar-type x) (specifier-type 'rational))
                 (csubtypep (lvar-type constraint) (specifier-type 'rational)))
        (let ((range (type-approximate-interval (lvar-type constraint))))
-         (when (numberp (interval-high range))
+         (when (and range
+                    (numberp (interval-high range)))
            (let ((var (ok-lvar-lambda-var x gen)))
              (when var
                (conset-add-constraint-to-eql consequent 'typep var (specifier-type `(rational (,(- (interval-high range)))))
