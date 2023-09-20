@@ -13,7 +13,6 @@
 #define _SEARCH_H_
 
 #include <stdbool.h>
-extern lispobj find_package(char*);
 extern lispobj* find_symbol(char*, lispobj, unsigned int*); // Find in a package
 extern struct symbol* lisp_symbol_from_tls_index(lispobj tls_index);
 // Find via heap scan

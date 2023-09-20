@@ -4376,7 +4376,8 @@ static inline uword_t word_has_stickymark(uword_t word) {
             ;; parent/child structs like to be output as one header, child first
             (let ((child (case class
                            (sb-c::compiled-debug-info 'sb-c::compiled-debug-fun)
-                           (defstruct-description 'defstruct-slot-description))))
+                           (defstruct-description 'defstruct-slot-description)
+                           (package 'sb-impl::symbol-hashset))))
               (when child
                 (write-structure-object (layout-info (find-layout child)) stream)))
             (write-structure-object (layout-info (find-layout class))

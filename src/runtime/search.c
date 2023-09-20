@@ -172,11 +172,11 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
     struct package* pkg = (struct package*)(package - INSTANCE_POINTER_LOWTAG);
     int table_selector = *hint & 1, iteration;
     for (iteration = 1; iteration <= 2; ++iteration) {
-        struct instance* table = (struct instance*)
+        struct symbol_hashset* table = (void*)
           native_pointer(table_selector ? pkg->external_symbols : pkg->internal_symbols);
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
-        gc_assert(listp(table->slots[INSTANCE_DATA_START])); // KLUDGE
-        struct cons* cells = (void*)native_pointer(table->slots[INSTANCE_DATA_START]);
+        gc_assert(listp(table->_cells));
+        struct cons* cells = (void*)native_pointer(table->_cells);
         gc_assert(simple_vector_p(cells->cdr));
         struct vector* v = VECTOR(cells->cdr);
         lispobj namelen = strlen(symbol_name);
@@ -207,8 +207,11 @@ lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 
 static inline bool fringe_node_p(struct binary_node* node)
 {
-    int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
-    return len <= (int)(1+INSTANCE_DATA_START);
+    const int internal_node_payload_words =
+      ((sizeof (struct binary_node) / sizeof (lispobj)) - 1);
+    int payload_words =
+      ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
+    return payload_words < internal_node_payload_words;
 }
 
 /* I anticipate using the brothertree search algorithms to find code
