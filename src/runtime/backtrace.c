@@ -37,6 +37,7 @@
 #include "code.h"
 #include "var-io.h"
 #include "lispstring.h"
+#include "search.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
@@ -135,10 +136,7 @@ lispobj symbol_package(struct symbol* s)
         }
         return NIL;
     }
-    struct vector* v = VECTOR(lisp_package_vector);
-    int id = symbol_package_id(s);
-    if (id < vector_len(v)) return v->data[id];
-    lose("can't decode package ID %d", id);
+    return get_package_by_id(symbol_package_id(s));
 }
 
 static void

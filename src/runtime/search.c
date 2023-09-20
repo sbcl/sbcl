@@ -156,6 +156,14 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 }
 #endif
 
+lispobj get_package_by_id(int id) {
+    // lisp_package_vector is a tagged pointer to SIMPLE-VECTOR
+    lispobj vector = lisp_package_vector;
+    if (!vector) lose("get_package_by_id: no package vector");
+    if (id >= vector_len(VECTOR(vector))) lose("can't decode package ID %d", id);
+    return VECTOR(vector)->data[id];
+}
+
 static bool sym_stringeq(lispobj sym, const char *string, int len)
 {
     struct vector* name = symbol_name(SYMBOL(sym));
@@ -164,45 +172,37 @@ static bool sym_stringeq(lispobj sym, const char *string, int len)
         && !memcmp(name->data, string, len);
 }
 
-static lispobj* search_package_symbols(lispobj package, char* symbol_name,
-                                       unsigned int* hint)
+static lispobj* search_package_symbols(lispobj package, char* symbol_name)
 {
     // Since we don't have Lisp's string hash algorithm in C, we can only
-    // scan linearly, using the 'hint' as a starting point.
-    struct package* pkg = (struct package*)(package - INSTANCE_POINTER_LOWTAG);
-    int table_selector = *hint & 1, iteration;
-    for (iteration = 1; iteration <= 2; ++iteration) {
+    // scan linearly.
+    struct package* pkg = (void*)INSTANCE(package);
+    int pass;
+    for (pass = 0; pass <= 1; ++pass) {
         struct symbol_hashset* table = (void*)
-          native_pointer(table_selector ? pkg->external_symbols : pkg->internal_symbols);
+          INSTANCE(pass ? pkg->external_symbols : pkg->internal_symbols);
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
         gc_assert(listp(table->_cells));
         struct cons* cells = (void*)native_pointer(table->_cells);
         gc_assert(simple_vector_p(cells->cdr));
         struct vector* v = VECTOR(cells->cdr);
         lispobj namelen = strlen(symbol_name);
-        int vector_length = vector_len(v);
-        int index = *hint >> 1;
-        if (index >= vector_length)
-            index = 0; // safeguard against vector shrinkage
-        int initial_index = index;
-        do {
+        int index;
+        for (index = vector_len(v)-1; index >= 0 ; --index) {
             lispobj thing = v->data[index];
             if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(thing)->header) == SYMBOL_WIDETAG
                 && sym_stringeq(thing, symbol_name, namelen)) {
-                *hint = (index << 1) | table_selector;
                 return (lispobj*)SYMBOL(thing);
             }
-            index = (index + 1) % vector_length;
-        } while (index != initial_index);
-        table_selector = table_selector ^ 1;
+        }
     }
     return 0;
 }
 
-lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
+lispobj* find_symbol(char* symbol_name, lispobj package)
 {
-    return package ? search_package_symbols(package, symbol_name, hint) : 0;
+    return package ? search_package_symbols(package, symbol_name) : 0;
 }
 
 static inline bool fringe_node_p(struct binary_node* node)
