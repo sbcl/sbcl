@@ -84,6 +84,13 @@ static inline int layoutp(lispobj thing)
 static inline int lockfree_list_node_layout_p(struct layout* layout) {
     return layout_depth2_id(layout) == LFLIST_NODE_LAYOUT_ID;
 }
+/// Return true if 'thing' is a finalizer list node
+/// FINALIZER-NODE is-a SO-DATA-NODE is-a SO-KEY-NODE is-a SO-NODE is-a
+///    LIST-NODE is-a STRUCTURE-OBJECT
+/// so layout depthoid 6 is the one to check the ID of.
+static inline int finalizer_node_layout_p(struct layout* layout) {
+    return layout_depthN_id(6, layout) == FINALIZER_NODE_LAYOUT_ID;
+}
 
 struct bitmap { sword_t *bits; unsigned int nwords; };
 static inline struct bitmap get_layout_bitmap(struct layout* layout)
