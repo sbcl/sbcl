@@ -5351,16 +5351,17 @@ void hexdump_spaces(struct verify_state* state, char *reason)
              * a reliable reproducer, this predicate can decide which objects to
              * output in full. Generally you don't need that much output */
             if (widetag_of(where) == FILLER_WIDETAG) {
-                lispobj* end = where + (1+HeaderValue(*where));
+                lispobj* end = where + filler_total_nwords(*where);
                 fprintf(f, " %06x: fill to %p\n", (int)(uword_t)where & 0xffffff, end);
             } else if (dump_completely_p(where, state)) {
                 sword_t i;
                 for(i=0;i<nwords;++i) {
                     uword_t word = where[i];
                     if (i==0)
-                        fprintf(f, " %06x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffffff, word);
+                        fprintf(f, " %06x: ", (int)(uword_t)(where+i) & 0xffffff);
                     else
-                        fprintf(f, "   %04x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffff, word);
+                        fprintf(f, "   %04x: ", (int)(uword_t)(where+i) & 0xffff);
+                    if (word == NIL) fprintf(f, "nil"); else fprintf(f, "%" OBJ_FMTX, word);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
                     if (i == 0 && header_widetag(word) == INSTANCE_WIDETAG) word >>= 32;
 #endif
