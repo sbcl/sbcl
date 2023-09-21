@@ -186,8 +186,6 @@
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
-  (:info stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation (result pa-flag temp value-cell-widetag value-cell-size)

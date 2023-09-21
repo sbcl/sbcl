@@ -1031,22 +1031,12 @@
                              (sc-is value constant control-stack))))
   (:results (result :scs (descriptor-reg) :from :eval))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
     (let ((value (encode-value-if-immediate value)))
-      (cond (stack-allocate-p
-             ;; No regression test got here. Therefore I think there's no such thing as a
-             ;; dynamic-extent value cell. It makes sense that there isn't: DX closures
-             ;; would just reference their frame, wouldn't they?
-             (inst and rsp-tn (lognot lowtag-mask)) ; align
-             (inst push value)
-             (inst push (compute-object-header value-cell-size value-cell-widetag))
-             (inst lea result (ea other-pointer-lowtag rsp-tn)))
-            (t
-             (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
-              (lambda ()
-                (storew value result value-cell-value-slot other-pointer-lowtag))))))))
+      (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
+                   (lambda ()
+                     (storew value result value-cell-value-slot other-pointer-lowtag))))))
 
 ;;;; automatic allocators for primitive objects
 

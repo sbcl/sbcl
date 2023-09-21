@@ -98,11 +98,10 @@
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation (result pa-flag value-cell-widetag
-                            value-cell-size :stack-allocate-p stack-allocate-p)
+                            value-cell-size)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.

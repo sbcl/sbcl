@@ -58,7 +58,7 @@
   (inst sra temp2 y n-fixnum-tag-bits)
   (inst addu temp temp1 temp2)
   (with-fixed-allocation (res pa-flag temp2 bignum-widetag
-                          (1+ bignum-digits-offset) nil)
+                          (1+ bignum-digits-offset))
     (storew temp res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
@@ -107,7 +107,7 @@
   (inst sra temp2 y n-fixnum-tag-bits)
   (inst subu temp temp1 temp2)
   (with-fixed-allocation (res pa-flag temp2 bignum-widetag
-                          (1+ bignum-digits-offset) nil)
+                          (1+ bignum-digits-offset))
     (storew temp res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 

@@ -32,7 +32,7 @@
   (:results (res :scs (descriptor-reg)))
   (:note "SAP to pointer coercion")
   (:generator 20
-    (with-fixed-allocation (res pa-flag ndescr sap-widetag sap-size nil)
+    (with-fixed-allocation (res pa-flag ndescr sap-widetag sap-size)
       (storew sap res sap-pointer-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-sap :move

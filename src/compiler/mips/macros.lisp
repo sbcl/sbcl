@@ -139,7 +139,7 @@ byte-ordering issues."
 
 ;;;; Storage allocation:
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code
-                                  size dynamic-extent-p
+                                  size
                                   &key (lowtag other-pointer-lowtag))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
@@ -151,22 +151,13 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (flag-tn flag-tn) (temp-tn temp-tn)
               (type-code type-code) (size size)
-              (dynamic-extent-p dynamic-extent-p)
               (lowtag lowtag))
-    `(if ,dynamic-extent-p
-         (pseudo-atomic (,flag-tn) ; why P-A ???
-           (align-csp ,temp-tn ,flag-tn)
-           (inst or ,result-tn csp-tn ,lowtag)
-           (inst li ,temp-tn (compute-object-header ,size ,type-code))
-           (inst addu csp-tn (pad-data-block ,size))
-           (storew ,temp-tn ,result-tn 0 ,lowtag)
-           ,@body)
-         (pseudo-atomic (,flag-tn)
-           (allocation ,type-code (pad-data-block ,size) ,result-tn ,lowtag
-                       (list ,flag-tn ,temp-tn) :stackp ,dynamic-extent-p)
-           (inst li ,temp-tn (compute-object-header ,size ,type-code))
-           (storew ,temp-tn ,result-tn 0 ,lowtag)
-           ,@body))))
+    `(pseudo-atomic (,flag-tn)
+       (allocation ,type-code (pad-data-block ,size) ,result-tn ,lowtag
+                   (list ,flag-tn ,temp-tn))
+       (inst li ,temp-tn (compute-object-header ,size ,type-code))
+       (storew ,temp-tn ,result-tn 0 ,lowtag)
+       ,@body)))
 
 (defun align-csp (temp1 temp2)
   (inst li temp1 (lognot lowtag-mask))

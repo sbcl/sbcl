@@ -178,14 +178,14 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defun alloc-other (result-tn widetag size node &optional stack-allocate-p)
-  (pseudo-atomic (:elide-if stack-allocate-p)
-      (allocation nil (* (pad-data-block size)
-                         #+bignum-assertions (if (eql widetag bignum-widetag) 2 1))
-                  other-pointer-lowtag
-                  node stack-allocate-p result-tn)
-      (storew (compute-object-header size widetag)
-              result-tn 0 other-pointer-lowtag)))
+(defun alloc-other (result-tn widetag size node)
+  (pseudo-atomic ()
+    (allocation nil (* (pad-data-block size)
+                       #+bignum-assertions (if (eql widetag bignum-widetag) 2 1))
+                other-pointer-lowtag
+                node nil result-tn)
+    (storew (compute-object-header size widetag)
+            result-tn 0 other-pointer-lowtag)))
 
 ;;;; CONS, LIST and LIST*
 (define-vop (list)
@@ -364,10 +364,9 @@
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg) :to :result))
   (:results (result :scs (descriptor-reg) :from :eval))
-  (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
-    (alloc-other result value-cell-widetag value-cell-size node stack-allocate-p)
+    (alloc-other result value-cell-widetag value-cell-size node)
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects

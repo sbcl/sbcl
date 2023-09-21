@@ -35,7 +35,7 @@
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
-  (vop make-value-cell node block value nil res))
+  (vop make-value-cell node block value res))
 
 ;;;; leaf reference
 

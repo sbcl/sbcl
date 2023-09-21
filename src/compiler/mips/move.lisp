@@ -188,7 +188,7 @@
     (inst sll y x n-fixnum-tag-bits)
 
     (with-fixed-allocation
-        (y pa-flag temp bignum-widetag (1+ bignum-digits-offset) nil)
+        (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
       ;; FIXME: could this store be moved forward into the branch delay slot?
       (storew x y bignum-digits-offset other-pointer-lowtag))
     (inst b done)
