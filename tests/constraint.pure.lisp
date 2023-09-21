@@ -747,3 +747,29 @@
      (declare (unsigned-byte x))
      (- x (truncate x 2)))
    unsigned-byte))
+
+(with-test (:name :equal)
+  (assert-type
+   (lambda (x y)
+     (if (eql x y)
+         (equalp x y)
+         t))
+   (member t))
+  (assert-type
+   (lambda (x y)
+     (if (eq x y)
+         (equal x y)
+         t))
+   (member t))
+  (assert-type
+   (lambda (x y)
+     (if (eql x y)
+         nil
+         (equal x y)))
+   boolean)
+  (assert-type
+   (lambda (x y)
+     (if (equalp x y)
+         (eql x y)
+         t))
+   boolean))
