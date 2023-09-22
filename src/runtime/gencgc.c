@@ -1514,10 +1514,17 @@ static inline int immune_set_memberp(page_index_t page)
              (is_code(page_table[page].type) && pin_all_dynamic_space_code)));
 }
 
+#ifndef LISP_FEATURE_WEAK_VECTOR_READBARRIER
 // Only a bignum, code blob, or vector could be on a single-object page.
 #define potential_largeobj_p(w) \
   (w==BIGNUM_WIDETAG || w==CODE_HEADER_WIDETAG || \
    (w>=SIMPLE_VECTOR_WIDETAG && w < COMPLEX_BASE_STRING_WIDETAG))
+#else
+// also include WEAK_POINTER_WIDETAG because it could be vector-like
+#define potential_largeobj_p(w) \
+  (w==BIGNUM_WIDETAG || w==CODE_HEADER_WIDETAG || w==WEAK_POINTER_WIDETAG || \
+   (w>=SIMPLE_VECTOR_WIDETAG && w < COMPLEX_BASE_STRING_WIDETAG))
+#endif
 
 static inline __attribute__((unused))
 int lowtag_ok_for_page_type(__attribute__((unused)) lispobj ptr,
