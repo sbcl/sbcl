@@ -773,3 +773,82 @@
          (eql x y)
          t))
    boolean))
+
+(with-test (:name :bounds-check-constants)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (declare (simple-vector v))
+                        (setf (aref v 0) (aref v 1)))
+                     nil))
+             1)))
+
+(with-test (:name :bounds-check-constants-svref)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (values (svref v 1)
+                                (svref v 0)))
+                     nil))
+             1)))
+
+(with-test (:name :bounds-check-variable-svref)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x i)
+                        (values (svref x i)
+                                (svref x i)))
+                     nil))
+             1)))
+
+(with-test (:name :bounds-check-length)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x y)
+                        (when (< x (length y))
+                          (svref y x)))
+                     nil))
+             0)))
+
+(with-test (:name :bounds-check-length)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (declare (simple-vector v)
+                                 (optimize (debug 2)))
+                        (loop for i below (1- (length v))
+                              sum (aref v i)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (declare (simple-vector v)
+                                 (optimize (debug 1)))
+                        (loop for i below (1- (length v))
+                              sum (aref v i)))
+                     nil))
+             0)))
+
+
+(with-test (:name :bounds-check-min-length)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x v)
+                        (declare (integer x)
+                                 (simple-vector v)
+                                 (optimize (debug 2)))
+                        (loop for i below (min x (1- (length v)))
+                              sum (aref v i)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x v)
+                        (declare (integer x)
+                                 (simple-vector v)
+                                 (optimize (debug 1)))
+                        (loop for i below (min x (length v))
+                              sum (aref v i)))
+                     nil))
+             0)))

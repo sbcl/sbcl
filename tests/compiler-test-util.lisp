@@ -62,17 +62,16 @@
 (defun ir1-named-calls (lambda-expression &optional (full t))
   (let* ((calls)
          (compiled-fun
-          (inspect-ir
-           lambda-expression
-           (lambda (component)
-             (do-blocks (block component)
-               (do-nodes (node nil block)
-                 (when (and (sb-c::basic-combination-p node)
-                            (if full
-                                (eq (sb-c::basic-combination-info node) :full)
-                                t))
-                   (pushnew (sb-c::combination-fun-debug-name node)
-                            calls :test 'equal))))))))
+           (inspect-ir
+            lambda-expression
+            (lambda (component)
+              (do-blocks (block component)
+                (do-nodes (node nil block)
+                  (when (and (sb-c::basic-combination-p node)
+                             (if full
+                                 (eq (sb-c::basic-combination-info node) :full)
+                                 t))
+                    (push (sb-c::combination-fun-debug-name node) calls))))))))
     (values calls compiled-fun)))
 
 ;;; For any call that passes a global constant funarg - as in (FOO #'EQ) -
