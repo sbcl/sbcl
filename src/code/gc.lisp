@@ -297,10 +297,7 @@ run in any thread.")
 The default is to initiate a nursery collection, which may in turn
 trigger a collection of one or more older generations as well. If FULL
 is true, all generations are collected. If GEN is provided, it can be
-used to specify the oldest generation guaranteed to be collected.
-
-On CheneyGC platforms arguments FULL and GEN take no effect: a full
-collection is always performed."
+used to specify the oldest generation guaranteed to be collected."
   (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
     (when (eq t (sub-gc gen))
       (post-gc))))
