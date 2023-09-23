@@ -172,10 +172,7 @@
 ;;; value-cells
 
 (defun-with-dx dx-value-cell (x)
-  ;; Not implemented everywhere, yet.
-  #+(or arm64 x86 x86-64 mips)
   (let ((cell x))
-    (declare (sb-int:truly-dynamic-extent cell))
     (flet ((f ()
              (incf cell)))
       (declare (dynamic-extent #'f))
@@ -330,7 +327,7 @@
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
     (values (funcall (the function thunk) s))))
 ;; stack-allocatable lists are necessary but not sufficient
-(with-test (:name (:dx-list :make-list) :skipped-on (not :x86-64))
+(with-test (:name (:dx-list :make-list) :fails-on (not :x86-64))
   (let ((calls (ctu:asm-search "CALL" #'make-var-length-dx-list)))
     ;; Call nothing but the funarg
     (assert (eql (length calls) 1)))
@@ -340,7 +337,7 @@
 ;;; MAKE-STRUCTURE
 
 ;; stack-allocatable fixed-size objects are necessary but not sufficient
-(with-test (:name :copy-structure-dx :skipped-on (not (or :x86 :x86-64)))
+(with-test (:name :copy-structure-dx :fails-on (not (or :x86 :x86-64)))
   (let ((thing sb-c::*backend-parsed-vops*))
     ;; check some preconditions
     (assert (typep thing 'hash-table))
@@ -874,7 +871,6 @@
     (assert (every (lambda (x) (eql x 0)) a))))
 
 (with-test (:name (:dx-bug-misc :bdowning-2005-iv-16))
-  #+(or arm64 mips x86 x86-64)
   (assert-no-consing (bdowning-2005-iv-16))
   (bdowning-2005-iv-16))
 
@@ -929,7 +925,6 @@
       (multiple-value-bind (y pos2) (read-from-string res nil nil :start pos)
         (assert (equalp f2 y))
         (assert (equalp f3 (read-from-string res nil nil :start pos2))))))
-  #+(or arm64 mips x86 x86-64)
   (assert-no-consing (assert (eql n (funcall fun nil))))
   (assert (eql n (funcall fun nil))))
 
