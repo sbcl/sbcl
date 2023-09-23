@@ -404,23 +404,6 @@
         (return))))
   (values))
 
-;;; Return true if TN represents a closed-over variable with an
-;;; "implicit" value-cell.
-(defun implicit-value-cell-tn-p (tn)
-  (let ((leaf (tn-leaf tn)))
-    (and (lambda-var-p leaf)
-         (lambda-var-indirect leaf)
-         (not (lambda-var-explicit-value-cell leaf)))))
-
-;;; If BLOCK ends with a TAIL LOCAL COMBINATION, the function called.
-;;; Otherwise, NIL.
-(defun block-tail-local-call-fun (block)
-  (let ((node (block-last block)))
-    (when (and (combination-p node)
-               (eq :local (combination-kind node))
-               (combination-tail-p node))
-      (ref-leaf (lvar-uses (combination-fun node))))))
-
 ;;; Iterate over all the blocks in ENV, setting up :LIVE conflicts for
 ;;; TN. We make the TN global if it isn't already. The TN must have at
 ;;; least one reference.
@@ -443,27 +426,19 @@
           (setup-environment-tn-conflict tn b debug-p)))))
   (values))
 
-;;; Implicit value cells are allocated on the stack and local
-;;; functions can access closed over values of the parent function
-;;; that way, but when the parent function tail calls a local function
-;;; its environment ceases to exist, yet the indirect TNs should still
-;;; be accessible within the tail-called function.  Find all the users
-;;; of the TN, returning their environments, in which the TN should be
-;;; marked as live.
-(defun find-implicit-value-cell-users (home-env tn)
-  (let (result)
-    (labels ((recur (lambda)
-               (let ((env (lambda-environment lambda)))
-                 (unless (or (eq env home-env)
-                             (memq env result))
-                   (push env result)
-                   (loop for ref in (leaf-refs lambda)
-                         do (recur (node-home-lambda ref)))))))
-      (loop for ref in (leaf-refs (tn-leaf tn))
-            do (recur (node-home-lambda ref)))
-      (loop for set in (basic-var-sets (tn-leaf tn))
-            do (recur (node-home-lambda set))))
-    result))
+;;; Iterate over all functions in the tail-set of FUN which close-over
+;;; TN, adding appropriate conflict information. Indirect TNs should
+;;; still be accessible within tail-called functions, even if the
+;;; environment of the caller which contains the implicit value cell
+;;; ceases to exist.
+(defun setup-implicit-value-cell-tn-conflicts (component fun tn)
+  (declare (type component component) (type clambda fun)
+           (type tn tn))
+  (let ((leaf (tn-leaf tn)))
+    (dolist (tail-set-fun (tail-set-funs (lambda-tail-set fun)))
+      (let ((env (lambda-environment tail-set-fun)))
+        (when (memq leaf (environment-closure env))
+          (setup-environment-tn-conflicts component tn env nil))))))
 
 ;;; Iterate over all the environment TNs, adding always-live conflicts
 ;;; as appropriate.
@@ -474,13 +449,11 @@
            (2env (environment-info env)))
       (dolist (tn (ir2-environment-live-tns 2env))
         (setup-environment-tn-conflicts component tn env nil)
-        (when (implicit-value-cell-tn-p tn)
-          (loop for env in (find-implicit-value-cell-users env tn)
-                ;; See the comment above FIND-IMPLICIT-VALUE-CELL-USERS
-                when (memq (environment-lambda env)
-                           (tail-set-funs (lambda-tail-set fun)))
-                do
-                (setup-environment-tn-conflicts component tn env nil))))
+        (let ((leaf (tn-leaf tn)))
+          (when (and (lambda-var-p leaf)
+                     (lambda-var-indirect leaf)
+                     (not (lambda-var-explicit-value-cell leaf)))
+            (setup-implicit-value-cell-tn-conflicts component fun tn))))
       (dolist (tn (ir2-environment-debug-live-tns 2env))
         (setup-environment-tn-conflicts component tn env t))))
   (values))
@@ -682,7 +655,10 @@
                (or (null succ)
                    (eq (first succ)
                        (component-tail (block-component 1block)))
-                   (block-tail-local-call-fun 1block)))
+                   (let ((node (block-last 1block)))
+                     (and (combination-p node)
+                          (eq (combination-kind node) :local)
+                          (node-tail-p node)))))
       (do ((conf (ir2-block-global-tns block)
                  (global-conflicts-next-blockwise conf)))
           ((null conf))
