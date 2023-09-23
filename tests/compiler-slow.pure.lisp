@@ -209,7 +209,7 @@
 
 (with-test (:name :functional-may-escape-p
             ;; INVALID-UNWIND-ERROR crashes fatally on ppc32. Not sure as of when.
-            :skipped-on :ppc32)
+            :broken-on :ppc)
   (checked-compile-and-assert
       (:optimize :safe)
       '(lambda ()
