@@ -275,6 +275,7 @@
 ;; look in an Info-Vector [q.v.] anyway to get the whole picture.
 ;;
 (defun info-puthash (env key update-proc)
+  (declare (dynamic-extent update-proc))
   (aver (not (member key '(0 -1))))
   (labels ((follow/update (array value-index)
              (let ((value ; see INFO-GETHASH for this barrier's rationale

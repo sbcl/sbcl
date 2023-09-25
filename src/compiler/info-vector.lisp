@@ -729,25 +729,26 @@ This is interpreted as
   (let ((name (uncross name)))
     ;; If the INFO-NUMBER already exists in VECT, then copy it and
     ;; alter one cell; otherwise unpack it, grow the vector, and repack.
-    (dx-flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
-                (declare (type packed-info packed-info))
-                (let ((index
-                       (packed-info-value-index packed-info aux-key info-number)))
-                  (if (not index)
-                      (packed-info-insert packed-info aux-key info-number new-value)
-                      (let ((copy (copy-packed-info packed-info)))
-                        (setf (%info-ref copy index) new-value)
-                        copy)))))
+    (flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
+             (declare (type packed-info packed-info))
+             (let ((index
+                     (packed-info-value-index packed-info aux-key info-number)))
+               (if (not index)
+                   (packed-info-insert packed-info aux-key info-number new-value)
+                   (let ((copy (copy-packed-info packed-info)))
+                     (setf (%info-ref copy index) new-value)
+                     copy)))))
       (with-globaldb-name (key1 key2) name
         :simple
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
-        (dx-flet ((simple-name (old-info) (augment old-info key2)))
-          (update-symbol-info key1 #'simple-name))
+        (update-symbol-info key1 (lambda (old-info)
+                                   (augment old-info key2)))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
-        (dx-flet ((hairy-name (old-info)
-                    (augment (or old-info +nil-packed-infos+) +no-auxiliary-key+)))
-          (info-puthash *info-environment* name #'hairy-name)))))
+        (info-puthash *info-environment* name
+                      (lambda (old-info)
+                        (augment (or old-info +nil-packed-infos+)
+                                 +no-auxiliary-key+))))))
   new-value)
 
 ;; Instead of accepting a new-value, call NEW-VALUE-FUN to compute it
@@ -763,32 +764,32 @@ This is interpreted as
   (when (pcl-methodfn-name-p name)
     (error "Can't SET-INFO-VALUE on PCL-internal function"))
   (let ((name (uncross name)) new-value)
-    (dx-flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
-                (declare (type packed-info packed-info))
-                (let ((index
-                       (packed-info-value-index packed-info aux-key info-number)))
-                  (if (not index)
-                      (packed-info-insert
-                       packed-info aux-key info-number
-                       (setq new-value (funcall new-value-fun nil nil)))
-                      (let ((oldval (%info-ref packed-info index)))
-                        (setq new-value (funcall new-value-fun oldval t))
-                        (if (eq new-value oldval)
-                            packed-info ; return the old packed-info
-                            (let ((copy (copy-packed-info packed-info)))
-                              (setf (%info-ref copy index) new-value)
-                              copy)))))))
+    (flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
+             (declare (type packed-info packed-info))
+             (let ((index
+                     (packed-info-value-index packed-info aux-key info-number)))
+               (if (not index)
+                   (packed-info-insert
+                    packed-info aux-key info-number
+                    (setq new-value (funcall new-value-fun nil nil)))
+                   (let ((oldval (%info-ref packed-info index)))
+                     (setq new-value (funcall new-value-fun oldval t))
+                     (if (eq new-value oldval)
+                         packed-info ; return the old packed-info
+                         (let ((copy (copy-packed-info packed-info)))
+                           (setf (%info-ref copy index) new-value)
+                           copy)))))))
       (with-globaldb-name (key1 key2) name
         :simple
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
-        (dx-flet ((simple-name (old-info) (augment old-info key2)))
-          (update-symbol-info key1 #'simple-name))
+        (update-symbol-info key1 (lambda (old-info)
+                                   (augment old-info key2)))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
-        (dx-flet ((hairy-name (old-info)
-                    (augment (or old-info +nil-packed-infos+)
-                             +no-auxiliary-key+)))
-          (info-puthash *info-environment* name #'hairy-name))))
+        (info-puthash *info-environment* name
+                      (lambda (old-info)
+                        (augment (or old-info +nil-packed-infos+)
+                                 +no-auxiliary-key+)))))
     new-value))
 
 ;; %GET-INFO-VALUE-INITIALIZING is provided as a low-level operation similar
@@ -806,33 +807,34 @@ This is interpreted as
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name))
         result)
-    (dx-flet ((get-or-set (packed-info aux-key)
-                (let ((index
-                       (packed-info-value-index packed-info aux-key info-number)))
-                  (cond (index
-                         (setq result (%info-ref packed-info index))
-                         nil) ; no update
-                        (t
-                         ;; Update conflicts possibly for unrelated info-number
-                         ;; can force re-execution. (UNLESS result ...) tries
-                         ;; to avoid calling the thunk more than once.
-                         (unless result
-                           (setq result (funcall creation-thunk)))
-                         (packed-info-insert packed-info aux-key info-number
-                                             result))))))
+    (flet ((get-or-set (packed-info aux-key)
+             (let ((index
+                     (packed-info-value-index packed-info aux-key info-number)))
+               (cond (index
+                      (setq result (%info-ref packed-info index))
+                      nil) ; no update
+                     (t
+                      ;; Update conflicts possibly for unrelated info-number
+                      ;; can force re-execution. (UNLESS result ...) tries
+                      ;; to avoid calling the thunk more than once.
+                      (unless result
+                        (setq result (funcall creation-thunk)))
+                      (packed-info-insert packed-info aux-key info-number
+                                          result))))))
       (with-globaldb-name (key1 key2) name
         :simple
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
-        (dx-flet ((simple-name (old-info) (get-or-set old-info key2)))
-          (update-symbol-info key1 #'simple-name))
+        (update-symbol-info key1 (lambda (old-info)
+                                   (get-or-set old-info key2)))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
-        (dx-flet ((hairy-name (old-info)
-                    (or (get-or-set (or old-info +nil-packed-infos+) +no-auxiliary-key+)
-                        ;; Return OLD-INFO to elide writeback. Unlike for
-                        ;; UPDATE-SYMBOL-INFO, NIL is not a no-op marker.
-                        old-info)))
-          (info-puthash *info-environment* name #'hairy-name))))
+        (info-puthash *info-environment* name
+                      (lambda (old-info)
+                        (or (get-or-set (or old-info +nil-packed-infos+)
+                                        +no-auxiliary-key+)
+                            ;; Return OLD-INFO to elide writeback. Unlike for
+                            ;; UPDATE-SYMBOL-INFO, NIL is not a no-op marker.
+                            old-info)))))
     result))
 
 ;;; Disassembling these proves that SYS-ALLOC-TRAMP gets called

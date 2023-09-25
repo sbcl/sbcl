@@ -829,11 +829,11 @@ We could try a few things to mitigate this:
   ;; something and then see it again after GC transports it higher. The only way to
   ;; allow consing in the predicate would be to use dedicated "arenas" for new
   ;; allocations, that being a concept which we do not now - and may never - support.
-  (sb-int:dx-flet ((wantp (obj widetag size)
-                     (and (or (not type) (eql widetag type))
-                          (or (not smaller) (<= size smaller))
-                          (or (not larger) (>= size larger))
-                          (or (not test) (funcall test obj)))))
+  (flet ((wantp (obj widetag size)
+           (and (or (not type) (eql widetag type))
+                (or (not smaller) (<= size smaller))
+                (or (not larger) (>= size larger))
+                (or (not test) (funcall test obj)))))
     ;; Unless COUNT is smallish, always start by counting. Don't just trust the user
     ;; because s/he might specify :COUNT huge-num which is acceptable provided that
     ;; huge-num is an INDEX which could either exhaust the heap, or at least be

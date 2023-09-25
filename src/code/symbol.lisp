@@ -186,7 +186,8 @@ distinct from the global value. Can also be SETF."
 ;; The function may choose to abort the update by returning NIL.
 (defun update-symbol-info (symbol update-fn)
   (declare (symbol symbol)
-           (type (function (t) t) update-fn))
+           (type (function (t) t) update-fn)
+           (dynamic-extent update-fn))
   (prog ((info-holder (symbol-%info symbol))
          (current-info)) ; a PACKED-INFO or NIL
    outer-restart
