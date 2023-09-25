@@ -77,12 +77,11 @@
   (let (dynamic-extent)
     (loop for arg in (basic-combination-args call)
           for var in (lambda-vars fun)
-          do (let ((dx-kind (leaf-dynamic-extent var)))
-               (when (and arg dx-kind (not (lvar-dynamic-extent arg)))
-                 (unless dynamic-extent
-                   (setq dynamic-extent (insert-dynamic-extent call dx-kind)))
-                 (setf (lvar-dynamic-extent arg) dynamic-extent)
-                 (push arg (dynamic-extent-values dynamic-extent))))))
+          do (when (and arg (leaf-dynamic-extent var) (not (lvar-dynamic-extent arg)))
+               (unless dynamic-extent
+                 (setq dynamic-extent (insert-dynamic-extent call)))
+               (setf (lvar-dynamic-extent arg) dynamic-extent)
+               (push arg (dynamic-extent-values dynamic-extent)))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially

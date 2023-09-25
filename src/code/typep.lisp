@@ -451,7 +451,7 @@ Experimental."
             (let ((dims (make-list rank)))
               ;; Need ALLOCATE-LIST-ON-STACK for this decl. Can't use vop-exists-p
               ;; because can't macroexpand into DECLARE. Maybe sharp-dot it ?
-              #+x86-64 (declare (truly-dynamic-extent dims))
+              #+x86-64 (declare (dynamic-extent dims))
               (dotimes (i rank)
                 (setf (nth i dims) (array-dimension x i)))
            (%make-array-type dims complexp etype etype))))))

@@ -328,7 +328,7 @@
                (context
                 (sb-kernel::make-type-context
                  ftype nil sb-kernel::+type-parse-signal-inhibit+)))
-          (declare (truly-dynamic-extent context))
+          (declare (dynamic-extent context))
           (values (sb-kernel::basic-parse-typespec ftype context)))))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory

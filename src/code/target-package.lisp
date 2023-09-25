@@ -235,7 +235,7 @@
                         &aux (index-var '#:index))
   `(let ((.tbl. ,table-var)
          (cell (list nil)))
-     (declare (truly-dynamic-extent cell))
+     (declare (dynamic-extent cell))
      (loop for ,index-var of-type index
            from 0 below (1- (length .tbl.))
            do (let ((data (svref .tbl. ,index-var)))

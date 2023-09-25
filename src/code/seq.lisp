@@ -827,7 +827,7 @@ Elements are copied to the subsequence bounded by START1 and END1,
 from the subsequence bounded by START2 and END2. If these subsequences
 are not of the same length, then the shorter length determines how
 many elements are copied."
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check target-sequence1 source-sequence2 :result))
   (let* (;; KLUDGE: absent either rewriting FOO-REPLACE-FROM-BAR, or
          ;; excessively polluting DEFINE-SEQUENCE-TRAVERSER, we rebind
@@ -1256,9 +1256,9 @@ many elements are copied."
   (declare (dynamic-extent fun))
   (let ((result nil))
     (flet ((f (&rest args)
-             (declare (truly-dynamic-extent args))
+             (declare (dynamic-extent args))
              (push (apply fun args) result)))
-      (declare (truly-dynamic-extent #'f))
+      (declare (dynamic-extent #'f))
       (%map-for-effect #'f sequences))
     (nreverse result)))
 (defun %map-to-vector (output-type-spec fun sequences)
@@ -1267,19 +1267,19 @@ many elements are copied."
   (declare (dynamic-extent fun))
   (let ((min-len 0))
     (flet ((f (&rest args)
-             (declare (truly-dynamic-extent args))
+             (declare (dynamic-extent args))
              (declare (ignore args))
              (incf min-len)))
-      (declare (truly-dynamic-extent #'f))
+      (declare (dynamic-extent #'f))
       (%map-for-effect #'f sequences))
     (let ((result (make-sequence output-type-spec min-len))
           (i 0))
       (declare (type (simple-array * (*)) result))
       (flet ((f (&rest args)
-               (declare (truly-dynamic-extent args))
+               (declare (dynamic-extent args))
                (setf (aref result i) (apply fun args))
                (incf i)))
-        (declare (truly-dynamic-extent #'f))
+        (declare (dynamic-extent #'f))
         (%map-for-effect #'f sequences))
       result)))
 
@@ -1357,7 +1357,7 @@ many elements are copied."
 (defmacro map-into-lambda (sequences params &body body)
   (check-type sequences symbol)
   `(flet ((f ,params ,@body))
-     (declare (truly-dynamic-extent #'f))
+     (declare (dynamic-extent #'f))
      ;; Note (MAP-INTO SEQ (LAMBDA () ...)) is a different animal,
      ;; hence the awkward flip between MAP and LOOP.
      (if ,sequences
@@ -1380,7 +1380,7 @@ many elements are copied."
     (declare (type index index))
     (block mapping
       (map-into-lambda sequences (&rest args)
-        (declare (truly-dynamic-extent args))
+        (declare (dynamic-extent args))
         (when (eql index end)
           (return-from mapping))
         (setf (aref data index) (apply fun args))
@@ -1415,7 +1415,7 @@ many elements are copied."
        (let ((node result-sequence))
          (declare (type list node))
          (map-into-lambda sequences (&rest args)
-           (declare (truly-dynamic-extent args))
+           (declare (dynamic-extent args))
            (cond ((null node)
                   (return-from map-into result-sequence))
                  ((not (listp (cdr node)))
@@ -1431,7 +1431,7 @@ many elements are copied."
            (sb-sequence:make-sequence-iterator result-sequence)
          (declare (ignore elt) (type function step endp set))
          (map-into-lambda sequences (&rest args)
-           (declare (truly-dynamic-extent args) (optimize speed))
+           (declare (dynamic-extent args) (optimize speed))
            (when (funcall endp result-sequence iter limit from-end)
              (return-from map-into result-sequence))
            (funcall set (apply really-fun args) result-sequence iter)
@@ -1504,7 +1504,7 @@ many elements are copied."
 (define-sequence-traverser reduce (function sequence &rest args &key key
                                    from-end start end (initial-value nil ivp))
   (declare (type index start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
     (let ((end (or end length)))
@@ -1596,7 +1596,7 @@ many elements are copied."
 
 (defmacro list-delete (pred)
   `(let ((handle (cons nil sequence)))
-     (declare (truly-dynamic-extent handle))
+     (declare (dynamic-extent handle))
      (do* ((previous (nthcdr start handle))
            (current (cdr previous) (cdr current))
            (index start (1+ index))
@@ -1613,7 +1613,7 @@ many elements are copied."
 (defmacro list-delete-from-end (pred)
   `(let* ((reverse (nreverse sequence))
           (handle (cons nil reverse)))
-     (declare (truly-dynamic-extent handle))
+     (declare (dynamic-extent handle))
      (do* ((previous (nthcdr (- length end) handle))
            (current (cdr previous) (cdr current))
            (index start (1+ index))
@@ -1645,7 +1645,7 @@ many elements are copied."
   "Return a sequence formed by destructively removing the specified ITEM from
   the given SEQUENCE."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1681,7 +1681,7 @@ many elements are copied."
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1717,7 +1717,7 @@ many elements are copied."
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1821,7 +1821,7 @@ many elements are copied."
                              (declare (fixnum index))
                              (setf splice
                                    (cdr (rplacd splice (list (pop sequence)))))))))
-     (declare (truly-dynamic-extent splice))
+     (declare (dynamic-extent splice))
      (do ((this-element)
           (number-zapped 0))
          ((cond ((eq tail sequence)
@@ -1879,7 +1879,7 @@ many elements are copied."
   "Return a copy of SEQUENCE with elements satisfying the test (default is
    EQL) with ITEM removed."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1898,7 +1898,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end start end count key)
   "Return a copy of sequence with elements satisfying PREDICATE removed."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1917,7 +1917,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end start end count key)
   "Return a copy of sequence with elements not satisfying PREDICATE removed."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -1966,7 +1966,7 @@ many elements are copied."
                     (make-hash-table :test test :size (- end start))))
          (tail (and (not whole)
                     (nthcdr end list))))
-    (declare (truly-dynamic-extent result))
+    (declare (dynamic-extent result))
     (do ((index 0 (1+ index)))
         ((= index start))
       (declare (fixnum index))
@@ -2085,7 +2085,7 @@ many elements are copied."
 
    The :TEST-NOT argument is deprecated."
   (declare (fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (if sequence
@@ -2105,7 +2105,7 @@ many elements are copied."
          (end (or end length))
          (tail (and (/= length (truly-the fixnum end))
                     (nthcdr end list))))
-    (declare (truly-dynamic-extent handle))
+    (declare (dynamic-extent handle))
     (do* ((previous (nthcdr start handle))
           (current (cdr previous) (cdr current)))
          ((eq current tail)
@@ -2161,7 +2161,7 @@ many elements are copied."
    given sequence, is returned.
 
    The :TEST-NOT argument is deprecated."
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (when sequence
@@ -2300,7 +2300,7 @@ many elements are copied."
   except that all elements equal to OLD are replaced with NEW."
   (declare (type fixnum start)
            (explicit-check sequence :result)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (subst-dispatch 'normal))
 
 ;;;; SUBSTITUTE-IF, SUBSTITUTE-IF-NOT
@@ -2311,7 +2311,7 @@ many elements are copied."
   except that all elements satisfying the PRED are replaced with NEW."
   (declare (type fixnum start)
            (explicit-check sequence :result)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (let ((test predicate)
         (test-not nil)
         old)
@@ -2323,7 +2323,7 @@ many elements are copied."
   except that all elements not satisfying the PRED are replaced with NEW."
   (declare (type fixnum start)
            (explicit-check sequence :result)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (let ((test predicate)
         (test-not nil)
         old)
@@ -2338,7 +2338,7 @@ many elements are copied."
   except that all elements equal to OLD are replaced with NEW. SEQUENCE
   may be destructively modified."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -2404,7 +2404,7 @@ many elements are copied."
    except that all elements satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -2460,7 +2460,7 @@ many elements are copied."
    except that all elements not satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (let ((end (or end length)))
@@ -2588,7 +2588,7 @@ many elements are copied."
 
 (defun find
     (item sequence &rest args &key from-end (start 0) end key test test-not)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (dynamic-extent key test test-not))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
@@ -2603,7 +2603,7 @@ many elements are copied."
     (apply #'sb-sequence:find item sequence args)))
 (defun position
     (item sequence &rest args &key from-end (start 0) end key test test-not)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (dynamic-extent key test test-not))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
@@ -2618,7 +2618,7 @@ many elements are copied."
     (apply #'sb-sequence:position item sequence args)))
 
 (defun find-if (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence))
   (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
@@ -2633,7 +2633,7 @@ many elements are copied."
     (apply #'sb-sequence:find-if predicate sequence args)))
 (defun position-if
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence))
   (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
@@ -2649,7 +2649,7 @@ many elements are copied."
 
 (defun find-if-not
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence))
   (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
@@ -2664,7 +2664,7 @@ many elements are copied."
     (apply #'sb-sequence:find-if-not predicate sequence args)))
 (defun position-if-not
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence))
   (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
@@ -2725,7 +2725,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end start end key)
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
       (let ((end (or end length)))
@@ -2744,7 +2744,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end start end key)
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
       (let ((end (or end length)))
@@ -2768,7 +2768,7 @@ many elements are copied."
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
   (declare (type fixnum start)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check sequence))
   (when (and test-p test-not-p)
     ;; Use the same wording as EFFECTIVE-FIND-POSITION-TEST
@@ -2865,7 +2865,7 @@ many elements are copied."
    :FROM-END argument is given, then one plus the index of the rightmost
    position in which the sequences differ is returned."
   (declare (type fixnum start1 start2))
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (explicit-check sequence1 sequence2 :result))
   (seq-dispatch-checking sequence1
     (seq-dispatch-checking sequence2
@@ -2990,7 +2990,7 @@ many elements are copied."
     (sub-sequence1 main-sequence2 &rest args &key
      from-end test test-not start1 end1 start2 end2 key)
   (declare (type fixnum start1 start2)
-           (truly-dynamic-extent args))
+           (dynamic-extent args))
   (declare (explicit-check main-sequence2))
   (seq-dispatch-checking main-sequence2
     (let ((end1 (or end1 length1))

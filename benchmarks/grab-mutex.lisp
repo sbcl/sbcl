@@ -19,7 +19,7 @@
 
 (defmacro timing-test (&body body)
   `(let ((m *mutex*) (waste (make-array 100 :element-type 'sb-vm:word)))
-     (declare (truly-dynamic-extent waste))
+     (declare (dynamic-extent waste))
      (setq sb-thread::*grab-mutex-calls-performed* 0)
      ;; Get all threads to agree on the moment they should start
      (sb-thread:signal-semaphore *ready-semaphore*)

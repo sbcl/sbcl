@@ -334,7 +334,7 @@ Examples:
   (let* ((data (atomic-pop *finalizers-triggered*))
          (data-list (list data)))
     ;; DATA could already be a list. This is basically a no-consing ENSURE-LIST
-    (declare (truly-dynamic-extent data-list))
+    (declare (dynamic-extent data-list))
     (dolist (finalizer (if (listp data) data data-list) (not (null data)))
       ;; :DONT-SAVE finalizers are wrapped in value-cells. Unwrap as necessary
       (let ((fun (the function (if (functionp finalizer)
@@ -352,7 +352,7 @@ Examples:
 ;;; See the trace at the bottom of this file.
 (define-load-time-global *bg-compiler-function* nil)
 (defun run-pending-finalizers (&aux (system-finalizer-scratchpad (list 0)))
-  (declare (truly-dynamic-extent system-finalizer-scratchpad))
+  (declare (dynamic-extent system-finalizer-scratchpad))
   (finalizers-rehash)
   (loop
    ;; Perform no further work if trying to stop the thread, even if there is work.

@@ -285,6 +285,8 @@
   (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
   (:temporary (:sc any-reg :offset eax-offset :from :eval) zero)
   (:temporary (:sc any-reg :offset edi-offset) res)
+  (:node-var node)
+  (:vop-var vop)
   (:results (result :scs (descriptor-reg) :from :load))
   (:arg-types positive-fixnum
               positive-fixnum
@@ -295,9 +297,20 @@
                               (+ (1- (ash 1 n-lowtag-bits))
                                  (* vector-data-offset n-word-bytes))))
     (inst and result (lognot lowtag-mask))
-    ;; FIXME: It would be good to check for stack overflow here.
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
+    (when (sb-c::make-vector-check-overflow-p node)
+      (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error ecx)))
+        (inst sub esp-tn ecx)
+        (inst cmp esp-tn
+              #-sb-thread
+              (make-ea-for-symbol-value *control-stack-start* :dword)
+              #+sb-thread
+              (make-ea :dword :disp (* 4 thread-control-stack-start-slot))
+              #+sb-thread :fs)
+        ;; avoid clearing condition codes
+        (inst lea esp-tn (make-ea :dword :base esp-tn :index ecx))
+        (inst jmp :be overflow)))
     (stack-allocation result result other-pointer-lowtag)
     (inst cld)
     (inst lea res

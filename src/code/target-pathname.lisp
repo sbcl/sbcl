@@ -337,7 +337,7 @@
                    (lambda (dir)
                      (cons (mapcar #'ensure-heap-string (car dir)) (cdr dir))))))
              (pn-key (!allocate-pathname host device dir+hash name type version)))
-        (declare (truly-dynamic-extent pn-key))
+        (declare (dynamic-extent pn-key))
         (hashset-insert-if-absent
          *pn-table* pn-key
          (lambda (tmp &aux (host (%pathname-host tmp)))

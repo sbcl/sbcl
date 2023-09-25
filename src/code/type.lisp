@@ -4132,7 +4132,7 @@ used for a COMPLEX component.~:@>"
          (let* ((codepoint (sb-xc:char-code elt))
                 (pairs (list (cons codepoint codepoint))))
            ;; PAIRS will get copied if needed, but not for the host
-           #-sb-xc-host (declare (truly-dynamic-extent pairs))
+           #-sb-xc-host (declare (dynamic-extent pairs))
            (make-character-set-type pairs)))
         (real
          (unless (fp-zero-p elt)

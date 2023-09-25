@@ -223,7 +223,7 @@
                  (return-from mark-2block))
                (setf (gethash 2block live-2blocks) t)
                (map nil #'mark-2block (cdr (gethash 2block *2block-info*)))))
-      (declare (truly-dynamic-extent #'mark-2block))
+      (declare (dynamic-extent #'mark-2block))
       (mark-2block (block-info (component-head component))))
 
     (flet ((delete-2block (2block)

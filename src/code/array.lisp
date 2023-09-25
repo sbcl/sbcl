@@ -924,7 +924,7 @@ of specialized arrays is supported."
 
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
 (defun %array-row-major-index (array &rest subscripts)
-  (declare (truly-dynamic-extent subscripts)
+  (declare (dynamic-extent subscripts)
            (array array))
   (let ((length (length subscripts)))
     (cond ((array-header-p array)
@@ -958,7 +958,7 @@ of specialized arrays is supported."
 
 (defun array-in-bounds-p (array &rest subscripts)
   "Return T if the SUBSCRIPTS are in bounds for the ARRAY, NIL otherwise."
-  (declare (truly-dynamic-extent subscripts))
+  (declare (dynamic-extent subscripts))
   (let ((length (length subscripts)))
     (cond ((array-header-p array)
            (let ((rank (%array-rank array)))
@@ -979,12 +979,12 @@ of specialized arrays is supported."
                      (length (truly-the (simple-array * (*)) array)))))))))
 
 (defun array-row-major-index (array &rest subscripts)
-  (declare (truly-dynamic-extent subscripts))
+  (declare (dynamic-extent subscripts))
   (apply #'%array-row-major-index array subscripts))
 
 (defun aref (array &rest subscripts)
   "Return the element of the ARRAY specified by the SUBSCRIPTS."
-  (declare (truly-dynamic-extent subscripts))
+  (declare (dynamic-extent subscripts))
   (row-major-aref array (apply #'%array-row-major-index array subscripts)))
 
 ;;; (setf aref/bit/sbit) are implemented using setf-functions,
@@ -993,7 +993,7 @@ of specialized arrays is supported."
 ;;; haven't found technical advantages or disadvantages for either
 ;;; scheme.
 (defun (setf aref) (new-value array &rest subscripts)
-  (declare (truly-dynamic-extent subscripts)
+  (declare (dynamic-extent subscripts)
            (type array array))
   (setf (row-major-aref array (apply #'%array-row-major-index array subscripts))
         new-value))
@@ -1020,14 +1020,14 @@ of specialized arrays is supported."
 (defun bit (bit-array &rest subscripts)
   "Return the bit from the BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (array bit) bit-array)
-           (truly-dynamic-extent subscripts)
+           (dynamic-extent subscripts)
            (optimize (safety 1)))
   (row-major-aref bit-array (apply #'%array-row-major-index bit-array subscripts)))
 
 (defun (setf bit) (new-value bit-array &rest subscripts)
   (declare (type (array bit) bit-array)
            (type bit new-value)
-           (truly-dynamic-extent subscripts)
+           (dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (apply #'%array-row-major-index bit-array subscripts))
@@ -1036,7 +1036,7 @@ of specialized arrays is supported."
 (defun sbit (simple-bit-array &rest subscripts)
   "Return the bit from SIMPLE-BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (simple-array bit) simple-bit-array)
-           (truly-dynamic-extent subscripts)
+           (dynamic-extent subscripts)
            (optimize (safety 1)))
   (row-major-aref simple-bit-array
                   (apply #'%array-row-major-index simple-bit-array subscripts)))
@@ -1044,7 +1044,7 @@ of specialized arrays is supported."
 (defun (setf sbit) (new-value bit-array &rest subscripts)
   (declare (type (simple-array bit) bit-array)
            (type bit new-value)
-           (truly-dynamic-extent subscripts)
+           (dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (apply #'%array-row-major-index bit-array subscripts))

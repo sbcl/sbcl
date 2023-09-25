@@ -347,10 +347,10 @@
                     (cond ((and enclose
                                 (enclose-dynamic-extent enclose))
                            (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
-                                 'dynamic-extent))
+                                 t))
                           (t
                            (unless dynamic-extent
-                             (setq dynamic-extent (insert-dynamic-extent node 'dynamic-extent)))
+                             (setq dynamic-extent (insert-dynamic-extent node)))
                            (setf (lvar-dynamic-extent arg) dynamic-extent)
                            (push arg (dynamic-extent-values dynamic-extent))))))))))))
 
@@ -375,18 +375,16 @@
   ;; variable can take on is also dynamic extent.
   (dolist (lambda (component-lambdas component))
     (dolist (var (lambda-vars lambda))
-      (let ((kind (leaf-dynamic-extent var)))
-        (when kind
-          (let ((values (mapcar #'set-value (basic-var-sets var))))
-            (when values
-              ;; This dynamic extent is over the whole environment and
-              ;; needs no cleanup code.
-              (let ((dynamic-extent (make-dynamic-extent :values values
-                                                         :cleanup nil
-                                                         :kind kind)))
-                (push dynamic-extent (lambda-dynamic-extents lambda))
-                (dolist (value values)
-                  (setf (lvar-dynamic-extent value) dynamic-extent))))))))
+      (when (leaf-dynamic-extent var)
+        (let ((values (mapcar #'set-value (basic-var-sets var))))
+          (when values
+            ;; This dynamic extent is over the whole environment and
+            ;; needs no cleanup code.
+            (let ((dynamic-extent (make-dynamic-extent :values values
+                                                       :cleanup nil)))
+              (push dynamic-extent (lambda-dynamic-extents lambda))
+              (dolist (value values)
+                (setf (lvar-dynamic-extent value) dynamic-extent)))))))
     (dolist (let (lambda-lets lambda))
       (dolist (var (lambda-vars let))
         (when (leaf-dynamic-extent var)
@@ -437,8 +435,7 @@
                                  (let ((fun (functional-entry-fun leaf)))
                                    (setf (enclose-dynamic-extent (functional-enclose fun))
                                          dynamic-extent)
-                                   (setf (leaf-dynamic-extent fun)
-                                         (dynamic-extent-kind dynamic-extent)))))))))))))
+                                   (setf (leaf-dynamic-extent fun) t))))))))))))
           ;; Check that the value hasn't been flushed somehow.
           (when (lvar-uses lvar)
             (cond ((lvar-good-for-dx-p lvar dynamic-extent)

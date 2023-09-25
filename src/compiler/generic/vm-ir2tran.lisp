@@ -27,13 +27,13 @@
   (or #+c-stack-is-control-stack t
       (not (dd-has-raw-slot-p (lvar-value defstruct-description)))))
 
-(defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
-  (eq dx 'truly-dynamic-extent))
+(defoptimizer (%make-instance stack-allocate-result) ((n) node)
+  t)
 #+c-stack-is-control-stack
-(defoptimizer (%make-instance/mixed stack-allocate-result) ((n) node dx)
-  (eq dx 'truly-dynamic-extent))
-(defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)
-  (eq dx 'truly-dynamic-extent))
+(defoptimizer (%make-instance/mixed stack-allocate-result) ((n) node)
+  t)
+(defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node)
+  t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
@@ -353,7 +353,7 @@
 (defoptimizer (make-array-header* stack-allocate-result) ((&rest args))
   t)
 (defoptimizer (allocate-vector stack-allocate-result)
-    ((#+ubsan poisoned type length words) node dx)
+    ((#+ubsan poisoned type length words) node)
   (and
    ;; Can't put unboxed data on the stack unless we scavenge it
    ;; conservatively.
@@ -362,22 +362,7 @@
    #-c-stack-is-control-stack
    (member (lvar-value type)
            '#.(list (sb-vm:saetp-typecode (find-saetp 't))
-                    (sb-vm:saetp-typecode (find-saetp 'fixnum))))
-   (cond ((or (eq dx 'truly-dynamic-extent)
-              (zerop (policy node safety))
-              ;; a vector object should fit in one page -- otherwise it might go past
-              ;; stack guard pages.
-              (values-subtypep (lvar-derived-type words)
-                               (specifier-type
-                                `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
-                                                sb-vm:vector-data-offset)))))
-          t)
-         (t
-          (compiler-notify "~@<Could~2:I not safely stack allocate the result of ~S, as it might ~
-                               silently overflow the stack. The vector ~
-                               must fit in a page of memory.~:@>"
-                           (find-original-source (node-source-path node)))
-          nil))))
+                    (sb-vm:saetp-typecode (find-saetp 'fixnum))))))
 (defoptimizer (allocate-vector ltn-annotate)
     ((#+ubsan poisoned type length words) call ltn-policy)
   (vectorish-ltn-annotate-helper call ltn-policy
@@ -386,20 +371,30 @@
                                      'sb-vm::allocate-vector-on-stack)
                                  'sb-vm::allocate-vector-on-heap))
 
+(defun make-vector-check-overflow-p (node)
+  (not (or (zerop (policy node safety))
+           ;; If the vector object fits in one page, no overflow checking is needed since it will hit the guard page.
+           (let ((words #-ubsan (third (combination-args node))
+                        #+ubsan (fourth (combination-args node))))
+             (values-subtypep (lvar-derived-type words)
+                              (specifier-type
+                               `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
+                                               sb-vm:vector-data-offset))))))))
+
 (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
-    (let* ((args (basic-combination-args call))
-           (template-name (if (node-stack-allocate-p call)
-                              dx-template
-                              not-dx-template))
-           (template (template-or-lose template-name)))
-      (dolist (arg args)
-        (setf (lvar-info arg)
-              (make-ir2-lvar (primitive-type (lvar-type arg)))))
-      (aver (is-ok-template-use template call (ltn-policy-safe-p ltn-policy)))
-      (setf (basic-combination-info call) template)
-      (setf (node-tail-p call) nil)
-      (dolist (arg args)
-        (annotate-1-value-lvar arg))))
+  (let* ((args (basic-combination-args call))
+         (template-name (if (node-stack-allocate-p call)
+                            dx-template
+                            not-dx-template))
+         (template (template-or-lose template-name)))
+    (dolist (arg args)
+      (setf (lvar-info arg)
+            (make-ir2-lvar (primitive-type (lvar-type arg)))))
+    (aver (is-ok-template-use template call (ltn-policy-safe-p ltn-policy)))
+    (setf (basic-combination-info call) template)
+    (setf (node-tail-p call) nil)
+    (dolist (arg args)
+      (annotate-1-value-lvar arg))))
 
 ;;; ...lists
 
@@ -419,28 +414,21 @@
 ;;; MAKE-LIST optimizations
 #+x86-64
 (progn
-  (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
-    (cond ((or (eq dx 'truly-dynamic-extent)
-               (zerop (policy node safety))
-               ;; At most one page (this is more paranoid than %listify-rest-args).
-               ;; Really what you want to do is decrement the stack pointer by one page
-               ;; at a time, filling in CDR pointers downward. Then this restriction
-               ;; could be removed, because allocation would never miss the guard page
-               ;; if it tries to consume too much stack space.
-               (values-subtypep (lvar-derived-type length)
-                                (specifier-type
-                                 `(integer 0 ,(/ +backend-page-bytes+ sb-vm:n-word-bytes 2)))))
-           t)
-          (t
-           (compiler-notify "~@<Could~2:I not safely stack allocate the result of ~S, as it might ~
-                                silently overflow the stack. The list ~
-                                must fit in a page of memory.~:@>"
-                            (find-original-source (node-source-path node)))
-           nil)))
+  (defoptimizer (%make-list stack-allocate-result) ((length element) node)
+    t)
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (vectorish-ltn-annotate-helper call ltn-policy
                                    'sb-vm::allocate-list-on-stack
                                    'sb-vm::allocate-list-on-heap)))
+
+(defun make-list-check-overflow-p (node)
+  (not (or (zerop (policy node safety))
+           ;; If the list object fits in one page, no overflow checking is needed since it will hit the guard page.
+           (let ((length (first (combination-args node))))
+             (values-subtypep (lvar-derived-type length)
+                              (specifier-type
+                               `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
+                                               sb-vm:vector-data-offset))))))))
 
 ;;; Return the vop that wrote the TN referenced by TN-REF,
 ;;; but look through MOVEs.

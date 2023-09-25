@@ -91,7 +91,7 @@
                    (not (memq restart stack))
                    (or (not call-test-p)
                        (let ((*restart-test-stack* (cons restart stack)))
-                         (declare (truly-dynamic-extent *restart-test-stack*))
+                         (declare (dynamic-extent *restart-test-stack*))
                          (funcall (restart-test-function restart) condition))))
           (funcall function restart))))))
 
@@ -111,7 +111,7 @@ restarts associated with CONDITION (or with no condition) will be returned."
            (when (eq identifier (restart-name restart))
              (return-from %find-restart restart))))
     ;; KLUDGE: can the compiler infer this dx automatically?
-    (declare (truly-dynamic-extent #'eq-restart-p #'named-restart-p))
+    (declare (dynamic-extent #'eq-restart-p #'named-restart-p))
     (if (typep identifier 'restart)
         ;; The code under #+previous-... below breaks the abstraction
         ;; introduced by MAP-RESTARTS, but is about twice as
@@ -2286,6 +2286,16 @@ the restart does not exist."))
                   the octet sequence ~S cannot be decoded.~@:>"
              (character-coding-error-external-format c)
              (character-decoding-error-octets c)))))
+
+
+(define-condition stack-allocated-object-overflows-stack (storage-condition)
+  ((size :initarg :size :reader stack-allocated-object-overflows-stack-size))
+  (:report
+   (lambda (condition stream)
+     (format stream
+             "~@<Stack allocating object of size ~D bytes exceeds the ~
+remaining space left on the control stack.~@:>"
+             (stack-allocated-object-overflows-stack-size condition)))))
 
 (define-condition control-stack-exhausted (storage-condition)
   ()

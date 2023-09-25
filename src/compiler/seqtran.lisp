@@ -80,7 +80,7 @@
                              #-sb-xc-host
                            (declare (muffle-conditions compiler-note))
                            (list nil))))
-                   (declare (truly-dynamic-extent ,map-result))
+                   (declare (dynamic-extent ,map-result))
                    (do-anonymous ((,last ,map-result) . ,(do-clauses))
                      (,endtest (cdr ,map-result))
                      (let ((result ,call))
@@ -97,7 +97,7 @@
                             #-sb-xc-host
                             (declare (muffle-conditions compiler-note))
                           (list nil))))
-                   (declare (truly-dynamic-extent ,map-result))
+                   (declare (dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest
                       (%rplacd ,temp nil) ;; replace the 0

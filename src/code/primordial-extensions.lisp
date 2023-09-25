@@ -22,7 +22,7 @@
 ;;; Another similar one.
 (defmacro dx-let (bindings &body forms)
   `(let ,bindings
-     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
+     (declare (dynamic-extent
                ,@(mapcar (lambda (bind) (if (listp bind) (car bind) bind))
                          bindings)))
      ,@forms))

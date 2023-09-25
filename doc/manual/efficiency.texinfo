@@ -112,9 +112,8 @@ one-dimensional, and has a constant @code{:element-type}.
 
 @cindex Safety optimization quality
 @strong{Note}: stack space is limited, so allocation of a large vector
-may cause stack overflow. For this reason potentially large vectors,
-which might circumvent stack overflow detection, are stack allocated
-only in zero @code{safety} policies.
+may cause stack overflow. Stack overflow checks are done except in zero
+@code{safety} policies.
 
 @item
 @findex @cl{flet}

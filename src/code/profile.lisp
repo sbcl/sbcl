@@ -188,7 +188,7 @@
              (dconsing 0)
              (inner-enclosed-profiles 0)
              (dgc-run-time 0))
-         (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
+         (declare (dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
               (let ((start-ticks (get-internal-ticks))
                     (start-gc-run-time *gc-run-time*)

@@ -199,7 +199,7 @@ variable: an unreadable object representing the error is printed instead.")
              (let* ((string (make-string buffer-size :element-type 'base-char))
                     (stream (%make-finite-base-string-output-stream string)))
                (declare (inline %make-finite-base-string-output-stream))
-               (declare (truly-dynamic-extent stream))
+               (declare (dynamic-extent stream))
                (output-integer object stream *print-base* *print-radix*)
                (%shrink-vector string
                                (finite-base-string-output-stream-pointer stream)))))))
@@ -1354,7 +1354,7 @@ variable: an unreadable object representing the error is printed instead.")
                  (let* ((ptr #.(length (write-to-string sb-ext:most-positive-word
                                                         :base 10)))
                         (buffer (make-array ptr :element-type 'base-char)))
-                   (declare (truly-dynamic-extent buffer))
+                   (declare (dynamic-extent buffer))
                    (iterative-algorithm)
                    (%write-string buffer stream ptr (length buffer))))
              #-c-stack-is-control-stack ; strings can't be DX-allocated

@@ -83,7 +83,7 @@
     `(let ((*restart-clusters*
             (cons (list ,@(mapcar #'parse-binding bindings))
                   *restart-clusters*)))
-       (declare (truly-dynamic-extent *restart-clusters*))
+       (declare (dynamic-extent *restart-clusters*))
        (progn
          ,@forms))))
 

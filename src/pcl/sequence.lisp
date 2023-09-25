@@ -434,7 +434,7 @@
               (,setf (new-value) (funcall ,nsetf new-value ,sequence,nstate))
               (,index () (funcall ,nindex ,sequence,nstate))
               (,copy () (funcall ,ncopy ,sequence,nstate)))
-         (declare (truly-dynamic-extent #',step #',endp #',elt
+         (declare (dynamic-extent #',step #',endp #',elt
                                   #',setf #',index #',copy))
          ,@body))))
 
@@ -501,10 +501,10 @@
     ;;
     ;; to return a sequence with three elements.
     (flet ((counting-visit (&rest args)
-             (declare (truly-dynamic-extent args)
+             (declare (dynamic-extent args)
                       (ignore args))
              (incf min-length)))
-      (declare (truly-dynamic-extent #'counting-visit))
+      (declare (dynamic-extent #'counting-visit))
       (%map-for-effect #'counting-visit sequences))
     ;; Map local function over SEQUENCES that steps through the result
     ;; sequence and stores results of applying FUNCTION.
@@ -513,10 +513,10 @@
                 (sequence:make-sequence-iterator result)))
       (declare (type function step setelt))
       (flet ((one-element (&rest args)
-               (declare (truly-dynamic-extent args))
+               (declare (dynamic-extent args))
                (funcall setelt (apply function args) result state)
                (setq state (funcall step result state from-end))))
-        (declare (truly-dynamic-extent #'one-element))
+        (declare (dynamic-extent #'one-element))
         (%map-for-effect #'one-element sequences))
       result)))
 
@@ -746,7 +746,7 @@
   (:argument-precedence-order sequence new old))
 (defmethod sequence:substitute (new old (sequence sequence) &rest args &key
                                 (start 0) end from-end test test-not count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore start end from-end test test-not count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute new old result args)))
@@ -756,7 +756,7 @@
   (:argument-precedence-order sequence new predicate))
 (defmethod sequence:substitute-if (new predicate (sequence sequence) &rest args
                                    &key (start 0) end from-end count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore start end from-end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute-if new predicate result args)))
@@ -767,7 +767,7 @@
 (defmethod sequence:substitute-if-not
     (new predicate (sequence sequence) &rest args &key
      (start 0) end from-end count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore start end from-end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute-if-not new predicate result args)))
@@ -970,7 +970,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (truly-dynamic-extent #'finish))
+          (declare (dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -1010,7 +1010,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (truly-dynamic-extent #'finish))
+          (declare (dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -1050,7 +1050,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (truly-dynamic-extent #'finish))
+          (declare (dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -1074,7 +1074,7 @@
   (:argument-precedence-order sequence item))
 (defmethod sequence:remove (item (sequence sequence) &rest args &key
                             from-end test test-not (start 0) end count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore from-end test test-not start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete item result args)))
@@ -1084,7 +1084,7 @@
   (:argument-precedence-order sequence predicate))
 (defmethod sequence:remove-if (predicate (sequence sequence) &rest args &key
                                from-end (start 0) end count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore from-end start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-if predicate result args)))
@@ -1094,7 +1094,7 @@
   (:argument-precedence-order sequence predicate))
 (defmethod sequence:remove-if-not (predicate (sequence sequence) &rest args
                                    &key from-end (start 0) end count key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore from-end start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-if-not predicate result args)))
@@ -1120,7 +1120,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (truly-dynamic-extent #'finish))
+          (declare (dynamic-extent #'finish))
           (do ((end (or end (length sequence)))
                (step 0 (1+ step)))
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
@@ -1149,7 +1149,7 @@
     (sequence &key from-end test test-not start end key))
 (defmethod sequence:remove-duplicates
     ((sequence sequence) &rest args &key from-end test test-not (start 0) end key)
-  (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent args))
   (declare (ignore from-end test test-not start end key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-duplicates result args)))
@@ -1176,14 +1176,14 @@
 
 (defgeneric sequence:sort (sequence predicate &key key))
 (defmethod sequence:sort ((sequence sequence) predicate &rest args &key key)
-  (declare (truly-dynamic-extent args)
+  (declare (dynamic-extent args)
            (ignore key))
   (apply #'%sort-with-temp-vector #'sort sequence predicate args))
 
 (defgeneric sequence:stable-sort (sequence predicate &key key))
 (defmethod sequence:stable-sort
     ((sequence sequence) predicate &rest args &key key)
-  (declare (truly-dynamic-extent args)
+  (declare (dynamic-extent args)
            (ignore key))
   (apply #'%sort-with-temp-vector #'stable-sort sequence predicate args))
 
@@ -1241,9 +1241,9 @@
                      (if (funcall predicate key2 key1)
                          (prog1 elt2 (step2) (pop/key2))
                          (prog1 elt1 (step1) (pop/key1)))))
-            (declare (truly-dynamic-extent #'pop/no-key1 #'pop/no-key2
-                                           #'pop/key1 #'pop/key2
-                                           #'pop-one/no-key #'pop-one/key))
+            (declare (dynamic-extent #'pop/no-key1 #'pop/no-key2
+                                     #'pop/key1 #'pop/key2
+                                     #'pop-one/no-key #'pop-one/key))
             ;; Populate ENDP{1,2}, ELT{1,2} and maybe KEY{1,2}.
             (cond (key-function (pop/key1) (pop/key2))
                   (t (pop/no-key1) (pop/no-key2)))

@@ -265,8 +265,7 @@
           (push `(,name (&rest args) ,macro-body) macros))))
     `(macrolet ,macros
        (let* ,(nreverse binds)
-         ,@(if dx `((declare (#+sb-xc-host dynamic-extent ; maybe host can do
-                              #-sb-xc-host truly-dynamic-extent ,@dx))))
+         ,@(if dx `((declare (dynamic-extent ,@dx))))
          ;; Even if the user reads each collection result,
          ;; reader conditionals might statically eliminate all writes.
          ;; Since we don't know, all the -n-tail variable are ignorable.
@@ -1282,7 +1281,6 @@ NOTE: This interface is experimental and subject to change."
                                 ((or (listp id) ; must be a type-specifier
                                      (memq id '(special ignorable ignore
                                                 dynamic-extent
-                                                truly-dynamic-extent
                                                 sb-c::constant-value
                                                 sb-c::no-constraints))
                                      (info :type :kind id))

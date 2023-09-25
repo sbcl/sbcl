@@ -253,7 +253,7 @@
                    ;; of using the compiler to perform interpretation.
                    (sb-c:with-compiler-error-resignalling
                        (load-as-source stream :verbose verbose :print print))))))
-    (declare (truly-dynamic-extent #'load-stream-1))
+    (declare (dynamic-extent #'load-stream-1))
 
     ;; Case 1: stream.
     (when (streamp filespec)

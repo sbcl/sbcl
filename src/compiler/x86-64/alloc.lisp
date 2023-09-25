@@ -697,6 +697,7 @@
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
+    (:node-var node)
     (:vop-var vop)
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
@@ -722,6 +723,13 @@
               (if (sc-is length immediate) (fixnumize (tn-value length)) length))
         (store-originating-pc rax))
       (let ((size (calc-size-in-bytes words result)))
+        (when (sb-c::make-vector-check-overflow-p node)
+          (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error size)))
+            (inst sub rsp-tn size)
+            (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
+            ;; avoid clearing condition codes
+            (inst lea rsp-tn (ea rsp-tn size))
+            (inst jmp :be overflow)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation size other-pointer-lowtag result
@@ -731,7 +739,6 @@
         ;; in case the length in words is 0, which stores into the LENGTH slot
         ;; as if it were element -1 of data (which probably can't happen).
         (store-string-trailing-null result type length words)
-        ;; FIXME: It would be good to check for stack overflow here.
         (put-header result other-pointer-lowtag type length nil nil)
         )
       #+ubsan
@@ -805,10 +812,19 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
     (:policy :fast-safe)
+    (:node-var node)
+    (:vop-var vop)
     (:temporary (:sc descriptor-reg) tail next limit)
     (:generator 20
       (let ((size (calc-size-in-bytes length next))
             (loop (gen-label)))
+        (when (sb-c::make-list-check-overflow-p node)
+          (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error size)))
+            (inst sub rsp-tn size)
+            (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
+            ;; avoid clearing condition codes
+            (inst lea rsp-tn (ea rsp-tn size))
+            (inst jmp :be overflow)))
         (stack-allocation size list-pointer-lowtag result)
         (compute-end)
         (inst mov next result)

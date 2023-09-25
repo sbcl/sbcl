@@ -830,8 +830,8 @@
   ;; T if there was a REF.
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type (member nil set t))
-  ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (dynamic-extent nil :type (member nil truly-dynamic-extent dynamic-extent))
+  ;; True if declared dynamic-extent.
+  (dynamic-extent nil :type boolean)
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)
@@ -1692,8 +1692,6 @@
                             (:predicate dynamic-extent-p)
                             (:constructor make-dynamic-extent)
                             (:copier nil))
-  ;; the kind of dynamic extent this is.
-  (kind (missing-arg) :type (member dynamic-extent truly-dynamic-extent))
   ;; the values explicitly declared with this dynamic extent.
   (values nil :type list)
   ;; the cleanup for this extent. NULL indicates that this dynamic
@@ -1704,7 +1702,6 @@
 
 (defprinter (cdynamic-extent :conc-name dynamic-extent-
                              :identity t)
-  kind
   values
   (info :test info))
 

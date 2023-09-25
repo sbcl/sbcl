@@ -771,7 +771,7 @@ filenames."
                            (dolist (p intersections)
                              (do-pathnames (translate-pathname p from to)))))))
                    (do-physical-pathnames pathname))))
-      (declare (truly-dynamic-extent #'record))
+      (declare (dynamic-extent #'record))
       (do-pathnames (merge-pathnames pathspec)))
     ;; Sorting isn't required by the ANSI spec, but sorting into some
     ;; canonical order seems good just on the grounds that the

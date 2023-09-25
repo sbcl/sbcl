@@ -340,7 +340,7 @@
 
 (defun values (&rest values)
   "Return all arguments, in order, as values."
-  (declare (truly-dynamic-extent values))
+  (declare (dynamic-extent values))
   (values-list values))
 
 (defun values-list (list)

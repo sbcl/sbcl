@@ -934,7 +934,7 @@ also processed as top level forms."
     (cond ((some #'leaf-dynamic-extent funs)
            (ctran-starts-block next)
            (let* ((enclose (ctran-use enclose-ctran))
-                  (dynamic-extent (make-dynamic-extent :kind 'dynamic-extent))
+                  (dynamic-extent (make-dynamic-extent))
                   (cleanup (make-cleanup :kind :dynamic-extent
                                          :mess-up dynamic-extent))
                   (dynamic-extent-ctran (make-ctran)))

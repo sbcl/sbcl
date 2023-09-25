@@ -787,9 +787,9 @@
 
 ;;; Insert code to establish a dynamic extent around CALL, returning
 ;;; the dynamic extent.
-(defun insert-dynamic-extent (call kind)
+(defun insert-dynamic-extent (call)
   (let* ((dynamic-extent (with-ir1-environment-from-node call
-                           (make-dynamic-extent :kind kind)))
+                           (make-dynamic-extent)))
          (cleanup (make-cleanup :kind :dynamic-extent
                                 :mess-up dynamic-extent)))
     (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
@@ -810,7 +810,7 @@
      (and (eq (combination-kind use) :known)
           (let ((info (combination-fun-info use)))
             (or (awhen (fun-info-stack-allocate-result info)
-                  (funcall it use (dynamic-extent-kind dynamic-extent)))
+                  (funcall it use))
                 (awhen (fun-info-result-arg info)
                   (lvar-good-for-dx-p (nth it (combination-args use))
                                       dynamic-extent))))))

@@ -41,7 +41,7 @@
       t)))
 
 (defun step-values (form &rest values)
-  (declare (truly-dynamic-extent values))
+  (declare (dynamic-extent values))
   (signal 'step-values-condition :form form :result values)
   (values-list values))
 

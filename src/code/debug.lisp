@@ -2049,7 +2049,7 @@ forms that explicitly control this kind of evaluation.")
            (string (make-array 127 :element-type 'base-char))
            (n 0)
            code)
-      (declare (truly-dynamic-extent cursor string))
+      (declare (dynamic-extent cursor string))
       (aver (zerop
              (sb-alien:alien-funcall sb-unw-init
                                      (vector-sap cursor) (sb-alien:alien-sap context))))

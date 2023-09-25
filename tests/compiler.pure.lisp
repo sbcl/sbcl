@@ -3915,7 +3915,7 @@
         (setq z 0)
         (flet ((foo ()
                  (foo z args)))
-          (declare (sb-int:truly-dynamic-extent #'foo))
+          (declare (dynamic-extent #'foo))
           (call #'foo nil))))
    :allow-style-warnings t))
 
@@ -6125,7 +6125,7 @@
   (checked-compile-and-assert ()
       `(lambda ()
          (let ((x (list 1)))
-           (declare (sb-int:truly-dynamic-extent x))
+           (declare (dynamic-extent x))
            (progv '(*) x
              (catch 'ct (the integer (eval (dotimes (i 1 42) 42)))))))
     (() 42)))

@@ -392,7 +392,7 @@
          (new-size (+ old-size n-extra-elts))
          (new (make-array new-size)))
     (declare (type index old-size new-size)
-             (truly-dynamic-extent new))
+             (dynamic-extent new))
     (unpackify-infos input new)
     (flet ((insert-at (point v0 v1)
              (unless (eql point old-size) ; slide right
@@ -484,7 +484,7 @@
   (let* ((end (compute-unpackified-info-size input))
          (new (make-array end))
          (data-start 0))
-    (declare (truly-dynamic-extent new) (type index end data-start))
+    (declare (dynamic-extent new) (type index end data-start))
     (unpackify-infos input new)
     (let ((start (info-find-aux-key/unpacked key2 new end)))
       (aver start) ; must be found - it was in the packed vector

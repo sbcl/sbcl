@@ -11,8 +11,6 @@
 
 (in-package "SB-IMPL")
 
-(declaim (declaration truly-dynamic-extent))
-
 ;;; MAYBE-INLINE, FREEZE-TYPE, and block compilation declarations can be safely ignored
 ;;; (possibly at some cost in efficiency).
 (declaim (declaration freeze-type maybe-inline start-block end-block))

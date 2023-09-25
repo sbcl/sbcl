@@ -120,6 +120,7 @@
    ("An array with element-type NIL was accessed." nil-array-accessed 1)
    ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)
    ("Thread local storage exhausted." tls-exhausted 0)
+   ("Stack allocated object overflows stack." stack-allocated-object-overflows-stack 1)
    ("Unreachable code reached" unreachable 0)
    ("Failed aver" failed-aver 1)
    ("Multiplication overflow" mul-overflow 2)

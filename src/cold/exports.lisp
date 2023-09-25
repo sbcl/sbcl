@@ -2294,6 +2294,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SEQUENCEP" "SEQUENCE-COUNT" "SEQUENCE-END"
            "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
            "SET-ARRAY-HEADER" "SET-HEADER-DATA"
+           "STACK-ALLOCATED-OBJECT-OVERFLOWS-STACK-ERROR"
            "ASSIGN-VECTOR-FLAGS" "LOGIOR-HEADER-BITS" "RESET-HEADER-BITS"
            "LOGIOR-ARRAY-FLAGS" "RESET-ARRAY-FLAGS"
            "TEST-HEADER-DATA-BIT"
@@ -2944,9 +2945,6 @@ possibly temporarily, because it might be used internally.")
             ;; Advice to the compiler that it doesn't need to assert types.
 
            "EXPLICIT-CHECK"
-            ;; Stack allocation without any questions asked
-
-           "TRULY-DYNAMIC-EXTENT"
 
            "WITH-SYSTEM-MUTEX"
            "HASH-TABLE-LOCK"

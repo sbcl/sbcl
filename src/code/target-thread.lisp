@@ -2056,7 +2056,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
          (child-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
          (created))
-    (declare (truly-dynamic-extent saved-sigmask child-sigmask))
+    (declare (dynamic-extent saved-sigmask child-sigmask))
     (with-pinned-objects (saved-sigmask child-sigmask) ; if not stack-allocated
       ;; Block deferrables to ensure that the new thread is unaffected by signals
       ;; before the various interrupt-related special vars are set up.
@@ -2669,7 +2669,7 @@ mechanism for inter-thread communication."
           (let ((a (make-array (histogram-array-length) :element-type 'fixnum))
                 (boxed (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot))
                 (unboxed (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot)))
-            (declare (truly-dynamic-extent a))
+            (declare (dynamic-extent a))
             (dotimes (i (length a))
               (setf (aref a i) (histogram-value c-thread i)))
             (list (subseq a 0 (+ sb-vm::n-histogram-bins-small

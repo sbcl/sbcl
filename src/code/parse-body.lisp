@@ -42,7 +42,7 @@
                          "DECLAIM where DECLARE was probably intended"))
                       nil))))))
     (let ((forms body) (decls (list nil)) (doc nil))
-      (declare (truly-dynamic-extent decls))
+      (declare (dynamic-extent decls))
       (let ((decls decls))
         (loop (when (endp forms) (return))
               (let ((form (first forms)))

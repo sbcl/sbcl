@@ -94,7 +94,7 @@
     ((head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
     `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
-       (declare (truly-dynamic-extent ,head-var)
+       (declare (dynamic-extent ,head-var)
                 ,@(and user-head-var `((list ,user-head-var))))
        ,@body)))
 

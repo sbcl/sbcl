@@ -133,7 +133,7 @@
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
   (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
          (%next (%node-next node)))
-    (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
+    (declare (dynamic-extent sb-vm::*pinned-objects*))
     (values (truly-the list-node
                        (%make-lisp-obj (logior (get-lisp-obj-address %next)
                                                sb-vm:instance-pointer-lowtag)))

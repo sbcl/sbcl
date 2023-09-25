@@ -407,6 +407,9 @@
   (%primitive print "Thread local storage exhausted.")
   (sb-impl::%halt))
 
+(deferr stack-allocated-object-overflows-stack-error (size)
+  (error 'stack-allocated-object-overflows-stack :size size))
+
 (deferr uninitialized-memory-error (address nbytes value)
   (declare (type sb-vm:word address))
   ;; Ignore sanitizer errors from reading the C stack.

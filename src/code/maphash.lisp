@@ -67,7 +67,7 @@
             ;; The high water mark needs to be loaded only once due to the
             ;; prohibition against adding keys during traversal.
             (,limit (1+ (* 2 (kv-vector-high-water-mark ,kv-vector)))))
-       #+weak-vector-readbarrier (declare (truly-dynamic-extent *unweakened-vectors*))
+       #+weak-vector-readbarrier (declare (dynamic-extent *unweakened-vectors*))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
        ;; However, for all intents and purposes, it is an INDEX because if not,
@@ -130,7 +130,7 @@ for."
                                        (cons ,kvv *unweakened-vectors*))
             (,lim (1+ (* 2 (kv-vector-high-water-mark ,kvv))))
             (,ind 3))
-       #+weak-vector-readbarrier (declare (truly-dynamic-extent *unweakened-vectors*))
+       #+weak-vector-readbarrier (declare (dynamic-extent *unweakened-vectors*))
        (declare (fixnum ,ind))
        (dx-flet ((,step ()
                    (loop

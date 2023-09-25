@@ -22,7 +22,7 @@ garbage collection."
   `(progn ,@objects (,(if objects 'without-gcing 'progn) ,@body))
   #+(and generational (not (or x86 x86-64)))
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
-     (declare (truly-dynamic-extent *pinned-objects*))
+     (declare (dynamic-extent *pinned-objects*))
      ,@body)
   #+(and generational (or x86 x86-64))
   (if objects

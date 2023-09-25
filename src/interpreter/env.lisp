@@ -528,8 +528,7 @@
 ;; variable-affecting declaration it is.
 (defun applies-to-variables-p (decl)
   (let ((id (car decl)))
-    (or (find id '(ignorable ignore type special
-                   dynamic-extent truly-dynamic-extent))
+    (or (find id '(ignorable ignore type special dynamic-extent))
         (if (or (listp id) ; it must be a type-specifier (including NIL)
                 (info :type :kind id))
             'type))))

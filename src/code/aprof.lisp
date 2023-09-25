@@ -102,7 +102,7 @@
          (sb-fasl:get-asm-routine 'sb-vm::enable-sized-alloc-counter t))
         (stack (make-array 1 :element-type 'sb-vm:word))
         (insts (code-instructions code)))
-    (declare (truly-dynamic-extent stack))
+    (declare (dynamic-extent stack))
     (with-alien ((allocation-tracker-counted (function void system-area-pointer) :extern)
                  (allocation-tracker-sized (function void system-area-pointer) :extern))
       (do-packed-varints (loc locs)

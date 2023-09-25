@@ -400,7 +400,7 @@
          (index 0)
          (length (length lists))
          (last (1- length)))
-    (declare (truly-dynamic-extent result))
+    (declare (dynamic-extent result))
     (loop
      (cond
        ((< (truly-the index index) last)

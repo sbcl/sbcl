@@ -833,7 +833,7 @@
     ;; COPY-CTYPE can copy subparts like the numeric bound if arena-allocated
     #-sb-xc-host
     `(let ((temp (,allocator (logior ,flag-bits ,class-bits) ,@initargs)))
-       (declare (truly-dynamic-extent temp))
+       (declare (dynamic-extent temp))
        #+nil ; or #+sb-devel as you see fit
        (unless *hashsets-preloaded*
          (write-string "CTYPE hashset preload failure")
