@@ -730,16 +730,10 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
      * non-conservative GC. */
     filename = strdup(filename);
 
-    /* We're committed to process death at this point, and interrupts can not
-     * possibly be handled in Lisp. Let the installed handler closures become
-     * garbage, since new ones will be made by ENABLE-INTERRUPT on restart */
-#ifndef LISP_FEATURE_WIN32
-    {
-        int i;
-        for (i=0; i<NSIG; ++i)
-            lisp_sig_handlers[i] = 0;
-    }
-#endif
+    /* We're destined for process exit at this point, and interrupts can not
+     * possibly be handled in Lisp. The installed signal handler closures should
+     * be clobbered since new ones will be made by ENABLE-INTERRUPT on restart */
+    memset(lisp_sig_handlers, 0, sizeof lisp_sig_handlers);
 
     conservative_stack = 0;
     gencgc_oldest_gen_to_gc = 0;
