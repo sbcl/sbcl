@@ -3566,16 +3566,21 @@
 (defpattern "lsl + and -> ubfiz" ((ubfm) (and)) (stmt next)
   (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
     (destructuring-bind (dst2 src2 mask) (stmt-operands next)
-      (when (and (location= dst1 src2)
-                 (tagged-mask-p mask)
-                 (= immr 63)
-                 (= imms 62)
-                 (stmt-delete-safe-p dst1 dst2 '(logand)))
-        (setf (stmt-mnemonic next) 'ubfm
-              (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
-        (add-stmt-labels next (stmt-labels stmt))
-        (delete-stmt stmt)
-        next))))
+      (let (tagged)
+        (when (and (location= dst1 src2)
+                   (or (setf tagged (tagged-mask-p mask))
+                       (untagged-mask-p mask))
+                   (= immr 63)
+                   (= imms 62)
+                   (stmt-delete-safe-p dst1 dst2 '(logand)))
+          (setf (stmt-mnemonic next) 'ubfm
+                (stmt-operands next) (list dst2 src1 63 (+ (logcount mask)
+                                                           (if tagged
+                                                               -1
+                                                               -2))))
+          (add-stmt-labels next (stmt-labels stmt))
+          (delete-stmt stmt)
+          next)))))
 
 ;;; Helps with SBIT
 (defpattern "and + lsl -> ubfiz" ((and) (ubfm)) (stmt next)
