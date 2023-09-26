@@ -1459,15 +1459,17 @@
                               (type-specifier initial-contents-type)
                               (sb-vm:saetp-specifier saetp))))
             ((constant-lvar-p initial-contents)
-             (map nil (lambda (x)
-                        (unless (ctypep x element-type)
-                          (let ((*compiler-error-context* node))
-                            (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
-                                           x
-                                           (type-specifier element-type)))
-                          (return-from %make-array-ir2-hook-optimizer))
-                        x)
-                  (lvar-value initial-contents)))))))
+             (let ((initial-contents (lvar-value initial-contents)))
+               (when (sequencep initial-contents)
+                 (map nil (lambda (x)
+                            (unless (ctypep x element-type)
+                              (let ((*compiler-error-context* node))
+                                (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
+                                               x
+                                               (type-specifier element-type)))
+                              (return-from %make-array-ir2-hook-optimizer))
+                            x)
+                      initial-contents))))))))
 
 (defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))

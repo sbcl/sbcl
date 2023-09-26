@@ -746,3 +746,10 @@
           '(or (integer 1 2) single-float))
     (test `(aref ,(make-array 3 :fill-pointer 2 :initial-contents #(1 2 3.0)) a)
           '(or (integer 1 2) single-float))))
+
+(with-test (:name :make-array-initial-contents-zero-dimensions)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (d)
+         (make-array d :initial-contents 1))
+    ((nil) #0a1 :test #'equalp)))
