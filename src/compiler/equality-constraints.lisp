@@ -536,7 +536,7 @@
         (do-equality-constraints (y op not-p) (make-vector-length-constraint vector-var) gen
           (let ((constant (and (constant-p y)
                                (constant-value y))))
-            (cond (constant
+            (cond ((integerp constant)
                    (case op
                      (eq
                       (unless not-p
