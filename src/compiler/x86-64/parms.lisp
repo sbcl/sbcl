@@ -44,14 +44,9 @@
 ;;; The card size for immobile/low space
 (defconstant immobile-card-bytes 4096)
 
-;;; ### Note: we simultaneously use ``word'' to mean a 32 bit quantity
-;;; and a 16 bit quantity depending on context. This is because Intel
-;;; insists on calling 16 bit things words and 32 bit things
-;;; double-words (or dwords). Therefore, in the instruction definition
-;;; and register specs, we use the Intel convention. But whenever we
-;;; are talking about stuff the rest of the lisp system might be
-;;; interested in, we use ``word'' to mean the size of a descriptor
-;;; object, which is 64 bits.
+;;; ### Note: 'lispword' always means 8 bytes, and 'word' usually means
+;;; the same as 'lispword', except in the assembler and disassembler,
+;;; where 'word' means 2 bytes to match AMD/Intel terminology.
 
 ;;;; machine architecture parameters
 
