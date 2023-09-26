@@ -210,9 +210,10 @@
   (values))
 
 (defun signal-delayed-combination-condition (call)
-  (let ((*compiler-error-context* call)
-        (delayed (combination-info call)))
-    (apply #'funcall delayed)))
+  (let* ((delayed (combination-info call))
+         (*compiler-error-context* call))
+    (when (consp delayed)
+      (apply #'funcall delayed))))
 
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
 ;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
