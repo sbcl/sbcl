@@ -3098,6 +3098,8 @@
            (cast (or (cast-or-check-bound-type (node-lvar node))
                      (give-up-ir1-transform)))
            (result-type (type-intersection type cast)))
+      (when (eq result-type *empty-type*)
+        (give-up-ir1-transform))
       (flet ((subp (lvar type)
                (cond
                  ((not (constant-type-p type))
@@ -3110,24 +3112,24 @@
                     (if (typep type '(cons (eql satisfies)))
                         (funcall (second type) value)
                         (sb-xc:typep value type)))))))
-       (loop with rotate
-             for vop in vops
-             for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
-             when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
-                       (neq x-type *universal-type*)
-                       (neq y-type *universal-type*)
-                       (or (and (subp x x-type)
-                                (subp y y-type))
-                           (and swap
-                                (subp y x-type)
-                                (subp x y-type)
-                                (setf rotate t))))
-             return `(%primitive ,(vop-info-name vop)
-                                 ,@(if rotate
-                                       '(y x)
-                                       '(x y))
-                                 ',(type-specifier cast))
-             finally (give-up-ir1-transform))))))
+        (loop with rotate
+              for vop in vops
+              for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
+              when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                        (neq x-type *universal-type*)
+                        (neq y-type *universal-type*)
+                        (or (and (subp x x-type)
+                                 (subp y y-type))
+                            (and swap
+                                 (subp y x-type)
+                                 (subp x y-type)
+                                 (setf rotate t))))
+              return `(%primitive ,(vop-info-name vop)
+                                  ,@(if rotate
+                                        '(y x)
+                                        '(x y))
+                                  ',(type-specifier cast))
+              finally (give-up-ir1-transform))))))
 
 (deftransform * ((x y) ((or word sb-vm:signed-word) (or word sb-vm:signed-word))
                  * :node node :important nil)
@@ -3159,13 +3161,14 @@
                    (csubtypep y-type (specifier-type 'word))
                    (csubtypep y-type (specifier-type 'sb-vm:signed-word)))
                   (or (csubtypep x-type (specifier-type 'word))
-                      (csubtypep x-type (specifier-type 'sb-vm:signed-word))))
-              (not (types-equal-or-intersect type (specifier-type 'fixnum))))
+                      (csubtypep x-type (specifier-type 'sb-vm:signed-word)))))
       (give-up-ir1-transform))
     (let* ((vops (fun-info-templates (fun-info-or-lose name)))
            (cast (or (cast-or-check-bound-type (node-lvar node) t)
                      (give-up-ir1-transform)))
            (result-type (type-intersection type cast)))
+      (when (eq result-type *empty-type*)
+        (give-up-ir1-transform))
       (multiple-value-bind (cast-low cast-high) (integer-type-numeric-bounds cast)
         (unless (and (fixnump cast-low)
                      (fixnump cast-high))

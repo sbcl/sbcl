@@ -209,7 +209,7 @@
     ((-9.223372036854776d18) nil)
     ((9.223372036854776d18) t)))
 
-(with-test (:name :overflow-t-transform)
+(with-test (:name :overflow-transform-nil)
   (checked-compile-and-assert
       (:allow-warnings t)
       `(lambda (v)
@@ -220,4 +220,9 @@
              (f i)
              (incf i)
              (f i)
-             (incf i))))))
+             (incf i)))))
+  (checked-compile-and-assert
+      (:allow-style-warnings t)
+      `(lambda (s e)
+         (subseq s 0 (when e
+                       (- (length s) 12129535698721845515))))))
