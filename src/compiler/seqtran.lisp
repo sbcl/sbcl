@@ -2784,18 +2784,12 @@
                                                                    (sb-xc:typep x 'eq-comparable-type))
                                                               'item)
                                                              ((and (eq effective-test 'char-equal)
-                                                                   (not (both-case-p x)))
+                                                                   (if (characterp x)
+                                                                       (not (both-case-p x))
+                                                                       (give-up-ir1-transform)))
                                                               'item)
                                                              (t
                                                               `',x))))))))
-                          ;; FIXME: dups cause more than one test on the same key because IR1
-                          ;; doesn't propagate information about which IFs can't possibly match.
-                          ;; FIXME: suffers from same type derivation issue as above.
-                          ;;        e.g. (- (position (the (member 10 20) x) #(1 2 5 10 15 20 30)))
-                          ;; -> "Constant NIL conflicts with its asserted type NUMBER."
-                          ;; But a fix for the general case (with any :TEST) has to figure out
-                          ;; whether the returned value must definitely be non-NIL before doing
-                          ;; the same thing as above which we claim is unreachable.
                           (return-from ,fun-name
                             `(lambda (item sequence &rest rest)
                                (declare (ignore sequence rest))

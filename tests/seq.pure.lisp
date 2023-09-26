@@ -795,3 +795,8 @@
                                     (declare ((simple-base-string 10) x))
                                     (fill x y :start 12))
                                  :allow-warnings t))))
+
+(with-test (:name :find-compile-time-mismatch)
+  (assert
+   (nth-value 2 (checked-compile `  (lambda (c) (find c #*10 :test #'char-equal))
+                                    :allow-warnings t))))
