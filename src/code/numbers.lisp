@@ -748,7 +748,7 @@ the first."
 #+64-bit
 (defmacro float-bignum-= (float bignum type)
   (macrolet ((sym (name)
-               `(package-symbolicate :sb-vm type '- ',name)))
+               `(package-symbolicate #.(find-package "SB-VM") type '- ',name)))
     `(let* ((float ,float)
             (bignum ,bignum)
             (bignum-length (%bignum-length bignum))
@@ -774,7 +774,7 @@ the first."
 #+64-bit
 (defmacro float-bignum-< (float bignum type)
   (macrolet ((sym (name)
-               `(package-symbolicate :sb-vm type '- ',name)))
+               `(package-symbolicate #.(find-package "SB-VM") type '- ',name)))
     `(let* ((float ,float)
             (bignum ,bignum)
             (bignum-length (%bignum-length bignum))
@@ -807,7 +807,7 @@ the first."
 #+64-bit
 (defmacro float-bignum-> (float bignum type)
   (macrolet ((sym (name)
-               `(package-symbolicate :sb-vm type '- ',name)))
+               `(package-symbolicate #.(find-package "SB-VM") type '- ',name)))
     `(let* ((float ,float)
             (bignum ,bignum)
             (bignum-length (%bignum-length bignum))
