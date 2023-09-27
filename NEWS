@@ -31,8 +31,8 @@ changes relative to sbcl-2.3.8:
   * optimization: function types derived by the compiler can in some cases be
     propagated backwards through the intermediate representation.
   * optimization: better type derivations for LDB, LOGBITP, RATIO.
-  * optimization: if things are known to the compiler to be EQ or EQL, that
-    will be used to optimize calls to EQUAL or EQUALP.
+  * optimization: eliminate bound checks in more cases involving transitive
+    comparisons.
 
 changes in sbcl-2.3.8 relative to sbcl-2.3.7:
   * enhancement: a mark-region parallel garbage collector is available as a
