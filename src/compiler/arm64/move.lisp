@@ -25,7 +25,8 @@
                    (setf ffff-count ffff
                          zero-count zero
                          single-mov (or (= ffff 1)
-                                        (= zero 1))))))
+                                        (= zero 1))))
+             single-mov))
       (cond ((typep val '(unsigned-byte 16))
              (inst movz y val)
              y)
