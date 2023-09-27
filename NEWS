@@ -6,9 +6,34 @@ changes relative to sbcl-2.3.8:
     binding. This permits for example building complex or recursive structures
     on the stack more easily via iteration. See the updated manual entry for
     more details.
-  * minor incompatible change: some SB-POSIX interfaces adhere to the spec
-    that a NULL result from the C library is an error if and only if errno
-    was altered by the call. SYSCALL-ERROR will be signaled if so.
+  * minor incompatible change: some interfaces in the SB-POSIX contrib module
+    adhere to the spec that a NULL result from the C library is an error if
+    and only if errno was altered by the call. SYSCALL-ERROR will be signaled
+    if so.
+  * enhancement: the SB-POSIX contrib module provides DO-PASSWDS and DO-GROUPS
+    to allow users to iterate over password and group databases safely.
+  * platform support:
+    ** support for Darwin on x86 and PowerPC has been restored.  (lp#2033287,
+       thanks to Kirill A. Korinsky, Sergey Fedorov and barracuda156)
+  * bug fix: miscompilation due to erroneous type derivation in the presence
+    of multiplication of fixnums by ratios.  (lp#2033695, reported by Patrick
+    Dussud)
+  * bug fix: compiler error when compiling signed- and unsigned 64-bit type
+    checks in some cases.  (lp#2033997, reported by Eric Smith)
+  * bug fix: compiler error when the :INITIAL-CONTENTS argument to MAKE-ARRAY
+    is a constant non-sequence.  (lp#2037328)
+  * bug fix: compiler error when constant-folding sequence functions with
+    :TEST or :KEY functions erroring on the given sequence.  (lp#2037341)
+  * bug fix: compiler error when arguments to array or sequence functions
+    imply a very large sequence size.  (lp#2037443, lp#2037348)
+  * bug fix: compiler error when the return value of ADJUST-ARRAY is not used.
+    (lp#2037450)
+  * optimization: function types derived by the compiler can in some cases be
+    propagated backwards through the intermediate representation.
+  * optimization: better type derivations for LDB, LOGBITP, RATIO.
+  * optimization: if things are known to the compiler to be EQ or EQL, that
+    will be used to optimize calls to EQUAL or EQUALP.
+
 changes in sbcl-2.3.8 relative to sbcl-2.3.7:
   * enhancement: a mark-region parallel garbage collector is available as a
     build-time option; it can be enabled by adding
