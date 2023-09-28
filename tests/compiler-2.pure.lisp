@@ -4221,3 +4221,27 @@
     ((nil nil) t)
     ((nil '(1)) nil)
     ((1 nil) nil)))
+
+(with-test (:name :optimize-return-deleted-lambda)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (labels ((f1 ()
+                    (case x (:star (f1))))
+                  (f2 (d n)
+                    (case x (:open (f1))))
+                  (f3 (d n)
+                    (case x
+                      (:backquote (f4 d 0))
+                      (:nest
+                       (f3 d n))
+                      (t (f2 d n))))
+                  (f4 (d n)
+                    (case x
+                      (:nest (f3 d n))
+                      (t (f2 d n))))
+                  (f5 (d)
+                    (case x
+                      (:backquote (f4 d 0))
+                      (:nest (f5 d)))))))
+    ((1) nil)))
