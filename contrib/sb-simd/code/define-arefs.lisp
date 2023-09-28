@@ -55,7 +55,7 @@
                  collect `(,(gensym "DIMENSION") (array-dimension ,array ,axis))))
          (dimensions (mapcar #'first dimension-bindings))
          (stride-bindings
-           (loop for axis from (- length 2) downto 0
+           (loop for axis from (1- length) downto 1
                  for old-stride = nil then new-stride
                  for new-stride = (gensym "STRIDE")
                  for stride-binding = `(,new-stride ,(nth axis dimensions))
