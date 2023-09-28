@@ -437,3 +437,9 @@ fractional bits."
       (= (/ a b)
          (/ c d)))
    ((#C(1.0f0 0.0f0) #C(10000.1f0 1.3f0) #C(1.0f0 0.0f0) #C(10000.1f0 1.3f0)) t)))
+
+(with-test (:name :rational-derive-type-nan)
+  (checked-compile `(lambda () (rationalize #.sb-ext:single-float-positive-infinity))
+                   :allow-style-warnings t)
+  (checked-compile `(lambda () (rational #.sb-ext:single-float-positive-infinity))
+                   :allow-style-warnings t))

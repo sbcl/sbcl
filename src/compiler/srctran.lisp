@@ -5010,11 +5010,15 @@
 
 (defoptimizer (rational derive-type) ((x))
   (one-arg-derive-type x (lambda (type)
-                           (flet ((%rational (bound)
-                                    (typecase bound
-                                      (cons (list (rational (car bound))))
-                                      (null nil)
-                                      (t (rational bound)))))
+                           (labels ((%%rational (x)
+                                      (unless (and (floatp x)
+                                                   (float-infinity-or-nan-p x))
+                                        (rational x)))
+                                    (%rational (bound)
+                                      (typecase bound
+                                        (cons (list (%%rational (car bound))))
+                                        (null nil)
+                                        (t (%%rational bound)))))
                              (make-numeric-type
                               :class 'rational
                               :low (%rational (numeric-type-low type))
@@ -5023,11 +5027,15 @@
 
 (defoptimizer (rationalize derive-type) ((x))
   (one-arg-derive-type x (lambda (type)
-                           (flet ((%rationalize (bound)
-                                    (typecase bound
-                                      (cons (list (rationalize (car bound))))
-                                      (null nil)
-                                      (t (rationalize bound)))))
+                           (labels ((%%rationalize (x)
+                                      (unless (and (floatp x)
+                                                   (float-infinity-or-nan-p x))
+                                        (rationalize x)))
+                                    (%rationalize (bound)
+                                      (typecase bound
+                                        (cons (list (%%rationalize (car bound))))
+                                        (null nil)
+                                        (t (%%rationalize bound)))))
                              (make-numeric-type
                               :class 'rational
                               :low (%rationalize (numeric-type-low type))
