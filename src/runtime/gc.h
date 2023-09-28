@@ -47,33 +47,37 @@ extern int sb_sprof_enabled;
 
 extern os_vm_size_t bytes_consed_between_gcs;
 
-#define VERIFY_VERBOSE    1
-#define VERIFY_PRE_GC     2
-#define VERIFY_POST_GC    4
+// flags passed to verify_heap().
+// The low 4 bits supply the generation number and 'raise' flag
+#define VERIFY_VERBOSE    (1<<4)
+#define VERIFY_PRE_GC     (1<<5)
+#define VERIFY_POST_GC    (1<<6)
 /* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers. */
-#define VERIFY_AGGRESSIVE 8
-#define VERIFY_TAGS       16
+#define VERIFY_AGGRESSIVE (1<<7)
+#define VERIFY_TAGS       (1<<8)
 /* QUICK = skip most tests. This is intended for use when GC is believed
  * to be correct per se (i.e. not for debugging GC), and so the verify
  * pass executes more quickly */
-#define VERIFY_QUICK      32
+#define VERIFY_QUICK      (1<<9)
 /* FINAL = warn about pointers from heap space to non-heap space.
  * Such pointers would normally be ignored and do not get flagged as failure.
  * This can be used in conjunction with QUICK, AGGRESSIVE, or neither. */
-#define VERIFY_FINAL      64
-#define VERIFY_DONT_LOSE  128
+#define VERIFY_FINAL      (1<<10)
+#define VERIFY_DONT_LOSE  (1<<11)
 
 /* VERIFYING_foo indicates internal state, not a caller's option */
 /* GENERATIONAL implies formatted objects, but there are ranges of objects
  * that are not generational (static space)
  * so there are no page protection checks performed for pointers from objects
  * in such ranges */
-#define VERIFYING_GENERATIONAL 256
+#define VERIFYING_GENERATIONAL (1<<12)
 /* UNFORMATTED implies that this is not a range of objects
  * but rather a range of pointers such as a binding stack, TLS,
  * lisp signal handler array, or other similar array */
-#define VERIFYING_UNFORMATTED 512
+#define VERIFYING_UNFORMATTED (1<<13)
+#define VERIFY_PRINT_HEADER_ON_FAILURE (1<<14)
 
+extern generation_index_t verify_gens;
 #define MAX_ERR_OBJS 5
 struct verify_state {
     lispobj* object_addr;
@@ -88,7 +92,7 @@ struct verify_state {
 #endif
     lispobj err_objs[5];
 };
-void hexdump_spaces(struct verify_state*, char *reason);
+void hexdump_spaces(struct verify_state*, char *reason, char *pathname);
 int verify_heap(lispobj*, int flags);
 int hexdump_and_verify_heap(lispobj*, int flags);
 
@@ -101,6 +105,7 @@ extern generation_index_t gencgc_oldest_gen_to_gc;
 extern page_index_t gencgc_alloc_start_page;
 extern bool conservative_stack;
 extern lispobj lisp_init_function;
+char *page_card_mark_string(page_index_t page, char *result);
 
 #include "immobile-space.h" // provides dummy stubs if #-immobile-space
 #ifdef LISP_FEATURE_MARK_REGION_GC

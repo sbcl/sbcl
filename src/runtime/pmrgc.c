@@ -44,18 +44,6 @@ int n_gcs;
  * and only a few rare messages are printed at level 1. */
 int gencgc_verbose = 0;
 
-/* FIXME: At some point enable the various error-checking things below
- * and see what they say. */
-
-/* We hunt for pointers to old-space, when GCing generations >= verify_gen.
- * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
- * check. */
-generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
-
-/* Should we do a pre-scan of the heap before it's GCed? */
-int pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
-
-
 /*
  * GC structures and variables
  */
@@ -953,7 +941,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
     // been on pages that got freed by free_oldspace.
     dynspace_codeblob_tree_snapshot = 0;
     if (generation >= verify_gens)
-        verify_heap(cur_thread_approx_stackptr, VERIFY_POST_GC | (generation<<16));
+        hexdump_and_verify_heap(cur_thread_approx_stackptr,
+                                VERIFY_POST_GC | (generation<<1) | raise);
 
     extern int n_unboxed_instances;
     n_unboxed_instances = 0;
@@ -1554,33 +1543,6 @@ static bool card_markedp(void* addr)
     return gc_card_mark[addr_to_card_index(addr)] != CARD_UNMARKED;
 }
 
-char *page_card_mark_string(page_index_t page, char *result)
-{
-    long card = addr_to_card_index(page_address(page));
-    if (cardseq_all_marked_nonsticky(card))
-        result[0] = '*', result[1] = 0;
-    else if (!cardseq_any_marked(card))
-        result[0] = '-', result[1] = 0;
-    else {
-        int i;
-        for(i=0; i<CARDS_PER_PAGE; ++i)
-        switch (gc_card_mark[card+i] & MARK_BYTE_MASK) {
-        case CARD_MARKED: result[i] = '*'; break;
-        case CARD_UNMARKED: result[i] = '-'; break;
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        case STICKY_MARK: result[i] = 'S'; break;
-#else
-        case WP_CLEARED_AND_MARKED: result[i] = 'd'; break; // "d" is for dirty
-#endif
-        default: result[i] = '?'; break; // illegal value
-        }
-        result[CARDS_PER_PAGE] = 0;
-    }
-    return result;
-}
-
-#define PRINT_HEADER_ON_FAILURE 2048
-
 // Check a single pointer. Return 1 if we should stop verifying due to too many errors.
 // (Otherwise continue showing errors until then)
 // NOTE: This function can produces false failure indications,
@@ -1590,10 +1552,10 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
                          char *str)
 {
     lock();
-    if (state->flags & PRINT_HEADER_ON_FAILURE) {
+    if (state->flags & VERIFY_PRINT_HEADER_ON_FAILURE) {
         if (state->flags & VERIFY_PRE_GC) fprintf(stderr, "pre-GC failure\n");
         if (state->flags & VERIFY_POST_GC) fprintf(stderr, "post-GC failure\n");
-        state->flags &= ~PRINT_HEADER_ON_FAILURE;
+        state->flags &= ~VERIFY_PRINT_HEADER_ON_FAILURE;
     }
     if (state->object_addr) {
         lispobj obj = compute_lispobj(state->object_addr);
@@ -2004,11 +1966,12 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr,
                 flags & VERIFY_PRE_GC ? "Verify before GC" :
-                flags & VERIFY_POST_GC ? "Verify after GC(%d)" :
+                flags & VERIFY_POST_GC ? "Verify after GC(%d,%d)" :
                 "Heap check", // if called at a random time
-                (int)(flags>>16)); // generation number
+                flags >> 1, // generation number
+                flags & 1); // 'raise'
     else
-        state.flags |= PRINT_HEADER_ON_FAILURE;
+        state.flags |= VERIFY_PRINT_HEADER_ON_FAILURE;
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
@@ -2105,11 +2068,6 @@ void gc_show_pte(lispobj obj)
     }
 #endif
     printf("not in GC'ed space\n");
-}
-
-int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
-{
-    return verify_heap(cur_thread_approx_stackptr, flags);
 }
 
 /* The other implementation of gc_gen_report_to_file gets the generations
