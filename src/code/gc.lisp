@@ -426,11 +426,12 @@ statistics are appended to it."
                        #xF)))))))
 
 #+mark-region-gc
-(define-alien-routine "gc_gen_of" char (address unsigned))
-#+mark-region-gc
 (defun generation-of (object)
-  (with-pinned-objects (object)
-    (gc-gen-of (get-lisp-obj-address object))))
+  (with-alien ((gc-gen-of (function char unsigned int) :extern))
+    (let ((result (with-pinned-objects (object)
+                    (alien-funcall gc-gen-of
+                                   (get-lisp-obj-address object) 127))))
+      (unless (= result 127) result))))
 
 (export 'page-protected-p)
 (macrolet ((addr->mark (addr)

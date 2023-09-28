@@ -212,7 +212,9 @@
   (declare (type function fun)
            (type fixnum start end))
   (declare (dynamic-extent fun))
-  (let* ((start (* start 2)) (end (* end 2)) ; Utter garbage conversion
+  ;; START/END are passed as fixnum-encoded raw words to ensure no boxing
+  (let* ((start (get-lisp-obj-address start))
+         (end (get-lisp-obj-address end))
          (first-byte (floor (- start dynamic-space-start)
                            (ash 8 n-lowtag-bits)))
         (last-byte (ceiling (- end dynamic-space-start n-lowtag-bits)
@@ -234,8 +236,14 @@
                        (aver (not (logtest (the fixnum size) lowtag-mask)))
                        ;; TODO: Each line has exactly one generation; should
                        ;; check that in the outer loop instead.
-                       (when (logbitp (generation-of obj) generation-mask)
-                         (funcall fun obj typecode size))))))))))
+                       ;; This code SHOULD work but does not:
+                       ;;   (let ((gen (the (not null) (generation-of obj))))
+                       ;;    (when (logbitp gen generation-mask)
+                       ;; So it was using the 'default' arg to gc_gen_of.
+                       ;; But why??? We're in a generational space aren't we?
+                       (let ((gen (generation-of obj)))
+                         (when (and gen (logbitp gen generation-mask))
+                           (funcall fun obj typecode size)))))))))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
