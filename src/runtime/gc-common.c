@@ -2851,6 +2851,9 @@ static void hexdump_control_stacks(__attribute__((unused)) void* approximate_sta
 #endif
 }
 
+extern void dump_immobile_fixedobjs(lispobj* where, lispobj* end, FILE*f);
+extern void dump_immobile_text(lispobj* where, lispobj* end, FILE*f);
+
 /* Dump spaces as human-readable text (hexadecimal) */
 void hexdump_spaces(struct verify_state* state, char *reason, char* pathname)
 {

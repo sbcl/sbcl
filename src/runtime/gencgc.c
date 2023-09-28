@@ -5230,8 +5230,6 @@ void gc_show_pte(lispobj obj)
     printf("not in GC'ed space\n");
 }
 
-extern void dump_immobile_fixedobjs(lispobj* where, lispobj* end, FILE*f);
-extern void dump_immobile_text(lispobj* where, lispobj* end, FILE*f);
 static int count_immobile_objects(__attribute__((unused)) int gen, int res[4])
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
