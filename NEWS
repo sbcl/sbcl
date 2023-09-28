@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.8:
+changes in sbcl-2.3.9 relative to sbcl-2.3.8:
   * enhancement: stack allocation via DYNAMIC-EXTENT now applies to all values
     that a variable can take on (for example via SETQ), not just the initial
     binding. This permits for example building complex or recursive structures
