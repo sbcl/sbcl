@@ -5133,7 +5133,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
                 flags & VERIFY_PRE_GC ? "Verify before GC" :
                 flags & VERIFY_POST_GC ? "Verify after GC(%d,%d)" :
                 "Heap check", // if called at a random time
-                flags >> 1, // generation number
+                (flags >> 1) & 7, // generation number
                 flags & 1); // 'raise'
     else
         state.flags |= VERIFY_PRINT_HEADER_ON_FAILURE;

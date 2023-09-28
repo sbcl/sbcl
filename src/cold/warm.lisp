@@ -13,6 +13,11 @@
 
 ;;;; general warm init compilation policy
 
+;;; The verification flags can always be enabled in self-build,
+;;; where correctness is at least as important as GC throughput.
+(setf (extern-alien "pre_verify_gen_0" int) 1
+      (extern-alien "verify_gens" char) 0)
+
 (defvar *objfile-prefix* "obj/from-self/")
 
 ;;; First things first, bootstrap the WARNING handler.
