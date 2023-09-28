@@ -327,7 +327,7 @@
 ;;; Note: a constant-tn is allowed in CMP; it uses an EA displacement,
 ;;; not immediate data.
 (define-vop (if-eq)
-  (:args (x :scs (any-reg descriptor-reg control-stack immediate))
+  (:args (x :scs (any-reg descriptor-reg control-stack))
          (y :scs (any-reg descriptor-reg control-stack immediate constant)))
   (:conditional :e)
   (:policy :fast-safe)
