@@ -97,6 +97,19 @@
       target)
     drop-through))
 
+(defun vector-length-p (node)
+  (destructuring-bind (array bound index) (sb-c::combination-args node)
+    (declare (ignore index))
+    (let ((ref (sb-c::principal-lvar-ref array))
+          (bound-use (sb-c::principal-lvar-use bound)))
+      (when (and ref
+                 (sb-c::combination-p bound-use)
+                 (eq (sb-c::combination-fun-source-name bound-use nil) 'sb-c::vector-length))
+        (let ((ref2 (sb-c::principal-lvar-ref (car (sb-c::combination-args bound-use)))))
+          (and ref
+               (eq (sb-c::ref-leaf ref)
+                   (sb-c::ref-leaf ref2))))))))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -116,10 +129,14 @@
   (:variant-vars %test-fixnum)
   (:variant t)
   (:vop-var vop)
+  (:node-var node)
   (:save-p :compute-only)
   (:generator 6
-    (let ((error (generate-error-code vop 'invalid-array-index-error
-                                      array bound index))
+    (let ((error (if (vector-length-p node)
+                     (generate-error-code vop 'sb-kernel::invalid-vector-index-error
+                                          array index)
+                     (generate-error-code vop 'invalid-array-index-error
+                                          array bound index)))
           (bound (if (sc-is bound immediate)
                      (let ((value (tn-value bound)))
                        (cond ((and %test-fixnum
@@ -179,7 +196,7 @@
          (bound)
          (index :scs (unsigned-reg signed-reg)))
   (:arg-types * *
-                (:or unsigned-num signed-num))
+              (:or unsigned-num signed-num))
   (:variant nil)
   (:variant-cost 5))
 ;;;; Accessors/Setters
