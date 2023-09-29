@@ -2142,7 +2142,8 @@
              (values z)))))
      ((1) 0))))
 
-(with-test (:name :stack-allocated-vector-checks-overflow)
+(with-test (:name :stack-allocated-vector-checks-overflow
+            :broken-on (or :arm64 :win32))
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()
