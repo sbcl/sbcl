@@ -3829,9 +3829,9 @@
         (inst inc :dword temp)
         (inst lea :dword temp (ea 1 posn)))
     (move res y)
-    (if (zerop new)
-        (inst btr res temp)
-        (inst bts res temp))))
+    (if (logbitp 0 new)
+        (inst bts res temp)
+        (inst btr res temp))))
 
 (define-vop (dpb-c/unsigned)
   (:translate %dpb)
@@ -3847,9 +3847,9 @@
   (:policy :fast-safe)
   (:generator 3
     (move res y)
-    (if (zerop new)
-        (inst btr res posn)
-        (inst bts res posn))))
+    (if (logbitp 0 new)
+        (inst bts res posn)
+        (inst btr res posn))))
 
 (define-vop (dpb-c/signed)
   (:translate %dpb)
@@ -3865,6 +3865,6 @@
   (:policy :fast-safe)
   (:generator 3
     (move res y)
-    (if (zerop new)
-        (inst btr res posn)
-        (inst bts res posn))))
+    (if (logbitp 0 new)
+        (inst bts res posn)
+        (inst btr res posn))))
