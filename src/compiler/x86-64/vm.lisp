@@ -621,6 +621,20 @@
                        (not (csubtypep (sb-c::lvar-type n) (specifier-type 'word)))))
              (values :direct nil)
              (values :default nil))))
+      (%dpb
+       (flet ((validp (type result-type)
+                (valid-funtype `((constant-arg integer)
+                                 (constant-arg (integer 1 1))
+                                 ,type
+                                 ,type)
+                               result-type)))
+         (if (and (or (validp 'signed-word 'signed-word)
+                      (validp 'word 'word))
+                  (not (destructuring-bind (new size posn integer) (sb-c::basic-combination-args node)
+                         (declare (ignore new size integer))
+                         (constant-lvar-p posn))))
+             (values :direct nil)
+             (values :default nil))))
       (t
        (values :default nil)))))
 
