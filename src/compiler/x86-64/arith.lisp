@@ -1281,15 +1281,20 @@
            (amount-error amount)
            (error (generate-error-code+
                    (when (sc-is amount immediate)
-                     (setf amount (tn-value amount)
-                           amount-error
-                           (make-random-tn :kind :normal
-                                           :sc (sc-or-lose (if (typep amount 'word)
-                                                               'unsigned-reg
-                                                               'signed-reg))
-                                           :offset (tn-offset temp)))
-                     (lambda ()
-                       (inst mov temp amount)))
+                     (setf amount (tn-value amount))
+                     (cond ((typep amount 'sc-offset)
+                            (setf amount-error (make-sc+offset immediate-sc-number amount))
+                            nil)
+                           (t
+                            (setf amount-error
+                                  (make-random-tn :kind :normal
+                                                  :sc (sc-or-lose (if (typep amount 'word)
+                                                                      'unsigned-reg
+                                                                      'signed-reg))
+                                                  :offset (tn-offset temp)))
+
+                            (lambda ()
+                              (inst mov temp amount)))))
                    vop 'sb-kernel::ash-overflow2-error number amount-error))
            (amount-width (if (csubtypep (tn-ref-type amount-ref)
                                         (specifier-type `(signed-byte 32)))
@@ -1378,15 +1383,20 @@
            (amount-error amount)
            (error (generate-error-code+
                    (when (sc-is amount immediate)
-                     (setf amount (tn-value amount)
-                           amount-error
-                           (make-random-tn :kind :normal
-                                           :sc (sc-or-lose (if (typep amount 'word)
-                                                               'unsigned-reg
-                                                               'signed-reg))
-                                           :offset (tn-offset temp)))
-                     (lambda ()
-                       (inst mov temp amount)))
+                     (setf amount (tn-value amount))
+                     (cond ((typep amount 'sc-offset)
+                            (setf amount-error (make-sc+offset immediate-sc-number amount))
+                            nil)
+                           (t
+                            (setf amount-error
+                                  (make-random-tn :kind :normal
+                                                  :sc (sc-or-lose (if (typep amount 'word)
+                                                                      'unsigned-reg
+                                                                      'signed-reg))
+                                                  :offset (tn-offset temp)))
+
+                            (lambda ()
+                              (inst mov temp amount)))))
                    vop 'sb-kernel::ash-overflow2-error number amount-error))
            (amount-width (if (csubtypep (tn-ref-type amount-ref)
                                         (specifier-type `(signed-byte 32)))
