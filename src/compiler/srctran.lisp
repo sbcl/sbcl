@@ -3706,6 +3706,16 @@
 (deftransform logandc2 ((x y) ((constant-arg (eql -1)) t) *)
   `(lognot y))
 
+(deftransform logandc2 ((x y) * * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  (if (and (not (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))))
+           (csubtypep (lvar-type y) (specifier-type 'fixnum))
+           (csubtypep (one-arg-derive-type y #'lognot-derive-type-aux #'lognot)
+                      (specifier-type 'fixnum)))
+      `(logand x (lognot y))
+      (give-up-ir1-transform)))
+
 (deftransform mask-signed-field ((size x) ((constant-arg t) t) *)
   "fold identity operation"
   (let ((size (lvar-value size)))
