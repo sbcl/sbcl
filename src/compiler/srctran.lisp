@@ -2754,6 +2754,14 @@
 ;;; the range -2^(n-1) .. 1-2^n, instead of allowing result types of
 ;;; (UNSIGNED-BYTE N) and result types of (SIGNED-BYTE N).
 
+(deftransform %dpb ((new size posn int) ((constant-arg integer) (constant-arg integer) t t) * :important nil)
+  (let* ((new (lvar-value new))
+         (size (lvar-value size))
+         (cut (ldb (byte size 0) new)))
+    (if (/= new cut)
+        `(%dpb ,cut ,size posn int)
+        (give-up-ir1-transform))))
+
 (deftransform %dpb ((new size posn int) * word :node node)
   "convert to inline logical operations"
   (delay-ir1-transform node :ir1-phases)
