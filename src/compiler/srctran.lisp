@@ -2758,9 +2758,26 @@
   (let* ((new (lvar-value new))
          (size (lvar-value size))
          (cut (ldb (byte size 0) new)))
-    (if (/= new cut)
-        `(%dpb ,cut ,size posn int)
-        (give-up-ir1-transform))))
+    (cond ((/= new cut)
+           `(%dpb ,cut ,size posn int))
+          ((not (csubtypep (lvar-type posn) (specifier-type `(integer 0 (,(- sb-vm:n-fixnum-bits size))))))
+           (give-up-ir1-transform))
+          ((= (logcount new) size)
+           (let ((uses (lvar-uses int)))
+             ;; Move the cast after the ash for cast-externally-checkable-p to work.
+             (when (cast-p uses)
+               (delete-cast uses)))
+           `(logior (ash new posn)
+                    (the integer int)))
+          ((zerop new)
+           (let ((uses (lvar-uses int)))
+             (when (cast-p uses)
+               (delete-cast uses)))
+           `(logandc2 int
+                      (ash (ldb (byte size 0) -1) posn)))
+
+          (t
+           (give-up-ir1-transform)))))
 
 (deftransform %dpb ((new size posn int) * word :node node)
   "convert to inline logical operations"
