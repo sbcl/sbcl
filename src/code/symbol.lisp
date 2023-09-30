@@ -400,7 +400,7 @@ distinct from the global value. Can also be SETF."
        (()
         (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
                    ;; Readonly space is physically unwritable. Don't touch it.
-                   (dynamic-space-obj-p name))
+                   (not (read-only-space-obj-p name)))
           (logior-array-flags name sb-vm:+vector-shareable+))) ; Set "logically read-only" bit
        (symbol
          (truly-the symbol
