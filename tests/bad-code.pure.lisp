@@ -587,7 +587,17 @@
    ()
    `(lambda (s e)
       (reduce #'funcall s :from-end e :initial-value '(1)))
-   (('(car) t) 1)))
+   (('(car) t) 1))
+  (checked-compile-and-assert
+   ()
+   `(lambda (e)
+      (reduce #'funcall #*1 :from-end e :initial-value 1 :key (lambda (x) x 'list)))
+   ((t) '(1) :test #'equal))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (reduce #'funcall #*1 :from-end t :initial-value 1 :key (lambda (x) x 'list)))
+   (() '(1) :test #'equal)))
 
 (with-test (:name :get-defined-fun-lambda-list-error)
   (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))
