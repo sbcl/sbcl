@@ -2160,3 +2160,15 @@
    ;; This condition will be different depending on whether the
    ;; explicit stack check signals or the guard page gets hit.
    (() (condition 'sb-kernel::storage-condition))))
+
+(with-test (:name :stack-allocated-vector-integer-size-arg)
+  (checked-compile-and-assert
+   (:optimize :safe)
+   '(lambda ()
+      (let ((buffer (make-array (* 128 1024) :element-type '(unsigned-byte 8))))
+        (declare (dynamic-extent buffer))
+        (dotimes (i (length buffer))
+          (setf (aref buffer i) (mod i 32)))
+        (print-nothing (aref buffer 0))
+        nil))
+   (() nil)))

@@ -728,7 +728,9 @@
             (inst sub rsp-tn size)
             (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
             ;; avoid clearing condition codes
-            (inst lea rsp-tn (ea rsp-tn size))
+            (inst lea rsp-tn (if (integerp size)
+                                 (ea size rsp-tn)
+                                 (ea rsp-tn size)))
             (inst jmp :be overflow)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
