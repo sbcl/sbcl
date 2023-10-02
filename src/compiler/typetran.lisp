@@ -660,6 +660,22 @@
                      (widetags
                       `(or (%other-pointer-subtype-p ,object ',widetags)
                            (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
+                     ((and (cdr more-types)
+                           (every #'intersection-type-p more-types)
+                           (let ((common (intersection-type-types (car more-types))))
+                             (loop for type in (cdr more-types)
+                                   for types = (intersection-type-types type)
+                                   for int = (intersection common types :test #'type=)
+                                   while int
+                                   do (setf common int)
+                                   finally
+                                   (return `(and
+                                             (typep ,object '(and ,@(mapcar #'type-specifier common)))
+                                             (or ,@(loop for type in more-types
+                                                         for types = (intersection-type-types type)
+                                                         collect
+                                                         `(typep ,object '(and ,@(mapcar #'type-specifier
+                                                                                  (set-difference types common))))))))))))
                      (t
                       `(or
                         ,@(mapcar (lambda (x)
