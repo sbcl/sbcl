@@ -1439,3 +1439,14 @@ is replaced with replacement."
                                   (cleanup-mess-up
                                    (block-start-cleanup ep)))))))))
     (write-line "}" stream)))
+
+(defun print-constraint (constraint)
+  (flet ((f (x)
+           (cond ((lambda-var-p x)
+                  (leaf-source-name x))
+                 ((ctype-p x)
+                  (type-specifier x))
+                 (t x))))
+   (format t "~a ~a ~a~%" (constraint-kind constraint)
+           (f (constraint-x constraint))
+           (f (constraint-y constraint)))))

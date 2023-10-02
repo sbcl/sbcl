@@ -43,7 +43,7 @@
   (let ((fun-type (global-ftype caller)))
     (collect ((lvars))
       (let ((arg-position -1)
-            (positional-count (fun-type-positional-count fun-type)))
+            (optional-args (nthcdr (fun-type-positional-count fun-type) lvars)))
         (labels ((record-lvar (lvar)
                    (lvars lvar)
                    (incf arg-position))
@@ -51,9 +51,17 @@
                    (loop for (key value*) on options by #'cddr
                          for value = (if (or (eq key :key)
                                              (eq key :value))
-                                         (let ((lvar (getf (nthcdr positional-count lvars) value*)))
-                                           (and lvar
-                                                (record-lvar lvar)))
+                                         (if (consp value*)
+                                             (let ((value-lvar (getf optional-args (car value*))))
+                                               (when value-lvar
+                                                 (let ((if (getf optional-args (second value*))))
+                                                   (if if
+                                                       (list (record-lvar value-lvar)
+                                                             (record-lvar if) (third value*))
+                                                       (record-lvar value-lvar)))))
+                                             (let ((lvar (getf optional-args value*)))
+                                               (and lvar
+                                                    (record-lvar lvar))))
                                          value*)
                          when value
                          collect key
@@ -66,7 +74,7 @@
                        (list* (record-lvar (nth (cadr arg) lvars))
                               (handle-keys (cddr arg)))))
                      (rest-args
-                      (loop for lvar in (nthcdr positional-count lvars)
+                      (loop for lvar in optional-args
                             collect
                             (list* (record-lvar lvar)
                                    (handle-keys (cdr arg)))))
@@ -318,12 +326,32 @@
                           (value-nth (getf options :value))
                           (key-nth (getf options :key))
                           (value (and value-nth
-                                      (nth value-nth deps)))
+                                      (nth (if (consp value-nth)
+                                               (car value-nth)
+                                               value-nth)
+                                           deps)))
                           (key (and key-nth (nth key-nth deps)))
                           (key-return-type (cond (value-nth
-                                                  (if (lvar-p value)
-                                                      (lvar-type value)
-                                                      *universal-type*))
+                                                  (if (consp value-nth)
+                                                      (let* ((option (nth (second value-nth) deps))
+                                                             (option-p (third value-nth))
+                                                             (false (or (not option)
+                                                                        (csubtypep (lvar-type option) (specifier-type 'null))))
+                                                             (true (and option
+                                                                        (csubtypep (lvar-type option) (specifier-type '(not null)))))
+                                                             (unknown (not (or true false))))
+                                                        (cond (unknown
+                                                               (type-union (lvar-type value)
+                                                                           (if (getf options :sequence)
+                                                                               (sequence-element-type (arg-type arg))
+                                                                               (arg-type arg))))
+                                                              ((and true option-p)
+                                                               (lvar-type value))
+                                                              ((and false (not option-p))
+                                                               (lvar-type value))))
+                                                      (if (lvar-p value)
+                                                          (lvar-type value)
+                                                          *universal-type*)))
                                                  ((not key)
                                                   nil)
                                                  ((lvar-p key)

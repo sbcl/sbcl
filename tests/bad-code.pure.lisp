@@ -577,6 +577,18 @@
                  :initial-value 0))
     (("abc") 294)))
 
+(with-test (:name :reduce-initial-value-from-end)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (reduce #'funcall s :from-end t :initial-value '(1)))
+   (('(car)) 1))
+  (checked-compile-and-assert
+   ()
+   `(lambda (s e)
+      (reduce #'funcall s :from-end e :initial-value '(1)))
+   (('(car) t) 1)))
+
 (with-test (:name :get-defined-fun-lambda-list-error)
   (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))
 
