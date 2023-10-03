@@ -3151,7 +3151,7 @@
                         (sb-xc:typep value type)))))))
         (loop with rotate
               for vop in vops
-              for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
+              for (x-type y-type) = (fun-type-required (vop-info-type vop))
               when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                         (neq x-type *universal-type*)
                         (neq y-type *universal-type*)
@@ -3245,7 +3245,7 @@
                             (funcall (second type) value)
                             (sb-xc:typep value type)))))))
             (loop for vop in vops
-                  for (x-type y-type cast-type) = (fun-type-required (vop-info-type vop))
+                  for (x-type y-type) = (fun-type-required (vop-info-type vop))
                   when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                             (if swap
                                 (eq y-type *universal-type*)
@@ -3297,7 +3297,7 @@
                      (give-up-ir1-transform)))
            (result-type (type-intersection type cast)))
       (loop for vop in vops
-            for (x-type cast-type) = (fun-type-required (vop-info-type vop))
+            for (x-type) = (fun-type-required (vop-info-type vop))
             when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                       (neq x-type *universal-type*)
                       (csubtypep (lvar-type x) x-type))
