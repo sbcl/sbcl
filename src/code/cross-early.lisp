@@ -98,3 +98,12 @@
   (if (complexp self)
       `(complex ,(complexnum-real self) ,(complexnum-imag self))
       `(make-flonum ,(flonum-%bits self) ',(flonum-format self))))
+
+#+weak-vector-readbarrier
+(progn (deftype weak-vector () nil) ; nothing is a weak-vector
+       (defun sb-int:weak-vector-ref (v i)
+         (error "Called WEAK-VECTOR-REF on ~S ~S" v i))
+       (defun (setf sb-int:weak-vector-ref) (new v i)
+         (error "Called (SETF WEAK-VECTOR-REF) on ~S ~S ~S" new v i))
+       (defun sb-int:weak-vector-len (v)
+         (error "Called WEAK-VECTOR-LEN on ~S" v)))

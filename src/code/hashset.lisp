@@ -62,29 +62,28 @@
   (mutex nil :type (or null #-sb-xc-host sb-thread:mutex)))
 
 (defmacro hs-cells-len (v)
-  #+(or (not weak-vector-readbarrier) sb-xc-host) `(length ,v)
-  #+(and weak-vector-readbarrier (not sb-xc-host))
+  #-weak-vector-readbarrier `(length ,v)
+  #+weak-vector-readbarrier
   `(let ((v (truly-the (or simple-vector weak-vector) ,v)))
      (if (simple-vector-p v) (length v) (weak-vector-len v))))
 
 (defun (setf hs-cell-ref) (newval cells index)
-  #+(or (not weak-vector-readbarrier) sb-xc-host)
-  (setf (svref cells index) newval)
+  #-weak-vector-readbarrier (setf (svref cells index) newval)
   ;; Even though this access could be punned (because the effective address
   ;; of weak-pointer + displacement or vector + displacement is the same)
   ;; that would be wrong because the store barriers are different.
-  #+(and weak-vector-readbarrier (not sb-xc-host))
+  #+weak-vector-readbarrier
   (if (simple-vector-p cells)
       (setf (svref cells index) newval)
       (setf (weak-vector-ref cells index) newval)))
 
 (declaim (inline hs-cell-ref))
 (defun hs-cell-ref (v i)
-  #+(or (not weak-vector-readbarrier) sb-xc-host) (svref v i)
+  #-weak-vector-readbarrier (svref v i)
   ;; As above, there is a read barrier needed for access to weak objects
   ;; but not for simple-vector. Would it be both correct and faster
   ;; to always _assume_ the vector is weak? I don't think so.
-  #+(and weak-vector-readbarrier (not sb-xc-host))
+  #+weak-vector-readbarrier
   (let ((v (truly-the (or simple-vector weak-vector) v)))
      (if (simple-vector-p v) (svref v i) (weak-vector-ref v i))))
 
