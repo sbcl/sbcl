@@ -1141,7 +1141,8 @@ void gc_init_immobile()
 static int page_attributes_valid;
 
 // Set the characteristics of each used page at image startup time.
-void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
+void immobile_space_coreparse(uword_t fixedobj_len,
+                              __attribute__((unused)) uword_t text_len)
 {
     int n_pages, word_idx, page;
     generation_index_t gen = CORE_PAGE_GENERATION;
@@ -1744,7 +1745,8 @@ static inline int nwords_to_layout_size_class(unsigned int nwords) {
 
 static void place_layout(lispobj* obj,
                          struct size_class size_classes[],
-                         char** alloc_ptr, char *alloc_ptr_limit)
+                         char** alloc_ptr,
+                         __attribute__((unused)) char *alloc_ptr_limit)
 {
     // Layouts may occur in different sizes.
     int nwords = 1 + (instance_length(*obj) | 1);

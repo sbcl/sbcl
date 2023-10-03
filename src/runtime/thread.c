@@ -776,7 +776,7 @@ static void detach_os_thread(init_thread_data *scribble)
         sigpending(&pending);
         if (sigismember(&pending, SIG_STOP_FOR_GC)) lose("clear stop-for-GC did not work");
 #else
-        int sig, rc;
+        __attribute__((unused)) int sig, rc;
         /* sigwait takes the mask of signals to allow through */
         rc = sigwait(&gc_sigset, &sig);
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);

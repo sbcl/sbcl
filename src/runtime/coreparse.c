@@ -1114,7 +1114,8 @@ void darwin_jit_code_pages_kludge () {
 /* Read corefile ptes from 'fd' which has already been positioned
  * and store into the page table */
 void gc_load_corefile_ptes(int card_table_nbits,
-                           core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
+                           core_entry_elt_t n_ptes,
+                           __attribute__((unused)) core_entry_elt_t total_bytes,
                            os_vm_offset_t offset, int fd,
                            __attribute__((unused)) struct coreparse_space *spaces,
                            struct heap_adjust *adj)
