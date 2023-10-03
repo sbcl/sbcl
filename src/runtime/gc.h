@@ -52,7 +52,7 @@ extern os_vm_size_t bytes_consed_between_gcs;
 #define VERIFY_VERBOSE    (1<<4)
 #define VERIFY_PRE_GC     (1<<5)
 #define VERIFY_POST_GC    (1<<6)
-/* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers. */
+/* AGGRESSIVE = always call valid_tagged_pointer_p() on pointers. */
 #define VERIFY_AGGRESSIVE (1<<7)
 #define VERIFY_TAGS       (1<<8)
 /* QUICK = skip most tests. This is intended for use when GC is believed
@@ -106,6 +106,13 @@ extern page_index_t gencgc_alloc_start_page;
 extern bool conservative_stack;
 extern lispobj lisp_init_function;
 char *page_card_mark_string(page_index_t page, char *result);
+/* These functions for looking up lisp objects given a pointer are for use
+ * from the C runtime, but should not be directly called from Lisp.
+ * The Lisp-callable ones may take additional steps, like ensuring mutual-exclusivity
+ * with GC, which are at best not needed or at worst incorrect (such as attempting
+ * recursive lock acquisition on a non-recursive lock) if called from C */
+extern int valid_tagged_pointer_p(lispobj);
+extern lispobj *component_ptr_from_pc(char *pc);
 
 #include "immobile-space.h" // provides dummy stubs if #-immobile-space
 #ifdef LISP_FEATURE_MARK_REGION_GC

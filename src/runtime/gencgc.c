@@ -4799,8 +4799,6 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
 static int
 verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
 {
-    extern int valid_lisp_pointer_p(lispobj);
-
     /* Strict containment: no pointer from a heap space may point
      * to anything outside of a heap space. */
     // bool strict_containment = state->flags & VERIFY_FINAL;
@@ -4884,7 +4882,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
     }
     int valid;
     if (state->flags & VERIFY_AGGRESSIVE) // Extreme paranoia mode
-        valid = valid_lisp_pointer_p(thing);
+        valid = valid_tagged_pointer_p(thing);
     else {
         /* Efficiently decide whether 'thing' is plausible.
          * This MUST NOT use properly_tagged_descriptor_p() which

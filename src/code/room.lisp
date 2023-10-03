@@ -886,7 +886,7 @@ We could try a few things to mitigate this:
                     ;; Explicitly skip non-pointer words. The callable that
                     ;; SB-INTROSPECT provides ignores immediate values anyway.
                     (when (and (is-lisp-pointer word)
-                               (not (zerop (sb-di::valid-lisp-pointer-p (int-sap word)))))
+                               (not (zerop (sb-di::valid-tagged-pointer-p (int-sap word)))))
                       (let ((obj (%make-lisp-obj word)))
                         (unless (memq obj seen)
                           (push obj seen)

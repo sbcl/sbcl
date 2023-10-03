@@ -66,7 +66,7 @@
   (:use #:cl #:sb-ext #:sb-alien #:sb-sys #:sb-int #:sb-kernel)
   (:export #:aprof-run #:aprof-show #:aprof-reset
            #:aprof-start #:aprof-stop #:patch-all-code)
-  (:import-from #:sb-di #:valid-lisp-pointer-p)
+  (:import-from #:sb-di #:valid-tagged-pointer-p)
   (:import-from #:sb-vm #:thread-reg)
   (:import-from #:sb-x86-64-asm
                 #:register-p #:get-gpr #:reg #:reg-num
@@ -214,7 +214,7 @@
        sb-vm::*room-info*))
 
 (defun layout-name (ptr)
-  (if (eql (valid-lisp-pointer-p (int-sap ptr)) 0)
+  (if (eql (valid-tagged-pointer-p (int-sap ptr)) 0)
       'structure
       (layout-classoid-name (make-lisp-obj ptr))))
 

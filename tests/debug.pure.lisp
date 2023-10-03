@@ -32,7 +32,7 @@
                           elsewhere-pc expect-elsewhere-pc))))))))
     (assert ok)))
 
-;;; Check that valid_lisp_pointer_p is correct for all pure boxed objects
+;;; Check that valid_tagged_pointer_p is correct for all pure boxed objects
 ;;; using the super quick check of header validity.
 (defun randomly-probe-pure-boxed-objects ()
   (let (list)
@@ -59,10 +59,10 @@
                  (base (logandc2 taggedptr sb-vm:lowtag-mask)))
             (dotimes (i 40)
               (let* ((ptr (+ base (random size)))
-                     (valid (sb-di::valid-lisp-pointer-p (sb-sys:int-sap ptr))))
+                     (valid (sb-di::valid-tagged-pointer-p (sb-sys:int-sap ptr))))
                 (if (= ptr taggedptr)
                     (assert (= valid 1))
                     (assert (= valid 0)))))))))))
 (compile 'randomly-probe-pure-boxed-objects)
-(with-test (:name :fast-valid-lisp-pointer-p)
+(with-test (:name :fast-valid-tagged-pointer-p)
   (randomly-probe-pure-boxed-objects))

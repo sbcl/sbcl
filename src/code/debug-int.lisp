@@ -541,8 +541,9 @@
          (or (not aligned) (zerop (logand (sap-int x)
                                           (1- (ash 1 word-shift))))))))
 
-(declaim (inline valid-lisp-pointer-p))
-(sb-alien:define-alien-routine valid-lisp-pointer-p sb-alien:int
+(declaim (inline valid-tagged-pointer-p))
+(sb-alien:define-alien-routine ("lisp_valid_tagged_pointer_p" valid-tagged-pointer-p)
+    sb-alien:int
   (pointer system-area-pointer))
 
 ;;; There are many opportunities for things to go wrong when searching
@@ -624,7 +625,7 @@
             ;; precise gc backends).
             (without-gcing
               (sb-alien:alien-funcall
-               (sb-alien:extern-alien "component_ptr_from_pc"
+               (sb-alien:extern-alien "lisp_component_ptr_from_pc"
                                       (function sb-alien:unsigned system-area-pointer))
                (etypecase pc
                  (system-area-pointer pc)
@@ -2335,7 +2336,7 @@ register."
 ;;; NOTE for precisely GC'd platforms:
 ;;; this function is not GC-safe in the slightest when creating
 ;;; a pointer to an object in dynamic space.  If a GC occurs between
-;;; the start of the call to VALID-LISP-POINTER-P and the end of
+;;; the start of the call to VALID-TAGGED-POINTER-P and the end of
 ;;; %MAKE-LISP-OBJ then the object could move before the boxed pointer
 ;;; is constructed.  This can happen on CHENEYGC if an asynchronous
 ;;; interrupt occurs within the window.  This can happen on GENCGC
@@ -2392,7 +2393,7 @@ register."
                    #-(or x86 x86-64) form))
         (let ((obj (if (and (typep val 'word) (is-lisp-pointer val))
                        (possibly-pin
-                        (if (= (valid-lisp-pointer-p (int-sap val)) 0)
+                        (if (= (valid-tagged-pointer-p (int-sap val)) 0)
                             0
                             (%make-lisp-obj val)))
                        0)))

@@ -2010,7 +2010,7 @@ int simple_fun_index(struct code* code, struct simple_fun *fun)
     return -1;
 }
 
-/* Helper for valid_lisp_pointer_p (below) and
+/* Helper for valid_tagged_pointer_p (below) and
  * conservative_root_p (gencgc).
  *
  * pointer is the pointer to check validity of,
@@ -2070,26 +2070,23 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 /* Used by the debugger to validate possibly bogus pointers before
  * calling MAKE-LISP-OBJ on them.
  *
- * FIXME: We would like to make this perfect, because if the debugger
- * constructs a reference to a bugs lisp object, and it ends up in a
- * location scavenged by the GC all hell breaks loose.
- *
- * Whereas conservative_root_p has to be conservative
- * and return true for all valid pointers, this could actually be eager
- * and lie about a few pointers without bad results... but that should
- * be reflected in the name.
+ * If the debugger constructs places a reference to a non-object
+ * into a boxed register, things could end very badly.
  */
 int
-valid_lisp_pointer_p(lispobj pointer)
+valid_tagged_pointer_p(lispobj pointer)
 {
     /* We don't have a general way to ask a specific GC implementation
      * whether 'pointer' is definitely the tagged pointer to an object -
      * all we have is "search for a containing object" and then a decision
      * whether pointer is the tagged pointer to that.
      * But searching is actually too complex an operation for some easy
-     * cases when we could answer the question more simply.
-     * So unfortunately this generic interface has to know something about
-     * which GC is in use. */
+     * cases when we could answer the question more simply, e.g. if the alleged
+     * pointer can not possibly be valid because of widetag/lowtag mismatch.
+     * I think it would be legal to start with that test here, because this
+     * function does not accept interior pointers. (Simple-fun pointers are
+     * interior to the containing code, but are properly tagged pointers
+     * to the base of the function to which they point) */
     page_index_t page = find_page_index((void*)pointer);
     if (page >= 0 &&
         (page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_BOXED) {
@@ -2972,3 +2969,13 @@ int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
     return verify_heap(cur_thread_approx_stackptr, flags);
 }
 #endif
+
+/* These are do-nothing wrappers for now */
+lispobj *lisp_component_ptr_from_pc(char *pc) {
+    lispobj *result = component_ptr_from_pc(pc);
+    return result;
+}
+int lisp_valid_tagged_pointer_p(lispobj pointer) {
+    int result = valid_tagged_pointer_p(pointer);
+    return result;
+}

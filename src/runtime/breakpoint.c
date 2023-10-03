@@ -18,6 +18,7 @@
 #include "os.h"
 #include "interrupt.h"
 #include "arch.h"
+#include "gc.h"
 #include "lispregs.h"
 #include "globals.h"
 #include "breakpoint.h"
