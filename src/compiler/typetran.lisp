@@ -666,7 +666,7 @@
                              (loop for type in (cdr more-types)
                                    for types = (intersection-type-types type)
                                    for int = (intersection common types :test #'type=)
-                                   while int
+                                   always int
                                    do (setf common int)
                                    finally
                                    (return `(and

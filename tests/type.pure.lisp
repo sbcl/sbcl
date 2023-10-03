@@ -875,3 +875,15 @@
                                              (declare ((or list fixnum) x))
                                              (typep x 'integer))
                                           nil)))))
+
+(with-test (:name :union-intersection-simplification)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (typep a '(or
+                 (and symbol (not null))
+                 (and array (not string)))))
+   ((#()) t)
+   (("") nil)
+   ((t) t)
+   ((nil) nil)))
