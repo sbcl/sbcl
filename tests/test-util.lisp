@@ -34,6 +34,7 @@
            #:assemble
            #:get-simple-fun-instruction-model
 
+           #:scratch-dir-name
            #:scratch-file-name
            #:*scratch-file-prefix*
            #:with-scratch-file
@@ -894,6 +895,15 @@
 ;;; We can't use any of the interfaces provided in libc because those are inadequate
 ;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
 (defvar *scratch-file-prefix* "sbcl-scratch")
+(defun scratch-dir-name ()
+  (let ((dir (posix-getenv #+win32 "TMP" #+unix "TMPDIR"))
+        (file (format nil "~a~d/" *scratch-file-prefix* (sb-unix:unix-getpid))))
+      (if dir
+          (namestring
+           (merge-pathnames
+            file (parse-native-namestring dir nil *default-pathname-defaults*
+                                          :as-directory t)))
+          (concatenate 'string "/tmp/" file))))
 (defun scratch-file-name (&optional extension)
   (let ((a (make-array 10 :element-type 'character)))
     (dotimes (i 10)
@@ -904,6 +914,7 @@
       (if dir
           (namestring
            (merge-pathnames
+            ;; TRUENAME - wtf ?
             file (truename (parse-native-namestring dir nil *default-pathname-defaults*
                                                     :as-directory t))))
           (concatenate 'string "/tmp/" file)))))
