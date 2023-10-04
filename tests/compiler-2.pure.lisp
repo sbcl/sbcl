@@ -4245,3 +4245,14 @@
                       (:backquote (f4 d 0))
                       (:nest (f5 d)))))))
     ((1) nil)))
+
+(with-test (:name :type-derivers-type-widening)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b c)
+         (logbitp 0
+                  (if (eql c 0)
+                      (max (ignore-errors c) 0)
+                      b)))
+      ((1 2) t)
+      ((0 0) nil)))
