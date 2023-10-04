@@ -889,7 +889,12 @@
       ;; the host upgraded to T but whose expressed type was not T.
       (sb-xc:simple-vector
        (dump-simple-vector simple-version file)
-       (eq-save-object x file))
+       (eq-save-object x file)
+       (unless (eq x simple-version)
+         ;; In case it has circularities that need to be patched
+         ;; later.
+         (setf (gethash simple-version (fasl-output-eq-table file))
+               (gethash x (fasl-output-eq-table file)))))
       (t
        (unless (similar-check-table x file)
          (dump-specialized-vector simple-version file)

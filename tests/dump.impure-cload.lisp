@@ -562,3 +562,11 @@
       (funcall 'eq-cdr-constants-coalescing)
     (assert (eq (cdadr a) (caddr a)))
     (assert (eq (cdadr b) (caddr b)))))
+
+(with-test (:name :circularity-within-non-simple-array)
+  (let ((a #.(make-array 2 :adjustable t
+                           :initial-element '#1=(#1#))))
+    (assert (eq (aref (opaque-identity a) 0)
+                (car (aref (opaque-identity a) 0))))
+    (assert (eq (aref (opaque-identity a) 0)
+                (aref (opaque-identity a) 1)))))
