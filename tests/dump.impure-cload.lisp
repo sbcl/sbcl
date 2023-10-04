@@ -570,3 +570,8 @@
                 (car (aref (opaque-identity a) 0))))
     (assert (eq (aref (opaque-identity a) 0)
                 (aref (opaque-identity a) 1)))))
+
+(with-test (:name :non-simple-array-constant-folding)
+  (let ((x #.(make-array 10 :fill-pointer 5)))
+    (assert (= (array-total-size x)
+               (array-total-size (opaque-identity x))))))

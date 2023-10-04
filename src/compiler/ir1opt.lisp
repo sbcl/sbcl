@@ -28,6 +28,8 @@
          leaf)
     (or (and (ref-p principal-use)
              (constant-p (setf leaf (ref-leaf principal-use)))
+             ;; Complex arrays get turned into simple arrays when compiling to a fasl.
+             (not (typep (constant-value leaf) '(and array (not simple-array))))
              ;; LEAF may be a CONSTANT behind a cast that will
              ;; later turn out to be of the wrong type.
              ;; And ir1-transforms suffer from this because
@@ -53,7 +55,8 @@
   (declare (type lvar lvar))
   (let ((use (principal-lvar-use lvar)))
     (or (and (ref-p use)
-             (constant-p (ref-leaf use)))
+             (constant-p (ref-leaf use))
+             (not (typep (constant-value (ref-leaf use)) '(and array (not simple-array)))))
         ;; check for EQL types and singleton numeric types
         (and singleton-types
              (values (type-singleton-p (lvar-type lvar)))))))

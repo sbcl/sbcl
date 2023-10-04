@@ -435,26 +435,30 @@ Experimental."
        ;; to pass to %MAKE-ARRAY-TYPE but with care we can usually avoid consing.
        (let ((etype (sb-vm::array-element-ctype x))
              (rank (array-rank x))
-             (complexp (not (simple-array-p x))))
-         (case rank
-           (0 (%make-array-type '() complexp etype etype))
-           ((1 2 3)
-            (dx-let ((dims (list (array-dimension x 0) nil nil)))
-              (case rank
-                (1 (setf (cdr dims) nil))
-                (2 (setf (cadr dims) (array-dimension x 1)
-                         (cddr dims) nil))
-                (t (setf (cadr dims) (array-dimension x 1)
-                         (caddr dims) (array-dimension x 2))))
-              (%make-array-type dims complexp etype etype)))
-           (t
-            (let ((dims (make-list rank)))
-              ;; Need ALLOCATE-LIST-ON-STACK for this decl. Can't use vop-exists-p
-              ;; because can't macroexpand into DECLARE. Maybe sharp-dot it ?
-              #+x86-64 (declare (dynamic-extent dims))
-              (dotimes (i rank)
-                (setf (nth i dims) (array-dimension x i)))
-           (%make-array-type dims complexp etype etype))))))
+             (complexp (and (not (simple-array-p x))
+                            :maybe)))
+         ;; Complex arrays get turned into simple arrays when compiling to a fasl.
+         (if complexp
+             (%make-array-type (make-list rank :initial-element '*) complexp etype etype)
+             (case rank
+               (0 (%make-array-type '() complexp etype etype))
+               ((1 2 3)
+                (dx-let ((dims (list (array-dimension x 0) nil nil)))
+                  (case rank
+                    (1 (setf (cdr dims) nil))
+                    (2 (setf (cadr dims) (array-dimension x 1)
+                             (cddr dims) nil))
+                    (t (setf (cadr dims) (array-dimension x 1)
+                             (caddr dims) (array-dimension x 2))))
+                  (%make-array-type dims complexp etype etype)))
+               (t
+                (let ((dims (make-list rank)))
+                  ;; Need ALLOCATE-LIST-ON-STACK for this decl. Can't use vop-exists-p
+                  ;; because can't macroexpand into DECLARE. Maybe sharp-dot it ?
+                  #+x86-64 (declare (dynamic-extent dims))
+                  (dotimes (i rank)
+                    (setf (nth i dims) (array-dimension x i)))
+                  (%make-array-type dims complexp etype etype)))))))
       (cons
        (make-cons-type (if (eq (car x) x)
                            (specifier-type 'cons)
