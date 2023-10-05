@@ -54,6 +54,9 @@
              (t
               (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
+  ;; FIXME: randomizing the order tests are run in, especially the "pure" ones,
+  ;; might help detect accidental side-effects by inducing failures elsewhere.
+  ;; And/or try all permutations using an infinite number of machines.
   (with-open-file (log "test.log" :direction :output
                        :if-exists :supersede
                        :if-does-not-exist :create)

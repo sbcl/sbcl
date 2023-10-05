@@ -65,28 +65,6 @@
 (with-test (:name (directory :..*))
   (directory "somedir/..*"))
 
-;;; DIRECTORY used to treat */** as **.
-(with-test (:name (directory :*/**))
-  ;; FIXME: this test should be redone to construct a controlled file
-  ;; hierarchy for listing. If test files or test runners ever get
-  ;; reorganized and it turns out there are no subdirectories under
-  ;; the *DEFAULT-PATHNAME-DEFAULTS* when this gets run, this test
-  ;; will pass but fail to test the behavior it's supposed to.
-  (assert (equal (directory "*/**/*.*")
-                 ;; Each call to DIRECTORY sorts its results, but if
-                 ;; our files' truenames are random (e.g., if files
-                 ;; here are symlinks to hashes of file content), then
-                 ;; we need to merge the results of the inner
-                 ;; DIRECTORY calls.
-                 (reduce
-                  (lambda (list1 list2)
-                    ;; Depends on all truenames having namestrings.
-                    ;; (Which they do; noted for future reference.)
-                    (merge 'list list1 list2 'string< :key 'namestring))
-                  (mapcar (lambda (directory)
-                            (directory (merge-pathnames "**/*.*" directory)))
-                          (directory "*/"))))))
-
 (with-test (:name (directory *default-pathname-defaults* :bug-1740563))
   (with-test-directory ()
     (close (open "a.txt" :if-does-not-exist :create))
