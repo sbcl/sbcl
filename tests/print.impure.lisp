@@ -33,7 +33,7 @@
 (defun f (x) (lambda (y) (+ (incf x) y)))
 (compile 'f)
 (with-test (:name :output-value-cell)
-  (assert (search "#<value cell"
+  (assert (search "#<value-cell"
                   (write-to-string (sb-kernel:%closure-index-ref (f 3) 0)))))
 
 ;;; Nathan Froyd reported that sbcl-0.6.11.34 screwed up output of
