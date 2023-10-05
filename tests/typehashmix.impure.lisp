@@ -2,6 +2,49 @@
 ;;; from other tests- I don't want the type caches to have many extra lines
 ;;; in them at the start of the test.
 
+(import '(sb-impl::hashset-storage
+          sb-impl::hashset-hash-function
+          sb-impl::hashset-test-function
+          sb-impl::hss-cells
+          sb-impl::hss-hash-vector
+          sb-impl::hss-psl-vector))
+
+(defun hs-cells-mask (v) (- (length v) 4))
+(defun hs-chain-terminator-p (x) (eq x 0))
+
+(defun hashset-probing-sequence (hashset key)
+  (let* ((storage (hashset-storage hashset))
+         (cells (hss-cells storage))
+         (mask (hs-cells-mask cells))
+         (index (logand (funcall (hashset-hash-function hashset) key) mask))
+         (interval 1)
+         (sequence))
+    (loop
+     (push index sequence)
+     (let ((probed-key (aref cells index)))
+       (assert (not (hs-chain-terminator-p probed-key)))
+       (when (and probed-key (funcall (hashset-test-function hashset) probed-key key))
+         (return (nreverse sequence)))
+       (setq index (logand (+ index interval) mask))
+       (incf interval)))))
+
+(defun compute-max-psl (hashset)
+  (reduce #'max (hss-psl-vector (hashset-storage hashset))))
+
+(defun debug-probing (hashset)
+  (let* ((storage (hashset-storage hashset))
+         (cells (hss-cells storage))
+         (psl (hss-psl-vector storage))
+         (mask (hs-cells-mask cells))
+         (*print-pretty* nil))
+    (format t "Mask=~X, maxPSL=~D~%" mask (compute-max-psl hashset))
+    (dotimes (i (1+ mask))
+      (let ((key (aref cells i)))
+        (unless (hs-chain-terminator-p key)
+          (let ((seq (hashset-probing-sequence hashset key)))
+            (assert (= (length seq) (aref psl i)))
+            (format t "~45a ~s~%" seq (sb-kernel:type-specifier key))))))))
+
 (with-test (:name :exactly-one-null-type-instance)
   (let ((null-instances))
     (dolist (x (sb-vm:list-allocated-objects :all :test #'sb-kernel:member-type-p))
@@ -344,10 +387,6 @@
 (SIMPLE-VECTOR 62)
 ))
 
-(defun compute-max-psl (hashset)
-  (reduce #'max
-          (sb-impl::hss-psl-vector (sb-impl::hashset-storage hashset))))
-
 (with-test (:name :array-type-hash-mixer)
   (let* ((hs sb-kernel::*array-type-hashset*)
          (pre (compute-max-psl hs)))
@@ -360,6 +399,9 @@
 (with-test (:name :numeric-type-hash-mixer)
   (let* ((hs sb-kernel::*numeric-type-hashset*)
          (pre (compute-max-psl hs)))
+    (when (> pre 7)
+      (format t "~&Dumping ~S~%" 'sb-kernel::*numeric-type-hashset*)
+      (debug-probing hs))
     (assert (<= pre 7))
     (loop for i = 1 then (ash i 1)
           for tp = `(real ,(- i) 0)
