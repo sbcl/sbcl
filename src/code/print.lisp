@@ -2100,7 +2100,7 @@ variable: an unreadable object representing the error is printed instead.")
          (let ((widetag (widetag-of object)))
            (case widetag
              (#.sb-vm:value-cell-widetag
-              (write-string "value cell " stream)
+              (write-string "value-cell " stream)
               (output-object (value-cell-ref object) stream))
              #+nil
              (#.sb-vm:filler-widetag

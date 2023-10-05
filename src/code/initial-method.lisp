@@ -70,8 +70,12 @@
   (flet ((last-ditch-effort (object stream)
            ;; Depending on what you're poking at in cold-init it was possible to see
            ;;  "No applicable method for PRINT-OBJECT on SB-KERNEL::RANDOM-CLASS"
-           ;; so just print the address and carry on.
-           (format stream "#<UNPRINTABLE @ #x~X>" (get-lisp-obj-address object))))
+           ;; so try to do something better than that.
+           (if (%other-pointer-subtype-p object `(,sb-vm:value-cell-widetag))
+               (print-unreadable-object (object stream :identity t)
+                 (write-string "value-cell " stream)
+                 (output-object (value-cell-ref object) stream))
+               (format stream "#<UNPRINTABLE @ #x~X>" (get-lisp-obj-address object)))))
     (initial-call-a-method 'print-object #'last-ditch-effort object stream)))
 
 (macrolet ((ensure-gfs (names)
