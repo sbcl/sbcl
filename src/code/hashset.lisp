@@ -140,6 +140,11 @@
   #+sb-xc-host (declare (ignore hashset))
   #-sb-xc-host (weak-vector-p (hss-cells (hashset-storage hashset))))
 
+;;; The hash-function provided to this constructor has to be reasonably strong.
+;;; You could probably get away with SXHASH for instance types since we have stable
+;;; addressed-based hashing on those. However, if the intent is to lookup keys
+;;; using a content-based hash, then it's not useful to rely on SXHASH. When in doubt
+;;; as to whether your hash is strong enough, call MURMUR3-FMIX-WORD somewhere in it.
 (defun make-hashset (estimated-count test-function hash-function &key weakness synchronized)
   (declare (boolean weakness synchronized))
   (let* ((capacity (power-of-two-ceiling (* estimated-count 2)))
