@@ -31,7 +31,11 @@ void thread_pool_init() {
     gc_threads = parse;
   }
 
+#ifdef LISP_FEATURE_DARWIN
+  if (1) { // pre-existing semaphores aren't visible in a forked child
+#else
   if (!start_semaphores) {
+#endif
     start_semaphores = successful_malloc(sizeof(os_sem_t) * gc_threads);
     for (unsigned int i = 0; i < gc_threads; i++)
       os_sem_init(start_semaphores + i, 0);

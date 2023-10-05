@@ -1939,7 +1939,7 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
     } else {
 #ifdef LISP_FEATURE_SB_THREAD
-        lose("Can't handle sig%d in non-lisp thread %p at @ %p",
+        lose("Can't handle sig%d in non-lisp thread %p @ %p",
              signal,
              // Casting to void* is a kludge - "technically" you can't assume that
              // pthread_t is integer-sized. It could be a struct.
