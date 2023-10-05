@@ -1196,7 +1196,6 @@ collect_garbage(generation_index_t last_gen)
                      && (generation_average_age(gen)
                          > generations[gen].minimum_age_before_gc))));
 
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     {
     // Turn sticky cards marks to the regular mark.
     page_index_t page;
@@ -1208,7 +1207,6 @@ collect_garbage(generation_index_t last_gen)
             gcm[card] = (gcm[card] == STICKY_MARK) ? CARD_MARKED : gcm[card];
     }
     }
-#endif
 
     /* Save the high-water mark before updating next_free_page */
     if (next_free_page > high_water_mark)
@@ -1667,18 +1665,9 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
          *    (either/or because Lisp marks the header card,
          *     but the collector marks the cell's card.) */
         int marked = card_markedp(where)
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
         || (state->object_header
             && header_widetag(state->object_header) != SIMPLE_VECTOR_WIDETAG
-            && card_markedp(state->object_addr))
-#elif defined LISP_FEATURE_EXECUTABLE_FUNINSTANCES
-        /* #+(and (not soft-card-marks) executable-funinstances) could find the mark
-         * for a page-spanning funinstance on the preceding page, because it uses
-         * logical marking, not physical protection of the page holding the pointer */
-        || (header_widetag(state->object_header) == FUNCALLABLE_INSTANCE_WIDETAG
-            && card_markedp(state->object_addr))
-#endif
-        ;
+            && card_markedp(state->object_addr));
         FAIL_IF(!marked, "younger obj from WP page");
     }
     int valid;

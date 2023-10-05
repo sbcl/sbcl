@@ -488,8 +488,6 @@ extern unsigned char* gc_card_mark;
 #define assign_page_card_marks(page, val) \
   memset(gc_card_mark+page_to_card_index(page), val, CARDS_PER_PAGE)
 
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-
 #define NON_FAULTING_STORE(operation, addr) { operation; }
 // The low bit of 0 implies "marked". So CARD_MARKED and STICKY_MARK
 // are both considered marked. All bits of UNMARKED are 1s, so that
@@ -500,70 +498,16 @@ extern unsigned char* gc_card_mark;
 #define CARD_UNMARKED 0xff
 #define MARK_BYTE_MASK 0xff
 
-#else
-
-// With physical page protection, bit index 0 is the MARKED bit (inverted WP bit)
-// and bit index 1 is the WP_CLEARED (write_protect_cleared) bit.
-// The fault handler always sets both bits.
-// The only other bit pair value would be illegal.
-#define CARD_UNMARKED         0 /* write-protected = 1 */
-#define CARD_MARKED           1 /* write-protected = 0 */
-#define WP_CLEARED_AND_MARKED 3 /* write-protected = 0, wp-cleared = 1 */
-// CODE-HEADER-SET can store the low byte from NULL-TN into the mark array.
-// This sets the two low bits on, but also spuriously sets other bits,
-// which we can ignore when reading the byte.
-#define MARK_BYTE_MASK 3
-
-#define PAGE_WRITEPROTECTED_P(n) (~gc_card_mark[page_to_card_index(n)] & CARD_MARKED)
-#define SET_PAGE_PROTECTED(n,val) gc_card_mark[page_to_card_index(n)] = \
-      (val ? CARD_UNMARKED : CARD_MARKED)
-
-#define cardseq_any_marked(card_index) (gc_card_mark[card_index] & CARD_MARKED)
-#define cardseq_all_marked_nonsticky(card_index) cardseq_any_marked(card_index)
-#define page_cards_all_marked_nonsticky(page_index) \
-  cardseq_all_marked_nonsticky(page_to_card_index(page_index))
-
-/* NON_FAULTING_STORE is only for fixnums and GC metadata where we need
- * the ability to write-through the store barrier.
- * The uses are limited to updating the weak vector chain, weak hash-table
- * chain, and vector rehash flags. Those don't affect a page's marked state */
-#define PAGE_BASE(addr) ((char*)ALIGN_DOWN((uword_t)(addr),GENCGC_PAGE_BYTES))
-#define NON_FAULTING_STORE(operation, addr) { \
-  page_index_t page_index = find_page_index(addr); \
-  if (page_index < 0 || !PAGE_WRITEPROTECTED_P(page_index)) { operation; } \
-  else { os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL); \
-         operation; \
-         os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ); } }
-
-/* This is used by the fault handler, and potentially during GC
- * if we need to remember that a pointer store occurred.
- * The fault handler should supply WP_CLEARED_AND_MARKED as the mark,
- * but the collector should use CARD_MARKED */
-static inline void unprotect_page(void* addr, unsigned char mark)
-{
-    // No atomic op needed for a 1-byte store.
-    gc_card_mark[addr_to_card_index(addr)] = mark;
-    os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL);
-}
-#endif
-
-// Helpers to avoid invoking the memory fault signal handler.
 // For clarity, distinguish between words which *actually* need to frob
 // physical (MMU-based) protection versus those which don't,
 // but are forced to call mprotect() because it's the only choice.
 // Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
 // the ensuing store toggles the WP bit without invoking the fault handler.
-static inline void notice_pointer_store(__attribute__((unused)) void* base_addr,
+static inline void notice_pointer_store(void* base_addr,
                                         __attribute__((unused)) void* slot_addr) {
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     int card = addr_to_card_index(base_addr);
     // STICKY is stronger than MARKED. Only change if UNMARKED.
     if (gc_card_mark[card] == CARD_UNMARKED) gc_card_mark[card] = CARD_MARKED;
-#else
-    page_index_t index = find_page_index(slot_addr);
-    gc_assert(index >= 0);
-    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page(slot_addr, CARD_MARKED);
-#endif
 }
 static inline void vector_notice_pointer_store(void* addr) {
     notice_pointer_store(addr, addr);
@@ -571,14 +515,9 @@ static inline void vector_notice_pointer_store(void* addr) {
 static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
 {
     // there's nothing to "ensure" if using software card marks
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    // #-soft-card-marks ignores the first argument of notice_pointer_store()
-    notice_pointer_store(0, addr);
-#endif
 }
 
 // #+soft-card-mark: this expresion is true of both CARD_MARKED and STICKY_MARK
-// #-soft-card-mark: this expresion is true of both CARD_MARKED and WP_CLEARED_AND_MARKED
 #define card_dirtyp(index) (gc_card_mark[index] & MARK_BYTE_MASK) != CARD_UNMARKED
 
 #include "forwarding-ptr.inc"
@@ -703,18 +642,6 @@ static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t
 #endif
 
 #define is_code(type) ((type & PAGE_TYPE_MASK) == PAGE_TYPE_CODE)
-
-// If *all* pages use soft card marks, then protection_mode() is not a thing.
-// Otherwise, only pages of code use soft card marks; return an enum indicating
-// whether the page protection for the specified page is applied in harware.
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-enum prot_mode { PHYSICAL, LOGICAL };
-static inline enum prot_mode protection_mode(page_index_t page) {
-    // code pages can be marked as logically read-only without OS protection,
-    // and everything else uses hardware-based protection where applicable.
-    return is_code(page_table[page].type) ? LOGICAL : PHYSICAL;
-}
-#endif
 
 static inline bool page_free_p(page_index_t page) {
     return (page_table[page].type == FREE_PAGE_FLAG);
