@@ -134,9 +134,9 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
   if (p < 0) return defaultval;
   if (page_single_obj_p(p))
     return page_table[p].gen;
-  char c = UNMARK_GEN(line_bytemap[address_line((void*)obj)]);
-  if (c == 0)
-    return defaultval;
+  char c = line_bytemap[address_line((void*)obj)];
+  if (UNMARK_GEN(c) == 0)
+    return IS_FRESH(c) ? 0 : defaultval;
   return DECODE_GEN(c);
 }
 
