@@ -25,6 +25,7 @@
 ;;; When executed on macOS, each waiter tends to (or does) print its output message
 ;;; exactly once, but on Linux I've seen threads print more than once, which
 ;;; unquestionably indicates spurious wakeup.
+(defparameter nthreads 10)
 (with-test (:name (:condition-variable :notify-multiple)
                   :broken-on :win32)
   (flet ((tester (name notify-fun)
@@ -32,7 +33,7 @@
            (let ((queue (make-waitqueue :name "queue"))
                  (lock (make-mutex :name "lock"))
                  (start-sem (make-semaphore))
-                 (waiting #x3ff))
+                 (waiting (1- (ash 1 nthreads))))
              (labels ((test (x &aux signaled-start-sem)
                         ;; This is an extremely atypical (dare I say "bogus") use of cv-wait
                         ;; in that there is no concrete test that it is waiting to satisfy.
@@ -61,7 +62,7 @@
                                     collect (make-kill-thread
                                              #'test :arguments (list x)
                                              :name (format nil "worker~D" x)))))
-                 (wait-on-semaphore start-sem :n 10)
+                 (wait-on-semaphore start-sem :n nthreads)
                  (format t "~&All threads indicate ready~%")
                  (with-mutex (lock)
                    (funcall notify-fun queue))
@@ -77,4 +78,4 @@
     (tester "condition-broadcast"
             (lambda (queue) (condition-broadcast queue)))
     (tester "condition-notify"
-            (lambda (queue) (condition-notify queue 10)))))
+            (lambda (queue) (condition-notify queue nthreads)))))
