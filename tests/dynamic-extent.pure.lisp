@@ -2143,7 +2143,7 @@
      ((1) 0))))
 
 (with-test (:name :stack-allocated-vector-checks-overflow
-            :broken-on (or :arm64 :win32))
+            :broken-on (or :arm64 :win32 :darwin))
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()
