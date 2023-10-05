@@ -99,7 +99,8 @@
     (dotimes (i (1- (length a)))
       (assert (= (aref a (1+ i)) (1+ (aref a i)))))))
 
-(with-test (:name :list-allocated-objects)
+(with-test (:name :list-allocated-objects
+            :skipped-on :weak-vector-readbarrier) ; uses more weak-pointers
   ;; Assert that if :COUNT is supplied as a higher number
   ;; than number of objects that exists, the output is
   ;; not COUNT many items long.

@@ -2682,6 +2682,7 @@ static inline bool obj_alivep(lispobj* obj_base) {
 
 void scan_finalizers()
 {
+#ifndef LISP_FEATURE_WEAK_VECTOR_READBARRIER
     lispobj finalizer_store = SYMBOL(FINALIZER_STORE)->value;
     gc_assert(lowtag_of(finalizer_store) == INSTANCE_POINTER_LOWTAG);
     struct split_ordered_list* solist = (void*)native_pointer(finalizer_store);
@@ -2720,6 +2721,7 @@ void scan_finalizers()
     }
     // Close the region
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
+#endif
 }
 
 /* Our own implementation of heapsort, because some C libraries have a qsort()

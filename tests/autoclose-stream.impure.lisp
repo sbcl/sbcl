@@ -6,7 +6,8 @@
 #-unix (invoke-restart 'run-tests::skip-file)
 
 (defun fd-has-finalizer-p (fd)
-  (flet ((checkit (thing)
+  (labels
+      ((checkit (thing)
            ;; Return T if THING is a closure created in MAKE-FD-STREAM
            ;; (which is assumed to be a stream finalizer) whose payload
            ;; contains the integer FD.
@@ -16,11 +17,16 @@
                (when (and (sb-kernel:simple-fun-p underlying)
                           (equal (sb-kernel:%simple-fun-name underlying)
                                  '(lambda () :in sb-sys:make-fd-stream)))
-                 (return-from fd-has-finalizer-p t))))))
+                 (return-from fd-has-finalizer-p t)))))
+       (scan-actions (actions)
+         (dolist (f (sb-int:ensure-list actions))
+           (checkit (if (functionp f) f (sb-kernel:value-cell-ref f))))))
+    #+weak-vector-readbarrier
+    (dolist (cell sb-impl::**finalizer-store**)
+      (scan-actions (cdr cell)))
+    #-weak-vector-readbarrier
     (sb-lockless:so-maplist
-     (lambda (node)
-       (dolist (f (sb-int:ensure-list (sb-lockless:so-data node)))
-         (checkit (if (functionp f) f (sb-kernel:value-cell-ref f)))))
+     (lambda (node) (scan-actions (sb-lockless:so-data node)))
      sb-impl::**finalizer-store**)))
 
 (defvar *fds*)
