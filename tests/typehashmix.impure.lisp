@@ -40,7 +40,7 @@
     (format t "Mask=~X, maxPSL=~D~%" mask (compute-max-psl hashset))
     (dotimes (i (1+ mask))
       (let ((key (aref cells i)))
-        (unless (hs-chain-terminator-p key)
+        (unless (or (null key) (hs-chain-terminator-p key))
           (let ((seq (hashset-probing-sequence hashset key)))
             (assert (= (length seq) (aref psl i)))
             (format t "~45a ~s~%" seq (sb-kernel:type-specifier key))))))))

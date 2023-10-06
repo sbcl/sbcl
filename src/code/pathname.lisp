@@ -71,8 +71,7 @@
   (type nil :type (or simple-string pattern pathname-component-tokens) :read-only t)
   ;; the version number of the file, a positive integer (not supported
   ;; on standard Unix filesystems)
-  (version nil :type (or integer pathname-component-tokens (member :newest))
-               :read-only t))
+  (version nil :type pathname-version :read-only t))
 
 (let ((to (find-layout 'logical-pathname))
       (from (find-layout 'pathname)))

@@ -973,3 +973,8 @@
 
 (with-test (:name :dx-pathname-parts-dont-crash)
   (prin1 (pathname-peristence-test)))
+
+(with-test (:name :internal-pathname-hash-incorporates-version)
+  (opaque-identity
+   (loop for i below 1000
+         collect (make-pathname :host "SYS" :name "FOO" :type "LISP" :version i))))

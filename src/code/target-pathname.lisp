@@ -290,6 +290,10 @@
   (or (eq (car entry) (car key)) ; quick win if lists are EQ
       (and (eq (cdr entry) (cdr key)) ; hashes match
            (compare-component (car entry) (car key)))))
+(defun pn-table-hash (pathname)
+  ;; The pathname table makes distinctions between pathnames that EQUAL does not.
+  (mix (sxhash (%pathname-version pathname))
+       (pathname-sxhash pathname)))
 (defun pn-table-pn= (entry key)
   (and (compare-pathname-host/dev/dir/name/type entry key)
        (eql (%pathname-version entry) (%pathname-version key))))
@@ -297,7 +301,7 @@
 (defun !pathname-cold-init ()
   (setq *pn-dir-table* (make-hashset 32 #'pn-table-dir= #'cdr
                                      :synchronized t :weakness t)
-        *pn-table* (make-hashset 32 #'pn-table-pn= #'pathname-sxhash
+        *pn-table* (make-hashset 32 #'pn-table-pn= #'pn-table-hash
                                  :synchronized t :weakness t)))
 
 ;;; A pathname is logical if the host component is a logical host.
@@ -595,8 +599,11 @@
          (awhen (%pathname-dir+hash x) (mixf hash (cdr it)))
          (mixf hash (hash-piece (%pathname-name x)))
          (mixf hash (hash-piece (%pathname-type x)))
-         ;; EQUAL might ignore the version, and it doesn't provide many bits
-         ;; of randomness, so don't bother with it.
+         ;; The requirement NOT to mix the version into the resulting hash is mandated
+         ;; by bullet point 1 in the SXHASH specification:
+         ;;  (equal x y) implies (= (sxhash x) (sxhash y))
+         ;; and the observation that in this implementation of Lisp:
+         ;;  (equal (make-pathname :version 1) (make-pathname :version 15)) => T
          hash))
       (list ;; a directory
        (let ((hash 0))
