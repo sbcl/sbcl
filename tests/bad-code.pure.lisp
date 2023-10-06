@@ -733,3 +733,11 @@
     (declare (ignore failure))
     (assert warning)
     (assert-error (funcall fun "abcdef") sb-kernel:bounding-indices-bad-error)))
+
+(with-test (:name :cast-movement-empty-types)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (loop for x to 2
+                               sum (the cons (signum x))))
+                      :allow-warnings 'warning))))

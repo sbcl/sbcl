@@ -2767,28 +2767,30 @@
                  next-block)
              (collect ((merges))
                (do-uses (use value)
-                 (when (and (values-subtypep (node-derived-type use) atype)
-                            (immediately-used-p value use))
-                   (unless next-block
-                     (when ctran (ensure-block-start ctran))
-                     (setq next-block (first (block-succ (node-block cast))))
-                     (ensure-block-start (node-prev cast))
-                     (reoptimize-lvar lvar)
-                     (setf (lvar-%derived-type value) nil))
-                   (%delete-lvar-use use)
-                   (add-lvar-use use lvar)
-                   (unlink-blocks (node-block use) (node-block cast))
-                   (link-blocks (node-block use) next-block)
-                   ;; At least one use is good, downgrade any possible
-                   ;; type conflicts to style warnings.
-                   (setf (cast-silent-conflict cast)
-                         (if (cast-mismatch-from-inlined-p cast use)
-                             t
-                             :style-warning))
-                   (when (and (return-p dest)
-                              (basic-combination-p use)
-                              (eq (basic-combination-kind use) :local))
-                     (merges use))))
+                 (let ((type (node-derived-type use)))
+                   (when (and (neq type *empty-type*)
+                              (values-subtypep (node-derived-type use) atype)
+                              (immediately-used-p value use))
+                     (unless next-block
+                       (when ctran (ensure-block-start ctran))
+                       (setq next-block (first (block-succ (node-block cast))))
+                       (ensure-block-start (node-prev cast))
+                       (reoptimize-lvar lvar)
+                       (setf (lvar-%derived-type value) nil))
+                     (%delete-lvar-use use)
+                     (add-lvar-use use lvar)
+                     (unlink-blocks (node-block use) (node-block cast))
+                     (link-blocks (node-block use) next-block)
+                     ;; At least one use is good, downgrade any possible
+                     ;; type conflicts to style warnings.
+                     (setf (cast-silent-conflict cast)
+                           (if (cast-mismatch-from-inlined-p cast use)
+                               t
+                               :style-warning))
+                     (when (and (return-p dest)
+                                (basic-combination-p use)
+                                (eq (basic-combination-kind use) :local))
+                       (merges use)))))
                (dolist (use (merges))
                  (merge-tail-sets use))))))))
 
