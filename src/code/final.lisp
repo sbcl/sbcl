@@ -275,7 +275,7 @@ Examples:
 
 (defun cancel-finalization (object)
   "Cancel all finalizations for OBJECT, returning T if it had a finalizer."
-  (when (and object (heap-allocated-p object))
+  (when (and object (sb-vm:is-lisp-pointer (get-lisp-obj-address object)))
     (with-pinned-objects (object)
       #+weak-vector-readbarrier
       (with-system-mutex (*finalizer-lock*)
