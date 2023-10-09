@@ -318,7 +318,7 @@
 
 (defknown make-array-header* (&rest t) array (flushable movable))
 
-(defknown make-weak-pointer (t) weak-pointer
+(defknown (make-weak-pointer sb-vm::%make-weak-pointer) (t) weak-pointer
   (flushable))
 
 ;; This used to have a :derive-type but it can't now. Even though a weak vector
@@ -681,6 +681,9 @@
 ;;; The index should be strictly negative and a multiple of 4.
 (defknown code-trailer-ref (code-component fixnum) (unsigned-byte 32)
   (flushable #-(or sparc ppc64) always-translatable))
+;; knownfun and vop not needed post-build, so name using #\! convention.
+;; Takes header word and malloc-segment pointer
+(defknown sb-vm::!manage-large-codeblob (sb-vm:word system-area-pointer) code-component ())
 
 (defknown %fun-pointer-widetag (function) (member . #.sb-vm::+function-widetags+)
   (flushable))

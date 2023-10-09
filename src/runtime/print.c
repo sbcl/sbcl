@@ -339,10 +339,15 @@ char * simple_base_stringize(struct vector * string)
   return newstring;
 }
 
+struct vector * classoid_name(lispobj* classoid);
 static void brief_struct(lispobj obj)
 {
+    if (layoutp(obj)) { // print the classoid this layout is for
+        struct vector* name = classoid_name(native_pointer(LAYOUT(obj)->classoid));
+        printf("#<layout-for %s %"OBJ_FMTX">", (char*)name->data, obj);
+        return;
+    }
     struct instance *instance = INSTANCE(obj);
-    extern struct vector * instance_classoid_name(lispobj*);
     struct vector * classoid_name;
     classoid_name = instance_classoid_name((lispobj*)instance);
     lispobj layout = instance_layout((lispobj*)instance);

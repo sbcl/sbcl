@@ -166,14 +166,14 @@
                            (values code-component (integer 0)))
                 allocate-code-object))
 
-(defun update-dynamic-space-code-tree (obj)
+(defun update-dynamic-space-code-tree (obj &optional generation-test)
   (with-pinned-objects (obj)
     (let ((addr (logandc2 (get-lisp-obj-address obj) other-pointer-lowtag))
           (tree *dynspace-codeblob-tree*))
       (loop (let ((newtree (sb-brothertree:insert addr tree)))
               ;; check that it hasn't been promoted from gen0 -> gen1 already
               ;; (very unlikely, but certainly possible).
-              (unless (eq (generation-of obj) 0) (return))
+              (when (and generation-test (not (eql (generation-of obj) 0))) (return))
               (let ((oldval (cas *dynspace-codeblob-tree* tree newtree)))
                 (if (eq oldval tree) (return) (setq tree oldval))))))))
 
@@ -225,6 +225,16 @@
                 (alien-funcall (extern-alien "alloc_code_object"
                                              (function unsigned (unsigned 32) (unsigned 32)))
                                total-words boxed)))))
+      ;; Small objects are always findable given an interior pointer,
+      ;; but large objects require the tree.
+      (when (and (neq (heap-allocated-p code) :dynamic)
+                 (> total-words (/ smlgc-blocksize-max n-word-bytes)))
+        (let ((tree *immobile-codeblob-tree*)
+              (addr (logandc2 (get-lisp-obj-address code) lowtag-mask)))
+          (loop (let ((newtree (sb-brothertree:insert addr tree)))
+                  (when (eq tree (setf tree (cas *immobile-codeblob-tree* tree newtree)))
+                    (return)))))
+        (return-from allocate-code-object (values code total-words)))
       (update-dynamic-space-code-tree code)
     ;; FIXME: there may be random values in the unboxed payload and it's not obvious
     ;; that all callers of ALLOCATE-CODE-OBJECT always write all raw bytes.
@@ -265,7 +275,7 @@
       ;; memory block at that address. Consider if we removed from the pool
       ;; without removing from the tree, the block could be coalesced on either side
       ;; and there would not necessarily be a block where the tree says it is.
-      (let ((tree sb-vm::*immobile-codeblob-tree*))
+      (let ((tree *immobile-codeblob-tree*))
         (loop (when (eq tree (setq tree (cas *immobile-codeblob-tree* tree
                                              (sb-brothertree:delete addr tree))))
                 (return))))
@@ -278,3 +288,197 @@
           (alien-funcall tlsf-unalloc-codeblob tlsf-control addr)
           (setf (car scratchpad) (pop-1)))))
     t))
+
+(define-alien-variable msegs-pending-free unsigned)
+
+#|
+(defglobal *large-object-hashset* nil)
+(defun largeobj-hs-insert (node object)
+  ;; NODE is an instance, OBJECT is anything.
+  (let ((addr (%make-lisp-obj (logandc2 (get-lisp-obj-address object) lowtag-mask))))
+    (sb-lockless:%so-eq-set-phase1-insert *large-object-hashset* node addr)))
+
+(defun largeobj-hs-maybe-rehash (node)
+  (sb-lockless:%so-eq-set-phase2-insert *large-object-hashset* node))
+|#
+
+;; GC-freed malloc-segments are chained through word 0 which happens to correspond
+;; to the 'as_list' slot in the C structure definition. The actual deallocation
+;; is deferred to Lisp so that we can remove from the lookup tables.
+(defun release-malloc-segments (&aux (count 0))
+  (flet ((segment-pop ()
+           (named-let retry ((mseg msegs-pending-free))
+             (if (zerop mseg)
+                 0
+                 (let* ((next (sap-ref-word (int-sap mseg) 0))
+                        (actual (cas msegs-pending-free mseg next)))
+                   (if (= actual mseg)
+                       (%make-lisp-obj mseg)
+                       (retry actual)))))))
+    (loop
+      (let ((mseg (truly-the fixnum (segment-pop))))
+        (when (zerop mseg)
+          #+nil
+          (let ((s "Released %d large code blocks"))
+            (alien-funcall (extern-alien "tprintf" (function void int system-area-pointer int))
+                           1 (vector-sap s) count))
+          (return))
+        (let* ((mseg-sap (descriptor-sap mseg))
+               (object-sap (sap+ mseg-sap smlgc-mseg-overhead-bytes))
+               (addr (truly-the (unsigned-byte 56) (sap-int object-sap))))
+          ;; the header was copied to wordindex 1 and then zeroized
+          (aver (= (widetag@baseptr (sap+ object-sap n-word-bytes))
+                   code-header-widetag))
+          (let ((tree *immobile-codeblob-tree*))
+            (loop (when (eq tree (setq tree (cas *immobile-codeblob-tree* tree
+                                                 (sb-brothertree:delete addr tree))))
+                    (return))))
+          (sb-thread:barrier (:write))
+          (with-alien ((delete-code-mseg (function void system-area-pointer) :extern))
+            (alien-funcall delete-code-mseg mseg-sap))
+          (incf count))))))
+
+;; Display but do not pop them off the list
+(defun show-releasable-malloc-segments ()
+  (let ((seg msegs-pending-free))
+    (loop (when (zerop seg) (return))
+          ;; show 4 words of the metadata, then the lispobj header word (which should be 0)
+          ;; and the word after that (which gets the header word before clobbering)
+          (let ((sap (int-sap seg)))
+            (format t "@ ~X:~{ ~16X~}~%"
+                    seg (loop for i below 6 collect (sap-ref-word sap (ash i word-shift))))
+            (setq seg (sap-ref-word sap 0))))))
+
+#+nil
+(defun call-with-sml#gc (which thunk)
+  (if (listp which) (apply #'use-smlgc which) (use-smlgc which))
+  (prog1 (funcall thunk)
+    (setq *use-smlgc* 0)))
+
+#+nil
+(defmacro with-sml#-allocator (&body body)
+  `(progn (setq *use-smlgc* -1)
+          (alien-funcall (extern-alien "enable_cms_cons" (function void)))
+          (multiple-value-prog1 (progn ,@body)
+            (alien-funcall (extern-alien "disable_cms_cons" (function void)))
+            (setq *use-smlgc* 0))))
+
+#+nil(defun sml#-cons (a b) (with-sml#-allocator (cons a b)))
+
+#+nil
+(defun force-barrier-on ()
+  (let ((phaseptr (find-dynamic-foreign-symbol-address "fake_phaseptr")))
+    (let* ((vmthread (current-thread-offset-sap thread-this-slot)))
+      (setf (sap-ref-word vmthread (ash thread-gc-phaseptr-slot word-shift))
+            phaseptr))))
+
+#+nil
+(defun call-with-barrier-forced-on (thunk)
+  (let ((phaseptr (find-dynamic-foreign-symbol-address "fake_phaseptr")))
+    (let* ((vmthread (current-thread-offset-sap thread-this-slot))
+           (actual-phaseptr (sap-ref-word vmthread (ash thread-gc-phaseptr-slot word-shift))))
+      (setf (sap-ref-word vmthread (ash thread-gc-phaseptr-slot word-shift))
+            phaseptr)
+      (multiple-value-prog1
+          (funcall thunk)
+        (setf (sap-ref-word vmthread (ash thread-gc-phaseptr-slot word-shift))
+              actual-phaseptr)))))
+
+(defun showlarge ()
+;  (sb-lockless::show-address-based-list sb-vm::*large-object-hashset*)
+  )
+
+#+nil
+(defun careful-obj-to-malloc-segment (addr)
+  (alien-funcall (extern-alien "careful_obj_to_malloc_segment"
+                               (function system-area-pointer unsigned))
+                 addr))
+
+#+nil
+(defun assert-all-large-simple-funs-findable ()
+  (let ((list (sb-brothertree::codeblob-tree-to-list sb-vm::*immobile-codeblob-tree*)))
+    (dolist (c list)
+      (let* ((code-base-addr (logandc2 (get-lisp-obj-address c) lowtag-mask))
+             (mseg (int-sap (- code-base-addr smlgc-mseg-overhead-bytes))))
+        (flet ((test (obj &aux (addr (logandc2 (get-lisp-obj-address obj)
+                                               lowtag-mask)))
+                 ;; every lowtag wouldn't be needed but it's an OK thing to test
+                 (dotimes (lowtag 16)
+                   (assert (sap= (careful-obj-to-malloc-segment (logior addr lowtag))
+                                 mseg)))))
+          (test c)
+          (dotimes (index (code-n-entries c))
+            (test (%code-entry-point c index))))))))
+
+(defun show-bitmap-aps ()
+  (loop for log2size from 4 to 12
+        for slot from thread-ap4-slot by 4
+        do
+     (format t "~2d ~16x ~8x ~16x ~4x~%"
+             log2size
+             (sap-int (current-thread-offset-sap slot))
+             (sap-int (current-thread-offset-sap (+ 1 slot)))
+             (sap-int (current-thread-offset-sap (+ 2 slot)))
+             (sap-int (current-thread-offset-sap (+ 3 slot))))))
+
+(defvar *stats*)
+
+(defun get-consing-stats ()
+  (setq *stats* (sb-kernel:make-lisp-obj (sb-vm::static-data-collection-vector)))
+  ;; element 0  : number of &REST lists of length 16 or more
+  ;; elt 1..15  : packed integer
+  ;;              hi = number of &REST lists of length N using slow path
+  ;;              lo = number of &REST lists of length N
+  ;; elt 16..25 : number of lists composed of N cons cells
+  (values (loop for i from 16 by 2 repeat 6
+                collect (let* ((total (aref *stats* i))
+                               (slow (aref *stats* (1+ i)))
+                               (fast (- total slow)))
+                          (cons total fast)))
+          (append (loop for i from 1 to 15
+                        collect
+                        (let* ((element (aref *stats* i))
+                               (slow (ldb (byte 32 32) element))
+                               (total (ldb (byte 32 0) element))
+                               (fast (- total slow)))
+                          (cons total fast)))
+                  (list (cons (aref *stats* 0) 0)))))
+
+(defun print-consing-stats ()
+  (multiple-value-bind (lists rest-lists) (get-consing-stats)
+    (format t "~&List consing:~%")
+    (let ((sum (reduce #'+ (mapcar 'car lists))))
+      (loop for (count . n-fast) in lists
+            for label across #("1" "2" "3" "4" "5" ">")
+            do (format t " ~A | ~12d ~6,2,2f% ~6,2,2f%~%"
+                       label
+                       count
+                       (/ count sum) ; percentage of total
+                       (cond ((string= label ">") 0)
+                             ((plusp count) (/ n-fast count))))))
+    (format t "~&&REST consing:~%")
+    (let ((sum (reduce #'+ (mapcar 'car rest-lists))))
+      (loop for (count . n-fast) in rest-lists
+            for label across #(" 1" " 2" " 3" " 4" " 5" " 6" " 7" " 8" " 9"
+                               "10" "11" "12" "13" "14" "15" " >")
+            when (plusp count)
+            do (format t "~A | ~12d ~6,2,2f% ~6,2,2f%~%"
+                       label
+                       count
+                       (/ count sum) ; percentage of total
+                       (cond ((string= label " >") 0)
+                             ((plusp count) (/ n-fast count))))))))
+
+(defun sayhello ()
+  (let ((s #.(format nil "Hey there~%")))
+    (sb-sys:with-pinned-objects (s)
+      (alien-funcall (extern-alien "printf" (function void system-area-pointer))
+                     (sb-sys:vector-sap s)))))
+(defun hellothread ()
+  (sb-thread:make-thread #'sayhello))
+
+#|
+(defun allocate-smlgc-cons ()
+  (let ((sap (int-sap (SB-THREAD::THREAD-PRIMITIVE-THREAD sb-thread:*current-thread*))))
+    (setf (sap-ref-32 sap (ash (1+ thread-ap4-slot) word-shift))
+|#

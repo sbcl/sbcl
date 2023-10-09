@@ -2334,3 +2334,7 @@ Works on all CASable places."
        (loop (let ((,new (cdr ,old)))
                (when (eq ,old (setf ,old ,cas-form))
                  (return (car (truly-the list ,old)))))))))
+
+(sb-xc:defmacro printf (x)
+  `(alien-funcall (extern-alien "printf" (function void system-area-pointer))
+                  (vector-sap ,(format nil "~A~%" x))))

@@ -654,6 +654,33 @@ bool page_is_zeroed(page_index_t page)
 }
 #endif
 
+__attribute__((unused)) static char* region_name(struct thread* th, struct alloc_region* r) {
+  if (r == &th->mixed_tlab) { return "um"; }
+  if (r == &th->cons_tlab) { return "uc"; }
+  if (r == &th->sys_mixed_tlab) { return "sm"; }
+  if (r == &th->sys_cons_tlab) { return "sc"; }
+  if (r == code_region) { return "code"; }
+  return 0;
+}
+static void show_new_region(__attribute__((unused)) struct alloc_region* r,
+                            __attribute__((unused)) int page_type) {
+#if 0
+  extern struct thread* mainthread;
+  struct thread* th = get_sb_vm_thread();
+  char *name = name_of_region(th, r);
+  char buf[100];
+  int n;
+  if (name)
+    n = snprintf(buf, sizeof buf, "%s: %s = %lx..%lx %x\n",
+                 th == mainthread ? "m" : "f", name,
+                 (uword_t)r->start_addr, (uword_t)r->end_addr, page_type);
+  else
+    n = snprintf(buf, sizeof buf, "%s: %p = %lx..%lx %x\n",
+                 th == mainthread ? "m" : "f", r,
+                 (uword_t)r->start_addr, (uword_t)r->end_addr, page_type);
+#endif
+}
+
 static void*
 gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
@@ -694,6 +721,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
           }
         alloc_region->free_pointer = alloc_region->start_addr;
         gc_assert(find_page_index(alloc_region->start_addr) == page);
+        show_new_region(alloc_region, page_type);
         return alloc_region->free_pointer;
     }
 
@@ -764,6 +792,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     INSTRUMENTING(zeroize_pages_if_needed(first_page+(page_words_used(first_page)?1:0),
                                           last_page, page_type), et_bzeroing);
 
+    show_new_region(alloc_region, page_type);
     return alloc_region->free_pointer;
 }
 
@@ -868,6 +897,20 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     page_index_t next_page = first_page+1;
     char *page_base = page_address(first_page);
     char *free_pointer = alloc_region->free_pointer;
+
+#if 0
+    extern struct thread* mainthread;
+    char buf[100];
+    int n;
+    struct thread* th = get_sb_vm_thread();
+    char* name = name_of_region(th, alloc_region);
+    if (name)
+      n = snprintf(buf, sizeof buf, "%s: c %s %x\n",
+                   th == mainthread ? "m" : "f", name, page_type);
+    else
+      n = snprintf(buf, sizeof buf, "%s: c %p %x\n",
+                   th == mainthread ? "m" : "f", alloc_region, page_type);
+#endif
 
 #if defined LISP_FEATURE_SYSTEM_TLABS && defined DEBUG
     if (alloc_region == &get_sb_vm_thread()->sys_mixed_tlab ||
@@ -4018,6 +4061,7 @@ long tot_gc_nsec;
 void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
+    if (get_sb_vm_thread()->ap4.freebit.mask != (uint32_t)-1) { fprintf(stderr, "gencgc ignoring collect_garbage call\n"); return; }
     ++n_gcs;
     THREAD_JIT(0);
     generation_index_t gen = 0, i;
@@ -4302,6 +4346,7 @@ lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
 {
     os_vm_size_t trigger_bytes = 0;
 
+    if (use_smlgc) lose("How did we get a gencgc allocation request?");
     gc_assert(nbytes > 0);
 
     /* Check for alignment allocation problems. */

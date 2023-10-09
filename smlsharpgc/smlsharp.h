@@ -7,6 +7,30 @@
 #ifndef SMLSHARP__SMLSHARP_H__
 #define SMLSHARP__SMLSHARP_H__
 
+extern int use_smlgc;
+extern int enable_async_gc;
+#define DEADBEEF 0xFFFFFFFFDEADBEEF
+#define VERBOSE_LOGGING 0
+extern int n_smlgcs;
+extern void tprintf_(char *fmt, ...);
+#define TPRINTF(msgclass, fmt, ...) if(0 /* msgclass & 2 */) tprintf_(fmt, ##__VA_ARGS__)
+extern void suspend_mutator(char* reason);
+extern void unsuspend_mutator();
+#include <stdio.h>
+extern FILE* get_gc_thread_log();
+void show_map(char*,void*);
+void show_fractional_usage();
+extern void get_segment_pool_bounds(char* bounds[2]);
+extern char *phase_names[8];
+extern char *phase_names_inactive[8];
+//extern FILE* get_large_object_logfile();
+extern int get_gc_cycle_number();
+
+static inline char* phase_name(int phase) {
+  if (phase & 0x10U) return phase_names_inactive[phase-0x10];
+  return phase_names[phase];
+}
+
 /*
  * One of the following macros may be defined by the command line:
  * - WITHOUT_MULTITHREAD: Remove multithread support at all.
@@ -26,12 +50,20 @@
 #define WITHOUT_MASSIVETHREADS
 #endif /* WITHOUT_CONCURRENCY */
 
+#define DPRINTF(x) {}
+
 #if !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
 # error C99 is required
 #endif
 #if defined __GNUC__ && __GNUC__ < 4
 #error GCC version 4.0 or later is required
 #endif
+
+/*#ifdef FOO_LISP_FEATURE_SBCL
+ #include "smlsharp-config.h"
+ #infdef WITHOUT_MASSIVETHREADS
+ #define WITHOUT_MASSIVETHREADS
+ #endif */
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -155,16 +187,20 @@
 #define cond_signal(c) ((void)0)
 #endif /* !WITHOUT_MULTITHREAD */
 
+#undef ATOMIC_VAR_INIT
+#define ATOMIC_VAR_INIT(x) x
+
 /* spin lock */
 #ifndef WITHOUT_MULTITHREAD
 typedef struct { _Atomic(int) lock; } sml_spinlock_t;
 #define SPIN_LOCK_INIT {ATOMIC_VAR_INIT(0)}
+extern void bump_spinlock_busyct();
 static inline void spin_lock(sml_spinlock_t *l) {
         int old, i = 8192;
         for (;;) {
                 old = 0;
                 if (cmpswap_weak_acquire(&l->lock, &old, 1)) break;
-                if (--i == 0) { sched_yield(); i = 8192; }
+                if (--i == 0) { sched_yield(); i = 8192; bump_spinlock_busyct(); }
         }
 }
 static inline void spin_unlock(sml_spinlock_t *l) {
@@ -397,9 +433,10 @@ void sml_msg_init(void);
  * If allocation failed, program exits immediately.
  */
 void *sml_xmalloc(size_t size) ATTR_MALLOC;
-void *sml_xrealloc(void *p, size_t size) ATTR_MALLOC;
-#define xmalloc sml_xmalloc
-#define xrealloc sml_xrealloc
+//void *sml_xrealloc(void *p, size_t size) ATTR_MALLOC;
+#define xmalloc(addr,reason) sml_xmalloc(addr)
+//#define xrealloc sml_xrealloc
+#define xfree(addr,reason) free(addr)
 
 /*
  * GC root set management including stack frame layouts
@@ -415,7 +452,8 @@ void sml_gcroot(void *, void (*)(void), void *, void *);
 struct sml_gcroot *sml_gcroot_load(void (* const *)(void *), unsigned int);
 void sml_gcroot_unload(struct sml_gcroot *);
 const struct sml_frame_layout *sml_lookup_frametable(void *retaddr);
-void sml_global_enum_ptr(void (*trace)(void **, void *), void *data);
+void sml_global_enum_ptr(void (*trace)(void *, void *), void *data);
+void lisp_global_enum_ptr(void (*trace)(uintptr_t, void *), void *data);
 
 /* remove all thread-local data for SML# */
 void sml_deatch(void);
@@ -458,6 +496,7 @@ void sml_gc(void);
 
 struct sml_user;
 void sml_stack_enum_ptr(struct sml_user *, void (*)(void **, void *), void *);
+void lisp_stack_enum_ptr(struct sml_user *, void (*)(uintptr_t, void *), void *);
 
 int sml_set_signal_handler(void(*)(void));
 int sml_send_signal(void);
@@ -501,6 +540,9 @@ SML_PRIMITIVE void *sml_unsave_exn(void *);
 /*
  * SML# heap object management
  */
+struct list_item {
+        struct list_item *next;
+};
 SML_PRIMITIVE void *sml_alloc(unsigned int objsize);
 SML_PRIMITIVE void *sml_load_intinf(const char *hexsrc);
 SML_PRIMITIVE void **sml_find_callback(void *codeaddr, void *env);
@@ -515,6 +557,7 @@ struct sml_intinf;
 typedef struct sml_intinf sml_intinf_t;
 
 void sml_obj_enum_ptr(void *obj, void (*callback)(void **, void *), void *);
+int lispobj_enum_ptr(void *obj, void (*callback)(uintptr_t, void *), void *);
 void *sml_obj_alloc(unsigned int objtype, size_t payload_size);
 NOINLINE char *sml_str_new(const char *str);
 char *sml_str_new2(const char *str, unsigned int len);
@@ -561,11 +604,7 @@ ATTR_NORETURN void sml_exit(int status);
 /*
  * bit pointer
  */
-typedef uint32_t sml_bmword_t;
-struct sml_bitptr { const sml_bmword_t *ptr; sml_bmword_t mask; };
-struct sml_bitptrw { sml_bmword_t *wptr; sml_bmword_t mask; };
-typedef struct sml_bitptr sml_bitptr_t;
-typedef struct sml_bitptrw sml_bitptrw_t;
+#include "alloc_ptr.h"
 #define BITPTR_WORDBITS  32U
 #define BITPTR(p,n) \
         ((sml_bitptr_t){.ptr = (p) + (n) / 32U, .mask = 1 << ((n) % 32U)})
@@ -579,9 +618,9 @@ typedef struct sml_bitptrw sml_bitptrw_t;
 #define BITPTRW_EQUAL(b1,b2)  ((b1).wptr == (b2).wptr && (b1).mask == (b2).mask)
 #define BITPTR_TEST(b)  (*(b).ptr & (b).mask)
 #define BITPTR_WORD(b)  (*(b).ptr)
-#define BITPTR_EQUAL(b1,b2)  ((b1).ptr == (b2).ptr && (b1).mask == (b2).mask)
+//#define BITPTR_EQUAL(b1,b2)  ((b1).ptr == (b2).ptr && (b1).mask == (b2).mask)
 #define BITPTR_WORDINDEX(b,begin)  ((b).ptr - (begin))
-#define BITPTR_NEXTWORD(b)  ((b).ptr++, (b).mask = 1U)
+//#define BITPTR_NEXTWORD(b)  ((b).ptr++, (b).mask = 1U)
 
 /* BITPTR_NEXT0: move to next 0 bit in the current word.
  * mask becomes zero if failed. */
@@ -633,20 +672,37 @@ typedef struct sml_bitptrw sml_bitptrw_t;
 #define UncommitPage(addr, size) \
         VirtualFree(addr, size, MEM_DECOMMIT)
 #else
-/* inclue <sys/mman.h> */
+#include <sys/mman.h>
 /* inclue <unistd.h> */
-#define GetPageSize() sysconf(_SC_PAGESIZE)
+void *wrapped_mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
+int wrapped_munmap(void *addr, size_t length);
+int wrapped_mprotect(void *addr, size_t len, int prot);
+#define GetPageSize() getpagesize()
 #define AllocPageError MAP_FAILED
 #define AllocPage(addr, size) \
-        mmap(addr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)
+        mmap(addr, size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)
 #define ReservePage(addr, size) \
         mmap(addr, size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0)
 #define ReleasePage(addr, size) \
         munmap(addr, size)
 #define CommitPage(addr, size) \
-        mprotect(addr, size, PROT_READ | PROT_WRITE)
+        mprotect(addr, size, PROT_EXEC | PROT_READ | PROT_WRITE)
 #define UncommitPage(addr, size) \
         mmap(addr, size, PROT_NONE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0)
 #endif /* MINGW32 */
+
+void trace_enter(char*);
+void trace_leave(char*);
+void trace_leaf(char*);
+extern int gc_verbose;
+extern void hexdump_sml_heap_to_file(char*);
+
+extern int ignorable_space_p(uintptr_t);
+extern int large_code_subspace_p(char*);
+//extern void* untagged_baseptr(uintptr_t);
+extern void* otherptr_mseg(uintptr_t);
+
+extern int smlgc_verbose;
+extern void ldb_monitor();
 
 #endif /* SMLSHARP__SMLSHARP_H__ */

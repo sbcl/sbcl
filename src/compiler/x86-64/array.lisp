@@ -69,7 +69,7 @@
   (:arg-types positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :to :eval) bytes)
   (:temporary (:sc any-reg :to :result) header)
-  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg :offset rax-offset) temp)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
@@ -85,10 +85,22 @@
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
     (instrument-alloc nil bytes node temp thread-tn)
+    (jump-if-not-bitmap-alloc LINEAR-ALLOC)
+    ;; TODO: inline the code to choose an allocation pointer
+    ;; and then use the fast path for bitmap allocation.
+    ;; (it won't be an oversized object)
+    (inst push 0)
+    (inst push header)
+    (move temp bytes) ; RAX
+    (invoke-asm-routine 'call 'bitmap-vect-alloc node)
+    (move result temp)
+    (inst jmp DONE)
+    LINEAR-ALLOC
     (pseudo-atomic (:thread-tn thread-tn)
-     (allocation type bytes 0 result node temp thread-tn)
-     (storew header result 0 0)
-     (inst or :byte result other-pointer-lowtag))))
+      (gengc-alloc type bytes 0 result node temp thread-tn)
+      (storew header result 0 0)
+      (inst or :byte result other-pointer-lowtag))
+    DONE))
 
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *
@@ -339,7 +351,7 @@
                            object index (index-scale n-word-bytes index))))
            ,@(when (eq type 'simple-vector)
                '((emit-gengc-barrier object ea val-temp (vop-nth-arg 2 vop) value)))
-           (emit-store ea value val-temp))))
+           (emit-store vop ,(eq type 'simple-vector) object ea value val-temp))))
      (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
@@ -359,7 +371,7 @@
          (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
            ,@(when (eq type 'simple-vector)
                '((emit-gengc-barrier object ea val-temp (vop-nth-arg 1 vop) value)))
-           (emit-store ea value val-temp))))))
+           (emit-store vop ,(eq type 'simple-vector) object ea value val-temp))))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
@@ -1067,10 +1079,12 @@
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
 
 ;;; Weak vectors
+#-weak-vector-readbarrier
+(progn
 (define-full-reffer %weakvec-ref * vector-data-offset other-pointer-lowtag
   (any-reg descriptor-reg) * %weakvec-ref)
 (define-full-setter %weakvec-set * vector-data-offset other-pointer-lowtag
-  (any-reg descriptor-reg) * %weakvec-set)
+  (any-reg descriptor-reg) * %weakvec-set))
 
 ;;;; ATOMIC-INCF for arrays
 

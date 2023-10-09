@@ -97,27 +97,30 @@
   ;;   Lisp = save GPRs that lisp call can change
   (aver (member convention '(lisp c)))
   (aver (eql card-table-reg 12)) ; change detector
-  (let ((fpr-align 64)
-        (except (ensure-list except))
-        (clobberables
-         (remove frame-reg
-                 `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
-           ;; 13 is usable only if not permanently wired to the thread base
-                       #+gs-seg r13
-                       r14 r15)))
-        (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
+  (let* ((except (ensure-list except))
+         (save-fprs (not (member :fprs except)))
+         (stack-align (if save-fprs 64 16))
+         (c-nonvolatile '(rbx r12 r13 r14 r15))
+         (clobberables
+          (remove frame-reg
+                  `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
+                        ;; 13 is usable only if not permanently wired to the thread base
+                        #+gs-seg r13
+                        r14 r15)))
+         (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
+    (when (eq convention 'c)
+      (binding* ((check (intersection c-nonvolatile except) :exit-if-null))
+        ;; specifying registers not to be preseerved that would not be clobbered
+        ;; by C call is indicative of programmer error
+        (warn "Don't specify nonvolatile regs ~S in registers not to preserve"
+              check)))
+    (setq except (delete :fprs except))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
     ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
-    ;; routine (by *not* preserving it) will be meaningless.
-    ;; You'd have to modify -SAVE / -RESTORE to avoid clobbering RAX.
-    ;; This is a bit limiting: if you ask not to preserve RAX, what you mean is exactly that:
-    ;; it does not matter what value is gets. But EXCEPT has a dual purpose of also
-    ;; propagating the value out from BODY. We _should_ allow RAX in the list of things
-    ;; not to save, in case the caller wants to be maximally efficient and specify that RAX
-    ;; can be trashed with impunity. But it helps with incorrect usage for now
-    ;; to raise this error.
-    (when (member 'rax except)
-      (error "Excluding RAX from preserved GPRs probably will not do what you want."))
+    ;; routine (by *not* preserving it) does not work,
+    ;; but you can still ask for it to explicitly not be preserved.
+    ;; You'd have to modify -SAVE / -RESTORE to avoid clobbering RAX
+    ;; if that were needed.
     (let* ((gprs ; take SET-DIFFERENCE with EXCEPT but in a predictable order
             (remove-if (lambda (x) (member x except))
                        (ecase convention
@@ -126,19 +129,26 @@
                          ;; all GPRs are potentially destroyed across lisp call
                          (lisp clobberables))))
            ;; each 8 registers pushed preserves 64-byte alignment
-           (alignment-bytes
-            (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
+           (gpr-pad-bytes
+            (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs))
+                                      stack-align)))))
       `(progn
          ,@(when frame-tn
              `((inst push ,frame-tn)
                (inst mov ,frame-tn rsp-tn)))
-         (inst and rsp-tn ,(- fpr-align))
+         (inst and rsp-tn ,(- stack-align))
          (regs-pushlist ,@gprs)
-         (inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
-         (call-fpr-save/restore-routine :save)
+         ,@(cond (save-fprs
+                  `((inst sub rsp-tn ,(+ gpr-pad-bytes xsave-area-size))
+                    (call-fpr-save/restore-routine :save)))
+                 ((plusp gpr-pad-bytes)
+                  `((inst sub rsp-tn ,gpr-pad-bytes))))
          (assemble () ,@body)
-         (call-fpr-save/restore-routine :restore)
-         (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
+         ,@(cond (save-fprs
+                  `((call-fpr-save/restore-routine :restore)
+                    (inst add rsp-tn ,(+ gpr-pad-bytes xsave-area-size))))
+                 ((plusp gpr-pad-bytes)
+                  `((inst add rsp-tn ,gpr-pad-bytes))))
          (regs-poplist ,@gprs)
         ,@(cond ((eq frame-tn 'rbp)
                   '((inst leave)))

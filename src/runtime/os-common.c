@@ -208,6 +208,7 @@ void os_unlink_runtime()
 
 bool gc_managed_heap_space_p(lispobj addr)
 {
+    extern int in_bitmapped_subheap(void* addr);
     if ((READ_ONLY_SPACE_START <= addr && addr < READ_ONLY_SPACE_END)
         || (STATIC_SPACE_START <= addr && addr < STATIC_SPACE_END)
 #if defined LISP_FEATURE_GENERATIONAL
@@ -225,6 +226,7 @@ bool gc_managed_heap_space_p(lispobj addr)
 #endif
         )
         return 1;
+    if (use_smlgc && in_bitmapped_subheap((void*)addr)) return 1;
     return 0;
 }
 

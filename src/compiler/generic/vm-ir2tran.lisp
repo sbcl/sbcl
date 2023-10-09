@@ -412,7 +412,7 @@
   t)
 
 ;;; MAKE-LIST optimizations
-#+x86-64
+#+nil ; x86-64
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node)
     t)

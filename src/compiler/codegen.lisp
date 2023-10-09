@@ -21,7 +21,7 @@
 ;;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
 (defun asm-routines-boxed-header-nwords ()
   (align-up (+ sb-vm:code-constants-offset
-               #+x86-64 1) ; KLUDGE: make room for 1 boxed constant
+               #+x86-64 2) ; KLUDGE: make room for 1 boxed constant
             2))
 ;;; the number of bytes used by the code object header
 (defun component-header-length ()

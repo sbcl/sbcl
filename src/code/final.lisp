@@ -237,7 +237,7 @@ Examples:
     ;; Rule out immediate, stack, arena, readonly, and static objects.
     ;; (Is it really an error for a readonly? Maybe a warning? I'll leave it this way unless
     ;; users complain. Surely DX and arena are errors, and NIL was always an error.)
-    (unless (member space '(:dynamic :immobile))
+    (unless (member space '(:dynamic :immobile :bitmapped :large-object))
       (if (eq space :static)
           (error "Cannot finalize ~S." object)
           ;; silently discard finalizers on file streams in arenas I guess
@@ -457,6 +457,7 @@ Examples:
               (setf *finalizer-thread* sb-thread:*current-thread*)
               (loop (run-pending-finalizers)
                     (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))
+                    (sb-vm::release-malloc-segments)
                     (when (zerop finalizer-thread-runflag) (return)))
               (setq *finalizer-thread* nil))
             nil nil)))
@@ -467,6 +468,10 @@ Examples:
 ;;; You should almost always invoke this with *MAKE-THREAD-LOCK* held.
 ;;; Some tests violate that, but they know what they're doing.
 (defun finalizer-thread-stop ()
+  (let ((phase (sb-sys:sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-gc-phase-slot))))
+    (when (> phase 1)
+      ;; TODO: figure this out
+      (error "Can not stop finalizer with GC in progress")))
   #+(and unix sb-safepoint)
   (let ((thread sb-unix::*sighandler-thread*))
     (aver (sb-thread::thread-p thread))

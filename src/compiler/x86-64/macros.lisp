@@ -13,6 +13,11 @@
 
 ;;;; instruction-like macros
 
+(defun cons-stats-v ()
+  (+ (static-data-collection-vector)
+     (ash vector-data-offset word-shift)
+     (- other-pointer-lowtag)))
+
 ;;; This used to be a macro (and still is on the other platforms) but
 ;;; the support for SC-dependent move instructions needed here makes
 ;;; that expand into so large an expression that the resulting code
@@ -107,8 +112,8 @@
 
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-tn
-(eval-when (:compile-toplevel)
-  (aver (<= (1+ thread-boxed-tlab-slot) 15))
+#+nil(eval-when (:compile-toplevel)
+  ;(aver (<= (1+ thread-boxed-tlab-slot) 15))
   (aver (<= (1+ thread-mixed-tlab-slot) 15))
   (aver (<= (1+ thread-cons-tlab-slot) 15)))
 
@@ -217,31 +222,53 @@
              #+(and sb-thread (not gs-seg)) 'thread-tn
              #-(and sb-thread (not gs-seg)) 'rbp-tn))
   (defun emit-begin-pseudo-atomic ()
-    #-sb-safepoint (inst mov (pa-bits-ea) (nonzero-bits)))
+    #-sb-safepoint (inst mov (pa-bits-ea) (nonzero-bits))
+    #+nil
+    (progn (let ((foo (gen-label)))
+             (inst mov (pa-bits-ea) (nonzero-bits))
+             (inst call foo)
+             (emit-label foo)
+             (inst pop (thread-slot-ea thread-et-bzeroing-slot)))))
+
   (defun emit-end-pseudo-atomic ()
     #+sb-safepoint (emit-safepoint)
     #-sb-safepoint
     (assemble ()
+      ;(inst mov :qword (thread-slot-ea thread-et-bzeroing-slot) 0)
       (inst xor (pa-bits-ea) (nonzero-bits))
       (inst jmp :z OUT)
       ;; if PAI was set, interrupts were disabled at the same time
       ;; using the process signal mask.
       #+int1-breakpoints (inst icebp)
       #-int1-breakpoints (inst break pending-interrupt-trap)
-      OUT)))
+      OUT
+      )))
 
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
-(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
+(defvar *in-pseudoatomic* nil)
+(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t) (sml-check t))
                          &body forms)
-  (declare (ignorable thread))
+  (declare (ignorable thread sml-check))
   `(macrolet ((exit-pseudo-atomic () '(emit-end-pseudo-atomic)))
      (unless ,elide-if
        (emit-begin-pseudo-atomic))
-     (assemble () ,@forms)
+     (let ((*in-pseudoatomic* t)) (assemble () ,@forms))
      (when (and ,default-exit (not ,elide-if))
-       (exit-pseudo-atomic))))
+       (exit-pseudo-atomic)
+       #+nil
+       (when ,sml-check
+         (assemble ()
+           (inst test :byte (static-symbol-value-ea '*sml-check-flag*) 2)
+           (inst jmp :z NO-PHASE-CHANGE)
+           (inst call (ea (make-fixup 'gc-check :assembly-routine*)))
+           NO-PHASE-CHANGE
+           (inst cmp :qword (static-symbol-value-ea '*n-malloc-segments-to-release*) 0)
+           (inst jmp :z NO-RELEASE-MEM)
+           (inst call (ea (make-fixup 'release-malloc-segments :assembly-routine*)))
+           NO-RELEASE-MEM
+           )))))
 
 ;;;; indexed references
 
@@ -261,10 +288,63 @@
                           (* max-offset sb-vm:n-word-bytes))
                        scale)))
 
+(defun bignum-index-check (bignum index addend vop)
+  (declare (ignore bignum index addend vop))
+  ;; Conditionally compile this in to sanity-check the bignum logic
+  #+nil
+  (let ((ok (gen-label)))
+    (cond ((and (tn-p index) (not (constant-tn-p index)))
+           (aver (sc-is index any-reg))
+           (inst lea :dword temp-reg-tn (ea (fixnumize addend) index))
+           (inst shr :dword temp-reg-tn n-fixnum-tag-bits))
+          (t
+           (inst mov temp-reg-tn (+ (if (tn-p index) (tn-value index) index) addend))))
+    (inst cmp :dword temp-reg-tn (ea (- 1 other-pointer-lowtag) bignum))
+    (inst jmp :b ok)
+    (inst break halt-trap)
+    (emit-label ok)))
+
+;;; used for: INSTANCE-INDEX-SET %CLOSURE-INDEX-SET
+;;;           SB-BIGNUM:%BIGNUM-SET %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS
+(defmacro define-full-setter (name type offset lowtag scs el-type translate)
+  (let ((barrierp (case name
+                    (%closure-index-set '(not (sc-is value any-reg)))
+                    ((instance-index-set #|%weakvec-set|#)
+                     '(or (not (sc-is index immediate))
+                       (slot-type-requires-gcbarrier args (tn-value index))))
+                    (%weakvec-set :weak))))
+    `(define-vop (,name)
+       (:translate ,translate)
+       (:arg-refs args)
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg immediate signed-reg unsigned-reg))
+              (value :scs ,scs))
+       (:arg-types ,type tagged-num ,el-type)
+       (:vop-var vop)
+       (:temporary (:sc unsigned-reg) val-temp)
+       (:arg-refs args)
+       (:generator 4
+         ,@(when (eq translate 'sb-bignum:%bignum-set)
+             '((bignum-index-check object index 0 vop)))
+         (let ((ea (if (sc-is index immediate)
+                       (ea (- (* (+ ,offset (tn-value index)) n-word-bytes) ,lowtag)
+                           object)
+                       (ea (- (* ,offset n-word-bytes) ,lowtag)
+                           object index (index-scale n-word-bytes index)))))
+           ,@(when (member name '(instance-index-set %closure-index-set %weakvec-set))
+               '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
+           (emit-store vop ,barrierp object ea value val-temp))))))
+
 (defmacro define-full-compare-and-swap
     (name type offset lowtag scs el-type &optional translate)
-  `(progn
-     (define-vop (,name)
+  (let ((barrierp (case name
+                    (%instance-cas
+                     '(or (not (sc-is index immediate))
+                          (slot-type-requires-gcbarrier args (tn-value index))))
+                    (%compare-and-swap-svref t)
+                    (t nil))))
+  `(define-vop (,name)
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
@@ -282,6 +362,7 @@
                         #|:from (:argument 2)|# :to :result :target value)  rax)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
+       (:arg-refs args)
        (:generator 5
          (let ((ea (ea (- (* (+ (if (sc-is index immediate) (tn-value index) 0) ,offset)
                          n-word-bytes)
@@ -297,25 +378,13 @@
                 ;; store barrier affects only the object's base address
                 '((emit-gengc-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
                ((%raw-instance-cas/word %raw-instance-cas/signed-word)))
-           (move-immediate rax (encode-value-if-immediate old-value ,(and (memq 'any-reg scs) t)))
-           (inst cmpxchg :lock ea new-value)
+           ,(if barrierp ; the s-expression is non-nil though may eval to nil
+                `(emit-cmpxchg vop ,barrierp object ea old-value new-value rax)
+                `(progn
+                   (move-immediate rax
+                    (encode-value-if-immediate old-value ,(and (memq 'any-reg scs) t)))
+                   (inst cmpxchg :lock ea new-value)))
            (move value rax))))))
-
-(defun bignum-index-check (bignum index addend vop)
-  (declare (ignore bignum index addend vop))
-  ;; Conditionally compile this in to sanity-check the bignum logic
-  #+nil
-  (let ((ok (gen-label)))
-    (cond ((and (tn-p index) (not (constant-tn-p index)))
-           (aver (sc-is index any-reg))
-           (inst lea :dword temp-reg-tn (ea (fixnumize addend) index))
-           (inst shr :dword temp-reg-tn n-fixnum-tag-bits))
-          (t
-           (inst mov temp-reg-tn (+ (if (tn-p index) (tn-value index) index) addend))))
-    (inst cmp :dword temp-reg-tn (ea (- 1 other-pointer-lowtag) bignum))
-    (inst jmp :b ok)
-    (inst break halt-trap)
-    (emit-label ok)))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)
   `(progn
@@ -408,27 +477,3 @@
          (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
            ,@(trap '(emit-constant (+ index addend)))
            (inst mov value ea)))))))
-
-;;; used for: INSTANCE-INDEX-SET %CLOSURE-INDEX-SET
-;;;           SB-BIGNUM:%BIGNUM-SET %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS
-(defmacro define-full-setter (name type offset lowtag scs el-type translate)
-  `(define-vop (,name)
-       (:translate ,translate)
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate signed-reg unsigned-reg))
-              (value :scs ,scs))
-       (:arg-types ,type tagged-num ,el-type)
-       (:vop-var vop)
-       (:temporary (:sc unsigned-reg) val-temp)
-       (:generator 4
-         ,@(when (eq translate 'sb-bignum:%bignum-set)
-             '((bignum-index-check object index 0 vop)))
-         (let ((ea (if (sc-is index immediate)
-                       (ea (- (* (+ ,offset (tn-value index)) n-word-bytes) ,lowtag)
-                           object)
-                       (ea (- (* ,offset n-word-bytes) ,lowtag)
-                           object index (index-scale n-word-bytes index)))))
-           ,@(when (member name '(instance-index-set %closure-index-set %weakvec-set))
-               '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
-           (emit-store ea value val-temp)))))

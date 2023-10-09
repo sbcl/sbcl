@@ -163,6 +163,9 @@
   '(sub-gc
     sb-kernel::post-gc
     internal-error
+    largeobj-hs-insert
+    largeobj-hs-maybe-rehash
+    release-malloc-segments
     sb-kernel::control-stack-exhausted-error
     sb-kernel::binding-stack-exhausted-error
     sb-kernel::alien-stack-exhausted-error
@@ -213,6 +216,9 @@
     ;; never the symbol-value slot
     #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
                            per-thread-c-interface-symbols)
+    bitmap-heap-base
+    bitmap-heap-size
+
     ;; NLX variables are thread slots on x86-64 and RISC-V.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
     ;; so must lookup the TLS index given the symbol.
@@ -412,6 +418,16 @@
 (defconstant single-float-digits 24)
 (defconstant double-float-digits 53)
 )
+
+;;; see smlsharp.h
+(defconstant gc-phase-async 1)
+(defconstant gc-phase-sync1 3)
+(defconstant gc-phase-sync2 5)
+(defconstant gc-phase-mark  7)
+(defconstant smlgc-blocksize-max 4096)
+;; an "mseg" wraps a malloc()'ed memory block. In addition to any malloc
+;; overhead there is some GC overhead on top of that.
+(defconstant smlgc-mseg-overhead-bytes 32)
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)

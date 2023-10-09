@@ -11,6 +11,20 @@
 
 (in-package "SB-VM")
 
+(defparameter *asm-routine-hit-counter-map*
+  (make-array 200 :fill-pointer 0))
+(eval-when (:compile-toplevel)
+(defmacro count-hit (name)
+  (declare (ignorable name))
+  #+nil
+  (let ((vector-data
+          (+ (static-data-collection-vector)
+             (ash vector-data-offset word-shift)
+             (- other-pointer-lowtag)))
+        (index (or (position name *asm-routine-hit-counter-map*)
+                   (vector-push-extend name *asm-routine-hit-counter-map*))))
+    `(inst inc :qword (ea ,(+ vector-data (ash index word-shift)))))))
+
 #-sb-assembling ; avoid redefinition warning
 (progn
 (defun both-fixnum-p (temp x y)
@@ -55,7 +69,7 @@
     (instrument-alloc bignum-widetag nbytes nil alloc-tn)
     (pseudo-atomic ()
       (allocation bignum-widetag nbytes 0 alloc-tn nil nil nil)
-      (storew* header alloc-tn 0 0 t)
+      (storew header alloc-tn 0 0)
       (storew source alloc-tn bignum-digits-offset 0)
       (if (eq dest alloc-tn)
           (inst or :byte dest other-pointer-lowtag)
@@ -100,6 +114,7 @@
     (inst rcr res 1)
     (when (> n-fixnum-tag-bits 1)   ; don't shift by 0
       (inst sar res (1- n-fixnum-tag-bits)))
+    (count-hit generic+)
     (return-single-word-bignum res rcx res))
 
   (define-generic-arith-routine (- 10)
@@ -114,6 +129,7 @@
     (inst rcr res 1)
     (when (> n-fixnum-tag-bits 1)   ; don't shift by 0
       (inst sar res (1- n-fixnum-tag-bits)))
+    (count-hit generic-)
     (return-single-word-bignum res rcx res))
 
   (define-generic-arith-routine (* 30)
@@ -133,12 +149,14 @@
     (inst cmp x rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
+    (count-hit generic-mul=>2word)
     (alloc-other bignum-widetag (+ bignum-digits-offset 2) res nil nil nil)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
     (inst clc) (inst ret)
 
     SINGLE-WORD-BIGNUM
+    (count-hit generic-mul=>1word)
     (return-single-word-bignum res res rax)))
 
 ;;;; negation

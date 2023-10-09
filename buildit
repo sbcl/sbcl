@@ -1,0 +1,8 @@
+#!/bin/sh
+
+export SMLGC=1
+host=$HOME/sbcl/pristine/bin/sbcl
+
+SBCL_MAKE_PARALLEL=8,0 sh make.sh $host --prefix=$HOME/sbcl/pristine \
+  --without-soft-card-marks --without-immobile-space --with-weak-vector-readbarrier \
+  --with-int4-breakpoints --without-sb-eval --with-sb-fasteval

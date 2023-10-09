@@ -111,6 +111,9 @@
 (defconstant +hashset-unused-cell+ 0)
 (defmacro hs-chain-terminator-p (val) `(eq ,val 0))
 
+#+sb-xc-host
+(defmacro add-weak-object (x) `(progn ,x))
+
 (defun allocate-hashset-storage (capacity weakp)
   (declare (type (unsigned-byte 28) capacity)) ; 256M cells maximum
   (declare (ignorable weakp))
@@ -126,6 +129,8 @@
          (psl-vector (make-array capacity :element-type '(unsigned-byte 8)
                                           :initial-element 0))
          (hash-vector (make-array capacity :element-type '(unsigned-byte 16))))
+    (when weakp
+      (add-weak-object cells))
     (setf (hs-cells-gc-epoch cells) sb-kernel::*gc-epoch*)
     (setf (hs-cells-max-psl cells) 0)
     (setf (hs-cells-n-avail cells) capacity)
@@ -354,6 +359,7 @@
                    (n-live))
                ;; First decide if the table occupancy needs to be recomputed after GC
                (unless (eq (hs-cells-gc-epoch cells) current-epoch)
+                 ;(format t "~&hashset GC epoch changed~%")
                  (setf n-live (hs-cells-occupancy cells capacity)
                        (hs-cells-n-avail cells) (- capacity n-live)
                        (hs-cells-gc-epoch cells) current-epoch))
@@ -568,3 +574,41 @@
   (dotimes (i (weak-vector-len vector))
     (when (eq (weak-vector-ref vector i) key)
       (return key)))))
+
+(defun hashset-probing-sequence (hashset key)
+  (let* ((storage (hashset-storage hashset))
+         (cells (hss-cells storage))
+         (mask (hs-cells-mask cells))
+         (index (logand (funcall (hashset-hash-function hashset) key) mask))
+         (interval 1)
+         (sequence))
+    (loop
+     (push index sequence)
+     (let ((probed-key (hs-cell-ref cells index)))
+       (assert (not (hs-chain-terminator-p probed-key)))
+       (when (and probed-key (funcall (hashset-test-function hashset) probed-key key))
+         (return (nreverse sequence)))
+       (setq index (logand (+ index interval) mask))
+       (incf interval)))))
+#-sb-xc-host
+(defun dump-hashset (hashset)
+  (let* ((storage (hashset-storage hashset))
+         (cells (hss-cells storage))
+         (mutex (hashset-mutex hashset))
+         (held (and mutex (sb-thread:holding-mutex-p mutex)))
+         (maxpsl 0)
+         (n 0))
+    (declare (notinline sb-thread:holding-mutex-p))
+    ;; to avoid recursive lock error. This is for debugging so it doesn't matter
+    (when held (sb-thread:release-mutex mutex))
+    (dotimes (i (hs-cells-capacity cells))
+      (let ((x (hs-cell-ref cells i)))
+        (when (and x (not (hs-chain-terminator-p x)))
+          (let ((seq (hashset-probing-sequence hashset x)))
+            (setq maxpsl (max (length seq) maxpsl))
+            (incf n)
+            (let ((*print-pretty* nil))
+              (format t "[~4d] = ~s ~s~%" i seq x))))))
+    (when held (sb-thread:grab-mutex mutex))
+    (format t ";~&Total entries: ~D, max-psl = ~D (stored=~D)~%"
+            n maxpsl (hs-cells-max-psl cells))))

@@ -63,28 +63,140 @@
   (inst and :dword scratch-reg card-index-mask)
   (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
 
-(defun emit-store (ea value val-temp)
-  (sc-case value
-   (immediate
-      (let ((bits (encode-value-if-immediate value)))
-        ;; Try to move imm-to-mem if BITS fits
-        (acond ((or (and (fixup-p bits)
-                         ;; immobile-object fixups must fit in 32 bits
-                         (eq (fixup-flavor bits) :immobile-symbol)
-                         bits)
-                    (plausible-signed-imm32-operand-p bits))
-                (inst mov :qword ea it))
-               (t
-                (inst mov val-temp bits)
-                (inst mov ea val-temp)))))
-   (constant
-      (inst mov val-temp value)
-      (inst mov :qword ea val-temp))
-   (t
-      (inst mov :qword ea value))))
+(defun branch-if-barrier-on (where)
+  (when *in-pseudoatomic* (error "can't emit CMS barrier if already pseudoatomic"))
+  (inst cmp :byte (thread-slot-ea thread-gc-phase-slot) GC-PHASE-SYNC1)
+  (let ((label (gen-label)))
+    (emit-label label)
+    (push label (sb-assem::asmstream-pseudo-atomic-locs sb-assem:*asmstream*)))
+  (inst jmp :ae where))
 
-;; This vop's sole purpose is to provide the implementation of value-cell-set.
-;; It could be removed, for x86-64 anyway.
+;;; FIXME: if and when I implement SIGUSR2 as the signal to cooperate
+;;; with GC - so that we don't switch over to safepoints -
+;;; then the only instruction sequences which will be _implicitly_ pseudo-atomic
+;;; will be:
+;;;   inst cmp [phase], 2
+;;;   inst jmp :a elsewhere
+;;;   inst mov [ea], something # any number of stores
+;;; so if the interrupt handler sees that it has been interrupted in lisp code
+;;; at a mov to memory, it will emulate the mov without allowing a phase change.
+;;; It will NOT work to have either of the following:
+;;;   inst cmp [phase], 2       |  inst cmp [phase], 2
+;;;   inst jmp :a elsewhere     |  inst jmp :a elsewhere
+;;;   inst mov temp, [rip-n]    |  inst mov temp, imm        <-- interrupted here
+;;;   inst mov [ea], temp       |  inst mov [ea], temp
+;;; In this instruction sequence, if we allow the interrupt to take place,
+;;; and it changes the GC phase, then the preceding comparison answer can not be
+;;; taken as correct. Perhaps we should have branched to the fallback code to
+;;; perform a barrier, but we did not, because the phase looked like it was ASYNC.
+;;; Somehow the GC phase has to be examined just before performing the store.
+;;;
+(defun emit-store (vop barrierp object ea value val-temp
+                   &optional slot-name
+                   &aux (asm-routine
+                         (case barrierp
+                           (:weak 'weak-vector-set)
+                           (:untagged 'gc-barrier-store-untagged)
+                           (t 'gc-barrier-store)))
+                   notinline done)
+  (declare (type (member t nil :weak :untagged) barrierp))
+  (declare (ignorable slot-name))
+
+  (when (and barrierp (stack-consed-p object))
+    ;; barriers do not pertain to stack objects
+    (setq barrierp nil))
+  #+smlgc-telemetry
+  (inst inc :qword (thread-slot-ea (if (stack-consed-p object)
+                                       thread-ct-stack-obj-stores-slot
+                                       thread-ct-heap-obj-stores-slot)))
+  (labels ((imm (operation)
+             (let ((bits (encode-value-if-immediate value)))
+               ;; Try to move imm-to-mem if BITS fits
+               (acond ((or (and (fixup-p bits)
+                                ;; immobile-object fixups must fit in 32 bits
+                                (eq (fixup-flavor bits) :immobile-symbol)
+                                bits)
+                           (plausible-signed-imm32-operand-p bits))
+                       (if (eq operation 'push)
+                           (inst push it) ; real good
+                           (progn (barrier)
+                                  (inst mov :qword ea it))))
+                      (t
+                       (inst mov val-temp bits)
+                       (if (eq operation 'push)
+                           (inst push val-temp)
+                           (progn (barrier)
+                                  (inst mov ea val-temp)))))))
+           (barrier ()
+             (when barrierp
+               (branch-if-barrier-on (setq notinline (gen-label))))))
+    (when (eq barrierp :weak) ; always call C
+      (if (sc-is value immediate) (imm 'push) (inst push value))
+      (inst lea val-temp ea)
+      (inst push val-temp)
+      (inst push (encode-value-if-immediate object))
+      (invoke-asm-routine 'call asm-routine vop)
+      (return-from emit-store))
+    (sc-case value
+     (immediate (imm 'store))
+     (constant
+      (inst mov val-temp value)
+      (barrier)
+      (inst mov :qword ea val-temp))
+     (t
+      (barrier)
+      (inst mov :qword ea value)))
+    (when barrierp
+      (emit-label (setq done (gen-label)))
+      (assemble (:elsewhere)
+        (emit-label NOTINLINE)
+        (if (sc-is value immediate) (imm 'push) (inst push value))
+        (inst lea val-temp ea)
+        (inst push val-temp)
+        (inst push (encode-value-if-immediate object))
+        (invoke-asm-routine 'call asm-routine vop)
+        (inst jmp DONE)))))
+
+;;; RAX is loaded with the expected oldval. Return from the slow path
+;;; is the same as if by the fast path (actual oldval is in RAX)
+(defun emit-cmpxchg (vop barrierp object ea old new rax
+                     &aux (asm-routine
+                           (if (eq barrierp :untagged)
+                               'gc-barrier-cmpxchg-untagged
+                               'gc-barrier-cmpxchg))
+                           (notinline (gen-label)))
+  (unless barrierp
+    (inst mov rax (encode-value-if-immediate old))
+    (inst cmpxchg :lock ea new)
+    (return-from emit-cmpxchg))
+  (assemble ()
+    ;; optimistically assume we're taking the fast path
+    (inst mov rax (encode-value-if-immediate old))
+    (branch-if-barrier-on NOTINLINE)
+    (inst cmpxchg :lock ea new)
+    DONE
+    (assemble (:elsewhere)
+      (emit-label NOTINLINE)
+      (inst push new)
+      (inst lea rax ea)
+      (inst push rax)
+      (inst push (encode-value-if-immediate object))
+      (inst mov rax (encode-value-if-immediate old))
+      (invoke-asm-routine 'call asm-routine vop)
+      (inst jmp done))))
+
+;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
+;;; offset to be read or written is a property of the VOP used.
+(define-vop (cell-ref)
+  (:args (object :scs (descriptor-reg)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:variant-vars offset lowtag)
+  (:policy :fast-safe)
+  (:generator 4
+    (check-alivep object lowtag)
+    (loadw value object offset lowtag)))
+;; This vop's sole purpose is to be an ancestor for other vops, to assign
+;; default operands, policy, and generator.
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
@@ -93,9 +205,9 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
+    (check-alivep object lowtag)
     (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)
-    (let ((ea (object-slot-ea object offset lowtag)))
-      (emit-store ea value val-temp))))
+    (emit-store vop t object (object-slot-ea object offset lowtag) value val-temp)))
 
 ;;; X86 special
 (define-vop (cell-xadd)
@@ -286,3 +398,50 @@
   ;; It wants a function, not a symbol
   (setf (sb-c::vop-info-optimizer (template-or-lose name))
         (lambda (vop) (sb-c::elide-zero-fill vop))))
+
+;; Placeholders until non-STW GC becomes a reality
+#+weak-vector-readbarrier
+(progn
+  (define-full-setter %weakvec-set * vector-data-offset other-pointer-lowtag
+    (any-reg descriptor-reg) * %weakvec-set)
+
+  (define-vop (%weakvec-ref)
+    (:translate %weakvec-ref)
+    (:policy :fast-safe)
+    (:args (object :scs (descriptor-reg))
+           (index :scs (any-reg signed-reg unsigned-reg)))
+    (:arg-types * tagged-num)
+    (:results (value :scs (descriptor-reg)))
+    (:result-types *)
+(:temporary (:sc unsigned-reg) junk)
+    (:vop-var vop)
+    (:generator 10
+      (pseudo-atomic ()
+        (inst mov junk (ea (make-fixup "weakrefget_ct" :foreign-dataref)))
+        (inst add :dword :lock (ea junk) 1)
+        (inst cmp :byte (thread-slot-ea thread-gc-phase-slot) GC-PHASE-ASYNC)
+        (inst jmp :e FAST)
+        (inst push object)
+        (inst push index)
+        (unless (sc-is index any-reg) (inst shl (ea rsp-tn) n-fixnum-tag-bits)) ; pass as fixnum
+        (invoke-asm-routine 'call 'weak-vector-ref vop)
+        FAST
+        (inst mov value (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                          object index (index-scale n-word-bytes index))))))
+
+  (define-vop (%weak-pointer-value)
+    (:policy :fast-safe)
+    (:args (weakptr :scs (descriptor-reg)))
+    (:results (value :scs (descriptor-reg)))
+    (:vop-var vop)
+    (:temporary (:sc unsigned-reg) junk)
+    (:generator 10
+      (pseudo-atomic ()
+        (inst mov junk (ea (make-fixup "weakrefget_ct" :foreign-dataref)))
+        (inst add :dword :lock (ea junk) 1)
+        (inst cmp :byte (thread-slot-ea thread-gc-phase-slot) GC-PHASE-ASYNC)
+        (inst jmp :e FAST)
+        (inst push weakptr)
+        (invoke-asm-routine 'call 'weak-pointer-ref vop)
+        FAST
+        (loadw value weakptr weak-pointer-value-slot other-pointer-lowtag)))))

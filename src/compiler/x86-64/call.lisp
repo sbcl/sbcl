@@ -162,7 +162,13 @@
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (popw rbp-tn (frame-word-offset return-pc-save-offset))))
+    (popw rbp-tn (frame-word-offset return-pc-save-offset))
+    ;;
+    ;(inst test :byte (static-symbol-value-ea '*sml-check-flag*) 2)
+    ;(inst jmp :z SKIP)
+    ;(inst call (ea (make-fixup 'gc-check :assembly-routine*)))
+
+    SKIP))
 
 (defun emit-lea (target source disp)
   (if (eql disp 0)
@@ -1286,7 +1292,8 @@
   ;; Not much of an advantage, but why not.
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
   ;; Note that DST conflicts with RESULT because we use both as temps
-  (:temporary (:sc unsigned-reg) value dst)
+  (:temporary (:sc unsigned-reg :offset rax-offset) dst)
+  (:temporary (:sc unsigned-reg) value)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -1307,9 +1314,28 @@
       (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
     (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
-       (if (node-stack-allocate-p node)
-           (stack-allocation rcx 0 dst)
-           (allocation +cons-primtype+ rcx 0 dst node value thread-tn
+      (cond
+        ((node-stack-allocate-p node)
+         (stack-allocation rcx 0 dst))
+        (t
+         ;; TODO: There could be no reason not to stuff this entire thing
+         ;; into an assembly routine. "unfolding" it into its constituent
+         ;; steps as done here may not be a win.
+         (let ((fallback (gen-label)) (linear (gen-label)))
+           ;; Try to get space for contiguous conses, the number of bytes being in RCX.
+           (jump-if-not-bitmap-alloc LINEAR)
+           (invoke-asm-routine 'call 'bitmap-reserve-&rest node)
+           ;; Result is in RAX, with ZF set on failure.
+           (inst jmp :nz CONTINUE)
+           (jump-if-bitmap-alloc FALLBACK)
+           (assemble (:elsewhere)
+             (emit-label fallback)
+             (move dst context) ; dst = RAX
+             (invoke-asm-routine 'call 'bitmap-listify node)
+             (move result dst)
+             (inst jmp LEAVE-PA))
+           (emit-label linear)
+           (gengc-alloc +cons-primtype+ rcx 0 dst node value thread-tn
                        :overflow
                        (lambda ()
                          (inst push rcx)
@@ -1318,7 +1344,8 @@
                           'call (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest)
                           node)
                          (inst pop result)
-                         (inst jmp leave-pa))))
+                         (inst jmp LEAVE-PA))))))
+      CONTINUE
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
@@ -1341,6 +1368,8 @@
        (inst inc rcx) ; :QWORD because it's a signed number
        (inst jmp :nz loop)
        LEAVE-PA)
+    ;; This label is branched to only if there were no &REST args
+    ;; and we never entered a pseudo-atomic section.
     DONE))
 
 ;;; Return the location and size of the &MORE arg glob created by
@@ -1382,6 +1411,15 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
+#|
+    ;; See if SML# collector has asked us to run a little bit
+    ;; (to be replaced by POSIX signal, but for now, no signals)
+    (inst mov temp (ea (make-fixup "sml_check_flag" :foreign-dataref)))
+    (inst test :dword (ea temp) -1)
+    (inst jmp :z SKIP)
+    (invoke-asm-routine 'call 'gc-cooperate vop)
+    SKIP
+|#
     ;; NOTE: copy-more-arg expects this to issue a CMP for min > 1
     (let ((err-lab
             (generate-error-code vop 'invalid-arg-count-error nargs)))

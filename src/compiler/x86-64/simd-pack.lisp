@@ -90,8 +90,10 @@
                     (:node-var node)
                     (:arg-types ,type)
                     (:note "AVX2 to pointer coercion")
+                    (:temporary (:sc unsigned-reg) temp temp2)
                     (:generator 13
-                      (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
+                      (alloc-other simd-pack-widetag simd-pack-size y node
+                                   (list temp temp2) thread-tn)
                       (storew (fixnumize ,tag)
                               y simd-pack-tag-slot other-pointer-lowtag)
                       (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
@@ -197,8 +199,9 @@
   (:result-types t)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 13
-    (alloc-other simd-pack-widetag simd-pack-size dst node nil thread-tn)
+    (alloc-other simd-pack-widetag simd-pack-size dst node (list temp temp2) thread-tn)
       ;; see +simd-pack-element-types+
     (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
     (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)

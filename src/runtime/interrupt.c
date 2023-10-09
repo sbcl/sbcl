@@ -69,6 +69,7 @@
 #include "genesis/cons.h"
 #include "genesis/vector.h"
 #include "atomiclog.inc"
+#include "search.h"
 
 #ifdef ATOMIC_LOGGING
 uword_t *eventdata;
@@ -258,10 +259,12 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 char* vm_thread_name(struct thread* th)
 {
     if (!th) return "non-lisp";
-    struct thread_instance *lispthread =
-        (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-    lispobj name = lispthread->_name;
-    if (simple_base_string_p(name)) return vector_sap(name);
+    if (th->lisp_thread) {
+        struct thread_instance *lispthread =
+            (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+        lispobj name = lispthread->_name;
+        if (simple_base_string_p(name)) return vector_sap(name);
+    }
     return "?";
 }
 
@@ -329,7 +332,12 @@ static void record_signal(int sig, void* context)
 {
     event2("got signal %d @ pc=%p", sig, os_context_pc(context));
 }
-#define RECORD_SIGNAL(sig,ctxt) if(sig!=SIGSEGV)record_signal(sig,ctxt);
+#define RECORD_SIGNAL(sig,ctxt) if(sig!=4) { \
+    char buf[100]; \
+    int n = snprintf(buf, sizeof buf,"[%s] sig%d @ pc=%lx fp=%lx sp=%lx\n", \
+                     vm_thread_name(get_sb_vm_thread()),                \
+                     sig, os_context_pc(ctxt), *os_context_fp_addr(ctxt), \
+                     *os_context_sp_addr(ctxt)); write(2,buf,n); }
 #else
 #define RECORD_SIGNAL(sig,ctxt)
 #endif
@@ -337,7 +345,12 @@ static void record_signal(int sig, void* context)
 #ifdef LISP_FEATURE_WIN32
 # define should_handle_in_this_thread(c) (1)
 #else
-# define should_handle_in_this_thread(c) lisp_thread_p(c)
+// collector needs to handle sigsegv in exception_handling_load()
+// in otherptr_mseg. Probably would be best to consider the collector thread
+// to be a Lisp thread, or else specifically allow that thread.
+// But wait! low_level_handle_now no longer uses SAVE_ERRNO so therefore
+// does not use should_handle_in_this_thread so why is this diff here?
+# define should_handle_in_this_thread(c) (lisp_thread_p(c)||signal==SIGSEGV)
 #endif
 #define SAVE_ERRNO(signal,context,void_context)                 \
     {                                                           \
@@ -1040,6 +1053,7 @@ bool interrupt_handler_pending_p(void)
 void
 interrupt_handle_pending(os_context_t *context)
 {
+  //  fprintf(stderr, "entered interrupt_handle_pending\n");
 #ifdef ADDRESS_SANITIZER
     __asan_unpoison_memory_region(context, sizeof *context);
 #endif
@@ -1401,9 +1415,17 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_GC_METRICS
 pthread_cond_t gcmetrics_condvar = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t gcmetrics_mutex = PTHREAD_MUTEX_INITIALIZER;
+int current_thread_total_gc_pause_microseconds() {
+    struct thread* th = get_sb_vm_thread();
+    struct extra_thread_data *data = thread_extra_data(th);
+    return data->sum_gc_wait;
+}
 #endif
 
 #ifdef THREADS_USING_GCSIGNAL
+
+extern int enable_async_gc;
+extern void sml_check_internal(void *);
 
 /* This function must not cons, because that may trigger a GC. */
 void
@@ -1417,17 +1439,20 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
      * pseudo atomic until gc is finally allowed. */
     if (read_TLS(GC_INHIBIT,thread) != NIL) {
+      tprintf_("GC sig deferred: INHIBIT");
         event0("stop_for_gc deferred for *GC-INHIBIT*");
         write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         return;
     } else if (arch_pseudo_atomic_atomic(thread)) {
-        event0("stop_for_gc deferred for PA");
+      tprintf_("GC sig deferred: pseudo-atomic");
+        event0("GC-cooperate deferred for PA");
         write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         arch_set_pseudo_atomic_interrupted(thread);
         maybe_save_gc_mask_and_block_deferrables(context);
         return;
     }
-
+    extern void adjust_context_for_implicit_pseudoatomic(os_context_t*);
+    adjust_context_for_implicit_pseudoatomic(context);
     event0("stop_for_gc");
 
     /* Not PA and GC not inhibited -- we can stop now. */
@@ -1458,6 +1483,12 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         struct interrupt_data *interrupt_data = &thread_interrupt_data(thread);
         sigcopyset(os_context_sigmask_addr(context), &interrupt_data->pending_mask);
         interrupt_data->gc_blocked_deferrables = 0;
+    }
+
+    if (use_smlgc && enable_async_gc) {
+         extern void cooperate_with_gc(uword_t);
+         cooperate_with_gc(*os_context_sp_addr(context));
+         goto Done;
     }
 
     /* No need to use an atomic memory load here - this thead "owns" its state
@@ -1515,6 +1546,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     if (my_state != STATE_RUNNING)
         lose("stop_for_gc: bad state on wakeup: %x", my_state);
 
+Done:
     if (was_in_lisp) {
         undo_fake_foreign_function_call(context);
     }
@@ -1911,6 +1943,7 @@ extern void restore_sbcl_signals () {
     }
 }
 
+extern int is_collector_thread();
 static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -1924,7 +1957,8 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     RECORD_SIGNAL(signal,void_context);
     UNBLOCK_SIGSEGV();
     RESTORE_FP_CONTROL_WORD(context,void_context);
-    if (lisp_thread_p(void_context)) {
+    // assume we know how to handle signals (SIGSEGV) in the collector thread
+    if (lisp_thread_p(void_context) || is_collector_thread()) {
         interrupt_low_level_handlers[signal](signal, info, context);
     }
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD

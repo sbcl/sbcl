@@ -48,6 +48,12 @@
   (and (simple-vector-p x)
        (test-header-data-bit x (ash sb-vm:vector-weak-flag sb-vm:array-flags-data-position))))
 
+
+(defun add-weak-object (x)
+  (alien-funcall (extern-alien "record_weak_object" (function void unsigned))
+                 (get-lisp-obj-address x))
+  x)
+
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
   (declare (index length))
@@ -62,6 +68,7 @@
         (error "~S has ~D elements, vector length is ~D."
                :initial-contents contents-length length))))
   (let ((v (sb-c::allocate-weak-vector length)))
+    (add-weak-object v)
     (if initial-contents
         (dotimes (i length)
           (setf (weak-vector-ref v i) (elt initial-contents i)))
@@ -71,7 +78,10 @@
     v))
 (defun make-weak-pointer (object)
   "Allocate and return a weak pointer which points to OBJECT."
-  (make-weak-pointer object))
+  (let ((wp (sb-vm::%make-weak-pointer object)))
+    (when (sb-vm:is-lisp-pointer (get-lisp-obj-address object))
+      (add-weak-object wp))
+    wp))
 
 (declaim (inline weak-pointer-value))
 (defun weak-pointer-value (weak-pointer)
@@ -79,7 +89,7 @@
 If the referent of WEAK-POINTER has been garbage collected,
 returns the values NIL and NIL."
   (declare (type weak-pointer weak-pointer))
-  (let ((value (sb-vm::%weak-pointer-value weak-pointer)))
+  (let ((value (%primitive sb-vm::%weak-pointer-value weak-pointer)))
     (if (sb-vm::unbound-marker-p value)
         (values nil nil)
         (values value t))))

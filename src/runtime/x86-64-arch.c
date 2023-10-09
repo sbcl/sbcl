@@ -29,6 +29,7 @@
 #include "unaligned.h"
 #include "search.h"
 #include "var-io.h"
+#include "code.h"
 
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
@@ -38,6 +39,7 @@
 
 #define INT3_INST 0xCC
 #define INTO_INST 0xCE
+#define UD1_INST 0xb90f
 #define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
 
@@ -820,3 +822,89 @@ lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs) {
 }
 
 #include "x86-arch-shared.inc"
+
+#define JAE_rel8 0x73
+
+int possibly_implicit_pseudoatomic(unsigned char* pc) {
+    unsigned char opcode = *pc;
+    if (opcode == JAE_rel8) return 1;
+    if (opcode == 0x0F && pc[1] == 0x83) return 1; // JAE rel32
+    int lock = 0;
+    if (*pc == 0xF0) { lock = 1; ++pc; }
+    if ((*pc & 0xF8) == 0x48) { // REX.w
+        unsigned char first = pc[1];
+        unsigned char second = pc[2];
+        if (first == 0x89 || // MOV r/m64, r64
+            first == 0xC7 || // MOV r/m64, imm32
+            (lock && (first == 0x0F) && (second == 0xB1)))
+            return 1;
+    }
+    return 0;
+}
+
+uint32_t* code_pseudoatomic_locs(struct code* code, int* pcount)
+{
+    int n_funs = code_n_funs(code);
+    if (!n_funs) return 0;
+    uint32_t* end = (uint32_t*)((lispobj*)code + code_total_nwords(code));
+    int n_locations = end[-(n_funs + 2)];
+    if (!n_locations) return 0;
+    *pcount = n_locations;
+    return &end[-(n_funs + 2 + n_locations)];
+}
+
+void adjust_context_for_implicit_pseudoatomic(os_context_t* context)
+{
+    extern uword_t* codeblob_from_interior_ptr(void* addr);
+    unsigned char* pc = (void*)os_context_pc(context);
+    if (!possibly_implicit_pseudoatomic(pc)) { // look only at the bytes @ PC
+        tprintf_("GC sig @ %p", pc);
+        return;
+    }
+    lispobj* code = codeblob_from_interior_ptr(pc);
+    if (!code) {
+        tprintf_("GC sig @ %p (non-lisp)", pc);
+        return;
+    }
+    uint32_t* pa_locs;
+    int nlocs, loc_index = -1;
+    pa_locs = code_pseudoatomic_locs((void*)code, &nlocs);
+    unsigned char *condjmp = 0, *memory_op = 0;
+    if (pa_locs) {
+        // find the nearest pseudoatomic store (or cmpxchg) below PC
+        unsigned char* insts = (void*)code_text_start((void*)code);
+        uint32_t pc_offs = pc - insts;
+        loc_index = bsearch_lesseql_uint32(pc_offs, pa_locs, nlocs);
+        if (loc_index >= 0) {
+            condjmp = insts + pa_locs[loc_index];
+            if (*condjmp == JAE_rel8)
+                memory_op = condjmp + 2;
+            else
+                memory_op = condjmp + 6;
+        }
+    }
+    // If the interrupted PC is one of the two indivisible instructions
+    // following the CMP of the GC phase, then upon return-from-interupt
+    // take the branch.
+    if (pc == condjmp || pc == memory_op) {
+        /* If interrupted at either of the 2 instructions that follow comparison
+         * of the GC phase, take the slow path on return from interrupt, as if
+         * a phase change occurred just prior to delivery of the signal */
+        unsigned char* next_inst;
+        int disp;
+        if (*condjmp == JAE_rel8) {
+            next_inst = condjmp + 2;
+            disp = (int)*(signed char*)(condjmp + 1);
+        } else {
+            next_inst = condjmp + 6;
+            disp = *(int*)(condjmp + 2);
+        }
+        pc = next_inst + disp;
+        set_os_context_pc(context, (uword_t)pc);
+        tprintf_("GC sig @ %p code %p + %x [%02x %02x %02x] phase %d, PA @ %p",
+                 pc, code, (int)((char*)pc - code_text_start((struct code*)code)),
+                 pc[0], pc[1], pc[3], get_sb_vm_thread()->gc_phase, condjmp);
+    } else {
+        tprintf_("GC sig @ %p not pseudo-atomic");
+    }
+}

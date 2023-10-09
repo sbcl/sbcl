@@ -618,6 +618,12 @@
 
       (setf (dstate-next-offs dstate) (dstate-cur-offs dstate))
 
+      (when (and stream
+                 (eql (car (seg-pseudo-atomic-locations segment))
+                      (dstate-next-offs dstate)))
+        (format stream "; GC barrier:")
+        (pop (seg-pseudo-atomic-locations segment)))
+
       (call-offs-hooks t stream dstate)
       (unless (or prefix-p (null stream))
         (print-current-address stream dstate))
@@ -1506,6 +1512,13 @@
            :code code
            :initial-offset initial-offset ; an offset into CODE
            :debug-fun debug-fun)))
+    (when code
+      (let (locs)
+        (dovector (x (sb-impl::code-pseudo-atomic-locations code))
+          (let ((loc (code-insts-offs-to-segment-offs x segment)))
+            (when (plusp loc)
+              (push loc locs))))
+        (setf (seg-pseudo-atomic-locations segment) (nreverse locs))))
     (add-debugging-hooks segment debug-fun source-form-cache)
     (when code
       (add-fun-header-hooks segment))

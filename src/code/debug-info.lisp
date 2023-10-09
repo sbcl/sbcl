@@ -214,6 +214,7 @@
                         #+unwind-to-frame-and-call-vop bsp-save
                         #-fp-and-pc-standard-save lra-saved-pc
                         #-fp-and-pc-standard-save cfp-saved-pc)
+  (declare (fixnum offset elsewhere-pc form-number))
   (dx-let ((bytes (make-array (* 8 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
     ;; OFFSET and ELSEWHERE are encoded first so that the C backtrace logic
@@ -480,7 +481,7 @@
                                   (s stream :type t :identity t))))
              (:copier nil))
   ;; the IRT that compilation started at
-  (start-real-time (get-internal-real-time) :type unsigned-byte :read-only t)
+  (start-real-time 42 #|(get-internal-real-time)|# :type unsigned-byte :read-only t)
   ;; the FILE-INFO structure for this compilation
   (file-info nil :type (or file-info null) :read-only t)
   ;; the stream that we are using to read the FILE-INFO, or NIL if

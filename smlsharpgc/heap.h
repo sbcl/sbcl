@@ -68,6 +68,9 @@ void sml_heap_collector_sync2(void);
  * At this time, all all mutators has switched to SYNC2.
  */
 void sml_heap_collector_mark(void);
+/* Called after switching from MARK to ASYNC but before runing
+ * finalizers or performing asynchronous sweeping */
+void sml_heap_collector_after_mark(void);
 
 /*
  * Called when the collector has finished MARK and switched to ASYNC.
@@ -92,12 +95,20 @@ SML_PRIMITIVE void sml_write(void *obj, void **writeaddr, void *new_value);
 
 /*
  * Check the liveness of the given object.
- * slot : pointer to a pointer to be checked
- * If *slot has been marked as live in sml_heap_collector_mark,
- * this returns true and update obj with its forwarded pointer.
+ * If obj has been marked as live in sml_heap_collector_mark,
+ * this returns true.
  * This is called after sml_heap_collector_mark and before
  * sml_heap_collector_async.
  */
-int sml_heap_check_alive(void **slot);
+int sml_heap_check_alive(void *obj);
+
+extern _Atomic(int) n_remset_insertions_skipped_large,
+                    n_remset_insertions_skipped_small;
+
+extern _Atomic(int) weakRefState;
+#define weakRefState_NORMAL   0
+#define weakRefState_TRACING  1
+#define weakRefState_REPEAT   2
+#define weakRefState_SPLAT    3
 
 #endif /* SMLSHARP__HEAP_H__ */

@@ -420,6 +420,21 @@
   (declare (type code-component code-obj))
   (ash (code-fun-table-count code-obj) -5))
 
+(defun code-pseudo-atomic-locations (code-obj)
+  (declare (type code-component code-obj))
+  (let ((n-simple-funs (code-n-entries code-obj)))
+    (when (plusp n-simple-funs)
+      (let* ((trailer-index (truly-the fixnum (- (ash (+ n-simple-funs 2) 2))))
+             (count (code-trailer-ref code-obj trailer-index)))
+        (when (plusp count)
+          (let ((v (make-array count :element-type '(unsigned-byte 32))))
+            (dotimes (i count)
+              (setf (aref v (decf count))
+                    (code-trailer-ref code-obj
+                                      (truly-the fixnum (decf trailer-index 4)))))
+            (return-from code-pseudo-atomic-locations v))))))
+  #.(sb-xc:make-array 0 :element-type '(unsigned-byte 32)))
+
 ;;; Start and count of fdefns used in #'F synax or normal named call
 ;;; (i.e. at the head of an expression)
 (defun code-header-fdefn-range (code-obj)

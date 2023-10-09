@@ -22,12 +22,12 @@
 ;;; This size is supposed to indicate something about the actual granularity
 ;;; at which you can map memory.  We just hardwire it, but that may or may not
 ;;; be necessary any more.
-(defconstant +backend-page-bytes+ #+win32 65536 #-win32 32768)
+(defconstant +backend-page-bytes+ #+win32 65536 #-win32 4096) ; 32768)
 
 ;;; The size in bytes of GENCGC pages. A page is the smallest amount of memory
 ;;; that a thread can claim for a thread-local region, and also determines
 ;;; the granularity at which we can find the start of a sequence of objects.
-(defconstant gencgc-page-bytes 32768)
+(defconstant gencgc-page-bytes 4096) ; 32768)
 ;;; The divisor relative to page-bytes which computes the granularity
 ;;; at which writes to old generations are logged.
 #+soft-card-marks (defconstant cards-per-page

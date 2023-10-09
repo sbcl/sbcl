@@ -31,4 +31,6 @@ extern void print_list_car_ptrs(lispobj, FILE*);
 
 void odxprint_fun(const char *fmt, ...);
 
+extern struct vector* instance_classoid_name(lispobj*);
+
 #endif

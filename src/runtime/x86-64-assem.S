@@ -83,7 +83,16 @@
 #define CARG2 %rsi
 #define CARG3 %rdx
 #endif
-	
+
+	.text
+	.globl  GNAME(exception_handling_load)
+	TYPE(GNAME(exception_handling_load))
+	.align	align_16byte,0x90
+GNAME(exception_handling_load):
+	mov (CARG1), %rax # if fault, handler loads RAX with 0 and skips this
+	ret
+	SIZE(GNAME(exception_handling_load))
+
 #ifdef LISP_FEATURE_OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
@@ -114,6 +123,37 @@ GNAME(funcall1_switching_stack):
 #endif
 
 	.text
+	.globl  GNAME(get_nonvolatile_gprs)
+	TYPE(GNAME(get_nonvolatile_gprs))
+	.align	align_16byte,0x90
+	// copy rbx, r12..r15 (in no particular order) into array pointed to rdi
+GNAME(get_nonvolatile_gprs):
+	mov %r12, 0(%rdi)
+	mov %r13, 8(%rdi)
+	mov %r14, 16(%rdi)
+	mov %r15, 24(%rdi)
+	mov %rbx, 32(%rdi)
+	ret
+	SIZE(GNAME(get_nonvolatile_gprs))
+
+	.globl	GNAME(clobber_clobberables)
+	TYPE(GNAME(clobber_clobberables))
+	.align	align_16byte,0x90
+GNAME(clobber_clobberables):
+	xor %rax, %rax
+        lea 0xeefbad1(%rax), %rcx
+        lea 0xeefbad2(%rax), %rdx
+        lea 0xeefbad3(%rax), %rsi
+        lea 0xeefbad4(%rax), %rdi
+        lea 0xeefbad8(%rax), %r8
+        lea 0xeefbad9(%rax), %r9
+        lea 0xeefbada(%rax), %r10
+        lea 0xeefbadb(%rax), %r11
+	ret
+	SIZE(GNAME(clobber_clobberables))
+
+	.globl	GNAME(clobber_clobberables)
+
 	.globl  GNAME(call_into_lisp_first_time_)
 	TYPE(GNAME(call_into_lisp_first_time_))
 

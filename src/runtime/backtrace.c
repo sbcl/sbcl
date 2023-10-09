@@ -558,6 +558,8 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
 #endif
     struct code *code = (void*)component_ptr_from_pc(pc);
     if (code) {
+        fprintf(f, "= id %x + %x ", code_serialno(code),
+                (int)((char*)pc - (char*)code_text_start(code)));
         struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
         if (df)
             print_entry_name(barrier_load(&df->name), f);
@@ -614,6 +616,9 @@ log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE 
 void backtrace_from_fp(void *fp, int nframes, int start) {
     log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
 }
+extern void backtrace_to_file(FILE* f) {
+    log_backtrace_from_fp(get_sb_vm_thread(), __builtin_frame_address(0), 100, 0, f);
+}
 
 void print_backtrace_from_context(os_context_t *context, int nframes, FILE* file) {
     void *fp = (void *)os_context_frame_pointer(context);
@@ -659,8 +664,11 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
 static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
 {
   struct code* code;
-  if (gc_managed_heap_space_p((uword_t)pc) &&
-      (code = (void*)component_ptr_from_pc(pc)) != 0) {
+  extern uword_t* codeblob_from_interior_ptr(void* addr);
+  code = (void*)codeblob_from_interior_ptr(pc);
+  if (!code && gc_managed_heap_space_p((uword_t)pc))
+    code = (void*)component_ptr_from_pc(pc);
+  if (code) {
       struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
       if (df) {
           fprintf(stderr, " %p [", pc);
@@ -712,7 +720,9 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
     // In case you get no backtrace whatsoever, maybe at least see where the
     // signal was received, probably in a function without the standard
     // frame pointer setup.
-    fprintf(stderr, " interrupted @ PC %p\n", (void*)OS_CONTEXT_PC(context));
+    fprintf(stderr, " interrupted FP=%p, PC=%p\n",
+            (void*)*os_context_fp_addr(context),
+            (void*)OS_CONTEXT_PC(context));
     if (lispthread->waiting_for != NIL) {
         fprintf(stderr, "waiting for %p", (void*)lispthread->waiting_for);
         if (instancep(lispthread->waiting_for)) {
@@ -747,14 +757,19 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
     do {
         uword_t offset;
         char *pc;
-        unw_get_reg(&cursor, UNW_TDEP_IP, (uword_t*)&pc);
+        uword_t *bp, *sp;
+        unw_get_reg(&cursor, UNW_TDEP_IP, (unw_word_t*)&pc);
+        unw_get_reg(&cursor, UNW_TDEP_BP, (unw_word_t*)&bp);
+        unw_get_reg(&cursor, UNW_TDEP_SP, (unw_word_t*)&sp);
+        fprintf(stderr, " %p %p %p ", sp, bp, pc);
         if (print_lisp_fun_name(pc)) {
             // printed
         } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
-            fprintf(stderr, " %p [%s]\n", pc, procname);
+            fprintf(stderr, "[%s]", procname);
         } else {
-            fprintf(stderr, " %p ?\n", pc);
+            fprintf(stderr, "?");
         }
+        putc('\n', stderr);
     } while (unw_step(&cursor));
 #else
     // If you don't have libunwind, this will almost surely not work,

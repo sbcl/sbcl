@@ -1924,7 +1924,9 @@ core and return a descriptor to it."
              (desired (sb-vm:static-fun-offset sym)))
         (unless (= offset desired)
           (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
-                 sym nil offset desired))))))
+                 sym nil offset desired)))))
+  (let ((v (word-vector (make-list 200 :initial-element 0) *static*)))
+    (format t "data collection vector @ ~x~%" (descriptor-bits v))))
 
 ;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
 (defun sort-cold-layouts ()
@@ -1933,6 +1935,7 @@ core and return a descriptor to it."
 
 ;;; Establish initial values for magic symbols.
 ;;;
+(defvar *cold-assembler-obj*) ; a single code component
 (defun finish-symbols ()
   (cold-set 'sb-kernel::*!initial-layouts*
             (vector-in-core

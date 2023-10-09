@@ -92,6 +92,13 @@ link_thread(struct thread *th)
     th->next=all_threads;
     th->prev=0;
     all_threads=th;
+    /* This ID is just for debugging the C runtime with a relatively small number of
+     * threads and you want to refer to them in diagnostic messages using an identifier
+     * other than kernel thread or pthread which are often hard to distinguish by eye,
+     * and if thread names are blank or otherwise non-identifying.
+     * This number can wrap around, resulting in accidental re-use */
+    static uword_t serialno;
+    th->serialno = ++serialno; // under a lock, so this is fine
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -284,7 +291,7 @@ extern pthread_key_t ignore_stop_for_gc;
 
 #if !defined COLLECT_GC_STATS && !defined STANDALONE_LDB && \
   defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
-#define COLLECT_GC_STATS
+#undef COLLECT_GC_STATS
 #endif
 #ifdef COLLECT_GC_STATS
 static struct timespec gc_start_time;
@@ -326,6 +333,11 @@ char* thread_name_from_pthread(pthread_t pointer){
 }
 #endif
 
+struct thread*  mainthread;
+extern void sml_current_user_set_arbdata(void*);
+extern void sml_current_worker_set_thread(void*,int);
+extern void smlgc_clear_alloc_ptr(struct alloc_ptr*);
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -333,8 +345,13 @@ void create_main_lisp_thread(lispobj function) {
     InitializeCriticalSection(&in_gc_lock);
 #endif
     struct thread *th = alloc_thread_struct(0);
+    mainthread = th;
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
+    sml_current_worker_set_thread(th, 1);
+    sml_current_user_set_arbdata(th);
+
+    //SYMBOL(FORCE_WEAK_POINTER_BARRIER_ON)->value = 0;
     th->state_word.sprof_enable = 1;
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&current_thread, 0);
@@ -373,6 +390,10 @@ void create_main_lisp_thread(lispobj function) {
 #ifdef COLLECT_GC_STATS
     atexit(summarize_gc_stats);
 #endif
+    fprintf(stderr, "create_main_thread: stack=%p:%p bindings=%p:%p TLS=%p:%p\n",
+            th->control_stack_start, th->control_stack_end,
+            th->binding_stack_start, th->alien_stack_start,
+            th, (char*)th + dynamic_values_bytes);
     /* WIN32 has a special stack arrangement, calling
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
@@ -449,11 +470,13 @@ init_new_thread(struct thread *th,
 #endif
 }
 
+extern void smlgc_unregister_lisp_thread(struct thread*);
 static void
 unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
 {
     block_blockable_signals(0);
+    smlgc_unregister_lisp_thread(th);
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
@@ -479,6 +502,7 @@ unregister_thread(struct thread *th,
     os_sem_destroy(&semaphores->sprof_sem);
 #endif
 #ifndef LISP_FEATURE_SB_SAFEPOINT
+    //pthread_mutex_destroy(&extra_data->signal_delivery_lock);
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
@@ -515,6 +539,7 @@ void* new_thread_trampoline(void* arg)
 {
     struct thread* th = arg;
     ASSOCIATE_OS_THREAD(th);
+    th->os_kernel_tid = get_nonzero_tid();
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     init_thread_data scribble;
@@ -568,8 +593,14 @@ void* new_thread_trampoline(void* arg)
     && !defined LISP_FEATURE_SB_SAFEPOINT
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
-    th->os_kernel_tid = get_nonzero_tid();
     init_new_thread(th, SCRIBBLE, 0);
+    long foo[3] = {0xFEED, 0xC0FFEE, 0xBEAD};
+    extern void sml_start(void*), sml_end();
+    fprintf(stderr, "SB-VM thread %p gets control_stack_end %p\n", th, th->control_stack_end);
+    sml_start(foo);
+    sml_current_worker_set_thread(th, 1);
+    sml_current_user_set_arbdata(th);
+/*if (SYMBOL(USE_SMLGC)->value == make_fixnum(-1)) smlgc_clear_alloc_ptr(&th->cons_ap);*/
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
@@ -577,6 +608,7 @@ void* new_thread_trampoline(void* arg)
     funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
     unregister_thread(th, SCRIBBLE);
+    sml_end(); // must balance with sml_start
 
     return 0;
 }
@@ -840,6 +872,18 @@ callback_wrapper_trampoline(
 
 #endif /* LISP_FEATURE_SB_THREAD */
 
+extern void smlgc_clear_alloc_ptr(struct alloc_ptr*);
+void initialize_bitmap_alloc_pointers(struct thread* th, int enable) {
+    int size_log2;
+    struct alloc_ptr* ap = &th->ap4;
+    sml_bmword_t mask = enable ? 1 : (sml_bmword_t)-1;
+    for (size_log2 = 4; size_log2 <= 12; ++size_log2, ++ap) {
+        ap->blocksize_bytes = 1 << size_log2;
+        smlgc_clear_alloc_ptr(ap);
+        ap->freebit.mask = mask;
+    }
+}
+
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
  * thread
@@ -926,7 +970,7 @@ alloc_thread_struct(void* spaces) {
     th->tls_size = dynamic_values_bytes;
 #endif
 
-    __attribute((unused)) lispobj* tls = (lispobj*)th;
+    lispobj* tls = (lispobj*)th;
 #ifdef THREAD_T_NIL_CONSTANTS_SLOT
     tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | LISP_T;
 #endif
@@ -945,6 +989,7 @@ alloc_thread_struct(void* spaces) {
     tls[THREAD_TEXT_CARD_COUNT_SLOT] = text_space_size / IMMOBILE_CARD_BYTES;
     tls[THREAD_TEXT_CARD_MARKS_SLOT] = (lispobj)text_page_touched_bits;
 #endif
+    tls[THREAD_STEPPING_SLOT] = 0;
 
     th->os_address = spaces;
     th->control_stack_start = (lispobj*)aligned_spaces;
@@ -994,6 +1039,7 @@ alloc_thread_struct(void* spaces) {
     memset(extra_data, 0, sizeof *extra_data);
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
+    //pthread_mutex_init(&extra_data->signal_delivery_lock);
     os_sem_init(&extra_data->state_sem, 1);
     os_sem_init(&extra_data->state_not_running_sem, 0);
     os_sem_init(&extra_data->state_not_stopped_sem, 0);
@@ -1029,6 +1075,8 @@ alloc_thread_struct(void* spaces) {
 #endif
 
     INIT_THREAD_REGIONS(th);
+    initialize_bitmap_alloc_pointers(th, use_smlgc);
+
 #ifdef LISP_FEATURE_SB_THREAD
     /* This parallels the same logic in globals.c for the
      * single-threaded foreign_function_call_active, KLUDGE and
@@ -1093,7 +1141,8 @@ alloc_thread_struct(void* spaces) {
         thread_private_events(th,i) = CreateEvent(NULL,FALSE,FALSE,NULL);
     thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
 #endif
-    th->stepping = 0;
+    fprintf(stderr, "alloc_thread_struct: stack range: %p .. %p\n", th->control_stack_start,
+            th->control_stack_end);
     return th;
 }
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1322,3 +1371,13 @@ void wake_thread(struct thread_instance* lispthread)
 #endif
 }
 #endif
+
+void print_thread_cons_metrics(){
+  /*
+  struct thread* th = get_sb_vm_thread();
+  printf("cons stats: 1=%d+%d 2=%d+%d 3=%d+%d\n",
+         (int)th->cons1_fast, (int)th->cons1_slow,
+         (int)th->cons2_fast, (int)th->cons2_slow,
+         (int)th->cons3_fast, (int)th->cons3_slow);
+  */
+}

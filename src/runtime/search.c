@@ -277,6 +277,24 @@ uword_t brothertree_find_greatereql(uword_t key, lispobj tree)
     return best;
 }
 
+#include <stdio.h>
+void dump_brothertree(lispobj tree)
+{
+    if (tree == NIL) return;
+    lispobj layout = instance_layout(INSTANCE(tree));
+    if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID)
+        dump_brothertree(((struct unary_node*)INSTANCE(tree))->child);
+    else {
+        struct binary_node* node = (void*)INSTANCE(tree);
+        lispobj l = NIL, r = NIL;
+        // unless a fringe node, read the left and right pointers
+        if (!fringe_node_p(node)) l = node->_left, r = node->_right;
+        dump_brothertree(l);
+        printf("%lx\n", node->uw_key);
+        dump_brothertree(r);
+    }
+}
+
 #define BSEARCH_ALGORITHM_IMPL \
     int low = 0; \
     int high = nelements - 1; \
@@ -362,4 +380,25 @@ split_ordered_list_find(struct split_ordered_list* solist,
             node->_node_next == LFLIST_TAIL_ATOM) return NULL;
         node = (void*)native_pointer(node->_node_next);
     }
+}
+
+#include <stdio.h>
+void dump_solist(lispobj list)
+{
+    lispobj ptr = ((struct split_ordered_list*)INSTANCE(list))->head;
+    int n = 0;
+    do {
+        struct split_ordered_list_node* node = (void*)native_pointer(ptr);
+        lispobj next = node->_node_next;
+        sword_t hash = fixnum_value(node->node_hash);
+        if (hash & 1) { // ordinary node
+            fprintf(stderr, "key   node %p hash=%16lx next=%lx key=%lx\n",
+                    node, hash, next, node->so_key);
+            ++n;
+        } else {
+            fprintf(stderr, "dummy node %p hash=%16lx next=%lx\n", node, hash, next);
+        }
+        ptr = next;
+    } while (ptr != LFLIST_TAIL_ATOM);
+    fprintf(stderr, "%d keys\n", n);
 }

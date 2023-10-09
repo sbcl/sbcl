@@ -59,6 +59,15 @@ int personality (unsigned long);
 #include <sys/personality.h>
 #endif
 
+char * cur_thread_name()
+{
+  struct thread *th = get_sb_vm_thread();
+  if (!th) return "gc";
+  struct thread_instance *ti = (void*)native_pointer(th->lisp_thread);
+  lispobj threadname = ti->_name;
+  return (char*)VECTOR(threadname)->data;
+}
+
 #ifdef LISP_FEATURE_SB_FUTEX
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -113,6 +122,7 @@ void lisp_mutex_start_eventrecording() {
     eventcount = 0;
     record_mutex_events = 1;
 }
+
 void lisp_mutex_done_eventrecording() {
     record_mutex_events = 0;
     int i;
@@ -259,7 +269,7 @@ void os_init()
 #ifdef LISP_FEATURE_SB_FUTEX
     futex_init();
 #endif
-#ifdef LISP_FEATURE_SB_DEVEL
+#if 1 // def LISP_FEATURE_SB_DEVEL
     prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY);
 #endif
 }
@@ -375,10 +385,26 @@ fallback_sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void (*sbcl_fallback_sigsegv_handler)  // Settable by user.
        (int, siginfo_t*, os_context_t*) = fallback_sigsegv_handler;
 
+extern uword_t exception_handling_load(uword_t*);
+extern void ldb_monitor();
+
 static void
 sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
+    uword_t pc = os_context_pc(context);
+    if (pc == (uword_t)&exception_handling_load) {
+        // instruction at PC: 488B07 MOV RAX, [RDI]
+        set_os_context_pc(context, pc + 3);
+        extern int mseg_rej_memfault;
+        __sync_fetch_and_add(&mseg_rej_memfault, 1);
+        *os_context_register_addr(context, 0) = 0;
+        return;
+    }
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
+
+    //fprintf(stderr, "fault @ pc=%p addr=%p fp=%lx\n", (void*)pc, addr, *os_context_fp_addr(context));
+
+    if (find_page_index(addr)<0) ldb_monitor();
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     if (handle_safepoint_violation(context, addr)) return;
@@ -395,12 +421,20 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
             sbcl_fallback_sigsegv_handler(signal, info, context);
 }
 
+void crash(__attribute__((unused)) int sig,
+           __attribute__((unused)) siginfo_t* info,
+           void* context)
+{
+  extern void sb_dump_mcontext(char*,void*);
+  fprintf(stderr, "pthread %lx vm-thread %p\n", pthread_self(), get_sb_vm_thread());
+  sb_dump_mcontext("SIGSEGV", context);
+  ldb_monitor();
+}
+
 void
 os_install_interrupt_handlers(void)
 {
-    if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
     ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
-    }
 }
 
 char *os_get_runtime_executable_path()
@@ -416,3 +450,5 @@ char *os_get_runtime_executable_path()
 
     return copied_string(path);
 }
+
+uword_t get_stderr() { return (uword_t)stderr; }

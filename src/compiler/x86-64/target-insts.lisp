@@ -358,8 +358,13 @@
                           'list))
            (a (make-array (1+ (slot-offset (car (last slots))))
                           :initial-element nil)))
-      (dolist (slot slots a)
-        (setf (aref a (slot-offset slot)) (slot-name slot)))))
+      (dolist (slot slots)
+        (setf (aref a (slot-offset slot)) (slot-name slot)))
+      (let ((i sb-vm::thread-ap4-slot))
+        (setf (aref a i) "ap4.freebit.ptr"
+              (aref a (+ i 1)) "ap4.freebit.mask"
+              (aref a (+ i 2)) "ap4.freeptr"))
+      a))
 
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be

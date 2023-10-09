@@ -629,6 +629,7 @@ Examples:
                                                   sb-vm:vector-weak-flag)))))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
+      (when weakp (add-weak-object table))
       table))
 
 ;;; a "plain" hash-table has nothing fancy: default size, default growth rate,
@@ -1503,6 +1504,18 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
            ;; are no concurrent readers to potentially mess up the chains.
            (hash-search)))))))
 
+(defmacro with-global-rwlock (&body body)
+  `(with-alien ((rwlock  (array unsigned 1) :extern "weakTableLock"))
+     (unwind-protect
+          (progn
+            ;; This lock makes GC's mark phase termination simpler.
+            ;; It seems feasible to eliminate the lock if reading, perhaps.
+            (alien-funcall (extern-alien "pthread_rwlock_rdlock" (function int system-area-pointer))
+                           (alien-sap rwlock))
+            ,@body)
+       (alien-funcall (extern-alien "pthread_rwlock_unlock" (function int system-area-pointer))
+                      (alien-sap rwlock)))))
+
 (defmacro with-weak-hash-table-entry (&body body)
   `(with-pinned-objects (key)
      (binding* (((hash0 address-sensitive-p)
@@ -1517,16 +1530,17 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                               (kv-vector (hash-table-pairs hash-table)))
                      (declare (index physical-index))
                      ,@body)))
-       ;; It would be ideal if we were consistent about all tables NOT having
-       ;; synchronization unless created with ":SYNCHRONIZED T"
-       ;; but it looks tricky to support concurrent gethash on weak tables,
-       ;; so we mostly default to locking, except where there is an outer scope
-       ;; providing mutual exclusion such as WITH-FINALIZER-STORE.
-       (if (hash-table-synchronized-p hash-table)
-           ;; Use the private slot accessor for the lock because it's known
-           ;; to have a mutex.
-           (sb-thread::call-with-recursive-system-lock #'body (hash-table-%lock hash-table))
-           (body))))))
+         (with-global-rwlock
+              ;; It would be ideal if we were consistent about all tables NOT having
+              ;; synchronization unless created with ":SYNCHRONIZED T"
+              ;; but it looks tricky to support concurrent gethash on weak tables,
+              ;; so we mostly default to locking, except where there is an outer scope
+              ;; providing mutual exclusion such as WITH-FINALIZER-STORE.
+              (if (hash-table-synchronized-p hash-table)
+                  ;; Use the private slot accessor for the lock because it's known
+                  ;; to have a mutex.
+                  (sb-thread::call-with-recursive-system-lock #'body (hash-table-%lock hash-table))
+                  (body)))))))
 
 (defun gethash/weak (key hash-table default)
   (declare (type hash-table hash-table) (optimize speed))
@@ -2018,9 +2032,15 @@ table itself."
                     (setf (hash-table-smashed-cells hash-table) nil))
                   (setf (hash-table-next-free-kv hash-table) 1
                         (kv-vector-high-water-mark kv-vector) 0))))
-      (if (hash-table-synchronized-p hash-table)
-          (sb-thread::call-with-recursive-system-lock #'clear (hash-table-%lock hash-table))
-          (clear))))
+      ;; Silly me, this should be the CLRHASH-IMPL function for weak tables, no?
+      (cond ((and (hash-table-weak-p hash-table) (/= (extern-alien "use_smlgc" int) 0))
+             ;; FIXME: this could be done without the deletion barrier or weakTableLock
+             ;; by just allocating a new pair vector instead of reusing the current one.
+             (with-global-rwlock
+                 (sb-thread::call-with-recursive-system-lock #'clear (hash-table-%lock hash-table))))
+            ((hash-table-synchronized-p hash-table)
+             (sb-thread::call-with-recursive-system-lock #'clear (hash-table-%lock hash-table)))
+            (t (clear)))))
   hash-table)
 
 

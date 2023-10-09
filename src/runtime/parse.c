@@ -205,6 +205,8 @@ int parse_addr(char **ptr, bool safely, char **output)
 
 static lispobj lookup_symbol(char *name)
 {
+    extern lispobj search_smlgc_heap_for_symbol(char*);
+    return search_smlgc_heap_for_symbol(name);
     uword_t ranges[][2] = {
       { STATIC_SPACE_OBJECTS_START, (uword_t)static_space_free_pointer },
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

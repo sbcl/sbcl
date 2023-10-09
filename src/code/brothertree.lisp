@@ -347,4 +347,45 @@
               (t node))))
       (unary-node (recurse (child node) best))
       (t best))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export '(tree-count codeblob-tree-to-list)))
+(defun codeblob-tree-to-list (tree)
+  (let (result)
+    (named-let visit ((node tree))
+      (typecase node
+        (unary-node
+         (visit (child node)))
+        (binary-node
+         (multiple-value-bind (left key right) (binary-node-parts node)
+           (visit right)
+           (push (sb-kernel:%make-lisp-obj (logior key sb-vm:other-pointer-lowtag))
+                 result)
+           (visit left)))))
+    result))
+
+(defun print-codeblob-tree (tree &aux (*print-pretty* nil))
+  (named-let visit ((node tree))
+    (typecase node
+      (unary-node
+       (visit (child node)))
+      (binary-node
+       (multiple-value-bind (left key right) (binary-node-parts node)
+         (visit left)
+         (if (= (sb-sys:sap-ref-8 (sb-sys:int-sap key) 0) sb-vm:code-header-widetag)
+             (let ((obj (sb-kernel:%make-lisp-obj (logior key sb-vm:other-pointer-lowtag))))
+               (format t "~10x ~6x ~a~%" key (primitive-object-size obj) obj))
+             (format t "~10x dead~%" key))
+         (visit right))))))
+
+(defun tree-count (tree)
+  (named-let recurse ((node tree))
+    (typecase node
+      (binary-node
+       (multiple-value-bind (left key right) (binary-node-parts node)
+         (declare (ignore key))
+         (+ 1 (recurse left) (recurse right))))
+      (unary-node (recurse (child node)))
+      (t 0))))
+
 ) ; end PROGN

@@ -41,6 +41,7 @@
 (eval-when (:compile-toplevel #-sb-xc :load-toplevel :execute)
 (#-sb-xc defmacro #+sb-xc sb-xc:defmacro sb-vm::define-assembly-routine
     (name&options vars &body code)
+(let ((expansion
   (multiple-value-bind (name options)
       (if (atom name&options)
           (values name&options nil)
@@ -50,3 +51,8 @@
       (if (member :sb-assembling sb-xc:*features*)
           (sb-c::emit-assemble name options regs code)
           (sb-c::emit-assemble-vop name options regs))))))
+  #+nil
+  (let ((*print-level* nil)(*print-length* nil))
+  (format t "DEFINE-ASM-ROUTINE ~S ~S ->~%~S~%" (car (ensure-list name&options)) (if (member :sb-assembling sb-xc:*features*) "assembling" "compiling")
+          expansion))
+  expansion)))

@@ -8,6 +8,26 @@
 
 #include <limits.h>
 
+#ifdef LISP_FEATURE_SBCL
+
+#define OBJ_BEGIN(obj) obj
+#define OBJ_HEADER(obj) (*(long*)(obj))
+#define OBJ_FLAG_SKIP 0
+#define OBJ_HEADER_SIZE  0
+
+#include "genesis/constants.h"
+#include "genesis/closure.h"
+
+static inline void* untagged_baseptr(lispobj taggedptr) {
+    // no need to read a word at native_pointer(thing) if it isn't fun-pointer tagged
+    lispobj* base = (lispobj*)(taggedptr & ~LOWTAG_MASK);
+    if ((taggedptr & LOWTAG_MASK) != FUN_POINTER_LOWTAG) return base;
+    return widetag_of(base) != SIMPLE_FUN_WIDETAG ? (void*)base :
+        (void*)fun_code_header((struct simple_fun*)base);
+}
+
+#else
+
 /*
  * size of a bitmap word in heap objects and stack frames.
  */
@@ -118,5 +138,6 @@
  * sentinel.  OBJ_STR_SIZE returns the length of the string except for
  * the sentinel. */
 #define OBJ_STR_SIZE(obj)  ((size_t)(OBJ_SIZE(obj) - 1))
+#endif
 
 #endif /* SMLSHARP__OBJECT_H__ */

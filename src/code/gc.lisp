@@ -299,6 +299,8 @@ trigger a collection of one or more older generations as well. If FULL
 is true, all generations are collected. If GEN is provided, it can be
 used to specify the oldest generation guaranteed to be collected."
   (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
+    (when (/= (extern-alien "use_smlgc" int) 0)
+      (return-from gc))
     (when (eq t (sub-gc gen))
       (post-gc))))
 
@@ -527,7 +529,16 @@ Experimental: interface subject to change."
                      :read-only)
                     ((< sb-vm:static-space-start addr
                         (sap-int sb-vm:*static-space-free-pointer*))
-                     :static))))
+                     :static)
+                    ((/= 0 (alien-funcall (extern-alien "in_bitmapped_subheap"
+                                                        (function int unsigned))
+                                          addr))
+                     :bitmapped)
+                    ((/= 0 (alien-funcall (extern-alien "careful_lispobj_stack_slot"
+                                                        (function int unsigned))
+                                          addr))
+                     :large-object))))
+
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)
 ;;; There's a microscopic window of time in which next_free_page for dynamic space

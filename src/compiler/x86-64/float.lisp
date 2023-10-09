@@ -174,8 +174,9 @@
   (:node-var node)
   (:note "float to pointer coercion")
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 13
-     (alloc-other double-float-widetag double-float-size y node nil thread-tn)
+     (alloc-other double-float-widetag double-float-size y node (list temp temp2) thread-tn)
      (inst movsd (ea-for-df-desc y) x)))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
@@ -185,8 +186,9 @@
   (:temporary (:sc unsigned-reg) bits)
   (:node-var node)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 3
-     (alloc-other double-float-widetag double-float-size copy node nil thread-tn)
+     (alloc-other double-float-widetag double-float-size copy node (list temp temp2) thread-tn)
      (loadw bits x double-float-value-slot other-pointer-lowtag)
      (storew bits copy double-float-value-slot other-pointer-lowtag)))
 
@@ -239,8 +241,10 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 13
-     (alloc-other complex-single-float-widetag complex-single-float-size y node nil thread-tn)
+     (alloc-other complex-single-float-widetag complex-single-float-size y node
+                  (list temp temp2) thread-tn)
      (inst movlps (ea-for-csf-data-desc y) x)))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -251,8 +255,10 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 13
-     (alloc-other complex-double-float-widetag complex-double-float-size y node nil thread-tn)
+     (alloc-other complex-double-float-widetag complex-double-float-size y node
+                  (list temp temp2) thread-tn)
      (inst movapd (ea-for-cdf-data-desc y) x)))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))

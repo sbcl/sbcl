@@ -346,6 +346,37 @@ void scan_binding_stack()
 #endif
 }
 
+// Forwarded code objects contain FPs for each embedded function
+void store_code_forwarding_ptrs(struct code* old, struct code* new)
+
+{
+    set_forwarding_pointer((lispobj *)old, make_lispobj(new, OTHER_POINTER_LOWTAG));
+
+    sword_t displacement = (char*)new - (char*)old;
+
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || \
+    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    // Fixup absolute jump tables. These aren't recorded in code->fixups
+    // because we don't need to denote an arbitrary set of places in the code.
+    // The count alone suffices. A GC immediately after creating the code
+    // could cause us to observe some 0 words here. Those should be ignored.
+    lispobj* jump_table = code_jumptable_start(new);
+    int count = jumptable_count(jump_table);
+    int i;
+    for (i = 1; i < count; ++i)
+        if (jump_table[i]) jump_table[i] += displacement;
+#endif
+    for_each_simple_fun(i, new_fun, new, 1, {
+        // Calculate the old raw function pointer
+        struct simple_fun* old_fun = (struct simple_fun*)((char*)new_fun - displacement);
+        if (fun_self_from_baseptr(old_fun) == old_fun->self) {
+            new_fun->self = fun_self_from_baseptr(new_fun);
+            set_forwarding_pointer((lispobj*)old_fun,
+                                   make_lispobj(new_fun, FUN_POINTER_LOWTAG));
+        }
+    })
+}
+
 extern int pin_all_dynamic_space_code;
 static struct code *
 trans_code(struct code *code)
@@ -378,32 +409,8 @@ trans_code(struct code *code)
 
     if (l_new_code == l_code) return code;
 
-    set_forwarding_pointer((lispobj *)code, l_new_code);
-
-    struct code *new_code = (struct code *) native_pointer(l_new_code);
-    sword_t displacement = l_new_code - l_code;
-
-#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || \
-    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
-    // Fixup absolute jump tables. These aren't recorded in code->fixups
-    // because we don't need to denote an arbitrary set of places in the code.
-    // The count alone suffices. A GC immediately after creating the code
-    // could cause us to observe some 0 words here. Those should be ignored.
-    lispobj* jump_table = code_jumptable_start(new_code);
-    int count = jumptable_count(jump_table);
-    int i;
-    for (i = 1; i < count; ++i)
-        if (jump_table[i]) jump_table[i] += displacement;
-#endif
-    for_each_simple_fun(i, new_fun, new_code, 1, {
-        // Calculate the old raw function pointer
-        struct simple_fun* old_fun = (struct simple_fun*)((char*)new_fun - displacement);
-        if (fun_self_from_baseptr(old_fun) == old_fun->self) {
-            new_fun->self = fun_self_from_baseptr(new_fun);
-            set_forwarding_pointer((lispobj*)old_fun,
-                                   make_lispobj(new_fun, FUN_POINTER_LOWTAG));
-        }
-    })
+    struct code* new_code = (void*)(l_new_code-OTHER_POINTER_LOWTAG);
+    store_code_forwarding_ptrs(code, new_code);
     gencgc_apply_code_fixups(code, new_code);
     os_flush_icache(code_text_start(new_code), code_text_size(new_code));
     return new_code;
@@ -1169,8 +1176,10 @@ DEF_SCAV_TRANS_SIZE_UB(128)
  * containing a single key */
 static sword_t scav_weakptr(lispobj *where, lispobj __attribute__((unused)) object)
 {
+    // fprintf(stderr, "scav_weakptr %p (hdr=%lx) ", where, object);
     if (weakptr_vectorp((struct weak_pointer*)where)) {
         add_to_weak_vector_list(where, *where); // treat it like weak simple-vector
+        // fprintf(stderr, "vectorp\n");
         return size_vector_t(where);
     }
     struct weak_pointer * wp = (struct weak_pointer*)where;
@@ -1188,6 +1197,7 @@ static sword_t scav_weakptr(lispobj *where, lispobj __attribute__((unused)) obje
              immobile_obj_gen_bits(base_pointer(pointee)) == from_space)
 #endif
             );
+        // fprintf(stderr, "pointee=%lx%s\n", pointee, breakable?" BREAKABLE":"");
         if (breakable) { // Pointee could potentially be garbage.
             // But it might already have been deemed live and forwarded.
             if (forwarding_pointer_p(native_pointer(pointee)))
@@ -1905,14 +1915,17 @@ sword_t scav_code_blob(lispobj *object, lispobj header);
 lispobj *
 component_ptr_from_pc(char *pc)
 {
+  extern uword_t* codeblob_from_interior_ptr(void* addr);
+  lispobj* object = NULL;
+  if(use_smlgc) object = codeblob_from_interior_ptr(pc);
+
     /* This will safely look in one or both codeblob trees and/or the
      * sorted array of immobile text pages. Failing those, it'll perform
      * the usual linear scan of generation 1 and up pages. In any case
      * it should be perfectly threadsafe because the trees are made of immutable
      * nodes, and linear scan only operates on pages that can't be
      * concurrently manipulated */
-    lispobj *object = search_all_gc_spaces(pc);
-
+    if (object == NULL) object = search_all_gc_spaces(pc);
     if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
         return object;
 
@@ -2076,6 +2089,8 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 int
 valid_tagged_pointer_p(lispobj pointer)
 {
+    extern int smlgc_valid_tagged_pointer_p();
+    if (smlgc_valid_tagged_pointer_p(pointer)) return 1;
     /* We don't have a general way to ask a specific GC implementation
      * whether 'pointer' is definitely the tagged pointer to an object -
      * all we have is "search for a containing object" and then a decision
@@ -2099,8 +2114,7 @@ valid_tagged_pointer_p(lispobj pointer)
                == pointer;
     }
     lispobj *start = search_all_gc_spaces((void*)pointer);
-    if (start != NULL)
-        return properly_tagged_descriptor_p((void*)pointer, start);
+    if (start != NULL) return properly_tagged_descriptor_p((void*)pointer, start);
     return 0;
 }
 
@@ -2972,6 +2986,7 @@ int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 }
 #endif
 
+#if 0
 /* These are do-nothing wrappers for now */
 lispobj *lisp_component_ptr_from_pc(char *pc) {
     lispobj *result = component_ptr_from_pc(pc);
@@ -2981,3 +2996,4 @@ int lisp_valid_tagged_pointer_p(lispobj pointer) {
     int result = valid_tagged_pointer_p(pointer);
     return result;
 }
+#endif

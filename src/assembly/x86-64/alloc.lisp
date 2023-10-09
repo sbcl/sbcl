@@ -11,6 +11,209 @@
 
 (in-package "SB-VM")
 
+#+sb-assembling
+(symbol-macrolet ((this-cons rax-tn)
+                  (ap rdi-tn)
+                  (num-conses rcx-tn)
+                  (curbit rdx-tn)
+                  (bmwordptr rsi-tn)
+                  (allocated rbx-tn) ; value loaded from *bmwordptr
+                  (element r8-tn)
+                  (last r9-tn)
+                  (context r10-tn))
+(with-bitmap-ap (ap)
+
+;;; Take CONTEXT in RAX and count (number of cons cells) in ECX,
+;;; returning a list in RAX. No other registers are affected.
+;;;      return-address    <-- RSP on entry
+;;;      [saved registers]  7 words
+;;;      dummy cons car
+;;;      dummy cons cdr    <-- RSP during execution
+(defun generate-list-allocator ()
+  (assemble ()
+   (inst mov context rax-tn)
+   ;;;(inst mov ap (thread-slot-ea thread-allocptr16-slot))
+   (inst lea ap (thread-slot-ea thread-ap4-slot))
+   (inst sub rsp-tn 16) ; rsp := dummy (struct cons)
+   (inst lea last (ea list-pointer-lowtag rsp-tn))
+   OUTER
+   (inst mov bmwordptr (freebit.ptr))
+   (inst mov :dword curbit (freebit.mask))
+   (inst mov :dword allocated (ea bmwordptr))
+   ;; if (!(allocated & curbit))
+   (inst test :dword allocated curbit)
+   (inst jmp :nz SLOW-PATH)
+   ;; quick path: allocate at least 1 cons
+   (inst mov this-cons (freeptr))
+   (inst or :byte this-cons list-pointer-lowtag) ; compute tagged ptr
+   INNER
+   (assert-word-unused (ea (- list-pointer-lowtag) this-cons))
+   (storew this-cons last cons-cdr-slot list-pointer-lowtag)
+   (inst mov element (ea context))
+   (inst sub context 8)
+   (storew element this-cons cons-car-slot list-pointer-lowtag)
+   (inst mov last this-cons)
+   (inst add this-cons 16)
+   (inst rol :dword curbit 1)
+   (inst jmp :nc NO-CARRY)
+   (inst add bmwordptr 4)
+   (inst mov :dword allocated (ea bmwordptr))
+   NO-CARRY
+   (inst dec :dword num-conses)
+   (inst jmp :z WRITEBACK) ; done
+   (inst test :dword allocated curbit)
+   (inst jmp :z INNER)
+   WRITEBACK ; exit from fast loop, flushing cached fields of 'struct alloc_ptr'
+   (inst mov (freebit.ptr) bmwordptr)
+   (inst mov (freebit.mask) curbit)
+   (inst sub :byte this-cons list-pointer-lowtag)
+   (inst mov (freeptr) this-cons)
+   (inst jrcxz TERMINATE)
+   SLOW-PATH
+   ;; Although this is a constructor, the optimization to elide snooping barriers
+   ;; is inadmissible. The _previously_ _allocated_ cell has a store to it,
+   ;; therefore this cell, being the new value, has to be remembered.
+   (inst call (make-fixup 'bitmap-cons-fallback :assembly-routine))
+   (assert-word-unused (ea this-cons))
+   (inst mov element (ea context))
+   (inst sub context 8)
+   (storew element this-cons cons-car-slot 0)
+   (inst or :byte this-cons list-pointer-lowtag) ; compute tagged ptr
+   (storew this-cons last cons-cdr-slot list-pointer-lowtag)
+   (inst mov last this-cons)
+   (inst dec :dword num-conses)
+   (inst jmp :nz OUTER)
+   TERMINATE))
+
+(define-assembly-routine (bitmap-listify) ()
+  (regs-pushlist rbx rdx rsi rdi r8 r9 r10)
+  (generate-list-allocator)
+  (storew nil-value last cons-cdr-slot list-pointer-lowtag)
+  (loadw rax-tn rsp-tn cons-cdr-slot 0) ; (CDR dummy)
+  (inst add rsp-tn 16)
+  (regs-poplist rbx rdx rsi rdi r8 r9 r10))
+
+(define-assembly-routine (bitmap-listify*) ()
+  (regs-pushlist rbx rdx rsi rdi r8 r9 r10)
+  (generate-list-allocator)
+  (inst mov element (ea context))
+  (storew element last cons-cdr-slot list-pointer-lowtag)
+  (loadw rax-tn rsp-tn cons-cdr-slot 0) ; (CDR dummy)
+  (inst add rsp-tn 16)
+  (regs-poplist rbx rdx rsi rdi r8 r9 r10))
+
+;;; Take RAX = element, RCX = count and return (MAKE-LIST ELEMENT COUNT)
+;;; in RAX, affecting no other registers.
+;;;      return-address    <-- RSP on entry
+;;;      [saved registers]  7 words
+;;;      dummy cons car
+;;;      dummy cons cdr    <-- RSP during execution
+#+nil (define-assembly-routine (make-list-helper) ()
+  (count-hit make-list-helper)
+  (regs-pushlist rbx rdx rsi rdi r8 r9)
+  (inst mov element rax-tn)
+  (inst lea ap (thread-slot-ea thread-ap4-slot))
+  (inst sub rsp-tn 16) ; rsp := dummy (struct cons)
+  (inst lea last (ea list-pointer-lowtag rsp-tn))
+  ;; top of outer do { } loop
+  OUTER
+  (inst mov bmwordptr (freebit.ptr))
+  (inst mov :dword curbit (freebit.mask))
+  (inst mov :dword allocated (ea bmwordptr))
+  ;; if (!(allocated & curbit))
+  (inst test :dword allocated curbit)
+  (inst jmp :nz SLOW-PATH)
+  ;; quick path: allocate at least 1 cons
+  (inst mov this-cons (freeptr))
+  (inst or :byte this-cons list-pointer-lowtag) ; compute tagged ptr
+  ;; top of inner do {} loop
+  INNER
+  (assert-word-unused (ea (- list-pointer-lowtag) this-cons))
+  (storew this-cons last cons-cdr-slot list-pointer-lowtag)
+  (storew element this-cons cons-car-slot list-pointer-lowtag)
+  (inst mov last this-cons)
+  (inst add this-cons 16)
+  (inst rol :dword curbit 1)
+  (inst jmp :nc NO-CARRY)
+  (inst add bmwordptr 4)
+  (inst mov :dword allocated (ea bmwordptr))
+  NO-CARRY
+  (inst dec :dword num-conses)
+  (inst jmp :z WRITEBACK) ; done
+  (inst test :dword allocated curbit)
+  (inst jmp :z INNER)
+  WRITEBACK ; exit from fast loop, flushing cached fields of 'struct alloc_ptr'
+  (inst mov (freebit.ptr) bmwordptr)
+  (inst mov (freebit.mask) curbit)
+  (inst sub :byte this-cons list-pointer-lowtag)
+  (inst mov (freeptr) this-cons)
+  (inst jrcxz TERMINATE)
+  SLOW-PATH
+  (inst call (make-fixup 'bitmap-alloc-fallback :assembly-routine))
+  (assert-word-unused (ea this-cons))
+  (storew element this-cons cons-car-slot 0)
+  (inst or :byte this-cons list-pointer-lowtag) ; compute tagged ptr
+  (storew this-cons last cons-cdr-slot list-pointer-lowtag)
+  (inst mov last this-cons)
+  (inst dec :dword num-conses)
+  (inst jmp :nz OUTER)
+  TERMINATE
+  (storew nil-value last cons-cdr-slot list-pointer-lowtag)
+  (loadw rax-tn rsp-tn cons-cdr-slot 0) ; (CDR dummy)
+  (inst add rsp-tn 16)
+  (regs-poplist rbx rdx rsi rdi r8 r9))
+)) ; end SYMBOL-MACROLET
+
+;;; Fallback routine are called after the inline code has tested 'freebit'
+;;; and found it to be unavailable.
+;;; All registers are preserved except for the destination.
+;;; The general routine takes alloc-ptr in the destination reg.
+#+sb-assembling
+(macrolet
+    ((gen-fallbacks ()
+       `(progn
+          ,@(loop
+              for reg in '(rax rbx rcx rdx rsi rdi r8 r9 r10 r11 r12 r14 r15)
+              collect
+              `(define-assembly-routine
+                   (,(symbolicate reg "-ALLOC-FALLBACK")
+                    (:return-style :none)
+                    (:export ,(symbolicate reg "-ALLOC16-FALLBACK")
+                             ,(symbolicate reg "-ALLOC32-FALLBACK")
+                             ,(symbolicate reg "-ALLOC64-FALLBACK")))
+                   ((:temp arg/res unsigned-reg ,(symbolicate reg "-OFFSET")))
+                 ENTRY
+                 (count-hit ,(symbolicate reg "-ALLOC-FALLBACK"))
+                 ;; Save RDI unless it is the arg/result register
+                 ,@(unless (eq reg 'rdi)
+                     '((inst push rdi-tn)
+                       (inst mov rdi-tn arg/res)))
+                 ;; Save RAX unless it is the destination register
+                 ,@(unless (eq reg 'rax)
+                     '((inst push rax-tn)))
+                 (inst call (make-fixup 'bitmap-alloc-fallback :assembly-routine))
+                 ,@(unless (eq reg 'rax) ; move the result if needed
+                     `((inst mov arg/res rax-tn)
+                       (inst pop rax-tn)))
+                 ;; Restore RDI
+                 ,@(unless (eq reg 'rdi)
+                     '((inst pop rdi-tn)))
+                 (inst ret)
+                 ,(symbolicate reg "-ALLOC16-FALLBACK")
+                 (count-hit ,(symbolicate reg "-ALLOC16-FALLBACK"))
+                 (inst lea arg/res (thread-slot-ea thread-ap4-slot))
+                 (inst jmp entry)
+                 ,(symbolicate reg "-ALLOC32-FALLBACK")
+                 (count-hit ,(symbolicate reg "-ALLOC32-FALLBACK"))
+                 (inst lea arg/res (thread-slot-ea thread-ap5-slot))
+                 (inst jmp entry)
+                 ,(symbolicate reg "-ALLOC64-FALLBACK")
+                 (count-hit ,(symbolicate reg "-ALLOC64-FALLBACK"))
+                 (inst lea arg/res (thread-slot-ea thread-ap6-slot))
+                 (inst jmp entry)
+                 )))))
+  (gen-fallbacks))
+
 ;;;; Signed and unsigned bignums from word-sized integers. Argument
 ;;;; and return in the same register. No VOPs, as these are only used
 ;;;; when called from a vop.
@@ -32,6 +235,7 @@
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
+          (count-hit ,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
           (popw number bignum-digits-offset other-pointer-lowtag)))
      (unsigned (reg)
@@ -42,10 +246,12 @@
           (inst push number)
           (inst jmp :ns one-word-bignum)
           ;; Two word bignum
+          (count-hit ,(symbolicate "ALLOC-UNSIGNED-BIGNUM2-IN-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
           (popw number bignum-digits-offset other-pointer-lowtag)
           (inst ret)
           ONE-WORD-BIGNUM
+          (count-hit ,(symbolicate "ALLOC-UNSIGNED-BIGNUM1-IN-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
           (popw number bignum-digits-offset other-pointer-lowtag)))
      (from-digits (reg)
@@ -57,11 +263,13 @@
             ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst test :byte result result) ; is-two-digit flag
           (inst jmp :z one-word-bignum)
+          (count-hit ,(symbolicate "BIGNUM2-TO-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) result nil nil nil)
           (inst movdqu float0-tn (ea 8 rsp-tn))
           (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
           (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
+          (count-hit ,(symbolicate "BIGNUM1-TO-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
           (inst movq float0-tn (ea 8 rsp-tn))
           (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
@@ -75,6 +283,7 @@
        ;; rsp : return-pc
        `(define-assembly-routine (,(symbolicate "+BIGNUM-TO-" reg) (:return-style :none))
             ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
+          (count-hit ,(symbolicate "+BIGNUM-TO-" reg))
           (inst test :byte result result) ; is-two-or-three-digit flag
           (inst jmp :z one-word-bignum)
           ;; Since 2 digits and 3 digits consume the same number of bytes
@@ -105,6 +314,7 @@
           (inst set :c number)
           (inst movzx '(:byte :dword) number number)
           (inst push number)
+          (count-hit ,(symbolicate "TWO-WORD-BIGNUM-TO-" reg))
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
           (inst pop (ea (- (ash 2 word-shift) other-pointer-lowtag) number))
           (inst pop (ea (- (ash 1 word-shift) other-pointer-lowtag) number))

@@ -83,7 +83,9 @@
 (defun proper-list (form)
   (if (proper-list-p form)
       form
-      (compiler-error "~@<~S is not a proper list.~@:>" form)))
+      (progn
+        (write-string "CRAPOLA: ")(write form)(terpri)
+        (compiler-error "~@<~S is not a proper list.~@:>" form))))
 
 ;;; *CURRENT-COMPONENT* is the COMPONENT structure which we link
 ;;; blocks into as we generate them. This just serves to glue the

@@ -232,6 +232,12 @@
              ;; and pick an appropriate way to atomically update the node.
              (aver (typep node 'so-key-node)))
             ((> (atomic-incf (so-count table)) (so-threshold table))
+             #+nil
+             (sb-alien:alien-funcall
+              (sb-alien:extern-alien "printf" (function sb-alien:void system-area-pointer sb-alien:int sb-alien:int))
+              (vector-sap #.(format nil "so-insert: Threshold reached %d %d~%"))
+              (so-count table)
+              (so-threshold table))
              (so-expand-bins table bins)))
       (values node foundp))))
 
@@ -370,6 +376,7 @@
   (defun make-so-set/string () (make nil))
   (defun make-so-map/string () (make t)))
 
+(declaim (ftype (sfunction () t) make-so-set/addr))
 (flet ((make (valuesp)
          (%make-so-list (lambda (x) (multiplicative-hash (get-lisp-obj-address x)))
                         #'%so-put/addr #'%so-delete/addr #'so-find/addr
@@ -377,39 +384,55 @@
   (defun make-so-set/addr () (make nil))
   (defun make-so-map/addr () (make t)))
 
+(macrolet ((with-start-node ((node) &body body)
+             `(let* ((hash (masked-hash (multiplicative-hash (get-lisp-obj-address key))))
+                     (bins (so-bins (truly-the split-ordered-list table)))
+                     (shift (bin-shift bins))
+                     (bin-vector (car bins))
+                     (index (ash hash (- shift)))
+                     (,node (svref bin-vector index)))
+                (when (unbound-marker-p ,node)
+                  ;; Pick any nonempty bin to the left of the intended bin.
+                  ;; It's always OK to pick a suboptimal start bin, because there is no requirement
+                  ;; to observe the BINS vector in the most up-to-date state anyway.
+                  (setf ,node (find-if-not #'unbound-marker-p bin-vector
+                                           :end index :from-end t)))
+                #+sb-devel (aver (dummy-node-p ,node))
+                ,@body)))
+;;; Like SO-FIND/ADDR but never initializing a bin
+(defun %so-eq-set-find (table key)
+  (with-start-node (start-node)
+    (let ((node (%so-search/addr start-node hash key)))
+      (unless (or (endp node) (dummy-node-p node) (neq (so-key node) key))
+        node))))
+;;; Like SO-DELETE but never initializing a bin
+(defun %so-eq-set-delete (table key)
+  (with-start-node (start-node)
+    (let ((deleted (%so-delete/addr start-node hash key)))
+      (when deleted (atomic-decf (so-count table)))
+      deleted)))
+
 ;;; This special case can be used during allocation of new objects (and usually only then).
 ;;; The address can not have previously existed in the table since it is fresh.
 ;;; Additionally, this takes a pre-allocated NODE, does not perform INITIALIZE-BIN,
 ;;; and does not increment the occupancy count. The latter two steps can be performed later.
 ;;; This can be run within a pseudo-atomic section, and the next step outside of it.
 (defun %so-eq-set-phase1-insert (table node key)
-  (let* ((hash (masked-hash (multiplicative-hash (get-lisp-obj-address key))))
-         (bins (so-bins (truly-the split-ordered-list table)))
-         (shift (bin-shift bins))
-         (bin-vector (car bins))
-         (index (ash hash (- shift)))
-         (start-node (svref bin-vector index)))
-    ;; HASH and KEY of a node are not accessible as read/write slots to clients
-    ;; of the table, but _can_ be written by this insert function only in as much as
-    ;; the caller has to preallocate the node, and we have to fill it in here.
-    (setf (%instance-ref (truly-the instance node) (get-dsd-index so-node node-hash)) hash
-          (%instance-ref node (get-dsd-index so-key-node so-key)) key)
-    (when (unbound-marker-p start-node)
-      ;; Pick any nonempty bin to the left of the intended bin.
-      ;; It's always OK to pick a suboptimal start bin, because there is no requirement
-      ;; to observe the BINS vector in the most up-to-date state anyway.
-      (setf start-node (find-if-not #'unbound-marker-p bin-vector
-                                    :end index :from-end t)))
-    #+sb-devel (aver (dummy-node-p start-node))
-    (loop
-     (multiple-value-bind (right left) (%so-search/addr start-node hash key)
-       #+sb-devel
-       (when (and (not (endp right)) (not (dummy-node-p right)))
-         ;; The successor had better not be the droid you're looking for.
-         (aver (neq key (so-key right))))
-       (setf (%node-next node) right)
-       (when (eq (cas (%node-next left) right node) right)
-         (return t))))))
+  (let ((node (truly-the so-key-node node)))
+    (with-start-node (start-node)
+      (aver (and (eq (%instance-layout node) #.(find-layout 'so-key-node))
+                 (eq key (%instance-ref node (get-dsd-index so-key-node so-key)))
+                 (eq hash (%instance-ref node (get-dsd-index so-node node-hash)))))
+      (loop
+        (multiple-value-bind (right left) (%so-search/addr start-node hash key)
+          #+sb-devel
+          (when (and (not (endp right)) (not (dummy-node-p right)))
+            ;; The successor had better not be the droid you're looking for.
+            (aver (neq key (so-key right))))
+          (setf (%node-next node) right)
+          (when (eq (cas (%node-next left) right node) right)
+            (return node)))))))
+) ; end MACROLET
 
 ;;; Complete the insertion of a previously-known-not-to-exist key.
 (defun %so-eq-set-phase2-insert (table node)
@@ -417,6 +440,13 @@
     (declare (ignore hash start-node))
     (when (> (atomic-incf (so-count table)) (so-threshold table))
       (so-expand-bins table bins)))
+  #+nil
+  (let* ((addr (ash (sb-lockless:so-key node) 1))
+         (obj (sb-kernel:%make-lisp-obj (logior addr sb-vm:other-pointer-lowtag)))
+         (nbytes (sb-ext:primitive-object-size obj))
+         (msg (format nil "new large obj @ ~x .. ~x~%" addr (+ addr nbytes))))
+    (sb-sys:with-pinned-objects (msg)
+      (sb-unix:unix-write 2 msg 0 (length msg))))
   node)
 
 (defun c-so-find/addr (solist key)
@@ -438,3 +468,30 @@
           ;; Would it better for tests to close the region? Maybe,
           ;; but we can't count on everybody doing that.
           (%make-lisp-obj (logior result sb-vm:instance-pointer-lowtag)))))))
+
+(defun show-address-based-list (hashset &optional (sort :hash))
+  (declare (type (member :address :hash) sort))
+  (without-gcing
+   (collect ((items))
+     (let ((node (so-head hashset)))
+       (loop (when (endp node) (return))
+             (when (so-key-node-p node)
+               (let* ((sap (descriptor-sap (so-key node)))
+                      (widetag #+little-endian (sap-ref-8 sap 0))
+                      (lowtag
+                       (case widetag
+                         (#.sb-vm:instance-widetag sb-vm:instance-pointer-lowtag)
+                         ((#.sb-vm:funcallable-instance-widetag
+                           #.sb-vm:closure-widetag) sb-vm:fun-pointer-lowtag)
+                         (t sb-vm:other-pointer-lowtag)))
+                      (key (%make-lisp-obj (logior (sap-int sap) lowtag))))
+                 (items
+                  (list (get-lisp-obj-address node) (node-hash node)
+                        (sap-int sap)
+                        (sb-ext:primitive-object-size key) (type-of key)))))
+             (setq node (get-next node))))
+     (let ((list (if (eq sort :hash)
+                     (items)
+                     (sort (items) #'< :key #'third))))
+       (let ((*print-pretty* nil))
+         (format t "~:{~x  ~16,'0x ~16x ~6x ~s~%~}" list))))))

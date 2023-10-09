@@ -1,6 +1,8 @@
 #ifndef _GENCGC_ALLOC_REGION_H_
 #define _GENCGC_ALLOC_REGION_H_
 
+#include "../../smlsharpgc/alloc_ptr.h"
+
 /* Abstract out the data for an allocation region allowing a single
  * routine to be used for allocation and closing. */
 /* Caution: if you change this, you may have to change compiler/generic/objdef
@@ -34,7 +36,7 @@ static inline void gc_init_region(struct alloc_region *region)
 typedef struct {
     struct alloc_region cons;
     struct alloc_region mixed;
-    uword_t token;
+    uintptr_t token;
 } arena_state;
 
 // One region for each of page type.

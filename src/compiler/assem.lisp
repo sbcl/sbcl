@@ -319,6 +319,11 @@
   ;; into the data section
   (constant-table (make-hash-table :test #'equal) :read-only t)
   (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
+  ;; for collecting barrier locations to be stored within the code trailer.
+  ;; This facilitates a program-counter-based pseudo-atomic wherein the signal
+  ;; handler see that it wants to stop within an uninterruptible sequence,
+  ;; and can choose to rollback or roll forward.
+  (pseudo-atomic-locs)
   ;; for deterministic allocation profiler (or possibly other tooling)
   ;; that wants to monkey patch the instructions at runtime.
   (alloc-points)
@@ -1448,6 +1453,7 @@
     (setf (section-tail first) last-stmt))
   first)
 
+;(defvar *cur-stmt* nil)
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble (segment section)
   (let ((*current-vop* nil)
@@ -1475,6 +1481,7 @@
       (dump-symbolic-asm section sb-c::*compiler-trace-output*))
     (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
         ((null statement))
+;      (setq *cur-stmt* statement)
       (awhen (stmt-vop statement) (setq *current-vop* it))
       (dolist (label (ensure-list (stmt-labels statement)))
         (%emit-label segment *current-vop* label))
@@ -1510,7 +1517,11 @@
 ;;; The interface to %ASSEMBLE
 (defun assemble-sections (asmstream simple-fun-labels segment)
   (let* ((n-entries (length simple-fun-labels))
-         (trailer-len (* (+ n-entries 1) 4))
+         (fun-offsets-len (* (1+ n-entries) 4))
+         ;; Each pseudoatomic location is stored as a 4-byte quantity.
+         (n-pseudo-atomic-locs (length (asmstream-pseudo-atomic-locs asmstream)))
+         (trailer-len (+ (* (1+ n-pseudo-atomic-locs) 4)
+                         fun-offsets-len))
          (end-text (gen-label))
          (combined
            (append-sections
@@ -1544,7 +1555,6 @@
                            0
                            (- index trailer-len (label-position end-text)))))
           (unless (and (typep trailer-len '(unsigned-byte 16))
-                       (typep n-entries '(unsigned-byte 12))
                        ;; Padding must be representable in 4 bits at assembly time,
                        ;; but CODE-HEADER/TRAILER-ADJUST can increase the padding.
                        (typep padding '(unsigned-byte 4)))
@@ -1552,6 +1562,13 @@
           (setf (sap-ref-16 sap (- index 2)) trailer-len)
           (setf (sap-ref-16 sap (- index 4)) (logior (ash n-entries 5) padding)))
         (decf index trailer-len)
+        (dolist (label (sort (asmstream-pseudo-atomic-locs asmstream) #'<
+                             :key #'label-posn))
+          (setf (sap-ref-32 sap index) (label-posn label))
+          (incf index 4))
+        (setf (sap-ref-32 sap index) n-pseudo-atomic-locs)
+        (incf index 4)
+        (aver (= index (- (length octets) fun-offsets-len)))
         ;; Iteration over label positions occurs from numerically highest
         ;; to lowest, which is right because the 0th indexed simple-fun
         ;; has the lowest entry offset, and is the last one written
@@ -1563,8 +1580,8 @@
           (let ((val (label-position label)))
             (push val fun-offsets)
             (setf (sap-ref-32 sap index) val)
-            (incf index 4)))))
-    (aver (= index (- (length octets) 4)))
+            (incf index 4)))
+        (aver (= index (- (length octets) 4)))))
     (values segment
             (label-position end-text)
             (segment-fixup-notes segment)

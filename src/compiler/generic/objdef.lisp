@@ -319,8 +319,8 @@ during backtrace.
 (define-primitive-object (weak-pointer :type weak-pointer
                                        :lowtag other-pointer-lowtag
                                        :widetag weak-pointer-widetag
-                                       :alloc-trans make-weak-pointer)
-  (value :ref-trans %weak-pointer-value :ref-known (flushable)
+                                       :alloc-trans %make-weak-pointer)
+  (value #|:ref-trans %weak-pointer-value :ref-known (flushable)|#
          :init :arg)
   ;; 64-bit uses spare header bytes to store the 'next' link
   #-64-bit (next :c-type "struct weak_pointer *"))
@@ -483,7 +483,11 @@ during backtrace.
 (defconstant-eqx +thread-header-slot-names+
     `#(#+x86-64
        ,@'(t-nil-constants
+           stepping
            alien-linkage-table-base
+           ;allocptr16 ; for sml#gc
+           ;allocptr32
+           ;allocptr64
            msan-xor-constant
            ;; The following slot's existence must NOT be conditional on #+msan
            msan-param-tls) ; = &__msan_param_tls
@@ -525,7 +529,8 @@ during backtrace.
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
 
-  (stepping)
+  #-x86-64 (stepping)
+  (gc-phase :c-type "_Atomic(unsigned int)")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
@@ -546,13 +551,36 @@ during backtrace.
                       :c-type "pa_bits_t")
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
+
+  (ap4  :c-type "struct alloc_ptr" :length 4)
+  (ap5  :c-type "struct alloc_ptr" :length 4)
+  (ap6  :c-type "struct alloc_ptr" :length 4)
+  (ap7  :c-type "struct alloc_ptr" :length 4)
+  (ap8  :c-type "struct alloc_ptr" :length 4)
+  (ap9  :c-type "struct alloc_ptr" :length 4)
+  (ap10 :c-type "struct alloc_ptr" :length 4)
+  (ap11 :c-type "struct alloc_ptr" :length 4)
+  (ap12 :c-type "struct alloc_ptr" :length 4)
+
+  ;; Thread-local allocation buffers
+  ;(boxed-tlab :c-type "struct alloc_region" :length 3)
+  ;(cons-ap :c-type "struct alloc_ptr" :length 4)
+
   ;; Deterministic consing profile recording area.
   (profile-data :c-type "uword_t *" :pointer t)
-  ;; Thread-local allocation buffers
-  (boxed-tlab :c-type "struct alloc_region" :length 3)
+  ;; END of slots to keep near the beginning.
+
+  ;; allocation pointers by block size
+  ;; todo: allocptr48
+;  (allocptr128)
+;  (allocptr256)
+;  (allocptr512)
+;  (allocptr1024)
+;  (allocptr2048)
+;  (allocptr4096)
+
   (cons-tlab :c-type "struct alloc_region" :length 3)
   (mixed-tlab :c-type "struct alloc_region" :length 3)
-  ;; END of slots to keep near the beginning.
 
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.
@@ -571,7 +599,9 @@ during backtrace.
   (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
                      #-(or win32 (not sb-thread)) "pthread_t")
   (os-kernel-tid) ; the kernel's thread identifier, 32 bits on linux
-
+  ;; a small integer identifier starting from 1 for the first thread.
+  ;; These are never recycled (but could wraparound in theory)
+  (serialno)
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
   (alien-stack-start :c-type "lispobj *" :pointer t)
@@ -619,6 +649,13 @@ during backtrace.
   (symbol-tlab :c-type "struct alloc_region" :length 3)
   (sys-mixed-tlab :c-type "struct alloc_region" :length 3)
   (sys-cons-tlab :c-type "struct alloc_region" :length 3)
+  ;; When the allocator fallback routine calls into C, it saves the stack pointer
+  ;; in this slot, so that we don't need to scan everything above the current stack
+  ;; pointer as it exists upon entry to C, if GC decides to run at that time.
+  ;; This avoids scanning the approximately 100 words comprising the floating-point save
+  ;; area.  Because allocation is pseudo-atomic (i.e. nonreentrant), there is no chance
+  ;; that two different allocation requests try to use this slot.
+  (stack-root-scan-start)
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)
   (tot-bytes-alloc-unboxed)
@@ -631,6 +668,12 @@ during backtrace.
                        ;; large bins store a count and size
                        :length #.(+ (* 2 n-histogram-bins-large)
                                     n-histogram-bins-small))
+
+  (ct-new-objects)
+  (ct-stack-obj-stores)
+  (ct-heap-obj-stores)
+  (ct-store-barriers)
+  (ct-spinlock-yields)
 
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
@@ -764,3 +807,38 @@ during backtrace.
   (+ static-space-objects-offset
      (* (length +static-symbols+) (ash (align-up symbol-size 2) word-shift))
      instance-pointer-lowtag))
+
+;(sb-ext:define-load-time-global *use-smlgc* 0)
+;(sb-ext:define-load-time-global *testroot* 0)
+;(declaim (fixnum *use-smlgc*))
+;(defun type-to-bit (type)
+;  (cond ((or (typep type 'sb-kernel:defstruct-description)
+;             (eql type instance-widetag))
+;         0)
+;        ((and (numberp type) (>= type 128)) 1)
+;        (t
+;         (let ((pos
+;                 (position type
+;                           `(,bignum-widetag
+;                             ,list-pointer-lowtag
+;                             ,funcallable-instance-widetag
+;                             ,double-float-widetag ,ratio-widetag
+;                             ,weak-pointer-widetag
+;                             ,complex-single-float-widetag
+;                             ,complex-double-float-widetag
+;                             ,complex-widetag
+;                             ,sap-widetag ,symbol-widetag
+;                             ,closure-widetag
+;                             ,code-header-widetag
+;                             ,simple-vector-widetag
+;                             ,value-cell-widetag
+;                             ,simd-pack-widetag ,simd-pack-256-widetag ,fdefn-widetag
+;                             vector
+;                             :cons1 :cons2 :cons3+ :&rest :make-list :unknown-type :variable
+;                             ))))
+;           (if pos (+ pos 2))))))
+;
+;(defun use-smlgc (&rest types)
+;  (setf sb-vm::*use-smlgc*
+;        (reduce #'+ (mapcar (lambda (x) (ash 1 (type-to-bit x)))
+;                            types))))

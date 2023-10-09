@@ -392,6 +392,10 @@ not supported."
     (let ((pid (posix-fork)))
       (when (= pid 0) ; child
         #+darwin (darwin-reinit)
+        (when (/= (extern-alien "use_smlgc" int) 0)
+          (alien-funcall (extern-alien "smlgc_init" (function void unsigned))
+                         (sb-ext:dynamic-space-size))
+          (alien-funcall (extern-alien "enable_collector_thread" (function void))))
         #+mark-region-gc (alien-funcall (extern-alien "thread_pool_init" (function void))))
       #+sb-thread (sb-impl::finalizer-thread-start)
       pid))

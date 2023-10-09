@@ -15,14 +15,21 @@
 #include "hopscotch.h"
 struct grvisit_context {
   struct hopscotch_table* seen;
-  void (*action)(lispobj, void*);
+  void (*action)(lispobj, lispobj, void*);
   void* data;
   int depth;
   int maxdepth;
+  long microsec_elapsed;
+  int n_known_ranges;
+  struct {
+    lispobj start, end;
+    unsigned int *markbits;
+  } ranges[4];
 };
 
 extern struct grvisit_context*
-visit_heap_from_static_roots(struct hopscotch_table* reached,
-                             void (*action)(lispobj, void*),
-                             void* data);
+visit_heap_from_roots(struct hopscotch_table* reached,
+                      void (*action)(lispobj, lispobj, void*),
+                      void* data, int,
+                      lispobj*, int);
 #endif

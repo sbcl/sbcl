@@ -94,6 +94,13 @@
   (+ (static-fdefn-offset name)
      (- other-pointer-lowtag)
      (* fdefn-raw-addr-slot n-word-bytes)))
+
+(export 'static-data-collection-vector)
+(defun static-data-collection-vector ()
+  (+ nil-value
+     (static-fdefn-offset (elt +static-fdefns+
+                               (1- (length +static-fdefns+))))
+     (ash fdefn-size word-shift)))
 
 
 ;;;; interfaces to IR2 conversion
@@ -317,6 +324,25 @@
                        'allocate-vector-on-stack))
           (return-from stack-consed-p t)))))
   nil)
+
+(defun slot-type-requires-gcbarrier (obj-ref index)
+  #-compact-instance-header
+  (when (eql index 0) ; layout is index 0 (physical word 1)
+    (return-from slot-type-requires-gcbarrier t))
+  (let ((obj-type (tn-ref-type obj-ref)))
+    (when (structure-classoid-p obj-type)
+      (when (and (csubtypep obj-type (specifier-type 'sb-lockless::list-node))
+                 (eq index instance-data-start))
+        (return-from slot-type-requires-gcbarrier :untagged))
+      (let* ((dd (layout-dd (classoid-layout obj-type)))
+             (slot (find index (dd-slots dd) :key #'dsd-index)))
+        (unless slot ; constant index may access slots beyond the defined slots
+          (return-from slot-type-requires-gcbarrier t))
+        (let ((slot-type (specifier-type (dsd-type slot))))
+          (when (csubtypep slot-type (specifier-type
+                                      '(or boolean fixnum character #+64-bit single-float)))
+            (return-from slot-type-requires-gcbarrier nil))))))
+  t)
 
 ;;; Just gathering some data to see where we can improve
 (define-load-time-global *store-barriers-potentially-emitted* 0)

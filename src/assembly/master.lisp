@@ -5,3 +5,8 @@
         "src/assembly/{arch}/array"
         "src/assembly/{arch}/arith"
         "src/assembly/{arch}/alloc"))
+
+(format t "~&Asm routine hit counters:~%")
+(let ((v sb-vm::*asm-routine-hit-counter-map*))
+  (dotimes (i (length v))
+    (format t " ~3d = ~a~%" i (aref v i))))

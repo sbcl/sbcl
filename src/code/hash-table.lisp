@@ -197,7 +197,8 @@
   (smashed-cells nil)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
-  (next-weak-hash-table nil :type null))
+  (next-weak-hash-table nil :type null)
+  (implied-edges-done nil :type null))
 
 (defconstant hash-table-weak-flag         8)
 ;;; USERFUN-FLAG implies a nonstandard hash function. Such tables may also have

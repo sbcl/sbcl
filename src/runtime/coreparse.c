@@ -234,6 +234,7 @@ struct heap_adjust {
 #include "genesis/cons.h"
 #include "genesis/hash-table.h"
 #include "genesis/vector.h"
+#include "genesis/weak-pointer.h"
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
@@ -1205,7 +1206,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
 
     // Apply physical page protection as needed.
     // The non-soft-card-mark code is disgusting and I do not understand it.
-    if (gen != 0 && ENABLE_PAGE_PROTECTION) {
+    if (0 && gen != 0 && ENABLE_PAGE_PROTECTION) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         page_index_t p;
         for (p = 0; p < next_free_page; ++p)
@@ -1256,6 +1257,32 @@ void gc_load_corefile_ptes(int card_table_nbits,
        Adding the executable bit here avoids calling pthread_jit_write_protect_np */
     os_protect((os_vm_address_t)STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, OS_VM_PROT_ALL);
 #endif
+}
+
+int enable_async_gc = 1;
+
+static void gather_weak_objects() {
+    extern void record_weak_object(lispobj);
+    lispobj* where = (lispobj*)DYNAMIC_SPACE_START;
+    lispobj* limit = (lispobj*)dynamic_space_highwatermark();
+    int tables = 0, vectors = 0;
+    while (where < limit) {
+        switch (widetag_of(where)) {
+        case INSTANCE_WIDETAG:
+            if (layout_depth2_id(LAYOUT(instance_layout(where))) == HASH_TABLE_LAYOUT_ID
+                && hashtable_weakp(((struct hash_table*)where)))
+                ++tables, record_weak_object(make_lispobj(where, INSTANCE_POINTER_LOWTAG));
+            break;
+        case WEAK_POINTER_WIDETAG:
+            // weak pointers that aren't vectors need not be recorded
+            // since they can't point to managed space.
+            if (weakptr_vectorp((struct weak_pointer*)where))
+                ++vectors, record_weak_object(make_lispobj(where, OTHER_POINTER_LOWTAG));
+            break;
+        }
+        where += object_size(where);
+    }
+    fprintf(stderr, "coreparse: registered %d weak tables, %d weak vectors\n", tables, vectors);
 }
 
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
@@ -1333,6 +1360,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             process_directory(remaining_len / NDIR_ENTRY_LENGTH,
                               (struct ndir_entry*)ptr, fd, file_offset,
                               merge_core_pages, spaces, &adj);
+            // before write-protecting
+            if (use_smlgc) gather_weak_objects();
             break;
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
             // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
@@ -1362,6 +1391,51 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 print_generation_stats();
             }
             sanity_check_loaded_core(initial_function);
+            extern void smlgc_init(long);
+            size_t smlgc_heapsize = 4*1024*1024;
+            char* specified_heapsize = getenv("SMLGC_HEAPSIZE");
+            if (specified_heapsize) // in megabytes
+                smlgc_heapsize = atol(specified_heapsize) * 1048576;
+            // default is now asynchronous enabled
+            if (getenv("SMLGC_ASYNC") && !strcmp(getenv("SMLGC_ASYNC"),"0"))
+                enable_async_gc = 0;
+            if (use_smlgc && !specified_heapsize)
+                smlgc_heapsize = 1024*1024*1024;
+            smlgc_heapsize = ALIGN_DOWN(smlgc_heapsize, 65536);
+            //gclogfd = open("/tmp/gclog.txt", O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0666);
+            smlgc_init(smlgc_heapsize);
+            int import_dynamic = 0;
+            if (getenv("SMLGC_IMPORT_CORE"))
+              import_dynamic = atoi(getenv("SMLGC_IMPORT_CORE"));
+            if (import_dynamic) {
+              lose("Won't import dynamic space");
+                extern lispobj import_dynamic_space(lispobj);
+                //initial_function = import_dynamic_space(initial_function);
+                if (import_dynamic == 2) {
+                  uword_t end = dynamic_space_highwatermark();
+                  // change to unallocated
+                  next_free_page = 0;
+                  munmap((char*)DYNAMIC_SPACE_START, end - DYNAMIC_SPACE_START);
+                  fprintf(stderr, "--> Unmapped gencgc dynamic space [%p:%p]\n",
+                          (char*)DYNAMIC_SPACE_START, (char*)end);
+                }
+            } else if (!import_dynamic && use_smlgc) {
+              char* unmap_from = page_address(next_free_page);
+              long unmap_len = page_address(page_table_pages) - unmap_from;
+              mprotect(unmap_from, unmap_len, PROT_NONE);
+              fprintf(stderr, "--> gencgc space [%p:%p] has PROT_NONE\n",
+                      unmap_from, page_address(page_table_pages));
+            }
+            fprintf(stderr, "R/O @ %p:%p\n",
+                    (void*)READ_ONLY_SPACE_START, read_only_space_free_pointer);
+#if 0
+            int* hint = 0;
+            lispobj sym =
+                find_symbol("*SHOW-NEW-CODE*",
+                            VECTOR(lisp_package_vector)->data[20], &hint);
+            printf("show_new_code=%lx\n", sym);
+            if(sym) SYMBOL(sym)->value = LISP_T;
+#endif
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
@@ -1414,7 +1488,21 @@ void asm_routine_poke(const char* routine, int offset, char byte)
 
 static void trace_sym(lispobj, struct symbol*, struct grvisit_context*);
 
-#define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,context)
+static int reject(lispobj ptr)
+{
+    struct thread* th;
+    if (ptr >= READ_ONLY_SPACE_START && ptr < (lispobj)read_only_space_free_pointer)
+        return 1;
+    for_each_thread(th) {
+      if (ptr >= (lispobj)th->control_stack_start
+          && ptr < (lispobj)th->control_stack_end) return 1;
+    }
+    return 0;
+}
+
+#define RECURSE(x) if(is_lisp_pointer(x) && !reject(x)) graph_visit(ptr,x,context)
+
+int graph_visit_skip_weak_pointers;
 
 /* Despite this being a nice concise expression of a pointer tracing algorithm,
  * it turns out to be almost unusable in any sufficiently complicated object graph
@@ -1430,12 +1518,21 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
     if (++context->depth > context->maxdepth) context->maxdepth = context->depth;
     // TODO: add rejection function for off-heap objects as part of supplied context
     hopscotch_insert(context->seen, ptr, 1);
-    if (context->action) context->action(ptr, context->data);
+    if (context->action) context->action(referer, ptr, context->data);
     lispobj layout, *obj;
     sword_t nwords, i;
     if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
+        // When constructing lists there is a transient state with a bad cdr depending on
+        // whether more than one aallocation is needed.
+        // It might not be an error, as long as no other thread can see the data.
+        if (CONS(ptr)->car == (uword_t)-1 || CONS(ptr)->cdr == (uword_t)-1) {
+            char buf[80];
+            int n = snprintf(buf, sizeof buf,
+                             "sus' cons @ %p: %lx %lx\n", (void*)ptr, CONS(ptr)->car, CONS(ptr)->cdr);
+            write(2, buf, n);
+        }
         RECURSE(CONS(ptr)->car);
-        RECURSE(CONS(ptr)->cdr);
+        if (CONS(ptr)->cdr != (uword_t)-1) RECURSE(CONS(ptr)->cdr);
     } else switch (widetag_of(obj = native_pointer(ptr))) {
         case SIMPLE_VECTOR_WIDETAG:
             {
@@ -1447,11 +1544,13 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:
             layout = layout_of(obj);
-            graph_visit(ptr, layout, context);
-            nwords = headerobj_size(obj);
-            struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
-            for (i=0; i<(nwords-1); ++i)
-                if (bitmap_logbitp(i, bitmap)) RECURSE(obj[1+i]);
+            if (layout != 0) {
+                graph_visit(ptr, layout, context);
+                nwords = headerobj_size(obj);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+                for (i=0; i<(nwords-1); ++i)
+                    if (bitmap_logbitp(i, bitmap)) RECURSE(obj[1+i]);
+            }
             break;
         case CODE_HEADER_WIDETAG:
             nwords = code_header_words((struct code*)obj);
@@ -1479,6 +1578,9 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
             RECURSE(obj[2]);
             RECURSE(decode_fdefn_rawfun((struct fdefn*)obj));
             break;
+        case WEAK_POINTER_WIDETAG:
+            if (graph_visit_skip_weak_pointers) break;
+            // else FALLTHROUGH
         default:
             // weak-pointer can be considered an ordinary boxed object.
             // the 'next' link looks like a fixnum.
@@ -1504,15 +1606,20 @@ static void trace_sym(lispobj ptr, struct symbol* sym, struct grvisit_context* c
  * dictated by thread stacks, etc. Caller may - but need not - provide
  * an 'action' to invoke on each object */
 struct grvisit_context*
-visit_heap_from_static_roots(struct hopscotch_table* reached,
-                             void (*action)(lispobj, void*),
-                             void* data)
+visit_heap_from_roots(struct hopscotch_table* reached,
+                      void (*action)(lispobj, lispobj, void*),
+                      void* data,
+                      int quasi_static_roots_too,
+                      lispobj* extra_roots,
+                      int n_extra_roots)
 {
     hopscotch_create(reached, HOPSCOTCH_HASH_FUN_DEFAULT,
                      0, // no values
                      1<<18, /* initial size */
                      0);
 
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_REALTIME, &start_time);
     struct grvisit_context* context = malloc(sizeof (struct grvisit_context));
     context->seen = reached;
     context->action = action;
@@ -1525,7 +1632,36 @@ visit_heap_from_static_roots(struct hopscotch_table* reached,
         graph_visit(0, compute_lispobj(where), context);
         where += object_size(where);
     }
+    if (quasi_static_roots_too) {
+        where = (lispobj*)DYNAMIC_SPACE_START;
+        end = (lispobj*)dynamic_space_highwatermark();
+        while (where<end) {
+            if (page_table[find_page_index(where)].gen
+                == PSEUDO_STATIC_GENERATION) {
+                graph_visit(0, compute_lispobj(where), context);
+            }
+            where += object_size(where);
+        }
+    }
+    int i;
+    for (i=0; i<n_extra_roots; ++i) {
+        lispobj root = extra_roots[i];
+        gc_assert(is_lisp_pointer(root));
+        graph_visit(0, root, context);
+    }
+    clock_gettime(CLOCK_REALTIME, &end_time);
+    context->microsec_elapsed =
+        (end_time.tv_sec - start_time.tv_sec)*1000000
+        + (end_time.tv_nsec - start_time.tv_nsec)/1000;
     return context;
+}
+
+int calc_log2size(long size)
+{
+    int log2size = 3; // naive integer-length algorithmn
+    while (1<<log2size < size) ++log2size;
+    gc_assert(log2size <= 12);
+    return log2size;
 }
 
 // Caution: use at your own risk
@@ -1537,6 +1673,8 @@ struct visitor {
         int count;
         int words;
     } headers[65], sv_subtypes[3];
+    int log2size_histo[13];
+    int n_oversized;
     struct hopscotch_table *reached;
 };
 
@@ -1563,6 +1701,12 @@ static void tally(lispobj ptr, struct visitor* v)
             v->sv_subtypes[subtype].words += words;
         }
     }
+    sword_t bytes = words * N_WORD_BYTES;
+    if (bytes > 4096)
+        ++v->n_oversized;
+    else {
+        ++v->log2size_histo[calc_log2size(bytes)];
+    }
 }
 
 /* This printing in here is useful, but it's too much to output in make-target-2,
@@ -1587,7 +1731,7 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
         }
         lispobj ptr = compute_lispobj(obj);
         tally(ptr, v);
-        if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
+        //if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
         obj += object_size(obj);
     }
     return 0;
@@ -1602,7 +1746,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
     memset(v, 0, sizeof v);
     // Pass 1: Count objects reachable from known roots.
     struct grvisit_context* c
-        = visit_heap_from_static_roots(&reached, 0, 0);
+        = visit_heap_from_roots(&reached, 0, 0, 0, 0);
     graph_visit(0, initial_function, c); // initfun is not otherwise reachable
     // having computed the reaching graph, tally up the dynamic space objects
     int key_index;
@@ -1652,6 +1796,10 @@ static void sanity_check_loaded_core(lispobj initial_function)
             v[1].headers[64].words += v[1].headers[i].words;
         }
     }
+    printf("Breakdown by log2(size):\n");
+    for (i=(N_WORD_BYTES==32)?3:4; i<=12; ++i)
+        printf(" %d", v[1].log2size_histo[i]);
+    printf(" oversized=%d\n", v[1].n_oversized);
     hopscotch_destroy(&reached);
 }
 #else
@@ -1674,4 +1822,23 @@ void gc_store_corefile_ptes(struct corefile_pte *ptes)
         gc_assert(!(used & 1));
         ptes[i].words_used = used | page_single_obj_p(i);
     }
+}
+static uword_t visit_instances(lispobj* where, lispobj* limit, uword_t arg)
+{
+    lispobj* obj = where;
+    while (obj < limit) {
+        if (widetag_of(obj) == INSTANCE_WIDETAG) {
+            if (instance_layout(obj) == 0) {
+              fprintf(stderr, "bad: %p\n", obj);
+              ++ *(int*)arg;
+            }
+        }
+        obj += object_size(obj);
+    }
+    return 0;
+}
+void check_for_layoutless_instances() {
+    int bad_count = 0;
+    walk_generation(visit_instances, -1, (uword_t)&bad_count);
+    if (bad_count) { fprintf(stderr, "total bad instances: %d\n", bad_count); }
 }

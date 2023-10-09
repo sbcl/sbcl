@@ -231,7 +231,7 @@
                      (min 16 (ash (primitive-object-size thing) (- word-shift))))))))
       ;; For all objects except lists, there is 1 iteration showing NWORDS.
       ;; Lists iterate up to COUNT times showing 2 words each time.
-      (dotimes (iteration (if (and (consp thing) countp) count 1))
+      (dotimes (n-iterations (if (and (consp thing) countp) count 1))
         (dotimes (i nwords)
           (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
             (multiple-value-bind (lispobj ok fmt)

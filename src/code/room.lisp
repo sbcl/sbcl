@@ -273,6 +273,88 @@
     (multiple-value-bind (start end) (%space-bounds subspace)
       (map-objects-in-range function start end)))))
 
+(define-alien-type nil
+  (struct segment-layout
+          (blocksize-bytes unsigned-int)
+          (bitmap-base (array unsigned-int 4))
+          (bitmap-sentinel (array unsigned-int 3))
+          (stack-offset unsigned-int)
+          (stack-limit unsigned-int)
+          (block-offset unsigned-int)
+          (num-blocks unsigned-int)
+          (block-limit unsigned-int)))
+
+(define-alien-type nil
+  (struct segment
+          (as-list system-area-pointer)
+          (stack system-area-pointer)
+          (block-base system-area-pointer)
+          (snapshot-free system-area-pointer)
+          (layout (* (struct segment-layout)))
+          (blocksize-log2 unsigned-int)
+          (free-count int)))
+
+(defun map-sml#gc-objects (function)
+  (break "don't use this yet")
+  (dx-let ((bounds (make-array 2 :element-type 'word)))
+    (alien-funcall (extern-alien "get_segment_pool_bounds" (function void system-area-pointer))
+                   (vector-sap bounds))
+    (format t "~&Heap range ~x ~x~%" (aref bounds 0) (aref bounds 1))
+    (loop for addr from (aref bounds 0) below (aref bounds 1) by 32768
+          do
+       (let* ((segment (sap-alien (int-sap addr) (* (struct segment))))
+              (obj-addr (slot segment 'block-base))
+              (layout (slot segment 'layout))
+              (blocksize (slot layout 'blocksize-bytes))
+              (num-blocks (slot layout 'num-blocks)))
+         (unless (= (sap-int obj-addr) 0)
+           (do ((i 0 (1+ i))
+                (obj-addr obj-addr (sap+ obj-addr blocksize)))
+               ((= i num-blocks))
+             (let* ((word (sap-ref-word obj-addr 0))
+                    (widetag (logand word widetag-mask)))
+               (unless (= word #xffffffffdeadbeef)
+                 (funcall function
+                          (lispobj@baseptr obj-addr widetag)
+                          segment)))))))))
+
+#+nil
+(defun collect-weak-objects ()
+  (nconc (collect ((result))
+           (map-sml#gc-objects
+            (lambda (x segment)
+              (declare (ignore segment))
+              (when (weak-pointer-p x)
+                (result x))))
+           (result))
+         (sb-vm:list-allocated-objects
+          :dynamic
+          :type sb-vm:weak-pointer-widetag)))
+
+(defun check-oversized ()
+  (map-sml#gc-objects
+   (lambda (object segment)
+     (let* ((log2size (slot segment 'blocksize-log2))
+            (blocksize (ash 1 log2size))
+            (actual-size (primitive-object-size object))
+            (smaller-size (ash blocksize -1)))
+       (when (<= actual-size smaller-size)
+         (format t "~&object @ ~x ~s could have fit in smaller block~%"
+                 (get-lisp-obj-address object)
+                 (type-of object)))))))
+
+(defun show-sml#gc-heap-objects (&aux prev-seg)
+  (map-sml#gc-objects
+   (lambda (x segment)
+     (unless (eq segment prev-seg)
+       (format t "-- segment @ ~x blocksize ~d --~%"
+               (sap-int (alien-sap segment))
+               (slot (slot segment 'layout) 'blocksize-bytes))
+       (setq prev-seg segment))
+     (format t " ~x: ~A~%"
+             (get-lisp-obj-address x)
+             (type-of x)))))
+
 #|
 MAP-ALLOCATED-OBJECTS is fundamentally unsafe to use if the user-supplied
 function allocates anything. Consider what can happens when NEXT-FREE-PAGE

@@ -17,6 +17,22 @@
 ;;; from the C alloc() function by way of the alloc-tramp
 ;;; assembly routine.
 
+#+nil
+(defun dontuse-test-should-use-smlgc (type)
+  (let ((bit (type-to-bit type)))
+    (unless bit
+      (error "No bit for ~x~%" type))
+    (inst test :dword (static-symbol-value-ea '*use-smlgc*) (ash 1 (1+ bit)))))
+
+(defmacro jump-if-not-bitmap-alloc (label)
+  `(progn
+     (inst cmp :dword (thread-slot-ea (1+ thread-ap4-slot)) -1)
+     (inst jmp :e ,label)))
+(defmacro jump-if-bitmap-alloc (label)
+  `(progn
+     (inst cmp :dword (thread-slot-ea (1+ thread-ap4-slot)) -1)
+     (inst jmp :ne ,label)))
+
 (defun tagify (result base lowtag)
   (if (eql lowtag 0)
       (inst mov result base)
@@ -74,6 +90,7 @@
   ;; so we may as well take advantage of this fact to load the temp reg
   ;; here, if provided, rather than spewing more #+gs-seg tests around.
   #+gs-seg (when thread-temp (inst rdgsbase thread-temp))
+  #+smlgc-telemetry (inst inc :qword (thread-slot-ea thread-ct-new-objects-slot)) ; TELEMETRY
   (when (member :allocation-size-histogram sb-xc:*features*)
     (let ((use-size-temp (not (typep size '(or (signed-byte 32) tn)))))
       ;; Sum up the sizes of boxed vs unboxed allocations.
@@ -184,6 +201,213 @@
 ;;; with the CONS-TYPE in our type-algebraic sense. Mostly just informs
 ;;; the allocator to use cons_tlab.
 (defconstant +cons-primtype+ list-pointer-lowtag)
+;(defvar *cons-n-histo* #x501009B0)
+
+;;; For async GC based on SML#
+;;; See 'struct alloc_ptr' in heap_concurrent
+;;; and 'struct sml_bitptr' in smlsharp.h
+(defmacro with-bitmap-ap ((allocptr &optional thread-slot) &body body)
+  (cond ((eq allocptr :thread)
+         (aver thread-slot)
+         ;; DISP has to remain as an expression so that the returned form
+         ;; is toplevelish.
+         (let ((disp `(ash ,thread-slot word-shift)))
+           `(macrolet ((freebit.ptr () '(ea ,disp thread-tn))
+                       (freebit.mask () '(ea (+ ,disp 8) thread-tn))
+                       ;; the most-significant byte of the mask for CONS special cases
+                       (freebit.mask-byte3 () '(ea (+ ,disp 11) thread-tn))
+                       (freeptr () '(ea (+ ,disp 16) thread-tn))
+                       (freeptr-fetch-and-add (result nbytes scratch)
+                         `(progn
+                            ;; XADD would do this, but C compilers don't use it
+                            ;; except for an atomic fetch-and-add.
+                            ;; the Agner Fog instruction latency tables seem to support that.
+                            (inst mov ,result (freeptr))
+                            (inst lea ,scratch (ea ,nbytes ,result))
+                            (inst mov (freeptr) ,scratch))))
+              ,@body)))
+        (t
+         (aver (not thread-slot))
+         `(macrolet ((freebit.ptr () '(ea 0 ,allocptr))
+                     (freebit.mask () '(ea 8 ,allocptr))
+                     (freeptr () '(ea 16 ,allocptr))
+                     (segment.blocksize () '(ea 24 ,allocptr)))
+            ,@body))))
+
+(defconstant unused-word-pattern #xffffffffdeadbeef)
+(defun assert-word-unused (ea &aux (ok (gen-label)))
+  (declare (ignore ea ok))
+  #+nil
+  (when t
+    (inst cmp :qword ea unused-word-pattern)
+    (inst jmp :eq OK)
+    (inst break halt-trap)
+    (emit-label OK)))
+(defun check-alivep (obj lowtag &aux (ok (gen-label)))
+  (declare (ignore obj lowtag ok))
+  #+nil
+  (unless (constant-tn-p obj)
+    (inst cmp :qword (ea (- lowtag) obj) unused-word-pattern)
+    (inst jmp :ne OK)
+    (inst break halt-trap)
+    (emit-label OK)))
+
+(defmacro count-alloc (name)
+  (declare (ignorable name))
+  #+nil
+  (let ((index
+         (the (not null)
+              (position name
+                        '(:cons1 :cons1-slow
+                          :cons2 :cons2-slow
+                          :cons3 :cons3-slow
+                          :cons4 :cons4-slow
+                          :cons5 :cons5-slow
+                          :cons6+ :dummy ; always "slow"
+                          :barrier-store :barrier-cmpxchg
+                          )))))
+    ;; The first 16 elements are taken up by a histogram of lengths
+    ;; of &REST args that we see - count and count-slow for each length
+    ;; 1 through 15 and a catch-all bin.
+    ;; But to make things more confusing, this is a vector of SB-VM:WORD
+    ;; though &REST lists treat it as a vector of UNSIGNED-BYTE-32
+    `(inst inc :lock :qword
+           (ea ,(+ (cons-stats-v) (ash 16 word-shift) (* index 8))))))
+
+(with-bitmap-ap (:thread thread-ap4-slot)
+(defun bitmap-inline-alloc-list (num-conses alloc-tn temp done-label fallback)
+  #+nil
+  (inst inc :lock :qword
+        (ea (+ (cons-stats-v) (ash 16 word-shift)
+               ;; Use pairs of elements for consN, consN-slow. See above
+               (* (1- num-conses) 16))))
+  (let ((bmwordptr alloc-tn)
+        (mask temp)
+        (unavailable (gen-label)))
+    ;; >1 cons has a pre-test for UNAVAILABLE in case the current mask + NUM-CONSES
+    ;; would exceed the current bitmap word
+    (ecase num-conses
+      (1
+       (inst mov bmwordptr (freebit.ptr))
+       (inst mov :dword mask (freebit.mask))) ; MASK has the bit we want next
+      (2
+       (inst mov bmwordptr (freebit.ptr))
+       (inst mov :dword mask (freebit.mask))
+       (inst test :dword mask mask)
+       ;; Fail if mask bit 31 is 1. We'd need to test bit 0 of the next bitmap word too,
+       ;; so just use the slow path. Fast path occurs 96% of the time if bitmap word = 0.
+       (inst jmp :s UNAVAILABLE) ; MASK*3 will overflow a :DWORD is sign bit is on
+       (inst lea :dword mask (ea mask mask 2))) ; MASK = MASK * 3 (setting 2 bits)
+      (3
+       (inst mov :dword bmwordptr (freebit.mask))
+       ;; Fail if bit 30 or 31 is 1.  Fast path occurs 93% of the time if bitmap word = 0.
+       (inst test :dword bmwordptr #xC0000000)
+       (inst jmp :nz UNAVAILABLE) ; MASK*7 would overflow :DWORD
+       ;; The highest bit that could be on is bit index 29. The highest affected bit
+       ;; could be index 32 after multiplying by 8. (Thus we need :QWORD operations)
+       (inst lea mask (ea nil bmwordptr 8))
+       (inst sub mask bmwordptr)) ; Set 3 bits by computing mask*7 as (8 x mask) - mask
+      (4
+       (inst mov :dword mask (freebit.mask))
+       ;; Fail if bit 29, 30 or 31 is 1.  Fast path occurs 90% of the time if bitmap word = 0.
+       (inst test :dword mask #xE0000000)
+       (inst jmp :nz UNAVAILABLE) ; MASK*15 would overflow :DWORD
+       ;; The highest bit that could be on is bit index 28
+       (inst mov :dword bmwordptr mask)
+       (inst shl mask 4)
+       (inst sub mask bmwordptr)) ; Set 4 bits by computing mask*15 as (16 x mask) - mask
+      (5
+       (inst mov :dword mask (freebit.mask))
+       (inst test :dword mask #xF0000000)
+       (inst jmp :nz UNAVAILABLE) ; MASK*31 would overflow :DWORD
+       ;; The highest bit that could be on is bit index 27
+       (inst mov :dword bmwordptr mask)
+       (inst shl mask 5)
+       (inst sub mask bmwordptr))) ; Set 5 bits by computing mask*31 as (32 x mask) - mask
+    ;;
+    (when (> num-conses 2) (inst mov bmwordptr (freebit.ptr)))
+    (inst test :dword (ea bmwordptr) mask)
+    (inst jmp :nz UNAVAILABLE)
+    ;; advance the bit
+    (case num-conses
+      (1
+       (inst rol :dword mask 1)
+       (inst mov :dword (freebit.mask) mask)) ; writeback
+      (t ; DO NOT write back from the mask register, as it contains > 1 set bit
+       (inst rol :dword (freebit.mask) num-conses)))
+    ;; I tested whether branchless logic for incrementing freebit.ptr is preferable
+    ;; to jumping over an add if the carry is clear, and it definitely is,
+    ;; because the branch is not very predictable.
+    (inst sbb :dword temp temp) ; broadcast the carry into low 32 bits
+    (inst and :dword temp 4) ; = 0 or 4 depending on CF prior to SBB
+    (inst add :qword (freebit.ptr) temp)
+#|
+    ;; Jmp over add is worse
+    (inst jmp :nc done-label)
+    (inst add :qword (freebit.ptr) 4)
+|#
+    (freeptr-fetch-and-add alloc-tn (* num-conses 16) temp)
+    (dotimes (i num-conses) (assert-word-unused (ea (ash i word-shift) alloc-tn)))
+    (inst jmp DONE-LABEL) ; success
+    (emit-label unavailable)
+    (inst cmp :dword (if (= num-conses 1) mask (freebit.mask)) -1)
+    (inst jmp :ne FALLBACK) ; call into C for help with bitmap allocation
+    ;; falllthrough goes to the gencgc allocator
+    )))
+
+(defun bitmap-call-alloc-list (things alloc-tn node num-conses star)
+  (macrolet ((pop-arg () `(prog1 (tn-ref-tn things) (setf things (tn-ref-across things)))))
+    (loop (list-ctor-push-elt (pop-arg) alloc-tn)
+          (unless things (return))))
+  (cond ((<= num-conses 5)
+         (let ((fallback
+                (aref (if star
+                          #(bitmap-list*4-fallback bitmap-list*5-fallback bitmap-list*6-fallback)
+                          #(bitmap-list3-fallback  bitmap-list4-fallback  bitmap-list5-fallback))
+                      (- num-conses 3))))
+           (invoke-asm-routine 'call fallback node)))
+        (t
+         (inst lea rax-tn (ea (* (+ num-conses (if star 0 -1)) n-word-bytes) rsp-tn))
+         (inst mov rcx-tn num-conses)
+         (invoke-asm-routine 'call (if star 'bitmap-listify* 'bitmap-listify) node)
+         (inst add rsp-tn (* (+ num-conses (if star 1 0)) n-word-bytes))))
+  (move alloc-tn rax-tn))
+
+(defun bitmap-alloc (nbytes result-tn temps node done-label)
+  (aver (<= 1 (length temps) 2))
+  (let* ((log2size (the (integer 4 12) (integer-length (1- nbytes))))
+         ;; each alloc_ptr consumes 4 words consecutively from the AP4 slot
+         (thread-slot (+ thread-ap4-slot (* 4 (- log2size 4))))
+         (fallback (gen-label))
+         (unavailable (gen-label))
+         (temp (car temps)))
+    (with-bitmap-ap (:thread thread-slot)
+      (inst mov temp (freebit.ptr))
+      (inst mov :dword result-tn (freebit.mask))
+      (inst test :dword (ea temp) result-tn) ; result-tn holds the desired bit
+      (inst jmp :nz UNAVAILABLE) ; block is not available
+      (inst rol :dword (freebit.mask) 1)
+      (inst sbb :dword result-tn result-tn) ; broadcast the carry into low 32 bits
+      (inst and :dword result-tn 4) ; = 0 or 4 depending on CF prior to SBB
+      (inst add (freebit.ptr) result-tn)
+      (freeptr-fetch-and-add result-tn (ash 1 log2size) temp)
+      (inst jmp DONE-LABEL)
+      (emit-label UNAVAILABLE)
+      ;; if mask is all 1s then we are NOT using the bitmap allocator
+      ;; if mask is NOT all 1s then we ARE using the bitmap allocator
+      (inst cmp :dword result-tn -1) ; freebit.mask is in RESULT-TN
+      (inst jmp :ne fallback))
+    ;; fallthrough
+    (assemble (:elsewhere)
+      (emit-label fallback)
+      (case log2size
+        (4 (call-reg-specific-asm-routine node "" result-tn "-ALLOC16-FALLBACK"))
+        (5 (call-reg-specific-asm-routine node "" result-tn "-ALLOC32-FALLBACK"))
+        (6 (call-reg-specific-asm-routine node "" result-tn "-ALLOC64-FALLBACK"))
+        ;; other sizes use a generalized fallback
+        (t (inst lea result-tn (thread-slot-ea thread-slot))
+           (call-reg-specific-asm-routine node "" result-tn "-ALLOC-FALLBACK")))
+      (inst jmp DONE-LABEL))))
 
 (define-vop (sb-c::end-pseudo-atomic)
   (:generator 1 (emit-end-pseudo-atomic)))
@@ -198,10 +422,12 @@
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
-(defun allocation (type size lowtag alloc-tn node temp thread-temp
-                   &key overflow
-                   &aux (systemp (system-tlab-p type node)))
+(defun gengc-alloc (type size lowtag alloc-tn node temp thread-temp
+                    &key overflow
+                    &aux (systemp (system-tlab-p type node)))
   (declare (ignorable thread-temp))
+  (when overflow
+    (aver (eql type +cons-primtype+)))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
@@ -295,7 +521,31 @@
                       (when (and (/= lowtag 0) (not temp) (not (tn-p size)))
                         (inst or :byte alloc-tn lowtag))
                       (inst jmp DONE))))))))
+
   t)
+
+(defun allocation (type size lowtag alloc-tn node temps thread-temp
+                   &key (try-bitmap-alloc t)
+                   &aux (saved-reg
+                         (when (and try-bitmap-alloc (not temps))
+                           (if (location= alloc-tn rax-tn) rcx-tn rax-tn)))
+                        (temps (ensure-list temps)))
+  ;; Conses and variable-sized or large allocations are
+  ;; handled outside of this function if using SML# allocator
+  (when saved-reg
+    (inst push saved-reg))
+  (assemble ()
+    (when try-bitmap-alloc
+      (bitmap-alloc size alloc-tn (or temps (list saved-reg)) node DONE))
+    ;; fallthrough
+    (gengc-alloc type size lowtag alloc-tn node (or (first temps) saved-reg)
+                 thread-temp)
+    DONE
+    ;; FIXME: there's redundancy here, because a single OR instruction
+    ;; should be part of both code flows.
+    (unless (= lowtag 0) (inst or :byte alloc-tn lowtag)))
+  (when saved-reg
+    (inst pop saved-reg)))
 
 ;;; Allocate an other-pointer object of fixed NWORDS with a single-word
 ;;; header having the specified WIDETAG value. The result is placed in
@@ -307,17 +557,19 @@
   (declare (dynamic-extent init))
   #+bignum-assertions
   (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
+  (aver (<= bytes smlgc-blocksize-max))
   (instrument-alloc widetag bytes node (cons result-tn (ensure-list alloc-temps)) thread-temp)
-  (let ((header (compute-object-header nwords widetag))
-        (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
+  (let ((header (compute-object-header nwords widetag)))
+    ;; if the object is cons-sized (2 words) then the page fill byte is 0xff
+    ;; so we have to write the entire header word. If more than 2 words, the fill byte is 0.
     (pseudo-atomic ()
-      (cond (alloc-temp
-             (allocation widetag bytes 0 result-tn node alloc-temp thread-temp)
-             (storew* header result-tn 0 0 t)
+      (cond (alloc-temps
+             (allocation widetag bytes 0 result-tn node alloc-temps thread-temp)
+             (storew* header result-tn 0 0 (> nwords 2))
              (inst or :byte result-tn other-pointer-lowtag))
             (t
              (allocation widetag bytes other-pointer-lowtag result-tn node nil thread-temp)
-             (storew* header result-tn 0 other-pointer-lowtag t)))
+             (storew* header result-tn 0 other-pointer-lowtag (> nwords 2))))
       (when init
         (funcall init)))))
 
@@ -365,6 +617,8 @@
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
          (cdr :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
+  ;; TEMP does not have to be wired, because the fallback does not destroy
+  ;; any registers
   (:temporary (:sc unsigned-reg :to (:result 0)
                :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
               temp)
@@ -393,16 +647,25 @@
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size n-word-bytes))
-             (prev-constant temp)) ;; a non-eq initial value
+             (prev-constant temp) ;; a non-eq initial value
+             (fallback (gen-label)))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
-           (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           (bitmap-inline-alloc-list 1 alloc temp CONTINUE FALLBACK)
+           (assemble (:elsewhere)
+             (emit-label fallback)
+             (call-reg-specific-asm-routine node "BITMAP-CONS-TO-" alloc "-FALLBACK")
+             (inst jmp CONTINUE))
+           ;; pointer bump allocation
+           (gengc-alloc +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           CONTINUE
            (store-slot car alloc cons-car-slot 0)
            (store-slot cdr alloc cons-cdr-slot 0)
            (if (location= alloc result)
                (inst or :byte alloc list-pointer-lowtag)
                (inst lea result (ea list-pointer-lowtag alloc)))))))))
 
+#+nil
 (define-vop (acons)
   (:args (key :scs (any-reg descriptor-reg constant immediate control-stack))
          (val :scs (any-reg descriptor-reg constant immediate control-stack))
@@ -419,7 +682,7 @@
           (prev-constant temp))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
-        (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+        (gengc-alloc +cons-primtype+ nbytes 0 alloc node temp thread-tn)
         (store-slot tail alloc cons-cdr-slot 0)
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
         (store-slot temp alloc cons-car-slot 0)
@@ -440,7 +703,9 @@
          (cadr :scs (any-reg descriptor-reg constant immediate control-stack))
          (cddr :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
-  (:temporary (:sc unsigned-reg :to (:result 0)
+  ;; TEMP has to be wired because the fallback returns a value in RAX
+  ;; (can we return it on the stack instead?)
+  (:temporary (:sc unsigned-reg :to (:result 0) :offset rax-offset
                :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
               temp)
   (:results (result :scs (descriptor-reg)))
@@ -458,11 +723,26 @@
        (list-ctor-push-elt car alloc)
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
-       (let ((nbytes (* cons-size 2 n-word-bytes))
-             (prev-constant temp))
+       (let ((nbytes (* 2 cons-size n-word-bytes))
+             (prev-constant temp)
+             (fallback (gen-label)))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
-           (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           (bitmap-inline-alloc-list 2 alloc temp CONTINUE FALLBACK)
+           (assemble (:elsewhere)
+             (emit-label fallback)
+             (list-ctor-push-elt car temp)
+             (list-ctor-push-elt cadr temp)
+             (cond ((and (constant-tn-p cddr) (eq (tn-value cddr) nil))
+                    (invoke-asm-routine 'call 'bitmap-list2-fallback node))
+                   (t
+                    (list-ctor-push-elt cddr temp)
+                    (invoke-asm-routine 'call 'bitmap-list*3-fallback node)))
+             (move result temp)
+             (inst jmp done))
+           ;; pointer bump allocation
+           (gengc-alloc +cons-primtype+ nbytes 0 alloc node temp thread-tn)
+           CONTINUE
            (store-slot car alloc cons-car-slot 0)
            (store-slot cadr alloc (+ 2 cons-car-slot) 0)
            (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
@@ -470,11 +750,13 @@
            (store-slot temp alloc cons-cdr-slot 0)
            (if (location= alloc result)
                (inst or :byte alloc list-pointer-lowtag)
-               (inst lea result (ea list-pointer-lowtag alloc)))))))))
+               (inst lea result (ea list-pointer-lowtag alloc)))
+           DONE))))))
 
 (define-vop (list)
   (:args (things :more t :scs (descriptor-reg any-reg constant immediate)))
-  (:temporary (:sc unsigned-reg) ptr temp)
+  (:temporary (:sc unsigned-reg :offset rcx-offset) ptr)
+  (:temporary (:sc unsigned-reg :offset rax-offset) temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info star cons-cells)
@@ -482,15 +764,35 @@
   (:node-var node)
   (:generator 0
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
-    (let ((stack-allocate-p (node-stack-allocate-p node))
-          (size (* (pad-data-block cons-size) cons-cells))
-          (prev-constant temp))
+    (let* ((stack-allocate-p (node-stack-allocate-p node))
+           (size (* (pad-data-block cons-size) cons-cells))
+           (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-        (if stack-allocate-p
-            (stack-allocation size list-pointer-lowtag res)
-            (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
+        (cond
+          (stack-allocate-p
+           (stack-allocation size list-pointer-lowtag res))
+          (t
+           (let ((linear-alloc (gen-label)) (fallback (gen-label)))
+             (cond
+               ((> cons-cells 5)
+                (jump-if-not-bitmap-alloc LINEAR-ALLOC)
+                ;; Don't bother trying to get contiguous bits- success rate is too low
+                (count-alloc :cons6+)
+                (bitmap-call-alloc-list things res node cons-cells star)
+                (inst jmp DONE))
+               (t
+                ;; emit the fallback first because THINGS gets popped later
+                (assemble (:elsewhere)
+                  (emit-label fallback)
+                  (bitmap-call-alloc-list things res node cons-cells star)
+                  (inst jmp DONE))
+                (bitmap-inline-alloc-list cons-cells res temp CONTINUE FALLBACK)))
+             (emit-label LINEAR-ALLOC)
+             (gengc-alloc +cons-primtype+ size 0 res node temp thread-tn))))
+        CONTINUE
+        (unless stack-allocate-p (inst or :byte res list-pointer-lowtag))
         (move ptr res)
         (dotimes (i (1- cons-cells))
           (store-slot (pop-arg things) ptr)
@@ -499,17 +801,19 @@
         (store-slot (pop-arg things) ptr cons-car-slot list-pointer-lowtag)
         (if star
             (store-slot (pop-arg things) ptr cons-cdr-slot list-pointer-lowtag)
-            (storew nil-value ptr cons-cdr-slot list-pointer-lowtag))))
+            (storew nil-value ptr cons-cdr-slot list-pointer-lowtag))
+        DONE))
     (aver (null things))
     (move result res)))
 )
 
 ;;;; special-purpose inline allocators
 
-;;; Special variant of 'storew' which might have a shorter encoding
-;;; when storing to the heap (which starts out zero-filled).
+;;; Zeroed storew - possibly use a shorter encoding if storing
+;;; to a word that was initialized with 0-fill.
 ;;; This will always write 8 bytes if WORD is a negative number.
 (defun storew* (word object slot lowtag zeroed &optional temp)
+  (setq zeroed nil)
   (cond
     ((or (not zeroed) (not (typep word '(unsigned-byte 31))))
      ;; Will use temp reg if WORD can't be encoded as an imm32
@@ -582,12 +886,13 @@
                      (inst and ,size-tn (lognot lowtag-mask))
                      ,size-tn)))
            (put-header (vector-tn lowtag type len zeroed temp)
+             (declare (ignore zeroed))
              `(let ((len (if (sc-is ,len immediate) (fixnumize (tn-value ,len)) ,len))
                     (type (if (sc-is ,type immediate) (tn-value ,type) ,type)))
-                (storew* type ,vector-tn 0 ,lowtag ,zeroed ,temp)
+                (storew* type ,vector-tn 0 ,lowtag #|,zeroed|# nil ,temp)
                 #+ubsan (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
                 #-ubsan (storew* len ,vector-tn vector-length-slot
-                                       ,lowtag ,zeroed ,temp)))
+                                       ,lowtag #|,zeroed|# nil ,temp)))
            (want-shadow-bits ()
              `(and poisoned
                    (if (sc-is type immediate)
@@ -625,10 +930,14 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
-    (:temporary (:sc unsigned-reg) temp)
+    ;; Wiring RAX as the temp is for the bitmap allocator call
+    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
+    (:temporary (:sc complex-double-reg :offset 7) header-temp)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:policy :fast-safe)
     (:node-var node)
+    (:arg-refs args-ref)
+    (:ignore header-temp)
     (:generator 100
       #+ubsan
       (when (want-shadow-bits)
@@ -660,10 +969,15 @@
       ;; * If WORDS is not immediate and ALLOC-TEMP is not R12, then compute size
       ;;   into RESULT, use ALLOC-TEMP as the instrumentation temp.
       ;;   ALLOCATION receives: input = RESULT, output = RESULT, temp = ALLOC-TEMP.
-      (multiple-value-bind (size-tn instrumentation-temp alloc-temp)
-          (cond ((sc-is words immediate)
+      (binding*
+          ((fixed-size (if (sc-is words immediate)
+                           (pad-data-block (+ (tn-value words) vector-data-offset))))
+           (maybe-large (or (not fixed-size) (> fixed-size smlgc-blocksize-max)))
+           ((size-tn instrumentation-temp alloc-temp)
+            (cond
+                (fixed-size
                  ;; If WORDS is immediate, then let INSTRUMENT-ALLOC choose its temp
-                 (values (calc-size-in-bytes words nil) (list result temp) temp))
+                 (values fixed-size (list result temp) temp))
                 ((location= temp r12-tn)
                  ;; Compute the size into TEMP, use RESULT for instrumentation.
                  ;; Don't give another temp to ALLOCATION, because its SIZE and temp
@@ -673,17 +987,34 @@
                  ;; Compute the size into RESULT, use TEMP for instrumentation.
                  ;; ALLOCATION needs the temp register in this case,
                  ;; because input and output are in the same register.
-                 (values (calc-size-in-bytes words result) temp temp)))
+                 (values (calc-size-in-bytes words result) temp temp)))))
         (instrument-alloc (if (sc-is type immediate)
                               (case (tn-value type)
                                 (#.simple-vector-widetag 'simple-vector)
                                 (t 'unboxed-array))
                               type)
                           size-tn node instrumentation-temp thread-tn)
+        ;; Same concept as in var-alloc
+        (when maybe-large
+          (assemble ()
+            (jump-if-not-bitmap-alloc LINEAR-ALLOC)
+            ;; MOVDQU can load and store the object header from these 2 words
+            ;; I pity the fool whose uses an immediate so large
+            ;; that's it not encodable as a PUSH operand.
+            (inst push (encode-value-if-immediate length))
+            (inst push (encode-value-if-immediate type nil)) ; untagged
+            (inst mov temp size-tn) ; TEMP = RAX
+            (invoke-asm-routine 'call 'bitmap-vect-alloc node)
+            (move result temp)
+            (inst jmp DONE)
+            LINEAR-ALLOC))
         (pseudo-atomic (:thread-tn thread-tn)
-         (allocation type size-tn 0 result node alloc-temp thread-tn)
+         (allocation (if (sc-is type immediate) (tn-value type) 'vector)
+                     size-tn 0 result node (list alloc-temp) thread-tn
+                     :try-bitmap-alloc (not maybe-large))
          (put-header result 0 type length t alloc-temp)
          (inst or :byte result other-pointer-lowtag)))
+      DONE
       #+ubsan
       (cond ((want-shadow-bits)
              (inst pop temp-reg-tn) ; restore shadow bits
@@ -786,6 +1117,7 @@
         (inst stos :qword)))))
 
 ;;; ALLOCATE-LIST
+#+nil
 (macrolet ((calc-size-in-bytes (length answer)
              `(cond ((sc-is ,length immediate)
                      (aver (/= (tn-value ,length) 0))
@@ -841,6 +1173,7 @@
         (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
       done))
 
+  #+nil ; FIXME
   (define-vop (allocate-list-on-heap)
     (:args (length :scs (any-reg immediate))
            ;; Too bad we don't have an SC that implies actually a CPU immediate
@@ -850,16 +1183,40 @@
     (:arg-types positive-fixnum *)
     (:policy :fast-safe)
     (:node-var node)
+    ;; These are need for the bitmap allocator
+    (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 0)) rcx)
+    (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1) :to :result) rax)
+    ;; Too many temps. Oh well.
     (:temporary (:sc descriptor-reg) tail next limit)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:generator 20
+      (unless (sc-is length immediate)
+        (inst test length length)
+        (inst jmp :nz continue)
+        (inst mov result nil-value)
+        (inst jmp out))
+      continue
+      (unless (sc-is length immediate) (move rcx length))
+      (move rax element)
+      (let ((nbytes (cond ((sc-is length immediate)
+                           (* (tn-value ,length) n-word-bytes 2))
+                          (t
+                           (inst shl rcx (1+ (- word-shift n-fixnum-tag-bits)))
+                           rcx))))
+        (instrument-alloc +cons-primtype+ nbytes node (list next limit) thread-tn))
       (let ((size (calc-size-in-bytes length tail))
             (entry (gen-label))
             (loop (gen-label))
+            (native (gen-label))
             (leave-pa (gen-label)))
         (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
-         (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
+         (test-should-use-smlgc :make-list)
+         (inst jmp :z native)
+         ;; SML# allocator, cons-at-a-time
+         (emit-label native)
+         (gengc-alloc +cons-primtype+ size list-pointer-lowtag result node
+                     limit thread-tn
                      :overflow
                      (lambda ()
                        ;; Push C call args right-to-left
@@ -893,8 +1250,9 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 37
-    (alloc-other fdefn-widetag fdefn-size result node nil thread-tn
+    (alloc-other fdefn-widetag fdefn-size result node (list temp temp2) thread-tn
       (lambda ()
         (storew name result fdefn-name-slot other-pointer-lowtag)
         (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
@@ -909,6 +1267,7 @@
   (:node-var node)
   (:vop-var vop)
   (:generator 10
+    (aver (>= length 1))
     (let* ((words (+ length closure-info-offset)) ; including header
            (bytes (pad-data-block words))
            (header (logior (ash (1- words) n-widetag-bits) closure-widetag))
@@ -920,7 +1279,7 @@
                       :elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation bytes fun-pointer-lowtag result)
-            (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
+            (allocation closure-widetag bytes fun-pointer-lowtag result node (list temp) thread-tn))
         (storew* #-compact-instance-header header ; write the widetag and size
                  #+compact-instance-header        ; ... plus the layout pointer
                  (let ((layout #-sb-thread (static-symbol-value-ea 'function-layout)
@@ -944,6 +1303,7 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info stack-allocate-p)
   (:node-var node)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 10
     (let ((data (if (sc-is value immediate)
                     (let ((bits (encode-value-if-immediate value)))
@@ -960,8 +1320,11 @@
              (inst push (compute-object-header value-cell-size value-cell-widetag))
              (inst lea result (ea other-pointer-lowtag rsp-tn)))
             (t
-             (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
+             (alloc-other
+              value-cell-widetag value-cell-size result node
+              (list temp temp2) thread-tn
               (lambda ()
+                ;; FIXME: use the temp instead of push/pop
                 (if (sc-case value
                      (immediate
                       (unless (integerp data) (inst push data) t))
@@ -984,15 +1347,16 @@
 
 (flet
   ((alloc (vop name words type lowtag stack-allocate-p result
-                    &optional alloc-temp node
+                    &optional temps node
                     &aux (bytes (pad-data-block words))
                          (remain-pseudo-atomic
                           (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
+    (aver (<= bytes smlgc-blocksize-max))
     (progn name) ; possibly not used
     (unless stack-allocate-p
-      (instrument-alloc type bytes node (list result alloc-temp) thread-tn))
+      (instrument-alloc type bytes node (cons result temps) thread-tn))
     (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
                     :elide-if stack-allocate-p :thread-tn thread-tn)
       ;; If storing a header word, defer ORing in the lowtag until after
@@ -1000,11 +1364,13 @@
       (cond (stack-allocate-p
              (stack-allocation bytes (if type 0 lowtag) result))
             ((eql type funcallable-instance-widetag)
+             (bitmap-alloc bytes result temps node ALLOCATED)
              (inst push bytes)
              (invoke-asm-routine 'call 'alloc-funinstance vop)
              (inst pop result))
             (t
-             (allocation type bytes (if type 0 lowtag) result node alloc-temp thread-tn)))
+             (allocation type bytes (if type 0 lowtag) result node temps thread-tn)))
+      ALLOCATED
       (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)
@@ -1014,7 +1380,8 @@
               ;; where this instruction must write exactly 4 bytes.
                (inst mov :dword (ea 0 result) header))
               (t
-               (storew* header result 0 0 (not stack-allocate-p)))))
+               (storew* header result 0 0 (and (not stack-allocate-p)
+                                               (> words 2))))))
       ;; GC can make the best choice about placement if it has a layout.
       ;; Of course with conservative GC the object will be pinned anyway,
       ;; but still, always having a layout is a good thing.
@@ -1026,11 +1393,11 @@
   (define-vop (fixed-alloc)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
-    (:temporary (:sc unsigned-reg) alloc-temp)
+    (:temporary (:sc unsigned-reg) temp1 temp2)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:vop-var vop)
     (:node-var node)
-    (:generator 50 (alloc vop name words type lowtag dx result alloc-temp node)))
+    (:generator 50 (alloc vop name words type lowtag dx result (list temp1 temp2) node)))
   (define-vop (sb-c::fixed-alloc-to-stack)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
@@ -1052,8 +1419,8 @@
   (:results (result :scs (descriptor-reg) :from (:eval 1)))
   (:temporary (:sc unsigned-reg :from :eval :to (:eval 1)) bytes)
   (:temporary (:sc unsigned-reg :from :eval :to :result) header)
-  ;; KLUDGE: wire to RAX so that it doesn't get R12
-  (:temporary (:sc unsigned-reg :offset 0) alloc-temp)
+  ;; alloc-temp is a passing register for the ASM routine
+  (:temporary (:sc unsigned-reg :offset rax-offset) alloc-temp)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:vop-var vop)
@@ -1063,7 +1430,8 @@
      ;; which it failed to do if the var-alloc translation was invoked.
      ;; But it seems we never need this! (so is it FIXME or isn't it?)
      (error "can't %MAKE-FUNCALLABLE-INSTANCE of unknown length"))
-   (let ((remain-pseudo-atomic (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
+   (progn ; let ((remain-pseudo-atomic (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
+     ; (declare (ignore remain-pseudo-atomic))
    ;; With the exception of bignums, these objects have effectively
    ;; 32-bit headers because the high 4 byes contain a layout pointer.
      (let ((operand-size (if (= type bignum-widetag) :qword :dword)))
@@ -1081,15 +1449,102 @@
              (stack-allocation bytes lowtag result)
              (storew header result 0 lowtag))
            (t
+            (assemble ()
              ;; can't pass RESULT as a possible choice of scratch register
              ;; because it might be in the same physical reg as BYTES.
              ;; Yup, the lifetime specs in this vop are pretty confusing.
              (instrument-alloc type bytes node alloc-temp thread-tn)
-             (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
-                             :thread-tn thread-tn)
-              (allocation type bytes lowtag result node alloc-temp thread-tn)
-              (storew header result 0 lowtag)))))))
+             (jump-if-not-bitmap-alloc LINEAR-ALLOC)
+             (inst push lowtag)
+             (inst push header)
+             (move alloc-temp bytes) ; RAX passes the size
+             (invoke-asm-routine 'call 'bitmap-var-alloc node)
+             (move result alloc-temp)
+             (inst jmp done)
+             LINEAR-ALLOC
+             (pseudo-atomic (:thread-tn thread-tn)
+              (gengc-alloc type bytes lowtag result node alloc-temp thread-tn)
+              (storew header result 0 lowtag))
+             DONE))))))
 
+#+sb-xc-host
+(progn
+(define-vop (alloc-code)
+  (:args (total-words :scs (unsigned-reg))
+         (boxed-words :scs (unsigned-reg)))
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset r15-offset) frame)
+  (:results (res :scs (descriptor-reg)))
+  (:node-var node)
+  (:ignore frame)
+  (:generator 1
+    (move rdi total-words) ; C arg 1
+    (move rsi boxed-words) ; C arg 2
+    (jump-if-not-bitmap-alloc LINEAR-ALLOC)
+
+    ;; bitmap allocator
+    (inst lea rax (ea nil rdi n-word-bytes)) ; RAX = nbytes
+    ;(inst cmp rax smlgc-blocksize-max)
+    ;(inst jmp :be OK)
+    ;(inst break halt-trap) ; can't use this vop for large code
+    ;OK
+    (inst shl rdi 32) ; CODE-HEADER-SIZE-SHIFT
+    (inst or :byte rdi code-header-widetag)
+    (inst push other-pointer-lowtag)
+    (inst push rdi) ; header word
+    (invoke-asm-routine 'call 'bitmap-var-alloc node)
+    ;; store the boxed size in bytes. BITMAP-VAR-ALLOC preserves RSI
+    (inst shl rsi word-shift) ; words to bytes
+    (move res rax)
+    (storew rsi res code-boxed-size-slot other-pointer-lowtag)
+    (inst jmp done)
+
+    LINEAR-ALLOC
+    (with-registers-preserved (c :except rsi :frame-reg r15)
+      (pseudo-atomic ()
+        (inst call (ea (make-fixup "alloc_code_object" :foreign 8))))
+      (move rsi rax-tn))
+    (move res rsi)
+
+    DONE))
+
+;;; Place a large codeblob under GC control.
+;;; The header words haven't been filled in yet because we have to deal with a subtle
+;;; timing issue: what happens if, one instruction after exiting pseudo-atomic, this
+;;; thread is asked by GC to publish roots. Do we see a properly tagged pointer to a
+;;; known good object; while prior to calling into C we do NOT see it as being a good
+;;; object? So the header can be filled in only while pseudo-atomic.
+;;; Other threads may observe the object in the balanced binary tree but ignore it
+;;; as if it were filler. (See also alloc_large in "lispobj.c")
+#+nil
+(define-vop (manage-large-codeblob)
+  (:policy :fast-safe)
+  (:arg-types positive-fixnum t)
+  (:args (header :scs (unsigned-reg) :target rbx)
+         (mseg :scs (sap-reg) :target rdi))
+  (:temporary (:sc unsigned-reg :offset rbx-offset :from (:argument 0)) rbx)
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 1) :to :result) rdi)
+  (:results (res :scs (descriptor-reg)))
+  (:generator 1
+    (move rbx header)
+    (move rdi mseg) ; C call arg
+    ;; Don't need to save any FPRs because this vop is invoked only by a Lisp function
+    ;; that does not use floating-point. Even if the C side clobbers every FPR
+    ;; (which it doesn't) the Lisp call convention has no callee-saved FPRs.
+    (with-registers-preserved (c :except (rdi :fprs))
+      (pseudo-atomic ()
+        (inst call (ea (make-fixup "manage_large_object" :foreign 8)))
+        ;; Compute the tagged pointer to the code blob given the 'mseg' pointer
+        ;; which was conveniently returned from C.
+        (inst lea rdi (ea (+ other-pointer-lowtag smlgc-mseg-overhead-bytes) rax-tn))
+        ;; Store the header word
+        (storew header rdi 0 other-pointer-lowtag)))
+    (move res rdi)))
+) ; end PROGN
+
+#|
 #+sb-xc-host
 (define-vop (alloc-code)
   (:args (total-words :scs (unsigned-reg) :target c-arg-1)
@@ -1113,6 +1568,7 @@
          #+immobile-code (make-fixup "alloc_code_object" :foreign)))
       (move c-arg-1 rax-tn))
     (move res c-arg-1)))
+|#
 
 #+immobile-space
 (macrolet ((c-fun (name)
@@ -1212,3 +1668,21 @@
        OUT)))
 
 ) ; end MACROLET
+
+(define-vop (new-make-list)
+  (:args (length :scs (signed-reg))
+         (element :scs (any-reg descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 0)) rcx)
+  (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1) :to :result) rax)
+  (:results (res :scs (descriptor-reg)))
+  (:generator 10
+    (inst test length length)
+    (inst jmp :nz callout)
+    (inst mov res nil-value)
+    (inst jmp done)
+    callout
+    (move rcx length)
+    (move rax element)
+    (inst call (ea (make-fixup 'make-list-helper :assembly-routine*)))
+    (move res rax)
+    done))

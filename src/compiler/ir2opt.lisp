@@ -1510,7 +1510,7 @@
                      (already-done (eq (fourth (vop-codegen-info vop)) :pseudo-atomic)))
                  (unless (or dx already-done)
                    (process-closure-inits vop))))
-              ((fixed-alloc var-alloc)
+              ((fixed-alloc #|var-alloc|#)
                (let ((last (car (last (vop-codegen-info vop)))))
                  (when (vop-p last)
                    (process-general-inits vop last)))))

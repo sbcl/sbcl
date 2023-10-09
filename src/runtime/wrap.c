@@ -622,3 +622,23 @@ double sb_hypot (double x, double y) {
 }
 
 #endif
+
+#if 0
+extern void clobber_clobberables();
+int clock_gettime(int clockid, struct timespec* ts)
+{
+  int fooseconds = 0;
+  if (clockid == CLOCK_THREAD_CPUTIME_ID) {
+    ts->tv_sec  = 0xBABAB00E;
+    ts->tv_nsec = 0xABADBAD;
+  clobber_clobberables();
+    return 0;
+  } else {
+    ts->tv_sec = ++fooseconds;
+    ts->tv_nsec = 1;
+  clobber_clobberables();
+    return 0;
+  }
+
+}
+#endif

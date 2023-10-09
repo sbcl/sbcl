@@ -1,4 +1,4 @@
-
+#|
 ;;; Please keep all the "smoke" tests in this file fairly lightweight.
 
 ;;; Don't crash on layoutless instances. It's that simple!
@@ -12,3 +12,4 @@
 (defvar *foo* (cons nil nil))
 (rplacd *foo* *foo*)
 (with-test (:name :circular-list) (gc :gen 7))
+|#

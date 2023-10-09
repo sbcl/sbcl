@@ -19,6 +19,22 @@
   (make-list (reduce #'max (mapcar #'length k))))
 (compile 'foo)
 
+
+(with-test (:name :recognize-implicit-pseudoatomic)
+  (with-alien ((matchp (function int system-area-pointer)
+                       :extern "possibly_implicit_pseudoatomic"))
+    (let ((all (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+          (n 0))
+      (dolist (c all)
+        (let ((locs (sb-impl::code-pseudo-atomic-locations c)))
+          (when (plusp (length locs))
+            (sb-int:dovector (loc locs)
+              (let ((abs-pc (sb-sys:sap+ (sb-kernel:code-instructions c) loc)))
+                (assert (= (alien-funcall matchp abs-pc) 1))))
+            (incf n))))
+      (format t "~&Tested ~D/~D codeblobs~%" n (length all)))))
+
+
 (with-test (:name :lowtag-test-elision)
   ;; This tests a certain behavior that while "undefined" should at least not
   ;; be fatal. This is important for things like hash-table :TEST where we might

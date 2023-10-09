@@ -234,10 +234,11 @@ void save_gc_crashdump(char *pathname,
 #endif
 
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
-static cmd flush_cmd, regs_cmd, exit_cmd;
+static cmd findpath_cmd, flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
+static cmd segs_cmd, hashsets_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
 static void suspend_other_threads() {
@@ -267,7 +268,8 @@ static int save_cmd(char **ptr) {
 #endif
     return 0;
 }
-void list_lisp_threads(int regions) {
+extern uword_t* obj_from_ambiguous_ptr(lispobj);
+void list_lisp_threads(int regions, int stack) {
     struct thread* th;
     fprintf(stderr, "(thread*,pthread,sb-vm:thread,name)\n");
     void* pthread;
@@ -301,9 +303,27 @@ void list_lisp_threads(int regions) {
         show_tlab("cons     ", cons_region);
 #undef show_tlab
     }
+    if (stack) { // show stack roots of current thread only
+        lispobj* low = (void*)ALIGN_DOWN((uword_t)&regions, N_WORD_BYTES);
+        lispobj* high = get_sb_vm_thread()->control_stack_end;
+        lispobj* sp;
+        for (sp = high-1; sp >= low; --sp) {
+            lispobj word = *sp;
+            lispobj* obj;
+            if ((word >= READ_ONLY_SPACE_START && word < (lispobj)read_only_space_free_pointer) ||
+                (word >= STATIC_SPACE_START && word < (lispobj)static_space_free_pointer)) {
+            } else if ((obj = obj_from_ambiguous_ptr(word)) != 0) {
+                fprintf(stderr, "%p: %16lx -> %p (%s)\n", sp, word, obj,
+                        (lowtag_of(word) == LIST_POINTER_LOWTAG) ? "cons"
+                        : widetag_names[widetag_of(obj)>>2]);
+            }
+        }
+    }
 }
 static int threads_cmd(char **ptr) {
-    list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2));
+    int show_regions = more_p(ptr) && !strncmp(*ptr, "-r", 2);
+    int show_stack = more_p(ptr) && !strncmp(*ptr, "-s", 2);
+    list_lisp_threads(show_regions, show_stack);
     return 0;
 }
 extern int heap_trace_verbose;
@@ -365,6 +385,18 @@ static int verify_cmd(char __attribute__((unused)) **ptr) {
     return 0;
 }
 static int gc_cmd(char **ptr) {
+#if 0
+  extern void sml_force_gc();
+  extern int sml_current_phase();
+  extern void sml_check_internal(void *frame_pointer);
+  int old =  sml_current_phase();
+    if (!strncmp(*ptr, "start", 5))
+      sml_force_gc();
+    else if (!strncmp(*ptr, "sync", 4))
+      sml_check_internal(&ptr);
+  int new =  sml_current_phase();
+  fprintf(stderr, "Phase %d -> %d\n", old, new);
+#else
     int last_gen = 0;
     extern generation_index_t verify_gens;
     if (more_p(ptr)) parse_number(ptr, &last_gen);
@@ -374,6 +406,7 @@ static int gc_cmd(char **ptr) {
     suspend_other_threads();
     collect_garbage(last_gen);
     unsuspend_other_threads();
+#endif
     return 0;
 }
 
@@ -404,12 +437,14 @@ static struct cmd {
     {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
     {"layouts", "Dump LAYOUT instances.", layouts_cmd},
+    {"hashsets", "Show hashsets.", hashsets_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
     {"pte", "Page table entry for address", pte_cmd},
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
+    {"segs", "List all segments", segs_cmd},
     {"save", "Produce crashdump", save_cmd},
     {"threads", "List threads", threads_cmd},
     {"tlsfdump", "Dump TLSF structures", tlsf_cmd},
@@ -546,11 +581,15 @@ dump_cmd(char **ptr)
     return 0;
 }
 
+extern void gc_show_seg(lispobj);
 static int
 print_cmd(char **ptr)
 {
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) print(obj);
+    if (parse_lispobj(ptr, &obj)) {
+      if (use_smlgc) gc_show_seg(obj);
+      print(obj);
+    }
     return 0;
 }
 
@@ -560,6 +599,12 @@ pte_cmd(char **ptr)
     extern void gc_show_pte(lispobj);
     lispobj obj;
     if (parse_lispobj(ptr, &obj)) gc_show_pte(obj);
+    return 0;
+}
+
+static int segs_cmd(__attribute__((unused)) char **ptr) {
+    extern void sml_heap_dump_everything();
+    //sml_heap_dump_everything();
     return 0;
 }
 
@@ -761,6 +806,12 @@ backtrace_cmd(char **ptr)
     int n;
 
     if (more_p(ptr)) {
+      long fp = strtol(*ptr, 0, 0);
+      fprintf(stderr, "using fp %lx\n", fp);
+      extern void log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE *f);
+
+      log_backtrace_from_fp(get_sb_vm_thread(), (void*)fp, 1000, 0, stdout);
+      return 0;
         if (!parse_number(ptr, &n)) return 0;
     } else
         n = 100;
@@ -1192,3 +1243,32 @@ int main(int argc, char *argv[], char **envp)
     ldb_monitor();
 }
 #endif
+
+static uword_t scan_for_hashsets(lispobj* where, lispobj* limit, uword_t arg)
+{
+  for ( ; where < limit ; where += object_size(where) ) {
+    if (widetag_of(where)==SYMBOL_WIDETAG) {
+      lispobj value = ((struct symbol*)where)->value;
+      if (instancep(value)) {
+        lispobj layout = instance_layout(INSTANCE(value));
+        if (layout_depth2_id(LAYOUT(layout)) == 145) {
+          lispobj lname = decode_symbol_name(((struct symbol*)where)->name);
+          struct vector* name = VECTOR(lname);
+          lispobj storage = INSTANCE(value)->slots[INSTANCE_DATA_START];
+          lispobj cells = storage ? INSTANCE(storage)->slots[INSTANCE_DATA_START] : 0;
+          fprintf(stderr, "sym %lx -> hs %lx -> storage %lx -> cells %lx [%lx] (%s)\n",
+                  (uword_t)where, value, storage, cells, *native_pointer(cells),
+                  (char*)name->data);
+        }
+      }
+    }
+
+  }
+  return 0;
+}
+
+static int hashsets_cmd(char __attribute__((unused)) **ptr)
+{
+  walk_generation(scan_for_hashsets, -1, 0);
+  return 0;
+}

@@ -2936,7 +2936,8 @@ the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
 possibly temporarily, because it might be used internally.")
   (:use "CL" "SB-ALIEN" "SB-GRAY" "SB-FASL" "SB-SYS")
   (:export ;; lambda list keyword extensions
-           "&MORE"
+   "&MORE"
+   "PRINTF"
 
             ;; utilities for floating point zero handling
 
@@ -3608,6 +3609,7 @@ package is deprecated in favour of SB-MOP.")
            "MAKE-SO-MAP/STRING" "MAKE-SO-MAP/FIXNUM" "MAKE-SO-MAP/ADDR"
            "MULTIPLICATIVE-HASH"
            "%SO-EQ-SET-PHASE1-INSERT" "%SO-EQ-SET-PHASE2-INSERT"
+           "%SO-EQ-SET-FIND" "%SO-EQ-SET-DELETE"
            "SO-INSERT" "SO-DELETE" "SO-FIND"
            "C-SO-FIND/ADDR"
            "SO-KEY" "SO-DATA" "SO-MAPLIST")

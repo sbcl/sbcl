@@ -78,6 +78,7 @@
   (any-reg descriptor-reg))
 
 (defun move-immediate (target val &optional tmp-tn zeroed)
+  (setq zeroed nil)
   ;; Try to emit the smallest immediate operand if the destination word
   ;; is already zeroed. Otherwise a :qword.
   (cond

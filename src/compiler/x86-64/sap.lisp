@@ -30,8 +30,9 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:note "SAP to pointer coercion")
   (:node-var node)
+  (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 20
-    (alloc-other sap-widetag sap-size res node nil thread-tn)
+    (alloc-other sap-widetag sap-size res node (list temp temp2) thread-tn)
     (storew sap res sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))

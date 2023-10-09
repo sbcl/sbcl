@@ -42,6 +42,7 @@
   (code nil :type (or null code-component))
   ;; list of function and fdefn constants extracted from code header
   (code-callables :?)
+  (pseudo-atomic-locations nil)
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
   (initial-offset 0 :type index)

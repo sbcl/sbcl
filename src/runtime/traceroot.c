@@ -47,7 +47,7 @@ typedef struct hopscotch_table* inverted_heap_t;
 #define inverted_heap_get_ref(graph, key) hopscotch_get_ref(graph, key)
 #endif
 
-int heap_trace_verbose = 0;
+int heap_trace_verbose = 2;
 
 typedef uintptr_t traceroot_pointer;
 
@@ -91,12 +91,10 @@ static int traceroot_gen_of(lispobj obj) {
 
 static const char* classify_obj(lispobj ptr)
 {
-    extern lispobj* instance_classoid_name(lispobj*);
-
     lispobj* name; // a Lisp string
     switch(lowtag_of(ptr)) {
     case INSTANCE_POINTER_LOWTAG:
-        name = instance_classoid_name(native_pointer(ptr));
+        name = (void*)instance_classoid_name(native_pointer(ptr));
         if (widetag_of(name) == SIMPLE_BASE_STRING_WIDETAG) return (char*)(name + 2);
         break;
     case LIST_POINTER_LOWTAG:
@@ -715,8 +713,10 @@ static bool record_ptr(lispobj* source, lispobj target, struct scan_state* ss)
     return 1;
 }
 
+extern int in_sml_heap_range_p(lispobj);
 #define relevant_ptr_p(x) \
- (find_page_index((void*)(x))>=0||immobile_space_p((lispobj)(x))||readonly_space_p(x))
+ (in_sml_heap_range_p(x) || find_page_index((void*)(x))>=0 || \
+  immobile_space_p((lispobj)(x)) || readonly_space_p(x))
 
 #define COUNT_POINTER(x) { ++n_scanned_words; \
       if (!is_lisp_pointer(x)) ++n_immediates; \
@@ -812,6 +812,15 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 }
             }
             break;
+        case SYMBOL_WIDETAG:
+            {
+            struct symbol* sym = (void*)where;
+            check_ptr(decode_symbol_name(sym->name));
+            check_ptr(sym->value);
+            check_ptr(sym->info);
+            check_ptr(sym->fdefn);
+            }
+            continue;
         case FILLER_WIDETAG: continue;
         default:
             if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag)))
@@ -871,6 +880,20 @@ static void scan_spaces(struct scan_state* ss)
     show_tally(old, ss, "text");
 #endif
     old = *ss;
+#if 0
+    extern int gather_all_smlheap_objects(uword_t** list);
+    uword_t* list;
+    int count = gather_all_smlheap_objects(&list);
+    printf("traceroot got %d SML heap objects\n", count);
+    int i;
+    for(i=0; i<count; ++i) {
+      lispobj* objbase = (lispobj*)list[i];
+      lispobj* end = objbase + object_size(objbase);
+      build_refs(objbase, end, ss);
+    }
+    show_tally(old, ss, "SMLgc");
+    old = *ss;
+#endif
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))build_refs,
                     -1, (uword_t)ss);
     show_tally(old, ss, "dynamic");

@@ -605,6 +605,8 @@ parse_argv(struct memsize_options memsize_options,
     return o;
 }
 
+extern void instant_stop_handler(int, siginfo_t*, void*);
+
 int
 initialize_lisp(int argc, char *argv[], char *envp[])
 {
@@ -770,6 +772,15 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     ll_install_handler(SIGURG, thruption_handler);
 # elif defined LISP_FEATURE_SB_THREAD
     ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
+
+    struct sigaction sa;
+    sa.sa_sigaction = instant_stop_handler;
+    sa.sa_mask = blockable_sigset;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
+    sigaction(SIGPROF, &sa, 0);
+
+    //ll_install_handler(SIGPWR, sigpwr_handler);
+    fprintf(stderr, "installed stop-for-gc handler\n");
 # endif
 #else
 /*     wos_install_interrupt_handlers(handler); */

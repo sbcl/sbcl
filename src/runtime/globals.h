@@ -12,6 +12,9 @@
 #ifndef _INCLUDED_GLOBALS_H_
 #define _INCLUDED_GLOBALS_H_
 
+extern int use_smlgc;
+extern int enable_async_gc;
+
 #ifndef __ASSEMBLER__
 # include <stdbool.h>
 # include <sys/types.h>

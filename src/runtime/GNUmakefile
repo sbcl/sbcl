@@ -86,7 +86,12 @@ C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
 SRCS = $(C_SRC) ${ASSEM_SRC}
 
-OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o
+SMLSHARPGC_OBJS = ../../smlsharpgc/control.o ../../smlsharpgc/error.o \
+ ../../smlsharpgc/heap_concurrent.o ../../smlsharpgc/lispobj.o ../../smlsharpgc/xmalloc.o
+
+../../smlsharpgc/%.o: CFLAGS+=-I../../smlsharpgc -DHAVE_GENESIS_CONFIG -DHAVE_CONFIG_H -DWITHOUT_MASSIVETHREADS
+
+OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o $(SMLSHARPGC_OBJS)
 
 LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
@@ -101,6 +106,7 @@ ldb: $(LIBSBCL)
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 	$(SBCL_PAXCTL) $@
+	#rm -f mylib.a ; ar cqD mylib.a $(filter-out main.o,$(USE_LIBSBCL))
 
 # tests/heap-reloc/fake-mman.c assumes #+linux, so this recipe
 # only works on linux.
@@ -178,8 +184,8 @@ TAGS tags: $(SRCS) $(HEADERS) $(INC)
 	@etags --language=c $(SRCS) $(HEADERS) $(INC) || true
 
 clean:
-	-rm -f *.[do] ../../tlsf-bsd/tlsf/tlsf.o $(TARGET) *.tmp libsbcl.a sbcl.h \
- ldb unit-tests libsbcl.a shrinkwrap-sbcl* sbcl.mk core
+	-rm -f *.[do] ../../tlsf-bsd/tlsf/tlsf.o ../../smlsharpgc/*.o $(TARGET) *.tmp libsbcl.a \
+ ldb unit-tests libsbcl.a shrinkwrap-sbcl* sbcl.mk core sbcl.h
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \

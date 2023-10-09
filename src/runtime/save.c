@@ -661,6 +661,7 @@ static void prepare_dynamic_space_for_final_gc()
 char gc_coalesce_string_literals = 0;
 
 extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
+extern lispobj copy_smlgc_heap_to_gencgc(lispobj);
 
 /* Do a non-conservative GC twice, and then save a core with the initial
  * function being set to the value of 'lisp_init_function'.
@@ -743,6 +744,10 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     struct thread *thread = get_sb_vm_thread();
     gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
+    gencgc_verbose = 1;
+    if (use_smlgc) {
+        lisp_init_function = copy_smlgc_heap_to_gencgc(lisp_init_function);
+    }
 #ifdef LISP_FEATURE_MARK_REGION_GC
     /* Do a minor GC to instate allocation bitmap for new objects.
      * This is needed to make heap walking in move_rospace_to_dynamic

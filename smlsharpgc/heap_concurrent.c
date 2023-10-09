@@ -4,6 +4,17 @@
  * @author UENO Katsuhiro
  */
 
+#define _GNU_SOURCE
+#ifdef HAVE_GENESIS_CONFIG
+#include "genesis/config.h"
+#include "genesis/constants.h"
+#include "genesis/hash-table.h"
+#include "genesis/weak-pointer.h"
+#include "genesis/thread.h"
+#include "genesis/vector.h"
+#include <stdio.h>
+#endif
+
 #include "smlsharp.h"
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +25,7 @@
 # include <windows.h>
 #endif /* MINGW32 */
 #endif /* HAVE_CONFIG_H */
+
 #include "object.h"
 #include "heap.h"
 
@@ -41,10 +53,6 @@ static struct {
 
 /********** linked list and look-free stack **********/
 
-struct list_item {
-        struct list_item *next;
-};
-
 /* thread-local use only */
 struct list {
         struct list_item *head;
@@ -70,7 +78,7 @@ list_append(struct list *l, struct list_item *item)
         l->last = &item->next;
 }
 
-static void *
+static ATTR_UNUSED void *
 list_finish(struct list *l, struct list_item *last)
 {
         *l->last = last;
@@ -85,7 +93,7 @@ list_last(struct list_item *l)
         return &l->next;
 }
 
-#if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
+#if 0
 static void *
 stack_top(struct stack *s)
 {
@@ -193,14 +201,6 @@ stack_flush(struct stack *s)
 
 /********** segments ***********/
 
-#ifndef SEGMENT_SIZE_LOG2
-#define SEGMENT_SIZE_LOG2  15   /* 32k */
-#endif /* SEGMENT_SIZE_LOG2 */
-#define SEGMENT_SIZE (1U << SEGMENT_SIZE_LOG2)
-#ifndef SEG_RANK
-#define SEG_RANK  3
-#endif /* SEG_RANK */
-
 #define BLOCKSIZE_MIN_LOG2  3U   /* 2^3 = 8 */
 #define BLOCKSIZE_MIN       (1U << BLOCKSIZE_MIN_LOG2)
 #define BLOCKSIZE_MAX_LOG2  12U  /* 2^4 = 16 */
@@ -245,40 +245,7 @@ stack_flush(struct stack *s)
  * N-th bit of bitmap[n] indicates whether N-th word of bitmap[n-1] is
  * filled (1) or not (0).
  */
-struct segment_layout {
-        unsigned int blocksize_bytes;
-        unsigned int bitmap_base[SEG_RANK + 1];
-        sml_bmword_t bitmap_sentinel[SEG_RANK];
-        unsigned int stack_offset;
-        unsigned int stack_limit;
-        unsigned int block_offset;
-        unsigned int num_blocks;
-        unsigned int block_limit;
-};
-
-struct segment {
-        struct list_item as_list;
-        struct stack_slot {
-                _Atomic(void *) next;
-        } *stack;  /* == seg + layout->stack_offset */
-        char *block_base;  /* == seg + layout->block_offset */
-        /* If block_base is null, this segment is in free list */
-#if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-        /* do not modify snapshot_free during the collector traces objects. */
-        char *snapshot_free;
-#endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-        const struct segment_layout *layout;
-        unsigned int blocksize_log2;
-        int free_count;
-        /* The free_count field not only holds the count (as its name) but
-         * indicates which set the segment is in.
-         * If free_count is negative, the segment is in the collect set
-         * and its absolute value is the count of unmarked blocks.
-         * If free_count is zero, the segment is in the filled set.
-         * If free_count is positive, the segment is in the partial set.
-         */
-};
-
+#include "segment.inc"
 static struct segment_layout segment_layout[BLOCKSIZE_MAX_LOG2 + 1];
 
 #define SEG_INITIAL_OFFSET \
@@ -303,7 +270,7 @@ static struct segment_layout segment_layout[BLOCKSIZE_MAX_LOG2 + 1];
 #define BITMAP0_BASE(seg) \
         ((sml_bmword_t*)ADD_BYTES(seg, SEG_BITMAP0_OFFSET))
 #define BLOCK_LIMIT(seg) \
-        ((char*)ADD_BYTES((seg)->block_base, (seg)->layout->block_limit))
+        ((char*)ADD_BYTES((seg), (seg)->layout->block_limit))
 
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
@@ -312,20 +279,25 @@ static struct segment_layout segment_layout[BLOCKSIZE_MAX_LOG2 + 1];
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 
-/* assume that segment address is a multiple of SEGMENT_SIZE */
-static inline struct segment *
-segment_addr(const void *p)
-{
-        return (void*)((uintptr_t)p & ~((uintptr_t)(SEGMENT_SIZE - 1)));
-}
-
 static inline unsigned int
 object_index(struct segment *seg, void *obj)
 {
         assert(segment_addr(obj) == seg);
         assert((char*)obj >= seg->block_base);
         assert((char*)obj < (char*)seg + SEGMENT_SIZE);
+        // TODO: non-power-of-2 block sizes
         return DIF_BYTES(obj, seg->block_base) >> seg->blocksize_log2;
+}
+
+static inline int
+objindex_or_end(struct segment *seg, void *obj)
+{
+        assert(seg->blocksize_log2 != 0);
+        assert((char*)obj >= seg->block_base);
+        if ((char*)obj < BLOCK_LIMIT(seg))
+          return DIF_BYTES(obj, seg->block_base) >> seg->blocksize_log2;
+        else
+          return -1;
 }
 
 static unsigned int
@@ -454,11 +426,25 @@ init_segment_layout()
          */
         compute_layout(0);
 
-        for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++)
+        for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++) {
                 compute_layout(i);
+                /* struct segment_layout * l = &segment_layout[i];
+                   printf("init_layout: i=%d %d %d %d %d\n",
+                   i, l->bitmap_base[0], l->bitmap_base[1], l->bitmap_base[2], l->bitmap_base[3]); */
+        }
 }
 
 /* for debug */
+static int ATTR_UNUSED
+check_pattern(uword_t* block, unsigned int nwords) {
+    unsigned int i;
+    if (nwords == 1) return 1; // single-word objects do not get scribbled
+    if (block[0] != DEADBEEF) return 0;
+    if (nwords == 2) return block[1] == (uword_t)-1;
+    for (i=1; i<nwords; ++i) if (block[i]) return 0; // fail
+    return 1; // succeed
+}
+
 static void ATTR_UNUSED
 scribble_segment(struct segment *seg)
 {
@@ -466,12 +452,50 @@ scribble_segment(struct segment *seg)
         sml_bitptr_t b = BITPTR(BITMAP0_BASE(seg), 0);
         unsigned int i;
 
+        switch (seg->layout->blocksize_bytes) {
+        case 8: // fill pattern is 0xAAAAAAAAAAAAAAAA
+#if 0
+            tprintf("scribble on %p", seg);
+            for (i = 0; i < seg->layout->num_blocks; i++) {
+                    if (!BITPTR_TEST(b)) *(uword_t*)block = 0xAAAAAAAAAAAAAAAA;
+                    BITPTR_INC(b);
+                    block += 8;
+            }
+#endif
+            break;
+        case 16: // fill pattern is DEADBEEF then 0xff
+            for (i = 0; i < seg->layout->num_blocks; i++) {
+                    if (!BITPTR_TEST(b)) {
+                            ((uword_t*)block)[0] = DEADBEEF;
+                            ((uword_t*)block)[1] = (uword_t)-1;
+                    }
+                    BITPTR_INC(b);
+                    block += 16;
+            }
+            break;
+        default: // fill pattern is DEADBEEF then 0
+            for (i = 0; i < seg->layout->num_blocks; i++) {
+                    if (!BITPTR_TEST(b)) {
+                            *(uword_t*)block = DEADBEEF;
+                            memset(block + 8, 0, seg->layout->blocksize_bytes - 8);
+                    }
+                    BITPTR_INC(b);
+                    block += seg->layout->blocksize_bytes;
+            }
+        }
+}
+void print_free_blocks(struct segment *seg)
+{
+        char *block = seg->block_base;
+        sml_bitptr_t b = BITPTR(BITMAP0_BASE(seg), 0);
+        unsigned int i;
+        ATTR_UNUSED int n = 0;
+
         for (i = 0; i < seg->layout->num_blocks; i++) {
-                if (!BITPTR_TEST(b))
-                        memset(block - OBJ_HEADER_SIZE, 0x55,
-                               seg->layout->blocksize_bytes);
-                BITPTR_INC(b);
-                block += seg->layout->blocksize_bytes;
+          if (!BITPTR_TEST(b)) fprintf(stderr, " free @ %p: %lx %lx\n",
+                                       block, 0[(long*)block], 1[(long*)block]);
+          BITPTR_INC(b);
+          block += seg->layout->blocksize_bytes;
         }
 }
 
@@ -493,6 +517,8 @@ init_segment(struct segment *seg, unsigned int blocksize_log2)
         const struct segment_layout *new_layout;
         unsigned int i;
         char *old_limit, *new_limit;
+
+        if (blocksize_log2 == 3) TPRINTF(0, "init_segment %p for size 8 (was size %d)", seg, 1<<seg->blocksize_log2);
 
         assert(BLOCKSIZE_MIN_LOG2 <= blocksize_log2
                && blocksize_log2 <= BLOCKSIZE_MAX_LOG2);
@@ -540,7 +566,7 @@ init_segment(struct segment *seg, unsigned int blocksize_log2)
         for (i = 0; i < SEG_RANK; i++)
                 BITMAP_LIMIT(seg, i)[-1] = new_layout->bitmap_sentinel[i];
 
-        DEBUG(scribble_segment(seg));
+        scribble_segment(seg);
 }
 
 static void
@@ -648,7 +674,9 @@ init_heap_space(struct heap_space *heap, size_t min_size, size_t max_size)
          * bytes and then release SEGMENT_SIZE bytes in total from the head
          * and end of the space.
          */
-        p = ReservePage(NULL, max_size + SEGMENT_SIZE);
+        void* want = (void*)0x1100000000; // SBCL likes its heap at a known address
+        //void* want  = 0;
+        p = ReservePage(want, max_size + SEGMENT_SIZE);
         if (p == AllocPageError)
                 sml_fatal(0, "failed to alloc virtual memory.");
         freesize_post = (uintptr_t)p & (SEGMENT_SIZE - 1);
@@ -660,6 +688,7 @@ init_heap_space(struct heap_space *heap, size_t min_size, size_t max_size)
                 ReleasePage(ADD_BYTES(p, max_size), freesize_post);
         }
 
+        fprintf(stderr, "freesize_post=%lx heap_base=%p\n", freesize_post, p);
         heap->begin = p;
         heap->end = ADD_BYTES(p, max_size);
         heap->free = p;
@@ -693,7 +722,7 @@ allocate_segments(struct heap_space *heap, unsigned int count,
         sml_debug("allocate %u segments (total %u segments)\n",
                   alloc, heap->num_committed);
 #ifndef EAGER_MMAP
-        CommitPage(heap->free, SEGMENT_SIZE * alloc);
+        CommitPage(heap->free, SEGMENT_SIZE * (unsigned long)alloc);
 #endif /* EAGER_MMAP */
 
         for (; alloc > 0; alloc--) {
@@ -714,10 +743,16 @@ clear_collect_bitmaps(struct heap_space *heap)
 {
         struct segment *seg;
 
+        // This clears all 'visited' bits for all segments regardless of whether
+        // the segment is in filled, active, partial.
         for (seg = heap->begin; seg < heap->free;
              seg = ADD_BYTES(seg, SEGMENT_SIZE)) {
                 if (!seg->block_base)
                         continue;
+                /*fprintf(stderr, "clear_collect_bitmaps: seg @ %p, blksize = %d, num_blocks = %d, nbytes = %d\n",
+                        seg, seg->layout->blocksize_bytes,
+                        seg->layout->num_blocks,
+                        seg->layout->stack_offset - seg->layout->bitmap_base[SEG_RANK]);*/
                 memset(COLLECT_BITMAP_BASE(seg), 0,
                        seg->layout->stack_offset
                        - seg->layout->bitmap_base[SEG_RANK]);
@@ -733,6 +768,15 @@ static struct {
         struct heap_space heap;
         unsigned int extend_step;
 } segment_pool;
+
+static int ATTR_UNUSED segment_number(void* s) {
+  return ((char*)s - (char*)segment_pool.heap.begin) / SEGMENT_SIZE;
+}
+
+void get_segment_pool_bounds(char* bounds[2]) {
+    bounds[0] = segment_pool.heap.begin;
+    bounds[1] = segment_pool.heap.end;
+}
 
 static void
 init_segment_pool(size_t min_size, size_t max_size)
@@ -805,7 +849,7 @@ collect_subheap(struct subheap *subheap, struct segment **seg_p)
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 static void
-collect_subheap(struct subheap *subheap, struct segment **seg_p)
+gather_subheap(struct subheap *subheap, struct segment **seg_p)
 {
         *seg_p = stack_flush(&subheap->filled);
 }
@@ -813,12 +857,12 @@ collect_subheap(struct subheap *subheap, struct segment **seg_p)
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 static void
-collect_subheaps(struct segment **segarray)
+gather_subheaps(struct segment **segarray)
 {
         unsigned int i;
 
         for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++)
-                collect_subheap(&global_subheaps[i], &segarray[i]);
+                gather_subheap(&global_subheaps[i], &segarray[i]);
 }
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
@@ -895,7 +939,7 @@ dump_subheap(struct subheap *subheap)
 }
 
 /* for debug */
-static ATTR_UNUSED void
+/*static ATTR_UNUSED*/ void
 dump_global_subheaps()
 {
         unsigned int i;
@@ -910,8 +954,14 @@ dump_global_subheaps()
 struct malloc_segment {
         struct list_item as_list;
         struct stack_slot stack;
+#ifdef LISP_FEATURE_SBCL
+        unsigned long markbit : 1;
+        unsigned long size : 63; // user-requested size (excluding the mseg header)
+        uword_t* voucher; // MUST be 1 word prior to the object header
+#else
         sml_bmword_t markbit;
         char dummy_for_objheader[OBJ_HEADER_SIZE];
+#endif
 };
 
 #define MALLOC_OBJECT_OFFSET \
@@ -920,21 +970,58 @@ struct malloc_segment {
         ((struct malloc_segment *)ADD_BYTES(obj, -MALLOC_OBJECT_OFFSET))
 #define MALLOC_SEGMENT_TO_OBJ(mseg) \
         ADD_BYTES(mseg, MALLOC_OBJECT_OFFSET)
-#define MALLOC_SEGMENT_SIZE(mseg) \
-        (MALLOC_OBJECT_OFFSET \
-         + OBJ_TOTAL_SIZE(MALLOC_SEGMENT_TO_OBJ(mseg)) \
-         - OBJ_HEADER_SIZE)
+#define MALLOC_SEGMENT_SIZE(mseg) (MALLOC_OBJECT_OFFSET + mseg->size)
 
 /* initialized correctly by default */
 static struct stack malloc_segments;
+/* For initializing the large codeblob tree and not used thereafter */
+extern void lose(char*,...);
+void* get_allocated_msegs() { return malloc_segments.top; }
 
-static struct malloc_segment *
-malloc_segment(unsigned int alloc_size)
+int in_bitmapped_subheap(void* addr) {
+    if (addr >= segment_pool.heap.begin && addr < (void*)segment_pool.heap.end) return 1;
+    return 0;
+}
+
+/*int in_smlgc_bitmapped_space(void* addr) { // FIXME?
+    if (in_bitmapped_subheap(addr)) return 1;
+    return 0;
+}*/
+
+uword_t* small_block_from_interior_ptr(char* addr, int* pblocksize) {
+    if (addr >= (char*)segment_pool.heap.begin && addr < (char*)segment_pool.heap.end) {
+        struct segment *seg = segment_addr(addr);
+        if (seg->block_base && addr >= seg->block_base && addr < BLOCK_LIMIT(seg)) {
+            // TODO: non-power-of-2 block sizes
+            unsigned int index = DIF_BYTES(addr, seg->block_base) >> seg->blocksize_log2;
+            if (pblocksize) *pblocksize = seg->layout->blocksize_bytes;
+            return (uword_t*)(seg->block_base + (index << seg->blocksize_log2));
+        }
+    }
+    return 0;
+}
+int seg_blocksize_of(void* addr) {
+    if (addr >= segment_pool.heap.begin && addr < segment_pool.heap.end) {
+        struct segment *seg = segment_addr(addr);
+        return 1 << seg->blocksize_log2; // TODO: non-power-of-2 size
+    }
+    return 0;
+}
+
+/*static*/ struct malloc_segment *
+alloc_mseg(int executable, unsigned int alloc_size)
 {
         struct malloc_segment *mseg;
 
+#ifdef LISP_FEATURE_SBCL
+        extern void* alloc_mseg_impl(int, size_t);
+        mseg = alloc_mseg_impl(executable, alloc_size);
+        assert(((uword_t)mseg & 0xF) == 0);
+        mseg->size = alloc_size;
+#else
         mseg = xmalloc(MALLOC_OBJECT_OFFSET + alloc_size);
         DEBUG(memset(mseg, 0x55, MALLOC_OBJECT_OFFSET + alloc_size));
+#endif
         store_relaxed(&mseg->stack.next, NULL);
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
         /* Indicate that this is allocated before SYNC2 */
@@ -944,12 +1031,39 @@ malloc_segment(unsigned int alloc_size)
         return mseg;
 }
 
+_Atomic(struct malloc_segment*) msegs_pending_free;
+
 static void
 destroy_malloc_segment(struct malloc_segment *mseg)
 {
         assert(mseg->markbit == 0);
-        DEBUG(memset(mseg, 0x55, MALLOC_SEGMENT_SIZE(mseg)));
-        free(mseg);
+        /* If GC decided that it can free the voucher (which it should have decided),
+         * based on it being in a GC-able segment, then it would have called scribble()
+         * on that segment and deposited the filler into the voucher.
+         * Therefore this MUST NOT try to write a 0 or something into the voucher
+         * because the filler pattern might not be 0. I tried storing a DEADBEEF
+         * but that didn't do me any favors, as it tripped the check_pattern assertion.
+         * So just leave the voucher alone if scribbling is enabled */
+        *mseg->voucher = 0;
+        // DEBUG(memset(mseg, 0xFF, MALLOC_SEGMENT_SIZE(mseg)));
+        uword_t* userobj = MALLOC_SEGMENT_TO_OBJ(mseg);
+        // { char buf[80]; int n = snprintf(buf, sizeof buf, "free %p\n", mseg); write(2, buf, n); }
+        if ((*userobj & WIDETAG_MASK) == CODE_HEADER_WIDETAG) {
+            userobj[-1] = 0; // delete the pointer to the voucher (doesn't matter really)
+            userobj[1] = userobj[0]; // copy the old header
+            userobj[0] = 0; // not a valid header
+            struct malloc_segment* next = atomic_load(&msegs_pending_free);
+            TPRINTF(1, "defer free mseg %p size %ld", mseg, mseg->size);
+            // FIXME: think about whether this succumbs to the ABA problem
+            // and explain why it doesn't, if it doesn't.
+            do  {
+                mseg->as_list.next = (void*)next;
+            } while (!cmpswap_relaxed(&msegs_pending_free, &next, mseg));
+            // printf("Deferred free code @ %p\n", mseg);
+        } else {
+            TPRINTF(1, "free %p size %ld", mseg, mseg->size);
+            xfree(mseg, "mseg");
+        }
 }
 
 #if defined WITHOUT_MULTITHREAD || defined WITHOUT_CONCURRENCY
@@ -961,7 +1075,7 @@ collect_malloc_segments(struct malloc_segment **collect_msegs)
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 static void
-collect_malloc_segments(struct malloc_segment **collect_msegs)
+gather_malloc_segments(struct malloc_segment **collect_msegs)
 {
         *collect_msegs = stack_flush(&malloc_segments);
 }
@@ -973,6 +1087,7 @@ destroy_malloc_segments()
 {
         struct malloc_segment *mseg, *next;
 
+        abort();
         mseg = stack_flush(&malloc_segments);
         while (mseg) {
                 next = (struct malloc_segment *)mseg->as_list.next;
@@ -1070,26 +1185,19 @@ print_heap_summary_light()
 
 #define NIL ((void*)1)
 
-#if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-/* thread-local use only */
-struct object_list {
-        struct stack_slot begin;
-        struct stack_slot *last;
-};
-
-#endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-
 static struct stack_slot *
 object_stack_slot(void *obj)
 {
         struct segment *seg;
         struct malloc_segment *mseg;
 
+#ifndef LISP_FEATURE_SBCL
         if (obj == NULL)
                 return NULL;
         if (OBJ_HEADER(obj) & OBJ_FLAG_SKIP)
                 return NULL;
-        if (OBJ_TOTAL_SIZE(obj) > BLOCKSIZE_MAX) {
+#endif
+        if (!in_bitmapped_subheap(obj)) {
                 mseg = OBJ_TO_MALLOC_SEGMENT(obj);
                 return &mseg->stack;
         } else {
@@ -1100,18 +1208,55 @@ object_stack_slot(void *obj)
         }
 }
 
+struct stack_slot *careful_lispobj_stack_slot(lispobj taggedptr)
+{
+        unsigned char lowtag;
+        void* obj = (void*)taggedptr;
+
+        if (in_bitmapped_subheap(obj)) {
+                struct segment *seg = segment_addr(obj);
+                return &seg->stack[object_index(seg, obj)];
+        } else if ((lowtag = lowtag_of(taggedptr)) == LIST_POINTER_LOWTAG
+                   || lowtag == INSTANCE_POINTER_LOWTAG
+                   || ignorable_space_p(taggedptr)) {
+                return 0;
+        } else if (large_code_subspace_p(obj)) {
+                lispobj* code = untagged_baseptr((lispobj)obj);
+                return &(OBJ_TO_MALLOC_SEGMENT(code)->stack);
+        } else if (lowtag == OTHER_POINTER_LOWTAG) {
+                struct malloc_segment *mseg = otherptr_mseg(taggedptr);
+                return mseg ? &mseg->stack : 0;
+        }
+        return NULL;
+}
+
+static int is_gcable_object(lispobj taggedptr)
+{
+        void* obj = (void*)taggedptr;
+
+        if (in_bitmapped_subheap(obj) || large_code_subspace_p(obj)) return 1;
+        unsigned char lowtag = lowtag_of(taggedptr);
+        if (lowtag == LIST_POINTER_LOWTAG || lowtag == INSTANCE_POINTER_LOWTAG
+            || ignorable_space_p(taggedptr)) return 0;
+        if (lowtag == OTHER_POINTER_LOWTAG && otherptr_mseg(taggedptr) != NULL) return 1;
+        return 0;
+}
+
+//int forwardable_descriptor_p(lispobj taggedptr) { return is_gcable_object(taggedptr); }
+
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
 static void
 object_list_init(struct object_list *l)
 {
         atomic_init(&l->begin.next, NIL);
         l->last = &l->begin;
+        l->count = 0;
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-static void
+/*static*/ void
 object_list_append(struct object_list *l, void *obj)
 {
         struct stack_slot *slot = object_stack_slot(obj);
@@ -1122,19 +1267,22 @@ object_list_append(struct object_list *l, void *obj)
             && load_relaxed(&slot->next) == old
             && cmpswap_relaxed(&slot->next, &old, NIL)) {
                 store_relaxed(&l->last->next, obj);
-                l->last = slot;
+                l->last = slot, ++l->count;
         }
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-static void
-enum_obj_to_list(void **slot, void *data)
+static void ATTR_UNUSED
+enum_obj_to_list_notused(void **slot, void *data)
 {
         void *obj = *slot;
         struct object_list *objs = data;
         object_list_append(objs, obj);
+}
+static void enum_obj_to_list(uintptr_t pointer, void *data) {
+        object_list_append(data, (void*)pointer);
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
@@ -1150,31 +1298,6 @@ struct object_stack {
 
 #define EMPTY_OBJECT_STACK \
         {.top = ATOMIC_VAR_INIT(NIL), .lock = SPIN_LOCK_INIT}
-
-
-#if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-static void
-push_object(struct object_stack *stack, void *obj)
-{
-        struct stack_slot *slot = object_stack_slot(obj);
-        void *old = NULL;
-
-        if (!slot)
-                return;
-
-         /* ensure that the collector receives all objects whose stack_slot
-          * were occupied by mutators. */
-         spin_lock(&stack->lock);
-
-        /* this may fail if obj already belongs to another list or stack */
-        if (load_relaxed(&slot->next) == old
-             && cmpswap_relaxed(&slot->next, &old, stack->top))
-                 stack->top = obj;
-
-         spin_unlock(&stack->lock);
-}
-
-#endif /* !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY */
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
 static void
@@ -1194,6 +1317,67 @@ push_objects(struct object_stack *stack, struct object_list *l)
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
+
+int obj_chain_length_capped(void* chain, int max) {
+  int n = 0;
+  while (chain != NIL) {
+    ++n;
+    if (n == max) return -1;
+    struct stack_slot * slot = object_stack_slot(chain);
+    chain = slot->next;
+  }
+  return n;
+}
+
+_Atomic(int) weakRefState = weakRefState_NORMAL;
+int weakTableOpsInhibited;
+pthread_rwlock_t weakTableLock = PTHREAD_RWLOCK_INITIALIZER;
+//void* visit_weak_hash_tables();
+
+extern void add_weak_tables_edges(void*,struct object_list*);
+extern void smash_weak_table_pairs(void*);
+static void* GetWeakTableList();
+
+static void *flush_gray_stack(struct object_stack *stack)
+{
+        void *top;
+        int verbosity = 1;
+
+        spin_lock(&stack->lock);
+        top = stack->top;
+        stack->top = NIL;
+        if (verbosity) {
+            int n = obj_chain_length_capped(top, 500);
+            fprintf(stderr, n<0?"flush_gray: >500 to go\n":"flush_gray: %d to go\n", n);
+        }
+        if (top == NIL) {
+            if (verbosity) fprintf(stderr, " -- gray stack is empty, tableInhibit=%d\n", weakTableOpsInhibited);
+            if (!weakTableOpsInhibited) {
+                /* If gray list was empty then there we are almost done,
+                 * other than considering weak hash tables. To prevent races,
+                 * suspend all weak table operations by mutators henceforth
+                 * until the gray list is completely drained.
+                 * As long as a worker thread has nothing to do with weak tables,
+                 * it won't have to wait */
+                spin_unlock(&stack->lock);
+                pthread_rwlock_wrlock(&weakTableLock);
+                weakTableOpsInhibited = 1;
+                struct object_list more_objects;
+                object_list_init(&more_objects);
+                add_weak_tables_edges(GetWeakTableList(), &more_objects);
+                push_objects(stack, &more_objects);
+                return flush_gray_stack(stack);
+            }
+            int old = weakRefState_TRACING;
+            if (atomic_compare_exchange_strong(&weakRefState, &old, weakRefState_SPLAT)) {
+                if (verbosity) fprintf(stderr, "weakRefState changed\n");
+            } else {
+                lose("wat?");
+            }
+        }
+        spin_unlock(&stack->lock);
+        return top;
+}
 static void *
 flush_object_stack(struct object_stack *stack)
 {
@@ -1209,13 +1393,6 @@ flush_object_stack(struct object_stack *stack)
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 /********** allocation pointers ***********/
-
-/* sizeof(struct alloc_ptr) must be power of 2 for performance */
-struct alloc_ptr {
-        sml_bitptr_t freebit;
-        char *free;
-        unsigned int blocksize_bytes;
-};
 
 union sml_alloc {
         struct alloc_ptr ptr[BLOCKSIZE_MAX_LOG2 + 1]; /* ptr[0] is not used. */
@@ -1246,12 +1423,13 @@ destroy_alloc_ptr_set_pool()
         p = stack_flush(&alloc_ptr_set_pool.freelist);
         while (p) {
                 next = (union sml_alloc *)p->as_list.next;
-                free(p);
+                xfree(p, "ap_set");
                 p = next;
         }
 }
 
-static void
+#define clear_alloc_ptr smlgc_clear_alloc_ptr
+/*static*/ void
 clear_alloc_ptr(struct alloc_ptr *ptr)
 {
         ptr->freebit = dummy_bitptr;
@@ -1332,8 +1510,16 @@ save_alloc_ptr_set_sync2(union sml_alloc *ptr_set)
 
         for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++) {
                 ptr = &ptr_set->ptr[i];
-                if (ptr->free)
-                        ALLOC_PTR_TO_SEGMENT(ptr)->snapshot_free = ptr->free;
+                if (!ptr->free) continue;
+#if 0
+                struct segment* s = ALLOC_PTR_TO_SEGMENT(ptr);
+                if (logfile)
+                    fprintf(logfile, "ap[%2d] seg=%5d @ %p free=%d/%d\n",
+                            i, segment_number(s), s,
+                            (ptr->free < BLOCK_LIMIT(s) ? (int)object_index(s, ptr->free) : -1),
+                            s->layout->num_blocks);
+#endif
+                ALLOC_PTR_TO_SEGMENT(ptr)->snapshot_free = ptr->free;
         }
 }
 
@@ -1348,7 +1534,7 @@ new_alloc_ptr_set()
         p = stack_pop(&alloc_ptr_set_pool.freelist);
 
         if (!p) {
-                p = xmalloc(sizeof(union sml_alloc));
+                p = xmalloc(sizeof(union sml_alloc), "ap_set");
                 for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++) {
                         p->ptr[i].blocksize_bytes = 1U << i;
                         clear_alloc_ptr(&p->ptr[i]);
@@ -1363,9 +1549,21 @@ move_to_filled(struct alloc_ptr *ptr, struct subheap *subheap)
 {
         struct segment *seg;
         seg = save_alloc_ptr(ptr);
+#if 0
+        if (seg->blocksize_log2 == 3) {
+            unsigned int free_index = object_index_or_end(seg, ptr->free);
+            TPRINTF(0, "move_to_filled %p %d/%d (ϕ%s)",
+                    seg, free_index, seg->layout->num_blocks,
+                    phase_name(sml_current_phase()));
+        }
+#endif
         assert(subheap == &global_subheaps[seg->blocksize_log2]);
         assert(seg->as_list.next == (void*)-1);
         stack_push(&subheap->filled, &seg->as_list);
+}
+
+void move_cons_ap_to_filled(struct alloc_ptr *ap) {
+    move_to_filled(ap, &global_subheaps[4]);
 }
 
 static void
@@ -1374,6 +1572,9 @@ move_all_to_filled(union sml_alloc *ptr_set)
         unsigned int i;
         struct alloc_ptr *ptr;
 
+        /* FIXME: need to take note of the extra alloc_ptr which is embedded
+         * in 'struct thread' */
+        lose("move_all_to_filled - not done");
         for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++) {
                 ptr = &ptr_set->ptr[i];
                 if (ptr->free) {
@@ -1381,10 +1582,11 @@ move_all_to_filled(union sml_alloc *ptr_set)
                         clear_alloc_ptr(ptr);
                 }
         }
+        TPRINTF(0, "end move_all_to_filled");
 }
 
 static void
-collect_alloc_ptr_set(union sml_alloc *p, struct segment **segarray)
+gather_alloc_ptr_set(union sml_alloc *p, struct segment **segarray)
 {
         unsigned int i;
         struct segment *seg;
@@ -1400,15 +1602,16 @@ collect_alloc_ptr_set(union sml_alloc *p, struct segment **segarray)
 }
 
 static void
-collect_alloc_ptr_set_pool(struct segment **segarray)
+gather_alloc_ptr_set_pool(struct segment **segarray)
 {
         union sml_alloc *p, *next;
 
         p = stack_flush(&alloc_ptr_set_pool.freelist);
+        TPRINTF(1, "alloc_ptr_set_pool.freelist = %p", p);
         while (p) {
-                collect_alloc_ptr_set(p, segarray);
+                gather_alloc_ptr_set(p, segarray);
                 next = (union sml_alloc *)p->as_list.next;
-                free(p);
+                xfree(p, "ap_set");
                 p = next;
         }
 }
@@ -1420,12 +1623,22 @@ union collect_set {
         struct malloc_segment *malloc_segments;
 };
 
+static FILE* gc_thread_log;
+FILE* get_gc_thread_log(){
+  return 0;
+  //if (!gc_thread_log) setlinebuf(gc_thread_log = fopen("gc-thread.txt","w"));
+  return gc_thread_log;
+}
+
 static void
-collect_segments(union collect_set *c)
+gather_segments(union collect_set *c)
 {
-        collect_subheaps(c->segments);
-        collect_malloc_segments(&c->malloc_segments);
-        collect_alloc_ptr_set_pool(c->segments);
+        gather_subheaps(c->segments);
+        gather_malloc_segments(&c->malloc_segments);
+        gather_alloc_ptr_set_pool(c->segments);
+
+        struct segment* seg = c->segments[3];
+        for ( ; seg ; seg = (void*)seg->as_list.next ) TPRINTF(0, "condemned %p", seg);
 }
 
 static unsigned int
@@ -1482,22 +1695,39 @@ separate_segments(union collect_set *c, struct reclaim *r)
         list_init(&r->freelist);
         r->num_filled = 0;
 
+        TPRINTF(0, "BEGIN separate_segments");
+
+        char buf[200];
+        int bufp = 0;
+
         for (i = BLOCKSIZE_MIN_LOG2; i <= BLOCKSIZE_MAX_LOG2; i++) {
                 s = &r->subheap[i];
                 list_init(&s->partial);
                 list_init(&s->filled);
                 s->num_free = 0;
                 s->num_free_blocks = 0;
+                int quick_scribbled = 0, careful_scribbled = 0;
                 for (seg = c->segments[i]; seg;
                      seg = (struct segment *)seg->as_list.next) {
                         assert(seg->free_count <= 0);
+                        if (i==3) TPRINTF(0, "segment @ %p: freect=%d", seg, seg->free_count);
                         seg->free_count *= -1;
-                        DEBUG(scribble_segment(seg));
+                        if (seg->free_count == (int)seg->layout->num_blocks) {
+                            char *block = seg->block_base;
+                            int fillbyte = seg->layout->blocksize_bytes == 2*N_WORD_BYTES ? -1 : 0;
+                            memset(block, fillbyte,
+                                   seg->layout->num_blocks * seg->layout->blocksize_bytes);
+                            ++quick_scribbled;
+                        } else {
+                            scribble_segment(seg);
+                            ++careful_scribbled;
+                        }
+                        /*DEBUG(scribble_segment(seg));*/
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
                         seg->snapshot_free = seg->block_base;
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-                        assert(stat_segment(seg).num_marked
-                               == seg->layout->num_blocks - seg->free_count);
+
+                        // assert(stat_segment(seg).num_marked == seg->layout->num_blocks - seg->free_count);
                         if (seg->free_count == 0) {
                                 list_append(&s->filled, &seg->as_list);
                                 r->num_filled++;
@@ -1513,18 +1743,28 @@ separate_segments(union collect_set *c, struct reclaim *r)
                                 s->num_free_blocks += seg->free_count;
                         }
                 }
+                int n = snprintf(buf+bufp, sizeof buf-bufp,
+                                 " %d+%d", quick_scribbled, careful_scribbled);
+                bufp += n;
         }
 
+        fprintf(stderr, "Sweep (empty,partial):%.*s\n", bufp, buf);
+
+        TPRINTF(0, "BEGIN malloc segments");
         list_init(&r->malloc_segments);
+        int n = 0, nlive = 0;
         for (mseg = c->malloc_segments; mseg; mseg = next) {
                 next = (struct malloc_segment *)mseg->as_list.next;
+                ++n;
                 if (mseg->markbit) {
+                        ++nlive;
                         list_append(&r->malloc_segments, &mseg->as_list);
                         /* r->num_filled++; */
                 } else {
                         destroy_malloc_segment(mseg);
                 }
         }
+        TPRINTF(1, "%d msegs, %d live", n, nlive);
 }
 
 /* for debug */
@@ -1582,7 +1822,7 @@ rebalance_subheaps(struct reclaim *r, unsigned int num_request)
         unsigned int num_required = num_request;
         unsigned int i;
         unsigned int old_num_blocks = 0, old_num_free = 0;
-        unsigned int new_num_blocks = 0, new_num_free = 0;
+        ATTR_UNUSED unsigned int new_num_blocks = 0, new_num_free = 0;
 
         /* Make sure that the free segments are many enough to allocate
          * free blocks as many as filled blocks in each subheap.
@@ -1683,18 +1923,28 @@ struct {
          * and trace_queue for local usage in the collector.
          */
         struct object_stack objects_from_mutators;
+        /* Weak-vectors includes single-element "vectors" (alternatively known
+         * as weak-pointer). Weak-tables are extra special because the strength
+         * of the reference to the value (resp key) is conditional */
+        struct object_stack weak_vectors, weak_tables;
         _Atomic(unsigned int) num_filled_total;
         unsigned int gc_threshold;
+        pthread_rwlock_t weakobj_lock;
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
         void *root_objects;
         union collect_set collect_set;
+        _Atomic(int) collector_bitmap_cleared;
         _Atomic(unsigned int) num_request;
 } collector = {
         .root_objects = NIL,
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-        .objects_from_mutators = EMPTY_OBJECT_STACK
+        .objects_from_mutators = EMPTY_OBJECT_STACK,
+        .weak_tables = EMPTY_OBJECT_STACK,
+        .weak_vectors = EMPTY_OBJECT_STACK
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 };
+
+static void* GetWeakTableList() { return collector.weak_tables.top; }
 
 #if defined WITHOUT_MULTITHREAD || defined WITHOUT_CONCURRENCY
 static struct stack_slot *
@@ -1728,26 +1978,37 @@ visit(void *obj)
 }
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-static struct stack_slot *
-visit(void *obj)
+FILE* marklog;
+/* In this collector, "visit" means:
+ *    - set the collector markbit if not already marked
+ *    - decide whether the object was white,
+ *      returning non-NULL if it was.
+ * In this way we won't schedule for re-enumeration of slots
+ * when visit returns NULL.
+ */
+static struct stack_slot *visit(void *obj)
 {
         struct stack_slot *slot;
-        struct malloc_segment *mseg;
-        struct segment *seg;
-        unsigned int index;
         sml_bitptrw_t b;
 
+#ifndef LISP_FEATURE_SBCL // SBCL does not need this filter on 'obj'
         if (obj == NULL || (OBJ_HEADER(obj) & OBJ_FLAG_SKIP))
                 return NULL;
-        if (OBJ_TOTAL_SIZE(obj) > BLOCKSIZE_MAX) {
-                mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+#endif
+        if (!in_bitmapped_subheap(obj)) {
+                uword_t* voucher = (uword_t*)((uword_t*)obj)[-1];
+                assert(in_bitmapped_subheap(voucher));
+                assert(seg_blocksize_of(voucher) == N_WORD_BYTES);
+                assert(*voucher == (uword_t)obj);
+                visit(voucher);
+                struct malloc_segment *mseg = OBJ_TO_MALLOC_SEGMENT(obj);
                 if (mseg->markbit)
                         return NULL;
                 mseg->markbit = 1;
                 slot = &mseg->stack;
         } else {
-                seg = segment_addr(obj);
-                index = object_index(seg, obj);
+                struct segment *seg = segment_addr(obj);
+                unsigned int index = object_index(seg, obj);
                 b = BITPTRW(COLLECT_BITMAP_BASE(seg), index);
                 if (BITPTRW_TEST(b))
                         return NULL;
@@ -1763,6 +2024,52 @@ visit(void *obj)
                 slot = &seg->stack[index];
         }
         return slot;
+}
+
+#if 0
+int mseg_obj_alivep(void* obj) {
+        struct malloc_segment *mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+        return mseg->markbit;
+}
+int subheap_obj_alivep(void* obj) {
+        struct segment *seg = segment_addr(obj);
+        unsigned int index = object_index(seg, obj);
+        sml_bitptrw_t b = BITPTRW(COLLECT_BITMAP_BASE(seg), index);
+        if (BITPTRW_TEST(b)) return 1;
+        // See if it was allocated after the snapshot (so is allocated black)
+        b = BITPTRW(BITMAP0_BASE(seg), index);
+        if ((char*)obj >= seg->snapshot_free && !BITPTRW_TEST(b)) return 1; // yup
+        return 0;
+}
+
+static int obj_alivep(lispobj* obj) {
+    extern int subheap_obj_alivep(void*), mseg_obj_alivep(void*);
+    if (in_bitmapped_subheap(obj)) return subheap_obj_alivep(obj);
+    if (ignorable_space_p((lispobj)obj)) return 1; // always alive
+    return mseg_obj_alivep(obj);
+}
+#endif
+
+char color_of(uword_t* obj) {
+    struct stack_slot *ss = object_stack_slot(obj);
+    assert(ss);
+    // objects in the collector's worklist are grey
+    if (ss->next) return 'g';
+    if (!in_bitmapped_subheap(obj)) {
+      // does it matter whethr mseg is in the threatened set?
+      struct malloc_segment * mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+      return mseg->markbit ? 'b' : 'w';
+    }
+    struct segment *seg = segment_addr(obj);
+    unsigned index = object_index(seg, obj);
+    sml_bitptrw_t b = BITPTRW(COLLECT_BITMAP_BASE(seg), index);
+    if (BITPTRW_TEST(b)) return 'b';
+    b = BITPTRW(BITMAP0_BASE(seg), index);
+    // if past the snapshot free ptr, the allocator bit doesn't matter.
+    // If the bit is off, it could be just-allocated
+    // and if the bit is on, it's not in the threatened set.
+    if ((char*)obj >= seg->snapshot_free) return 'b';
+    return 'w';
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
@@ -1783,7 +2090,7 @@ push(void **objslot, void *data)
 }
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-static void
+static void ATTR_UNUSED
 push(void **objslot, void *data)
 {
         void *obj = *objslot;
@@ -1799,6 +2106,16 @@ push(void **objslot, void *data)
         }
 }
 
+static void push_lispobj(lispobj obj, void *data) {
+        struct stack_slot *slot = visit((void*)obj);
+        if (slot) {
+                void *old = NULL;
+                void **top = data;
+                if (load_relaxed(&slot->next) == old /* TODO: this load is not needed */
+                    && cmpswap_relaxed(&slot->next, &old, *top))
+                        *top = (void*)obj;
+        }
+}
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 static void *
@@ -1812,6 +2129,17 @@ pop(void **top)
         *top = load_relaxed(&slot->next);
         store_relaxed(&slot->next, NULL);
         return obj;
+}
+static int ATTR_UNUSED stack_count(void *obj)
+{
+        if (obj == NIL) return 0;
+        int n = 0;
+        do {
+          struct stack_slot *slot = object_stack_slot(obj);
+          obj = slot->next;
+          ++n;
+        } while (obj != NIL);
+        return n;
 }
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
@@ -1841,18 +2169,21 @@ trace_all()
 }
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-static void
+/*static*/ void
 trace_all()
 {
         void *top = collector.root_objects;
+
         do {
+                atomic_store(&weakRefState, weakRefState_TRACING);
                 while (top != NIL)
-                        sml_obj_enum_ptr(pop(&top), push, &top);
+                        lispobj_enum_ptr(pop(&top), push_lispobj, &top);
                 /* objects_from_mutators contains objects that is visited
                  * but not enumerated yet due to failure of CAS in push. */
-                top = flush_object_stack(&collector.objects_from_mutators);
+                top = flush_gray_stack(&collector.objects_from_mutators);
                 visit_all(top);
-        } while (top != NIL);
+        } while (atomic_load(&weakRefState) != weakRefState_SPLAT);
+        assert(top ==  NIL);
         collector.root_objects = NIL;
 }
 
@@ -1862,7 +2193,7 @@ trace_all()
 void
 sml_heap_collector_sync1()
 {
-        collect_segments(&collector.collect_set);
+        gather_segments(&collector.collect_set);
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY */
@@ -1879,13 +2210,45 @@ sml_heap_collector_sync2()
 }
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
-void
-sml_heap_collector_sync2()
+
+void sml_heap_collector_sync2()
 {
         struct object_list objs;
         object_list_init(&objs);
+#ifdef LISP_FEATURE_SBCL
+        struct timespec t_before, t_after;
+        clock_gettime(CLOCK_MONOTONIC, &t_before);
+        lisp_global_enum_ptr(enum_obj_to_list, &objs);
+        clock_gettime(CLOCK_MONOTONIC, &t_after);
+        long delta_usec = (1000000*(t_after.tv_sec - t_before.tv_sec)) +
+                          (t_after.tv_nsec - t_before.tv_nsec) / 1000;
+#else
         sml_global_enum_ptr(enum_obj_to_list, &objs);
         sml_callback_enum_ptr(enum_obj_to_list, &objs);
+#endif
+        fprintf(stderr, "global_enum: %d objects in %ld \u00B5sec\n",
+                objs.count, delta_usec);
+        //TPRINTF(2, "global_enum: %d objects in %ld \u00B5sec", n, delta_usec);
+
+#if 0
+        {
+        // Print the SML# heap objects that we saw
+        FILE* f = get_gc_thread_log();
+        int n = 0;
+        uword_t* obj = objs.begin.next;
+        if (f) fprintf(f, "Globally enumerated objects:\n");
+        while (obj != NIL) {
+          uword_t** link = (void*)object_stack_slot(obj);
+          //fprintf(f, "%p [%16lx]\n" /* link=%p\n"*/, obj, *obj, link);
+          if (f) fprintf(f, "%p [%16lx]\n", obj, *obj);
+          obj = *link;
+          ++n;
+        }
+        if (f) fprintf(f, "Global root objects: %d\n", n);
+        }
+#endif
+        // Is this right??? Should we not push into collector.root_objects?
+        // Or does it simply not matter?
         push_objects(&collector.objects_from_mutators, &objs);
 }
 
@@ -1899,48 +2262,114 @@ sml_heap_collector_mark()
 }
 
 #else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
+
+static void ATTR_UNUSED print_bitmap(struct segment* seg, sml_bitptr_t b)
+{
+  char buf[210];
+
+  int nchars = 0;
+  unsigned int i;
+  for (i = 0; i < seg->layout->num_blocks; i++) {
+    if (nchars == 200) { buf[200] = 0; TPRINTF(0, "%s", buf); nchars = 0; }
+    buf[nchars++] = BITPTR_TEST(b) ? '*' : '_';
+    BITPTR_INC(b);
+  }
+  buf[nchars] = 0;
+  TPRINTF(0, "%s", buf);
+}
+
+int count_weakobj_chain(void* list) {
+    int n = 0;
+    while ( (void*)list != NIL ) { ++n; list = get_weak_pointer_next(list); }
+    return n;
+}
+void show_weakptr_chain(void* list) {
+    while ( list != NIL ) { fprintf(stderr, " %lx", (uword_t)list); list = get_weak_pointer_next(list); }
+    putc('\n', stderr);
+}
+
+_Atomic(int) remset_omit_lg, remset_omit_sm, weakrefgray_omit;
+void clear_weak_references(void);
+
 void
 sml_heap_collector_mark()
 {
+        struct timespec t_before, t_after;
+        clock_gettime(CLOCK_MONOTONIC, &t_before);
+        TPRINTF(1, "marking started");
         unsigned int n;
         /* ToDo: replace clear bitmap with copy from collector bitmap */
         n = clear_collect_set(&collector.collect_set);
         fetch_sub(relaxed, &collector.num_filled_total, n);
         clear_collect_bitmaps(&segment_pool.heap);
+        // After this, mutators can attempt to avoid reinserting objects
+        // into the remembered set by looking at the collector's mark bit.
+        spin_lock(&collector.objects_from_mutators.lock);
+        atomic_store(&collector.collector_bitmap_cleared, 1);
+        spin_unlock(&collector.objects_from_mutators.lock);
         trace_all();
+        clear_weak_references();
+        clock_gettime(CLOCK_MONOTONIC, &t_after);
+        long delta_usec = (t_after.tv_sec - t_before.tv_sec) * 1000000
+                          + (t_after.tv_nsec - t_before.tv_nsec) / 1000;
+        TPRINTF(1, "marking done: %ld \u00B5sec", delta_usec);
+        // mutators can push objects _after_ loop termination
+        void* foo = collector.objects_from_mutators.top;
+        if (foo != NIL) {
+          TPRINTF(1, "mutator pushed %d items more after termination", stack_count(foo));
+        }
 }
-
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 int
-sml_heap_check_alive(void **slot)
+sml_heap_check_alive(void *obj)
 {
-        void *obj = *slot;
         struct segment *seg;
         unsigned int index;
         sml_bitptr_t b;
 
+#ifndef LISP_FEATURE_SBCL
         if (OBJ_HEADER(obj) & OBJ_FLAG_SKIP)
                 return 1;
-
+#endif
+        if (!in_bitmapped_subheap(obj)) {
+            struct malloc_segment *mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+            return mseg->markbit;
+        }
         seg = segment_addr(obj);
         index = object_index(seg, obj);
         b = BITPTR(BITMAP0_BASE(seg), index);
         return seg->free_count >= 0 || BITPTR_TEST(b);
 }
 
+extern void log_effectless_barrier_ops_to_file();
+
 void
 sml_heap_collector_async()
 {
         struct reclaim r;
+        //if (get_gc_thread_log()) { suspend_mutator("post-mark usage map"); show_map("post-mark", &r); unsuspend_mutator(); }
         separate_segments(&collector.collect_set, &r);
         rebalance_subheaps(&r, load_relaxed(&collector.num_request));
         reclaim_segments(&r);
+        //show_map("post-sweep", 0);
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
         fetch_add(relaxed, &collector.num_filled_total, r.num_filled);
         collector.gc_threshold =
                 (segment_pool.heap.num_committed + r.num_filled) / 2;
 #endif /* !WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY */
+        extern int otherptr_mseg_calls,
+            mseg_rej_static, mseg_rej_stack, mseg_rej_filter, mseg_rej_memfault, mseg_rej_unknown;
+        int tot_reject = mseg_rej_static + mseg_rej_stack + mseg_rej_filter +
+                         mseg_rej_memfault + mseg_rej_unknown;
+        int tot_accept = otherptr_mseg_calls - tot_reject;
+        TPRINTF(1, "mseg_test: %d accept=%d reject=(static=%d stk=%d filt=%d segv=%d unk=%d)",
+                otherptr_mseg_calls, tot_accept,
+                mseg_rej_static, mseg_rej_stack, mseg_rej_filter, mseg_rej_memfault, mseg_rej_unknown);
+        otherptr_mseg_calls = 0;
+        mseg_rej_static = mseg_rej_stack = mseg_rej_filter = mseg_rej_memfault = mseg_rej_unknown = 0;
+        extern void dispose_weak_table_edge_lists();
+        dispose_weak_table_edge_lists();
 }
 
 static void
@@ -1950,6 +2379,8 @@ do_gc()
         sml_timer_t t1, t2;
         sml_timer_now(t1);
 #endif /* GCTIME */
+        //        fprintf(stderr, "do_gc: won't actually GC\n"); fflush(stderr);
+        //        sleep(100000);
         sml_gc();
 #ifdef GCTIME
         sml_timer_now(t2);
@@ -1967,7 +2398,6 @@ inc_num_filled_total()
 }
 
 #elif defined WITHOUT_CONCURRENCY
-
 struct collector_control {
         pthread_mutex_t lock;
         pthread_cond_t cond_collector;
@@ -1978,8 +2408,7 @@ struct collector_control {
         .cond_collector = PTHREAD_COND_INITIALIZER,
 };
 
-static void
-wait_for_gc()
+static void wait_for_gc()
 {
         mutex_lock(&collector_control.lock);
         collector_control.exit = GC;
@@ -2023,18 +2452,30 @@ struct collector_control {
         unsigned int num_mutators;
         unsigned int mutators_stalled;
         unsigned int vote_continue, vote_abort;
-        unsigned int exit;
+        int exit;
         pthread_t collector_thread;
 } collector_control = {
         .lock = PTHREAD_MUTEX_INITIALIZER,
         .cond_collector = PTHREAD_COND_INITIALIZER,
         .cond_mutators = PTHREAD_COND_INITIALIZER,
+        .exit = -1, /* SBCL: for delaying start of collector_main */
 };
+int get_gc_cycle_number() { return collector_control.gc_count; }
+int is_collector_thread() {
+    return pthread_equal(pthread_self(), collector_control.collector_thread);
+
+}
 
 static void
 inc_num_filled_total()
 {
         fetch_add(relaxed, &collector.num_filled_total, 1);
+#if 0
+        if (collector.num_filled_total >= collector.gc_threshold)
+          fprintf(stderr, "DPK: inc_num_filled: num_filled_total=%d threshold=%d\n",
+                  collector.num_filled_total,
+                  collector.gc_threshold);
+#endif
         mutex_lock(&collector_control.lock);
         cond_signal(&collector_control.cond_collector);
         mutex_unlock(&collector_control.lock);
@@ -2106,6 +2547,7 @@ count_vote(unsigned int num_stalled)
         struct collector_control * const cc = &collector_control;
         cc->vote_continue = 0;
         cc->vote_abort = 0;
+        // TODO: try to explain this test
         while (!(cc->num_mutators != num_stalled
                  || cc->vote_continue > 0
                  || cc->vote_continue + cc->vote_abort == num_stalled
@@ -2119,28 +2561,46 @@ count_vote(unsigned int num_stalled)
                 || cc->exit);
 }
 
+int force_gc_flag;
 static void *
 collector_main(void *arg ATTR_UNUSED)
 {
         struct collector_control * const cc = &collector_control;
         unsigned int num_stalled;
 
+#ifdef __linux__
+        pthread_setname_np(pthread_self(), "GC");
+#endif
         mutex_lock(&cc->lock);
+        while (cc->exit < 0) {
+                cond_wait(&cc->cond_collector, &cc->lock);
+        }
+        fprintf(stderr, "SML# collector enabled, num_filled=%d threshold=%d\n",
+                collector.num_filled_total, collector.gc_threshold);
+
  loop:
+        /* wait until:
+         * - at least one mutator requires a GC in order to proceed,
+         * - the number of filled-to-capacity segments exceeds a threshold
+         * - process wants to exit */
         while (!(cc->mutators_stalled > 0
+                 || force_gc_flag
                  || (load_relaxed(&collector.num_filled_total)
                      >= collector.gc_threshold)
-                 || cc->exit))
+                 || cc->exit)) {
                 cond_wait(&cc->cond_collector, &cc->lock);
+        }
         store_relaxed(&collector.num_request, cc->mutators_stalled);
         mutex_unlock(&cc->lock);
         if (cc->exit)
                 return NULL;
 
+        force_gc_flag = 0;
         do_gc();
         mutex_lock(&cc->lock);
 
         cc->gc_count++;
+        // If _everybody_ can make progress, we're good
         if (cc->mutators_stalled == 0) goto loop;
  retry:
         /* Some mutators are being stalled due to lack of segments.
@@ -2150,10 +2610,12 @@ collector_main(void *arg ATTR_UNUSED)
         num_stalled = cc->mutators_stalled;
         cc->mutators_stalled = 0;
         cond_broadcast(&cc->cond_mutators);
+        // If _somebody_ can make progress, we're good
         if (count_vote(num_stalled)) goto loop;
 
         /* All mutators voted for aborting the program and still stalled.
          * Try full GC and expect that it recovers the situation. */
+        TPRINTF(0, "FULL GC");
         sml_debug("full gc\n");
 #ifdef GCTIME
         gctime.full_gc_count++;
@@ -2174,7 +2636,6 @@ collector_main(void *arg ATTR_UNUSED)
         print_heap_summary();
         sml_fatal(0, "heap exhausted; all threads stalled");
 }
-
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
@@ -2215,7 +2676,7 @@ sml_heap_worker_destroy(union sml_alloc *ptr_set)
 void
 sml_heap_user_sync2(struct sml_user *user)
 {
-        sml_stack_enum_ptr(user, push, &collector.root_objects);
+        sml_stack_enum_ptr(user, push_lispobj, &collector.root_objects);
 }
 
 void
@@ -2232,8 +2693,18 @@ sml_heap_user_sync2(struct sml_user *user)
 
         /* enumerate pointers in the stack and send them to the collector */
         object_list_init(&objs);
+#ifdef LISP_FEATURE_SBCL
+        if (pthread_equal(pthread_self(), collector_control.collector_thread)) {
+          TPRINTF(1, "performing SYNC2 on behalf of inactive thread");
+        } else {
+          TPRINTF(1, "performing SYNC2");
+        }
+        lisp_stack_enum_ptr(user, enum_obj_to_list, &objs);
+#else
         sml_stack_enum_ptr(user, enum_obj_to_list, &objs);
+#endif
         push_objects(&collector.objects_from_mutators, &objs);
+        TPRINTF(1, "Done with stack enumeration");
 }
 
 void
@@ -2251,10 +2722,123 @@ sml_heap_worker_sync2(union sml_alloc *ptr_set)
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
-static inline void
-remember(void *obj)
+int collector_markbit(void *obj) {
+    if (!in_bitmapped_subheap(obj)) {
+        struct malloc_segment* mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+        return mseg->markbit;
+    }
+    struct segment *seg = segment_addr(obj);
+    unsigned int index = object_index(seg, obj);
+    sml_bitptr_t b = BITPTR(COLLECT_BITMAP_BASE(seg), index);
+    return BITPTR_TEST(b) != 0;
+}
+#if 0
+int managed_object_alivep(void *obj) {
+  /* FIXME: what about the allocate black logic ?
+     i.e. the test in visit() which says 'obj' need not have its children visited
+     if ((char*)obj >= seg->snapshot_free && !BITPTRW_TEST(b))
+                        return NULL;
+  */
+  int answer1 = sml_heap_check_alive(obj);
+  int answer2 = collector_markbit(obj);
+  if (answer1 != answer2) lose("my_heap_check_alive: mismatch on %p: %d vs %d", obj, answer1, answer2);
+  return answer1;
+}
+#endif
+
+static void remember_internal(struct object_stack *stack, lispobj taggedptr)
 {
-        push_object(&collector.objects_from_mutators, obj);
+        struct stack_slot *slot = careful_lispobj_stack_slot(taggedptr);
+        if (!slot) return;
+        void* obj = untagged_baseptr(taggedptr);
+
+#if 1
+        /* Avoid re-enumerating slots of 'obj' by testing whether the collector already
+         * visited it. This check is inadmissible unless in MARK phase.
+         * This is perfectly acceptable because avoiding extra insertions into the remembered
+         * set is beneficial only when the collector is trying to terminate the marking loop */
+        if (atomic_load(&collector.collector_bitmap_cleared) && collector_markbit(obj)) {
+            fetch_add(relaxed,
+                      in_bitmapped_subheap(obj) ? &remset_omit_sm : &remset_omit_lg,
+                      1);
+            return;
+        }
+#endif
+
+        /* ensure that the collector receives all objects whose stack_slot
+         * were occupied by mutators. */
+        spin_lock(&stack->lock);
+
+        /* this may fail if obj already belongs to another list or stack */
+        /* N.B.: This is an atomic operation because we're competing
+         * with enum_obj_to_list() which does not use the spinlock.
+         * (This has to compete with other mutators for access to the stack top.
+         * It might work better to cmpswap on the stack top, and reassign
+         * slot->next on value. We're certain to be the unique owner of this object
+         * for purposes of graying it (I think). On the other hand,
+         * since we're also racing with the "flush" operation,
+         * maybe the spinlock _is_ needed for that? */
+        void *old = NULL;
+        if (load_relaxed(&slot->next) == NULL
+            && cmpswap_relaxed(&slot->next, &old, stack->top))
+                stack->top = obj;
+
+        spin_unlock(&stack->lock);
+}
+void rememberedset_insert(lispobj taggedptr) {
+    return remember_internal(&collector.objects_from_mutators, taggedptr);
+}
+
+int n_weak_hashtables, n_weak_vectors, n_weak_ptrs;
+void record_weak_object(uword_t taggedptr) {
+    if (!use_smlgc) return;
+    struct object_stack *stack = &collector.weak_vectors;
+    switch (lowtag_of(taggedptr)) {
+    case INSTANCE_POINTER_LOWTAG: {
+#ifdef DISABLE_HASH_TABLE_WEAKNESS
+        fprintf(stderr, "record_weak_object: ignoring HASH-TABLE %p\n", (void*)taggedptr); return;
+#endif
+        // XXX: Does this need to grab the weakTableLock as a writer
+        // in order to ensure mutual-exclusivity with GC ? Not really
+        struct hash_table *ht = (void*)(taggedptr - INSTANCE_POINTER_LOWTAG);
+        stack = &collector.weak_tables;
+        spin_lock(&stack->lock);
+        ht->next_weak_hash_table = collector.weak_tables.top;
+        collector.weak_tables.top = (void*)ht;
+        ++n_weak_hashtables;
+        break;
+    }
+    case OTHER_POINTER_LOWTAG: {
+        struct weak_pointer* wp = (void*)(taggedptr - OTHER_POINTER_LOWTAG);
+        if (weakptr_vectorp(wp)) {
+            ++n_weak_vectors;
+        } else {
+            lispobj referent = wp->value;
+            assert(is_lisp_pointer(referent));
+            // do not record if it points to non-GCable space
+            if (!careful_lispobj_stack_slot(referent)) return;
+            ++n_weak_ptrs;
+        }
+        spin_lock(&stack->lock);
+        set_weak_pointer_next(wp, collector.weak_vectors.top);
+        collector.weak_vectors.top = wp;
+        break;
+    }
+    default:
+        lose("bad ptr in record_weak_object: %lx", taggedptr);
+    }
+    spin_unlock(&stack->lock);
+}
+void show_weak_objects()
+{
+  printf("Hash-Tables:\n");
+  struct hash_table* ht = collector.weak_tables.top;
+  for ( ; ht != NIL ; ht = ht->next_weak_hash_table )
+    printf(" %p\n", ht);
+  printf("Pointers:\n");
+  struct weak_pointer* wp = collector.weak_vectors.top;
+  for ( ; wp != NIL ; wp = get_weak_pointer_next(wp) )
+    printf(" %p\n", wp);
 }
 
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
@@ -2266,7 +2850,7 @@ sml_write(void *obj ATTR_UNUSED, void **writeaddr, void *new_value)
         *writeaddr = new_value;
 }
 
-#else /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
+#elif 0 /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 static void
 barrier(void **old_value, void *new_value)
 {
@@ -2326,7 +2910,6 @@ sml_cmpswap(void *obj, void *old_value, void *new_value)
                 return 0;
         }
 }
-
 #endif /* !WITHOUT_MULTITHREAD && !WITHOUT_CONCURRENCY */
 
 static sml_bitptr_t
@@ -2342,9 +2925,13 @@ bitptr_linear_search(const unsigned int *start, const unsigned int *limit)
         return b;
 }
 
-static NOINLINE void *
+/* find_bitmap will either find something in the segment
+ * to which 'ptr' points, or else fail. */
+#define find_bitmap smlgc_search_freebit
+/*static*/ NOINLINE void *
 find_bitmap(struct alloc_ptr *ptr)
 {
+  if (ptr->freebit.mask == (sml_bmword_t)-1) { lose("Should not reach smlgc with a mask of -1"); }
         unsigned int i, index, *base, *limit;
         const unsigned int *p;
         struct segment *seg;
@@ -2557,9 +3144,15 @@ find_segment(struct alloc_ptr *ptr, void *frame_pointer)
          * argument.  This is an optimization to minimize the number of
          * instructions on the most frequently executed path in sml_alloc.
          */
-        blocksize_log2 = ptr - &worker_tlv_get(alloc_ptr_set)->ptr[0];
-        assert(BLOCKSIZE_MIN_LOG2 <= blocksize_log2
-               && blocksize_log2 <= BLOCKSIZE_MAX_LOG2);
+        union sml_alloc* ptrset = worker_tlv_get(alloc_ptr_set);
+        if (ptr >= &ptrset->ptr[BLOCKSIZE_MIN_LOG2] &&
+            ptr <= &ptrset->ptr[BLOCKSIZE_MAX_LOG2])
+            blocksize_log2 = ptr - &ptrset->ptr[0];
+        else {
+            blocksize_log2 = CEIL_LOG2(ptr->blocksize_bytes);
+            assert(BLOCKSIZE_MIN_LOG2 <= blocksize_log2
+                   && blocksize_log2 <= BLOCKSIZE_MAX_LOG2);
+        }
         subheap = &global_subheaps[blocksize_log2];
 
         if (ptr->free) {
@@ -2599,7 +3192,7 @@ find_segment(struct alloc_ptr *ptr, void *frame_pointer)
 static NOINLINE void *
 malloc_object(size_t alloc_size)
 {
-        struct malloc_segment *mseg = malloc_segment(alloc_size);
+        struct malloc_segment *mseg = alloc_mseg(0, alloc_size);
         /* inc_num_filled_total(); */
         return MALLOC_SEGMENT_TO_OBJ(mseg);
 }
@@ -2636,8 +3229,38 @@ sml_alloc(unsigned int objsize)
         obj = find_segment(ptr, CALLER_FRAME_END_ADDRESS());
 
 alloced:
-        assert(check_filled(OBJ_BEGIN(obj), 0x55, objsize));
+        // assert(check_pattern(obj, objsize >> WORD_SHIFT));
         return obj;
+}
+
+void* getallocptr_for_log2size(unsigned int log2_size) {
+    return &(worker_tlv_get(alloc_ptr_set)->ptr[log2_size]);
+}
+
+int showfallback = 1;
+void* sml_alloc_fallback2(struct alloc_ptr *ptr, void *roots_start) {
+  if(showfallback & 2) fprintf(stderr, "alloc_fallback2(%p,%p)", ptr, roots_start);
+    void* result = find_segment(ptr, roots_start);
+    if(showfallback & 2) fprintf(stderr, " -> %p\n", result);
+    return result;
+}
+// This is for allocating a cons cell with the assumption that it will be stored
+// in the CDR of the preceding (not contiguously) cons cell.
+// It might be necessary to invoke the snooping barrier.
+// I'm not sure if this is really needed.
+void* sml_cons_fallback2(struct alloc_ptr *ptr, void *roots_start) {
+    enum sml_sync_phase oldphase = sml_current_phase();
+    if(showfallback & 4) fprintf(stderr, "cons_fallback2(%p,%p)", ptr, roots_start);
+    void* result = find_segment(ptr, roots_start);
+    if(showfallback & 4) fprintf(stderr, " -> %p\n", result);
+    enum sml_sync_phase newphase = sml_current_phase();
+    if (oldphase != newphase)
+      TPRINTF(1, "fallback2 cons allocator sees phase change from %s to %s",
+              phase_name(oldphase), phase_name(newphase));
+    // FIXME: this might not be needed, in which case it can be folded in with alloc_fallback2
+    if (newphase >= SYNC1 && newphase <= SYNC2)
+        rememberedset_insert((uword_t)result);
+    return result;
 }
 
 /********** initialize/finalize garbage collection ***********/
@@ -2647,6 +3270,7 @@ sml_heap_init(size_t min_size, size_t max_size)
 {
         init_segment_layout();
         init_segment_pool(min_size, max_size);
+        pthread_rwlock_init(&collector.weakobj_lock, 0);
 
 #if !defined WITHOUT_MULTITHREAD && !defined WITHOUT_CONCURRENCY
         collector.gc_threshold = segment_pool.heap.min_num_segments / 2;
@@ -2661,6 +3285,11 @@ sml_heap_init(size_t min_size, size_t max_size)
 #ifdef GCTIME
         sml_timer_now(gctime.exec_start);
 #endif /* GCTIME */
+}
+
+void enable_collector_thread() {
+        collector_control.exit = 0;
+        cond_signal(&collector_control.cond_collector);
 }
 
 #if !defined WITHOUT_MULTITHREAD
@@ -2717,4 +3346,353 @@ sml_heap_destroy()
         destroy_alloc_ptr_set_pool();
         destroy_segment_pool();
         destroy_malloc_segments();
+}
+
+uword_t* reject_ptr(void* a, char *kind, char* reason)
+{
+    // Show something about each rejected pointer that potentially sees into managed space
+    if (in_bitmapped_subheap(a)) {
+      struct segment* seg = segment_addr(a);
+      void* block_base = seg->block_base;
+      void* block_limit = BLOCK_LIMIT(seg);
+      uword_t* baseptr = (uword_t*)((uintptr_t)a & ~LOWTAG_MASK);
+      TPRINTF(0, "REJECT %s root: %p blocks=%p:%p size %d (%s) header=%lx",
+              kind, a,
+              block_base, block_limit,
+              1<<seg->layout->blocksize_bytes,
+              a < block_base ? "<base" :
+              a >= block_limit ? ">=limit":
+              reason, baseptr);
+    } else {
+      TPRINTF(0, "REJECT %s root: %p LARGE? %s", kind, a, reason);
+    }
+
+  return 0;
+}
+
+/* See "Reference Object Processing in On-The-Fly Garbage Collection"
+ * by Tomoharu Ugawa, Richard E. Jones, Carl G. Ritson
+ * This is almost but not quite the algorithm of fig. 6.
+ * It differs because strengthenWeakRef acquires the spinlock on the gray list
+ * and tests whether refs are considered to be cleared before invoking the logic
+ * of remember(). */
+
+/* published algo-
+get()
+{
+  while (true) {
+    switch(refState) {
+      case NORMAL:
+        return referent;
+      case REPEAT:
+        if (referent=null||COLOR(referent))=WHITE)
+        return referent;
+        COLOR(referent) ← GREY;
+        return referent;
+    case TRACING:
+      if (referent=null||COLOR(referent))=WHITE)
+      return referent;
+      if (CAS(refState, TRACING, REPEAT)) {
+        COLOR(referent) ← GREY;
+        return referent;
+      }
+      break; // retry
+    case CLEANING:
+      if (referent=null||COLOR(referent))=WHITE)
+      return referent;
+      return null;
+    }
+  }
+}
+*/
+
+#include "genesis/instance.h"
+#include "genesis/hash-table.h"
+static int is_weak_hash_table(lispobj x) {
+    if (!instancep(x)) return 0;
+    struct layout* layout = (void*)native_pointer(instance_layout(INSTANCE(x)));
+    if (layout_depth2_id(layout) != HASH_TABLE_LAYOUT_ID) return 0;
+    return hashtable_weakp((struct hash_table*)INSTANCE(x));
+}
+
+static void weakRefGray(lispobj referent)
+{
+    /* This shades white to gray, but might accidentally turn black to gray
+     * which is generally harmless other than causing duplicated work.
+     * We can't avoid it here because the collector's bitmap may not have been
+     * initialized yet (is that true???) which makes distinguishing gray
+     * from black impossible. All we can distinguish is "in a list" or not.
+     * Since "not in the list" could be white or black, we have to assume
+     * that it means "white".
+     * Another difference vs. rememberedset_insert() is that we hold the spinlock
+     * on the gray list already, which prevents the collector from terminating
+     * its marking loop */
+    struct stack_slot *slot = careful_lispobj_stack_slot(referent);
+    if (!slot) return; // not a GC-managed object
+
+    void* obj = untagged_baseptr(referent);
+    if (atomic_load(&collector.collector_bitmap_cleared) && collector_markbit(obj)) {
+        // fprintf(stderr, "Yay!\n");
+        ++weakrefgray_omit;
+    } else {
+        /* If the referent is a weak hash-table we have to avoid a race
+         * with the collector visiting the table since the collector
+         * has to make a decision about liveness of the table.
+         * FIXME: can there be a lock ordering problem? Mutator holds
+         * the spinlock on objects_from_mutators. Does GC want that first or
+         * second when it needs the weak table lock?  */
+        int tablep = is_weak_hash_table(referent);
+        if (tablep) lose("Weak object livens weak object: not working yet");
+        if (tablep) pthread_rwlock_rdlock(&weakTableLock);
+        struct object_stack *stack = &collector.objects_from_mutators;
+        void *old = NULL;
+        if (load_relaxed(&slot->next) == NULL && cmpswap_relaxed(&slot->next, &old, stack->top))
+            stack->top = untagged_baseptr(referent);
+        if (tablep) pthread_rwlock_unlock(&weakTableLock);
+    }
+}
+
+_Atomic(int) weakrefget_ct[4];
+/* Unlike the published algorithm for this, we don't need a loop.
+ * Cmpswap can't fail, because either the collector or at most one mutator
+ * will perform the cmpswap. So we have a little bit more synchronization
+ * but the advantage is that it can't fail, and it is easier to reason about */
+lispobj weakRefGetImpl(lispobj* where, lispobj splatted_value)
+{
+    lispobj referent = *where;
+
+    // Could already be splatted in this GC cycle or a prior cycle
+    if (referent == splatted_value || !is_lisp_pointer(referent)) return referent;
+    switch (atomic_load(&weakRefState)) {
+    case weakRefState_NORMAL: fetch_add(relaxed, weakrefget_ct+0, 1); return referent;
+    case weakRefState_REPEAT:
+        fetch_add(relaxed, weakrefget_ct+1, 1);
+        weakRefGray(referent);
+        return referent;
+    case weakRefState_TRACING:
+        fetch_add(relaxed, weakrefget_ct+2, 1);
+        // All unmanaged objects are live
+        if (!is_gcable_object(referent)) return referent;
+        if (sml_heap_check_alive(untagged_baseptr(referent))) return referent;
+        int old = weakRefState_TRACING;
+        if (!cmpswap_acq_rel(&weakRefState, &old, weakRefState_REPEAT))
+            lose("unexpected failure in weakRefGetImpl");
+        weakRefGray(referent);
+        return referent;
+    default: // actually weakRefState_SPLAT:
+        fetch_add(relaxed, weakrefget_ct+3, 1);
+        // All unmanaged objects are live
+        if (!is_gcable_object(referent)) return referent;
+        if (sml_heap_check_alive(untagged_baseptr(referent))) return referent;
+        *where = splatted_value;
+        return splatted_value;
+    }
+}
+
+lispobj weak_ref_get(lispobj* slot, lispobj splatted_value) {
+    // Acquring the gray list spinlock prevents the collector from deciding to terminate
+    spin_lock(&collector.objects_from_mutators.lock);
+    lispobj result = weakRefGetImpl(slot, splatted_value);
+    spin_unlock(&collector.objects_from_mutators.lock);
+    //fprintf(stderr, "wrg returns %lx\n", result);
+    return result;
+}
+
+#if 0
+/* Compare a key in a weak hash-table. This is more efficient than using weakRefGet
+ * because on a mismatch no object will be enlivened. */
+int weakRefEq(lispobj* slot, lispobj key) {
+    pthread_rwlock_rdlock(&collector.weakobj_lock);
+    // for now I'm just doing the simplest thing since the hash-table code
+    // hasn't been modified to use this.
+    lispobj result = weakRefGetLocked(slot);
+    pthread_rwlock_unlock(&collector.weakobj_lock);
+    return result == key;
+}
+#endif
+
+// This returns 1 if the weak object (NOT what it refers to)
+// is considered smashed, i.e. gone - and GC can henceforth ignore it.
+extern int weakobj_smashed_p(void*);
+
+static void clear_weak_vector_refs()
+{
+    int verbose = 1;
+    struct weak_pointer dummy;
+    memset(&dummy, 0, sizeof dummy);
+    struct object_stack *stack = &collector.weak_vectors;
+    struct weak_pointer *prev = &dummy,
+                        *this = flush_object_stack(stack),
+                        *next = NIL;
+    set_weak_pointer_next(prev, this);
+    int count = 0;
+    for ( ; (void*)this != NIL ; this = next ) {
+        ++count;
+        assert(header_widetag(this->header) == WEAK_POINTER_WIDETAG);
+        next = get_weak_pointer_next(this);
+        // weak pointers of the vector kind might not be in a bitmapped subheap
+        int this_alive = !is_gcable_object(make_lispobj(this, OTHER_POINTER_LOWTAG))
+            || sml_heap_check_alive(this);
+        if (!this_alive || weakobj_smashed_p(this)) { // snip it out
+            set_weak_pointer_next(this, 0);
+            set_weak_pointer_next(prev, next);
+        } else {
+            prev = this;
+        }
+    }
+    extern int n_weak_refs_broken;
+    if (verbose) printf("weak refs: cleared %d\n", n_weak_refs_broken);
+    n_weak_refs_broken = 0;
+    if (prev == &dummy) return;
+    // There are some weak objects that need to be stuffed back in to the global list
+    spin_lock(&stack->lock);
+    uword_t* top = stack->top;
+    assert((void*)top == NIL || *(unsigned char*)top == WEAK_POINTER_WIDETAG);
+    set_weak_pointer_next(prev, top);
+    // the 'next' of dummy is the real head of the list
+    collector.weak_vectors.top = get_weak_pointer_next(&dummy);
+    // printf("weakobjs: %d remain\n", count_weakobj_chain(stack->top));
+    spin_unlock(&stack->lock);
+}
+static void clear_weak_table_refs()
+{
+    struct hash_table dummy;
+    memset(&dummy, 0, sizeof dummy);
+    struct object_stack *stack = &collector.weak_tables;
+    struct hash_table *prev = &dummy,
+                      *this = flush_object_stack(stack),
+                      *next = NIL;
+    prev->next_weak_hash_table = this;
+    for ( ; (void*)this != NIL ; this = next ) {
+        assert(header_widetag(this->header) == INSTANCE_WIDETAG);
+        next = this->next_weak_hash_table;
+        /* weak tables NOT in a managed space are always alive, but are
+         * subject to splatting */
+        int this_alive = !is_gcable_object(make_lispobj(this, INSTANCE_POINTER_LOWTAG))
+            || sml_heap_check_alive(this);
+        if (!this_alive) { // snip it out
+            this->next_weak_hash_table = 0;
+            prev->next_weak_hash_table = next;
+        } else {
+            smash_weak_table_pairs(this);
+            prev = this;
+        }
+    }
+    if (prev == &dummy) return;
+    // Stuff the tables back into the global list
+    spin_lock(&stack->lock);
+    uword_t* top = stack->top;
+    assert((void*)top == NIL || *(unsigned char*)top == INSTANCE_WIDETAG);
+    prev->next_weak_hash_table = (void*)top;
+    // the 'next' of dummy is the real head of the list
+    stack->top = dummy.next_weak_hash_table;
+    spin_unlock(&stack->lock);
+}
+
+void clear_weak_references() {
+    fprintf(stderr, "Clearing weak refs\n");
+    // First clear hash-table elements since we're holding a lock that globally
+    // inhibits table access from mutators. Releasing it sooner than later is the polite thing.
+    clear_weak_table_refs();
+    weakTableOpsInhibited = 0;
+    pthread_rwlock_unlock(&weakTableLock);
+    fprintf(stderr, "released global weak table lock\n");
+    clear_weak_vector_refs();
+    atomic_store(&weakRefState, weakRefState_NORMAL);
+}
+
+void sml_heap_collector_after_mark() {
+        atomic_store(&collector.collector_bitmap_cleared, 0);
+        if (1) {
+            char msg[100];
+            int n = snprintf(msg, sizeof msg,
+                             "weakRefGray omit: %d; remset_ins omit: %d small + %d large\n",
+                             weakrefgray_omit, remset_omit_sm, remset_omit_lg);
+            write(2, msg, n);
+        }
+        atomic_store(&weakrefgray_omit, 0);
+        atomic_store(&remset_omit_lg, 0);
+        atomic_store(&remset_omit_sm, 0);
+        if (smlgc_verbose)
+          printf("weakref_get: %d + %d + %d + %d normal,tracing,repeat,splat\n",
+                 weakrefget_ct[0], weakrefget_ct[1], weakrefget_ct[2], weakrefget_ct[3]);
+
+}
+
+static inline int snapshot_block_index(struct segment* seg) {
+  return objindex_or_end(seg, seg->snapshot_free);
+}
+int seglist_find(struct segment* seg, struct segment* list)
+{
+  while (list && (void*)list != (void*)NIL) {
+    if (seg == list) return 1;
+    list = (void*)list->as_list.next;
+  }
+  return 0;
+}
+void diagnose_obj(ATTR_UNUSED char* label, lispobj taggedptr) {
+  void* obj = native_pointer(taggedptr);
+  if (in_bitmapped_subheap(obj)) {
+
+    struct segment* seg = segment_addr(obj);
+    int blocksize_log2 = seg->blocksize_log2;
+    struct segment* partial = (void*)atomic_load(&global_subheaps[blocksize_log2].partial.top);
+    struct segment* filled = (void*)atomic_load(&global_subheaps[blocksize_log2].filled.top);
+    struct segment* collect = collector.collect_set.segments[blocksize_log2];
+    fprintf(stderr, "seg %5d @ %p blksize %d snap=%d/%d free=%d%s%s%s\n",
+             segment_number(seg), seg,
+            seg->layout->blocksize_bytes,
+            snapshot_block_index(seg), seg->layout->num_blocks,
+            seg->free_count,
+            seglist_find(seg, partial) ? " PARTIAL":"",
+            seglist_find(seg, filled) ? " FILLED":"",
+            seglist_find(seg, collect) ? " COLLECT":"");
+
+    unsigned int obindex = object_index(seg, obj);
+    sml_bitptr_t b;
+    b = BITPTR(BITMAP0_BASE(seg), obindex);
+    int allocated = BITPTR_TEST(b) != 0;
+    b = BITPTR(COLLECT_BITMAP_BASE(seg), obindex);
+    int marked = BITPTR_TEST(b) != 0;
+    struct stack_slot *stackslot = object_stack_slot(obj);
+
+    fprintf(stderr, "obj %d link=%p%s%s\n",
+            obindex, stackslot->next, allocated ? " ALLOC" : "", marked ? " MARK" : "");
+
+    // Show thread alloc ptrs for objects of this size class
+    extern struct thread* all_threads;
+    struct thread* th;
+    for (th = all_threads; th ; th = th->next) {
+      struct alloc_ptr* ap = &th->ap4;
+      ap += (blocksize_log2 - 4);
+      if (ap->free) {
+        seg = segment_addr(ap->freebit.ptr);
+        printf("thread %p: free=%p (index %d)\n", th,
+               ap->free, objindex_or_end(seg, ap->free));
+      }
+    }
+
+  } else {
+
+    struct malloc_segment* mseg = OBJ_TO_MALLOC_SEGMENT(obj);
+    assert(mseg);
+    fprintf(stderr, "Large (size=%d) next=%p marked=%d%s\n",
+            (int)mseg->size, mseg->stack.next,
+            mseg->markbit,
+            seglist_find((struct segment*)mseg,
+                         (struct segment*)collector.collect_set.malloc_segments)
+            ? " THREATENED":"");
+
+  }
+}
+void gc_show_seg(lispobj x)
+{
+    //struct segment* seg = segment_addr(x);
+    //dump_segment("", x);
+    diagnose_obj("", x);
+}
+
+void force_gc() {
+  force_gc_flag = 1;
+  pthread_cond_signal(&collector_control.cond_collector);
 }

@@ -1,4 +1,4 @@
-#+(and linux sb-thread 64-bit)
+#+nil ; (and linux sb-thread 64-bit)
 (sb-alien:alien-funcall (sb-alien:extern-alien
                          "reset_gc_stats"
                          (function sb-alien:void)))

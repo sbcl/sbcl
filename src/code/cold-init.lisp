@@ -221,6 +221,7 @@
   (setq sb-pcl::*!docstrings* nil) ; needed before any documentation is set
   (setq sb-c::*queued-proclaims* nil) ; needed before any proclaims are run
 
+  (alien-funcall (extern-alien "enable_collector_thread" (function void)))
   (/show0 "calling cold toplevel forms and fixups")
   (let ((*package* *package*)) ; rebind to self, as if by LOAD
     (dolist (toplevel-thing *!cold-toplevels*)
@@ -401,6 +402,7 @@ process to continue normally."
 
 ;;;; initialization functions
 
+(defconstant malloc-object-offset 32)
 (defun reinit (total)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
@@ -409,10 +411,26 @@ process to continue normally."
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
       #+x86-64 (sb-vm::validate-asm-routine-vector)
+      (do ((mseg (alien-funcall (extern-alien "get_allocated_msegs"
+                                              (function system-area-pointer)))
+                 (sap-ref-sap mseg 0)))
+          ((= (sap-int mseg) 0))
+        (let* ((addr (sap+ mseg malloc-object-offset))
+               (widetag (logand (sap-ref-word addr 0) sb-vm:widetag-mask)))
+          (when (= widetag sb-vm:code-header-widetag)
+            (setf sb-vm::*immobile-codeblob-tree*
+                  (sb-brothertree:insert (sap-int addr) sb-vm::*immobile-codeblob-tree*))
+            #+nil
+            (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned unsigned))
+                           (vector-sap #.(format nil "initial mseg @ %p: %lx %lx~%"))
+                           (sap-int addr)
+                           (sap-ref-word addr 0)
+                           (sap-ref-word addr 8)))))
       (rebuild-package-vector))
     ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
-    (rebuild-pathname-cache)
+    (alien-funcall (extern-alien "enable_collector_thread" (function void)))
+    ; (rebuild-pathname-cache)
     (os-cold-init-or-reinit)
     #-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
@@ -428,7 +446,8 @@ process to continue normally."
     (sb-debug::disable-debugger))
   (call-hooks "initialization" *init-hooks*)
   #+sb-thread (finalizer-thread-start)
-  (sb-vm::!setup-cpu-specific-routines))
+  ;(sb-vm::!setup-cpu-specific-routines)
+  )
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code
@@ -484,3 +503,9 @@ process to continue normally."
     #+sb-show ()
     #-sb-show (/noshow /noshow0 /show /show0))
   *!removable-symbols*)
+
+(defun test-cons-mkay () (cons 1 2))
+(defun test-list-mkay () (list 1 2))
+(defun test-2-vector-mkay () (vector 1 2))
+(defun test-var-vector-mkay (n)
+  (make-array (the integer n)))

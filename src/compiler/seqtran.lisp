@@ -858,7 +858,7 @@
               ,@(loop for i below (car (array-type-dimensions type))
                       collect `(setf (aref seq ,i) item))
               seq))
-          #+x86-64
+          #+nil ; x86-64 ; disabled for concurrent GC
           ((and (type= element-ctype *universal-type*)
                 (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
                 ;; FIXME: why can't this work with arbitrary START and END?
@@ -928,7 +928,7 @@
                ;; Force bounds-checks to 0 even if local policy had it >0.
                (declare (optimize (safety 0) (speed 3)
                                   (insert-array-bounds-checks 0)))
-               ,(cond #+x86-64
+               ,(cond #+nil ; #+x86-64
                       ((type= element-ctype *universal-type*)
                        '(vector-fill/t data item start end))
                       (t
