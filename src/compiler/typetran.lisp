@@ -143,6 +143,8 @@
                             (not (and (eq current 'functionp)
                                       (eq new-predicate 'compiled-function-p)))
                             (not (eq current 'characterp))
+                            (not (and (eq current 'non-null-symbol-p)
+                                      (eq new-predicate 'keywordp)))
                             (not (eq new-predicate #+64-bit 'signed-byte-64-p
                                                    #-64-bit 'signed-byte-32-p))
                             (not (eq new-predicate #+64-bit 'unsigned-byte-64-p
