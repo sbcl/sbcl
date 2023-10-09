@@ -385,7 +385,8 @@ distinct from the global value. Can also be SETF."
   ;; with the system TLAB assumption that I'm leaving that as-is, and mitigating the
   ;; problem with arena-allocated strings, rather than guessing whether you really
   ;; did want an arena-allocated symbol.
-  (declare (sb-c::tlab :system))
+  (declare (sb-c::tlab :system)
+           (optimize speed))
   (binding*
       ((name
         ;; We clearly have permission to copy: "It is implementation-dependent whether

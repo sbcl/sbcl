@@ -597,11 +597,14 @@
     vector
   (flushable no-verify-arg-count))
 
+(defknown (possibly-base-stringize possibly-base-stringize-to-heap) (string) simple-string
+  (flushable no-verify-arg-count))
+
 (defknown map (type-specifier (function-designator ((nth-arg 2 :sequence t)
                                                     (rest-args :sequence t))
                                                    (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
-  consed-sequence (call))
+    consed-sequence (call))
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence
   (call no-verify-arg-count))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null

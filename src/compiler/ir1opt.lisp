@@ -1821,7 +1821,8 @@
                      (eq :declared (leaf-where-from leaf))
                      (type-needs-conservation-p var-type)))
       (let ((int (type-approx-intersection2 var-type type)))
-        (when (type/= int var-type)
+        ;; Can't use type/=, which gives up on hairy types.
+        (unless (type= int var-type)
           (setf (leaf-type leaf) int)
           (let ((s-int (make-single-value-type int)))
             (dolist (ref refs)

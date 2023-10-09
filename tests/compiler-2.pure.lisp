@@ -4256,3 +4256,12 @@
                       b)))
       ((1 2) t)
       ((0 0) nil)))
+
+(with-test (:name :propagate-to-refs-hairy)
+  (checked-compile-and-assert
+      ()
+      `(lambda (y)
+         (declare (fixnum y))
+         (let ((d (max 1 (the (satisfies eval) y))))
+           (the fixnum (* d 8))))
+      ((2) 16)))
