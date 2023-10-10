@@ -1,0 +1,182 @@
+Concurrent mark/sweep based on SML# GC
+
+Overview
+--------
+The SML# collector is a non-moving, non-stop, snapshot-at-the-beginning
+algorithm using a hybrid store barrier combining a deletion and insertion
+barrier; and no read barrier. This document describes some aspects of
+a port of the SML# collector into SBCL.
+
+Three publications describe the garbage collector in the SML# variant of
+the SML language:
+
+1) https://dl.acm.org/doi/pdf/10.1145/2034773.2034802
+   "An Efficient Non-Moving Garbage Collector for Functional Languages"
+   (Katsuhiro Ueno, Atsushi Ohori, Toshiaki Otomo)
+   describes a non-moving stop-the-world collector that uses a bitmap
+   to identify free cells.
+
+2) https://dl.acm.org/doi/pdf/10.1145/2951913.2951944
+   "A Fully Concurrent Garbage Collector for Functional Programs on Multicore Processors"
+   (Katsuhiro Ueno, Atsushi Ohori)
+   describes a low-pause extension of the preceding algorithm.
+
+3) https://dl.acm.org/doi/pdf/10.1145/3520263.3534652
+   "Concurrent and Parallel Garbage Collection for Lightweight Threads on Multicore Processors"
+   (Katsuhiro Ueno, Atsushi Ohori)
+   describes an extension in which all threads participate in marking.
+
+The SBCL collector is based on the second paper.
+All three are mentioned only for completeness in case we ever
+decide to utilize multiple GC threads.
+
+Allocator
+---------
+The allocation sequence is no longer just a simple pointer bump, but instead
+a scan for a free bit in a bitmap, which is optimized to usually succeed
+in a few instructions. The sml code has been partially inlined into all VOPs
+that allocate, so that they can often avoid a call out. There is a size
+constraint on objects that can be allocated in the fast path; objects larger than
+4kb use malloc (or any malloc/free simulacrum).  Lists, particularly &REST,
+pose a problem as they want to occupy contiguous cons cells. The published algorithm
+does not directly support subdividing a single allocation into multiple cells,
+but the SBCL allocator has been modified relative to the published algorithm so that
+it can, in many cases, recognize that contiguous bits of a bitmap are available.
+Additionally, arena support requires that we detect at each allocation whether
+an arena is in use, and utilize the bump-pointer allocator instead. So essentially
+the assembly code for two different allocators is present at each allocation site.
+
+Ambiguous pointer detection
+---------------------------
+To address the problem of ambiguous root detection (worse,
+ambiguous interior pointer detection) given that some allocations
+are at "random" addresses due to the use of malloc(),
+we take one of two approaches for objects not in the well-known range:
+- code blobs are all stored in a balanced binary tree. Before code
+  can be executed it has to be inserted into the tree. (And code
+  has to be removed from the tree before freeing). Therefore we can
+  always rely on the tree to determine whether an interior pointer
+  points to something live. Also, as the code allocator is not on
+  any hot path (typically), it doesn't matter that we have to bracket
+  all allocations with extra housekeeping.
+- for exact pointers (and pointers to base addresses of code)
+  we rely on a multi-stage filter that conclusively decides whether
+  a completely arbitrary pointer was allocated on behalf of GC via
+  malloc. Even though some malloc-styled allocators do expose an API to
+  let the user query whether an address belongs to that allocator,
+  the filter does not need any help from the underlying malloc.
+
+Pseudo-atomic
+-------------
+As with many store barrier implementations, the barrier instructions
+themselves MUST NOT be interrupted by GC.  gencgc and parallel-mark-region
+both have the interesting property that their barrier code _can_ be
+interrupted. It works only because the collector behaves "as if"
+the barrier dirtied a card whenever a machine register points to that card.
+(Naturally, the correct functioning of a half-executed barrier is very
+specific to those GCs, and strange for that matter)
+In SBCL we would naturally make the barrier uninterruptible by guarding
+it with a pseudo-atomic section. But that has incredibly high overhead
+if executed at every store. In fact we can't even test whether to perform
+the barrier outside of pseudo-atomic, because that decision itself could
+be interrupted, returning the wrong answer.
+So a new mechanism is implemented which recognizes certain instruction
+sequences in the interrupt handler. The handler needs to have a way
+to resume the instructions - one way would be to rollback to the start
+of the instruction sequence, assuming it to be idempotent.
+In practice, this algorithm rolls forward by causing the assignment
+to take the slow path on return from interrupt; it knows how to alter
+the signal context to do that.
+
+Threads
+-------
+The GC's view of threads is structured around two distinct notions of
+thread: OS thread and user-mode thread, under the assumption that you
+will use their "massive threads" libary. (In release 3.5 of the GC,
+it is optional; but it seems to be non-optional in later releases)
+We also have "our" views of threads in the form of SB-THREAD:THREAD
+and 'struct thread'. Ideally 'struct thread' will contain whatever
+GC-related information is needed, but it's not that simple.
+The GC needs to be able to ask any mutator what state it believes
+itself to be in, among the choices in 'enum sml_sync_phase'.
+By lifting that field into our own struct thread we gain quick access
+to it, as benefits Lisp's asm code; but this this comes with a new problem-
+the GC wants sole responsibility for freeing our thread structs in that case,
+because it needs to get the state of all threads that it believes it has
+responsibility for at an instant in time. There is data race between
+freeing threads structures if we allow Lisp to do it.
+But if we don't lift the critical fields into our thread structure,
+then we have a different problem, one of performance.
+
+Mutator cooperation
+-------------------
+Threads respond to STOP_FOR_GC signals by performing the action that would
+be performed by sml_check were we to use the same mechanism that SML could
+uses, a/k/a safepoints.  Because we're not doing this exactly the same,
+we need to ensure that the state transitions are all valid. So if for example
+a thread needs to pause to acquire more memory from the GC, it would
+use "their" way, which is sml_check. So a signal would not be warranted.
+I haven't fully explored all the edge cases, but it seems a little sketchy
+that we're halfway between "their" and "our" way when ideally it would
+work one or the other but not both.
+
+Weakness
+--------
+SBCL supports more flexible weak references than SML# did.
+SML# offers finalizers, but finalizers are insufficient to implement
+general weakness. We instead implement weak pointers using the algorithm of
+https://dl.acm.org/doi/10.1145/2602988.2602991
+"Reference object processing in on-the-fly garbage collection"
+and we implement finalization on top of weak pointers.
+Additionally, SBCL has weak hash-tables that are strictly more powerful
+than weak tables in many languages. e.g. the Java spec calls out
+that it suffers from the "Key-in-value problem" - a weak-keyed
+pair is NOT garbage whenever the value contains the key, because a
+table strongly references all its values.
+
+Core loading
+------------
+We use the gencgc-structured heap for the core. All of the pseudo-static
+generation is treated as static for purposes of the SML# GC.
+This seems to work relatively well, and in fact is no different from
+how gencgc treats it anyway - generation 6 objects can not die.
+
+Core saving
+-----------
+Easy: just copy all SML#gc-allocated objects back into the gencgc heap,
+then let gencgc take over. This makes sense for a couple of reasons:
+in general, the SML# allocator has a lot of per-page overhead
+(a page being 32k, which they call a "segment") that would be wasteful
+to store; and the overhead per page is stored on the page itself,
+rendering a core image particularly wasteful of space if stored as-is.
+Additionally there are the malloc-allocated objects to be concerned with.
+By copying SML# space into gencgc space, we end up with the core format
+that just works, as per the previous item on loading a core.
+
+Observed performance problems
+-----------------------------
+1) The allocator can be up to 30% slower than our bump-pointer allocator.
+The list allocator is the likely place that offers the most bang-for-buck
+if it can be immproved. Most "static" calls to LIST are with 1 or 2 arguments,
+so those are unlikely to be too terrible. The larger problem
+is that &REST list allocation has a poorly-performing fast path.
+
+2) The allocator quantizes all allocations to a power of 2.
+Unfortunately a lot of useful Lisp objects (notably symbols)
+want to allocate 6 words, which means that they actually take up 8 words.
+It should be a fairly simple matter to allow the collector to deal
+with non-power-of-2 sizes. Parts of it already can.
+
+3) SBCL's standard functions like CLRHASH make the assumptions that it is very
+cheap to zero-fill a vector. But in fact with a concurrent algorithm using
+a deletion barrier, it is more expensive to zero-fill than to make a new array.
+The deletion barrier has to record every value that _was_ in the array, when you
+could much more readily just drop the pointer and make a new array.
+(The rationale for the deletion barrier can be found in any pedagogical GC text)
+
+4) After running for many hours, the percentage of time that mutators
+spend in their ASYNC phase has been observed to decrease to as low as 55%.
+This means that an unfortunately large percentage of their time
+is spent non-ASYNC, i.e. in code which is not able to skip over the
+store barrier.  It is likely that this is due to fragmentation and resulting
+non-locality which has implications on the OS's paging of the memory.
