@@ -56,7 +56,7 @@
              :ref-known (flushable movable)
              :ref-trans %numerator
              :init :arg)
-  (denominator :type (integer 1)
+  (denominator :type (integer 2)
                :ref-known (flushable movable)
                :ref-trans %denominator
                :init :arg))
