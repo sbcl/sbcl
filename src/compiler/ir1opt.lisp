@@ -2661,6 +2661,14 @@
       `(car list)
       (give-up-ir1-transform)))
 
+;;; PCL uses apply %listify-rest-args, probably could be changed to
+;;; use m-v-call directly, but figuring the PCL indirections is harder
+;;; than adding this transform.
+(deftransform values-list ((list) (list))
+  (splice-fun-args list '%listify-rest-args 2)
+  `(lambda (more count)
+     (%more-arg-values more 0 count)))
+
 ;;; If VALUES appears in a non-MV context, then effectively convert it
 ;;; to a PROG1. This allows the computation of the additional values
 ;;; to become dead code.
