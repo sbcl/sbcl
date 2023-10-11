@@ -37,6 +37,7 @@
 #include "dynbind.h"
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"
+#include "genesis/instance.h"
 #include "genesis/vector.h"
 #include "interr.h"             /* for lose() */
 #include "gc.h"
@@ -1152,12 +1153,34 @@ int release_gc_lock() { return mutex_release(&in_gc_lock); }
  * (so that dereferencing was valid), but if dereferencing was valid, then the thread
  * can't have died (i.e. if ESRCH could be returned, then that implies that
  * the memory shouldn't be there) */
+
+static struct timespec stw_begin_time;
+long timespec_delta_microsec(struct timespec* begin, struct timespec* end)
+{
+    return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
+}
+void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
+{
+    /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
+     * can receive SIG_STOP_FOR_GC as soon as it has a 'struct thread'
+     * and _before_ a thread instance has been consed */
+    if (th->lisp_thread) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        unsigned long elapsed = timespec_delta_microsec(begin, &now);
+        struct thread_instance* ti = (void*)INSTANCE(th->lisp_thread);
+        if (elapsed > ti->uw_max_stw_pause) ti->uw_max_stw_pause = elapsed;
+        ti->uw_sum_stw_pause += elapsed;
+        ++ti->uw_ct_stw_pauses;
+    }
+}
+
 void gc_stop_the_world()
 {
-#ifdef COLLECT_GC_STATS
-    struct timespec stw_begin_time, stw_end_time;
-    // Measuring the wait time has to use a realtime clock, not a thread clock
-    // because sleeping below in a sem_wait needs to accrue time.
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+    /* The thread performing stop-the-world does not use sig_stop_for_gc_handler on itself,
+     * so it would not accrue time spent stopped. Force it to, by considering it "paused"
+     * from the moment it wants to stop all other threads. */
     clock_gettime(CLOCK_MONOTONIC, &stw_begin_time);
 #endif
     struct thread *th, *me = get_sb_vm_thread();
@@ -1193,12 +1216,6 @@ void gc_stop_the_world()
         }
     }
     event0("/gc_stop_the_world:end");
-#ifdef COLLECT_GC_STATS
-    clock_gettime(CLOCK_MONOTONIC, &stw_end_time);
-    stw_elapsed = (stw_end_time.tv_sec - stw_begin_time.tv_sec)*1000000000L
-                + (stw_end_time.tv_nsec - stw_begin_time.tv_nsec);
-    gc_start_time = stw_end_time;
-#endif
 }
 
 void gc_start_the_world()
@@ -1243,6 +1260,9 @@ void gc_start_the_world()
 
     lock_ret = mutex_release(&all_threads_lock);
     gc_assert(lock_ret);
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+    thread_accrue_stw_time(me, &stw_begin_time);
+#endif
 }
 
 #endif /* !LISP_FEATURE_SB_SAFEPOINT */

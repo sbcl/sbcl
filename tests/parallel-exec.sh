@@ -77,6 +77,8 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
         #'> :key (lambda (file) (or (cadr (assoc file *timings* :test #'equal)) 0))))
 
 (defun summarize-gc-times ()
+  ;; this function prints random numbers now, I don't know why
+  (return-from summarize-gc-times)
   (let (observations)
     (flet ((parse-triple (string pos)
              (sb-int:binding* (((int1 end) (parse-integer string :start (1+ pos)
@@ -169,9 +171,6 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
         (let ((pid (sb-posix:fork)))
           (when (zerop pid)
           (let  ((mylog (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))))
-            #+(and linux sb-thread 64-bit)
-            (sb-alien:alien-funcall (sb-alien:extern-alien "reset_gc_stats"
-                                    (function sb-alien:void)))
             ;; FILE is (filename . test-iteration)
             (with-open-file (stream mylog :direction :output :if-exists :supersede)
               (alien-funcall (extern-alien "dup2" (function int int int))

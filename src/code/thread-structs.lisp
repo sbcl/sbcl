@@ -145,6 +145,10 @@ in future versions."
             :type sb-vm:signed-word)
   #-64-bit (internal-real-time)
 
+  (max-stw-pause 0 :type sb-vm:word) ; microseconds
+  (sum-stw-pause 0 :type sb-vm:word) ; "
+  (ct-stw-pauses 0 :type sb-vm:word) ; to compute the avg
+
   ;; On succesful execution of the thread's lambda, a list of values.
   (result 0)
   ;; The completion condition _could_ be manifested as a condition var, but a difficulty

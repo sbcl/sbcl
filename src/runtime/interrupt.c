@@ -62,6 +62,7 @@
 #include "validate.h"
 #include "interr.h"
 #include "gc.h"
+#include "genesis/instance.h"
 #include "genesis/sap.h"
 #include "dynbind.h"
 #include "pseudo-atomic.h"
@@ -258,8 +259,7 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 char* vm_thread_name(struct thread* th)
 {
     if (!th) return "non-lisp";
-    struct thread_instance *lispthread =
-        (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+    struct thread_instance *lispthread = (void*)INSTANCE(th->lisp_thread);
     lispobj name = lispthread->_name;
     if (simple_base_string_p(name)) return vector_sap(name);
     return "?";
@@ -1398,11 +1398,6 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 }
 #endif
 
-#ifdef LISP_FEATURE_GC_METRICS
-pthread_cond_t gcmetrics_condvar = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t gcmetrics_mutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
-
 #ifdef THREADS_USING_GCSIGNAL
 
 /* This function must not cons, because that may trigger a GC. */
@@ -1432,7 +1427,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
     /* Not PA and GC not inhibited -- we can stop now. */
 
-    was_in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
+    was_in_lisp = !foreign_function_call_active_p(thread);
 
     if (was_in_lisp) {
         /* need the context stored so it can have registers scavenged */
@@ -1467,6 +1462,11 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     if (thread->state_word.state != STATE_RUNNING)
         lose("stop_for_gc: bad thread state: %x", (int)thread->state_word.state);
 
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+    struct timespec t_beginpause;
+    clock_gettime(CLOCK_MONOTONIC, &t_beginpause);
+#endif
+
     /* We say that the thread is "stopped" as of now, but the blocking operation
      * occurs below at thread_wait_until_not(STATE_STOPPED). Note that sem_post()
      * is expressly permitted in signal handlers, and set_thread_state uses it */
@@ -1484,26 +1484,10 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * syscall such as sigsuspend() or select(). Apparently every OS + C runtime that
      * we wish to support has no problem with sem_wait() here in the signal handler. */
 
-#ifdef LISP_FEATURE_GC_METRICS
-    int my_state;
-    {
-    struct timespec t_beginwait, t_endwait, t_runtime;
-    clock_gettime(CLOCK_MONOTONIC, &t_beginwait);
-    my_state = thread_wait_until_not(STATE_STOPPED, thread);
-    clock_gettime(CLOCK_MONOTONIC, &t_endwait);
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t_runtime);
-    // calculate CPU time in microseconds
-    long elapsed = ((t_endwait.tv_sec - t_beginwait.tv_sec)*1000000000L
-                    + (t_endwait.tv_nsec - t_beginwait.tv_nsec)) / 1000;
-    struct extra_thread_data *data = thread_extra_data(thread);
-    if (elapsed > data->worst_gc_wait) data->worst_gc_wait = elapsed;
-    data->sum_gc_wait += elapsed;
-    data->avg_gc_wait = data->sum_gc_wait / ++data->n_gc_wait;
-    data->on_cpu_time = t_runtime.tv_sec * 1000000 + t_runtime.tv_nsec / 1000;
-    pthread_cond_broadcast(&gcmetrics_condvar);
-    }
-#else
     int my_state = thread_wait_until_not(STATE_STOPPED, thread);
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+    extern void thread_accrue_stw_time(struct thread*,struct timespec*);
+    thread_accrue_stw_time(thread, &t_beginpause);
 #endif
 
     event0("resumed");

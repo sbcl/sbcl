@@ -124,4 +124,9 @@ extern lispobj *component_ptr_from_pc(char *pc);
 #error "GC selector not defined"
 #endif
 
+#if (defined LISP_FEATURE_DARWIN || defined LISP_FEATURE_LINUX) \
+  && defined LISP_FEATURE_SB_THREAD
+#define MEASURE_STOP_THE_WORLD_PAUSE
+#endif
+
 #endif /* _GC_H_ */
