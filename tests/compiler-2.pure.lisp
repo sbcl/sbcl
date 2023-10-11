@@ -4265,3 +4265,12 @@
          (let ((d (max 1 (the (satisfies eval) y))))
            (the fixnum (* d 8))))
       ((2) 16)))
+
+(with-test (:name :complicated-cons-function-unions)
+  (checked-compile-and-assert
+      ()
+      `(lambda (w)
+         (car (member w '#.(list #'< #'= #'eql #'equalp))))
+    ((#'=) #'=)))
+
+

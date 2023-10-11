@@ -460,12 +460,21 @@ Experimental."
                     (setf (nth i dims) (array-dimension x i)))
                   (%make-array-type dims complexp etype etype)))))))
       (cons
-       (make-cons-type (if (eq (car x) x)
-                           (specifier-type 'cons)
-                           (ctype-of (car x)))
-                       (if (consp (cdr x))
-                           (specifier-type 'cons)
-                           (ctype-of (cdr x)))))
+       (let ((car (car x))
+             (cdr (cdr x)))
+         (make-cons-type (cond ((eq car x)
+                                (specifier-type 'cons))
+                               ;; Creates complicated unions
+                               ((functionp car)
+                                (specifier-type 'function))
+                               (t
+                                (ctype-of car)))
+                         (cond ((consp cdr)
+                                (specifier-type 'cons))
+                               ((functionp cdr)
+                                (specifier-type 'function))
+                               (t
+                                (ctype-of cdr))))))
       (character ; Why not return an EQL type?
        (typecase x
          (standard-char (specifier-type 'standard-char))
