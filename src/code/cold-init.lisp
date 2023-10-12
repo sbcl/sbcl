@@ -330,11 +330,6 @@
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
-  ;; Notwithstanding that the verbosity flag can cause deadlocks
-  ;; in printf(), it should be OK to enable, because the only other
-  ;; Lisp thread is the finalizer, which outputs nothing at all.
-  #-no-gc-verify
-  (setf (extern-alien "gencgc_verbose" int) 1)
   #+sb-thread (finalizer-thread-start)
 
   ;; The show is on.
