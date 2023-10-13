@@ -1578,10 +1578,20 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
         (gen-cases locked-methods)
         (gen-cases methods))))
 
-;;; Three argument version of GETHASH
+;;; Three argument version of GETHASH. KLUDGE: The FUNCALL is not
+;;; recognized as a tail call due to the return type having been
+;;; declared (https://bugs.launchpad.net/sbcl/+bug/2039301) so remove
+;;; it temporarily.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (setf (info :function :type 'gethash3)
+       (specifier-type '(function (t hash-table t) *))))
 (defun gethash3 (key hash-table default)
   (declare (type hash-table hash-table))
   (funcall (hash-table-gethash-impl hash-table) key hash-table default))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (info :function :type 'gethash3)
+        (specifier-type '(function (t hash-table t)
+                          (values t boolean &optional)))))
 
 ;;; so people can call #'(SETF GETHASH)
 ;;; FIXME: this function is not mandated. Why do we have it?
@@ -1776,9 +1786,16 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
   (define-ht-setter puthash/equalp equalp)
   (define-ht-setter puthash/any nil))
 
+;;; KLUDGE: Same as above for GETHASH3.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (info :function :type '%puthash)
+        (specifier-type '(function (t hash-table t) *))))
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
   (funcall (hash-table-puthash-impl hash-table) key hash-table value))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (setf (info :function :type '%puthash)
+       (specifier-type '(function (t hash-table t) (values t &optional)))))
 
 (defmacro define-remhash (name std-fn)
   `(defun ,name (key table &aux (hash-table (truly-the hash-table table))
