@@ -16,6 +16,7 @@
 use_test_subdirectory
 
 tmpfilename="$TEST_FILESTEM.lisp"
+tmpcore="stream-test.core"
 
 cat > $tmpfilename <<EOF
     (in-package :cl-user)
@@ -62,6 +63,19 @@ if [ 'Bivalent *ERROR-OUTPUT*' != "$test_output" ]; then
     echo "bad test output: '$test_output'"
     exit $EXIT_LOSE
 fi
+
+run_sbcl <<EOF
+  (setf sb-ext:*default-external-format* '(:utf-8 :newline :crlf))
+  (sb-ext:save-lisp-and-die "$tmpcore")
+EOF
+if [ $? -ne 0 ]; then
+    echo "failure saving core"
+    exit 1
+fi
+
+run_sbcl_with_core "$tmpcore" --disable-ldb  --noinform --no-sysinit --no-userinit --disable-debugger \
+                   --eval '(sb-ext:quit :unix-status 52)'
+check_status_maybe_lose "stdstream external format setting" $? 52 "(loading worked)"
 
 # success
 exit $EXIT_TEST_WIN

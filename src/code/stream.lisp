@@ -2678,7 +2678,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                         ((sb-win32::console-handle-p fd)
                          :ucs-2)
                         (t
-                         (default-external-format))))
+                         (external-format-keyword (default-external-format)))))
          (ef (get-external-format keyword))
          (replacement (ef-default-replacement-character ef)))
     `(,keyword :replacement ,replacement)))
