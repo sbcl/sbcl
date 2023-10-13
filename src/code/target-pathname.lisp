@@ -325,9 +325,11 @@
     (flet ((ensure-heap-string (part) ; return any non-string as-is
              ;; FIXME: what about pattern pieces and (:HOME "user") ?
              (cond ((or (not (stringp part)) (read-only-space-obj-p part)) part)
-                   ((dynamic-space-obj-p part) (logically-readonlyize part))
-                   ;; dynamic-extent strings and lisp strings in alien memory are acceptable.
-                   ;; Copies must be made in that case, since we're holding on to them.
+                   ;; Altering a string that is any piece of any arg to INTERN-PATHNAME
+                   ;; is a surefire way to corrupt the hashset, so *always* copy the input.
+                   ;; Users might not have reason to believe that once a string is passed
+                   ;; to any pathname function, it is immutable. We can only hope that
+                   ;; they don't mutate strings returned by pathname accessors.
                    (t (let ((l (length part)))
                         (logically-readonlyize
                          (replace (typecase part
@@ -564,8 +566,6 @@
 (defun pathname= (a b)
   (declare (type pathname a b))
   (or (eq a b)
-      ;; I believe that this is actually the same as EQ on pathnames now,
-      ;; but until I prove it, I'm leaving this code in.
       (and (compare-pathname-host/dev/dir/name/type a b)
            (or (eq (%pathname-host a) *physical-host*)
                (compare-component (pathname-version a)
@@ -574,7 +574,7 @@
 (sb-kernel::assign-equalp-impl 'pathname #'pathname=)
 (sb-kernel::assign-equalp-impl 'logical-pathname #'pathname=)
 
-;;; Hash either a PATHNAME or a PATHNAME-DIRECTORY. This is called byt both SXHASH
+;;; Hash either a PATHNAME or a PATHNAME-DIRECTORY. This is called by both SXHASH
 ;;; and by the interning of pathnames, which uses a multi-step approaching to
 ;;; coalescing shared subparts. If an EQUAL directory was used before, we share that.
 ;;; Since a directory is stored with its hash precomputed, hashing a PATHNAME as a
@@ -583,7 +583,12 @@
 (defun pathname-sxhash (x)
   (flet ((hash-piece (piece)
            (etypecase piece
-             (string (sxhash piece)) ; transformed
+             (string
+              (let ((res (length piece)))
+                (if (<= res 6) ; hash it more thoroughly than (SXHASH string)
+                    (dovector (ch piece res)
+                      (setf res (mix (murmur-hash-word/+fixnum (char-code ch)) res)))
+                    (sxhash piece))))
              (symbol (sxhash piece)) ; transformed
              (pattern (pattern-hash piece))
              ((cons (eql :home) (cons string null))

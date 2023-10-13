@@ -978,3 +978,9 @@
   (opaque-identity
    (loop for i below 1000
          collect (make-pathname :host "SYS" :name "FOO" :type "LISP" :version i))))
+
+(with-test (:name :pathname-hash-more-strongly)
+  ;; examples from xof's email
+  (assert (/= (sxhash #P"APPVA") (sxhash #P"APPKZ")))
+  (assert (/= (sxhash #P"AVERA") (sxhash #P"AVEQR")))
+  (assert (/= (sxhash #P"AVERB") (sxhash #P"AVEQS"))))
