@@ -520,13 +520,3 @@
          (let ((foo 0))
            (dolist (sap list-of-saps foo)
              (setq foo (logxor foo (sxhash sap)))))))))
-
-(with-test (:name :c-prefuzz-hash-table-hash :skipped-on (:not :64-bit))
-  (dotimes (i 100000)
-    (let* ((h0 (random (1+ most-positive-fixnum)))
-           (h1 (sb-impl::prefuzz-hash h0))
-           (c-h1 (alien-funcall (extern-alien "prefuzz_ht_hash"
-                                              (function unsigned unsigned))
-                                (sb-kernel:get-lisp-obj-address h0))))
-      (unless (= h1 c-h1)
-        (format t "~16x ~x ~x~%" h0 h1 c-h1)))))

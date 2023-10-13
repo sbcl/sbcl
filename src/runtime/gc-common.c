@@ -3407,28 +3407,6 @@ extern void check_barrier (lispobj young, lispobj old, int wp) {
 }
 #endif
 
-// Return a native representation of the perturbed h0 supplied as a fixnum.
-unsigned prefuzz_ht_hash(lispobj h0)
-{
-#ifdef LISP_FEATURE_64_BIT
-    /* Cautiously compute in the Lisp representation
-     * to ensure total consistency with the Lisp code.
-     * e.g. (SB-IMPL::EQ-HASH -1s0) => -2323857407723175924
-     * All of the shifts are to the right, so we needn't consider
-     * overflow but we do need to kill the tag bit(s).
-     * The sum can wrap, but that's OK because it gets chopped at the end */
-#define fixnum_ashr(val,count) ((val>>count)&~(uword_t)FIXNUM_TAG_MASK)
-    sword_t sum = (h0 ^ make_fixnum(0x39516A7))
-      + fixnum_ashr(h0, 3)
-      + fixnum_ashr(h0, 12)
-      + fixnum_ashr(h0, 20);
-    // the mask looks wrong for 32-bit, but I'm not trying to debug 32-bit.
-    return fixnum_value(sum & (make_fixnum(((uword_t)1<<31)-1)));
-#else
-    lose("Unimplemented");
-#endif
-}
-
 #ifdef LISP_FEATURE_MARK_REGION_GC
 static void maybe_fix_hash_table(struct hash_table* ht, bool fix_bad)
 {

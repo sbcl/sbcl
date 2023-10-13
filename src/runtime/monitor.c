@@ -662,11 +662,10 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
                         j, key, val, h, h & ivmask);
         } else {
             // print the hash and then fuzzed hash;
-            lispobj h0 = funcall1(ht->hash_fun, key);
-            h = prefuzz_ht_hash(h0);
+            h = fixnum_value(funcall1(ht->hash_fun, key));
             if (file)
-                fprintf(file, "[%4d] %12lx %16lx %016lx %08x %4x (", j,
-                        key, val, fixnum_value(h0), h, h & ivmask);
+                fprintf(file, "[%4d] %12lx %16lx %016lx (", j,
+                        key, val, (unsigned long int)h);
         }
         // show the chain
         unsigned cell = ivdata[h & ivmask];
