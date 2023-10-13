@@ -152,12 +152,14 @@
                    `(,new-predicate object))))
               ;; (typep (the float x) 'double-float) =>
               ;; (typep x 'single-float)
-              ((and (memory-type-test-p type)
-                    (let* ((diff (type-difference otype type))
-                           (pred (and (not (memory-type-test-p diff))
-                                      (backend-type-predicate diff))))
-                      (when pred
-                        `(not (,pred object))))))
+              ((let* ((diff (type-difference otype type))
+                      (pred (and (not (memory-type-test-p diff))
+                                 (backend-type-predicate diff))))
+                 (when (and pred
+                            ;; Testing for fixnum is usually the cheapest
+                            (or (eq pred 'fixnump)
+                                (memory-type-test-p type)))
+                   `(not (,pred object)))))
               (t
                (give-up-ir1-transform)))))))
 
