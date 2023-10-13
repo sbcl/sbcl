@@ -706,48 +706,19 @@ multiple threads accessing the same hash-table without locking."
                           ;; Use the existing hash value (not address-based hash)
                           (mask-hash (aref hash-vector i) mask))
                          (t
-                         ;; Set address-sensitivity BEFORE depending on the bits.
-                         ;; Precise GC platforms can move any key except the ones which
-                         ;; are explicitly pinned, and we're not explictly pinning.
-                          (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
                           (pointer-hash->bucket (pointer-hash key) mask)))))
              (push-in-chain bucket)))))
       ((eq (hash-table-test table) 'eql)
-     ;; There's a very tricky issue here with using EQL-HASH - you can't just
-     ;; call it and then decide to set the address-sensitivity bit if the secondary
-     ;; result is T. Normally we call the hash function with the key pinned,
-     ;; so we have to do the same here. Consider if we didn't, on a precise GC
-     ;; architecture given the initial condition that the kv-vector is not
-     ;; marked as address-sensitive:
-     ;;   - call EQL hash, take PAIR-KEY's address as its hash
-     ;;   - GC observes that vector is not address-sensitive,
-     ;;     moves PAIR-KEY, gives it a new address, does not flag vector
-     ;;     as needing rehash.
-     ;;   - set the vector header as address-sensitive
-     ;;   - push in chain
-     ;; After that sequence of operations, the item is in the wrong chain,
-     ;; for its new address, but the need-rehash bit is not set in the vector.
-     ;; It would work to call EQL-HASH twice per key: once to get the secondary
-     ;; value, maybe set the vector bit, call it again. But that's not great.
-     ;; Instead we use a macro that is like WITH-PINNED-OBJECTS, but cheaper
-     ;; than binding a special variable once per key.
-       (sb-vm::with-pinned-object-iterator (pin-object)
-         (do ((i hwm (1- i))) ((zerop i))
-           (declare (type index/2 i)
-                    (optimize (safety 0)))
-           (with-key (key)
-             (pin-object key)
-             (multiple-value-bind (hash address-based) (eql-hash key)
-               (when address-based
-                 (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-               (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))
+       (do ((i hwm (1- i))) ((zerop i))
+         (declare (type index/2 i)
+                  (optimize (safety 0)))
+         (with-key (key)
+           (push-in-chain (mask-hash (prefuzz-hash (eql-hash key)) mask)))))
       (t
        (do ((i hwm (1- i))) ((zerop i))
          (declare (type index/2 i)
                   (optimize (safety 0)))
          (with-key (key)
-           (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
-             (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
            (push-in-chain (pointer-hash->bucket (pointer-hash key) mask)))))))
   ;; This is identical to the calculation of next-free-kv in INSERT-AT.
   (cond ((/= next-free 0) next-free)
@@ -783,8 +754,6 @@ multiple threads accessing the same hash-table without locking."
    ;; rehash-in-progress bit. It also gives this thread exclusive write access
    ;; to the bucket chains since at most one thread can win this CAS.
    (when (eq (cas (svref kv-vector rehash-stamp-elt) epoch rehashing-state) epoch)
-     ;; Remove address-sensitivity, preserving the other flags.
-     (reset-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
      ;; Rehash in place. For the duration of the rehash, readers who otherwise
      ;; might have seen intact chains (by which to find address-insensitive keys)
      ;; can't. No big deal. If we were willing to cons new vectors, we could
@@ -816,28 +785,20 @@ multiple threads accessing the same hash-table without locking."
                         (cond ((/= stored-hash +magic-hash-vector-value+)
                                (mask-hash stored-hash mask))
                               (t
-                               (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
                                (pointer-hash->bucket (pointer-hash pair-key) mask)))))
                   (push-in-chain bucket)))))
            ((eq (hash-table-test table) 'eql)
-            (sb-vm::with-pinned-object-iterator (pin-object)
-              (do ((i hwm (1- i))) ((zerop i))
-                (declare (type index/2 i)
-                         (optimize (safety 0)))
-                (with-key (pair-key)
-                  (pin-object pair-key)
-                  (multiple-value-bind (hash address-based) (eql-hash pair-key)
-                    (when address-based
-                      (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-                    (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))
+            (do ((i hwm (1- i))) ((zerop i))
+              (declare (type index/2 i)
+                       (optimize (safety 0)))
+              (with-key (pair-key)
+                (push-in-chain (mask-hash (prefuzz-hash (eql-hash pair-key)) mask)))))
            (t
             ;; No hash vector and not an EQL table, so it's an EQ table
             (do ((i hwm (1- i))) ((zerop i))
               (declare (type index/2 i)
                        (optimize (safety 0)))
               (with-key (pair-key)
-                (when (sb-vm:is-lisp-pointer (get-lisp-obj-address pair-key))
-                  (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
                 (push-in-chain (pointer-hash->bucket (pointer-hash pair-key) mask)))))))
        (done-rehashing table kv-vector epoch)
        (unless (eql result 0)
@@ -986,7 +947,10 @@ multiple threads accessing the same hash-table without locking."
                (old-kv-vector (hash-table-pairs table))
                ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
                 (realloc new-size new-n-buckets))
-               (hwm (kv-vector-high-water-mark old-kv-vector)))
+               (hwm (kv-vector-high-water-mark old-kv-vector))
+               (old-kv-vector-addr-hashing-p
+                (test-header-data-bit old-kv-vector (ash sb-vm:vector-addr-hashing-flag
+                                                         sb-vm:array-flags-data-position))))
 
       (declare (type simple-vector new-kv-vector)
                (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
@@ -1036,6 +1000,17 @@ multiple threads accessing the same hash-table without locking."
     ;; Copy the k/v pairs excluding leading and trailing metadata.
       (replace new-kv-vector old-kv-vector
                :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
+      ;; Here and also in FINDHASH-WEAK, we keep the
+      ;; SB-VM:VECTOR-ADDR-HASHING-FLAG. If a hash table is
+      ;; address-based at any time, it'll remain so until CLRHASH even
+      ;; if all address-based keys had been removed. This allows
+      ;; rehashing to do less work and makes EQ hash tables a few
+      ;; percents faster. In the rare case where the flag errs on the
+      ;; side of conservativeness, the GC needs to do a bit more work.
+      ;; If this ever becomes a problem, maybe the GC can detect this
+      ;; and clear the flag. -- MG, 2023-10-13
+      (when old-kv-vector-addr-hashing-p
+        (logior-array-flags new-kv-vector sb-vm:vector-addr-hashing-flag))
 
       (let ((next-free (rehash new-kv-vector new-hash-vector
                                new-index-vector new-next-vector table)))
@@ -1483,8 +1458,14 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
              ;; access, but use CAS to be sure.
              (aver (eql (cas (svref kv-vector rehash-stamp-elt) initial-stamp
                              (1+ initial-stamp)) initial-stamp))
-             ;; Remove weakness and address-sensitivity.
-             (assign-vector-flags kv-vector sb-vm:vector-hashing-flag)
+             ;; Set vector hashing, remove weakness, keep address-sensitivity.
+             (if (test-header-data-bit kv-vector
+                                       (ash sb-vm:vector-addr-hashing-flag
+                                            sb-vm:array-flags-data-position))
+                 (assign-vector-flags kv-vector
+                                      (logior sb-vm:vector-hashing-flag
+                                              sb-vm:vector-addr-hashing-flag))
+                 (assign-vector-flags kv-vector sb-vm:vector-hashing-flag))
              ;; We don't need to zero-fill the NEXT vector, just the INDEX vector.
              ;; Unless a key slot can be reached by a chain starting from the index
              ;; vector or the 'next' of a previous chain element, we don't read either

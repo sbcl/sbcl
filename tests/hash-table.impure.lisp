@@ -179,6 +179,11 @@
             do (setf (aref pairs i) i))) ; highly illegal!
     ;; try to find an address-sensitive key
     (assert (not (gethash '(foo) tbl)))
+    ;; Address-sensitivity is sticky.
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
+               (+ sb-vm:vector-addr-hashing-flag
+                  sb-vm:vector-hashing-flag)))
+    (clrhash tbl)
     (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
                ;; Table is no longer address-sensitive
                sb-vm:vector-hashing-flag))))
