@@ -311,30 +311,41 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
   ;; Non-tail self-recursion implemented with a local auxiliary function
   ;; is a lot faster than doing it the straightforward way (at least
   ;; on x86oids) due to calling convention differences. -- JES, 2005-12-30
-  (labels ((equal-aux (x y)
-             (cond ((%eql x y)
-                    t)
-                   ((consp x)
-                    (and (consp y)
-                         (equal-aux (car x) (car y))
-                         (equal-aux (cdr x) (cdr y))))
-                   ((stringp x)
-                    (and (stringp y) (string= x y)))
-                   ;; We could remove this case by ensuring that MAKE-PATHNAME,
-                   ;; PARSE-NAMESTRING, MERGE-PATHNAME, etc look in a weak hash-based
-                   ;; thing first for an EQUAL pathname, ensuring that if two pathnames
-                   ;; are EQUAL then they are EQ. That would elide this test at the
-                   ;; expense of pathname construction which seems like a good tradeoff.
-                   ((pathnamep x)
-                    (and (pathnamep y) (pathname= x y)))
-                   ((bit-vector-p x)
-                    (and (bit-vector-p y)
-                         (bit-vector-= x y)))
-                   (t nil))))
-    ;; Use MAYBE-INLINE to get the inline expansion only once (instead
-    ;; of 200 times with INLINE). -- JES, 2005-12-30
-    (declare (maybe-inline equal-aux))
-    (equal-aux x y)))
+  (macrolet ((equal-body (recurse-car recurse-cdr)
+               `(cond ((%eql x y)
+                       t)
+                      ((consp x)
+                       (and (consp y)
+                            (,recurse-car (car x) (car y))
+                            (,recurse-cdr (cdr x) (cdr y))))
+                      ((stringp x)
+                       (and (stringp y) (string= x y)))
+                      ;; We could remove this case by ensuring that
+                      ;; MAKE-PATHNAME, PARSE-NAMESTRING,
+                      ;; MERGE-PATHNAME, etc look in a weak hash-based
+                      ;; thing first for an EQUAL pathname, ensuring
+                      ;; that if two pathnames are EQUAL then they are
+                      ;; EQ. That would elide this test at the expense
+                      ;; of pathname construction, which seems like a
+                      ;; good tradeoff.
+                      ((pathnamep x)
+                       (and (pathnamep y) (pathname= x y)))
+                      ((bit-vector-p x)
+                       (and (bit-vector-p y)
+                            (bit-vector-= x y)))
+                      (t nil))))
+    ;; Calling local functions is still slow, so we inline
+    ;; self-recursion on CAR (at even depths only to avoid infinite
+    ;; inlining). This doubles the code size, but it also makes
+    ;; comparing lists much faster. -- MG, 2023-10-13
+    (labels ((equal-not-inline (x y)
+               ;; Don't inline self-recursion on CDR because that's
+               ;; conveniently in tail position.
+               (equal-body equal-inline equal-not-inline))
+             (equal-inline (x y)
+               (equal-body equal-not-inline equal-not-inline)))
+      (declare (inline equal-inline))
+      (equal-not-inline x y))))
 
 ;;; Like EQUAL, but any two gensyms whose names are STRING= are equalish.
 (defun fun-names-equalish (x y)
