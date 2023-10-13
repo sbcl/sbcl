@@ -680,7 +680,8 @@ multiple threads accessing the same hash-table without locking."
                     (hwm (kv-vector-high-water-mark kv-vector)))
   (declare (simple-vector kv-vector)
            (type (simple-array hash-table-index (*)) next-vector index-vector)
-           (type (or null (simple-array hash-table-index (*))) hash-vector))
+           (type (or null (simple-array hash-table-index (*))) hash-vector)
+           (optimize (sb-c:insert-array-bounds-checks 0)))
   (macrolet ((with-key ((key-var) &body body)
                ;; If KEY-VAR is empty, then push I onto the freelist, otherwise invoke BODY
                `(let* ((key-index (* 2 i))
@@ -692,7 +693,8 @@ multiple threads accessing the same hash-table without locking."
       (hash-vector
        ;; Scan backwards so that chains are in ascending index order.
        (do ((i hwm (1- i))) ((zerop i))
-         (declare (type index/2 i))
+         (declare (type index/2 i)
+                  (optimize (safety 0)))
          (with-key (key)
            (let* ((stored-hash (aref hash-vector i))
                   (bucket
@@ -727,7 +729,8 @@ multiple threads accessing the same hash-table without locking."
      ;; than binding a special variable once per key.
        (sb-vm::with-pinned-object-iterator (pin-object)
          (do ((i hwm (1- i))) ((zerop i))
-           (declare (type index/2 i))
+           (declare (type index/2 i)
+                    (optimize (safety 0)))
            (with-key (key)
              (pin-object key)
              (multiple-value-bind (hash address-based) (eql-hash key)
@@ -736,7 +739,8 @@ multiple threads accessing the same hash-table without locking."
                (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))
       (t
        (do ((i hwm (1- i))) ((zerop i))
-         (declare (type index/2 i))
+         (declare (type index/2 i)
+                  (optimize (safety 0)))
          (with-key (key)
            (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
              (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
@@ -800,7 +804,8 @@ multiple threads accessing the same hash-table without locking."
          (cond
            (hash-vector
             (do ((i hwm (1- i))) ((zerop i))
-              (declare (type index/2 i))
+              (declare (type index/2 i)
+                       (optimize (safety 0)))
               (with-key (pair-key)
                 (let* ((stored-hash (aref hash-vector i))
                        (bucket
@@ -813,7 +818,8 @@ multiple threads accessing the same hash-table without locking."
            ((eq (hash-table-test table) 'eql)
             (sb-vm::with-pinned-object-iterator (pin-object)
               (do ((i hwm (1- i))) ((zerop i))
-                (declare (type index/2 i))
+                (declare (type index/2 i)
+                         (optimize (safety 0)))
                 (with-key (pair-key)
                   (pin-object pair-key)
                   (multiple-value-bind (hash address-based) (eql-hash pair-key)
@@ -823,7 +829,8 @@ multiple threads accessing the same hash-table without locking."
            (t
             ;; No hash vector and not an EQL table, so it's an EQ table
             (do ((i hwm (1- i))) ((zerop i))
-              (declare (type index/2 i))
+              (declare (type index/2 i)
+                       (optimize (safety 0)))
               (with-key (pair-key)
                 (when (sb-vm:is-lisp-pointer (get-lisp-obj-address pair-key))
                   (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
@@ -1270,9 +1277,9 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
   `(defun ,name (key table default
                      &aux (hash-table (truly-the hash-table table))
                           (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)
+                        (sb-c:insert-array-bounds-checks 0)))
      (let ((index (hash-table-cache hash-table)))
-       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
        ;; First check the cache using EQ, not the test fun, for speed.
        (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
          (return-from ,name (values (aref kv-vector (1+ index)) t))))
@@ -1323,7 +1330,6 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                  (let ((index (hash-search)))
                    (if (not (eql index 0))
                        (let ((key-index (* 2 (truly-the index/2 index))))
-                         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                          (setf (hash-table-cache hash-table) key-index)
                          (values (aref kv-vector (1+ key-index)) t))
                        ;; the BARRIER macro sucks bigly, hence the PROGN
@@ -1624,10 +1630,10 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defmacro define-ht-setter (name std-fn)
   `(defun ,name (key table value &aux (hash-table (truly-the hash-table table))
                                       (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)
+                        (sb-c:insert-array-bounds-checks 0)))
      (block done
        (let ((index (hash-table-cache hash-table)))
-         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
          ;; Check the most-recently-used cell
          (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
            (return-from done (setf (aref kv-vector (1+ index)) value))))
@@ -1696,7 +1702,9 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                       hash-table key hash address-based-p value))))))
 
 (flet ((insert-at (index hash-table key hash address-based-p value)
-         (declare (optimize speed) (type index/2 index))
+         (declare (optimize speed (sb-c:insert-array-bounds-checks 0))
+                  (type index/2 index)
+                  (type (unsigned-byte #-64-bit 29 #+64-bit 31) hash))
          (when (zerop index)
            (setq index (grow-hash-table hash-table))
            ;; Growing the table can not make the key become found when it was not
@@ -1776,7 +1784,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defmacro define-remhash (name std-fn)
   `(defun ,name (key table &aux (hash-table (truly-the hash-table table))
                                        (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)
+                        (sb-c:insert-array-bounds-checks 0)))
      ;; The cache provides no benefit to REMHASH. A hit would just mean there is work
      ;; to do in removing the item from a chain, whereas a miss means we don't know
      ;; if there is work to do, so effectively there is work to do either way.
