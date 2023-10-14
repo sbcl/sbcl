@@ -123,18 +123,6 @@
       (zero))
     (storew t1 x 0 other-pointer-lowtag)))
 
-
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    ;; FIXME: It would be better if this would mask the lowtag,
-    ;; and shift the result into a positive fixnum like on x86.
-    (inst sll res ptr 3)
-    (inst srl res res 1)))
-
 
 ;;;; allocation
 

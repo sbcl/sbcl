@@ -1316,16 +1316,6 @@ void smash_weak_pointers(void)
 
 /* Hash tables */
 
-#if N_WORD_BITS == 32
-#define EQ_HASH_MASK 0x1fffffff
-#elif N_WORD_BITS == 64
-#define EQ_HASH_MASK 0x1fffffffffffffff
-#endif
-
-/* Compute the EQ-hash of KEY. This must match POINTER-HASH in
- * target-hash-table.lisp.  */
-#define EQ_HASH(key) ((key) & EQ_HASH_MASK)
-
 /* List of weak hash tables chained through their NEXT-WEAK-HASH-TABLE
  * slot. Set to NULL at the end of a collection.
  *

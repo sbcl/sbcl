@@ -24,7 +24,9 @@
 (defun-cached (tokenize-control-string
                :memoizer memoize
                :hash-bits 7
-               :hash-function #'pointer-hash)
+               :hash-function (lambda (string)
+                                (ash (get-lisp-obj-address string)
+                                     #.(- sb-vm:n-lowtag-bits))))
               ((string eq))
   (declare (simple-string string))
   (macrolet ((compute-it ()

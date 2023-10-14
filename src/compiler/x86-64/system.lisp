@@ -215,15 +215,6 @@
     (multiple-value-bind (imm8 shift) (header-byte-imm8 mask)
       (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8)))))
 
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg) :target res))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    (move res ptr)
-    (inst and res (lognot fixnum-tag-mask))))
-
 ;;;; allocation
 
 (define-vop (binding-stack-pointer-sap)

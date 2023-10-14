@@ -82,7 +82,6 @@
   (def set-header-data (x val))
   (def widetag-of)
   (def %other-pointer-widetag)
-  (def pointer-hash)
   (def vector-sap)
   (def binding-stack-pointer-sap  ())
   #+cheneygc (def dynamic-space-free-pointer ())

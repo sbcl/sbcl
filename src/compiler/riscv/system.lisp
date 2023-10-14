@@ -139,14 +139,6 @@
       (zero))
     (storew t1 x 0 other-pointer-lowtag)))
 
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    (inst andi res ptr (lognot fixnum-tag-mask))))
-
 
 ;;;; Allocation
 

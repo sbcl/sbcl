@@ -311,8 +311,8 @@ used to specify the oldest generation guaranteed to be collected."
   (setf sb-c::*phash-lambda-cache* nil)
   ;; Clear caches depending on the generation being collected.
   (cond ((eql 0 gen)
-         ;; Drop strings because the hash is pointer-hash
-         ;; but there is no automatic cache rehashing after GC.
+         ;; Drop strings because the hash is address-based, but there
+         ;; is no automatic cache rehashing after GC.
          (sb-format::tokenize-control-string-cache-clear))
         ((eql 1 gen)
          (sb-format::tokenize-control-string-cache-clear))

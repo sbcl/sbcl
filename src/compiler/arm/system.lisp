@@ -130,15 +130,6 @@
        ;; maybe it should be promoted to an instruction-macro?
        (inst orr t1 t1 (ash (tn-value data) n-widetag-bits))))
     (storew t1 x 0 other-pointer-lowtag)))
-
-
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    (inst bic res ptr fixnum-tag-mask)))
 
 ;;;; Allocation
 

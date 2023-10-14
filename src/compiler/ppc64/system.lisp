@@ -131,14 +131,6 @@
     (inst or t1 t1 t2)
     (storew t1 x 0 other-pointer-lowtag)))
 
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    (inst clrrdi res ptr n-fixnum-tag-bits)))
-
 
 ;;;; Allocation
 

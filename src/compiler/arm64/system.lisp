@@ -149,14 +149,6 @@
               byte 2))
       (inst ldrb tmp-tn (@ array (- byte other-pointer-lowtag)))
       (inst tst tmp-tn mask))))
-
-(define-vop (pointer-hash)
-  (:translate pointer-hash)
-  (:args (ptr :scs (any-reg descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 1
-    (inst and res ptr (lognot fixnum-tag-mask))))
 
 ;;;; Allocation
 

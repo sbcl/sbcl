@@ -93,8 +93,6 @@
 
 ;;;; miscellaneous "sub-primitives"
 
-(defknown pointer-hash (t) fixnum (flushable))
-
 (defknown %sp-string-compare
   (simple-string simple-string index (or null index) index (or null index))
   (values index fixnum)
