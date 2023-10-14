@@ -87,7 +87,8 @@
            (return-from ir1-transform-type-predicate t))
           ((eq type *empty-type*)
            (return-from ir1-transform-type-predicate nil)))
-    (let ((intersect (type-intersection type otype)))
+    (let ((intersect (type-intersection type otype))
+          (current-predicate (combination-fun-source-name node)))
       ;; I guess the theory here is that an intersection type
       ;; is never a singleton, because if we could see that it was
       ;; a singleton, it wouldn't be an intersection.
@@ -125,8 +126,7 @@
                  `(sb-alien::alien-value-typep object ',alien-type)))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
-              ((let ((current (combination-fun-source-name node))
-                     (new-predicate
+              ((let ((new-predicate
                        (or
                         (backend-type-predicate intersect)
                         ;; Remove bounds from numeric types
@@ -145,14 +145,14 @@
                                    float floatp
                                    real realp))))))
                  (when (and new-predicate
-                            (neq new-predicate current)
+                            (neq new-predicate current-predicate)
                             ;; Some subtypes are more expensive to check
-                            (not (and (eq current 'listp)
+                            (not (and (eq current-predicate 'listp)
                                       (eq new-predicate 'consp)))
-                            (not (and (eq current 'functionp)
+                            (not (and (eq current-predicate 'functionp)
                                       (eq new-predicate 'compiled-function-p)))
-                            (not (eq current 'characterp))
-                            (not (and (eq current 'non-null-symbol-p)
+                            (not (eq current-predicate 'characterp))
+                            (not (and (eq current-predicate 'non-null-symbol-p)
                                       (eq new-predicate 'keywordp)))
                             (not (eq new-predicate #+64-bit 'signed-byte-64-p
                                                    #-64-bit 'signed-byte-32-p))
@@ -162,8 +162,24 @@
               ;; (typep (the float x) 'double-float) =>
               ;; (typep x 'single-float)
               ((let* ((diff (type-difference otype type))
-                      (pred (and (not (memory-type-test-p diff))
-                                 (backend-type-predicate diff))))
+                      (pred (and (or (eq current-predicate 'sequencep) ;; always expensive
+                                     (not (memory-type-test-p diff)))
+                                 (or (backend-type-predicate diff)
+                                     ;; Remove bounds from numeric types
+                                     (and (csubtypep diff (specifier-type 'real))
+                                          (macrolet ((up (&rest types)
+                                                       `(cond ,@(loop for (type predicate) on types by #'cddr
+                                                                      collect
+                                                                      `((and (csubtypep diff (specifier-type ',type))
+                                                                             (not (types-equal-or-intersect type (specifier-type ',type))))
+                                                                        ',predicate)))))
+                                            (up fixnum fixnump
+                                                integer integerp
+                                                rational rationalp
+                                                single-float single-float-p
+                                                double-float double-float-p
+                                                float floatp
+                                                real realp)))))))
                  (cond ((and pred
                              ;; Testing for fixnum is usually the cheapest
                              (or (eq pred 'fixnump)
