@@ -2172,3 +2172,28 @@
         (print-nothing (aref buffer 0))
         nil))
    (() nil)))
+
+(with-test (:name :stack-analysis-preserve.setq-loop)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda ()
+       (let ((digits '()))
+         (declare (dynamic-extent digits))
+         (let ((result (make-array 128 :element-type 'base-char)))
+           (declare (dynamic-extent result))
+           (dotimes (i 2)
+             (setq digits (cons 0 digits)))
+           (dotimes (i 3)
+             (setf (aref result i) #\0)))
+         ;; can't actually deallocate RESULT yet because we have to keep
+         ;; DIGITS on the stack.
+         (let ((another-result (make-array 128 :element-type 'base-char))
+               (another (list 1 2 3 4 5 6 7 8 9 10)))
+           (declare (dynamic-extent another another-result))
+           (dotimes (i 3)
+             (setf (aref another-result i) #\0))
+           (print-nothing (car another)))
+         (car digits)))
+     (() 0))))
+

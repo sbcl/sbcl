@@ -1852,10 +1852,6 @@
       (vop current-stack-pointer node block
            (first (ir2-lvar-locs 2lvar))))))
 
-;;; %PRESERVE-DYNAMIC-EXTENT doesn't do anything except prevent stack
-;;; %objects from getting cleaned up too early.
-(defoptimizer (%preserve-dynamic-extent ir2-convert) (()))
-
 ;;;; special binding
 
 ;;; This is trivial, given our assumption of a shallow-binding
