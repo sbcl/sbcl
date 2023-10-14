@@ -67,6 +67,14 @@
         (abort-ir1-transform)
         expansion)))
 
+(progn
+  (defun type-other-pointer-p (type)
+    (csubtypep type (specifier-type '(not #1=(or fixnum #+64-bit single-float
+                                                     list function instance character)))))
+
+  (defun type-not-other-pointer-p (type)
+    (csubtypep type (specifier-type '#1#))))
+
 ;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
 ;;; GIVE-UP-IR1-TRANSFORM.
@@ -98,12 +106,13 @@
           (unless (type= difference (specifier-type 'fixnum))
             (return-from  ir1-transform-type-predicate `(not (null object))))))
       (flet ((memory-type-test-p (type)
-               (types-equal-or-intersect
-                type
-                (specifier-type
-                 '(not (or fixnum #+64-bit single-float
-                                  boolean character
-                        function list))))))
+               (and (types-equal-or-intersect
+                     type
+                     (specifier-type
+                      '(not (or fixnum #+64-bit single-float
+                                       boolean character
+                             function list))))
+                    (not (type= type (specifier-type 'instance))))))
         (cond ((typep type 'alien-type-type)
                ;; We don't transform alien type tests until here, because
                ;; once we do that the rest of the type system can no longer
@@ -155,11 +164,18 @@
               ((let* ((diff (type-difference otype type))
                       (pred (and (not (memory-type-test-p diff))
                                  (backend-type-predicate diff))))
-                 (when (and pred
-                            ;; Testing for fixnum is usually the cheapest
-                            (or (eq pred 'fixnump)
-                                (memory-type-test-p type)))
-                   `(not (,pred object)))))
+                 (cond ((and pred
+                             ;; Testing for fixnum is usually the cheapest
+                             (or (eq pred 'fixnump)
+                                 (memory-type-test-p type)))
+                        `(not (,pred object)))
+                       ((and (memory-type-test-p type)
+                             (cond ((and (type-not-other-pointer-p diff)
+                                         (type-other-pointer-p type))
+                                    `(%other-pointer-p object))
+                                   ((and (type-other-pointer-p type)
+                                         (type-not-other-pointer-p type))
+                                    `(not (%other-pointer-p object)))))))))
               (t
                (give-up-ir1-transform)))))))
 
