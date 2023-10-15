@@ -28,18 +28,12 @@
 ;;; which contains copies of the length/depthoid/inherits etc
 ;;; that we compare against the installed one to make sure they match.
 ;;; The third one also gets thrown away.
-(define-load-time-global *layout-id-generator* (cons 0 nil))
-(declaim (type (cons fixnum) *layout-id-generator*))
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
                          (info nil)
                          (bitmap (if info (dd-bitmap info) 0))
-                         (invalid :uninitialized)
-                    &aux (id (or (atomic-pop (cdr *layout-id-generator*))
-                                 (atomic-incf (car *layout-id-generator*)))))
-  (unless (typep id '(and layout-id (not (eql 0))))
-    (error "Layout ID limit reached"))
+                         (invalid :uninitialized))
   (let* ((fixed-words (type-dd-length layout))
          (extra-id-words ; count of additional words needed to store ancestors
           (if (logtest flags +structure-layout-flag+)
@@ -66,25 +60,21 @@
                    (layout-length layout) length)
     (setf (layout-%info layout) info
           (layout-slot-table layout) #(1 nil))
-    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) id)
+    ;; All layouts initially have an ID of 0. The ID is assigned on demand
+    ;; for the layouts that actually get registered, and only those.
+    ;; We do not need to or want to recycle IDs, because:
+    ;; - assembly code can use layout-ID fixups without reference to the layout.
+    ;;   So GCing a layout should *not* allow reuse of its ID because we have no
+    ;;   way of knowing where it was wired in.
+    ;; - only subtypes of STRUCTURE-OBJECT need an ID for TYPEP, and structures
+    ;;   are not redefinable, so you'd have to define 2^32 different structure
+    ;;   types to exhaust the space of IDS.
+    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) 0)
     (let ((bitmap-base (+ fixed-words extra-id-words)))
       (dotimes (i bitmap-words)
         (%raw-instance-set/word layout (+ bitmap-base i)
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
     (aver (= (%layout-bitmap layout) bitmap)) ; verify it reads back the same
-    ;; It's not terribly important that we recycle layout IDs, but I have some other
-    ;; changes planned that warrant a finalizer per layout.
-    ;; FIXME: structure IDs should never be recycled because code blobs referencing
-    ;; th ID do not reference the layout, and so the layout could be GCd allowing
-    ;; reuse of an old ID for a new type.
-    (unless (built-in-classoid-p classoid)
-      (let ((layout-addr (- (get-lisp-obj-address layout) sb-vm:instance-pointer-lowtag)))
-        (declare (ignorable layout-addr))
-        (declare (sb-c::tlab :system))
-        (finalize layout
-                  (lambda ()
-                    (atomic-push id (cdr *layout-id-generator*)))
-                :dont-save t)))
     layout))
 
 ;;; This allocator is used by the expansion of MAKE-LOAD-FORM-SAVING-SLOTS
@@ -133,9 +123,17 @@
                        sb-kernel::*raw-slot-data*))))
   (define-raw-slot-accessors))
 
+(define-load-time-global *layout-id-generator* (cons 0  nil))
+(declaim (type (cons fixnum) *layout-id-generator*))
+(define-load-time-global *layout-id-mutex* (sb-thread:make-mutex :name "LAYOUT-ID"))
 (macrolet ((id-bits-sap ()
              `(sap+ (int-sap (get-lisp-obj-address layout))
-                    ,(- (sb-vm::id-bits-offset) sb-vm:instance-pointer-lowtag))))
+                    ,(- (sb-vm::id-bits-offset) sb-vm:instance-pointer-lowtag)))
+           (access-it ()
+             #-64-bit `(%raw-instance-ref/signed-word
+                        layout (+ (get-dsd-index layout id-word0) index))
+             ;; use SAP-ref, for lack of half-sized slots
+             #+64-bit `(signed-sap-ref-32 (id-bits-sap) (ash index 2))))
 (defun layout-id (layout)
   ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
   ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
@@ -146,13 +144,22 @@
   (let* ((depth (- (sb-vm::layout-depthoid layout) 2))
          (index (if (or (< depth 0) (not (logtest (layout-flags layout)
                                                   +structure-layout-flag+)))
-                    0 depth)))
-    (truly-the layout-id
-              #-64-bit (%raw-instance-ref/signed-word
-                        layout (+ (get-dsd-index layout id-word0) index))
-              #+64-bit ; use SAP-ref for lack of half-sized slots
-              (with-pinned-objects (layout)
-                (signed-sap-ref-32 (id-bits-sap) (ash index 2))))))
+                    0 depth))
+         (id (with-pinned-objects (layout)
+               (access-it))))
+    (truly-the
+     layout-id
+     (cond ((zerop id)
+            (aver (logior +structure-layout-flag+ (layout-flags layout)))
+            (with-system-mutex (*layout-id-mutex*)
+              (let ((id (truly-the layout-id (access-it)))) ; double-check
+                (if (zerop id)
+                    (with-pinned-objects (layout)
+                      (setf (access-it)
+                            ;; doesn't really need ATOMIC- any moren
+                            (atomic-incf (car *layout-id-generator*))))
+                    id))))
+           (t id)))))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
   (setf (layout-inherits layout) inherits)
