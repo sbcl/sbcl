@@ -480,9 +480,11 @@
 
 (macrolet ((def (name prim rtype)
              `(progn
-               (deftransform ,name ((x) (single-float) ,rtype)
-                 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
-               (deftransform ,name ((x) (double-float) ,rtype)
+               (deftransform ,name ((x) (single-float) ,rtype :node node)
+                 (delay-ir1-transform node :ir1-phases)
+                 `(%single-float (,',prim (%double-float x))))
+               (deftransform ,name ((x) (double-float) ,rtype :node node)
+                 (delay-ir1-transform node :ir1-phases)
                  `(,',prim x)))))
   (def exp %exp *)
   (def log %log float)
