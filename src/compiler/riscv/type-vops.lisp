@@ -44,7 +44,8 @@
                                  :immediate-tested immediate-tested)))
 
 
-(defun %test-immediate (value temp target not-p immediate)
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst andi temp value widetag-mask)
     (inst xori temp temp immediate)
@@ -52,7 +53,8 @@
         (inst bne temp zero-tn target)
         (inst beq temp zero-tn target))))
 
-(defun %test-lowtag (value temp target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst andi temp value lowtag-mask)
     (inst xori temp temp lowtag)

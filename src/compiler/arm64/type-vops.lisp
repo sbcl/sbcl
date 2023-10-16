@@ -35,15 +35,22 @@
                                     &key (drop-through (gen-label))
                                          value-tn-ref
                                          immediate-tested)
-  (cond ((= immediate single-float-widetag)
-         (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
-                                         (specifier-type 'single-float))
-           (inst cmp (32-bit-reg value) single-float-widetag)
-           (inst b :eq (if not-p drop-through target))))
-        (t
-         (inst mov temp immediate)
-         (inst cmp temp (extend value :uxtb))
-         (inst b :eq (if not-p drop-through target))))
+  (multiple-value-bind (bit set) (tn-ref-lowtag-bit immediate value-tn-ref)
+    (case set
+      (1
+       (inst tbnz* value bit (if not-p drop-through target)))
+      (0
+       (inst tbz* value bit (if not-p drop-through target)))
+      (t
+       (cond ((= immediate single-float-widetag)
+              (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                              (specifier-type 'single-float))
+                (inst cmp (32-bit-reg value) single-float-widetag)
+                (inst b :eq (if not-p drop-through target))))
+             (t
+              (inst mov temp immediate)
+              (inst cmp temp (extend value :uxtb))
+              (inst b :eq (if not-p drop-through target)))))))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
                  :value-tn-ref value-tn-ref
@@ -63,19 +70,40 @@
                    :value-tn-ref value-tn-ref
                    :immediate-tested immediate-tested)))
 
-(defun %test-immediate (value temp target not-p immediate)
-  (cond ((= immediate unbound-marker-widetag)
-         (inst cmp value immediate))
-        (t
-         (inst and temp value widetag-mask)
-         (inst cmp temp immediate)))
-  (inst b (if not-p :ne :eq) target))
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (multiple-value-bind (bit set) (tn-ref-lowtag-bit immediate value-tn-ref)
+    (case set
+      (1
+       (if not-p
+           (inst tbz* value bit target)
+           (inst tbnz* value bit target)))
+      (0
+       (if not-p
+           (inst tbnz* value bit target)
+           (inst tbz* value bit target)))
+      (t
+       (cond ((= immediate unbound-marker-widetag)
+              (inst cmp value immediate))
+             (t
+              (inst and temp value widetag-mask)
+              (inst cmp temp immediate)))
+       (inst b (if not-p :ne :eq) target)))))
 
-(defun %test-lowtag (value temp target not-p lowtag)
-  (assemble ()
-    (inst and temp value lowtag-mask)
-    (inst cmp temp lowtag)
-    (inst b (if not-p :ne :eq) target)))
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (multiple-value-bind (bit set) (tn-ref-lowtag-bit lowtag value-tn-ref)
+    (case set
+      (1
+       (if not-p
+           (inst tbz* value bit target)
+           (inst tbnz* value bit target)))
+      (0
+       (if not-p
+           (inst tbnz* value bit target)
+           (inst tbz* value bit target)))
+      (t
+       (inst and temp value lowtag-mask)
+       (inst cmp temp lowtag)
+       (inst b (if not-p :ne :eq) target)))))
 
 (defun %test-headers (value widetag target not-p function-p headers
                       &key (drop-through (gen-label))
@@ -102,9 +130,17 @@
         (assemble ()
           (cond (widetag
                  (unless (and value-tn-ref
-                              (eq lowtag other-pointer-lowtag)
+                              (= lowtag other-pointer-lowtag)
                               (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers immediate-tested))
-                   (%test-lowtag value widetag when-false t lowtag))
+                   (multiple-value-bind (bit set) (tn-ref-lowtag-bit lowtag value-tn-ref
+                                                                       nil-in-other-pointers immediate-tested)
+                     (case set
+                       (1
+                        (inst tbz* value bit when-false))
+                       (0
+                        (inst tbnz* value bit when-false))
+                       (t
+                        (%test-lowtag value widetag when-false t lowtag)))))
                  (load-type widetag value (- lowtag)))
                 (t
                  (setf widetag value
@@ -743,11 +779,21 @@
 
 (define-vop (single-float-p)
   (:args (value :scs (any-reg descriptor-reg)))
+  (:arg-refs value-ref)
   (:conditional :eq)
   (:policy :fast-safe)
   (:translate single-float-p)
+  (:vop-var vop)
   (:generator 7
-    (inst cmp (32-bit-reg value) single-float-widetag)))
+    (multiple-value-bind (bit set) (tn-ref-lowtag-bit single-float-widetag value-ref)
+      (case set
+        (1
+         (change-vop-flags vop '(:ne))
+         (inst tst value (ash 1 bit)))
+        (0
+         (inst tst value (ash 1 bit)))
+        (t
+         (inst cmp (32-bit-reg value) single-float-widetag))))))
 
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))

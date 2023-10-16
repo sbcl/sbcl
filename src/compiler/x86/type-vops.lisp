@@ -30,8 +30,8 @@
                    :drop-through drop-through :value-tn-ref value-tn-ref
                    :immediate-tested immediate-tested)))
 
-(defun %test-immediate (value temp target not-p immediate)
-  (declare (ignore temp))
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (declare (ignore temp value-tn-ref))
   ;; Code a single instruction byte test if possible.
   (let ((offset (tn-offset value)))
     (cond ((and (sc-is value any-reg descriptor-reg)
@@ -46,8 +46,8 @@
            (inst cmp al-tn immediate))))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag (value temp target not-p lowtag)
-  (declare (ignore temp))
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore temp value-tn-ref))
   (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
   (inst test al-tn lowtag-mask)
   ;; FIXME: another 'optimization' which doesn't appear to work:

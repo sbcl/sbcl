@@ -243,16 +243,8 @@
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (if permit-nil
-                 (specifier-type '(or
-                                   function
-                                   cons
-                                   instance
-                                   character))
-                 (specifier-type '(or
-                                   function
-                                   list
-                                   instance
-                                   character)))))
+                 (specifier-type '(or function cons instance character))
+                 (specifier-type '(or function list instance character)))))
        (or (memq 'fixnum immediates-tested)
            (not (types-equal-or-intersect (tn-ref-type tn-ref) (specifier-type 'fixnum))))
        #+64-bit
@@ -263,17 +255,57 @@
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
-             (specifier-type (if permit-nil
-                                 '(or #+64-bit single-float
-                                   function
-                                   cons
-                                   instance
-                                   character)
-                                 '(or #+64-bit single-float
-                                   function
-                                   list
-                                   instance
-                                   character)))))))
+             (if permit-nil
+                 (specifier-type '(or cons . #1=(#+64-bit single-float function cons instance character)))
+                 (specifier-type '(or list . #1#)))))))
+
+;;; Can LOWTAG be distinguished from other tn lowtags by testing a single bit?
+(defun tn-ref-lowtag-bit (lowtag tn-ref &optional permit-nil immediates-tested)
+  (declare (fixnum lowtag))
+  (when tn-ref
+    (let ((type (tn-ref-type tn-ref))
+          (set 0)
+          (clear 0))
+      (when (eq type *universal-type*)
+        (return-from tn-ref-lowtag-bit))
+      (unless (memq 'fixnum immediates-tested)
+        (when (types-equal-or-intersect type (specifier-type 'fixnum))
+          (setf set (logandc2 lowtag-mask fixnum-tag-mask)
+                clear lowtag-mask)))
+      (macrolet ((s (lowtag type)
+                   `(when (and (/= lowtag ,lowtag)
+                               (types-equal-or-intersect type ,(if (symbolp type)
+                                                                   `(specifier-type ',type)
+                                                                   type)))
+                      (setf set (logior set (logand lowtag-mask ,lowtag))
+                            clear (logior clear (logandc2 lowtag-mask ,lowtag))))))
+        #+64-bit
+        (unless (memq single-float-widetag immediates-tested)
+          (s single-float-widetag single-float))
+        (if permit-nil
+            (s list-pointer-lowtag cons)
+            (s list-pointer-lowtag list))
+        (s fun-pointer-lowtag function)
+        (s instance-pointer-lowtag instance)
+        (s character-widetag character)
+        (s other-pointer-lowtag
+           (if permit-nil
+               (specifier-type '(not (or cons . #1=(#+64-bit fixnum single-float function cons instance character))))
+               (specifier-type '(not (or list . #1#)))))
+        (let ((set-bit (logand lowtag-mask (logandc2 lowtag set)))
+              (clear-bit (logandc2 lowtag-mask (logior lowtag clear))))
+          (cond ((plusp set-bit)
+                 (values (sb-kernel::first-bit-set set-bit) 1))
+                ((plusp clear-bit)
+                 (values (sb-kernel::first-bit-set clear-bit) 0))))))))
+
+(defun fun-or-other-pointer-tn-ref-p (tn-ref &optional permit-nil)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (not (types-equal-or-intersect
+             (tn-ref-type tn-ref)
+             (if permit-nil
+                 (specifier-type '(or cons instance character fixnum #+64-bit single-float))
+                 (specifier-type '(or cons instance character fixnum #+64-bit single-float)))))))
 
 (defun not-nil-tn-ref-p (tn-ref)
   (not (types-equal-or-intersect (tn-ref-type tn-ref)

@@ -47,13 +47,15 @@
                  :drop-through drop-through :value-tn-ref value-tn-ref
                  :immediate-tested immediate-tested))
 
-(defun %test-immediate (value temp target not-p immediate)
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst andi. temp value widetag-mask)
     (inst cmpwi temp immediate)
     (inst b? (if not-p :ne :eq) target)))
 
-(defun %test-lowtag (value temp target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst andi. temp value lowtag-mask)
     (inst cmpwi temp lowtag)

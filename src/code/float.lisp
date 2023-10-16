@@ -719,14 +719,6 @@
     (((foreach single-float double-float #+long-float long-float))
      (%unary-ftruncate number))))
 
-(declaim (inline first-bit-set))
-(defun first-bit-set (x)
-  #+x86-64
-  (truly-the (values (mod #.sb-vm:n-word-bits) &optional)
-             (%primitive sb-vm::unsigned-word-find-first-bit (the word x)))
-  #-x86-64
-  (1- (integer-length (logand x (- x)))))
-
 (defun rational (x)
   "RATIONAL produces a rational number for any real numeric argument. This is
   more efficient than RATIONALIZE, but it assumes that floating-point is

@@ -30,7 +30,8 @@
                    :value-tn-ref value-tn-ref
                    :immediate-tested immediate-tested)))
 
-(defun %test-immediate (value temp target not-p immediate)
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst and temp value widetag-mask)
     (inst xor temp immediate)
@@ -39,7 +40,8 @@
         (inst beq temp target))
     (inst nop)))
 
-(defun %test-lowtag (value temp target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (assemble ()
     (inst and temp value lowtag-mask)
     (inst xor temp lowtag)

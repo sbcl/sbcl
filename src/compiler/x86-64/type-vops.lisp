@@ -63,15 +63,6 @@
                      :drop-through drop-through
                      :immediate-tested immediate-tested)))))
 
-;; I can see no reason this would ever be used.
-;; (or fixnum character|unbound-marker) is implausible.
-(defun %test-fixnum-and-immediate (value target not-p immediate)
-  (error "WAT")
-  (let ((drop-through (gen-label)))
-    (generate-fixnum-test value)
-    (inst jmp :z (if not-p drop-through target))
-    (%test-immediate value target not-p immediate drop-through)))
-
 ;; Numerics
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers
                                            &key value-tn-ref immediate-tested)
@@ -100,11 +91,10 @@
                                      :immediate-tested immediate-tested)))))
 
 (defun %test-immediate (value temp target not-p immediate
-                        &optional (drop-through (gen-label)))
-  (declare (ignore temp))
+                        &key value-tn-ref)
+  (declare (ignore temp value-tn-ref))
   (inst cmp :byte value immediate)
-  (inst jmp (if not-p :ne :e) target)
-  (emit-label drop-through))
+  (inst jmp (if not-p :ne :e) target))
 
 ;; Numerics including short-float, excluding fixnum
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
@@ -123,7 +113,8 @@
                  :value-tn-ref value-tn-ref
                  :immediate-tested immediate-tested))
 
-(defun %test-lowtag (value temp target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore value-tn-ref))
   (%lea-for-lowtag-test temp value lowtag)
   (inst test :byte temp lowtag-mask)
   (inst jmp (if not-p :nz :z) target))

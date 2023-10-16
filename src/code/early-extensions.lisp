@@ -1463,5 +1463,14 @@ NOTE: This interface is experimental and subject to change."
               (eq (symbol-value x) x))))
     (cons nil)
     (t t)))
+
+(declaim (inline first-bit-set))
+(defun first-bit-set (x)
+  #+(and x86-64 (not sb-xc-host))
+  (truly-the (values (mod #.sb-vm:n-word-bits) &optional)
+             (%primitive sb-vm::unsigned-word-find-first-bit (the word x)))
+  #-(and x86-64 (not sb-xc-host))
+  (1- (integer-length (logand x (- x)))))
+
 
 (defvar *top-level-form-p* nil)
