@@ -342,6 +342,7 @@
 
 ;;; FIXME: Maybe rename this so that it's clearer that it only works
 ;;; on integers?
+(declaim (inline log2))
 (defun log2 (x)
   (declare (type integer x))
   ;; CMUCL comment:
@@ -351,15 +352,20 @@
   ;;   appropriately, take the log of it and add it to n.
   ;;
   ;; Motivated by an attempt to get LOG to work better on bignums.
-  (let ((n (integer-length x)))
-    (if (< n sb-vm:double-float-digits)
-        (log (coerce x 'double-float) $2.0d0)
-        (let ((f (ldb (byte sb-vm:double-float-digits
-                            (- n sb-vm:double-float-digits))
-                      x)))
-          (+ n (log (scale-float (coerce f 'double-float)
-                                 (- sb-vm:double-float-digits))
-                    $2.0d0))))))
+  (cond ((typep x 'sb-vm:signed-word)
+         (log (coerce x 'double-float) $2.0d0))
+        (t
+         (let ((n (integer-length x)))
+           (cond #-64-bit
+                 ((< n sb-vm:double-float-digits)
+                  (log (coerce x 'double-float) $2.0d0))
+                 (t
+                  (let ((f (ldb (byte sb-vm:double-float-digits
+                                      (- n sb-vm:double-float-digits))
+                                x)))
+                    (+ n (log (scale-float (coerce f 'double-float)
+                                           (- sb-vm:double-float-digits))
+                              $2.0d0)))))))))
 
 (defun log (number &optional (base nil base-p))
   "Return the logarithm of NUMBER in the base BASE, which defaults to e."
@@ -372,7 +378,8 @@
              $0.0f0))
         ((and (typep number '(integer (0) *))
               (typep base '(integer (0) *)))
-         (coerce (/ (log2 number) (log2 base)) 'single-float))
+         (coerce (/ (truly-the double-float (log2 number))
+                    (truly-the double-float (log2 base))) 'single-float))
         ((and (typep number 'integer) (typep base 'double-float))
          ;; No single float intermediate result
          (/ (log2 number) (log base $2.0d0)))
@@ -384,7 +391,8 @@
         (((foreach fixnum bignum))
          (if (minusp number)
              (complex (log (- number)) (coerce pi 'single-float))
-             (coerce (/ (log2 number) (log (exp $1.0d0) $2.0d0)) 'single-float)))
+             (coerce (/ (truly-the double-float (log2 number))
+                        (log (exp $1.0d0) $2.0d0)) 'single-float)))
         ((ratio)
          (if (minusp number)
              (complex (log (- number)) (coerce pi 'single-float))
@@ -394,7 +402,8 @@
                       (integer-length denominator))
                    (coerce (%log1p (coerce (- number 1) 'double-float))
                            'single-float)
-                   (coerce (/ (- (log2 numerator) (log2 denominator))
+                   (coerce (/ (- (truly-the double-float (log2 numerator))
+                                 (truly-the double-float (log2 denominator)))
                               (log (exp $1.0d0) $2.0d0))
                            'single-float)))))
         (((foreach single-float double-float))
