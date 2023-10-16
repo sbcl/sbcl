@@ -443,3 +443,13 @@ fractional bits."
                    :allow-style-warnings t)
   (checked-compile `(lambda () (rational #.sb-ext:single-float-positive-infinity))
                    :allow-style-warnings t))
+
+(with-test (:name :log-derive-type)
+  (assert-type (lambda (y)
+                 (declare (integer y))
+                 (log y 2.0d0))
+               (or double-float (complex double-float)))
+  (assert-type (lambda (y)
+                 (declare (double-float y))
+                 (log y 2.0d0))
+               (or double-float (complex double-float))))

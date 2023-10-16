@@ -16,15 +16,6 @@
 ;;;; in addition to which it is near impossible to wade through the
 ;;;; ton of nameless, slow, and noisy tests.
 
-(defmacro assert-type (lambda type)
-  `(assert
-    (type-specifiers-equal
-     (caddr
-      (sb-kernel:%simple-fun-type
-       (checked-compile
-        ',lambda)))
-     '(values ,type &optional))))
-
 #+sb-unicode
 (with-test (:name :base-char-p)
   (assert

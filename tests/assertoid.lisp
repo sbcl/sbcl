@@ -18,7 +18,8 @@
            "HAS-ERROR?" "IS" "ASSERTOID"
            "ASSERT-SIGNAL" "ASSERT-NO-SIGNAL"
            "LEGACY-EVAL-P"
-           "EQUAL-MOD-GENSYMS" "CHECK-FUNCTION-EVALUATION-ORDER"))
+           "EQUAL-MOD-GENSYMS" "CHECK-FUNCTION-EVALUATION-ORDER"
+           "ASSERT-TYPE"))
 
 (cl:in-package "ASSERTOID")
 
@@ -74,6 +75,15 @@
       (lambda (,handle)
         (handler-bind ((,condition-type ,handle)) ,form))
       ',condition-type)))
+
+(defmacro assert-type (lambda type)
+  `(assert
+    (test-util:type-specifiers-equal
+     (caddr
+      (sb-kernel:%simple-fun-type
+       (test-util:checked-compile
+        ',lambda)))
+     '(values ,type &optional))))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of

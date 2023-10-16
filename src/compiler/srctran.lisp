@@ -1250,6 +1250,8 @@
               (list arg))
              (union-type
               (union-type-types arg))
+             (list
+              arg)
              (t
               (list arg))))
          (ignore-hairy-type (type)
