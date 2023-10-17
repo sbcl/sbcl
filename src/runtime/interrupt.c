@@ -51,6 +51,9 @@
 #include <sys/wait.h>
 #endif
 #include <errno.h>
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+#include <time.h>
+#endif
 
 #include "runtime.h"
 #include "arch.h"
@@ -62,13 +65,13 @@
 #include "validate.h"
 #include "interr.h"
 #include "gc.h"
-#include "genesis/instance.h"
 #include "genesis/sap.h"
 #include "dynbind.h"
 #include "pseudo-atomic.h"
 #include "genesis/fdefn.h"
 #include "genesis/cons.h"
 #include "genesis/vector.h"
+#include "genesis/thread.h"
 #include "atomiclog.inc"
 
 #ifdef ATOMIC_LOGGING
@@ -253,17 +256,6 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 #else
 #  define UNBLOCK_SIGSEGV() {}
 #endif
-
-/* Not safe in general, but if your thread names are all
- * simple-base-string and won't move, this is slightly ok */
-char* vm_thread_name(struct thread* th)
-{
-    if (!th) return "non-lisp";
-    struct thread_instance *lispthread = (void*)INSTANCE(th->lisp_thread);
-    lispobj name = lispthread->_name;
-    if (simple_base_string_p(name)) return vector_sap(name);
-    return "?";
-}
 
 /* These are to be used in signal handlers. Currently all handlers are
  * called from one of:

@@ -30,6 +30,7 @@
 #include "runtime.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
 #include "thread.h"
+#include "genesis/thread.h"
 #include "arch.h"
 #include "target-arch-os.h"
 #include "os.h"
@@ -105,6 +106,17 @@ unlink_thread(struct thread *th)
         all_threads = th->next;
     if (th->next)
         th->next->prev = th->prev;
+}
+
+/* Not safe in general, but if your thread names are all
+ * simple-base-string and won't move, this is slightly ok */
+char* vm_thread_name(struct thread* th)
+{
+    if (!th) return "non-lisp";
+    struct thread_instance *lispthread = (void*)INSTANCE(th->lisp_thread);
+    lispobj name = lispthread->_name;
+    if (simple_base_string_p(name)) return vector_sap(name);
+    return "?";
 }
 
 #define get_thread_state(thread) \

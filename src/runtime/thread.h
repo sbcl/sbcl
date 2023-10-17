@@ -268,6 +268,7 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
     return 1;
 #endif
 }
+extern char* vm_thread_name(struct thread*);
 
 extern void record_backtrace_from_context(void*,struct thread*);
 
