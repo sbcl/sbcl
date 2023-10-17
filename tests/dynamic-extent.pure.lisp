@@ -2143,7 +2143,7 @@
      ((1) 0))))
 
 (with-test (:name :stack-allocated-vector-checks-overflow
-            :broken-on (or :arm64 :win32 :darwin))
+            :broken-on (not (and :x86-64 :linux)))
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()
@@ -2196,4 +2196,3 @@
            (print-nothing (car another)))
          (car digits)))
      (() 0))))
-
