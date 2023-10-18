@@ -641,9 +641,9 @@
   (if (eq args-thunk :return-type)
       (let ((type (sb-kernel:%simple-fun-type function)))
        (unless (or (eq type 'function)
-                   (type-specifiers-equal (caddr type) expected)
                    #.(and (not (member :unwind-to-frame-and-call-vop sb-impl:+internal-features+))
-                          '(member '(debug 3) optimize :test #'equal)))
+                          '(member '(debug 3) optimize :test #'equal))
+                   (type-specifiers-equal (caddr type) expected))
          (error "~@<The derived type of~
                    ~/test-util::print-form-and-optimize/ ~
                    is ~/sb-impl:print-type-specifier/
