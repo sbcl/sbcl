@@ -34,9 +34,6 @@
 ;;; This representation allows trailing slots to be either all tagged
 ;;; or all untagged.
 
-(defun ld (x) (sb-kernel:layout-depthoid (truly-the layout x)))
-(compile 'ld)
-
 (defstruct d2)
 (defstruct (d3 (:include d2)))
 (defstruct (d4 (:include d3)))
