@@ -1132,6 +1132,27 @@ uword_t create_thread(struct thread* th)
 int try_acquire_gc_lock() { return TryEnterCriticalSection(&in_gc_lock); }
 int release_gc_lock() { return mutex_release(&in_gc_lock); }
 
+static __attribute__((unused)) struct timespec stw_begin_time;
+long timespec_delta_microsec(struct timespec* begin, struct timespec* end)
+{
+    return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
+}
+void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
+{
+    /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
+     * can receive SIG_STOP_FOR_GC as soon as it has a 'struct thread'
+     * and _before_ a thread instance has been consed */
+    if (th->lisp_thread) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        unsigned long elapsed = timespec_delta_microsec(begin, &now);
+        struct thread_instance* ti = (void*)INSTANCE(th->lisp_thread);
+        if (elapsed > ti->uw_max_stw_pause) ti->uw_max_stw_pause = elapsed;
+        ti->uw_sum_stw_pause += elapsed;
+        ++ti->uw_ct_stw_pauses;
+    }
+}
+
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while
@@ -1165,27 +1186,6 @@ int release_gc_lock() { return mutex_release(&in_gc_lock); }
  * (so that dereferencing was valid), but if dereferencing was valid, then the thread
  * can't have died (i.e. if ESRCH could be returned, then that implies that
  * the memory shouldn't be there) */
-
-static struct timespec stw_begin_time;
-long timespec_delta_microsec(struct timespec* begin, struct timespec* end)
-{
-    return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
-}
-void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
-{
-    /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
-     * can receive SIG_STOP_FOR_GC as soon as it has a 'struct thread'
-     * and _before_ a thread instance has been consed */
-    if (th->lisp_thread) {
-        struct timespec now;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-        unsigned long elapsed = timespec_delta_microsec(begin, &now);
-        struct thread_instance* ti = (void*)INSTANCE(th->lisp_thread);
-        if (elapsed > ti->uw_max_stw_pause) ti->uw_max_stw_pause = elapsed;
-        ti->uw_sum_stw_pause += elapsed;
-        ++ti->uw_ct_stw_pauses;
-    }
-}
 
 void gc_stop_the_world()
 {
