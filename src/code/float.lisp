@@ -262,37 +262,46 @@
 (macrolet ((def (type)
              `(defun ,(symbolicate 'scale- type '-maybe-underflow) (x exp)
                 (declare (inline ,(symbolicate 'integer-decode- type)))
-                (multiple-value-bind (sig old-exp sign) (,(symbolicate 'integer-decode- type) x)
-                  (let* ((digits (float-digits x))
-                         (new-exp (+ exp old-exp digits
-                                     ,(case type
-                                        (single-float 'sb-vm:single-float-bias)
-                                        (double-float 'sb-vm:double-float-bias))))
-                         ;; convert decoded values {-1,+1} into {1,0} respectively
-                         (sign (if (minusp sign) 1 0)))
-                    (cond
-                      ((< new-exp
-                          ,(case type
-                             (single-float 'sb-vm:single-float-normal-exponent-min)
-                             (double-float 'sb-vm:double-float-normal-exponent-min)))
-                       (when (sb-vm:current-float-trap :inexact)
-                         (error 'floating-point-inexact :operation 'scale-float
-                                                        :operands (list x exp)))
-                       (when (sb-vm:current-float-trap :underflow)
-                         (error 'floating-point-underflow :operation 'scale-float
-                                                          :operands (list x exp)))
-                       (let ((shift (1- new-exp)))
-                         (if (< shift (- (1- digits)))
-                             (float-sign x ,(case type
-                                              (single-float $0f0)
-                                              (double-float $0d0)))
-                             ,(case type
-                                (single-float '(single-from-bits sign 0 (ash sig shift)))
-                                (double-float '(double-from-bits sign 0 (ash sig shift)))))))
+                (cond ((float-infinity-p x)
+                       x)
+                      ((float-nan-p x)
+                       (when (and (float-trapping-nan-p x)
+                                  (sb-vm:current-float-trap :invalid))
+                         (error 'floating-point-invalid-operation :operation 'scale-float
+                                                                  :operands (list x exp)))
+                       x)
                       (t
-                       ,(case type
-                          (single-float '(single-from-bits sign new-exp sig))
-                          (double-float '(double-from-bits sign new-exp sig))))))))))
+                       (multiple-value-bind (sig old-exp sign) (,(symbolicate 'integer-decode- type) x)
+                         (let* ((digits (float-digits x))
+                                (new-exp (+ exp old-exp digits
+                                            ,(case type
+                                               (single-float 'sb-vm:single-float-bias)
+                                               (double-float 'sb-vm:double-float-bias))))
+                                ;; convert decoded values {-1,+1} into {1,0} respectively
+                                (sign (if (minusp sign) 1 0)))
+                           (cond
+                             ((< new-exp
+                                 ,(case type
+                                    (single-float 'sb-vm:single-float-normal-exponent-min)
+                                    (double-float 'sb-vm:double-float-normal-exponent-min)))
+                              (when (sb-vm:current-float-trap :inexact)
+                                (error 'floating-point-inexact :operation 'scale-float
+                                                               :operands (list x exp)))
+                              (when (sb-vm:current-float-trap :underflow)
+                                (error 'floating-point-underflow :operation 'scale-float
+                                                                 :operands (list x exp)))
+                              (let ((shift (1- new-exp)))
+                                (if (< shift (- (1- digits)))
+                                    (float-sign x ,(case type
+                                                     (single-float $0f0)
+                                                     (double-float $0d0)))
+                                    ,(case type
+                                       (single-float '(single-from-bits sign 0 (ash sig shift)))
+                                       (double-float '(double-from-bits sign 0 (ash sig shift)))))))
+                             (t
+                              ,(case type
+                                 (single-float '(single-from-bits sign new-exp sig))
+                                 (double-float '(double-from-bits sign new-exp sig))))))))))))
   (def single-float)
   (def double-float))
 
