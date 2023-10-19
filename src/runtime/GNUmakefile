@@ -90,7 +90,13 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o
 
 LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
-targets: $(TARGET) $(OBJTARGET) ldb sbcl.mk
+ifdef LISP_FEATURE_SB_SAFEPOINT
+LDB_TARGET =
+else
+LDB_TARGET = ldb
+endif
+
+targets: $(TARGET) $(OBJTARGET) $(LDB_TARGET) sbcl.mk
 
 LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o safepoint.o,$(OBJS))
 ldb: $(LIBSBCL)
