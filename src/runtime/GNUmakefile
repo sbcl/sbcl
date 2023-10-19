@@ -90,7 +90,7 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o
 
 LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
-targets: $(TARGET) $(OBJTARGET) sbcl.mk
+targets: $(TARGET) $(OBJTARGET) ldb sbcl.mk
 
 LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o,$(OBJS))
 ldb: $(LIBSBCL)
