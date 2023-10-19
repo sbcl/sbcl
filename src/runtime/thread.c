@@ -1278,7 +1278,7 @@ void gc_start_the_world()
 }
 
 #endif /* !LISP_FEATURE_SB_SAFEPOINT */
-#else
+#elif !defined STANDALONE_LDB
 // no threads
 void gc_stop_the_world() {}
 void gc_start_the_world() {}
