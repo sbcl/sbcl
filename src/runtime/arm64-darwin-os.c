@@ -49,16 +49,15 @@ void jit_copy_code_constants(lispobj lispcode, lispobj constants)
     struct vector* v = VECTOR(constants);
     gc_assert(header_widetag(v->header) == SIMPLE_VECTOR_WIDETAG);
     gc_assert(find_page_index((void*)code) >= 0);
-    THREAD_JIT(0);
+
     sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, SIG_STOP_FOR_GC);
-    thread_sigmask(SIG_BLOCK, &mask, 0);
+    block_blockable_signals(&mask);
+    THREAD_JIT(0);
     gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
     SET_WRITTEN_FLAG((lispobj*)code);
     memcpy(&code->constants, v->data, vector_len(v) * N_WORD_BYTES);
-    thread_sigmask(SIG_UNBLOCK, &mask, 0);
     THREAD_JIT(1);
+    thread_sigmask(SIG_SETMASK, &mask, 0);
 }
 
 void jit_memcpy(void* dst, void* src, size_t n) {
@@ -74,16 +73,16 @@ void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
      * marked (i.e. not write-protected, allegedly) would be an error.
      * Disallow GC in between setting the WRITTEN flag and doing the assigmment */
     if (find_page_index((void*)code) >= 0) {
-        THREAD_JIT(0);
         sigset_t mask;
-        sigemptyset(&mask);
-        sigaddset(&mask, SIG_STOP_FOR_GC);
-        thread_sigmask(SIG_BLOCK, &mask, 0);
+        block_blockable_signals(&mask);
+        THREAD_JIT(0);
+
         gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
         SET_WRITTEN_FLAG(native_pointer(code));
         native_pointer(code)[index] = value;
-        thread_sigmask(SIG_UNBLOCK, &mask, 0);
+
         THREAD_JIT(1);
+        thread_sigmask(SIG_SETMASK, &mask, 0);
     } else { // Off-heap code objects can't be executed (or GC'd)
         SET_WRITTEN_FLAG(native_pointer(code));
         native_pointer(code)[index] = value;
