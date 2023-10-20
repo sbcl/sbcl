@@ -256,7 +256,7 @@ static int save_cmd(char **ptr) {
     char *name  = parse_token(ptr);
     if (!name) {
         fprintf(stderr, "Need filename\n");
-        return 1;
+        return 0;
     }
 #if (defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64) && defined LISP_FEATURE_SB_THREAD
     suspend_other_threads();
