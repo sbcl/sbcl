@@ -93,7 +93,7 @@ struct crash_thread_preamble {
 };
 
 // Prevent some mixups in case you add fields to the crash dump
-const int CRASH_PREAMBLE_SIGNATURE =
+const uword_t CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
@@ -180,7 +180,7 @@ void save_gc_crashdump(char *pathname,
         if (ici) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             sp = *os_context_register_addr(threadcontext, reg_SP);
-#else
+#elif defined reg_CSP
             sp = *os_context_register_addr(threadcontext, reg_CSP);
 #endif
         } else if (th->state_word.state == STATE_DEAD) {
@@ -1115,7 +1115,7 @@ int load_gc_crashdump(char* pathname)
         *os_context_register_addr(context,reg_SP) = (os_context_register_t)stackptr;
 #endif
         gc_assert(*os_context_register_addr(context,reg_SP) == (os_context_register_t)stackptr);
-#else
+#elif defined reg_CSP
         *os_context_register_addr(context, reg_CSP) = (uword_t)stackptr;
 #endif
         checked_read(" stack", fd, stackptr, thread_preamble.control_stack_nbytes);
