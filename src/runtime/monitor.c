@@ -377,21 +377,22 @@ static int gc_cmd(char **ptr) {
     return 0;
 }
 
-static int tlsf_cmd(__attribute__((unused)) char **ptr) {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+static int tlsf_cmd(__attribute__((unused)) char **ptr) {
     tlsf_dump_pool(tlsf_control, tlsf_mem_start, "/dev/tty");
 #ifdef TLSF_CONFIG_DEBUG
     tlsf_check(tlsf_control);
     tlsf_check_pool(tlsf_mem_start);
 #endif
-#endif
     return 0;
 }
+#endif
 
 static struct cmd {
     char *cmd, *help;
     int (*fn)(char **ptr);
 } supported_cmds[] = {
+    // Commands with no help string are all at-your-own-risk
     {"help", "Display this help information.", help_cmd},
     {"?", "(an alias for help)", help_cmd},
     {"backtrace", "Backtrace up to N frames.", backtrace_cmd},
@@ -410,11 +411,13 @@ static struct cmd {
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
-    {"save", "Produce crashdump", save_cmd},
+    {"save", 0, save_cmd}, // snapshot heap to file ("best effort" though)
     {"threads", "List threads", threads_cmd},
-    {"tlsfdump", "Dump TLSF structures", tlsf_cmd},
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    {"tlsfdump", 0, tlsf_cmd}, // (unsafely) dump TLSF structures
+#endif
     {"verify", "Check heap invariants", verify_cmd},
-    {"gc", "Collect garbage", gc_cmd},
+    {"gc", 0, gc_cmd}, // (this is not the right way to invoke GC)
     {NULL, NULL, NULL}
 };
 
