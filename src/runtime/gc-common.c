@@ -2981,3 +2981,18 @@ int lisp_valid_tagged_pointer_p(lispobj pointer) {
     int result = valid_tagged_pointer_p(pointer);
     return result;
 }
+
+#ifdef LISP_FEATURE_GENERATIONAL
+// For the standalone ldb monitor
+void recompute_gen_bytes_allocated() {
+    page_index_t page;
+    int gen;
+    for (gen=0; gen<NUM_GENERATIONS; ++gen)
+        generations[gen].bytes_allocated = 0;
+    for (page=0; page<next_free_page; ++page)
+        generations[page_table[page].gen].bytes_allocated += page_bytes_used(page);
+    bytes_allocated = 0;
+    for (gen=0; gen<NUM_GENERATIONS; ++gen)
+        bytes_allocated += generations[gen].bytes_allocated;
+}
+#endif

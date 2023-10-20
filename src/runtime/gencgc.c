@@ -4730,19 +4730,6 @@ done:
     return code_total_nwords(code);
 }
 
-// For the standalone ldb monitor
-void recompute_gen_bytes_allocated() {
-    page_index_t page;
-    int gen;
-    for (gen=0; gen<NUM_GENERATIONS; ++gen)
-        generations[gen].bytes_allocated = 0;
-    for (page=0; page<next_free_page; ++page)
-        generations[page_table[page].gen].bytes_allocated += page_bytes_used(page);
-    bytes_allocated = 0;
-    for (gen=0; gen<NUM_GENERATIONS; ++gen)
-        bytes_allocated += generations[gen].bytes_allocated;
-}
-
 void really_note_transporting(lispobj old,void*new,sword_t nwords)
 {
     page_index_t p = find_page_index((void*)old);
