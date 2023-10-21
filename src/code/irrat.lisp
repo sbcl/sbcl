@@ -356,8 +356,7 @@
          (log (coerce x 'double-float) $2.0d0))
         (t
          (let ((n (integer-length x)))
-           (cond #-64-bit
-                 ((< n sb-vm:double-float-digits)
+           (cond ((< n sb-vm:double-float-digits)
                   (log (coerce x 'double-float) $2.0d0))
                  (t
                   (let ((f (ldb (byte sb-vm:double-float-digits

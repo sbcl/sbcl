@@ -2465,25 +2465,34 @@
 ;;;; miscellaneous derive-type methods
 
 (defoptimizer (integer-length derive-type) ((x))
-  (let ((x-type (lvar-type x)))
-    (when (numeric-type-p x-type)
-      ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
-      ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
-      ;; careful about LO or HI being NIL, though.  Also, if 0 is
-      ;; contained in X, the lower bound is obviously 0.
-      (flet ((null-or-min (a b)
-               (and a b (min (integer-length a)
-                             (integer-length b))))
-             (null-or-max (a b)
-               (and a b (max (integer-length a)
-                             (integer-length b)))))
-        (let* ((min (numeric-type-low x-type))
-               (max (numeric-type-high x-type))
-               (min-len (null-or-min min max))
-               (max-len (null-or-max min max)))
-          (when (ctypep 0 x-type)
-            (setf min-len 0))
-          (specifier-type `(integer ,(or min-len '*) ,(or max-len '*))))))))
+  (one-arg-derive-type
+   x
+   (lambda (x-type)
+     (when (numeric-type-p x-type)
+       ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
+       ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
+       ;; careful about LO or HI being NIL, though.  Also, if 0 is
+       ;; contained in X, the lower bound is obviously 0.
+       (flet ((min-il (a b)
+                (min (integer-length a)
+                     (integer-length b)))
+              (max-il (a b)
+                (max (integer-length a)
+                     (integer-length b))))
+         (let ((lo (numeric-type-low x-type))
+               (hi (numeric-type-high x-type)))
+           (cond ((and lo hi)
+                  (specifier-type `(integer ,(if (<= lo 0 hi)
+                                                 0
+                                                 (min-il lo hi))
+                                            ,(max-il lo hi))))
+                 (lo
+                  (when (> lo 0)
+                    (specifier-type `(integer ,(integer-length lo)))))
+                 (hi
+                  (when (< hi 0)
+                    (specifier-type `(integer ,(integer-length hi))))))))))
+   #'integer-length))
 
 (defoptimizer (logcount derive-type) ((x))
   (let ((x-type (lvar-type x)))

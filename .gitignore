@@ -24,6 +24,7 @@ src/runtime/TAGS
 src/runtime/genesis
 src/runtime/openbsd-sigcontext.h
 src/runtime/sbcl
+src/runtime/ldb
 src/runtime/sbcl.exe
 src/runtime/sbcl.h
 src/runtime/sbcl.mk
