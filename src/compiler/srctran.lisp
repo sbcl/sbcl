@@ -2495,18 +2495,55 @@
    #'integer-length))
 
 (defoptimizer (logcount derive-type) ((x))
-  (let ((x-type (lvar-type x)))
-    (when (numeric-type-p x-type)
-      (let ((min (numeric-type-low x-type))
-            (max (numeric-type-high x-type)))
-        (when (and min max)
-          (specifier-type
-           `(integer ,(if (or (> min 0)
-                              (< max -1))
-                          1
-                          0)
-                     ,(max (integer-length min)
-                           (integer-length max)))))))))
+  (one-arg-derive-type
+   x
+   (lambda (x-type)
+     (when (numeric-type-p x-type)
+       (let ((lo (numeric-type-low x-type))
+             (hi (numeric-type-high x-type)))
+         (cond ((and lo hi)
+                (let ((adjust 0))
+                  (make-numeric-type :class 'integer
+                                     :low
+                                     (cond ((<= lo 0 hi)
+                                            0)
+                                           ((progn
+                                              (when (minusp lo)
+                                                (psetf lo (lognot hi)
+                                                       hi (lognot lo)))
+                                              (= (integer-length lo)
+                                                 (integer-length hi)))
+                                            ;; Count the bits that are always the same
+                                            (let ((first-diff (integer-length (logxor lo hi))))
+                                              (psetf
+                                               adjust (logcount (ash lo (- first-diff)))
+                                               lo (ldb (byte first-diff 0) lo)
+                                               hi (ldb (byte first-diff 0) hi))
+                                              (+ adjust
+                                                 (if (= lo 0)
+                                                     0
+                                                     1))))
+                                           ((= lo 0)
+                                            0)
+                                           (t
+                                            1))
+                                     :high
+                                     (let ((l (max (integer-length lo)
+                                                   (integer-length hi))))
+                                       (+ adjust
+                                          l
+                                          ;; Only one number can have all the bits turned on
+                                          (if (or (= hi (1- (ash 1 l)))
+                                                  (= lo (ash -1 l)))
+                                              0
+                                              -1))))))
+               (lo
+                (when (> lo 0)
+                  (specifier-type `(integer 1))))
+               (hi
+                (when (< hi -1)
+                  (specifier-type `(integer 1))))))))
+   #'logcount))
 
 (defoptimizer (isqrt derive-type) ((x))
   (let ((x-type (lvar-type x)))

@@ -49,6 +49,18 @@
             (sb-c::interval-low interval)
             (sb-c::interval-high interval))))
 
+(defun type-derivation1 (op l h)
+  (let ((interval (sb-c::numeric-type->interval
+                   (sb-kernel:specifier-type (cadr (caddr (sb-kernel:%simple-fun-type
+                                                           (compile nil `(lambda (u)
+                                                                           (,op (truly-the (integer ,l ,h) u)))))))))))
+    (values (loop for u from l to h
+                  minimize (funcall op u))
+            (loop for u from l to h
+                  maximize (funcall op u))
+            (sb-c::interval-low interval)
+            (sb-c::interval-high interval))))
+
 (with-test (:name :logical-type-derivation)
   (loop
     for low1 from -4 to 5
@@ -68,3 +80,15 @@
                     (type-derivation op low1 high1 low2 high2)
                   (assert (>= low r-low))
                   (assert (<= high r-high)))))))))
+
+(with-test (:name :bit-type-derivation)
+  (loop
+    for low from -18 to 17
+    do
+    (loop
+      for high from low to 17
+      do (loop for op in '(logcount integer-length)
+               do
+               (multiple-value-bind (low high r-low r-high) (type-derivation1 op low high)
+                 (assert (>= low r-low))
+                 (assert (<= high r-high)))))))
