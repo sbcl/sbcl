@@ -1367,18 +1367,19 @@
                         (and (not ratio-to-rational)
                              (eq x (specifier-type 'ratio))))
                     (funcall derive-fun x))
-                   (t
-                    (if (eq x (specifier-type 'ratio))
-                        (deriver (specifier-type 'rational))
-                        *universal-type*)))))
+                   ((eq x (specifier-type 'ratio))
+                    (deriver (specifier-type 'rational))))))
         ;; Run down the list of args and derive the type of each one,
         ;; saving all of the results in a list.
         (let ((results nil))
           (dolist (arg arg-list)
             (let ((result (deriver arg)))
-              (if (listp result)
-                  (setf results (append results result))
-                  (push result results))))
+              (cond ((not result)
+                     (return-from one-arg-derive-type))
+                    ((listp result)
+                     (setf results (append results result)))
+                    (t
+                     (push result results)))))
           (if (rest results)
               (make-derived-union-type results)
               (first results)))))))
@@ -2468,81 +2469,79 @@
   (one-arg-derive-type
    x
    (lambda (x-type)
-     (when (numeric-type-p x-type)
-       ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
-       ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
-       ;; careful about LO or HI being NIL, though.  Also, if 0 is
-       ;; contained in X, the lower bound is obviously 0.
-       (flet ((min-il (a b)
-                (min (integer-length a)
-                     (integer-length b)))
-              (max-il (a b)
-                (max (integer-length a)
-                     (integer-length b))))
-         (let ((lo (numeric-type-low x-type))
-               (hi (numeric-type-high x-type)))
-           (cond ((and lo hi)
-                  (specifier-type `(integer ,(if (<= lo 0 hi)
-                                                 0
-                                                 (min-il lo hi))
-                                            ,(max-il lo hi))))
-                 (lo
-                  (when (> lo 0)
-                    (specifier-type `(integer ,(integer-length lo)))))
-                 (hi
-                  (when (< hi 0)
-                    (specifier-type `(integer ,(integer-length hi))))))))))
+     ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
+     ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
+     ;; careful about LO or HI being NIL, though.  Also, if 0 is
+     ;; contained in X, the lower bound is obviously 0.
+     (flet ((min-il (a b)
+              (min (integer-length a)
+                   (integer-length b)))
+            (max-il (a b)
+              (max (integer-length a)
+                   (integer-length b))))
+       (let ((lo (numeric-type-low x-type))
+             (hi (numeric-type-high x-type)))
+         (cond ((and lo hi)
+                (specifier-type `(integer ,(if (<= lo 0 hi)
+                                               0
+                                               (min-il lo hi))
+                                          ,(max-il lo hi))))
+               (lo
+                (when (> lo 0)
+                  (specifier-type `(integer ,(integer-length lo)))))
+               (hi
+                (when (< hi 0)
+                  (specifier-type `(integer ,(integer-length hi)))))))))
    #'integer-length))
 
 (defoptimizer (logcount derive-type) ((x))
   (one-arg-derive-type
    x
    (lambda (x-type)
-     (when (numeric-type-p x-type)
-       (let ((lo (numeric-type-low x-type))
-             (hi (numeric-type-high x-type)))
-         (cond ((and lo hi)
-                (let ((adjust 0))
-                  (make-numeric-type :class 'integer
-                                     :low
-                                     (cond ((<= lo 0 hi)
-                                            0)
-                                           ((progn
-                                              (when (minusp lo)
-                                                (psetf lo (lognot hi)
-                                                       hi (lognot lo)))
-                                              (= (integer-length lo)
-                                                 (integer-length hi)))
-                                            ;; Count the bits that are always the same
-                                            (let ((first-diff (integer-length (logxor lo hi))))
-                                              (psetf
-                                               adjust (logcount (ash lo (- first-diff)))
-                                               lo (ldb (byte first-diff 0) lo)
-                                               hi (ldb (byte first-diff 0) hi))
-                                              (+ adjust
-                                                 (if (= lo 0)
-                                                     0
-                                                     1))))
-                                           ((= lo 0)
-                                            0)
-                                           (t
-                                            1))
-                                     :high
-                                     (let ((l (max (integer-length lo)
-                                                   (integer-length hi))))
-                                       (+ adjust
-                                          l
-                                          ;; Only one number can have all the bits turned on
-                                          (if (or (= hi (1- (ash 1 l)))
-                                                  (= lo (ash -1 l)))
-                                              0
-                                              -1))))))
-               (lo
-                (when (> lo 0)
-                  (specifier-type `(integer 1))))
-               (hi
-                (when (< hi -1)
-                  (specifier-type `(integer 1))))))))
+     (let ((lo (numeric-type-low x-type))
+           (hi (numeric-type-high x-type)))
+       (cond ((and lo hi)
+              (let ((adjust 0))
+                (make-numeric-type :class 'integer
+                                   :low
+                                   (cond ((<= lo 0 hi)
+                                          0)
+                                         ((progn
+                                            (when (minusp lo)
+                                              (psetf lo (lognot hi)
+                                                     hi (lognot lo)))
+                                            (= (integer-length lo)
+                                               (integer-length hi)))
+                                          ;; Count the bits that are always the same
+                                          (let ((first-diff (integer-length (logxor lo hi))))
+                                            (psetf
+                                             adjust (logcount (ash lo (- first-diff)))
+                                             lo (ldb (byte first-diff 0) lo)
+                                             hi (ldb (byte first-diff 0) hi))
+                                            (+ adjust
+                                               (if (= lo 0)
+                                                   0
+                                                   1))))
+                                         ((= lo 0)
+                                          0)
+                                         (t
+                                          1))
+                                   :high
+                                   (let ((l (max (integer-length lo)
+                                                 (integer-length hi))))
+                                     (+ adjust
+                                        l
+                                        ;; Only one number can have all the bits turned on
+                                        (if (or (= hi (1- (ash 1 l)))
+                                                (= lo (ash -1 l)))
+                                            0
+                                            -1))))))
+             (lo
+              (when (> lo 0)
+                (specifier-type `(integer 1))))
+             (hi
+              (when (< hi -1)
+                (specifier-type `(integer 1)))))))
    #'logcount))
 
 (defoptimizer (isqrt derive-type) ((x))

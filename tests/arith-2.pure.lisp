@@ -226,3 +226,15 @@
       `(lambda (s e)
          (subseq s 0 (when e
                        (- (length s) 12129535698721845515))))))
+
+(with-test (:name :integer-length-union-derivation)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (integer-length
+          (if (>= b 0)
+              b
+              -2)))
+    ((-1) 1)
+    ((0) 0)
+    ((15) 4)))
