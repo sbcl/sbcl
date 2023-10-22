@@ -55,7 +55,8 @@
 (defun make-effective-method-function1 (generic-function form
                                         method-alist-p wrappers-p)
   (if (and (listp form)
-           (eq (car form) 'call-method))
+           (eq (car form) 'call-method)
+           (not (gf-requires-emf-keyword-checks generic-function)))
       (make-effective-method-function-simple generic-function form)
       ;; We have some sort of `real' effective method. Go off and get a
       ;; compiled function for it. Most of the real hair here is done by
@@ -342,7 +343,6 @@
             generic-function form method-alist-p wrappers-p)
        (fast-method-call '.fast-call-method-list.)
        (t '.call-method-list.)))
-    (check-applicable-keywords 'check-applicable-keywords)
     (t (default-test-converter form))))
 
 ;;; CMUCL comment (2003-10-15):
@@ -368,12 +368,6 @@
        (values `(dolist (emf ,gensym nil)
                  ,(make-emf-call (length metatypes) applyp 'emf type))
                (list gensym))))
-    (check-applicable-keywords
-     (values `(check-applicable-keywords .keyargs-start.
-                                         .valid-keys.
-                                         .dfun-more-context.
-                                         .dfun-more-count.)
-             '()))
     (t
      (default-code-converter form))))
 
@@ -389,8 +383,6 @@
                            (make-effective-method-function-simple
                             generic-function form))
                          (cdr form)))))
-    (check-applicable-keywords
-     '())
     (t
      (default-constant-converter form))))
 
@@ -481,17 +473,12 @@
            ;; perform this checking in fast-method-functions given
            ;; that they are not solely used for effective method
            ;; functions, but also in combination, when they should not
-           ;; perform argument checks.
-           (let ((call-method
-                  `(call-method ,(first (primary)) ,(rest (primary)))))
-             (if (gf-requires-emf-keyword-checks generic-function)
-                 (multiple-value-bind (valid-keys keyargs-start)
-                     (compute-applicable-keywords generic-function applicable-methods)
-                   `(let ((.valid-keys. ',valid-keys)
-                          (.keyargs-start. ',keyargs-start))
-                      (check-applicable-keywords)
-                      ,call-method))
-                 call-method)))
+           ;; perform argument checks.  We still return the bare
+           ;; CALL-METHOD, but the caller is responsible for ensuring
+           ;; that keyword applicability is checked if this is a fast
+           ;; method function used in an effective method.  (See
+           ;; WRAP-WITH-APPLICABLE-KEYWORD-CHECK below).
+           `(call-method ,(first (primary)) ,(rest (primary))))
           (t
            (let ((main-effective-method
                    (if (or (before) (after))
@@ -636,6 +623,14 @@
                ((eq t valid-keys))
                ((not (memq key valid-keys)) (invalid key))))
            (incf i))))))
+
+(defun wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
+  (setf effective
+        `(let ((.valid-keys. ',valid-keys)
+               (.keyargs-start. ',keyargs-start))
+           (check-applicable-keywords
+            .keyargs-start. .valid-keys. .dfun-more-context. .dfun-more-count.)
+           ,effective)))
 
 ;;;; the STANDARD method combination type. This is coded by hand
 ;;;; (rather than with DEFINE-METHOD-COMBINATION) for bootstrapping

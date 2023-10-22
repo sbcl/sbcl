@@ -5,6 +5,12 @@ changes relative to sbcl-2.3.9:
     on all safety levels, not just those which it can prove are of sub-page
     sizes. It can do this because it now inserts code to check for stack
     overflow explicitly on higher safety levels.
+  * bug fix: calls to generic functions now detect erroneous keywords (in the
+    sense of CLHS 7.6.5) passed as arguments even when auxiliary methods are
+    applicable.
+  * bug fix: the standard method on SB-MOP:COMPUTE-EFFECTIVE-METHOD no longer
+    inserts calls to implementation-defined local macros.  (reported by Daniel
+    Kochmański)
 
 changes in sbcl-2.3.9 relative to sbcl-2.3.8:
   * enhancement: stack allocation via DYNAMIC-EXTENT now applies to all values

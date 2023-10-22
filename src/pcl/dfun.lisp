@@ -1680,6 +1680,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     ((eq **boot-state** 'complete)
      (let* ((combin (generic-function-method-combination gf))
             (effective (compute-effective-method gf combin methods)))
+       (when (gf-requires-emf-keyword-checks gf)
+         (multiple-value-bind (valid-keys keyargs-start)
+             (compute-applicable-keywords gf methods)
+           (setf effective (wrap-with-applicable-keyword-check effective valid-keys keyargs-start))))
        (make-effective-method-function1
         gf effective method-alist-p wrappers-p)))
     ((eq (generic-function-name gf) 'make-specializer-form-using-class)
