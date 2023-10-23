@@ -848,7 +848,7 @@ of specialized arrays is supported."
                                        ;; a cheaper one.
                                        (declare (optimize (speed 1)
                                                           (safety 1)))
-                                     (the* (,type :context 'sb-c::aref-context) new-value)))
+                                     (the* (,type :context sb-c::aref-context) new-value)))
                   ;; Low-level setters return no value
                   new-value)))
            (define-reffers (symbol deffer check-form slow-path)
