@@ -129,6 +129,8 @@
   (define-arg-type ldr-str-reg-annotation :printer #'annotate-ldr-str-reg)
   (define-arg-type ldr-literal-annotation :printer #'annotate-ldr-literal :sign-extend t)
 
+  (define-arg-type add-sub-imm-annotation :printer #'annotate-add-sub-imm)
+
   (define-arg-type label :sign-extend t :use-label #'use-label))
 
 ;;;; primitive emitters
@@ -399,11 +401,14 @@
 
 (define-instruction-format
     (add-sub-imm 32
-     :default-printer '(:name :tab rd ", " rn ", " imm shift)
+     :default-printer '(:name :tab rd ", " rn ", " imm shift
+                        add-sub-imm-annotation)
      :include add-sub)
   (op2 :field (byte 5 24) :value #b10001)
   (shift :field (byte 2 22) :type '2-bit-shift)
-  (imm :field (byte 12 10) :type 'unsigned-immediate))
+  (imm :field (byte 12 10) :type 'unsigned-immediate)
+  (add-sub-imm-annotation :fields (list (byte 5 5) (byte 2 22) (byte 12 10))
+                          :type 'add-sub-imm-annotation))
 
 (define-instruction-format
     (adds-subs-imm 32

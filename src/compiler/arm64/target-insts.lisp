@@ -423,6 +423,18 @@
         (- address (- other-pointer-lowtag n-word-bytes))
         address)))
 
+(defun annotate-add-sub-imm (value stream dstate)
+  (declare (ignore stream))
+  (destructuring-bind (register shift offset) value
+    (case register
+      (#.sb-vm::null-offset
+       (let ((inst (current-instruction dstate))
+             (offset (+ sb-vm:nil-value
+                        (if (= shift 1)
+                            (ash offset 12)
+                            offset))))
+         (when (zerop (ldb (byte 2 29) inst)) ;; ADD
+           (maybe-note-static-symbol offset dstate)))))))
 
 (defun annotate-ldr-str (register offset dstate)
   (case register
