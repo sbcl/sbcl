@@ -5360,7 +5360,8 @@
                                   proxy))))
                        #-sb-xc-host ; no such object as a FMT-CONTROL
                        (t
-                        (sb-format::make-fmt-control new-string symbols)))))))))
+                        (sb-format::make-fmt-control new-string symbols))))
+                :recklessly t)))))
     (when (list-of-length-at-least-p combination-args (1+ arg-n))
       (let* ((args (nthcdr arg-n combination-args))
              (control (pop args)))
@@ -5581,6 +5582,14 @@
                             uses at most ~D."
                            :format-arguments
                            (list nargs 'cerror y x (max max1 max2))))))))))))))
+
+(deftransform error ((x &key format-control format-arguments))
+  (if (and format-control format-arguments
+           (let ((use (lvar-uses format-arguments)))
+             (and (combination-p use)
+                  (lvar-fun-is (combination-fun use) '(list)))))
+      `(apply #'%simple-error x format-control format-arguments)
+      (give-up-ir1-transform)))
 
 (defun constant-cons-type (type)
   (multiple-value-bind (singleton value)

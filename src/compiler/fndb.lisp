@@ -1729,6 +1729,7 @@
 
 (defknown (signal warn) (condition-designator-head &rest t) null)
 (defknown error (condition-designator-head &rest t) nil)
+(defknown %simple-error (condition-designator-head t &rest t) nil)
 (defknown cerror (format-control condition-designator-head &rest t) null)
 (defknown invalid-method-error (t format-control &rest t) *) ; FIXME: first arg is METHOD
 (defknown method-combination-error (format-control &rest t) *)
