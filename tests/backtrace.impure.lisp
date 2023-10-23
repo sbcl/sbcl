@@ -345,7 +345,8 @@
           ;; no lambda-list saved
           (defun ,(intern (format nil "BT.~A.3" n)) ,ll
             (declare (optimize (debug 0)))
-            ,@body)))
+            (let (*) ;; disable tail calls enabled by debug-0
+              ,@body))))
      :allow-style-warnings t)))
 
 (defbt 1 (&key key)

@@ -570,9 +570,7 @@
   (values))
 
 ;;; Mark all tail-recursive uses of function result continuations with
-;;; the corresponding TAIL-SET. Nodes whose type is NIL (i.e. don't
-;;; return) such as calls to ERROR are never annotated as TAIL-P, in
-;;; order to preserve debugging information.
+;;; the corresponding TAIL-SET.
 (defun tail-annotate (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
@@ -589,4 +587,17 @@
                            ;; functions they are the entry point for.
                            (eq (basic-combination-kind use) :local)))
               (setf (node-tail-p use) t)))))))
+  ;; Tail call non returning functions if no debugging is wanted.
+  (dolist (block (block-pred (component-tail component)))
+    (let ((last (block-last block)))
+      (when (and (combination-p last)
+                 (combination-fun-info last)
+                 (policy last (= debug 0))
+                 (do-nested-cleanups (cleanup block t)
+                   (case (cleanup-kind cleanup)
+                     ((:block :tagbody)
+                      (when (entry-exits (cleanup-mess-up cleanup))
+                        (return nil)))
+                     (t (return nil)))))
+        (setf (node-tail-p last) t))))
   (values))
