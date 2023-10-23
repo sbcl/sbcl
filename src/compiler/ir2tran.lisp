@@ -241,6 +241,12 @@
            (let* ((this-env (node-environment ref))
                   (tn (find-in-environment functional this-env)))
              (emit-move ref ir2-block tn res)))
+          ((when-vop-existsp (:named sb-vm::reference-closure)
+             (when (and (lambda-p functional)
+                        (eq (node-component ref)
+                            (lambda-component functional)))
+               (vop sb-vm::reference-closure ref ir2-block (entry-info-offset (leaf-info functional)) res)
+               t)))
           (t
            (let ((entry (make-load-time-constant-tn :entry functional)))
              (emit-move ref ir2-block entry res)))))

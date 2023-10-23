@@ -109,6 +109,12 @@
         (inst adr lr label (ash simple-fun-insts-offset word-shift))
         (storew-pair temp 0 lr closure-fun-slot tmp-tn)))))
 
+(define-vop (reference-closure)
+  (:info label)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 1
+    (inst adr result label fun-pointer-lowtag)))
+
 ;;; The compiler likes to be able to directly make value cells.
 ;;;
 (define-vop (make-value-cell)
