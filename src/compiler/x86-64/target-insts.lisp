@@ -425,7 +425,10 @@
              ;; absolute address as would be used for asm routines and static symbols.
              ;; FIRSTP implies lack of a base and index register.
              (unless (minusp disp)
-               (maybe-note-assembler-routine disp nil dstate)))
+               (or (maybe-note-static-symbol (+ disp (- other-pointer-lowtag
+                                                        (* n-word-bytes sb-vm:symbol-value-slot)))
+                                             dstate)
+                   (maybe-note-assembler-routine disp nil dstate))))
             (t
              (princ disp stream))))
     (write-char #\] stream)
