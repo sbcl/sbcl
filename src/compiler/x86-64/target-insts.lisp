@@ -546,7 +546,10 @@
   ;; If VALUE should be regarded as a label, return the address.
   ;; If not, just return VALUE.
   (if (and (typep value 'machine-ea) (eq (machine-ea-base value) :rip))
-      (+ (dstate-next-addr dstate) (machine-ea-disp value))
+      (let ((addr (+ (dstate-next-addr dstate) (machine-ea-disp value))))
+        (if (= (logand addr lowtag-mask) fun-pointer-lowtag)
+            (- addr fun-pointer-lowtag)
+            addr))
       value))
 
 ;; Figure out whether LEA should print its EA with just the stuff in brackets,
@@ -554,38 +557,56 @@
 (defun lea-print-ea (value stream dstate)
   (let*
       ((width (inst-operand-size dstate))
+       (ea)
        (addr
-        (etypecase value
-          (machine-ea
-           ;; Indicate to PRINT-MEM-REF that this is not a memory access.
-           (print-mem-ref :compute value width stream dstate)
-           (when (eq (machine-ea-base value) :rip)
-             (+ (dstate-next-addr dstate) (machine-ea-disp value))))
+         (etypecase value
+           (machine-ea
+            ;; Indicate to PRINT-MEM-REF that this is not a memory access.
+            (print-mem-ref :compute value width stream dstate)
+            (when (eq (machine-ea-base value) :rip)
+              (+ (dstate-next-addr dstate) (machine-ea-disp value))))
 
-          ((or string integer)
-           ;; A label for the EA should not print as itself, but as the decomposed
-           ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
-           ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
-           ;; on the operand to LEA, and it will compute an absolute address based
-           ;; off RIP when possible. If :use-labels NIL was specified, there is
-           ;; no hashtable of address to string, so we get the address.
-           ;; But ordinarily we get the string. Either way, the r/m arg reveals the
-           ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
-           ;; because the EA was computed in a prefilter.
-           ;; (the instruction format is known because LEA has exactly one format)
-           (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
-                          width stream dstate)
-           value)
+           ((or string integer)
+            ;; A label for the EA should not print as itself, but as the decomposed
+            ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
+            ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
+            ;; on the operand to LEA, and it will compute an absolute address based
+            ;; off RIP when possible. If :use-labels NIL was specified, there is
+            ;; no hashtable of address to string, so we get the address.
+            ;; But ordinarily we get the string. Either way, the r/m arg reveals the
+            ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
+            ;; because the EA was computed in a prefilter.
+            ;; (the instruction format is known because LEA has exactly one format)
+            (print-mem-ref :compute (setf ea
+                                          (regrm-inst-r/m dchunk-zero dstate))
+                           width stream dstate)
+            value)
 
-         ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
-         ;; When we used integers instead of REG to represent registers, this case
-         ;; overlapped with the preceding. It's nice that it no longer does.
-         (reg
-          (print-reg-with-width value width stream dstate)
-          nil))))
+           ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
+           ;; When we used integers instead of REG to represent registers, this case
+           ;; overlapped with the preceding. It's nice that it no longer does.
+           (reg
+            (print-reg-with-width value width stream dstate)
+            nil))))
     (when stream
-      (cond ((stringp addr) ; label
+      (cond ((stringp addr)             ; label
              (note (lambda (s) (format s "= ~A" addr)) dstate))
+            ;; Local function
+            ((and ea
+                  (= (logand (+ (dstate-next-addr dstate) (machine-ea-disp ea))
+                             lowtag-mask)
+                      fun-pointer-lowtag)
+                  (let* ((seg (dstate-segment dstate))
+                         (code (seg-code seg))
+                         (offset (+ (sb-disassem::seg-initial-offset seg)
+                                    (dstate-next-offs dstate)
+                                    (- (machine-ea-disp ea)
+                                       fun-pointer-lowtag))))
+                    (loop for n below (code-n-entries code)
+                          do (when (= (%code-fun-offset code n) offset)
+                               (let ((fun (%code-entry-point code n)))
+                                 (note (lambda (stream) (prin1-quoted-short fun stream)) dstate))
+                               (return t))))))
             (addr
              (note (lambda (s) (format s "= #x~x" addr)) dstate))))))
 

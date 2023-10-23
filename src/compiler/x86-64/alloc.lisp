@@ -937,6 +937,12 @@
         (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
         (storew temp result closure-fun-slot fun-pointer-lowtag)))))
 
+(define-vop (reference-closure)
+  (:info label)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 1
+    (inst lea result (rip-relative-ea label fun-pointer-lowtag))))
+
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg immediate constant) :to :result))
