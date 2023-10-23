@@ -576,7 +576,7 @@
                  (setq any-keyp t))
                (values nopt (ll-kwds-allowp llks) keys))))
       (multiple-value-bind (nopt allowp keys)
-          (analyze (generic-function-lambda-list gf))
+          (analyze (gf-lambda-list gf))
         (dolist (method methods)
           (let ((ll (if (consp method)
                         (early-method-lambda-list method)

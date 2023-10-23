@@ -1337,6 +1337,18 @@
   (assert-error (gf-with-keys-to-check 'a :b 2 :b) program-error)
   (assert-error (gf-with-keys-to-check 'a :c 2 :b) program-error)
   (assert-error (gf-with-keys-to-check 'a :b 2 :c 3 :b) program-error))
+
+;;; verify that we perform these checks for standardized generic
+;;; functions too
+(defclass shared-initialize-keyword-check () ())
+
+(with-test (:name (:check-keyword-args shared-initialize :odd-keyword :error))
+  (assert-error (shared-initialize (make-instance 'shared-initialize-keyword-check) nil :a)
+                program-error))
+
+(with-test (:name (:check-keyword-args shared-initialize :non-keyword :error))
+  (assert-error (shared-initialize (make-instance 'shared-initialize-keyword-check) nil '(abc) 1)
+                program-error))
 
 ;;; class redefinition shouldn't give any warnings, in the usual case
 (defclass about-to-be-redefined () ((some-slot :accessor some-slot)))
