@@ -486,7 +486,7 @@
               (found-allow-p nil))
 
           (temps #-stack-grows-downward-not-upward
-                 `(,n-index (+ ,n-count ,(if (vop-existsp :translate %more-keyword-pair)
+                 `(,n-index (+ ,n-count ,(if (vop-existsp :translate %more-kw-arg)
                                              0
                                              -1)))
                  #+stack-grows-downward-not-upward
@@ -540,9 +540,11 @@
                        (setq ,n-lose ,n-key))))
 
             (body
-             `(when (oddp ,(if (vop-existsp :translate %more-keyword-pair)
-                               n-index
-                               n-count))
+             `(when (oddp ,(cond #-stack-grows-downward-not-upward
+                                 ((vop-existsp :translate %more-kw-arg)
+                                  n-index)
+                                 (t
+                                  n-count)))
                 (%odd-key-args-error)))
 
             (body
@@ -550,11 +552,11 @@
              `(locally
                 (declare (optimize (safety 0)))
                 (loop
-                  ,@(cond ((vop-existsp :translate %more-keyword-pair)
+                  ,@(cond ((vop-existsp :translate %more-kw-arg)
                            `((when (zerop ,n-index) (return))
                              (decf ,n-index 2)
-                             (multiple-value-bind (,n-key ,n-value-temp)
-                                 (%more-keyword-pair ,n-context ,n-index)
+                             (multiple-value-bind (,n-value-temp ,n-key)
+                                 (%more-kw-arg ,n-context ,n-index)
                                (declare (ignorable ,n-value-temp ,n-key))
                                (case ,n-key ,@(tests)))))
                           (t

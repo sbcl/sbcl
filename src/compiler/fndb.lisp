@@ -1904,10 +1904,6 @@
 (defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t (flushable))
-(defknown %more-keyword-pair (t fixnum) (values t t) (flushable))
-#+stack-grows-downward-not-upward
-;;; FIXME: The second argument here should really be NEGATIVE-INDEX, but doing that
-;;; breaks the build, and I cannot seem to figure out why. --NS 2006-06-29
 (defknown %more-kw-arg (t fixnum) (values t t))
 (defknown %more-arg-values (t index index) * (flushable))
 

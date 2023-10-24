@@ -544,14 +544,14 @@
        (loadw value temp)))))
 
 (define-vop ()
-  (:translate sb-c::%more-keyword-pair)
+  (:translate sb-c::%more-kw-arg)
   (:policy :fast-safe)
   (:args (context :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * tagged-num)
   (:temporary (:scs (any-reg)) temp)
-  (:results (keyword :scs (descriptor-reg any-reg))
-            (value :scs (descriptor-reg any-reg)))
+  (:results (value :scs (descriptor-reg any-reg))
+            (keyword :scs (descriptor-reg any-reg)))
   (:result-types * *)
   (:generator 5
     (inst add temp context (lsl index (- word-shift n-fixnum-tag-bits)))
