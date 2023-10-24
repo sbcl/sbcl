@@ -66,7 +66,7 @@
                ((:fixedobj-space-start fixedobj-space-start*))
                ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
                ((:text-space-start text-space-start*))
-               ((:text-space-size  text-space-size*) (* 104 1024 1024))
+               ((:text-space-size  text-space-size*) (* 160 1024 1024))
                (small-space-size #x100000)
                ((:read-only-space-size ro-space-size)
                 #+darwin-jit small-space-size
