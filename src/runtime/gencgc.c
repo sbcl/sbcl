@@ -46,7 +46,6 @@
 #include "genesis/fdefn.h"
 #include "save.h"
 #include "genesis/hash-table.h"
-#include "genesis/list-node.h"
 #include "genesis/instance.h"
 #include "hopscotch.h"
 #include "genesis/cons.h"
@@ -4915,7 +4914,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
                 if (fixnump(next) && next)
                   CHECK(next | INSTANCE_POINTER_LOWTAG, &node->_node_next);
                 if (finalizer_node_layout_p(LAYOUT(layout))) {
-                    struct split_ordered_list_node* node = (void*)object;
+                    struct solist_node* node = (void*)object;
                     // !fixnump(next) implies that this node is NOT deleted, nor in
                     // the process of getting deleted by CANCEL-FINALIZATION
                     if (node->so_key && !fixnump(next)) {

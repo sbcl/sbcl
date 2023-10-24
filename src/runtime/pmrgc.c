@@ -24,7 +24,7 @@
 #include "pseudo-atomic.h"
 #include "genesis/instance.h"
 #include "genesis/gc-tables.h"
-#include "genesis/list-node.h"
+#include "genesis/split-ordered-list.h"
 #include "thread.h"
 
 /* forward declarations */

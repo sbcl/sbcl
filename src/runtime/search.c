@@ -350,7 +350,7 @@ int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements)
  * Unlike the lisp algorithm, this does not "assist" a pending deletion
  * by completing it with compare-and-swap - this loop simply ignores
  * any deleted nodes that haven't been snipped out yet. */
-struct split_ordered_list_node*
+struct solist_node*
 split_ordered_list_find(struct split_ordered_list* solist,
                         lispobj key)
 {
@@ -369,7 +369,7 @@ split_ordered_list_find(struct split_ordered_list* solist,
     while ((nodeptr & WIDETAG_MASK) == UNBOUND_MARKER_WIDETAG) {
         nodeptr = bins->data[--bin_index];
     }
-    struct split_ordered_list_node* node = (void*)native_pointer(nodeptr);
+    struct solist_node* node = (void*)native_pointer(nodeptr);
     lispobj hash_as_fixnum = make_fixnum(full_hash);
     while (1) {
         if (node->node_hash == hash_as_fixnum) { // possible hit

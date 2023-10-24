@@ -34,7 +34,7 @@ run_sbcl_with_core "$tmpcore" --noinform --disable-ldb --no-userinit --no-sysini
 (sb-sys:with-pinned-objects (*x*)
   (let ((list (sb-lockless:so-data
                (sb-lockless:so-find sb-impl::**finalizer-store**
-                (sb-kerneL:%make-lisp-obj
+                (sb-kernel:%make-lisp-obj
                  (logandc2 (sb-kernel:get-lisp-obj-address *x*)
                            sb-vm:lowtag-mask))))))
     (assert (= (length list) 2))

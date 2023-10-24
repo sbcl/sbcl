@@ -3583,8 +3583,11 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
       (write-hash-table-flag-extractors))
     (when (eq (dd-name dd) 'sb-lockless::split-ordered-list)
       (terpri)
-      (output (layout-info (find-layout 'sb-lockless::so-data-node))
-              "split_ordered_list_node"))
+      (output (layout-info (find-layout 'sb-lockless::list-node)) "list_node")
+      (terpri)
+      (output (layout-info (find-layout 'sb-lockless::so-data-node)) "solist_node")
+      (format t "static inline int so_dummy_node_p(struct solist_node* n) {
+    return !(n->node_hash & ~D);~%}~%" (sb-vm:fixnumize 1)))
     (when assembler-guard
       (format t "~%#endif /* __ASSEMBLER__ */~2%"))))
 
@@ -4370,7 +4373,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
           (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
         (dolist (class '(defstruct-description package
                          ;; FIXME: probably these should be external?
-                         sb-lockless::list-node sb-lockless::split-ordered-list
+                         sb-lockless::split-ordered-list
                          sb-vm::arena sb-thread::avlnode
                          sb-c::compiled-debug-info))
           (out-to (string-downcase class)
