@@ -490,12 +490,8 @@
                                              0
                                              -1)))
                  #+stack-grows-downward-not-upward
-                 `(,n-index (- (1- ,n-count)))
-                 #-stack-grows-downward-not-upward n-value-temp
-                 #-stack-grows-downward-not-upward n-key)
-          (body `(declare (fixnum ,n-index)
-                          #-stack-grows-downward-not-upward
-                          (ignorable ,n-value-temp ,n-key)))
+                 `(,n-index (- (1- ,n-count))))
+          (body `(declare (fixnum ,n-index)))
 
           (collect ((tests))
             (dolist (key keys)
@@ -554,19 +550,20 @@
              `(locally
                 (declare (optimize (safety 0)))
                 (loop
-                 ,@(cond ((vop-existsp :translate %more-keyword-pair)
-                          `((when (zerop ,n-index) (return))
-                            (decf ,n-index 2)
-                            (multiple-value-bind (key value)
-                                (%more-keyword-pair ,n-context ,n-index)
-                              (setf ,n-value-temp value ,n-key key))))
-                         (t
-                          `((when (minusp ,n-index) (return))
-                            (setf ,n-value-temp (%more-arg ,n-context ,n-index))
-                            (decf ,n-index)
-                            (setq ,n-key (%more-arg ,n-context ,n-index))
-                            (decf ,n-index))))
-                 (case ,n-key ,@(tests))))
+                  ,@(cond ((vop-existsp :translate %more-keyword-pair)
+                           `((when (zerop ,n-index) (return))
+                             (decf ,n-index 2)
+                             (multiple-value-bind (,n-key ,n-value-temp)
+                                 (%more-keyword-pair ,n-context ,n-index)
+                               (declare (ignorable ,n-value-temp ,n-key))
+                               (case ,n-key ,@(tests)))))
+                          (t
+                           `((when (minusp ,n-index) (return))
+                             (let ((,n-value-temp (%more-arg ,n-context ,n-index))
+                                   (,n-key (%more-arg ,n-context (decf ,n-index))))
+                               (declare (ignorable ,n-value-temp ,n-key))
+                               (decf ,n-index)
+                               (case ,n-key ,@(tests))))))))
              #+stack-grows-downward-not-upward
              `(locally (declare (optimize (safety 0)))
                 (loop
