@@ -325,13 +325,14 @@ Examples:
          ;; guarantee that finalizers on objects killed in the last GC of save-lisp-and-die
          ;; will be executed; and (2) dumped objects are immortal.
          ;; Therefore saved finalizers are best avoided.
-         (let ((actions
-                (cond ((functionp actions) actions) ; FUNCTIONP implies save it
-                      ((listp actions)
-                       (let ((actions (delete-if-not #'functionp actions)))
-                         (if (singleton-p actions) (car actions) actions))))))
-           (when actions
-             (push (cons (make-weak-pointer object) actions) save))))
+         (let ((list
+                (cond ((functionp actions) (list actions)) ; FUNCTIONP implies save it
+                      ((listp actions) (delete-if-not #'functionp actions)))))
+           ;; FINALIZERS-REINIT employs FINALIZE to reinstall saved finalizers. That
+           ;; function does not accept a list of actions, so insert each action
+           ;; individually if there is more than one, which there probably isn't.
+           (dolist (action list)
+             (push (cons (make-weak-pointer object) action) save))))
        (flameout (object)
          (push (list object
                      (ansi-stream-in object)
@@ -376,8 +377,12 @@ Examples:
           ((atom tail)) ; could be terminated by either 0 or NIL
         (let ((pair (car tail)))
           (filter-actions (car pair) (cdr pair))))))
-  ;; Similarly clobber the rehashlist
+  ;; Clobber the rehashlist
   (setf *finalizer-rehashlist* nil)
+  ;; Drop any triggered actions, becaused the system is in a state where
+  ;; executing random user code is probably undesirable if not impossible
+  ;; given that OS-DEINIT and CLOSE-SHARED-OBJECTS were already invoked.
+  (setq *finalizers-triggered* nil)
   (setq *saved-finalizers* save))
 
 (defun finalizers-reinit ()
