@@ -8,6 +8,10 @@
   (f 20)
   (gc))
 
+(with-test (:name (:room :layoutless-instance))
+  (let ((*standard-output* (make-broadcast-stream)))
+    (room t)))
+
 ;;; Don't loop infinitely in mark_obj() on circular lists
 (defvar *foo* (cons nil nil))
 (rplacd *foo* *foo*)
