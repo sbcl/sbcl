@@ -1349,6 +1349,38 @@
 (with-test (:name (:check-keyword-args shared-initialize :non-keyword :error))
   (assert-error (shared-initialize (make-instance 'shared-initialize-keyword-check) nil '(abc) 1)
                 program-error))
+
+;;; verify that we can still detect no primary methods and invalid qualifiers
+
+(defmethod gf-with-keys-and-no-primary-method :around ((x integer) &key b) (1+ x))
+
+(with-test (:name (:check-keyword-args :no-primary-method :no-keywords :error))
+  (assert-error (gf-with-keys-and-no-primary-method 3) sb-pcl::no-primary-method-error))
+(with-test (:name (:check-keyword-args :no-primary-method :ok-keyword :error))
+  (assert-error (gf-with-keys-and-no-primary-method 3 :b 2) sb-pcl::no-primary-method-error))
+(with-test (:name (:check-keyword-args :no-primary-method :bad-keyword :error))
+  (assert-error (gf-with-keys-and-no-primary-method 3 :c 2)
+                (or program-error sb-pcl::no-primary-method-error)))
+
+(defgeneric gf-with-keys-and-invalid-qualifier (x &key)
+  (:method-combination progn))
+(defmethod gf-with-keys-and-invalid-qualifier progn ((x integer) &key b) (print (1+ x)))
+(defmethod gf-with-keys-and-invalid-qualifier prong ((x fixnum) &key c) (print c))
+
+(with-test (:name (:check-keyword-args :invalid-qualifier :no-keywords :error))
+  (assert-error (gf-with-keys-and-invalid-qualifier 3)))
+(with-test (:name (:check-keyword-args :invalid-qualifier :ok-keyword :error))
+  (assert-error (gf-with-keys-and-invalid-qualifier 3 :b 3)))
+(with-test (:name (:check-keyword-args :invalid-qualifier :bad-keyword :error))
+  (assert-error (gf-with-keys-and-invalid-qualifier 3 :z 4)))
+(with-test (:name (:check-keyword-args :no-applicable-invalid-qualifier :no-keywords :no-error))
+  (assert (= (gf-with-keys-and-invalid-qualifier (1+ most-positive-fixnum))
+             (+ most-positive-fixnum 2))))
+(with-test (:name (:check-keyword-args :no-applicable-invalid-qualifier :ok-keyword :no-error))
+  (assert (= (gf-with-keys-and-invalid-qualifier (1+ most-positive-fixnum) :b 3)
+             (+ most-positive-fixnum 2))))
+(with-test (:name (:check-keyword-args :no-applicable-invalid-qualifier :bad-keyword :error))
+  (assert-error (gf-with-keys-and-invalid-qualifier (1+ most-positive-fixnum) :c 3)))
 
 ;;; class redefinition shouldn't give any warnings, in the usual case
 (defclass about-to-be-redefined () ((some-slot :accessor some-slot)))

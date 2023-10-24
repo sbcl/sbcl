@@ -624,13 +624,30 @@
                ((not (memq key valid-keys)) (invalid key))))
            (incf i))))))
 
+(defun maybe-wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
+  ;; KLUDGE: this is a continuation of the "weird" hack (see
+  ;; SHORT-COMPUTE-EFFECTIVE-METHOD for the comment, but it also
+  ;; applies to STANDARD-COMPUTE-EFFECTIVE-METHOD) regarding these
+  ;; error cases, which are treated specially in
+  ;; EXPAND-EFFECTIVE-METHOD-FUNCTION.  We only maybe wrap the
+  ;; effective method in GET-SECONDARY-DISPATCH-FUNCTION2, to allow
+  ;; EXPAND-EFFECTIVE-METHOD-FUNCTION to treat these magic operators
+  ;; specially.  (The comment regarding the bugginess of this check
+  ;; regarding MOP users is true and they should be reworked to use
+  ;; less magic; also, probably we should do keyword argument error
+  ;; signalling before method correctness signalling, as it seems a
+  ;; more fundamental error.)
+  (if (or (eq (first effective) '%no-primary-method)
+          (eq (first effective) '%invalid-qualifiers))
+      effective
+      (wrap-with-applicable-keyword-check effective valid-keys keyargs-start)))
+
 (defun wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
-  (setf effective
-        `(let ((.valid-keys. ',valid-keys)
-               (.keyargs-start. ',keyargs-start))
-           (check-applicable-keywords
-            .keyargs-start. .valid-keys. .dfun-more-context. .dfun-more-count.)
-           ,effective)))
+  `(let ((.valid-keys. ',valid-keys)
+         (.keyargs-start. ',keyargs-start))
+     (check-applicable-keywords
+      .keyargs-start. .valid-keys. .dfun-more-context. .dfun-more-count.)
+     ,effective))
 
 ;;;; the STANDARD method combination type. This is coded by hand
 ;;;; (rather than with DEFINE-METHOD-COMBINATION) for bootstrapping

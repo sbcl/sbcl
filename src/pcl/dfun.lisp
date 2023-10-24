@@ -1676,7 +1676,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            (if (gf-requires-emf-keyword-checks gf)
                (multiple-value-bind (valid-keys keyargs-start)
                    (compute-applicable-keywords gf methods)
-                 (wrap-with-applicable-keyword-check effective valid-keys keyargs-start))
+                 (maybe-wrap-with-applicable-keyword-check effective valid-keys keyargs-start))
                effective)))
     (cond
       ((not (and all-applicable-p all-sorted-p (not function-p)))
