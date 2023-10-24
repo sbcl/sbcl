@@ -4261,6 +4261,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
                (sb-lockless::list-node "LFLIST_NODE")
                (sb-lockless::finalizer-node "FINALIZER_NODE")
                (sb-brothertree::unary-node "BROTHERTREE_UNARY_NODE")
+               (package "PACKAGE")
                (hash-table "HASH_TABLE")))
     (destructuring-bind (type c-const) x
         (format stream "#define ~A_LAYOUT_ID ~D~%"

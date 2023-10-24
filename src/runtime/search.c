@@ -156,10 +156,30 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 }
 #endif
 
+static uword_t bruteforce_findpkg_by_id(lispobj* where, lispobj* limit, uword_t id)
+{
+    lispobj layout;
+    for ( where = next_object(where, 0, limit) ; where ;
+          where = next_object(where, object_size(where), limit) ) {
+        if (widetag_of(where) == INSTANCE_WIDETAG
+            && (layout = instance_layout(where)) != 0
+            && layout_depth2_id(LAYOUT(layout)) == PACKAGE_LAYOUT_ID
+            && ((struct package*)where)->id == id) {
+            return make_lispobj(where, INSTANCE_POINTER_LOWTAG);
+        }
+    }
+    return 0;
+}
+
 lispobj get_package_by_id(int id) {
     // lisp_package_vector is a tagged pointer to SIMPLE-VECTOR
     lispobj vector = barrier_load(&lisp_package_vector);
-    if (!vector) lose("get_package_by_id: no package vector");
+    if (!vector) {
+        // Perform a heap walk. This should never occur except in core loading/saving.
+        lispobj result =  walk_generation(bruteforce_findpkg_by_id, -1, make_fixnum(id));
+        if (is_lisp_pointer(result)) return result;
+        lose("get_package_by_id: no package vector");
+    }
     if (id >= vector_len(VECTOR(vector))) lose("can't decode package ID %d", id);
     return barrier_load(&VECTOR(vector)->data[id]);
 }
