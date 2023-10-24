@@ -934,14 +934,21 @@
                           (inst or temp layout)))
                    temp)
                  result 0 fun-pointer-lowtag (not stack-allocate-p))
-        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
+        (inst lea (if (sb-c::code-immobile-p vop)
+                      :dword
+                      :qword)
+              temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
         (storew temp result closure-fun-slot fun-pointer-lowtag)))))
 
 (define-vop (reference-closure)
   (:info label)
   (:results (result :scs (descriptor-reg)))
+  (:vop-var vop)
   (:generator 1
-    (inst lea result (rip-relative-ea label fun-pointer-lowtag))))
+    (inst lea (if (sb-c::code-immobile-p vop)
+                  :dword
+                  :qword)
+      result (rip-relative-ea label fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
