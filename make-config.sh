@@ -328,7 +328,7 @@ case `uname` in
     SunOS)
         sbcl_os="sunos"
         ;;
-    CYGWIN* | WindowsNT | MINGW* | MSYS*)
+    WindowsNT | MINGW* | MSYS*)
         sbcl_os="win32"
         ;;
     Haiku)
