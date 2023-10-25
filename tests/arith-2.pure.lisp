@@ -238,3 +238,10 @@
     ((-1) 1)
     ((0) 0)
     ((15) 4)))
+
+(with-test (:name :isqrt-union)
+  (assert-type
+   (lambda (x)
+     (declare ((or (integer 1 5) (integer 9 10)) x))
+     (isqrt x))
+   (integer 1 3)))
