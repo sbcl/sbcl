@@ -1,6 +1,7 @@
 // -*- mode: c -*-
 
 #include "weak-hash-pred.inc"
+#include "genesis/split-ordered-list.h"
 
 /* TRACE_NAME = Base name for generated tracing functions
  * ACTION = Function name to call with every pointer

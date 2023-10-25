@@ -11,14 +11,18 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 
-#include "sbcl.h"
-#include "runtime.h"
+#include "genesis/config.h"
+#include "genesis/constants.h"
+#include "interr.h"
+#include "lispobj.h"
 #include "os.h"
 #include "search.h"
 #include "thread.h"
 #include "gc.h"
 #include "genesis/primitive-objects.h"
+#include "genesis/instance.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
 #include "genesis/split-ordered-list.h"

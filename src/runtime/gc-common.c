@@ -44,6 +44,7 @@
 #include "genesis/binding.h"
 #include "genesis/hash-table.h"
 #include "genesis/split-ordered-list.h"
+#include "genesis/static-symbols.h"
 #include "var-io.h"
 #include "search.h"
 #include "murmur_hash.h"
