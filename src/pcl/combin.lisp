@@ -297,6 +297,8 @@
         (t
          `(named-lambda ,name ,ll
             (declare (ignore .pv. .next-method-call.))
+            (declare (ignorable ,@(make-dfun-required-args nreq)
+                                ,@(when applyp '(.dfun-more-context. .dfun-more-count.))))
             ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
@@ -464,7 +466,7 @@
            ;; here.
            `(method-combination-error
              "No primary method found for ~S among applicable methods: ~S"
-             ',generic-function ',applicable-methods))
+             ',generic-function (list ,@(mapcar (lambda (m) `(quote ,m)) applicable-methods))))
           ((and (null (before)) (null (after)) (null (around)))
            ;; By returning a single call-method `form' here we enable
            ;; an important implementation-specific optimization; that
@@ -549,7 +551,7 @@
              ;; here.
              `(method-combination-error
                "No primary method found for ~S among applicable methods: ~S"
-               ',generic-function ',applicable-methods))
+               ',generic-function (list ,@(mapcar (lambda (m) `(quote ,m)) applicable-methods))))
             ((null around) main-method)
             (t
              `(call-method ,(car around)
