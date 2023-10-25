@@ -338,9 +338,11 @@ protocol. Interface subject to change."))
 ;;; remember what the second value was supposed to be.  So, PCL's
 ;;; COMPUTE-EFFECTIVE-METHOD returns one value as do Allegro and
 ;;; Lispworks.
-(defgeneric compute-effective-method (generic-function
-                                      combin
-                                      applicable-methods))
+(defgeneric compute-effective-method
+    (generic-function combin applicable-methods))
+
+(defgeneric compute-primary-methods
+    (generic-function combin applicable-methods))
 
 (defgeneric compute-effective-slot-definition (class name dslotds))
 

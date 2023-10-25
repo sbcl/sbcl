@@ -1678,42 +1678,33 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                    (compute-applicable-keywords gf methods)
                  (wrap-with-applicable-keyword-check effective valid-keys keyargs-start))
                effective)))
-    (handler-case
-        (cond
-          ((not (and all-applicable-p all-sorted-p (not function-p)))
-           (let ((net (generate-discrimination-net
-                       gf methods types all-sorted-p)))
-             (compute-secondary-dispatch-function1 gf net function-p)))
-          ((eq **boot-state** 'complete)
-           (let* ((combin (generic-function-method-combination gf))
-                  (effective (maybe-wrap (compute-effective-method gf combin methods))))
-             (make-effective-method-function1
-              gf effective method-alist-p wrappers-p)))
-          ((eq (generic-function-name gf) 'make-specializer-form-using-class)
-           ;; FIXME: instead of the above form, this should be
-           ;; (eq (generic-function-method-combination gf) *or-method-combination*)
-           ;; but that does not work for reasons I (JM) do not understand.
-           (let* ((combin (generic-function-method-combination gf))
-                  (effective (maybe-wrap (short-compute-effective-method gf combin methods))))
-             (make-effective-method-function1
-              gf effective method-alist-p wrappers-p)))
-          (t
-           (let ((effective (maybe-wrap (standard-compute-effective-method gf nil methods))))
-             (make-effective-method-function1
-              gf effective method-alist-p wrappers-p))))
-      (%no-primary-method ()
-        (lambda (method-alist wrappers)
-          (declare (ignore method-alist wrappers))
-          (lambda (&rest args)
-            (call-no-primary-method gf args))))
-      (%invalid-qualifiers (c)
-        (let ((combin (generic-function-method-combination gf))
-              (method (%invalid-qualifiers-method c)))
-          (lambda (method-alist wrappers)
-            (declare (ignore method-alist wrappers))
-            (lambda (&rest args)
-              (declare (ignore args))
-              (invalid-qualifiers gf combin method))))))))
+    (cond
+      ((not (and all-applicable-p all-sorted-p (not function-p)))
+       (let ((net (generate-discrimination-net
+                   gf methods types all-sorted-p)))
+         (compute-secondary-dispatch-function1 gf net function-p)))
+      ((eq **boot-state** 'complete)
+       (let ((combin (generic-function-method-combination gf)))
+         (if (null (compute-primary-methods gf combin methods))
+             (lambda (method-alist wrappers)
+               (declare (ignore method-alist wrappers))
+               (lambda (&rest args)
+                 (call-no-primary-method gf args)))
+             (let ((effective (maybe-wrap (compute-effective-method gf combin methods))))
+               (make-effective-method-function1
+                gf effective method-alist-p wrappers-p)))))
+      ((eq (generic-function-name gf) 'make-specializer-form-using-class)
+       ;; FIXME: instead of the above form, this should be
+       ;; (eq (generic-function-method-combination gf) *or-method-combination*)
+       ;; but that does not work for reasons I (JM) do not understand.
+       (let* ((combin (generic-function-method-combination gf))
+              (effective (maybe-wrap (short-compute-effective-method gf combin methods))))
+         (make-effective-method-function1
+          gf effective method-alist-p wrappers-p)))
+      (t
+       (let ((effective (maybe-wrap (standard-compute-effective-method gf nil methods))))
+         (make-effective-method-function1
+          gf effective method-alist-p wrappers-p))))))
 
 (defun get-effective-method-function (gf methods
                                          &optional method-alist wrappers)

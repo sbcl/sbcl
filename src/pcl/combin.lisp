@@ -427,13 +427,6 @@
 (defun gf-requires-emf-keyword-checks (generic-function)
   (member '&key (gf-lambda-list generic-function)))
 
-;;; internal condition types to exit COMPUTE-EFFECTIVE-METHOD
-;;; non-locally (allowing the caller to generate error-case effective
-;;; method functions).
-(define-condition %invalid-qualifiers ()
-  ((%method :initarg :method :reader %invalid-qualifiers-method)))
-(define-condition %no-primary-method () ())
-
 (defconstant-eqx +standard-method-combination-qualifiers+
     '(:around :before :after) #'equal)
 
@@ -444,8 +437,8 @@
     (generic-function combin applicable-methods)
   (collect ((before) (primary) (after) (around))
     (flet ((invalid (method)
-             (signal '%invalid-qualifiers :method method)
-             (invalid-qualifiers generic-function combin method)))
+             (return-from standard-compute-effective-method
+               `(invalid-qualifiers ',generic-function ',combin ',method))))
       (dolist (m applicable-methods)
         (let ((qualifiers (if (listp m)
                               (early-method-qualifiers m)
@@ -457,11 +450,21 @@
             ((eq (car qualifiers) :before) (before m))
             ((eq (car qualifiers) :after) (after m))
             (t (invalid m))))))
-    (cond ((null (primary))
-           (signal '%no-primary-method)
-           (method-combination-error
-            "No primary method found for ~S among applicable methods: ~S"
-            generic-function applicable-methods))
+    (cond ((null applicable-methods)
+           ;; APPLICABLE-METHODS is normally non-null in effective
+           ;; method computation, but COMPUTE-APPLICABLE-METHODS can
+           ;; in principle be called by MetaObject Protocol programmers.
+           `(method-combination-error
+             "No applicable method found for ~S"
+             ',generic-function))
+          ((null (primary))
+           ;; PCL checks for no primary method before method
+           ;; combination, but a MetaObject Protocol programmer could
+           ;; call COMPUTE-EFFECTIVE-METHOD themselves and end up
+           ;; here.
+           `(method-combination-error
+             "No primary method found for ~S among applicable methods: ~S"
+             ',generic-function ',applicable-methods))
           ((and (null (before)) (null (after)) (null (around)))
            ;; By returning a single call-method `form' here we enable
            ;; an important implementation-specific optimization; that
@@ -510,8 +513,8 @@
         (around ())
         (primary ()))
     (flet ((invalid (method)
-             (signal '%invalid-qualifiers :method method)
-             (invalid-qualifiers generic-function combin method)))
+             (return-from short-compute-effective-method
+               `(invalid-qualifiers ',generic-function ',combin ',method))))
       (dolist (m applicable-methods)
         (let ((qualifiers (method-qualifiers m)))
           (cond ((null qualifiers) (invalid m))
@@ -532,11 +535,21 @@
                 `(call-method ,(car primary) ())
                 `(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
                                       primary)))))
-      (cond ((null primary)
-             (signal '%no-primary-method)
-             (method-combination-error
-              "No primary method found for ~S among applicable methods: ~S"
-              generic-function applicable-methods))
+      (cond ((null applicable-methods)
+             ;; APPLICABLE-METHODS is normally non-null in effective
+             ;; method computation, but COMPUTE-APPLICABLE-METHODS can
+             ;; in principle be called by MetaObject Protocol programmers.
+             `(method-combination-error
+               "No applicable method found for ~S"
+               ',generic-function))
+            ((null primary)
+             ;; PCL checks for no primary method before method
+             ;; combination, but a MetaObject Protocol programmer could
+             ;; call COMPUTE-EFFECTIVE-METHOD themselves and end up
+             ;; here.
+             `(method-combination-error
+               "No primary method found for ~S among applicable methods: ~S"
+               ',generic-function ',applicable-methods))
             ((null around) main-method)
             (t
              `(call-method ,(car around)

@@ -396,3 +396,8 @@
       the single qualifiers ~{~S~#[~; and ~:;, ~]~} or to have no ~
       qualifier at all.~@:>"
      method gf why type-name +standard-method-combination-qualifiers+)))
+
+(defmethod compute-primary-methods ((gf generic-function)
+                                    combin
+                                    applicable-methods)
+  applicable-methods)

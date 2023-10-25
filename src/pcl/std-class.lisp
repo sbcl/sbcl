@@ -144,7 +144,7 @@
 ;;;; various class accessors that are a little more complicated than can be
 ;;;; done with automatically generated reader methods
 
-(defmethod class-prototype :before (class)
+(defmethod class-prototype :before ((class pcl-class))
   (unless (class-finalized-p class)
     (error "~@<~S is not finalized.~:@>" class)))
 
@@ -221,13 +221,13 @@
 ;;; function using the same lock.
 (define-load-time-global *specializer-lock* (sb-thread:make-mutex :name "Specializer lock"))
 
-(defmethod add-direct-method :around ((specializer specializer) method)
+(defmethod add-direct-method :around ((specializer specializer) (method method))
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
   (sb-thread::with-recursive-system-lock (*specializer-lock*)
     (call-next-method)))
 
-(defmethod remove-direct-method :around ((specializer specializer) method)
+(defmethod remove-direct-method :around ((specializer specializer) (method method))
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
   (sb-thread::with-recursive-system-lock (*specializer-lock*)
