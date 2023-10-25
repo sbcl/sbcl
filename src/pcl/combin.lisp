@@ -272,8 +272,6 @@
   (multiple-value-bind (nreq applyp)
       (get-generic-fun-info gf)
     (let ((ll (make-fast-method-call-lambda-list nreq applyp))
-          (error-p (or (eq (first effective-method) '%no-primary-method)
-                       (eq (first effective-method) '%invalid-qualifiers)))
           (mc-args-p
            (when (eq **boot-state** 'complete)
              ;; Otherwise the METHOD-COMBINATION slot is not bound.
@@ -282,16 +280,6 @@
                     (long-method-combination-args-lambda-list combin)))))
           (name `(emf ,(generic-function-name gf))))
       (cond
-        (error-p
-         `(named-lambda ,name (.pv. .next-method-call. &rest .args.)
-            (declare (ignore .pv. .next-method-call.))
-            (declare (ignorable .args.))
-            (flet ((%no-primary-method (gf args)
-                     (call-no-primary-method gf args))
-                   (%invalid-qualifiers (gf combin method)
-                     (invalid-qualifiers gf combin method)))
-              (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
-              ,effective-method)))
         (mc-args-p
          (let* ((required (make-dfun-required-args nreq))
                 (gf-args (if applyp
@@ -308,7 +296,7 @@
                 ,effective-method))))
         (t
          `(named-lambda ,name ,ll
-            (declare (ignore ,@(if error-p ll '(.pv. .next-method-call.))))
+            (declare (ignore .pv. .next-method-call.))
             ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
@@ -439,6 +427,13 @@
 (defun gf-requires-emf-keyword-checks (generic-function)
   (member '&key (gf-lambda-list generic-function)))
 
+;;; internal condition types to exit COMPUTE-EFFECTIVE-METHOD
+;;; non-locally (allowing the caller to generate error-case effective
+;;; method functions).
+(define-condition %invalid-qualifiers ()
+  ((%method :initarg :method :reader %invalid-qualifiers-method)))
+(define-condition %no-primary-method () ())
+
 (defconstant-eqx +standard-method-combination-qualifiers+
     '(:around :before :after) #'equal)
 
@@ -448,20 +443,25 @@
 (defun standard-compute-effective-method
     (generic-function combin applicable-methods)
   (collect ((before) (primary) (after) (around))
-    (flet ((invalid (gf combin m) (invalid-qualifiers gf combin m)))
+    (flet ((invalid (method)
+             (signal '%invalid-qualifiers :method method)
+             (invalid-qualifiers generic-function combin method)))
       (dolist (m applicable-methods)
         (let ((qualifiers (if (listp m)
                               (early-method-qualifiers m)
                               (safe-method-qualifiers m))))
           (cond
             ((null qualifiers) (primary m))
-            ((cdr qualifiers) (invalid generic-function combin m))
+            ((cdr qualifiers) (invalid m))
             ((eq (car qualifiers) :around) (around m))
             ((eq (car qualifiers) :before) (before m))
             ((eq (car qualifiers) :after) (after m))
-            (t (invalid generic-function combin m))))))
+            (t (invalid m))))))
     (cond ((null (primary))
-           `(%no-primary-method ',generic-function .args.))
+           (signal '%no-primary-method)
+           (method-combination-error
+            "No primary method found for ~S among applicable methods: ~S"
+            generic-function applicable-methods))
           ((and (null (before)) (null (after)) (null (around)))
            ;; By returning a single call-method `form' here we enable
            ;; an important implementation-specific optimization; that
@@ -509,18 +509,18 @@
         (order (car (method-combination-options combin)))
         (around ())
         (primary ()))
-    (flet ((invalid (gf combin m)
-             (return-from short-compute-effective-method
-               `(%invalid-qualifiers ',gf ',combin ',m))))
+    (flet ((invalid (method)
+             (signal '%invalid-qualifiers :method method)
+             (invalid-qualifiers generic-function combin method)))
       (dolist (m applicable-methods)
         (let ((qualifiers (method-qualifiers m)))
-          (cond ((null qualifiers) (invalid generic-function combin m))
-                ((cdr qualifiers) (invalid generic-function combin m))
+          (cond ((null qualifiers) (invalid m))
+                ((cdr qualifiers) (invalid m))
                 ((eq (car qualifiers) :around)
                  (push m around))
                 ((eq (car qualifiers) type-name)
                  (push m primary))
-                (t (invalid generic-function combin m))))))
+                (t (invalid m))))))
     (setq around (nreverse around))
     (ecase order
       (:most-specific-last) ; nothing to be done, already in correct order
@@ -533,33 +533,10 @@
                 `(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
                                       primary)))))
       (cond ((null primary)
-             ;; As of sbcl-0.8.0.80 we don't seem to need to do
-             ;; anything messy like
-             ;;        `(APPLY (FUNCTION (IF AROUND
-             ;;                              'NO-PRIMARY-METHOD
-             ;;                              'NO-APPLICABLE-METHOD)
-             ;;                           ',GENERIC-FUNCTION
-             ;;                           .ARGS.)
-             ;; here because (for reasons I don't understand at the
-             ;; moment -- WHN) control will never reach here if there
-             ;; are no applicable methods, but instead end up
-             ;; in NO-APPLICABLE-METHODS first.
-             ;;
-             ;; FIXME: The way that we arrange for .ARGS. to be bound
-             ;; here seems weird. We rely on EXPAND-EFFECTIVE-METHOD-FUNCTION
-             ;; recognizing any form whose operator is %NO-PRIMARY-METHOD
-             ;; as magical, and carefully surrounding it with a
-             ;; LAMBDA form which binds .ARGS. But...
-             ;;   1. That seems fragile, because the magicalness of
-             ;;      %NO-PRIMARY-METHOD forms is scattered around
-             ;;      the system. So it could easily be broken by
-             ;;      locally-plausible maintenance changes like,
-             ;;      e.g., using the APPLY expression above.
-             ;;   2. That seems buggy w.r.t. to MOPpish tricks in
-             ;;      user code, e.g.
-             ;;         (DEFMETHOD COMPUTE-EFFECTIVE-METHOD :AROUND (...)
-             ;;           `(PROGN ,(CALL-NEXT-METHOD) (INCF *MY-CTR*)))
-             `(%no-primary-method ',generic-function .args.))
+             (signal '%no-primary-method)
+             (method-combination-error
+              "No primary method found for ~S among applicable methods: ~S"
+              generic-function applicable-methods))
             ((null around) main-method)
             (t
              `(call-method ,(car around)
@@ -624,24 +601,6 @@
                ((not (memq key valid-keys)) (invalid key))))
            (incf i))))))
 
-(defun maybe-wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
-  ;; KLUDGE: this is a continuation of the "weird" hack (see
-  ;; SHORT-COMPUTE-EFFECTIVE-METHOD for the comment, but it also
-  ;; applies to STANDARD-COMPUTE-EFFECTIVE-METHOD) regarding these
-  ;; error cases, which are treated specially in
-  ;; EXPAND-EFFECTIVE-METHOD-FUNCTION.  We only maybe wrap the
-  ;; effective method in GET-SECONDARY-DISPATCH-FUNCTION2, to allow
-  ;; EXPAND-EFFECTIVE-METHOD-FUNCTION to treat these magic operators
-  ;; specially.  (The comment regarding the bugginess of this check
-  ;; regarding MOP users is true and they should be reworked to use
-  ;; less magic; also, probably we should do keyword argument error
-  ;; signalling before method correctness signalling, as it seems a
-  ;; more fundamental error.)
-  (if (or (eq (first effective) '%no-primary-method)
-          (eq (first effective) '%invalid-qualifiers))
-      effective
-      (wrap-with-applicable-keyword-check effective valid-keys keyargs-start)))
-
 (defun wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
   `(let ((.valid-keys. ',valid-keys)
          (.keyargs-start. ',keyargs-start))
@@ -666,15 +625,20 @@
                                      combin
                                      applicable-methods))
 
+;;; not INVALID-METHOD-ERROR as that would violate CLHS 11.1.2.1.1
+(define-condition invalid-method-program-error (program-error simple-condition)
+  ())
 (defun invalid-method-error (method format-control &rest format-arguments)
   (let ((sb-debug:*stack-top-hint* (find-caller-frame)))
-    (error "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
-           method
-           format-control
-           format-arguments)))
+    (error 'invalid-method-program-error
+           :format-control "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
+           :format-arguments (list method format-control format-arguments))))
 
+;;; not METHOD-COMBINATION-ERROR as that would violate CLHS 11.1.2.1.1
+(define-condition method-combination-program-error (program-error simple-condition)
+  ())
 (defun method-combination-error (format-control &rest format-arguments)
   (let ((sb-debug:*stack-top-hint* (find-caller-frame)))
-    (error "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
-           format-control
-           format-arguments)))
+    (error 'method-combination-program-error
+           :format-control "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
+           :format-arguments (list format-control format-arguments))))
