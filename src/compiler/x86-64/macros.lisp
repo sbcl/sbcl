@@ -432,3 +432,8 @@
            ,@(when (member name '(instance-index-set %closure-index-set %weakvec-set))
                '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
            (emit-store ea value val-temp)))))
+
+(defmacro pc-size (vop)
+  `(if (sb-c::code-immobile-p ,vop)
+       :dword
+       :qword))
