@@ -168,6 +168,8 @@
   ;; And now *CURRENT-THREAD*
   (sb-thread::init-main-thread)
 
+  (show-and-call !hash-table-cold-init)
+
   ;; not sure why this is needed on some architectures. Dark magic.
   #-linkage-space
   (setf (fdefn-fun (find-or-create-fdefn '%coerce-callable-for-call))

@@ -10,8 +10,8 @@
 ;;; half as many buckets as it would ordinarily get after enlarging.
 (sb-int:encapsulate 'sb-impl::recompute-ht-vector-sizes 'collision-inducement
  (compile nil
-          '(lambda (fn tbl old-size)
-             (multiple-value-bind (new-size new-n-buckets) (funcall fn tbl old-size)
+          '(lambda (fn tbl)
+             (multiple-value-bind (new-size new-n-buckets) (funcall fn tbl)
                (values new-size (ash new-n-buckets
                                      (if (eq tbl *table-under-test*) -1 0)))))))
 

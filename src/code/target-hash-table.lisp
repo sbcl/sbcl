@@ -12,6 +12,9 @@
 
 (in-package "SB-IMPL")
 
+
+(!begin-collecting-cold-init-forms)
+
 ;;;; utilities
 
 ;;;; TODOs:
@@ -279,9 +282,9 @@ Examples:
 
 ;;;; construction and simple accessors
 
-;;; The smallest table holds 14 items distributed among 16 buckets.
-;;; So we allocate 14 k/v pairs = 28 cells + 3 overhead = 31 cells,
-;;; and at maximum load the table will have a load factor of 87.5%
+;;; The smallest table holds 7 items distributed among 8 buckets. So
+;;; we allocate 7 k/v pairs = 14 cells + 3 overhead = 17 cells, and at
+;;; maximum load the table will have a load factor of 87.5%
 (defconstant kv-pairs-overhead-slots 3)
 (defconstant bad-next-value #xfefefefe)
 ;;; This constant is referenced via its name in cold load, so it needs to
@@ -842,13 +845,11 @@ multiple threads accessing the same hash-table without locking."
        result))))
 ) ; end MACROLET
 
-(defun recompute-ht-vector-sizes (table old-size)
+(defun %recompute-ht-vector-sizes (rehash-size old-size)
   ;; Compute new vector lengths for the table, extending the table based on the
   ;; rehash-size.
-  ;; If I did the math right, the upper bound is a fixnum on 32-bit (and 64-bit of course)
   (declare (type (integer 1 (#.(ash 1 +max-hash-table-bits+))) old-size))
-  (let* ((rehash-size (hash-table-rehash-size table))
-         (new-size
+  (let* ((new-size
            (typecase rehash-size
              (single-float
               ;; This is the more common case by far, and we take some
@@ -865,7 +866,7 @@ multiple threads accessing the same hash-table without locking."
                      ;; Ensure that the size grows, e.g. for
                      ;; (TRUNCATE (* 14 1.01)) => 14.
                      (1+ old-size))))
-             (fixnum (+ rehash-size old-size)))
+             (fixnum (+ rehash-size old-size))))
          (new-n-buckets
            (let ((pow2ceil (power-of-two-ceiling new-size)))
              ;; If the default rehash-size was employed, let's try to keep the
@@ -898,6 +899,41 @@ multiple threads accessing the same hash-table without locking."
                         (setq new-size (floor (* 0.65 pow2ceil))))))) ; target LF = 65%
              pow2ceil)))
     (values new-size new-n-buckets)))
+
+;;; Cache the expensive computation of RECOMPUTE-HT-VECTOR-SIZES for
+;;; when REHASH-SIZE is the default.
+
+(defconstant +cache-default-ht-sizes-below+ 1024)
+
+(declaim (type (simple-array fixnum (#.(* 2 +cache-default-ht-sizes-below+)))
+               *default-ht-sizes*))
+(define-load-time-global *default-ht-sizes* nil)
+#-sb-xc-host
+(!cold-init-forms
+ (setq *default-ht-sizes*
+       (let ((v (make-array (* 2 +cache-default-ht-sizes-below+)
+                            :element-type 'fixnum)))
+         (loop for size upfrom 1 below +cache-default-ht-sizes-below+
+               do (multiple-value-bind (new-size new-n-buckets)
+                      (%recompute-ht-vector-sizes default-rehash-size size)
+                    (setf (aref v (* 2 size)) new-size
+                          (aref v (1+ (* 2 size))) new-n-buckets)))
+         v)))
+
+(defun recompute-ht-vector-sizes (table)
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+  (let* ((table (truly-the hash-table table))
+         ;; NEXT-VECTOR's length is 1 greater than "size" which is the
+         ;; number of k/v pairs stored at its full capacity.
+         (old-size (1- (length (hash-table-next-vector table))))
+         (rehash-size (hash-table-rehash-size table)))
+    (if (and (floatp rehash-size)
+             (= rehash-size default-rehash-size)
+             (< old-size +cache-default-ht-sizes-below+))
+        (let ((default-ht-sizes *default-ht-sizes*))
+          (values (aref default-ht-sizes (* 2 old-size))
+                  (aref default-ht-sizes (1+ (* 2 old-size)))))
+        (%recompute-ht-vector-sizes rehash-size old-size))))
 
 ;;; Enlarge TABLE.  If it is weak, then both the old and new vectors are temporarily
 ;;; made non-weak so that we don't have to deal with GC-related shenanigans.
@@ -946,11 +982,7 @@ multiple threads accessing the same hash-table without locking."
               (hash-table-hash-vector table) hash-vector)
         (return-from grow-hash-table 1)))
     (binding* (((new-size new-n-buckets)
-                (recompute-ht-vector-sizes
-                 table
-                 ;; Pass the old size. The NEXT vector's length is 1 greater than "size"
-                 ;; which is the number of k/v pairs stored at its full capacity.
-                 (1- (length (hash-table-next-vector table)))))
+                (recompute-ht-vector-sizes table))
                (old-kv-vector (hash-table-pairs table))
                ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
                 (realloc new-size new-n-buckets))
@@ -2104,6 +2136,8 @@ table itself."
 ;;; so its effect would just get clobbered by the defstruct.
 (sb-kernel::assign-equalp-impl 'hash-table #'hash-table-equalp)
 
+(!defun-from-collected-cold-init-forms !hash-table-cold-init)
+
 #|
 (defun memusage (x)
   (+ (sb-vm::primitive-object-size (hash-table-pairs x))
@@ -2196,7 +2230,7 @@ table itself."
               (* n-cells 4))) ; HASH-VECTOR  = one 32-bit int per cell
          (log2-buckets (n-buckets)
            (integer-length (1- n-buckets))))
-  (let* ((size 14)
+  (let* ((size 7)
          (n-buckets (power-of-two-ceiling size))
          (memused (compute-memused n-buckets size)))
     (format t "        size   bits        LF           mem~%")
@@ -2229,11 +2263,13 @@ table itself."
 ;;; to between .6 and .85 if every k/v cell is in use at the new size.
 
         size   bits        LF           mem
-          14      4    0.8750           400
-          21      5    0.6563           632  (* 1.58)
-          27      5    0.8438           776  (* 1.227848)
-          40      6    0.6250          1216  (* 1.5670103)
-          54      6    0.8438          1552  (* 1.2763158)
+           7      3    0.8750           200
+          10      4    0.6250           304  (* 1.52)
+          13      4    0.8125           376  (* 1.2368422)
+          19      5    0.5938           584  (* 1.5531915)
+          28      5    0.8750           800  (* 1.369863)
+          42      6    0.6563          1264  (* 1.58)
+          54      6    0.8438          1552  (* 1.227848)
           81      7    0.6328          2456  (* 1.5824742)
          108      7    0.8438          3104  (* 1.2638437)
          162      8    0.6328          4912  (* 1.5824742)
