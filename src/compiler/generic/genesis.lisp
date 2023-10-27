@@ -503,8 +503,11 @@
                (loop for index from start-page to end-page
                      do (let ((pte (pte index)))
                           (unless (page-scan-start pte)
-                            (setf (page-scan-start pte) start-word-index
-                                  (page-single-object-p pte) (>= n-words words-per-page))))))
+                            (setf (page-scan-start pte) start-word-index)
+                            ;; gencgc doesn't use single-object pages in genesis.
+                            ;; mark-region does for all oversized objects.
+                            #+mark-region-gc
+                            (setf (page-single-object-p pte) (>= n-words words-per-page))))))
              start-word-index)
            (get-frontier-page-type ()
              (page-type (pte (page-index (1- (gspace-free-word-index gspace))))))
@@ -3907,14 +3910,10 @@ III. initially undefined function references (alphabetically):
                               (:code  (incf n-code)  #b111)
                               (:list  (incf n-cons)  #b101)
                               (:mixed (incf n-mixed) #b011))
-                            0))
-             #+mark-region-gc
-             (single-object-bit (if (page-single-object-p pte) 1 0)))
+                            0)))
         (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
-        #+mark-region-gc
-        (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes)) (logior usage single-object-bit))
-        #-mark-region-gc
-        (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes)) usage)))
+        (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes))
+              (logior usage (if (page-single-object-p pte) 1 0)))))
     (when verbose
       (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
               n-cons n-code n-mixed))
