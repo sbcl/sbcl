@@ -371,7 +371,6 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
                                      COMPRESSION_LEVEL_NONE, 1);
 #ifdef LISP_FEATURE_MARK_REGION_GC
-        extern sword_t bitmap_size(core_entry_elt_t);
         sword_t size = bitmap_size(next_free_page);
         extern uword_t *allocation_bitmap;
         write_bytes(file, (char*)allocation_bitmap, size, core_start_pos, COMPRESSION_LEVEL_NONE, 0);

@@ -1729,6 +1729,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         }
 #endif
         for (i=2; i <nheader_words; ++i) CHECK(object[i], object+i);
+#ifndef NDEBUG // avoid "unused" warnings on auto vars of for_each_simple_fun()
         // Check the SIMPLE-FUN headers
         for_each_simple_fun(i, fheaderp, code, 1, {
 #if defined LISP_FEATURE_COMPACT_INSTANCE_HEADER
@@ -1738,6 +1739,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
             gc_assert((fheaderp->header >> 32) == 0);
 #endif
         });
+#endif
 #if 0 // this looks redundant. It's checked with each pointer, no?
         bool rememberedp = header_rememberedp(code->header);
         /* The remembered set invariant is that an object is marked "written"
