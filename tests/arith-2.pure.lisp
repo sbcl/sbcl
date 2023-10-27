@@ -245,3 +245,10 @@
      (declare ((or (integer 1 5) (integer 9 10)) x))
      (isqrt x))
    (integer 1 3)))
+
+(with-test (:name :integer-length-union)
+  (assert-type
+   (lambda (x)
+     (declare ((or (integer 1 5) (integer 9 10)) x))
+     (integer-length x))
+   (integer 1 4)))
