@@ -104,8 +104,7 @@ line_index_t line_count;
 uword_t mark_bitmap_size;
 
 static void allocate_bitmaps() {
-  int bytes_per_heap_byte = 8 /* bits/byte */ << N_LOWTAG_BITS;
-  mark_bitmap_size = dynamic_space_size / bytes_per_heap_byte;
+  mark_bitmap_size = bitmap_size(dynamic_space_size / GENCGC_PAGE_BYTES);
   allocate_bitmap(&allocation_bitmap, mark_bitmap_size, "allocation bitmap");
   allocate_bitmap((uword_t**)&mark_bitmap, mark_bitmap_size, "mark bitmap");
   line_count = dynamic_space_size / LINE_SIZE;
@@ -1235,11 +1234,6 @@ void prepare_lines_for_final_gc() {
 }
 
 /* Core file I/O */
-
-sword_t bitmap_size(core_entry_elt_t n_ptes) {
-  sword_t bytes_of_heap = n_ptes * GENCGC_PAGE_BYTES;
-  return bytes_of_heap / (8 << N_LOWTAG_BITS);
-}
 
 void load_corefile_bitmaps(int fd, core_entry_elt_t n_ptes) {
   sword_t size = bitmap_size(n_ptes);

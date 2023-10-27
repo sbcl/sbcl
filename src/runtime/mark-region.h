@@ -46,7 +46,10 @@ static inline line_index_t address_line(void *address) {
 /* I/O */
 extern void mrgc_init();
 extern void load_corefile_bitmaps(int fd, core_entry_elt_t n_ptes);
-extern sword_t bitmap_size(core_entry_elt_t n_ptes);
+static inline uword_t bitmap_size(uword_t n_ptes) {
+    const int bitmap_bytes_per_page = GENCGC_PAGE_BYTES / (CONS_SIZE*N_WORD_BYTES) / 8;
+    return n_ptes * bitmap_bytes_per_page;
+}
 
 /* Allocation */
 extern bool try_allocate_small_from_pages(sword_t nbytes, struct alloc_region *region,
