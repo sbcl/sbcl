@@ -5,12 +5,43 @@ changes relative to sbcl-2.3.9:
     on all safety levels, not just those which it can prove are of sub-page
     sizes. It can do this because it now inserts code to check for stack
     overflow explicitly on higher safety levels.
+  * enhancements to the disassembler:
+    ** on x86-64, DISASSEMBLE now annotates references to static symbols.
+    ** on arm64, DISASSEMBLE now annotates references to static symbols and
+       local function external entry points.
   * bug fix: calls to generic functions now detect erroneous keywords (in the
     sense of CLHS 7.6.5) passed as arguments even when auxiliary methods are
     applicable.
   * bug fix: the standard method on SB-MOP:COMPUTE-EFFECTIVE-METHOD no longer
     inserts calls to implementation-defined local macros.  (reported by Daniel
     Kochmański)
+  * bug fix: compiler error from state-machine-like LABELS forms in some
+    circumstances.  (lp#2037318)
+  * bug fix: fix compile-time error in constant-folding RATIONAL on literal
+    float infinities.  (lp#2037455)
+  * bug fix: failure on x86-64 to assemble code for EQL tests of comparisons
+    with immediates.  (lp#2037456)
+  * bug fix: infinite loop in the compiler for simplification of type tests of
+    complicated union types.  (lp#2038112, reported by Paul M. Rodriguez)
+  * bug fix: inability to dump a literal displaced array containing copies of
+    its displacement target.  (lp#2038233, reported by James Kalenius)
+  * bug fix: compiler error in LOGBITP type derivation.  (lp#2038241)
+  * bug fix: compiler error in AREF type derivation.  (lp#2038659)
+  * bug fix: compiler internal consistency failure in overflow type checks.
+    (lp#2038736)
+  * bug fix: work around an infinite loop in type simplification by not
+    providing such types from the compiler.  (lp#2038980, reported by Richard
+    Holcombe)
+  * bug fix: spurious run-time argument count errors from generic function
+    calls on arm64.  (lp#2039006, reported by fiddlerwoaroof)
+  * bug fix: compiler type derivation error in SCALE-FLOAT on floating-point
+    infinities.  (lp#2039613)
+  * bug fix: ROOM is slightly more robust to incompletely-initialized
+    instances at the point of running ROOM.  (Reported by Andreas Franke)
+  * bug fix: finalizers saved through SAVE-LISP-AND-DIE and subsequently
+    executed do not trigger memory faults.  (Reported by Bohong Huang)
+  * optimization: improvements to type derivation for ISQRT, INTEGER-LENGTH,
+    LOGCOUNT, LOG, DENOMINATOR.
 
 changes in sbcl-2.3.9 relative to sbcl-2.3.8:
   * enhancement: stack allocation via DYNAMIC-EXTENT now applies to all values
