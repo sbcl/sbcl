@@ -11,6 +11,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Package-Local Nicknames::
 * Package Variance::
 * Garbage Collection::
+* Generic Function Dispatch::
 * Slot Access::
 * Metaobject Protocol::
 * Extensible Sequences::
@@ -281,6 +282,22 @@ There is no output on @code{cl:*standard-output*} and the return value
 is a single path for the target object @t{"my string"}. As before, the
 path shows the symbol and the three cons cells.
 
+@node Generic Function Dispatch
+@comment  node-name,  next,  previous,  up
+@section Generic Function Dispatch
+
+@findex @sbpcl{no-primary-method}
+@findex @cl{no-applicable-method}
+If a generic function with standard or short method combination is
+called, and the set of applicable methods does not include any primary
+methods, then the generic function @code{no-primary-method} will be
+invoked, with the arguments to @code{no-primary-method} being the
+invoked generic function and its arguments, similar to the standard
+function @code{no-applicable-method}.  As with
+@code{no-applicable-method}, the default method on
+@code{no-primary-method} signals an error; programmers may define
+methods on it.
+
 @node Slot Access
 @comment  node-name,  next,  previous,  up
 @section Slot Access
@@ -538,6 +555,23 @@ functions is the same before and after the change.
 This is required for correct operation of the protocol to update
 instances for the new or redefined class, and can be seen as part of
 the contract of the @code{:instance} or @code{:class} allocations.
+
+@item
+@findex @cl{no-applicable-method}
+@findex @sbpcl{no-primary-method}
+@findex @sbmop{compute-discriminating-function}
+@findex @cl{compute-applicable-methods}
+@findex @sbmop{compute-effective-method}
+Metaobject protocol users may wish to override
+@code{compute-discriminating-function} for their own generic function
+classes.  Overriding implementations of
+@code{compute-discriminating-function} must, in order to participate
+in the @code{no-applicable-method} and @code{no-primary-method}
+protocols, perform appropriate checks on the return value of
+@code{compute-applicable-methods} before processing the effective
+method; the standard effective method contains error-invoking forms,
+but those forms have no access to the generic function invocation's
+arguments.
 
 @end itemize
 

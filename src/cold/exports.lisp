@@ -3593,7 +3593,9 @@ package is deprecated in favour of SB-MOP.")
 
            "ILLEGAL-CLASS-NAME-ERROR"
            "CLASS-NOT-FOUND-ERROR"
-           "SPECIALIZER-NAME-SYNTAX-ERROR"))
+           "SPECIALIZER-NAME-SYNTAX-ERROR"
+
+           "NO-PRIMARY-METHOD"))
 
 (defpackage* "SB-BROTHERTREE"
   (:use "CL" "SB-EXT" "SB-INT")

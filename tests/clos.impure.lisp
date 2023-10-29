@@ -49,11 +49,17 @@
 ;;; sbcl-0.6.12.25, the implementation of NO-APPLICABLE-METHOD was
 ;;; broken in such a way that the code here would signal an error.
 (defgeneric zut-n-a-m (a b c))
+(defmethod zut-n-a-m :around (a b (c symbol)) nil)
 (defmethod no-applicable-method ((zut-n-a-m (eql #'zut-n-a-m)) &rest args)
   (declare (ignore args))
   :no-applicable-method)
+(defmethod sb-pcl:no-primary-method ((zut-n-a-m (eql #'zut-n-a-m)) &rest args)
+  (declare (ignore-args))
+  :no-primary-method)
 (with-test (:name no-applicable-method)
   (assert (eq :no-applicable-method (zut-n-a-m 1 2 3))))
+(with-test (:name :no-primary-method)
+  (assert (eq :no-primary-method (zut-n-a-m 1 2 t))))
 
 ;;; bug reported and fixed by Alexey Dejneka sbcl-devel 2001-09-10:
 ;;; This DEFGENERIC shouldn't cause an error.
