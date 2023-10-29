@@ -27,8 +27,6 @@ Essentially every type of non-conformance is considered a bug. (The
 exceptions involve internal inconsistencies in the standard.)
 @xref{Reporting Bugs}.
 
-@node Exceptions to ANSI Conformance
-@comment  node-name,  next,  previous,  up
 @subsection Exceptions
 
 @itemize
