@@ -247,7 +247,6 @@ page_index_t try_allocate_large(uword_t nbytes,
                                 int page_type, generation_index_t gen,
                                 page_index_t *start, page_index_t end,
                                 uword_t *largest_hole) {
-  void set_allocation_bit_mark(void *address);
   gc_assert(gen != SCRATCH_GENERATION);
   uword_t pages_needed = ALIGN_UP(nbytes, GENCGC_PAGE_BYTES) / GENCGC_PAGE_BYTES;
   uword_t remainder = nbytes % GENCGC_PAGE_BYTES;
@@ -1199,10 +1198,30 @@ void mr_collect_garbage(bool raise) {
 }
 
 void zero_all_free_ranges() {
-  for (page_index_t p = 0; p < page_table_pages; p++)
-    if (!page_single_obj_p(p))
+  for (page_index_t p = 0; p < page_table_pages; p++) {
+    char* addr = page_address(p);
+    char* limit = addr + GENCGC_PAGE_BYTES;
+    // mark-region frequently leaves empty pages below the high water mark.
+    // We avoid operating on free pages. The same function in gencgc iterates only
+    // up to next_free_page, I don't know why this can't do likewise.
+    if (page_single_obj_p(p) || (page_free_p(p) && p < next_free_page)) {
+      // all bytes beyond the bytes_used must be 0
+      char* unused = addr + page_bytes_used(p);
+      memset(unused, 0, limit-unused);
+    } else if (!page_free_p(p)) {
+      lispobj* where = (void*)addr;
+      while ( (char*)where < limit )
+        if (allocation_bit_marked(where)) // skip all bits of this object
+          where += object_size(where);
+        else {
+          where[0] = where[1] = 0;
+          where += 2;
+        }
+      set_page_bytes_used(p, GENCGC_PAGE_BYTES);
       for_lines_in_page (l, p)
         if (!line_bytemap[l]) memset(line_address(l), 0, LINE_SIZE);
+    }
+  }
 }
 
 void prepare_lines_for_final_gc() {
