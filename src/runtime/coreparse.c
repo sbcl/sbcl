@@ -1120,8 +1120,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
                            __attribute__((unused)) struct coreparse_space *spaces,
                            struct heap_adjust *adj)
 {
-    gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
-              == (size_t)total_bytes);
     if (next_free_page != n_ptes)
         lose("n_PTEs=%"PAGE_INDEX_FMT" but expected %"PAGE_INDEX_FMT,
              n_ptes, next_free_page);
@@ -1130,6 +1128,15 @@ void gc_load_corefile_ptes(int card_table_nbits,
     bool patchp = gc_allocate_ptes();
 
     if (LSEEK(fd, offset, SEEK_SET) != offset) lose("failed seek");
+
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    sword_t bitmapsize = bitmap_size(n_ptes);
+    if (read(fd, allocation_bitmap, bitmapsize) != bitmapsize)
+        lose("failed to read allocation bitmap from core");
+    total_bytes -= bitmapsize;
+#endif
+    gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
+              == (size_t)total_bytes);
 
     char data[8192];
     // Process an integral number of ptes on each read.
@@ -1157,12 +1164,15 @@ void gc_load_corefile_ptes(int card_table_nbits,
             pte.words_used &= ~1;
             /* It is possible, though rare, for the saved page table
              * to contain free pages below alloc_ptr. */
-            if (type != FREE_PAGE_FLAG) {
-                gc_assert(pte.words_used);
-                page_table[page].words_used_ = pte.words_used;
-                set_page_scan_start_offset(page, pte.sso & ~0x07);
-                page_table[page].gen = gen;
-            }
+            if (type == FREE_PAGE_FLAG) continue;
+            gc_assert(pte.words_used);
+            page_table[page].words_used_ = pte.words_used;
+            set_page_scan_start_offset(page, pte.sso & ~0x07);
+            page_table[page].gen = gen;
+#ifdef LISP_FEATURE_MARK_REGION_GC
+            if (!page_single_obj_p(page))
+                for_lines_in_page(l, page) line_bytemap[l] = ENCODE_GEN(gen);
+#endif
             bytes_allocated += pte.words_used << WORD_SHIFT;
         }
     }
@@ -1171,9 +1181,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
 
     // Adjust for discrepancies between actually-allocated space addresses
     // and desired addresses.
-#ifdef LISP_FEATURE_MARK_REGION_GC
-    load_corefile_bitmaps(fd, n_ptes);
-#endif
     if (adj->n_ranges) relocate_heap(adj);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

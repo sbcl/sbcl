@@ -155,7 +155,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
 };
 
 static long write_bytes(FILE *file, char *addr, size_t bytes,
-                        os_vm_offset_t file_offset, int compression, int align)
+                        os_vm_offset_t file_offset, int compression)
 {
     ftell_type here, data;
 
@@ -169,7 +169,7 @@ static long write_bytes(FILE *file, char *addr, size_t bytes,
     here = FTELL(file);
     FSEEK(file, 0, SEEK_END);
     data = ALIGN_UP(FTELL(file), os_vm_page_size);
-    if (align) FSEEK(file, data, SEEK_SET);
+    FSEEK(file, data, SEEK_SET);
     write_bytes_to_file(file, addr, bytes, compression);
     FSEEK(file, here, SEEK_SET);
     return ((data - file_offset) / os_vm_page_size) - 1;
@@ -212,7 +212,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
      * That seems quite bogus to operate on bytes that the caller didn't promise were OK
      * to be saved out (and didn't contain, say, a password and social security number) */
     data = write_bytes(file, (char *)addr, ALIGN_UP(bytes, os_vm_page_size),
-                       file_offset, core_compression_level, 1);
+                       file_offset, core_compression_level);
 
     write_lispobj(data, file);
     write_lispobj((uword_t)addr, file);
@@ -356,25 +356,27 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #ifdef LISP_FEATURE_GENERATIONAL
     {
         extern void gc_store_corefile_ptes(struct corefile_pte*);
-        size_t true_size = next_free_page * sizeof(struct corefile_pte);
-        size_t aligned_size = ALIGN_UP(true_size, N_WORD_BYTES);
+        sword_t bitmapsize = 0;
+#ifdef LISP_FEATURE_MARK_REGION_GC
+        bitmapsize = bitmap_size(next_free_page);
+#endif
+        size_t ptes_nbytes = next_free_page * sizeof(struct corefile_pte);
+        size_t aligned_size = ALIGN_UP((bitmapsize+ptes_nbytes), N_WORD_BYTES);
         char* data = successful_malloc(aligned_size);
         // Zeroize the final few bytes of data that get written out
         // but might be untouched by gc_store_corefile_ptes().
         memset(data + aligned_size - N_WORD_BYTES, 0, N_WORD_BYTES);
-        gc_store_corefile_ptes((struct corefile_pte*)data);
+#ifdef LISP_FEATURE_MARK_REGION_GC
+        memcpy(data, allocation_bitmap, bitmapsize);
+#endif
+        gc_store_corefile_ptes((struct corefile_pte*)(data + bitmapsize));
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
         write_lispobj(6, file); // number of words in this core header entry
         write_lispobj(gc_card_table_nbits, file);
         write_lispobj(next_free_page, file);
         write_lispobj(aligned_size, file);
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
-                                     COMPRESSION_LEVEL_NONE, 1);
-#ifdef LISP_FEATURE_MARK_REGION_GC
-        sword_t size = bitmap_size(next_free_page);
-        extern uword_t *allocation_bitmap;
-        write_bytes(file, (char*)allocation_bitmap, size, core_start_pos, COMPRESSION_LEVEL_NONE, 0);
-#endif
+                                     COMPRESSION_LEVEL_NONE);
         write_lispobj(offset, file);
     }
 #endif

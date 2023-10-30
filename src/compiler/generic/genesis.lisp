@@ -120,9 +120,13 @@
 (defun write-words (stream &rest words)
   (let ((bigvec *bigvec-for-write-words*)
         (offset 0))
-    (dolist (word words)
-      (setf (bvref-word bigvec offset) (the sb-vm:word word))
-      (incf offset sb-vm:n-word-bytes))
+    (if (and (singleton-p words) (typep (first words) 'array))
+        (dovector (word (first words))
+          (setf (bvref-word bigvec offset) (the sb-vm:word word))
+          (incf offset sb-vm:n-word-bytes))
+        (dolist (word words)
+          (setf (bvref-word bigvec offset) (the sb-vm:word word))
+          (incf offset sb-vm:n-word-bytes)))
     (write-sequence (elt (bigvec-outer-vector bigvec) 0) stream :end offset)))
 
 ;;; analogous to WRITE-SEQUENCE, but for a BIGVEC
@@ -3885,9 +3889,13 @@ III. initially undefined function references (alphabetically):
 
     (+ data-page page-count)))
 
+(defconstant bitmap-bytes-per-page
+  (or #-mark-region-gc 0
+      (/ sb-vm:gencgc-page-bytes (* sb-vm:cons-size sb-vm:n-word-bytes)
+         sb-vm:n-byte-bits)))
+
 (defun output-page-table (gspace data-page core-file verbose)
-  ;; Write as many PTEs as there are pages used.
-  ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
+  (force-output core-file)
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
          (n-ptes (ceiling data-bytes sb-vm:gencgc-page-bytes))
          (sizeof-corefile-pte (+ sb-vm:n-word-bytes 2))
@@ -3895,7 +3903,19 @@ III. initially undefined function references (alphabetically):
          (n-code 0)
          (n-cons 0)
          (n-mixed 0)
+         (posn (file-position core-file))
          (ptes (make-bigvec)))
+    (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
+    ;; Bitmap, if relevant, precedes the PTEs and consumes a whole number of words
+    #+mark-region-gc
+    (dotimes (page-index n-ptes)
+      (write-words core-file
+                   (page-allocation-bitmap (aref (gspace-page-table gspace) page-index)))
+      (let ((pte (aref (gspace-page-table gspace) page-index)))
+        (unless (page-single-object-p pte) ; ordinary pages must be 100% full
+          (setf (page-words-used pte) sb-vm::gencgc-page-words))))
+    ;; Write as many PTEs as there are pages used.
+    ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
     (expand-bigvec ptes pte-bytes)
     (dotimes (page-index n-ptes)
       (let* ((pte-offset (* page-index sizeof-corefile-pte))
@@ -3917,22 +3937,14 @@ III. initially undefined function references (alphabetically):
     (when verbose
       (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
               n-cons n-code n-mixed))
+    (write-bigvec-as-sequence ptes core-file :end pte-bytes)
     (force-output core-file)
-    (let ((posn (file-position core-file)))
-      (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
-      (write-bigvec-as-sequence ptes core-file :end pte-bytes)
-      #+mark-region-gc
-      (dotimes (page-index n-ptes)
-        (loop for word across (page-allocation-bitmap
-                               (aref (gspace-page-table gspace) page-index))
-              do (write-words core-file word)))
-      (force-output core-file)
-      (file-position core-file posn))
+    (file-position core-file posn)
     (write-words core-file
                  page-table-core-entry-type-code
                  6 ; = number of words in this core header entry
                  sb-vm::gencgc-card-table-index-nbits
-                 n-ptes pte-bytes data-page)))
+                 n-ptes (+ (* n-ptes bitmap-bytes-per-page) pte-bytes) data-page)))
 
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later

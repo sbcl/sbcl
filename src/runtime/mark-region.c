@@ -1252,26 +1252,6 @@ void prepare_lines_for_final_gc() {
   }
 }
 
-/* Core file I/O */
-
-void load_corefile_bitmaps(int fd, core_entry_elt_t n_ptes) {
-  sword_t size = bitmap_size(n_ptes);
-  lseek(fd, ALIGN_UP(lseek(fd, 0, SEEK_CUR), N_WORD_BYTES), SEEK_SET);
-  if (read(fd, allocation_bitmap, size) != size)
-    lose("failed to read allocation bitmap from core");
-
-  /* Mark pseudo-static lines as if everything is live. */
-  for (page_index_t p = 0; p <= page_table_pages; p++)
-    if (!page_free_p(p) && !page_single_obj_p(p)) {
-      set_page_bytes_used(p, GENCGC_PAGE_BYTES);
-      for_lines_in_page(l, p) line_bytemap[l] = ENCODE_GEN(PSEUDO_STATIC_GENERATION);
-    }
-  bytes_allocated = 0;
-  for (page_index_t p = 0; p <= page_table_pages; p++)
-    bytes_allocated += page_bytes_used(p);
-  generations[PSEUDO_STATIC_GENERATION].bytes_allocated = bytes_allocated;
-}
-
 /* Useful hacky stuff */
 
 void find_references_to(lispobj something) {
