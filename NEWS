@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.9:
+changes in sbcl-2.3.10 relative to sbcl-2.3.9:
   * enhancement: The compiler now allows stack allocating vectors of any size
     on all safety levels, not just those which it can prove are of sub-page
     sizes. It can do this because it now inserts code to check for stack
