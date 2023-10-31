@@ -125,7 +125,7 @@ void lisp_mutex_done_eventrecording() {
         rel_time.tv_sec -= basetime.tv_sec;
         rel_time.tv_nsec -= basetime.tv_nsec;
         if (rel_time.tv_nsec<0) rel_time.tv_nsec += 1000 * 1000 * 1000, rel_time.tv_sec--;
-        lispobj threadname = ti->name;
+        lispobj threadname = ti->_name;
         if (events[i].timeout >= 0) // must also have mutex_name in this case
             fprintf(stderr, "[%d.%09ld] %s: %s '%s' timeout %ld\n",
                     (int)rel_time.tv_sec, rel_time.tv_nsec,
@@ -216,8 +216,8 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
   int t;
 
 #ifdef MUTEX_EVENTRECORDING
-    struct mutex* m = (void*)((char*)lock_word - offsetof(struct mutex,state));
-    char *name = m->name != NIL ? vector_sap((m->name) : "(unnamed)";
+    struct lispmutex* m = (void*)((char*)lock_word - offsetof(struct lispmutex,uw_state));
+    char *name = m->name != NIL ? vector_sap(m->name) : "(unnamed)";
 #endif
   if (sec<0) {
       lisp_mutex_event1("start futex wait", name);
@@ -245,7 +245,7 @@ int
 futex_wake(int *lock_word, int n)
 {
 #ifdef MUTEX_EVENTRECORDING
-    struct mutex* m = (void*)((char*)lock_word - offsetof(struct mutex,state));
+    struct lispmutex* m = (void*)((char*)lock_word - offsetof(struct lispmutex,uw_state));
     char *name = m->name != NIL ? vector_sap(m->name) : "(unnamed)";
     lisp_mutex_event1("waking futex", name);
 #endif

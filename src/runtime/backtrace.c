@@ -721,7 +721,7 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
             // and a mutex have a name at the same slot offset (if #+sb-futex).
             // So to reiterate the comment from linux-os.c -
             // "Use this only if you know what you're doing"
-            struct mutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
+            struct lispmutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
             if (lispmutex->name != NIL) {
                 fprintf(stderr, " (MUTEX:\"");
                 print_string(VECTOR(lispmutex->name), stderr);

@@ -3373,7 +3373,7 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
   (write-structure-object (layout-info (find-layout 'sb-thread::thread))
                           *standard-output* "thread_instance" nil)
   (write-structure-object (layout-info (find-layout 'sb-thread::mutex))
-                          *standard-output* "mutex" nil)
+                          *standard-output* "lispmutex" nil)
   ;; The os_thread field is either pthread_t or lispobj.
   ;; If no threads, then it's lispobj. #+win32 uses lispobj too
   ;; but it gets cast to HANDLE upon use.
