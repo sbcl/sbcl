@@ -262,13 +262,26 @@
             (specifier-type
              `(integer ,(or y-low '*)
                        -1))
-            (cond ((and x-len y-len)
-                   (specifier-type `(integer ,(min x-low y-low)
-                                             ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
-                  ((and x-high y-high)
-                   (specifier-type `(integer * ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
-                  (t
-                   (specifier-type 'integer)))))))))
+            (let ((type
+                    (cond ((and x-len y-len)
+                           (specifier-type `(integer ,(min x-low y-low)
+                                                     ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
+                          ((and x-high y-high)
+                           (specifier-type `(integer * ,(nth-value 1 (logior-derive-unsigned-bounds x y)))))
+                          (t
+                           (specifier-type 'integer)))))
+              (flet ((contains-zero (low high)
+                       (cond ((and low high)
+                              (<= low 0 high))
+                             (low
+                              (<= low 0))
+                             (high
+                              (>= high 0))
+                             (t))))
+               (if (and (contains-zero x-low x-high)
+                        (contains-zero y-low y-high))
+                   type
+                   (type-intersection type (specifier-type '(and integer (not (eql 0))))))))))))))
 
 (defun logxor-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))

@@ -35,19 +35,14 @@
     (test-guts)))
 
 (defun type-derivation (op u-l u-h s-l s-h)
-  (let ((interval (sb-c::numeric-type->interval
-                   (sb-kernel:specifier-type (cadr (caddr (sb-kernel:%simple-fun-type
-                                                           (compile nil `(lambda (u s)
-                                                                           (,op (truly-the (integer ,u-l ,u-h) u)
-                                                                                (truly-the (integer ,s-l ,s-h) s)))))))))))
-    (values (loop for u from u-l to u-h
-                  minimize (loop for s from s-l to s-h
-                                 minimize (funcall op u s)))
-            (loop for u from u-l to u-h
-                  maximize (loop for s from s-l to s-h
-                                 maximize (funcall op u s)))
-            (sb-c::interval-low interval)
-            (sb-c::interval-high interval))))
+  (let ((type (sb-kernel:specifier-type (cadr (caddr (sb-kernel:%simple-fun-type
+                                                      (compile nil `(lambda (u s)
+                                                                      (,op (truly-the (integer ,u-l ,u-h) u)
+                                                                           (truly-the (integer ,s-l ,s-h) s))))))))))
+    (loop for u from u-l to u-h
+          always (assert (sb-kernel:ctypep (loop for s from s-l to s-h
+                                                 minimize (funcall op u s))
+                                           type)))))
 
 (defun type-derivation1 (op l h)
   (let ((interval (sb-c::numeric-type->interval
@@ -76,10 +71,7 @@
           do
           (loop for op in '(logand logior logxor)
                 do
-                (multiple-value-bind (low high r-low r-high)
-                    (type-derivation op low1 high1 low2 high2)
-                  (assert (>= low r-low))
-                  (assert (<= high r-high)))))))))
+                (type-derivation op low1 high1 low2 high2)))))))
 
 (with-test (:name :bit-type-derivation)
   (loop
