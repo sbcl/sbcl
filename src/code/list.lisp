@@ -1369,7 +1369,6 @@
                 (let* ((body-loop
                         `(do ((list list (cdr list)))
                              ((null list) nil)
-                           (declare (list list))
                            (let ((this (car list)))
                              ,(let ((cxx (if (char= #\A (char (string name) 0))
                                              'car    ; assoc, assoc-if, assoc-if-not
@@ -1415,7 +1414,6 @@
                                  body-loop)))
                   `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
                        (x list ,@funs)
-                     (declare (optimize speed (sb-c:verify-arg-count 0)))
                      ,@(when funs `((declare (function ,@funs)
                                              (dynamic-extent ,@funs))))
                      ,@(unless (member name '(member assoc adjoin rassoc))
