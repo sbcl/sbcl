@@ -1,32 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes not yet implemented in the external-format-line-endings branch:
-  * (internal) the positional arguments to define-external-format/variable
-    width have been simplified and converted to keyword arguments
-    - unit size / minimum read size / advance size
-    - character read size
-    - input size expression
-    - ...
-  * (internal) construct strict variants of CR and CRLF external formats:
-    - CR: input of LF signals error, output of #\Return signals error
-    - CRLF: input of LF signals error
-  * bug fix: the character-decoding-error condition signalled by octet
-    conversion routines now provides access to a copy of the subsequence
-    that triggered the error.
-  * enhancement: the character-decoding-error condition has readers for the
-    the number of octets that will be skipped if the USE-VALUE restart is
-    invoked.
-  * enhancement: SB-EXT:MAKE-OCTETS-INPUT-STREAM,
-    SB-EXT:WITH-INPUT-FROM-OCTETS, SB-EXT:MAKE-OCTETS-OUTPUT-STREAM and
-    SB-EXT:WITH-OUTPUT-TO-OCTETS are now provided, with their behavior
-    essentially analogous to the standard STRING equivalents.
-  * enhancement: octet and string input and output streams can be bivalent if
-    they are created with the :ELEMENT-TYPE :DEFAULT (non-standard) keyword
-    argument.  If they are, their external format for conversions between
-    characters and octets is provided by the :EXTERNAL-FORMAT keyword argument
-    at their creation.
-
-changes in the external-format-line-endings branch:
+changes relative to sbcl-2.3.10:
   * minor incompatible change: streams with an external-format specified with
     :REPLACEMENT will use their replacement data once per stream unit that
     causes a decoding error (rather than, in some cases, once for a sequence
@@ -34,13 +8,20 @@ changes in the external-format-line-endings branch:
     external-format).
   * minor incompatible change: external-format designators with unsupported or
     unrecognized options now signal an error when used.
-  * enhancement: external formats now support newline variants.
+  * enhancement: During generic function dispatch, for a generic function
+    using standard- or short-method-combination, if there are no applicable
+    primary methods the system will call the generic function
+    SB-PCL:NO-PRIMARY-METHOD, whose default behaviour is to signal an error.
+    Users may define methods on this generic function.
+  * enhancement: external formats for unibyte encodings and utf-8 now support
+    newline variants.
   * enhancement: character decoding and encoding errors signalled by stream or
     octet functions now provide a USE-VALUE restart for handlers to provide
     replacement input or output.
   * bug fix: OCTETS-TO-STRING using unibyte external formats with unallocated
     codepoints (e.g. iso-8859-3) correctly signal or use replacements rather
-    than taking bits from NIL and converting them to characters.
+    than taking bits from the address of NIL and converting those bits to
+    a character.
   * bug fix: FILE-STRING-LENGTH now returns NIL if the input datum is not
     encodable in the stream's external format.
   * bug fix: table-based multibyte external formats (EUC-JP, Shift-JIS, GBK)
@@ -61,13 +42,6 @@ changes in the external-format-line-endings branch:
   * optimization: when the :EXTERNAL-FORMAT argument to STRING-TO-OCTETS or
     OCTETS-TO-STRING is a compile-time constant, the external format is
     resolved at load time rather than on each call.
-
-changes relative to sbcl-2.3.10:
-  * enhancement: During generic function dispatch, for a generic function
-    using standard- or short-method-combination, if there are no applicable
-    primary methods the system will call the generic function
-    SB-PCL:NO-PRIMARY-METHOD, whose default behaviour is to signal an error.
-    Users may define methods on this generic function.
 
 changes in sbcl-2.3.10 relative to sbcl-2.3.9:
   * enhancement: The compiler now allows stack allocating vectors of any size
