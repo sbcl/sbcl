@@ -497,14 +497,22 @@ distinct from the global value. Can also be SETF."
            (return (car (truly-the cons cdr)))))))
 
 ;;; Note: this will cons in an arena if you're using one.
-(defun %putf (place property new-value)
-  (declare (type list place))
-  (do ((plist place (cddr plist)))
-      ((endp plist) (list* property new-value place))
-    (declare (type list plist))
-    (when (eq (car plist) property)
-      (setf (cadr plist) new-value)
-      (return place))))
+(defun %putf (place indicator new-value)
+  (do* (cdr
+        (plist place (cdr (truly-the cons cdr))))
+       ((null plist) (list* indicator new-value place))
+    (cond ((or (atom plist)
+               (atom (setf cdr (cdr plist))))
+           (error 'simple-type-error
+                  :format-control "malformed property list: ~S."
+                  :format-arguments (list place)
+                  :datum (if (atom plist)
+                             plist
+                             (cdr plist))
+                  :expected-type 'cons))
+          ((eq (car plist) indicator)
+           (setf (cadr plist) new-value)
+           (return place)))))
 
 (defun get-properties (place indicator-list)
   "Like GETF, except that INDICATOR-LIST is a list of indicators which will
