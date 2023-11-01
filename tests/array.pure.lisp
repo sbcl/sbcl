@@ -753,3 +753,10 @@
       `(lambda (d)
          (make-array d :initial-contents 1))
     ((nil) #0a1 :test #'equalp)))
+
+(with-test (:name :negative-fill-pointer)
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (a f)
+      (setf (fill-pointer a) f))
+   (((make-array 0 :fill-pointer 0) -1) (condition 'type-error))))

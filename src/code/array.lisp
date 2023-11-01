@@ -1152,7 +1152,7 @@ of specialized arrays is supported."
          (fill-pointer-error vector))
         (t
          (let ((max (%array-available-elements vector)))
-           (when (> (the fixnum new) max)
+           (when (> (the (and unsigned-byte fixnum) new) max)
              (error 'simple-type-error
                     :datum new
                     :expected-type (list 'integer 0 max)
