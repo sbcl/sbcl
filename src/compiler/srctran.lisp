@@ -5583,12 +5583,17 @@
                            :format-arguments
                            (list nargs 'cerror y x (max max1 max2))))))))))))))
 
-(deftransform error ((x &key format-control format-arguments))
+(deftransform error ((x &key datum expected-type format-control format-arguments))
   (if (and format-control format-arguments
            (let ((use (lvar-uses format-arguments)))
              (and (combination-p use)
                   (lvar-fun-is (combination-fun use) '(list)))))
-      `(apply #'%simple-error x format-control format-arguments)
+      (cond ((and datum expected-type)
+             `(apply #'%simple-type-error x datum expected-type format-control format-arguments))
+            ((not (and datum expected-type))
+             `(apply #'%simple-error x format-control format-arguments))
+            (t
+             (give-up-ir1-transform)))
       (give-up-ir1-transform)))
 
 (defun constant-cons-type (type)

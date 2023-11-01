@@ -3172,7 +3172,7 @@ possibly temporarily, because it might be used internally.")
            "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
            "PSXHASH"
            "%BREAK"
-           "%SIMPLE-ERROR"
+           "%SIMPLE-ERROR" "%SIMPLE-TYPE-ERROR"
            "BIT-VECTOR-="
            "PATHNAME="
            "%HASH-TABLE-ALIST"

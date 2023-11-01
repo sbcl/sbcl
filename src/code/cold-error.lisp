@@ -183,6 +183,16 @@
   (error datum :format-control format-control
                :format-arguments format-arguments))
 
+(defun %simple-type-error (condition datum expected-type format-control &rest format-arguments)
+  (declare (explicit-check)
+           (notinline error)
+           (optimize (debug 0))) ;; enable tail calls for ERROR
+  (error condition
+         :datum datum
+         :expected-type expected-type
+         :format-control format-control
+         :format-arguments format-arguments))
+
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
 ;;; we can use it in system code (e.g. in SIGINT handling) without
 ;;; messing up --disable-debugger mode (which works by setting
