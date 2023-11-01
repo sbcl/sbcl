@@ -1974,7 +1974,7 @@
 (defknown %set-symbol-package (symbol t) t ())
 (defknown (%coerce-callable-to-fun %coerce-callable-for-call)
     (function-designator)
-    function (flushable))
+    function (flushable no-verify-arg-count))
 (defknown array-bounding-indices-bad-error (t t t) nil)
 (defknown sequence-bounding-indices-bad-error (t t t) nil)
 (defknown %find-position
