@@ -480,16 +480,21 @@ distinct from the global value. Can also be SETF."
 (defun getf (place indicator &optional (default ()))
   "Search the property list stored in PLACE for an indicator EQ to INDICATOR.
   If one is found, return the corresponding value, else return DEFAULT."
-  (do ((plist place (cddr plist)))
-      ((null plist) default)
-    (cond ((atom (cdr plist))
+  (declare (explicit-check))
+  (do* (cdr
+        (plist place (cdr (truly-the cons cdr))))
+       ((null plist) default)
+    (cond ((or (atom plist)
+               (atom (setf cdr (cdr plist))))
            (error 'simple-type-error
                   :format-control "malformed property list: ~S."
                   :format-arguments (list place)
-                  :datum (cdr plist)
+                  :datum (if (atom plist)
+                             plist
+                             (cdr plist))
                   :expected-type 'cons))
           ((eq (car plist) indicator)
-           (return (cadr plist))))))
+           (return (car (truly-the cons cdr)))))))
 
 ;;; Note: this will cons in an arena if you're using one.
 (defun %putf (place property new-value)
