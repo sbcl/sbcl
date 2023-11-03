@@ -1137,6 +1137,7 @@ long timespec_delta_microsec(struct timespec* begin, struct timespec* end)
 {
     return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
 }
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
 void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
 {
     /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
@@ -1152,6 +1153,7 @@ void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
         ++ti->uw_ct_stw_pauses;
     }
 }
+#endif
 
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
