@@ -14,7 +14,7 @@
  */
 
 #include <stdbool.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "gc.h"
 #include "genesis/vector.h"
 #include "genesis/gc-tables.h"

@@ -14,7 +14,7 @@
  * files for more information.
  */
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #ifndef LISP_FEATURE_WIN32
 #include <sys/mman.h>

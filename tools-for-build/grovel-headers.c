@@ -18,7 +18,7 @@
  * more information.
  */
 
-#include "genesis/config.h"
+#include "genesis/sbcl.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -12,7 +12,7 @@
 #ifndef _PRINT_H_
 #define _PRINT_H_
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 
 extern void print(lispobj obj);

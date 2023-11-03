@@ -28,7 +28,7 @@ export LANG LC_ALL
 # file will be loaded before the following file is compiled.)
 #
 # Also take the opportunity to compile and load genesis, to create the
-# header file sbcl.h which will be needed to create the C runtime
+# header files which will be needed to create the C runtime
 # environment.
 echo //building cross-compiler, and doing first genesis
 echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | $SBCL_XC_HOST

@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <inttypes.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
 #include "gc.h"

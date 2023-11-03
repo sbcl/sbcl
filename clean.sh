@@ -5,9 +5,6 @@ set -e
 # In most cases, we can remove the directories, too.
 #
 # Preserving the skeletons of some directories might or might not not be relevant.
-# The supposed explanation definitely no longer holds - there is no "src/c-runtime/sbcl.h"
-# as a symlink into "output/". The sbcl.h file is a plain file, and it's been that way
-# for quite some time.
 rm -rf obj/* src/runtime/genesis/ src/runtime/sbcl.mk src/runtime/*.dSYM
 
 if [ -z "$SBCL_LEAVE_OUTPUT" ]
@@ -44,9 +41,6 @@ done
 # files. Some explanations:
 #   sbcl
 #     the runtime environment, created by compiling C code
-#   sbcl.h
-#     information about Lisp code needed to build the runtime environment,
-#     created by running GENESIS
 #   Config, target
 #     architecture-dependent or OS-dependent symlinks
 #   core
@@ -116,7 +110,6 @@ find . \( \
         -name 'test.log' -o \
         -name 'a.out' -o \
         -name 'sbcl' -o \
-        -name 'sbcl.h' -o \
         -name 'ppc-linux-mcontext.h' -o \
         -name 'depend' -o \
         -name 'TAGS' -o \

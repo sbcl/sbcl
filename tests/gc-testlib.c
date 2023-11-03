@@ -3,7 +3,7 @@
  * or update_writeprotection() */
 
 #include <stdio.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "gc.h"
 #include "genesis/instance.h"
 #include "thread.h"

@@ -9,7 +9,7 @@
  * files for more information.
  */
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "lispobj.h"
 
 #include <stdio.h>
@@ -35,7 +35,6 @@
 #include "lispregs.h"
 #include "interrupt.h"
 #include "thread.h"
-#include "genesis/constants.h"
 #include "genesis/instance.h"
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"

@@ -19,7 +19,7 @@
 #include <strings.h>
 #include <errno.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "os.h"
 #include "globals.h"

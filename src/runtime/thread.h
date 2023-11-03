@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <stddef.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "globals.h"
 #include "runtime.h"
 #include "os.h"

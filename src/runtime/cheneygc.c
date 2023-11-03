@@ -18,7 +18,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 #include <stdlib.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "os.h"
 #include "gc.h"

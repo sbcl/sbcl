@@ -40,7 +40,7 @@
  *
  * - WHN 20000728, dan 20010128 */
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #include <stdio.h>
 #include <stdlib.h>

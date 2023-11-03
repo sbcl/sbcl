@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "arch.h"
 #include "globals.h"
@@ -19,8 +19,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-
-#include "genesis/constants.h"
 
 #define INSN_LEN sizeof(unsigned int)
 

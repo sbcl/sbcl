@@ -28,7 +28,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #include <sys/types.h>
 #include "runtime.h"

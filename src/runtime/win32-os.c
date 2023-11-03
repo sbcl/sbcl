@@ -32,7 +32,7 @@
 #include <sys/param.h>
 #include <sys/file.h>
 #include <io.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "globals.h"

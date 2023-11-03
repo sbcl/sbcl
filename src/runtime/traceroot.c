@@ -1,4 +1,4 @@
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "arch.h"
 #include "runtime.h"
 #include "lispregs.h"
@@ -6,7 +6,6 @@
 #include "code.h"
 #include "genesis/closure.h"
 #include "genesis/cons.h"
-#include "genesis/constants.h"
 #include "genesis/fdefn.h"
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"

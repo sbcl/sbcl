@@ -17,7 +17,7 @@
 
 #define _OS_H_INCLUDED_
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 
 #include <inttypes.h>

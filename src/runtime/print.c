@@ -11,16 +11,10 @@
  * files for more information.
  */
 
-/*
- * FIXME:
- *   Some of the code in here is deeply broken, depending on guessing
- *   already out-of-date values instead of getting them from sbcl.h.
- */
-
 #include <stdio.h>
 #include <string.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "print.h"
 #include "runtime.h"
 #include "code.h"

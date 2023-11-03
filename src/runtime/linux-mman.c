@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "genesis/config.h"
-#include "genesis/constants.h"
+#include "genesis/sbcl.h"
 #include "globals.h"
 #include "os.h"
 #include "interr.h"

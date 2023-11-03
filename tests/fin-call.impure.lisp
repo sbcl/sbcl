@@ -154,7 +154,7 @@ index 400772889..229eea81c 100644
 +++ b/src/runtime/interrupt.c
 @@ -42,6 +42,9 @@
 
- #include "sbcl.h"
+ #include "genesis/sbcl.h"
 
 +#define _GNU_SOURCE /* for REG_RAX etc. from sys/ucontext */
 +#include <sys/ucontext.h>

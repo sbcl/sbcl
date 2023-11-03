@@ -16,7 +16,7 @@
  *
  */
 
-#include "genesis/config.h"
+#include "genesis/sbcl.h"
 #include "murmur_hash.h"
 #include <string.h>
 

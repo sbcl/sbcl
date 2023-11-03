@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <signal.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "genesis/sap.h"
 #include "runtime.h"
 #include "os.h"

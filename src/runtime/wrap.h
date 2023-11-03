@@ -32,7 +32,7 @@
  * shouldn't be used for any purpose for which the real type can be
  * employed. */
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 /* We use an extra layer of aliasing because Linux/MIPS struct stat
    doesn't use dev_t. This type is not defined on the Lisp side. */

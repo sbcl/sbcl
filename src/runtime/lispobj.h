@@ -6,7 +6,7 @@ typedef intptr_t sword_t;
 typedef uintptr_t uword_t;
 typedef uword_t lispobj;
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 static inline int fixnump(lispobj obj)
 {

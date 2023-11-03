@@ -15,7 +15,7 @@
  */
 
 #include "thread.h"
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "globals.h"
 #include "runtime.h"
 #include "interr.h"

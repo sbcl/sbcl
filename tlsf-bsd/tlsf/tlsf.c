@@ -31,8 +31,7 @@
 #define tlsf_assert(expr) (void)(0)
 #endif
 
-#include "genesis/config.h"
-#include "genesis/constants.h"
+#include "genesis/sbcl.h"
 
 /* Public constants: may be modified. */
 enum tlsf_public {

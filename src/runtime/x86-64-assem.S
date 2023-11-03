@@ -18,9 +18,8 @@
 .section .note.GNU-stack,"",%progbits
 #endif
 
-#include "genesis/config.h"
+#include "genesis/sbcl.h"
 #include "validate.h"
-#include "sbcl.h"
 #include "genesis/closure.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"

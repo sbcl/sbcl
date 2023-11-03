@@ -16,7 +16,7 @@
 #ifndef _GC_H_
 #define _GC_H_
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "gc-assert.h"
 #include "gc-typedefs.h"
 #include <stdbool.h>

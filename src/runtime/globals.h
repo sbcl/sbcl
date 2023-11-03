@@ -20,7 +20,7 @@
 # include "os.h"
 #endif
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #ifndef __ASSEMBLER__
 

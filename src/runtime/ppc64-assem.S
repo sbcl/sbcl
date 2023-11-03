@@ -1,4 +1,4 @@
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "lispregs.h"
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"

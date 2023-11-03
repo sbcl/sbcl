@@ -15,7 +15,7 @@
 
 #include <stdio.h>
 #include <time.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 
 int get_timezone(time_t when, unsigned int *dst)

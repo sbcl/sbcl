@@ -14,11 +14,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "globals.h"
 #include "runtime.h"
-#include "genesis/config.h"
-#include "genesis/constants.h"
 #include "genesis/cons.h"
 #include "genesis/vector.h"
 #include "genesis/symbol.h"

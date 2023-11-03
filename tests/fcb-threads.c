@@ -1,5 +1,5 @@
 /* In as much as this file simulates "foreign" code,
- * we don't include "sbcl.h" and we use the native thread API
+ * we don't include "genesis/sbcl.h" and we use the native thread API
  * for the platform */
 
 #ifdef _WIN32

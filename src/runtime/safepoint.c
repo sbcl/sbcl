@@ -8,7 +8,7 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT /* entire file */
 #include <stdlib.h>

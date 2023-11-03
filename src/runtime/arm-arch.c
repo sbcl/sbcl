@@ -10,7 +10,7 @@
  */
 #include <stdio.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "arch.h"
 #include "globals.h"

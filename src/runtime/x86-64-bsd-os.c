@@ -1,6 +1,6 @@
 #include <signal.h>
 #include <errno.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "thread.h"
 #include "interr.h"

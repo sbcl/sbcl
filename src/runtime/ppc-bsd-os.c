@@ -1,7 +1,7 @@
 #include <signal.h>
 #include <machine/cpu.h>
 #include <errno.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "interr.h"
 #include "runtime.h"
 #include "thread.h"

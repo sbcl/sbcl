@@ -1,6 +1,6 @@
 #include "lispregs.h"
 #include "globals.h"
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"

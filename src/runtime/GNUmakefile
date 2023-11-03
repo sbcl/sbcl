@@ -172,10 +172,6 @@ sbcl.mk: Config
 	  fi ; \
 	  : ) > $@
 
-sbcl.h: $(wildcard genesis/*.h)
-	echo '#include "genesis/config.h"' >sbcl.h
-	echo '#include "genesis/constants.h"' >>sbcl.h
-
 # || true because we don't want the build to break if etags isn't there.
 # ...but it's still nice to have it done by default.
 HEADERS=$(wildcard *.h genesis/*.h)
@@ -184,15 +180,15 @@ TAGS tags: $(SRCS) $(HEADERS) $(INC)
 	@etags --language=c $(SRCS) $(HEADERS) $(INC) || true
 
 clean:
-	-rm -f *.[do] ../../tlsf-bsd/tlsf/tlsf.o $(TARGET) *.tmp libsbcl.a sbcl.h \
+	-rm -f *.[do] ../../tlsf-bsd/tlsf/tlsf.o $(TARGET) *.tmp libsbcl.a \
  ldb unit-tests libsbcl.a shrinkwrap-sbcl* sbcl.mk core
 
-%.d: %.c sbcl.h
+%.d: %.c
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.tmp > $@; \
 	rm -f $@.tmp
 
-%.d: %.S sbcl.h
+%.d: %.S
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.tmp > $@; \
 	rm -f $@.tmp

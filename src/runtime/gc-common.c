@@ -28,7 +28,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "os.h"
 #include "interr.h"

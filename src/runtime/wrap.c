@@ -5,12 +5,7 @@
  * The functions in this file are typically called directly from Lisp.
  * Thus, when their signature changes, they don't need updates in a .h
  * file somewhere, but they do need updates in the Lisp code. FIXME:
- * It would be nice to enforce this at compile time. It mighn't even
- * be all that hard: make the cross-compiler versions of DEFINE-ALIEN-FOO
- * macros accumulate strings in a list which then gets written out at
- * the end of sbcl2.h at the end of cross-compilation, then rerun
- * 'make' in src/runtime/ using the new sbcl2.h as sbcl.h (and make
- * sure that all the files in src/runtime/ include sbcl.h). */
+ * It would be nice to enforce this at compile time. */
 
 /*
  * This software is part of the SBCL system. See the README file for
@@ -23,7 +18,7 @@
  * files for more information.
  */
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #include <sys/types.h>
 #include <dirent.h>

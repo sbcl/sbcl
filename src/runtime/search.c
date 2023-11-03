@@ -13,8 +13,7 @@
 #include <ctype.h>
 #include <stdint.h>
 
-#include "genesis/config.h"
-#include "genesis/constants.h"
+#include "genesis/sbcl.h"
 #include "interr.h"
 #include "lispobj.h"
 #include "os.h"

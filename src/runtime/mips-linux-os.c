@@ -20,7 +20,7 @@
 /* for cacheflush() */
 #include <sys/cachectl.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "os.h"
 #include "arch.h"
 

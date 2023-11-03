@@ -18,7 +18,7 @@
 #include <sys/cachectl.h>
 #include <sys/param.h>
 #include <sys/file.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "globals.h"

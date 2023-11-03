@@ -15,7 +15,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "lispregs.h"
 #include "gc.h"
 #include "code.h"

@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <sys/param.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "interr.h"

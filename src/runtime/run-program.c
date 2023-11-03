@@ -18,7 +18,7 @@
 #define _GNU_SOURCE
 #endif
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/types.h>

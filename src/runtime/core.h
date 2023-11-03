@@ -12,7 +12,7 @@
 #ifndef _CORE_H_
 #define _CORE_H_
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 
 typedef sword_t core_entry_elt_t;

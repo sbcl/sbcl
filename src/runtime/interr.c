@@ -17,7 +17,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "arch.h"
 #include <signal.h>
 

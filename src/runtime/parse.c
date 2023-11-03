@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #ifdef LISP_FEATURE_WIN32
 #include "pthreads_win32.h"
 #else

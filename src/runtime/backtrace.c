@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
 #include "os.h"

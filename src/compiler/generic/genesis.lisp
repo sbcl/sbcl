@@ -3013,7 +3013,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format t "/*~%")
   (dolist (line
            '("This is a machine-generated file. Please do not edit it by hand."
-             "(As of sbcl-0.8.14, it came from WRITE-CONFIG-H in genesis.lisp.)"
              nil
              "This file contains low-level information about the"
              "internals of a particular version and configuration"
@@ -4324,8 +4323,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
                     (funcall lambda stream)
                     (when inclusion-guardp
                       (format stream "#endif~%"))))))
-        (out-to "config" (write-config-h stream))
-        (out-to "constants" (write-constants-h stream))
+        (out-to "sbcl" (write-config-h stream) (write-constants-h stream))
         (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))

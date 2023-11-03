@@ -12,7 +12,7 @@
 #ifdef __linux__
 #define _GNU_SOURCE // for pthread_setname_np()
 #endif
-#include "sbcl.h"
+#include "genesis/sbcl.h"
 
 #include <stdlib.h>
 #include <stdio.h>
