@@ -470,6 +470,8 @@ STRING (or the subsequence bounded by START and END)."
 (defun get-external-format (external-format)
   (let* ((external-format (ensure-list external-format))
          (options (cdr external-format)))
+    (unless (symbolp (car external-format))
+      (return-from get-external-format nil))
     (loop for (option value) on options by 'cddr
           unless (or (eql option :newline) (eql option :replacement))
           do (return-from get-external-format nil))
