@@ -5,10 +5,6 @@
 #ifndef _X86_ARCH_H
 #define _X86_ARCH_H
 
-#ifndef SBCL_GENESIS_CONFIG
-#error genesis/config.h (or sbcl.h) must be included before this file
-#endif
-
 // DO NOT REMOVE THIS. DOING SO WILL CAUSE NO COMPILATION ERRORS,
 // BUT WILL CAUSE RUNTIME FAILURE.
 #include "interr.h"                     /* for declaration of lose() */
