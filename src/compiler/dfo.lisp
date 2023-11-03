@@ -51,8 +51,7 @@
 ;;; Find the DFO for a component, deleting any unreached blocks and
 ;;; merging any other components we reach. We repeatedly iterate over
 ;;; the entry points, since new ones may show up during the walk.
-(declaim (ftype (function (component) (values)) find-dfo))
-(defun find-dfo (component)
+(defun find-dfo (component &optional clean-only)
   (clear-flags component)
   (setf (component-reanalyze component) nil)
   (let ((head (component-head component)))
@@ -61,7 +60,7 @@
            (unless (or (block-flag ep)
                        (block-to-be-deleted-p ep)
                        (not (entry-point-reached-p ep)))
-             (find-dfo-aux ep head component)
+             (find-dfo-aux ep head component clean-only)
              (return nil))))))
   (let ((num 0))
     (declare (fixnum num))
@@ -119,18 +118,15 @@
   (values))
 
 ;;; Do a depth-first walk from BLOCK, inserting ourself in the DFO
-;;; after HEAD. If we somehow find ourselves in another component,
-;;; then we join that component to our component.
-(declaim (ftype (function (cblock cblock component) (values)) find-dfo-aux))
-(defun find-dfo-aux (block head component)
-  (unless (eq (block-component block) component)
-    (join-components component (block-component block)))
+;;; after HEAD.
+(defun find-dfo-aux (block head component &optional mark-only)
   (unless (or (block-flag block) (block-delete-p block))
     (setf (block-flag block) t)
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component))
-    (remove-from-dfo block)
-    (add-to-dfo block head))
+    (unless mark-only
+      (remove-from-dfo block)
+      (add-to-dfo block head)))
   (values))
 
 ;;; This function is called on each block by FIND-INITIAL-DFO-AUX

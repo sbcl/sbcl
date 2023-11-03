@@ -408,10 +408,15 @@
          (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
            (setf did-something t)
-           (locall-analyze-component component)
-           (clean-component component))))
+           (locall-analyze-component component))))
      (unless did-something
        (return))))
+  ;; find-initial-dfo doesn't do a good job of ignoring unreachable
+  ;; functions.
+  (dolist (clambda clambdas)
+    (let ((component (lambda-component clambda)))
+      (find-dfo component t)
+      (clear-flags component)))
   (values))
 
 ;;; If policy is auspicious and CALL is not in an XEP and we don't seem

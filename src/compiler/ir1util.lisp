@@ -1835,7 +1835,8 @@
 ;;;    present in all intervening actual source forms.
 (defun note-block-deletion (block)
   (let ((home (block-home-lambda block)))
-    (unless (eq (functional-kind home) :deleted)
+    (unless (or (eq (functional-kind home) :deleted)
+                (block-delete-p (lambda-block home)))
       (do-nodes (node nil block)
         (let* ((path (node-source-path node))
                (ctran-path (ctran-source-path (node-prev node))))

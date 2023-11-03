@@ -991,6 +991,10 @@
       (format t " <deleted>"))
 
     (pprint-newline :mandatory)
+    (let ((pred (block-pred block)))
+      (format t "predecessors~{ c~D~}~%"
+              (mapcar (lambda (x) (cont-num (block-start x))) pred)))
+    (pprint-newline :mandatory)
     (when (block-start-cleanup block)
       (format t "cleanup ~s~%" (cleanup-kind (block-start-cleanup block))))
     (awhen (block-info block)

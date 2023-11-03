@@ -741,3 +741,22 @@
                          (loop for x to 2
                                sum (the cons (signum x))))
                       :allow-warnings 'warning))))
+
+(with-test (:name :dead-code-after-ir1-conversion)
+  (assert (nth-value 5
+                     (checked-compile
+                      `(lambda (r v)
+                         (labels ((scan (ch l)
+                                    (finish l)
+                                    (let ((d (digit-char-p ch r)))
+                                      (labels ((fix (x i l)
+                                                 (if (null l)
+                                                     (scan 1
+                                                           (cons (cons x i) nil))
+                                                     (if i
+                                                         (fix (+ (* 2 (aref v i)) x) (1+ i) nil)
+                                                         (scan 1
+                                                               (cons (cons x i) l))))))
+                                        (fix d 0 l))))
+                                  (finish (nil)))))
+                      :allow-failure t))))
