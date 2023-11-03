@@ -635,16 +635,6 @@
   (def member t)
   (def rassoc t))
 
-(deftransform memq ((item list) (t (constant-arg list)) * :node node)
-  (or (memq-translation-as-case list node)
-      (labels ((rec (tail)
-                 (if tail
-                     `(if (eq item ',(car tail))
-                          ',tail
-                          ,(rec (cdr tail)))
-                     nil)))
-        (rec (lvar-value list)))))
-
 ;;; A similar transform used to apply to MEMBER and ASSOC, but since
 ;;; TRANSFORM-LIST-ITEM-SEEK now takes care of them those transform
 ;;; would never fire, and (%MEMBER-TEST ITEM LIST #'EQ) should be
