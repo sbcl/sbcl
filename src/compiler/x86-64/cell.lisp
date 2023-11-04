@@ -165,30 +165,28 @@
              (eq (info :variable :wired-tls (tn-value symbol)) :always-thread-local))
         ;; We never need the GC barrier for TLS.  I think it would be preferable
         ;; to resolve this in IR1, maybe turning it into SET-TLS-VALUE.
-        (emit-store (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)
-                      value val-temp)
-        (let ((store (gen-label)))
-          (cond ((and (sc-is symbol immediate)
-                      (info :variable :wired-tls (tn-value symbol)))
-                 ;; The TLS index is arbitrary but known to be nonzero,
-                 ;; so we can resolve the displacement of the thread-local value
-                 ;; at load-time, saving one instruction over the general case.
-                 (inst lea cell (ea (make-fixup (tn-value symbol) :symbol-tls-index)
-                                    thread-tn)))
-                (t
-                 ;; These MOVs look the same, but when the symbol is immediate, this is
-                 ;; a load from an absolute address. Needless to say, the names of these
-                 ;; accessor macros are arbitrary - the difference is not very apparent.
-                 (inst mov :dword cell (if (sc-is symbol immediate)
-                                           (symbol-tls-index-ea symbol)
-                                           (tls-index-of symbol)))
-                 (inst add cell thread-tn)))
-          (inst cmp :qword (ea cell) no-tls-value-marker)
-          (inst jmp :ne STORE)
-          (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
-          (get-symbol-value-slot-ea cell symbol)
-          (emit-label STORE)
-          (emit-store (ea cell) value val-temp)))))
+        (return-from set
+          (emit-store (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)
+                      value val-temp)))
+    (cond ((and (sc-is symbol immediate) (info :variable :wired-tls (tn-value symbol)))
+           ;; The TLS index is arbitrary but known to be nonzero,
+           ;; so we can resolve the displacement of the thread-local value
+           ;; at load-time, saving one instruction over the general case.
+           (inst lea cell (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)))
+          (t
+           ;; These MOVs look the same, but when the symbol is immediate, this is
+           ;; a load from an absolute address. Needless to say, the names of these
+           ;; accessor macros are arbitrary - the difference is not very apparent.
+           (inst mov :dword cell (if (sc-is symbol immediate)
+                                     (symbol-tls-index-ea symbol)
+                                     (tls-index-of symbol)))
+           (inst add cell thread-tn)))
+    (inst cmp :qword (ea cell) no-tls-value-marker)
+    (inst jmp :ne STORE)
+    (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
+    (get-symbol-value-slot-ea cell symbol)
+    STORE
+    (emit-store (ea cell) value val-temp)))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))

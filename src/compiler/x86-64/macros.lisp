@@ -169,17 +169,16 @@
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (:elsewhere)
-    (let ((start-lab (gen-label)))
-      (emit-label start-lab)
-      (when preamble-emitter
-        (funcall preamble-emitter))
-      (emit-error-break vop
-                        (case error-code ; should be named ERROR-SYMBOL really
-                          (invalid-arg-count-error invalid-arg-count-trap)
-                          (t error-trap))
-                        (error-number-or-lose error-code)
-                        values)
-      start-lab)))
+    START
+    (when preamble-emitter
+      (funcall preamble-emitter))
+    (emit-error-break vop
+                      (case error-code ; should be named ERROR-SYMBOL really
+                        (invalid-arg-count-error invalid-arg-count-trap)
+                        (t error-trap))
+                      (error-number-or-lose error-code)
+                      values)
+    (values start))) ; prevent START from being seen as a label defn
 
 
 ;;;; PSEUDO-ATOMIC
