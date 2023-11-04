@@ -4274,3 +4274,12 @@
     ((#'=) #'=)))
 
 
+(with-test (:name :tail-calls-terminated-blocks)
+  (prog* ((f (checked-compile `(lambda (f)
+                                 (declare (optimize  (debug 1)))
+                                 (labels ((f1 (f)
+                                            (funcall f)
+                                            (f1 f)))
+                                   (f1 (f1 f))))))
+          (x 0))
+     (assert (funcall f (lambda () (when (= (incf x) 2) (return t)))))))

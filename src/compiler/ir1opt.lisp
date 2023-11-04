@@ -1242,6 +1242,7 @@
     (declare (ignore lvar))
     (unless (or (and (eq node (block-last block)) (eq succ tail))
                 (block-delete-p block)
+                (node-tail-p node)
                 ;; Even if the combination will never return, don't
                 ;; terminate if this is the tail call of a XEP: doing
                 ;; that would inhibit TCO.
