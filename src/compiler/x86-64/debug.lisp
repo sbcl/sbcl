@@ -67,13 +67,27 @@
   (:policy :fast-safe)
   (:args (thing :scs (descriptor-reg)))
   (:results (code :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0) :target code) temp)
   (:generator 5
+    ;; This vop is supposed to return NIL if the simple-fun has an invalid header
+    ;; as determined by the relative backpointer being 0.  I don't know why a simple-fun
+    ;; would ever be constructed like that.
+    #-relocatable-static-space
+    (progn
+    ;; The largest displacement in words from a code header to
+    ;; the header word of a contained function is #xFFFFFF.
+    ;; (See FUN_HEADER_NWORDS_MASK in 'gc.h')
+    (inst mov :dword temp (ea (- fun-pointer-lowtag) thing))
+    (inst shr :dword temp n-widetag-bits)
+    (inst neg temp)
+    (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
+                       thing temp n-word-bytes))
+    ;; note that LEA does not affect any flags
+    (inst cmov :z code (ea (- nil-value list-pointer-lowtag)))) ; put NIL into CODE if ZF
+    ;; I don't know where to load a NIL from with relocatable static space.
+    #+relocatable-static-space
     (let ((bogus (gen-label))
           (done (gen-label)))
-      ;; The largest displacement in words from a code header to
-      ;; the header word of a contained function is #xFFFFFF.
-      ;; (See FUN_HEADER_NWORDS_MASK in 'gc.h')
       (inst mov :dword temp (ea (- fun-pointer-lowtag) thing))
       (inst shr :dword temp n-widetag-bits)
       (inst jmp :z bogus)
