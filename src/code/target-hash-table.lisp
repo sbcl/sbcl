@@ -994,8 +994,8 @@ multiple threads accessing the same hash-table without locking."
     ;; Rehash + resize only occurs when:
     ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
     ;;  (2) no cells below HWM are available (so COUNT = SIZE)
-      (aver (= hwm (hash-table-size table)))
-      (when (and (not (hash-table-weak-p table)) (/= (hash-table-count table) hwm))
+      (aver (= hwm (hash-table-pairs-capacity old-kv-vector)))
+      (when (and (not (hash-table-weak-p table)) (/= (hash-table-%count table) hwm))
         ;; If the table is not weak, then every cell pair has to be in use
         ;; as a precondition to resizing. If weak, this might not be true.
         (signal-corrupt-hash-table table))
@@ -1708,7 +1708,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
            (declare (fixnum hash0) (index/2 index))
            ;; Search next-vector chain for a matching key.
            (if eq-test
-               ;; TODO: consider unrolling a few times like in %GETHASH
+               ;; Unrolling a few times like in %GETHASH doesn't seem
+               ;; to affect even the tightest microbenchmarks.
                (do ((next index (aref next-vector next)))
                    ((zerop next))
                  (declare (type index/2 next))
@@ -1744,7 +1745,7 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                      ((not (fixnump key-index)) (signal-corrupt-hash-table hash-table))
                      (t (return-from done (setf (aref kv-vector (1+ key-index)) value))))))
            ;; Pop a KV slot off the free list
-           (insert-at (hash-table-next-free-kv hash-table)
+           (insert-at (truly-the index/2 (hash-table-next-free-kv hash-table))
                       hash-table key hash address-based-p value))))))
 
 (flet ((insert-at (index hash-table key hash address-based-p value)

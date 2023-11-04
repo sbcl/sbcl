@@ -524,7 +524,7 @@
                    ;; This is a purposely not very strong hash so that it does not make any
                    ;; distinctions that EQUALP does not make. Computing a hash of the k/v pair
                    ;; vector would incorrectly take insertion order into account.
-                   (mix (mix 103924836 (hash-table-count key))
+                   (mix (mix 103924836 (hash-table-%count key))
                         (sxhash (hash-table-test key))))
                   ((pathnamep key) (pathname-sxhash key))
                   (t
