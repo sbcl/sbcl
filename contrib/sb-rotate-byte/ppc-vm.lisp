@@ -47,16 +47,14 @@
                (:results (res :scs (sb-vm::unsigned-reg)))
                (:result-types sb-vm::unsigned-byte-32)
                (:generator 10
-                (let ((label (gen-label))
-                      (end (gen-label)))
                   (inst cmpwi count 0)
                   (inst bge label)
                   (inst addi realcount count 32)
                   (inst rotlw res integer realcount)
                   (inst b end)
-                  (emit-label label)
+                  LABEL
                   (inst rotlw res integer count)
-                  (emit-label end))))))
+                  END))))
   (def %32bit-rotate-byte sb-vm::unsigned-byte-32)
   ;; FIXME: see x86-vm.lisp
   (def %32bit-rotate-byte-fixnum sb-vm::positive-fixnum))

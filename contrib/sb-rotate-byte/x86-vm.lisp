@@ -49,8 +49,6 @@
                (:results (res :scs (sb-vm::unsigned-reg) :from :load))
                (:result-types sb-vm::unsigned-byte-32)
                (:generator 10
-                (let ((label (gen-label))
-                      (end (gen-label)))
                   (move res integer)
                   (move ecx count)
                   (inst cmp ecx 0)
@@ -58,9 +56,9 @@
                   (inst neg ecx)
                   (inst ror res :cl)
                   (inst jmp end)
-                  (emit-label label)
+                  LABEL
                   (inst rol res :cl)
-                  (emit-label end))))))
+                  END))))
   (def %32bit-rotate-byte sb-vm::unsigned-byte-32)
   ;; FIXME: it's not entirely clear to me why we need this second
   ;; definition -- or rather, why the compiler isn't smart enough to
