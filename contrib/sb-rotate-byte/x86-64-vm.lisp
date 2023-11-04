@@ -30,16 +30,9 @@
   (:results (result :scs (sb-vm::unsigned-reg) :from :load))
   (:result-types sb-vm::unsigned-num)
   (:generator 10
-      (move result integer)
-      (move rcx count :dword)
-      (inst cmp :dword rcx 0)
-      (inst jmp :ge label)
-      (inst neg :dword rcx)
-      (inst ror :dword result :cl)
-      (inst jmp end)
-      LABEL
-      (inst rol :dword result :cl)
-      END))
+    (move result integer)
+    (move rcx count :dword)
+    (inst rol :dword result :cl)))
 
 ;;; 64-bit rotates
 
@@ -70,13 +63,6 @@
   (:results (result :scs (sb-vm::unsigned-reg) :from :load))
   (:result-types sb-vm::unsigned-num)
   (:generator 10
-      (move result integer)
-      (move rcx count :dword)
-      (inst cmp :dword rcx 0)
-      (inst jmp :ge label)
-      (inst neg :dword rcx)
-      (inst ror result :cl)
-      (inst jmp end)
-      LABEL
-      (inst rol result :cl)
-      END))
+    (move result integer)
+    (move rcx count :dword)
+    (inst rol result :cl)))

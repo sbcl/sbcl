@@ -25,16 +25,12 @@
   (:args (count :scs (sb-vm::signed-reg))
          (integer :scs (sb-vm::unsigned-reg)))
   (:arg-types sb-vm::tagged-num sb-vm::unsigned-num)
-  (:temporary (:sc sb-vm::signed-reg) temp)
   (:results (res :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 10
-    (inst mov temp 32)
-    (inst cmp count 0)
-    (inst csel temp sb-vm::zr-tn temp :le)
-    (inst sub temp temp count)
+    (inst neg sb-vm::tmp-tn count)
     (inst ror (sb-vm::32-bit-reg res)
-          (sb-vm::32-bit-reg integer) (sb-vm::32-bit-reg temp))))
+          (sb-vm::32-bit-reg integer) (sb-vm::32-bit-reg sb-vm::tmp-tn))))
 
 ;;; 64-bit
 (define-vop (%64bit-rotate-byte/c)
@@ -59,12 +55,8 @@
   (:args (count :scs (sb-vm::signed-reg))
          (integer :scs (sb-vm::unsigned-reg)))
   (:arg-types sb-vm::tagged-num sb-vm::unsigned-num)
-  (:temporary (:sc sb-vm::signed-reg) temp)
   (:results (res :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 10
-    (inst mov temp 64)
-    (inst cmp count 0)
-    (inst csel temp sb-vm::zr-tn temp :le)
-    (inst sub temp temp count)
-    (inst ror res integer temp)))
+    (inst neg sb-vm::tmp-tn count)
+    (inst ror res integer sb-vm::tmp-tn)))
