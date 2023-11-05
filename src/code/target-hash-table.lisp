@@ -911,11 +911,14 @@ multiple threads accessing the same hash-table without locking."
                                            #+sb-devel :initial-element #+sb-devel bad-next-value)
                                (when hash-vector-p
                                  (make-array size+1 :element-type 'hash-table-index))
-                               (make-index-vector n-buckets))))
+                               (let ((old-index-vector (hash-table-index-vector table)))
+                                 (if (and (eq n-buckets (length old-index-vector))
+                                          ;; FIXME: Safe?
+                                          (evenp (kv-vector-rehash-stamp (hash-table-pairs table))))
+                                     old-index-vector
+                                     (make-index-vector n-buckets))))))
            (declare (optimize (sb-c::type-check 0)))
-           (let ((size+1 (1+ size))
-                 (old-kvv (hash-table-pairs table)))
-             (declare (ignorable old-kvv))
+           (let ((size+1 (1+ size)))
              #-system-tlabs (new-vectors)
              #+system-tlabs
              ;; If allocation was directed off the main heap when this table was made, then we assume
@@ -1012,8 +1015,17 @@ multiple threads accessing the same hash-table without locking."
       (when old-kv-vector-addr-hashing-p
         (logior-array-flags new-kv-vector sb-vm:vector-addr-hashing-flag))
 
-      (let ((next-free (rehash new-kv-vector new-hash-vector
-                               new-index-vector new-next-vector table)))
+      (let ((next-free (cond ((eq new-index-vector (hash-table-index-vector table))
+                              (let ((old-next-vector (hash-table-next-vector table))
+                                    (old-next-free (hash-table-next-free-kv table)))
+                                (replace new-next-vector old-next-vector
+                                         :start1 1 :start2 1 :end1 (1+ hwm))
+                                (if (/= 0 old-next-free)
+                                    old-next-free
+                                    (1+ hwm))))
+                             (t
+                              (rehash new-kv-vector new-hash-vector
+                                      new-index-vector new-next-vector table)))))
         (setf (hash-table-pairs table)        new-kv-vector
               (hash-table-hash-vector table)  new-hash-vector
               (hash-table-index-vector table) new-index-vector
@@ -1887,10 +1899,6 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
              (setf (aref kv-vector physindex) +empty-ht-slot+
                    (aref kv-vector (1+ physindex)) +empty-ht-slot+))
            ;; Push KV slot onto free chain.
-           ;; Possible optimization: if we linked the free chain through
-           ;; the 'value' half of a pair, we could avoid rebuilding the
-           ;; free chain in %REHASH because rehashing won't affect it.
-           ;; (Maybe it already doesn't?)
            (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
                  (hash-table-next-free-kv hash-table) index)
            ;; On parallel accesses this may turn out to be a
