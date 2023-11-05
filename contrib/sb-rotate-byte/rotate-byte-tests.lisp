@@ -100,3 +100,8 @@
 (assert (= (ub64 6 1) 64))
 (assert (= (ub64 6 (ash 1 57)) (ash 1 63)))
 (assert (= (ub64 6 (ash 1 58)) 1))
+
+(defun non-zero-posn (c x)
+  (declare ((unsigned-byte 8) x))
+  (typep (rotate-byte c (byte 8 3) x) '(unsigned-byte 8)))
+(assert (not (non-zero-posn 1 #xFF)))
