@@ -706,6 +706,7 @@ static os_vm_address_t reserve_space(int space_id, int attr,
 }
 
 struct coreparse_space {
+    int id;
     size_t desired_size; // size wanted, ORed with 1 if addr must be <2GB
     // Values from the core file:
     uword_t len; // length in bytes, as an integral multiple of os_vm_page_size
@@ -1265,6 +1266,21 @@ void gc_load_corefile_ptes(int card_table_nbits,
 #endif
 }
 
+static struct coreparse_space*
+init_coreparse_spaces(int n, struct coreparse_space* input)
+{
+    // Indexing of spaces[] by the space ID should conveniently just work,
+    // so we have to leave an empty row for space ID 0 which doesn't exist.
+    struct coreparse_space* output =
+      successful_malloc(sizeof (struct coreparse_space)*(MAX_CORE_SPACE_ID+1));
+    int i;
+    for (i=0; i<n; ++i) {
+        int id = input[i].id;
+        memcpy(&output[id], &input[i], sizeof (struct coreparse_space));
+    }
+    return output;
+}
+
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
  * pages as targets for virtual memory deduplication via MADV_MERGEABLE.
  * 1: Yes
@@ -1304,24 +1320,24 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         lose("invalid magic number in core: %"OBJ_FMTX" should have been %x",
              (lispobj)val, CORE_MAGIC);
 
-    struct coreparse_space spaces[MAX_CORE_SPACE_ID+1] = {
-        {0, 0, 0, 0}, // blank for space ID 0
-        {dynamic_space_size, 0, DYNAMIC_SPACE_START, 0},
-        // This order is determined by constants in compiler/generic/genesis
-        {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
-
-        {0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
-
+    struct coreparse_space defined_spaces[] = {
+        {READ_ONLY_CORE_SPACE_ID, 0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
+        {STATIC_CORE_SPACE_ID, 0, 0, STATIC_SPACE_START, &static_space_free_pointer},
 #ifdef LISP_FEATURE_DARWIN_JIT
-        {0, 0, STATIC_CODE_SPACE_START, &static_code_space_free_pointer},
+        {STATIC_CODE_CORE_SPACE_ID, 0, 0, STATIC_CODE_SPACE_START, &static_code_space_free_pointer},
 #endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {FIXEDOBJ_SPACE_SIZE | 1, 0,
-            FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
-        {1, 0, TEXT_SPACE_START, &text_space_highwatermark}
+        {IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, FIXEDOBJ_SPACE_SIZE | 1, 0,
+            0, &fixedobj_free_pointer},
+        {IMMOBILE_TEXT_CORE_SPACE_ID, 1, 0, 0, &text_space_highwatermark},
 #endif
+        {DYNAMIC_CORE_SPACE_ID, dynamic_space_size, 0, 0, 0}
     };
+    // The initializer ensures that indexing into spaces[] is insensitive
+    // to the space numbering and the order listed in defined_spaces.
+    struct coreparse_space* spaces =
+      init_coreparse_spaces(sizeof defined_spaces/sizeof (struct coreparse_space),
+                            defined_spaces);
 
     for ( ; ; ptr += remaining_len) {
         val = *ptr++;
@@ -1369,6 +1385,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 print_generation_stats();
             }
             sanity_check_loaded_core(initial_function);
+            free(spaces);
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
