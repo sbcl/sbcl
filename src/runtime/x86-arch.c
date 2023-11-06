@@ -322,18 +322,9 @@ arch_install_interrupt_handlers()
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
-    lispobj fixups = new_code->fixups;
+    lispobj fixups = barrier_load(&new_code->fixups);
     /* It will be a nonzero integer if valid, or 0 if there are no fixups */
     if (!fixups) return;
-
-    /* Could be pointing to a forwarding pointer. */
-    /* This is extremely unlikely, because the only referent of the fixups
-       is usually the code itself; so scavenging a bignum of fixups won't occur
-       until after the code object is known to be live. As we're just now
-       enlivening the code, the fixups shouldn't have been forwarded.
-       Maybe the bignum is otherwise referenced though ... */
-    if (is_lisp_pointer(fixups) && forwarding_pointer_p(native_pointer(fixups)))
-        fixups = forwarding_pointer_value(native_pointer(fixups));
 
     char* code_start_addr = code_text_start(new_code);
     os_vm_size_t displacement = (char*)new_code - (char*)old_code;
