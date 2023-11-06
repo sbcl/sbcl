@@ -39,18 +39,10 @@
   (:args (count :scs (sb-vm::signed-reg))
          (integer :scs (sb-vm::unsigned-reg) :target res))
   (:arg-types sb-vm::tagged-num sb-vm::unsigned-num)
-  (:temporary (:scs (sb-vm::unsigned-reg) :from (:argument 0)) pluscount)
   (:results (res :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 6
-    (inst cmpdi count 0)
-    (inst bge rotate-left)
-    (inst addi pluscount count 32)
-    (inst rotlw res integer pluscount)
-    (inst b end)
-    ROTATE-LEFT
-    (inst rotlw res integer count)
-    END))
+    (inst rotlw res integer count)))
 
 (define-vop (%64bit-rotate-byte)
   (:policy :fast-safe)
@@ -59,15 +51,7 @@
   (:args (count :scs (sb-vm::signed-reg))
          (integer :scs (sb-vm::unsigned-reg) :target res))
   (:arg-types sb-vm::tagged-num sb-vm::unsigned-num)
-  (:temporary (:scs (sb-vm::unsigned-reg) :from (:argument 0)) pluscount)
   (:results (res :scs (sb-vm::unsigned-reg)))
   (:result-types sb-vm::unsigned-num)
   (:generator 6
-    (inst cmpdi count 0)
-    (inst bge rotate-left)
-    (inst addi pluscount count 64)
-    (inst rotld res integer pluscount)
-    (inst b end)
-    ROTATE-LEFT
-    (inst rotld res integer count)
-    END))
+    (inst rotld res integer count)))
