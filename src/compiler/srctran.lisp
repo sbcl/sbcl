@@ -1606,14 +1606,31 @@
                    numeric)))))
         ((and same-arg
               (eq x (specifier-type 'ratio)))
-         ;; TODO: should be positive, but this results in an
+         ;; TODO: should be positive, but this result is an
          ;; intersection type which other optimizers do not see.
          (specifier-type 'ratio))
         (t
          (numeric-contagion x y))))
 
 (defoptimizer (* derive-type) ((x y))
-  (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:* nil))
+  (let ((x-type (lvar-type x))
+        (y-type (lvar-type y)))
+    (block nil
+      (flet ((try-zero (x y)
+               (when (and (csubtypep x (specifier-type 'integer))
+                          (csubtypep (specifier-type '(eql 0)) x)
+                          (csubtypep y (specifier-type '(and integer (not (eql 0))))))
+                 (return
+                   (let ((result (%two-arg-derive-type (type-intersection x (specifier-type '(and integer (not (eql 0)))))
+                                                       y
+                                                       #'*-derive-type-aux #'sb-xc:* nil)))
+                     (when result
+                       (type-union result (specifier-type '(eql 0)))))))))
+        ;; If one of the integer arguments is non zero seperate the zero
+        ;; result from the rest of the result range.
+        (try-zero x-type y-type)
+        (try-zero y-type x-type)
+        (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:* nil)))))
 
 (defoptimizer (%signed-multiply-high derive-type) ((x y))
   (two-arg-derive-type x y
