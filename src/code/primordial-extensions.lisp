@@ -368,7 +368,9 @@
 ;;; respect to coalescing structure in (host) fasl files, which might
 ;;; then be used in compiling the target.
 (defun hash-cons (list)
-  (declare (type list list))
+  (declare (type list list)
+           #-sb-xc-host
+           (notinline gethash3 %puthash))
   (let ((table (make-hash-table :test 'equal)))
     (labels ((hc (thing)
                (cond

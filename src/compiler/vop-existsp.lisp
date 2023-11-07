@@ -29,7 +29,7 @@
   ;;; before quitting the image, and when loading it from compiled fasls
   ;;; (because toplevel forms might use %VOP-EXISTSP at any time).
 (defun %vop-existsp (name query &optional optimistic)
-  (declare (notinline info fun-info-templates)
+  (declare (notinline info fun-info-templates #-sb-xc-host sb-impl::gethash3)
            #+sb-xc (ignore optimistic))
   (let ((answer
           (not (null (ecase query
