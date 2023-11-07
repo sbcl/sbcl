@@ -3396,7 +3396,8 @@
                               -913097464
                               5)))
            39)))))
-    '(values (or (integer -21 -21) (integer 0 0)) (integer -21 0)
+    '(values (or (integer -21 -21) (integer 0 0)) (integer #+(or arm64 x86-64) -21
+                                                   #-(or arm64 x86-64) -38 0)
       &optional)))
   (assert
    (type-specifiers-equal
