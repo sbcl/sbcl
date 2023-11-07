@@ -157,6 +157,10 @@ use_test_subdirectory () { # not a "subdirectory" now, but don't feel like renam
     trap "cleanup_test_subdirectory" EXIT
 }
 
+# FIXME: Is it really true that a test must alter the source tree? How pathetic.
+# In particular, failures can occur in the :READDIR/DIRENT-NAME test of sb-posix
+# when using parallel-exec, because "run-sbcl-test-NNNN" randomly appears
+# in either the SB-POSIX:READDIR call or CL:DIRECTORY but not both.
 use_test_subdirectory_in_source_tree () { # DON'T USE THIS!
     if test -d "$TEST_DIRECTORY"
     then
