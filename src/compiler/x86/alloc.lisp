@@ -300,8 +300,8 @@
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
     (when (sb-c::make-vector-check-overflow-p node)
-      (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error ecx)))
-        (inst sub esp-tn ecx)
+      (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error result)))
+        (inst sub esp-tn result)
         (inst cmp esp-tn
               #-sb-thread
               (make-ea-for-symbol-value *control-stack-start* :dword)
@@ -309,7 +309,7 @@
               (make-ea :dword :disp (* 4 thread-control-stack-start-slot))
               #+sb-thread :fs)
         ;; avoid clearing condition codes
-        (inst lea esp-tn (make-ea :dword :base esp-tn :index ecx))
+        (inst lea esp-tn (make-ea :dword :base esp-tn :index result))
         (inst jmp :be overflow)))
     (stack-allocation result result other-pointer-lowtag)
     (inst cld)
