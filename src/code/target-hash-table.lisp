@@ -505,6 +505,7 @@ Examples:
              reason tbl npairs (* 2 indexval))))))
 
 (defun %make-hash-table (flags test test-fun hash-fun size rehash-size rehash-threshold)
+  (declare (type single-float rehash-threshold))
   (binding* (
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size) rehash-threshold)), and indeed
@@ -517,7 +518,7 @@ Examples:
            ;;
            ;; Note that this has not yet been audited for
            ;; correctness. It just seems to work. -- CSR, 2002-11-02
-           (scaled-size (truncate (/ (float size) rehash-threshold)))
+           (scaled-size (truncate (/ (float size 1.0) rehash-threshold)))
            (bucket-count (power-of-two-ceiling
                           (max scaled-size +min-hash-table-size+)))
            (weakp (logtest flags hash-table-weak-flag))
