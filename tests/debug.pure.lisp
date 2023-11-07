@@ -12,7 +12,8 @@
          ,@body
          (setf (sb-sys:sap-ref-word sap 0) good)))))
 
-(with-test (:name :fun-code-header-bogus)
+(with-test (:name :fun-code-header-bogus
+                  :skipped-on :darwin-jit)
   ;; This "should" tests two things:
   ;; (1) that FUN-CODE-HEADER returns NIL if the simple-fun lacks a backpointer
   ;;     (expressed as a nonzero word count) to its containing code object.
