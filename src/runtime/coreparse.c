@@ -261,12 +261,22 @@ static inline lispobj adjust_word(struct heap_adjust* adj, lispobj word) {
     return word + calc_adjustment(adj, word);
 }
 
+struct coreparse_space {
+    int id;
+    size_t desired_size; // size wanted, ORed with 1 if addr must be <2GB
+    // Values from the core file:
+    uword_t len; // length in bytes, as an integral multiple of os_vm_page_size
+    uword_t base;
+    lispobj** pfree_pointer; // pointer to x_free_pointer
+} spaces;
+
 static void
-set_adjustment(struct heap_adjust* adj,
-               uword_t actual_addr,
-               uword_t desired_addr,
-               uword_t len)
+set_adjustment(struct cons* pair, int id, uword_t actual_addr)
 {
+    struct coreparse_space* spaces = (void*)pair->car;
+    struct heap_adjust* adj = (void*)pair->cdr;
+    uword_t desired_addr = spaces[id].base;
+    sword_t len = spaces[id].len;
     sword_t delta = len ? actual_addr - desired_addr : 0;
     if (!delta) return;
     int j = adj->n_ranges;
@@ -705,15 +715,6 @@ static os_vm_address_t reserve_space(int space_id, int attr,
     return addr;
 }
 
-struct coreparse_space {
-    int id;
-    size_t desired_size; // size wanted, ORed with 1 if addr must be <2GB
-    // Values from the core file:
-    uword_t len; // length in bytes, as an integral multiple of os_vm_page_size
-    uword_t base;
-    lispobj** pfree_pointer; // pointer to x_free_pointer
-} spaces;
-
 /* TODO: If static + readonly were mapped as desired without disabling ASLR
  * but one of the large spaces couldn't be mapped as desired, start over from
  * the top, disabling ASLR. This should help to avoid relocating the heap
@@ -918,33 +919,24 @@ process_directory(int count, struct ndir_entry *entry,
     }
 
     calc_asm_routine_bounds();
+    struct cons spaceadj = {(lispobj)spaces, (lispobj)adj};
 #ifndef LISP_FEATURE_DARWIN_JIT
-    set_adjustment(adj, READ_ONLY_SPACE_START, // actual
-                   spaces[READ_ONLY_CORE_SPACE_ID].base, // expected
-                   spaces[READ_ONLY_CORE_SPACE_ID].len);
+    set_adjustment(&spaceadj, READ_ONLY_CORE_SPACE_ID, READ_ONLY_SPACE_START);
 #endif
-    set_adjustment(adj, DYNAMIC_SPACE_START, // actual
-                   spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
-                   spaces[DYNAMIC_CORE_SPACE_ID].len);
+    set_adjustment(&spaceadj, DYNAMIC_CORE_SPACE_ID, DYNAMIC_SPACE_START);
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-    set_adjustment(adj, STATIC_SPACE_START, // actual
-                   spaces[STATIC_CORE_SPACE_ID].base, // expected
-                   spaces[STATIC_CORE_SPACE_ID].len);
+    set_adjustment(&spaceadj, STATIC_CORE_SPACE_ID, STATIC_SPACE_START);
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (lisp_code_in_elf() && TEXT_SPACE_START != spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base) {
         lose("code-in-elf + PIE not supported");
     }
-    set_adjustment(adj, FIXEDOBJ_SPACE_START, // actual
-                   spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base, // expected
-                   spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len);
+    set_adjustment(&spaceadj, IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, FIXEDOBJ_SPACE_START);
     if (!apply_pie_relocs(TEXT_SPACE_START
                           - spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base,
                           DYNAMIC_SPACE_START - spaces[DYNAMIC_CORE_SPACE_ID].base,
                           fd))
-        set_adjustment(adj, TEXT_SPACE_START, // actual
-                       spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base, // expected
-                       spaces[IMMOBILE_TEXT_CORE_SPACE_ID].len);
+        set_adjustment(&spaceadj, IMMOBILE_TEXT_CORE_SPACE_ID, TEXT_SPACE_START);
 #endif
 }
 

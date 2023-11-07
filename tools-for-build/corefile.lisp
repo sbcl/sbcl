@@ -8,7 +8,6 @@
            #:page-table-core-entry-type-code
            #:alien-linkage-table-core-entry-type-code
            #:end-core-entry-type-code
-           #:max-core-space-id
            ;;
            #:read-only-core-space-id
            #:static-core-space-id

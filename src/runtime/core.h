@@ -15,6 +15,12 @@
 #include "genesis/sbcl.h"
 #include "runtime.h"
 
+/* This is the largest ID of any core space that can be saved to disk, so
+ * disregarding THREAD-STRUCT-CORE-SPACE-ID and ALIEN-LINKAGE-TABLE-CORE-SPACE-ID.
+ * The constant is mainly for dimensioning some C arrrays, and a given platform
+ * might not utilize all possible space IDs */
+#define MAX_CORE_SPACE_ID 7
+
 typedef sword_t core_entry_elt_t;
 
 struct ndir_entry {

@@ -298,29 +298,30 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         perror(GENERAL_WRITE_FAILURE_MSG);
 
     write_lispobj(DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(/* (word count = N spaces described by 5 words each, plus the
-          * entry type code, plus this count itself) */
-         (5 * MAX_CORE_SPACE_ID) + 2, file);
+    ftell_type spacecount_pos = FTELL(file);
+    write_lispobj(0, file); // placeholder
+
+    int count = 0;
     output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
                  static_space_free_pointer,
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
 #ifdef LISP_FEATURE_DARWIN_JIT
     output_space(file,
                  STATIC_CODE_CORE_SPACE_ID,
                  (lispobj *)STATIC_CODE_SPACE_START,
                  static_code_space_free_pointer,
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
 #endif
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  (void*)DYNAMIC_SPACE_START,
                  (void*)dynamic_space_highwatermark(),
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
     /* FreeBSD really doesn't like to give you the address you asked for
      * on dynamic space. We have a better chance at satisfying the request
      * if we haven't already mapped R/O space below it. */
@@ -329,14 +330,14 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  (lispobj *)READ_ONLY_SPACE_START,
                  read_only_space_free_pointer,
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     output_space(file,
                  IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
                  (lispobj *)FIXEDOBJ_SPACE_START,
                  fixedobj_free_pointer,
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
     // Leave this space for last! Things are easier when splitting a core into
     // code and non-code if we don't have to compensate for removal of pages.
     // i.e. if code resided between dynamic and fixedobj space, then dynamic
@@ -346,7 +347,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  (lispobj *)TEXT_SPACE_START,
                  text_space_highwatermark,
                  core_start_pos,
-                 core_compression_level);
+                 core_compression_level), ++count;
 #endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
@@ -382,11 +383,14 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
 
     write_lispobj(END_CORE_ENTRY_TYPE_CODE, file);
+    FSEEK(file, spacecount_pos, SEEK_SET);
+    // 5 = length of (struct ndir_entry) in words, plus 2 fixed words
+    write_lispobj(2 + count * 5, file);
 
     /* Write a trailing header, ignored when parsing the core normally.
      * This is used to locate the start of the core when the runtime is
      * prepended to it. */
-    fseek(file, 0, SEEK_END);
+    FSEEK(file, 0, SEEK_END);
 
     if (1 != fwrite(&core_start_pos, sizeof(os_vm_offset_t), 1, file)) {
         perror("Error writing core starting position to file");
