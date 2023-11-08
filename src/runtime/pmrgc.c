@@ -13,6 +13,7 @@
  * files for more information.
  */
 
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "genesis/sbcl.h"
@@ -255,9 +256,8 @@ static generation_index_t gc_alloc_generation;
 /* We use five regions for the current newspace generation. */
 struct alloc_region gc_alloc_region[6];
 
-static page_index_t
-  alloc_start_pages[8], // one for each value of PAGE_TYPE_x
-  max_alloc_start_page; // the largest of any array element
+static _Atomic struct allocator_state alloc_start_states[8]; // one for each value of PAGE_TYPE_x
+static page_index_t max_alloc_start_page; // the largest of any array element
 page_index_t gencgc_alloc_start_page; // initializer for the preceding array
 
 /* Each 'start_page' informs the region-opening logic where it should
@@ -269,47 +269,42 @@ page_index_t gencgc_alloc_start_page; // initializer for the preceding array
  * It's kind of dumb that there is one start_page per type,
  * other than it serves its purpose for picking up where it left off
  * on a partially full page during GC */
-#define RESET_ALLOC_START_PAGES() \
-        alloc_start_pages[0] = gencgc_alloc_start_page; \
-        alloc_start_pages[1] = gencgc_alloc_start_page; \
-        alloc_start_pages[2] = gencgc_alloc_start_page; \
-        alloc_start_pages[3] = gencgc_alloc_start_page; \
-        alloc_start_pages[4] = gencgc_alloc_start_page; \
-        alloc_start_pages[5] = gencgc_alloc_start_page; \
-        alloc_start_pages[6] = gencgc_alloc_start_page; \
-        alloc_start_pages[7] = gencgc_alloc_start_page; \
-        max_alloc_start_page = gencgc_alloc_start_page;
+void reset_alloc_start_pages(bool allow_free_pages) {
+  for (int i = 0; i < 8; i++)
+    alloc_start_states[i] = (struct allocator_state){gencgc_alloc_start_page, allow_free_pages};
+  max_alloc_start_page = gencgc_alloc_start_page;
+}
 
-static page_index_t
+static struct allocator_state
 get_alloc_start_page(unsigned int page_type)
 {
     if (page_type > 7) lose("bad page_type: %d", page_type);
     struct thread* th = get_sb_vm_thread();
-    page_index_t global_start = alloc_start_pages[page_type];
+    struct allocator_state global_start = alloc_start_states[page_type];
     page_index_t hint;
     switch (page_type) {
     case PAGE_TYPE_MIXED:
-        if ((hint = thread_extra_data(th)->mixed_page_hint) > 0 && hint <= global_start) {
+        if ((hint = thread_extra_data(th)->mixed_page_hint) > 0 && hint <= global_start.page) {
             thread_extra_data(th)->mixed_page_hint = - 1;
-            return hint;
+            return (struct allocator_state){hint, global_start.allow_free_pages};
         }
         break;
     case PAGE_TYPE_CONS:
-        if ((hint = thread_extra_data(th)->cons_page_hint) > 0 && hint <= global_start) {
+        if ((hint = thread_extra_data(th)->cons_page_hint) > 0 && hint <= global_start.page) {
             thread_extra_data(th)->cons_page_hint = - 1;
-            return hint;
+            return (struct allocator_state){hint, global_start.allow_free_pages};
         }
         break;
     }
     return global_start;
 }
 
-static inline void
-set_alloc_start_page(unsigned int page_type, page_index_t page)
+static void
+set_alloc_start_page(unsigned int page_type, struct allocator_state state)
 {
     if (page_type > 7) lose("bad page_type: %d", page_type);
-    if (page > max_alloc_start_page) max_alloc_start_page = page;
-    alloc_start_pages[page_type] = page;
+    if (state.page > max_alloc_start_page) max_alloc_start_page = state.page;
+    alloc_start_states[page_type] = state;
 }
 #include "private-cons.inc"
 
@@ -323,7 +318,7 @@ void gc_close_region(struct alloc_region *alloc_region,
  * when it can't fit in the open region.
  * This entry point is only for use within the GC itself. */
 void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int page_type) {
-    page_index_t alloc_start = get_alloc_start_page(page_type);
+    struct allocator_state alloc_start = get_alloc_start_page(page_type);
     void *new_obj;
     if ((uword_t)nbytes >= (GENCGC_PAGE_BYTES / 4 * 3)) {
         uword_t largest_hole;
@@ -770,7 +765,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 
     /* Change to a new space for allocation, resetting the alloc_start_page */
         gc_alloc_generation = new_space;
-        RESET_ALLOC_START_PAGES();
+        reset_alloc_start_pages(false);
 
         /* Don't try to allocate into pseudo-static, when we collect it */
         if (generation == PSEUDO_STATIC_GENERATION)
@@ -931,7 +926,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     }
 
     mr_collect_garbage(raise);
-    RESET_ALLOC_START_PAGES();
+    reset_alloc_start_pages(false);
     struct generation* g = &generations[generation];
     /* Set the new gc trigger for the GCed generation. */
     g->gc_trigger = g->bytes_allocated + g->bytes_consed_between_gc;
@@ -1399,11 +1394,11 @@ lisp_alloc(__attribute__((unused)) int flags,
 #endif
 
     ensure_region_closed(region, page_type);
-    int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
-    gc_assert(ret);
-    page_index_t alloc_start = get_alloc_start_page(page_type);
+    struct allocator_state alloc_start = get_alloc_start_page(page_type);
     bool largep = nbytes >= LARGE_OBJECT_SIZE && page_type != PAGE_TYPE_CONS;
     if (largep) {
+        int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
+        gc_assert(ret);
         uword_t largest_hole;
         page_index_t new_page = try_allocate_large(nbytes, page_type, gc_alloc_generation,
                                                    &alloc_start, page_table_pages, &largest_hole);
@@ -1415,7 +1410,13 @@ lisp_alloc(__attribute__((unused)) int flags,
         set_allocation_bit_mark(new_obj);
         memset(new_obj, 0, nbytes);
     } else {
+        /* Try to find a page before acquiring free_pages_lock. */
+        pre_search_for_small_space(nbytes, page_type, &alloc_start, page_table_pages);
+        int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
+        gc_assert(ret);
         if (!gc_active_p) small_allocation_count++;
+        /* This search will only re-visit the page found by pre_search_for_small_space
+         * if no one else claimed the page since acquiring free_pages_lock. */
         bool success =
             try_allocate_small_from_pages(nbytes, region, page_type,
                                           gc_alloc_generation,
