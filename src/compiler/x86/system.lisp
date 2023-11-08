@@ -233,10 +233,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 3
     (loadw result function closure-fun-slot fun-pointer-lowtag)
-    (inst lea result
-          (make-ea :byte :base result
-                   :disp (- fun-pointer-lowtag
-                            (* simple-fun-insts-offset n-word-bytes))))))
+    (inst sub result (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))))
 
 
 ;;;; other miscellaneous VOPs

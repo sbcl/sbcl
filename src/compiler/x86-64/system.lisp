@@ -281,9 +281,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 3
     (loadw result function closure-fun-slot fun-pointer-lowtag)
-    (inst lea result
-          (ea  (- fun-pointer-lowtag (* simple-fun-insts-offset n-word-bytes))
-               result))))
+    (inst sub result (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))))
 
 ;;;; symbol frobbing
 (defun load-symbol-dbinfo (result symbol)
