@@ -3839,6 +3839,18 @@
   (def + :type rational :folded (+ -))
   (def * :type rational :folded (* /)))
 
+(deftransform * ((x y) (rational (constant-arg ratio)))
+  (let ((y (/ (lvar-value y))))
+    (if (integerp y)
+        `(/ x ,y)
+        (give-up-ir1-transform))))
+
+(deftransform / ((x y) (rational (constant-arg ratio)))
+  (let ((y (/ (lvar-value y))))
+    (if (integerp y)
+        `(* x ,y)
+        (give-up-ir1-transform))))
+
 (deftransform mask-signed-field ((width x) ((constant-arg unsigned-byte) t))
   "Fold mask-signed-field/mask-signed-field of constant width"
   (binding* ((node  (if (lvar-has-single-use-p x)
