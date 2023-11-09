@@ -1592,11 +1592,11 @@ static void tally(lispobj ptr, struct visitor* v)
  * to it from another object that is definitely in the cold core, via FOP-LOAD-CODE
  * and who know what else. Thus it remains a graph tracing problem in nature,
  * which is best left to GC */
-static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
+static uword_t visit_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct visitor* v = (struct visitor*)arg;
-    lispobj* obj = where;
-    while (obj < limit) {
+    lispobj* obj = next_object(where, 0, limit);
+    while (obj) {
         if (widetag_of(obj) == FILLER_WIDETAG) {
             obj += object_size(obj);
             continue;
@@ -1604,7 +1604,7 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
         lispobj ptr = compute_lispobj(obj);
         tally(ptr, v);
         if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
-        obj += object_size(obj);
+        obj = next_object(obj, object_size(obj), limit);
     }
     return 0;
 }
@@ -1629,7 +1629,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
     free(c);
     // Pass 2: Count all heap objects
     v[1].reached = &reached;
-    walk_generation(visit, -1, (uword_t)&v[1]);
+    walk_generation(visit_range, -1, (uword_t)&v[1]);
 
     // Pass 3: Compare
     // Start with the conses
