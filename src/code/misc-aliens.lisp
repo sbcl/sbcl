@@ -51,11 +51,11 @@
     (let ((addr (get-lisp-obj-address x)))
       (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
 
+(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long)
+
 #+immobile-space
-(progn
 (define-symbol-macro sb-vm:alien-linkage-table-space-start
     (extern-alien "ALIEN_LINKAGE_TABLE_SPACE_START" unsigned))
-(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long))
 
 #+darwin-jit
 (define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)

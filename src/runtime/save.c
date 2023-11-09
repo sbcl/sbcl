@@ -348,6 +348,9 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  text_space_highwatermark,
                  core_start_pos,
                  core_compression_level), ++count;
+#else
+    // FIXME: don't know why it crashes on restart (when the space is output, of course)
+    if (TEXT_SPACE_START) lose("save not working");
 #endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);

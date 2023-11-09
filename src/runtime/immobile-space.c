@@ -86,7 +86,6 @@ FILE * logfile;
 
 static void defrag_immobile_space(bool verbose);
 
-uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 uword_t immobile_space_lower_bound, immobile_space_max_offset;
 uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
 unsigned int text_space_size = TEXT_SPACE_SIZE;

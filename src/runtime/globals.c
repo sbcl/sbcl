@@ -58,7 +58,6 @@ lispobj *static_code_space_free_pointer;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-lispobj *text_space_highwatermark;
 lispobj *fixedobj_free_pointer;
 lispobj ALIEN_LINKAGE_TABLE_SPACE_START;
 #endif
@@ -93,3 +92,6 @@ void globals_init(void)
 #endif
 #endif
 }
+
+uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
+lispobj *text_space_highwatermark;

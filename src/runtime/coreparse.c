@@ -715,6 +715,15 @@ static os_vm_address_t reserve_space(int space_id, int attr,
     return addr;
 }
 
+static __attribute__((unused)) uword_t corespace_checksum(uword_t* base, int nwords)
+{
+    uword_t result  = 0;
+    int i;
+    for (i = 0; i<nwords; ++i)
+        result = ((result << 1) | (result >> (N_WORD_BITS-1))) ^ base[i];
+    return result;
+}
+
 /* TODO: If static + readonly were mapped as desired without disabling ASLR
  * but one of the large spaces couldn't be mapped as desired, start over from
  * the top, disabling ASLR. This should help to avoid relocating the heap
@@ -776,11 +785,6 @@ process_directory(int count, struct ndir_entry *entry,
     for ( ; --count>= 0; ++entry) {
         long id = entry->identifier;
         uword_t addr = entry->address;
-#ifdef DEBUG_COREPARSE
-        printf("space %d @ %10lx pg=%4d+%4d nwords=%ld\n",
-               (int)id, addr, (int)entry->data_page, (int)entry->page_count,
-               entry->nwords);
-#endif
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
@@ -862,7 +866,12 @@ process_directory(int count, struct ndir_entry *entry,
                 else
                     TEXT_SPACE_START = addr;
                 break;
+#else
+            case IMMOBILE_TEXT_CORE_SPACE_ID:
+                TEXT_SPACE_START = addr;
+                break;
 #endif
+
             case DYNAMIC_CORE_SPACE_ID:
                 {
                 uword_t aligned_start = ALIGN_UP(addr, GENCGC_PAGE_BYTES);
@@ -917,6 +926,11 @@ process_directory(int count, struct ndir_entry *entry,
               / GENCGC_PAGE_BYTES;
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
         }
+#ifdef DEBUG_COREPARSE
+        printf("space %d @ %10lx pg=%4d+%4d nwords=%9ld checksum=%lx\n",
+               (int)id, addr, (int)entry->data_page, (int)entry->page_count,
+               entry->nwords, corespace_checksum((void*)addr, entry->nwords));
+#endif
     }
 
     calc_asm_routine_bounds();
@@ -1199,9 +1213,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
         gengcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);
         gengcbarrier_patch_code_range(STATIC_SPACE_START, static_space_free_pointer);
         gengcbarrier_patch_code_range(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark());
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
         gengcbarrier_patch_code_range(TEXT_SPACE_START, text_space_highwatermark);
-#endif
     }
 
     // Apply physical page protection as needed.
@@ -1323,6 +1335,11 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         {IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, FIXEDOBJ_SPACE_SIZE | 1, 0,
             0, &fixedobj_free_pointer},
         {IMMOBILE_TEXT_CORE_SPACE_ID, 1, 0, 0, &text_space_highwatermark},
+#else
+        // Without the immobile-space feature, immobile-text-space is nonetheless valid.
+        // editcore can put all code there, and then convert the space to an ELF section.
+        // Unlike static-code-core-space, this space _is_ a root for GC.
+        {IMMOBILE_TEXT_CORE_SPACE_ID, 0, 0, 0, &text_space_highwatermark},
 #endif
         {DYNAMIC_CORE_SPACE_ID, dynamic_space_size, 0, 0, 0}
     };

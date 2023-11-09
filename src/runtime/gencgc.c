@@ -3723,6 +3723,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (GC_LOGGING) fprintf(gc_activitylog(), "begin scavenge static roots\n");
     heap_scavenge((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+    // TODO: use an explicit remembered set of modified objects in this range
+    if (TEXT_SPACE_START) heap_scavenge((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
+#endif
 #ifdef LISP_FEATURE_SYSTEM_TLABS
     extern void gc_scavenge_arenas();
     gc_scavenge_arenas();

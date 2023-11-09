@@ -629,15 +629,14 @@ structure representations")
            "WORD" "WORD-REG-SC-NUMBER" "WORD-SHIFT"
            #+win32 "CONTEXT-RESTORE-TRAP"
            "ZERO-SC-NUMBER")
+  (:export "TEXT-SPACE-START" "*TEXT-SPACE-FREE-POINTER*")
   #+immobile-space
   (:export
    "IMMOBILE-CARD-BYTES"
    "FIXEDOBJ-SPACE-START"
    "FIXEDOBJ-SPACE-SIZE"
-   "TEXT-SPACE-START"
    "TEXT-SPACE-SIZE"
-   "*FIXEDOBJ-SPACE-FREE-POINTER*"
-   "*TEXT-SPACE-FREE-POINTER*")
+   "*FIXEDOBJ-SPACE-FREE-POINTER*")
   #+sb-simd-pack
   (:export
    "SIMD-PACK-TAG-SLOT"
