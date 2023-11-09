@@ -848,44 +848,57 @@ multiple threads accessing the same hash-table without locking."
   ;; If I did the math right, the upper bound is a fixnum on 32-bit (and 64-bit of course)
   (declare (type (integer 1 (#.(ash 1 +max-hash-table-bits+))) old-size))
   (let* ((rehash-size (hash-table-rehash-size table))
-         (new-size (typecase rehash-size
-                     ;; Ensure that if the user specifies a float that is so close
-                     ;; to 1.0 as to disappear in the TRUNCATE that we actually grow.
-                     ;; (TRUNCATE (* 14 1.01)) => 14
-                     (float (max (the index (truncate (* rehash-size old-size))) ; usually
-                                 (1+ old-size)))
-                     (fixnum (+ rehash-size old-size)))) ; rarely, I imagine
+         (new-size
+           (typecase rehash-size
+             (single-float
+              ;; This is the more common case by far, and we take some
+              ;; pains to tell TRUNCATE that the result fits in a
+              ;; fixnum.
+              (let ((new-size/float
+                      ;; These magic constants are (FLOAT (ASH 1
+                      ;; +MAX-HASH-TABLE-BITS+)).
+                      (the (single-float * #-64-bit 5.368709e8
+                                           #+64-bit 2.1474836e9)
+                           (truly-the (single-float 1.0)
+                                      (* rehash-size old-size)))))
+                (max (truncate new-size/float)
+                     ;; Ensure that the size grows, e.g. for
+                     ;; (TRUNCATE (* 14 1.01)) => 14.
+                     (1+ old-size))))
+             (fixnum (+ rehash-size old-size)))
          (new-n-buckets
-          (let* ((pow2ceil (power-of-two-ceiling new-size))
-                 (full-lf (/ new-size pow2ceil)))
-            ;; If the default rehash-size was employed, let's try to keep the
-            ;; load factor within a reasonable band. Otherwise don't bother.
-            ;; The motivation for this decision is twofold:
-            ;; - if using defaults, it would be ideal to attempt to be nominally
-            ;;   conscientious of the 1.5x resize amount.
-            ;; - we can't really accommodate arbitrary resize amounts, especially if small.
-            ;;   (power-of-2 sizing can't do that- doubling is the only possibility)
-            ;;   But we can produce the smallest table consistent with the request.
-            ;;   Say e.g. REHASH-SIZE was 2 using the default initial size of 14.
-            ;;   Resizing computes 16 k/v pairs which coincides exactly with
-            ;;   16 buckets (the nearest power of 2). But if we wish to avoid 100% load,
-            ;;   what can we do? Re-double the bin count to 32? Decrease the k/v pair count
-            ;;   to 15? Clearly neither of those make sense if the user is trying to say
-            ;;   that (s)he wants 2 entries more which means "don't increase by a lot".
-            ;;   Changing from 8 buckets (at the old size) to 32 buckets is a lot,
-            ;;   so why do that? Conversely, it makes no sense to reduce the k/v pair
-            ;;   limit just to keep the LF less than 100%. A similar problem occurs
-            ;;   if you specify 1.001 or other float near 1.
-            ;;   Anyway, chaining supports load factors in excess of 100%
-            (when (eql rehash-size default-rehash-size)
-              (cond ((> full-lf 9/10)   ; .9 is unhappy in cross-float due to inexactness
-                     ;; If we're going to decrease the size, make sure we definitely
-                     ;; don't decrease below the old size.
-                     (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
-                    ((< full-lf 55/100) ; and .55 is similarly unhappy
-                     (setq new-size (floor pow2ceil 100/65))))) ; target LF = 65%
-            pow2ceil)))
+           (let ((pow2ceil (power-of-two-ceiling new-size)))
+             ;; If the default rehash-size was employed, let's try to keep the
+             ;; load factor (LF) within a reasonable band. Otherwise don't bother.
+             ;; The motivation for this decision is twofold:
+             ;; - if using defaults, it would be ideal to attempt to be nominally
+             ;;   conscientious of the 1.5x resize amount.
+             ;; - we can't really accommodate arbitrary resize amounts, especially if small.
+             ;;   (power-of-2 sizing can't do that- doubling is the only possibility)
+             ;;   But we can produce the smallest table consistent with the request.
+             ;;   Say e.g. REHASH-SIZE was 2 using the default initial size of 14.
+             ;;   Resizing computes 16 k/v pairs which coincides exactly with
+             ;;   16 buckets (the nearest power of 2). But if we wish to avoid 100% load,
+             ;;   what can we do? Re-double the bin count to 32? Decrease the k/v pair count
+             ;;   to 15? Clearly neither of those make sense if the user is trying to say
+             ;;   that (s)he wants 2 entries more which means "don't increase by a lot".
+             ;;   Changing from 8 buckets (at the old size) to 32 buckets is a lot,
+             ;;   so why do that? Conversely, it makes no sense to reduce the k/v pair
+             ;;   limit just to keep the LF less than 100%. A similar problem occurs
+             ;;   if you specify 1.001 or other float near 1.
+             ;;   Anyway, chaining supports load factors in excess of 100%
+             (when (eql rehash-size default-rehash-size)
+               (let* ((pow2ceil (float pow2ceil))
+                      (full-lf (/ new-size pow2ceil)))
+                 (cond ((> full-lf 0.9)
+                        ;; If we're going to decrease the size, make sure we definitely
+                        ;; don't decrease below the old size.
+                        (setq new-size (floor (* 0.85 pow2ceil)))) ; target LF = 85%
+                       ((< full-lf 0.55)
+                        (setq new-size (floor (* 0.65 pow2ceil))))))) ; target LF = 65%
+             pow2ceil)))
     (values new-size new-n-buckets)))
+
 ;;; Enlarge TABLE.  If it is weak, then both the old and new vectors are temporarily
 ;;; made non-weak so that we don't have to deal with GC-related shenanigans.
 (defun grow-hash-table (table)
