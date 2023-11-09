@@ -3422,11 +3422,11 @@
                (values tru rem)))
         (give-up-ir1-transform))))
 
-(deftransform rem ((number divisor))
-  `(nth-value 1 (truncate number divisor)))
+(define-source-transform rem (number divisor)
+  `(nth-value 1 (truncate ,number ,divisor)))
 
-(deftransform mod ((number divisor))
-  `(nth-value 1 (floor number divisor)))
+(define-source-transform mod (number divisor)
+  `(nth-value 1 (floor ,number ,divisor)))
 
 (deftransform ceiling ((number divisor) ((real (0) (1)) (integer * (0))) * :important nil)
   `(values 0 number))
@@ -3468,19 +3468,6 @@
     "convert division by 2^k to shift"
     (frob y t)))
 
-;;; Do the same for MOD.
-(deftransform mod ((x y) (integer (constant-arg integer)) *)
-  "convert remainder mod 2^k to LOGAND"
-  (let* ((y (lvar-value y))
-         (y-abs (abs y))
-         (len (1- (integer-length y-abs))))
-    (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
-      (give-up-ir1-transform))
-    (let ((mask (1- y-abs)))
-      (if (minusp y)
-          `(- (logand (- x) ,mask))
-          `(logand x ,mask)))))
-
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
 (deftransform truncate ((x y) (integer (constant-arg integer)))
   "convert division by 2^k to shift"
@@ -3509,19 +3496,6 @@
   (if (same-leaf-ref-p x y)
       `(values 1 0)
       (give-up-ir1-transform)))
-
-;;; And the same for REM.
-(deftransform rem ((x y) (integer (constant-arg integer)) *)
-  "convert remainder mod 2^k to LOGAND"
-  (let* ((y (lvar-value y))
-         (y-abs (abs y))
-         (len (1- (integer-length y-abs))))
-    (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
-      (give-up-ir1-transform))
-    (let ((mask (1- y-abs)))
-      `(if (minusp x)
-           (- (logand (- x) ,mask))
-           (logand x ,mask)))))
 
 (defoptimizer (truncate constraint-propagate)
     ((x y) node gen)
