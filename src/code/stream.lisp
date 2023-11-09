@@ -558,12 +558,12 @@
       ;; These bytes are of course actual bytes, i.e. 8-bit octets
       ;; and not variable-length bytes.
       (cond ((<= numbytes num-buffered)
-             (%byte-blt in-buffer index buffer start (+ start numbytes))
+             (%byte-blt in-buffer index buffer start numbytes)
              (setf (ansi-stream-in-index stream) (+ index numbytes))
              numbytes)
             (t
+             (%byte-blt in-buffer index buffer start num-buffered)
              (let ((end (+ start num-buffered)))
-               (%byte-blt in-buffer index buffer start end)
                (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
                (+ (funcall (ansi-stream-n-bin stream) stream buffer nil
                            end (- numbytes num-buffered) eof-error-p)

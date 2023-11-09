@@ -77,7 +77,7 @@
     (def-accessor sap-ref-lispobj)
     (def-accessor sap-ref-single)
     (def-accessor sap-ref-double))
-  (def %byte-blt (src src-start dst dst-start dst-end))
+  (def %byte-blt (src src-start dst dst-start count))
   (def shift-towards-start (number count))
   (def shift-towards-end (number count))
   (def get-header-data)

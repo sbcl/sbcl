@@ -1383,12 +1383,11 @@
            (available (- tail head))
            (n-this-copy (min remaining-request available))
            (this-start (+ start total-copied))
-           (this-end (+ this-start n-this-copy))
            (sap (buffer-sap ibuf)))
       (declare (type index remaining-request head tail available))
       (declare (type index n-this-copy))
       ;; Copy data from stream buffer into user's buffer.
-      (%byte-blt sap head buffer this-start this-end)
+      (%byte-blt sap head buffer this-start n-this-copy)
       (incf (buffer-head ibuf) n-this-copy)
       (incf total-copied n-this-copy)
       ;; Maybe we need to refill the stream buffer.

@@ -552,7 +552,7 @@
 ;;; currently (ca. sbcl-0.6.12.30) the main interface for code in
 ;;; SB-KERNEL and SB-SYS (e.g. i/o code). It's not clear that it's the
 ;;; ideal interface, though, and it probably deserves some thought.
-(deftransform %byte-blt ((src src-start dst dst-start dst-end)
+(deftransform %byte-blt ((src src-start dst dst-start nbytes)
                          ((or (simple-unboxed-array (*)) system-area-pointer)
                           index
                           (or (simple-unboxed-array (*)) system-area-pointer)
@@ -586,7 +586,7 @@
               (sap-ref-8 dst (1- dst-end)) (sap-ref-8 dst (1- dst-end))))
       (memmove (sap+ (sapify dst) dst-start)
                (sap+ (sapify src) src-start)
-               (- dst-end dst-start)))
+               nbytes))
      (values)))
 
 ;;;; transforms for EQL of floating point values
