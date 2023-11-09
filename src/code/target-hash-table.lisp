@@ -1080,7 +1080,9 @@ if there is no such entry. Entries can be added using SETF."
       ;; so we need to avoid "unused variable warnings" by eliding this
       ;; binding as well.
       ,@(unless (member std-fn '(eq eql))
-          '((hash-vector (hash-table-hash-vector hash-table))))
+          '((hash-vector (truly-the
+                          (simple-array hash-table-index (*))
+                          (hash-table-hash-vector hash-table)))))
       ,@(when (member std-fn '(nil *))
           '((test-fun (hash-table-test-fun hash-table))))
       (probe-limit (length next-vector))
