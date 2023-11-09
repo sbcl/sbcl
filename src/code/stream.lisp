@@ -1772,22 +1772,21 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;;  CHARACTER-STRING into CHARACTER-STRING
     ;;  BASE-STRING into BASE-STRING
     ;; BASE-STRING copied into CHARACTER-STRING is not possible.
-    ;; Strings with element type NIL are not possible.
     ;; The first case occurs when and only when the element type is * and
     ;; only base characters were written. The other two cases can be handled
-    ;; using BYTE-BLT with indices multiplied by either 1 or 4.
-    (flet ((copy (fun extra)
+    ;; using memcpy() with string indices multiplied by either 1 or 4.
+    (flet ((copy (fun scale)
              (let ((start 0)) ; index into RESULT
                (declare (index start))
                (dolist (buffer prev)
                  ;; It doesn't look as though we should have to pass RESULT
                  ;; in to FUN to avoid closure consing, but indeed we do.
-                 (funcall fun result buffer start extra)
+                 (funcall fun result buffer start scale)
                  (incf start (length buffer)))
-               (funcall fun result this start extra)
+               (funcall fun result this start scale)
                (incf start (length this))
                (dolist (buffer next)
-                 (funcall fun result buffer start extra)
+                 (funcall fun result buffer start scale)
                  (incf start (length buffer))))))
       (if (and (eq (string-output-stream-element-type stream) '*)
                base-string-p)
@@ -1803,20 +1802,19 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                            :start1 start))
                 0)
           (with-pinned-objects (result)
-              ;; BYTE-BLT doesn't know that it could use memcpy rather then memmove,
-              ;; but it nonetheless should be faster than REPLACE.
+            (with-alien ((memcpy (function system-area-pointer
+                                           system-area-pointer system-area-pointer unsigned)
+                                 :extern))
               (copy (lambda (result source start scale)
                       (declare (index start))
-                      (let* ((length (min (- (length result) start) (length source)))
-                             (end (+ start length)))
-                        (declare (index length end))
+                      (let* ((nchars (min (- length start) (length source)))
+                             (nbytes (the index (ash (the index nchars) scale))))
                         (with-pinned-objects (source)
-                          (%byte-blt (vector-sap source)
-                                     0
-                                     (vector-sap result)
-                                     (truly-the index (ash start scale))
-                                     (truly-the index (ash end scale))))))
-                    (if base-string-p 0 2)))))
+                          (alien-funcall memcpy
+                                         (sap+ (vector-sap result) (ash start scale))
+                                         (vector-sap source)
+                                         nbytes))))
+                    (if base-string-p 0 2))))))
     result))
 
 ;;; Now that we support base-char string-output streams, it may be possible to eliminate
