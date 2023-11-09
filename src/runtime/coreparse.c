@@ -843,6 +843,7 @@ process_directory(int count, struct ndir_entry *entry,
                 STATIC_SPACE_START = addr;
                 STATIC_SPACE_END = addr + len;
 #endif
+                break;
 #ifndef LISP_FEATURE_DARWIN_JIT
             case READ_ONLY_CORE_SPACE_ID:
                 READ_ONLY_SPACE_START = addr;
