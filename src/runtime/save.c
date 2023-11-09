@@ -338,6 +338,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  fixedobj_free_pointer,
                  core_start_pos,
                  core_compression_level), ++count;
+#endif
     // Leave this space for last! Things are easier when splitting a core into
     // code and non-code if we don't have to compensate for removal of pages.
     // i.e. if code resided between dynamic and fixedobj space, then dynamic
@@ -348,10 +349,6 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  text_space_highwatermark,
                  core_start_pos,
                  core_compression_level), ++count;
-#else
-    // FIXME: don't know why it crashes on restart (when the space is output, of course)
-    if (TEXT_SPACE_START) lose("save not working");
-#endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(3, file);
