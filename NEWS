@@ -36,6 +36,9 @@ changes relative to sbcl-2.3.10:
   * bug fix: providing an invalid external format argument to OPEN or
     WITH-OPEN-FILE (or the internal MAKE-FD-STREAM) no longer leaks a file
     descriptor.
+  * bug fix: SB-ROTATE-BYTE recognizes out-of-relevant-range BYTE
+    specifications for integers before attempting to cons up enormous bignums
+    for masking and shifting.  (lp#2042937)
   * optimization: external formats with :REPLACEMENT no longer bind handlers
     for coding errors around conversion functions, and so should cons less and
     be faster.

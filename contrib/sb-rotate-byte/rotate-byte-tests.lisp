@@ -105,3 +105,26 @@
   (declare ((unsigned-byte 8) x))
   (typep (rotate-byte c (byte 8 3) x) '(unsigned-byte 8)))
 (assert (not (non-zero-posn 1 #xFF)))
+
+(declaim (notinline rb))
+(defun rb (c s p i)
+  (rotate-byte c (byte s p) i))
+
+(dolist (x '(#x5AE12D96 #x-5AE12D96))
+  (dotimes (p 64)
+    (assert (= (rb 1 32 p x)
+               (let ((chunk (ldb (byte 32 p) x)))
+                 (dpb (logand (logior (ash chunk 1) (ash chunk -31)) #xffffffff)
+                      (byte 32 p)
+                      x))))))
+
+(assert (= (rotate-byte 1 (byte 2 100000000000) 17) 17))
+(assert (= (rotate-byte 2 (byte 13 100000000000) (1- most-negative-fixnum))
+           (1- most-negative-fixnum)))
+
+(defun enormous-byte-rotate (c)
+  (declare (type (signed-byte 32) c))
+  (rotate-byte 2 (byte 3 100000000000) c))
+
+(assert (= (enormous-byte-rotate #x7fffffff) #x7fffffff))
+(assert (= (enormous-byte-rotate #x-80000000) #x-80000000))

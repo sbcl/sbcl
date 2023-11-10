@@ -10,6 +10,8 @@ contains the bits of INTEGER."
 (defun %rotate-byte (count size pos integer)
   (let ((count (nth-value 1 (round count size)))
         (mask (1- (ash 1 size))))
+    (when (>= pos (integer-length integer))
+      (return-from %rotate-byte integer))
     (logior (logand integer (lognot (ash mask pos)))
             (let ((field (logand (ash mask pos) integer)))
               (logand (ash mask pos)
