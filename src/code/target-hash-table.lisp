@@ -176,7 +176,7 @@
   ;; there too. On 32-bit machines, the result is is a positive fixnum,
   ;; but on 64-bit, we use 2 more bits though must avoid conflict with
   ;; the unique value that that denotes an address-based hash.
-  (ldb (byte #-64-bit 29 #+64-bit 31 0)
+  (ldb (byte #.+max-hash-table-bits+ 0)
        (+ (logxor #b11100101010001011010100111 hash)
           (ash hash -3)
           (ash hash -12)
@@ -846,7 +846,7 @@ multiple threads accessing the same hash-table without locking."
   ;; Compute new vector lengths for the table, extending the table based on the
   ;; rehash-size.
   ;; If I did the math right, the upper bound is a fixnum on 32-bit (and 64-bit of course)
-  (declare (type (integer 1 (#.(ash 1 29))) old-size))
+  (declare (type (integer 1 (#.(ash 1 +max-hash-table-bits+))) old-size))
   (let* ((rehash-size (hash-table-rehash-size table))
          (new-size (typecase rehash-size
                      ;; Ensure that if the user specifies a float that is so close
@@ -1380,7 +1380,7 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 ;;; versus the cell being in the freelist. So the code diverges in at least that way.
 (defun findhash-weak (key hash-table hash address-based-p)
   (declare (hash-table hash-table) (optimize speed)
-           (type (unsigned-byte #-64-bit 29 #+64-bit 31) hash))
+           (type (unsigned-byte #.+max-hash-table-bits+) hash))
   (let* ((kv-vector (hash-table-pairs hash-table))
          (initial-stamp (kv-vector-rehash-stamp kv-vector)))
     (flet ((hash-search ()
@@ -1704,8 +1704,7 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 
 (flet ((insert-at (index hash-table key hash address-based-p value)
          (declare (optimize speed (sb-c:insert-array-bounds-checks 0))
-                  (type index/2 index)
-                  (type (unsigned-byte #-64-bit 29 #+64-bit 31) hash))
+                  (type (unsigned-byte #.+max-hash-table-bits+) hash))
          (when (zerop index)
            (setq index (grow-hash-table hash-table))
            ;; Growing the table can not make the key become found when it was not

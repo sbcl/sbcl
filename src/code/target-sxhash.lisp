@@ -18,6 +18,8 @@
 ;;; when we descend into a compound object or when we step through elements of
 ;;; a compound object.
 (defconstant +max-hash-depthoid+ 4)
+
+(defconstant +max-hash-table-bits+ #-64-bit 29 #+64-bit 31)
 
 ;;; This is an out-of-line callable entrypoint that the compiler can
 ;;; transform SXHASH into when hashing a non-simple string.
