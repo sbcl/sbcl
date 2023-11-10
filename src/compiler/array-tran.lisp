@@ -1686,6 +1686,23 @@
                           (lvar-value dimension)
                           'dimension)
                index))
+
+(defun check-bound-empty-p (bound index)
+  (let* ((bound-type (lvar-type bound))
+         (bound-type
+           (specifier-type `(integer 0
+                                     (,(cond ((constant-lvar-p bound)
+                                              (lvar-value bound))
+                                             ((and (integer-type-p bound-type)
+                                                   (nth-value 1 (integer-type-numeric-bounds bound-type))))
+                                             (array-dimension-limit))))))
+         (index-type (lvar-type index)))
+    (eq (type-intersection bound-type index-type)
+        *empty-type*)))
+
+(defoptimizer (%check-bound derive-type) ((array bound index))
+  (when (check-bound-empty-p bound index)
+    *empty-type*))
 
 ;;;; WITH-ARRAY-DATA
 

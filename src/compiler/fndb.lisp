@@ -1957,7 +1957,9 @@
   (movable foldable flushable no-verify-arg-count))
 (defknown %negate (number) number
   (movable foldable flushable no-verify-arg-count))
-(defknown (%check-bound check-bound) (array index t) index
+(defknown check-bound (array index t) index
+  (dx-safe))
+(defknown %check-bound (array index t) (values)
   (dx-safe))
 (defknown data-vector-ref (simple-array index) t
   (foldable flushable always-translatable))

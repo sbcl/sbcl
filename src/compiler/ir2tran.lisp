@@ -574,21 +574,11 @@
                                (ir2-lvar-locs 2lvar)))))))
 
 (defoptimizer (%check-bound ir2-hook) ((array bound index) node)
-  (let* ((bound-type (lvar-type bound))
-         (bound-type
-           (specifier-type `(integer 0
-                                     (,(cond ((constant-lvar-p bound)
-                                              (lvar-value bound))
-                                             ((and (integer-type-p bound-type)
-                                                   (nth-value 1 (integer-type-numeric-bounds bound-type))))
-                                             (array-dimension-limit))))))
-         (index-type (lvar-type index)))
-    (when (eq (type-intersection bound-type index-type)
-              *empty-type*)
-      (let ((*compiler-error-context* node))
-        (compiler-warn "Derived type ~s is not a suitable index for ~s."
-                       (type-specifier index-type)
-                       (type-specifier (lvar-type array)))))))
+  (when (check-bound-empty-p bound index)
+    (let ((*compiler-error-context* node))
+      (compiler-warn "Derived type ~s is not a suitable index for ~s."
+                     (type-specifier (lvar-type index))
+                     (type-specifier (lvar-type array))))))
 
 ;;;; template conversion
 

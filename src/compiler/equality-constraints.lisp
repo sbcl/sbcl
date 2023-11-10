@@ -524,7 +524,8 @@
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t) * :node node)
   (if (eq (combination-info node) 'array-in-bounds-p)
       ;; It's in bounds but it may be of the wrong type
-      `(the (and fixnum unsigned-byte) index)
+      `(progn (the (and fixnum unsigned-byte) index)
+              (values))
       (give-up-ir1-transform)))
 
 (defoptimizer (vector-length equality-constraint) ((vector) node gen)
