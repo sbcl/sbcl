@@ -82,6 +82,8 @@
   (find id (cdr spacemap) :key #'space-id))
 (defun compute-nil-object (spacemap)
   (let ((space (get-space static-core-space-id spacemap)))
+    ;; TODO: The core should store its address of NIL in the initial function entry
+    ;; so this kludge can be removed.
     (%make-lisp-obj (logior (space-addr space) #x117)))) ; SUPER KLUDGE
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
@@ -1611,11 +1613,11 @@
      (loop
        (let ((,id-var (%vector-raw-bits ,buffer ,ptr-var))
              (,len-var (%vector-raw-bits ,buffer (1+ ,ptr-var))))
-         (format t "~&entry type ~D @ ~d len ~d words~%" id ptr len)
+         ;; (format t "~&entry type ~D @ ~d len ~d words~%" id ptr len)
          (incf ,ptr-var 2)
          (decf ,len-var 2)
          (when (= ,id-var end-core-entry-type-code)
-           (assert (not (find 0 ,buffer :start (ash ,ptr-var word-shift) :test #'/=)))
+           (aver (not (find 0 ,buffer :start (ash ,ptr-var word-shift) :test #'/=)))
            (return ,ptr-var))
          ,@body
          (incf ,ptr-var ,len-var)))))
@@ -1928,11 +1930,9 @@
                       (unless (plusp (decf remaining n)) (return))))
               (aver (zerop remaining)))))))))
 
-;; FIXME: choose this by the target lisp's *FEATURES*, not the hosts's
-(defconstant +bitmap-bits-per-page+
-  #+mark-region-gc (/ gencgc-page-bytes (* cons-size n-word-bytes))
-  #-mark-region-gc 0)
-(defconstant +bitmap-bytes-per-page+ (/ +bitmap-bits-per-page+ n-byte-bits))
+;; These will get set to 0 if the target is not using mark-region-gc
+(defglobal *bitmap-bits-per-page* (/ gencgc-page-bytes (* cons-size n-word-bytes)))
+(defglobal *bitmap-bytes-per-page* (/ *bitmap-bits-per-page* n-byte-bits))
 
 (defstruct page
   words-used
@@ -1946,9 +1946,9 @@
   (let ((table (make-array n-ptes)))
     (file-position stream (* (1+ data-page) sb-c:+backend-page-bytes+))
     (dotimes (i n-ptes)
-      (let* ((bitmap (make-array +bitmap-bits-per-page+ :element-type 'bit))
-             (temp (make-array +bitmap-bytes-per-page+ :element-type '(unsigned-byte 8))))
-        (when (plusp +bitmap-bits-per-page+)
+      (let* ((bitmap (make-array *bitmap-bits-per-page* :element-type 'bit))
+             (temp (make-array *bitmap-bytes-per-page* :element-type '(unsigned-byte 8))))
+        (when (plusp *bitmap-bits-per-page*)
           (read-sequence temp stream))
         (dotimes (i (/ (length bitmap) n-word-bits))
           (setf (%vector-raw-bits bitmap i) (%vector-raw-bits temp i)))
@@ -2034,8 +2034,8 @@
                              (let* ((obj (reconstitute-object (%make-lisp-obj (sap-int paddr))))
                                     (widetag (logand (sap-ref-word paddr 0) widetag-mask))
                                     (size (primitive-object-size obj)))
-                               (assert (or (= widetag code-header-widetag)
-                                           (= widetag funcallable-instance-widetag)))
+                               (aver (or (= widetag code-header-widetag)
+                                         (= widetag funcallable-instance-widetag)))
                                (when (= widetag funcallable-instance-widetag)
                                  (setf (caar page-ranges) t)) ; T = has funcallable-instance
                                (funcall function obj vaddr size :ignore)
@@ -2060,7 +2060,7 @@
              #+nil (format t "~&Page ~4D : ~A~%" first-page (decode-page-type (page-type pte)))
              (when (or (null page-type) (eq page-type (decode-page-type (page-type pte))))
                (do ((object-offset-in-dualwords 0))
-                   ((>= object-offset-in-dualwords +bitmap-bits-per-page+))
+                   ((>= object-offset-in-dualwords *bitmap-bits-per-page*))
                  (let ((size
                         (cond ((zerop (sbit bitmap object-offset-in-dualwords))
                                (unless (and (zerop (sap-ref-word paddr 0))
@@ -2077,6 +2077,42 @@
                          paddr (sap+ paddr size))
                    (incf object-offset-in-dualwords (ash size (- (1+ word-shift)))))))))
       (incf first-page))))
+
+;;; Unfortunately the idea of using target features to decide whether to
+;;; read a bitmap from PAGE_TABLE_CORE_ENTRY_TYPE_CODE falls flat,
+;;; because we can't scan for symbols until the core is read, but we can't
+;;; read the core until we decide whether there is a bitmap, which needs the
+;;; feature symbols. Some possible solutions (and there are others too):
+;;; 1) make a separate core entry for the bitmap
+;;; 2) add a word to that core entry indicating that it has a bitmap
+;;; 3) make a different entry type code for PTES_WITH_BITMAP
+(defun detect-target-features (spacemap &aux result)
+  (flet ((scan (symbol)
+           (let ((list (symbol-global-value symbol))
+                 (target-nil (compute-nil-object spacemap)))
+             (loop
+               (when (eq list target-nil) (return))
+               (setq list (translate list spacemap))
+               (let ((feature (translate (car list) spacemap)))
+                 (aver (symbolp feature))
+                 ;; convert keywords and only keywords into host keywords
+                 (when (eq (symbol-package-id feature) (symbol-package-id :sbcl))
+                   (let ((string (translate (symbol-name feature) spacemap)))
+                     (push (intern string "KEYWORD") result))))
+               (setq list (cdr list))))))
+    (walk-dynamic-space
+     nil
+     spacemap
+     (lambda (obj vaddr size large)
+       (declare (ignore vaddr size large))
+       (when (symbolp obj)
+         (when (or (and (eq (symbol-package-id obj) #.(symbol-package-id 'sb-impl:+internal-features+))
+                        (string= (symbol-name obj) "+INTERNAL-FEATURES+"))
+                   (and (eq (symbol-package-id obj) #.(symbol-package-id '*features*))
+                        (string= (symbol-name obj) "*FEATURES*")))
+           (scan obj))))))
+  ;;(format t "~&Target-features=~S~%" result)
+  result)
 
 (defun transport-dynamic-space-code (codeblobs spacemap new-space free-ptr)
   (do ((list codeblobs (cdr list))
@@ -2238,7 +2274,7 @@
                      (format t "~&Cleared large-object pages @ ~x~%" (sap-int vaddr))
                      (loop for p from page-index to (calc-page-index (sap+ vaddr (1- size)) space)
                            do (let ((pte (svref (space-page-table space) p)))
-                                (assert (not (find 1 (page-bitmap pte))))
+                                (aver (not (find 1 (page-bitmap pte))))
                                 (reset-pte pte))))
                     ((not (find 1 (page-bitmap pte)))
                      ;; is the #+gencgc logic above actually more efficient?
@@ -2296,7 +2332,7 @@
         (declare (ignore paddr))
         (let ((npages (ceiling nwords +lispwords-per-corefile-page+)))
           (when (= id dynamic-core-space-id)
-            (assert (= npages n-ptes)))
+            (aver (= npages n-ptes)))
           (dolist (word (list id nwords page-count vaddr npages))
             (setf (%vector-raw-bits core-header (incf offset)) word))
           (incf page-count npages))))
@@ -2305,7 +2341,7 @@
       (dolist (word (list  page-table-core-entry-type-code
                            6 ; = number of words in this core header entry
                            card-mask-nbits
-                           n-ptes (+ (* n-ptes +bitmap-bytes-per-page+) pte-bytes)
+                           n-ptes (+ (* n-ptes *bitmap-bytes-per-page*) pte-bytes)
                            page-count))
         (setf (%vector-raw-bits core-header (incf offset)) word)))
     (dolist (word (list initial-fun-core-entry-type-code 3 initfun
@@ -2316,13 +2352,13 @@
     (dolist (dir-entry directory)
       (destructuring-bind (page id paddr vaddr nwords) dir-entry
         (declare (ignore id vaddr))
-        (assert (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page))))
+        (aver (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page))))
         (let* ((npages (ceiling nwords +lispwords-per-corefile-page+))
                (nbytes (* npages sb-c:+backend-page-bytes+))
                (wrote
                 (sb-unix:unix-write (sb-impl::fd-stream-fd output) paddr 0 nbytes)))
-          (assert (= wrote nbytes)))))
-    (assert (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page-count))))
+          (aver (= wrote nbytes)))))
+    (aver (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page-count))))
     #+mark-region-gc ; write the bitmap
     (dovector (pte (space-page-table dynamic-space))
       (let ((bitmap (page-bitmap pte)))
@@ -2340,13 +2376,14 @@
     (force-output output)))
 
 (defun move-dynamic-code-to-text-space (input-pathname output-pathname)
-  #+immobile-space (error "Can't relocate code to text space since text space already exists")
   ;; Remove old files
   (ignore-errors (delete-file output-pathname))
   ;; Ensure that all files can be opened
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (output output-pathname :direction :output
                                             :element-type '(unsigned-byte 8) :if-exists :supersede)
+      ;; KLUDGE: see comment above DETECT-TARGET-FEATURES
+      #+gencgc (setq *bitmap-bits-per-page* 0 *bitmap-bits-per-page* 0)
       (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
                  (core-offset (read-core-header input core-header t))
                  ((npages space-list card-mask-nbits core-dir-start initfun)
@@ -2354,6 +2391,7 @@
         ;; Map the core file to memory
         (with-mapped-core (sap core-offset npages input)
           (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
+                 (target-features (detect-target-features spacemap))
                  (codeblobs nil)
                  (fwdmap (make-hash-table))
                  (n-objects)
@@ -2369,6 +2407,8 @@
                        ;; new object will be at FREEPTR bytes from new space start
                        (setf (gethash (sap-int vaddr) fwdmap) freeptr)
                        (incf freeptr size))))))
+            (when (member :immobile-space target-features)
+              (error "Can't relocate code to text space since text space already exists"))
             (setq codeblobs (nreverse codeblobs)
                   n-objects (length codeblobs))
             ;; Preceding the code objects is a vector of uint32_t indicating the
@@ -2441,6 +2481,7 @@
                 (rewrite-core spaces spacemap card-mask-nbits initfun
                               core-header core-dir-start output)
                 ))))))))
+(export 'move-dynamic-code-to-text-space)
 ;;;;
 
 (defun cl-user::elfinate (&optional (args (cdr *posix-argv*)))
