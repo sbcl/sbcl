@@ -159,8 +159,8 @@
     (if (and (combination-p dest)
              (eq (basic-combination-kind dest) :local))
         (let* ((fun (combination-lambda dest))
-               (n (position lvar
-                            (combination-args dest)))
+               (n (position-or-lose lvar
+                                    (combination-args dest)))
                (var (nth n (lambda-vars fun)))
                (refs (leaf-refs var)))
           (when (and refs
