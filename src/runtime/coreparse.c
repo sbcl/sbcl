@@ -620,9 +620,9 @@ static void relocate_heap(struct heap_adjust* adj)
 #endif
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(),
                    adj);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // FIXME: This fixes pointers in the space but I think it won't work
+    // if the space itself fails to map where requested.
     relocate_space(TEXT_SPACE_START, text_space_highwatermark, adj);
-#endif
 }
 
 #if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_SPACE)

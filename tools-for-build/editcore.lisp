@@ -2028,18 +2028,20 @@
         (do ((vaddr (int-sap start-vaddr))
              (paddr (int-sap (translate-ptr start-vaddr spacemap))))
             ((>= (sap-int vaddr) end-vaddr))
-          (let ((size (cond ((zerop (sap-ref-word paddr 0))
-                             (* 2 n-word-bytes))
-                            (t
-                             (let* ((obj (reconstitute-object (%make-lisp-obj (sap-int paddr))))
-                                    (widetag (logand (sap-ref-word paddr 0) widetag-mask))
-                                    (size (primitive-object-size obj)))
+          (let* ((word (sap-ref-word paddr 0))
+                 (widetag (logand word widetag-mask))
+                 (size (if (eq widetag filler-widetag)
+                           (ash (ash word -32) word-shift) ; -> words -> bytes
+                           (let* ((obj (reconstitute-object (%make-lisp-obj (sap-int paddr))))
+                                  (size (primitive-object-size obj)))
+                             ;; page types codes are never defined for Lisp
+                             (when (eq page-type 7) ; KLUDGE: PAGE_TYPE_CODE
                                (aver (or (= widetag code-header-widetag)
-                                         (= widetag funcallable-instance-widetag)))
-                               (when (= widetag funcallable-instance-widetag)
-                                 (setf (caar page-ranges) t)) ; T = has funcallable-instance
-                               (funcall function obj vaddr size :ignore)
-                               size)))))
+                                         (= widetag funcallable-instance-widetag))))
+                             (when (= widetag funcallable-instance-widetag)
+                               (setf (caar page-ranges) t)) ; T = has funcallable-instance
+                             (funcall function obj vaddr size :ignore)
+                             size))))
             (setq vaddr (sap+ vaddr size)
                   paddr (sap+ paddr size)))))
       (setq first-page (1+ last-page)))
@@ -2245,7 +2247,7 @@
         #+gencgc
         (dolist (range page-ranges (aver (null codeblobs)))
           (destructuring-bind (in-use first last) range
-            (format t "~&Working on range ~D..~D~%" first last)
+            ;;(format t "~&Working on range ~D..~D~%" first last)
             (loop while codeblobs
                   do (destructuring-bind (vaddr . size) (car codeblobs)
                        (let ((page (calc-page-index vaddr space)))
@@ -2383,7 +2385,7 @@
     (with-open-file (output output-pathname :direction :output
                                             :element-type '(unsigned-byte 8) :if-exists :supersede)
       ;; KLUDGE: see comment above DETECT-TARGET-FEATURES
-      #+gencgc (setq *bitmap-bits-per-page* 0 *bitmap-bits-per-page* 0)
+      #+gencgc (setq *bitmap-bits-per-page* 0 *bitmap-bytes-per-page* 0)
       (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
                  (core-offset (read-core-header input core-header t))
                  ((npages space-list card-mask-nbits core-dir-start initfun)
@@ -2407,6 +2409,9 @@
                        ;; new object will be at FREEPTR bytes from new space start
                        (setf (gethash (sap-int vaddr) fwdmap) freeptr)
                        (incf freeptr size))))))
+            ;; FIXME: this _still_ doesn't work, because if the buid has :IMMOBILE-SPACE
+            ;; then the symbols CL:*FEATURES* and SB-IMPL:+INTERNAL-FEATURES+
+            ;; are not in dynamic space.
             (when (member :immobile-space target-features)
               (error "Can't relocate code to text space since text space already exists"))
             (setq codeblobs (nreverse codeblobs)

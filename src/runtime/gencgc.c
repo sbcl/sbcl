@@ -4661,6 +4661,10 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
     // of the OR condition. As is, we scavenge "too much" of newspace which
     // is not an issue of correctness but rather efficiency.
     if (header_rememberedp(header) || (my_gen == new_space) ||
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+        // if NO immobile-space, then text space is equivalent to static space
+        ((uword_t)object >= TEXT_SPACE_START && object < text_space_highwatermark) ||
+#endif
         ((uword_t)object >= STATIC_SPACE_START && object < static_space_free_pointer)) {
         // FIXME: We sometimes scavenge protected pages.
         // This assertion fails, but things work nonetheless.

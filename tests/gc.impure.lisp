@@ -156,8 +156,13 @@
   ;; GENERATION-OF broke when fdefns stopped storing a generation in word 0.
   ;; Normally we expect to see SB-VM:+PSEUDO-STATIC-GENERATION+
   ;; but allow for varied definition of CORE_PAGE_GENERATION.
-  (assert (= (sb-kernel:generation-of (sb-int:find-fdefn '(setf car)))
-             (sb-kernel:generation-of #'car))))
+  ;;
+  ;; Note that if (SB-EDITCORE:MOVE-DYNAMIC-CODE-TO-TEXT-SPACE) has been performed
+  ;; on this core, then #'CAR has no generation because it is essentially static.
+  ;; So we can't really assert anything in that case.
+  (when (numberp (sb-kernel:generation-of #'car))
+    (assert (= (sb-kernel:generation-of (sb-int:find-fdefn '(setf car)))
+               (sb-kernel:generation-of #'car)))))
 
 (with-test (:name :static-fdefn-space)
   (sb-int:dovector (name sb-vm:+static-fdefns+)

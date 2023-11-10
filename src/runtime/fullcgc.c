@@ -272,6 +272,15 @@ void prepare_for_full_mark_phase()
     fullcgcmarks = (void*)os_allocate(markbits_size);
 }
 
+void scav_static_range(lispobj* where, lispobj* end)
+{
+    while (where < end) {
+        lispobj obj = compute_lispobj(where);
+        gc_enqueue(obj);
+        where += listp(obj) ? 2 : headerobj_size(where);
+    }
+}
+
 void execute_full_mark_phase()
 {
 #ifdef HAVE_GETRUSAGE
@@ -279,13 +288,11 @@ void execute_full_mark_phase()
     getrusage(RUSAGE_SELF, &before);
 #endif
     trace_object((lispobj*)NIL_SYMBOL_SLOTS_START);
-    lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
-    lispobj* end = static_space_free_pointer;
-    while (where < end) {
-        lispobj obj = compute_lispobj(where);
-        gc_enqueue(obj);
-        where += listp(obj) ? 2 : headerobj_size(where);
-    }
+    scav_static_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+    // if NO immobile-space, then text space is equivalent to static space
+    scav_static_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
+#endif
     gc_mark_obj(lisp_package_vector);
     gc_mark_obj(lisp_init_function);
     gc_mark_obj(alloc_profile_data);
