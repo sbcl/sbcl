@@ -66,7 +66,7 @@
                                 gethash-impl
                                 puthash-impl
                                 remhash-impl
-                                clrhash-impl
+                                hash-fun-state
                                 test
                                 test-fun
                                 hash-fun
@@ -77,10 +77,11 @@
                                 next-vector
                                 hash-vector)))
 
-  (gethash-impl #'error :type (sfunction * (values t boolean)) :read-only t)
-  (puthash-impl #'error :type (sfunction * t) :read-only t)
-  (remhash-impl #'error :type (sfunction * t) :read-only t)
-  (clrhash-impl #'error :type (sfunction * t) :read-only t)
+  (gethash-impl #'error :type (sfunction * (values t boolean)))
+  (puthash-impl #'error :type (sfunction * t))
+  (remhash-impl #'error :type (sfunction * t))
+  ;; +HFT-FLAT+ if FLAT-HASH-TABLE-P, +HFT-NORMAL+ otherwise.
+  (hash-fun-state 0 :type fixnum)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
@@ -134,7 +135,7 @@
   ;; The function used to compute the hashing of a key. Returns two
   ;; values: the index hashing and T if that might change with the
   ;; next GC.
-  (hash-fun nil :type function :read-only t)
+  (hash-fun nil :type function)
 
   ;; The type of hash table this is. Part of the exported interface,
   ;; as well as needed for the MAKE-LOAD-FORM and PRINT-OBJECT methods.
@@ -180,7 +181,7 @@
                                 gethash-impl
                                 puthash-impl
                                 remhash-impl
-                                clrhash-impl
+                                hash-fun-state
                                 test
                                 test-fun
                                 hash-fun
@@ -224,16 +225,25 @@
 (sb-xc:defmacro pack-ht-flags-kind (x) `(ash ,x 4))
 (defmacro ht-flags-kind (flags) `(ldb (byte 2 4) ,flags))
 
-(defconstant default-rehash-size 1.5)
-;; Don't raise this number to 8 - if you do it'll increase the memory
-;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
-;; padding slots.  This is a "perfect" minimal size.
-(defconstant +min-hash-table-size+ 7)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant default-rehash-size 1.5)
+  ;; Don't raise this number to 8 - if you do it'll increase the memory
+  ;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
+  ;; padding slots.  This is a "perfect" minimal size.
+  (defconstant +min-hash-table-size+ 7)
+  ;; Possible HASH-TABLE-HASH-FUN-STATEs.
+  (defconstant +hft-flat+ -1)
+  (defconstant +hft-normal+ 0))
 
 (sb-xc:defmacro make-system-hash-table (&key test synchronized weakness)
   (multiple-value-bind (kind args)
-      (cond ((equal test '(quote eq))  (values 0 '('eq  #'eq  #'eq-hash)))
-            ((equal test '(quote eql)) (values 1 '('eql #'eql #'eql-hash)))
+      ;; Currently, all calls to MAKE-SYSTEM-HASH-TABLE are with
+      ;; :WEAKNESS, so we need not bother with flat hash tables
+      ;; because they are not implemented for weak hash tables.
+      (cond ((equal test '(quote eq))
+             (values 0 '('eq  #'eq  #'eq-hash)))
+            ((equal test '(quote eql))
+             (values 1 '('eql #'eql #'eql-hash)))
             (t
              (bug "Incomplete implementation of MAKE-SYSTEM-HASH-TABLE")
              0))
@@ -248,6 +258,7 @@
       ;; MAKE-SYSTEM-HASH-TABLE before the constants are known to make-host-2, as happens
       ;; when compiling type-class. hash-table.lisp can't be moved earlier in build-order
       ;; (without pain) so the expanded code can't use the values.
+      ,+hft-normal+
       ,+min-hash-table-size+
       ,default-rehash-size
       1.0)))

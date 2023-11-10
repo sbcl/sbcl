@@ -30,9 +30,6 @@
           (with-array-data ((string x) (start) (end) :check-fill-pointer t)
             (values string start end))
           (values x 0 (length x)))
-    ;; I'm not sure I believe the comment about FLET TRICK being needed.
-    ;; The generated code seems tight enough, and the comment is, after all,
-    ;; >14 years old.
     (%sxhash-simple-substring string start end)))
 
 ;;;; the SXHASH function

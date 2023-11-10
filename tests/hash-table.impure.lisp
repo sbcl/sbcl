@@ -38,12 +38,14 @@
 (with-test (:name (hash-table :eql-hash-symbol-not-eq-based))
   ;; If you ask for #'EQ as the test, then everything is address-sensitive,
   ;; though this is not technically a requirement.
-  (let ((ht (make-hash-table :test 'eq)))
+  (let ((ht (make-hash-table :test 'eq :size 128)))
+    (assert (not (sb-impl::flat-hash-table-p ht)))
     (setf (gethash (make-symbol "GOO") ht) 1)
     (assert (is-address-sensitive ht)))
   ;; EQUAL tables don't use SYMBOL-HASH
   (dolist (test '(eql equalp))
-    (let ((ht (make-hash-table :test test)))
+    (let ((ht (make-hash-table :test test :size 128)))
+      (assert (not (sb-impl::flat-hash-table-p ht)))
       (setf (gethash (make-symbol "GOO") ht) 1)
       (assert (not (is-address-sensitive ht))))))
 
@@ -51,12 +53,14 @@
 
 (with-test (:name (hash-table :equal-hash-std-object-not-eq-based))
   (dolist (test '(eq eql))
-    (let ((ht (make-hash-table :test test)))
+    (let ((ht (make-hash-table :test test :size 128)))
+      (assert (not (sb-impl::flat-hash-table-p ht)))
       (setf (gethash (make-instance 'ship) ht) 1)
       (assert (is-address-sensitive ht))))
   ;; EQUAL tables don't use INSTANCES-SXHASH
   (dolist (test '(equalp))
-    (let ((ht (make-hash-table :test test)))
+    (let ((ht (make-hash-table :test test :size 128)))
+      (assert (not (sb-impl::flat-hash-table-p ht)))
       (setf (gethash (make-instance 'ship) ht) 1)
       (assert (not (is-address-sensitive ht))))))
 
@@ -83,7 +87,9 @@
             :skipped-on (or :mark-region-gc :gc-stress))
   (let ((h (make-hash-table :weakness :key)))
     (setq *gc-after-rehash-me* h)
-    (dotimes (i 50) (setf (gethash (list (gensym)) h) i))
+    (dotimes (i 50)
+      (setf (gethash (list (gensym)) h) i)
+      (assert (is-address-sensitive h)))
     (setf (gethash (cons 1 2) h) 'foolz))
   (assert (>= *rehash+gc-count* 10)))
 

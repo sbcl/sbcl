@@ -12,8 +12,16 @@
  (compile nil
           '(lambda (fn tbl)
              (multiple-value-bind (new-size new-n-buckets) (funcall fn tbl)
-               (values new-size (ash new-n-buckets
-                                     (if (eq tbl *table-under-test*) -1 0)))))))
+               (values new-size
+                       (ash new-n-buckets
+                            (if (and (eq tbl *table-under-test*)
+                                     ;; Not for flat tables though
+                                     ;; because they use the number of
+                                     ;; buckets as their size. See
+                                     ;; SB-IMPL::GROW-HASH-TABLE.
+                                     (not (sb-impl::flat-hash-table-p tbl)))
+                                -1
+                                0)))))))
 
 ;;; Keep moving everything that can move during each GC
 #+generational (setf (generation-number-of-gcs-before-promotion 0) 1000000)
@@ -147,7 +155,8 @@
                       (let* ((i (random 100))
                              (x (gethash (aref keys i) table)))
                         (atomic-incf (aref actions n))
-                        (when (zerop (random 100 random-state))
+                        (when (and (zerop (random 100 random-state))
+                                   (not (sb-impl::flat-hash-table-p table)))
                           (let* ((kvv (sb-impl::hash-table-pairs table))
                                  (epoch (svref kvv 1)))
                             ;; Randomly force a rehash (as if by GC) so that we get "invalid" rehashes,

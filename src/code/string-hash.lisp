@@ -64,6 +64,9 @@
   ;; KLUDGE: this FLET is a workaround (suggested by APD) for presence
   ;; of let conversion in the cross compiler, which otherwise causes
   ;; strongly suboptimal register allocation.
+  ;; I'm not sure I believe the comment about FLET TRICK being needed.
+  ;; The generated code seems tight enough, and the comment is, after all,
+  ;; >14 years old. -- DK, 2018-11-29
   (flet ((trick (x)
            (%sxhash-simple-substring x 0 (length x))))
     (declare (notinline trick))

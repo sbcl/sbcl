@@ -1172,8 +1172,10 @@
   (flushable)) ; not FOLDABLE, since hash table contents can change
 (defknown sb-impl::gethash3 (t hash-table t) (values t boolean)
   (flushable no-verify-arg-count)) ; not FOLDABLE, since hash table contents can change
-(defknown (sb-impl::gethash/eq
-           sb-impl::gethash/eql
+(defknown (sb-impl::gethash/eq-hash/flat
+           sb-impl::gethash/eq-hash/default
+           sb-impl::gethash/eql-hash/flat
+           sb-impl::gethash/eql-hash
            sb-impl::gethash/equal
            sb-impl::gethash/equalp
            sb-impl::gethash/any)
@@ -1184,16 +1186,20 @@
 (defknown %puthash (t (modifying hash-table) t) t
   (no-verify-arg-count)
   :derive-type #'result-type-last-arg)
-(defknown (sb-impl::puthash/eq
-           sb-impl::puthash/eql
+(defknown (sb-impl::puthash/eq-hash/flat
+           sb-impl::puthash/eq-hash/default
+           sb-impl::puthash/eql-hash/flat
+           sb-impl::puthash/eql-hash
            sb-impl::puthash/equal
            sb-impl::puthash/equalp
            sb-impl::puthash/any)
     (t t t) t
     (no-verify-arg-count))
 (defknown remhash (t (modifying hash-table)) boolean ())
-(defknown (sb-impl::remhash/eq
-           sb-impl::remhash/eql
+(defknown (sb-impl::remhash/eq-hash/flat
+           sb-impl::remhash/eq-hash/default
+           sb-impl::remhash/eql-hash/flat
+           sb-impl::remhash/eql-hash
            sb-impl::remhash/equal
            sb-impl::remhash/equalp
            sb-impl::remhash/any)

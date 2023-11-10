@@ -846,7 +846,7 @@ line break."
                               (key (car object)))
                           (if (functionp mapping)
                               (funcall mapping key)
-                              (sb-impl::gethash/eql key mapping nil))))))
+                              (sb-impl::gethash/eql-hash key mapping nil))))))
               (cond ((not cons-entry)
                      (dovector (entry (pp-dispatch-entries table) nil)
                        (when (funcall (pprint-dispatch-entry-test-fn

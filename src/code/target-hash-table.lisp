@@ -87,6 +87,28 @@
                 (ash hash -20))))
 
 
+;;;; Generic adaptive hashing machinery
+
+(declaim (ftype (sfunction (t t t)
+                           (values (sfunction * (values t boolean))
+                                   (sfunction * t)
+                                   (sfunction * t)))
+                pick-table-methods))
+
+(defun set-hash-fun (table hash-fun hash-fun-state)
+  (declare (type fixnum hash-fun-state)
+           (optimize speed (safety 0)))
+  (setf (hash-table-hash-fun table) hash-fun)
+  (setf (hash-table-hash-fun-state table) hash-fun-state)
+  (setf (values (hash-table-gethash-impl table)
+                (hash-table-puthash-impl table)
+                (hash-table-remhash-impl table))
+        (let ((flags (hash-table-flags table)))
+          (pick-table-methods (logtest flags hash-table-synchronized-flag)
+                              (hash-table-test table) hash-fun-state)))
+  t)
+
+
 ;;; EQ hash functions
 
 ;;; Define an inline function called NAME, which takes a single KEY
@@ -140,8 +162,28 @@
      (ash address #.(- (+ 20 sb-vm:n-fixnum-tag-bits)))))
 
 
+;;; EQL, EQUAL and EQUALP hash functions
+
 (declaim (ftype (sfunction (t) (values fixnum boolean))
                 eql-hash equal-hash equalp-hash))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant-eqx +numeric-widetags+
+      (list sb-vm:bignum-widetag sb-vm:ratio-widetag
+            sb-vm:double-float-widetag sb-vm:single-float-widetag
+            sb-vm:complex-rational-widetag
+            sb-vm:complex-single-float-widetag
+            sb-vm:complex-double-float-widetag)
+    #'equal))
+
+(defmacro eql-hash-defer-to-eq-hash-p (key)
+  `(not (%other-pointer-subtype-p
+         ,key
+         ;; SYMBOLs are deferred to EQ-HASH so that they can be hashed
+         ;; address-insensitively. We have to pick off a bunch of
+         ;; OTHER-POINTER objects anyway, so there no overhead to
+         ;; extending the widetag range by 1 widetag.
+         '(,@+numeric-widetags+ ,sb-vm:symbol-widetag))))
 
 ;;; Note: We could somewhat easily add SAP-WIDETAG into the list of types
 ;;; that get a stable hash for EQL tables (via SAP-HASH), however:
@@ -152,16 +194,7 @@
 (declaim (inline eql-hash))
 (defun eql-hash (key)
   (declare (values fixnum boolean))
-  (if (%other-pointer-subtype-p
-       key
-       ;; SYMBOL is listed here so that we can hash symbols address-insensitively.
-       ;; We have to pick off a bunch of OTHER-POINTER objects anyway, so there
-       ;; no overhead to extending the widetag range by 1 widetag.
-       '#.(list sb-vm:bignum-widetag sb-vm:ratio-widetag sb-vm:double-float-widetag
-                sb-vm:single-float-widetag
-                sb-vm:complex-rational-widetag sb-vm:complex-single-float-widetag
-                sb-vm:complex-double-float-widetag
-                sb-vm:symbol-widetag))
+  (if (not (eql-hash-defer-to-eq-hash-p key))
       ;; NON-NULL-SYMBOL-P skips a test for NIL which is sensible, and we're
       ;; excluding NIL anyway because it's not an OTHER-POINTER.
       ;; To produce the best code for NON-NULL-SYMBOL-P (omitting a lowtag test)
@@ -202,12 +235,6 @@
                       (logbitp bit ,(ldb (byte 32 0) mask))
                       (logbitp (- bit 32) ,(ash mask -32)))))))
 
-;;; As a consequence of change 3bdd4d28ed, the compiler started to emit multiple
-;;; definitions of certain INLINE global functions.
-;;; Genesis is so fraught with other pitfalls and traps that I want no chance
-;;; of seeing duplicate definitions.  So no INLINE here. Tail wagging the dog?
-;;; Perhaps, but that was an dangerous thing to sneakily allow.
-;; (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values fixnum boolean))
   ;; Ultimately we just need to choose between SXHASH or EQ-HASH. As to using
@@ -339,6 +366,15 @@ Examples:
 ;;; be evaluable in the host.
 (defconstant +min-hash-table-rehash-threshold+ #.(sb-xc:float 1/16 1.0))
 
+;;; The number of buckets up until which we use a low-overhead, flat
+;;; hash table for EQ and EQL hash tables.
+(defconstant +flat-limit/eq+ 32)
+;;; EQL is more costly than EQ, so this limit is lower. This is
+;;; somewhat conservative because although e.g. flat GETHASH is a lot
+;;; slower above size 16 on BIGNUMs, operations with keys for which
+;;; EQL-IMPLIES-EQ-P are still a win up to +FLAT-LIMIT/EQ+.
+(defconstant +flat-limit/eql+ 16)
+
 ;; The GC will set this to 1 if it moves an address-sensitive key. This used
 ;; to be signaled by a bit in the header of the kv vector, but that
 ;; implementation caused some concurrency issues when we stopped
@@ -419,7 +455,7 @@ Examples:
 ;;; Maybe I can figure out how to make concurrent weak GETHASH threadsafe,
 ;;; but I've spent a bit of time on it and it is quite difficult.
 
-(declaim (ftype (sfunction (t t t t t t t) (values hash-table))
+(declaim (ftype (sfunction (t t t t t t t t) (values hash-table))
                 %make-hash-table))
 
 (defun make-hash-table (&key (test 'eql)
@@ -490,44 +526,57 @@ Examples:
     remains in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
-  (multiple-value-bind (kind test test-fun hash-fun)
-      (cond ((or (eq test #'eq) (eq test 'eq))
-             (values 0 'eq #'eq #'eq-hash))
-            ((or (eq test #'eql) (eq test 'eql))
-             (values 1 'eql #'eql #'eql-hash))
-            ((or (eq test #'equal) (eq test 'equal))
-             (values 2 'equal #'equal #'equal-hash))
-            ((or (eq test #'equalp) (eq test 'equalp))
-             (values 3 'equalp #'equalp #'equalp-hash))
-            (t
-             (dolist (info *user-hash-table-tests*
-                      (flet ((proper-name (fun &aux (name (%fun-name fun)))
-                               (if (and (symbolp name) (fboundp name) (eq (symbol-function name) fun))
-                                   name
-                                   fun)))
-                        (if hash-function
-                            (if (functionp test)
-                                (values -1 (proper-name test) test nil)
-                                (values -1 test (%coerce-callable-to-fun test) nil))
-                            (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test))))
-               (destructuring-bind (test-name test-fun hash-fun) info
-                 (when (or (eq test test-name) (eq test test-fun))
-                   (return (values -1 test-name test-fun hash-fun)))))))
-    (when user-hashfun-p
-      ;; It is permitted to specify a custom hash function with any of the standard predicates.
-      ;; This forces use of the generalized table methods.
-      (setf hash-fun (%coerce-callable-to-fun hash-function)
-            kind -1))
-    (let* ((size (max +min-hash-table-size+
-                      ;; Our table sizes are capped by the 32-bit integers used as indices
-                      ;; into the chains. Prevent our code from failing if the user specified
-                      ;; most-positive-fixnum here. (fndb says that size is 'unsigned-byte')
-                      (min size (ash 1 24)))) ; 16M key/value pairs
-           (rehash-size (if (integerp rehash-size)
-                            rehash-size
-                            (float rehash-size 1.0))) ; always single-float
-           (rehash-threshold (max #.+min-hash-table-rehash-threshold+
-                                  (float rehash-threshold 1.0)))) ; always single-float
+  (let* ((size (max +min-hash-table-size+
+                    ;; Our table sizes are capped by the 32-bit
+                    ;; integers used as indices into the chains.
+                    ;; Prevent our code from failing if the user
+                    ;; specified most-positive-fixnum here. (fndb says
+                    ;; that size is 'unsigned-byte')
+                    (min size (ash 1 24)))) ; 16M key/value pairs
+         (rehash-size (if (integerp rehash-size)
+                          rehash-size
+
+                          (float rehash-size 1.0))) ; always single-float
+         (rehash-threshold (max #.+min-hash-table-rehash-threshold+
+                                (float rehash-threshold 1.0))) ; always single-float
+         (hash-fun-state +hft-normal+))
+    (multiple-value-bind (kind test test-fun hash-fun)
+        (cond ((or (eq test #'eq) (eq test 'eq))
+               (values 0 'eq #'eq #'eq-hash))
+              ((or (eq test #'eql) (eq test 'eql))
+               (values 1 'eql #'eql #'eql-hash))
+              ((or (eq test #'equal) (eq test 'equal))
+               (values 2 'equal #'equal #'equal-hash))
+              ((or (eq test #'equalp) (eq test 'equalp))
+               (values 3 'equalp #'equalp #'equalp-hash))
+              (t
+               (dolist (info *user-hash-table-tests*
+                             (flet ((proper-name (fun &aux (name (%fun-name fun)))
+                                      (if (and (symbolp name) (fboundp name) (eq (symbol-function name) fun))
+                                          name
+                                          fun)))
+                               (if hash-function
+                                   (if (functionp test)
+                                       (values -1 (proper-name test) test nil)
+                                       (values -1 test (%coerce-callable-to-fun test) nil))
+                                   (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test))))
+                 (destructuring-bind (test-name test-fun hash-fun) info
+                   (when (or (eq test test-name) (eq test test-fun))
+                     (return (values -1 test-name test-fun hash-fun)))))))
+      (cond (user-hashfun-p
+             ;; It is permitted to specify a custom hash function with
+             ;; any of the standard predicates. This forces use of the
+             ;; generalized table methods.
+             (setq hash-fun (%coerce-callable-to-fun hash-function)
+                   kind -1))
+            ;; There is no flat implementation for weak hash tables
+            ;; yet, and only EQ and EQL are reliably fast enough for
+            ;; it to work well.
+            ((and (not weakness)
+                  (or (and (eql kind 0) (<= size +flat-limit/eq+))
+                      (and (eql kind 1) (<= size +flat-limit/eql+))))
+             (setq hash-fun #'hash/flat
+                   hash-fun-state +hft-flat+)))
       (%make-hash-table
        ;; compute flags. The stored KIND bits don't matter for a user-supplied hash
        ;; and/or test fun, however we don't want to imply that it is an EQ table
@@ -541,7 +590,7 @@ Examples:
                (pack-ht-flags-kind (logand kind 3)) ; kind -1 becomes 3
                (if (or weakness synchronized) hash-table-synchronized-flag 0)
                (if (eql kind -1) hash-table-userfun-flag 0))
-       test test-fun hash-fun
+       test test-fun hash-fun hash-fun-state
        size rehash-size rehash-threshold))))
 
 (defmacro make-index-vector (n)
@@ -558,7 +607,8 @@ Examples:
         (bug "~a: Busted index vector on ~S, pairlen=~d 2*index=~d"
              reason tbl npairs (* 2 indexval))))))
 
-(defun %make-hash-table (flags test test-fun hash-fun size rehash-size rehash-threshold)
+(defun %make-hash-table (flags test test-fun hash-fun hash-fun-state
+                         size rehash-size rehash-threshold)
   (declare (type single-float rehash-threshold))
   (binding* (
            ;; KLUDGE: The most natural way of expressing the below is
@@ -610,10 +660,10 @@ Examples:
             (if weakp
                 (values #'gethash/weak #'puthash/weak #'remhash/weak)
                 (pick-table-methods (logtest flags hash-table-synchronized-flag)
-                                    (if userfunp -1 table-kind))))
+                                    (if userfunp nil test) hash-fun-state)))
            (table
             (funcall (if weakp #'%alloc-general-hash-table #'%alloc-hash-table)
-                               flags getter setter remover #'clrhash-impl
+                               flags getter setter remover hash-fun-state
                                test test-fun hash-fun
                                rehash-size rehash-threshold
                                kv-vector index-vector next-vector hash-vector)))
@@ -638,22 +688,24 @@ Examples:
                                                   sb-vm:vector-weak-flag)))))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
-      table))
+    table))
 
 ;;; a "plain" hash-table has nothing fancy: default size, default growth rate,
 ;;; not weak, not synchronized, not a user-defined hash fun and/or comparator.
 (defun make-hash-table-using-defaults (kind)
-  (declare ((integer 0 3) kind))
-  (let ((test (aref #(eq eql equal equalp) kind)))
-    (declare (optimize (safety 0))) ; skip FBOUNDP checks
-    (let ((test-fun (symbol-function test))
-          (hash-fun (symbol-function
-                     (aref #(eq-hash eql-hash equal-hash equalp-hash) kind))))
-      (%make-hash-table (pack-ht-flags-kind kind)
-                        test test-fun hash-fun
-                        +min-hash-table-size+
-                        #.default-rehash-size
-                        1.0)))) ; rehash threshold
+  (declare ((integer 0 3) kind)
+           (optimize (safety 0)))    ; skip FBOUNDP checks
+  (multiple-value-bind (test test-fun hash-fun hash-fun-state)
+      (case kind
+        ((0) (values 'eq #'eq #'hash/flat +hft-flat+))
+        ((1) (values 'eql #'eql #'hash/flat +hft-flat+))
+        ((2) (values 'equal #'equal #'equal-hash +hft-normal+))
+        ((3) (values 'equalp #'equalp #'equalp-hash +hft-normal+)))
+   (%make-hash-table (pack-ht-flags-kind kind)
+                     test test-fun hash-fun hash-fun-state
+                     +min-hash-table-size+
+                     #.default-rehash-size
+                     1.0))) ; rehash threshold
 
 ;;; We don't expose HASH-TABLE-%COUNT directly because it is SETFable.
 (defun hash-table-count (hash-table)
@@ -692,8 +744,226 @@ Examples:
   (error "Corrupt NEXT-chain in ~A. This is probably caused by ~
 multiple threads accessing the same hash-table without locking."
          hash-table))
-
 
+
+;;;; Flat hash tables (https://zenodo.org/doi/10.5281/zenodo.10991321)
+;;;;
+;;;; For the smallest sizes, EQ and EQL hash tables forego most of the
+;;;; complex machinery and use the kv vector with a simple linear
+;;;; search. This can be seen as a constant hash function with a
+;;;; specialized implementation. For EQUAL, EQUALP and user-defined
+;;;; test functions, we don't use flat tables because the extra calls
+;;;; to them could be very costly.
+;;;;
+;;;; For convenience (e.g. to have MAPHASH work the same way), the
+;;;; layout of the kv vector is almost the same as with normal hash
+;;;; tables:
+;;;;
+;;;; - At index 0, we have the KV-VECTOR-HIGH-WATER-MARK.
+;;;;
+;;;; - At index 1, where KV-VECTOR-REHASH-STAMP normally resides, we
+;;;;   have nothing.
+;;;;
+;;;; - Alternating keys and values follow.
+;;;;
+;;;; - The last element (KV-VECTOR-SUPPLEMENT) is not used.
+;;;;
+;;;; Importantly, no flags are set on the kv vector, so it is just a
+;;;; plain vector as far as the GC is concerned.
+
+(declaim (inline flat-hash-table-p))
+;; For testing
+(export 'flat-hash-table-p)
+(defun flat-hash-table-p (table)
+  (eql (hash-table-hash-fun-state table) +hft-flat+))
+
+;;; This gets installed in HASH-TABLE-HASH-FUN but is never called.
+(defun hash/flat (address)
+  (declare (ignore address))
+  (aver nil))
+
+;;; See if KEY can only be EQL to some other object if they are EQ.
+;;; EQL flat hash tables use this to elide %EQL's type checking within
+;;; the loop. Same as EQL-HASH-DEFER-TO-EQ-HASH-P except that it also
+;;; includes symbols.
+(defmacro eql-implies-eq-p (key)
+  `(not (%other-pointer-subtype-p ,key +numeric-widetags+)))
+
+(defmacro define-gethash/flat (name test &optional use-eq-pred)
+  ;; Maintaining HASH-TABLE-CACHE is not worth it here.
+  `(defun ,name (key table default)
+     (declare (optimize speed (sb-c:verify-arg-count 0)
+                        (sb-c:insert-array-bounds-checks 0)))
+     (let* ((hash-table (truly-the hash-table table))
+            (kv-vector (hash-table-pairs hash-table))
+            (hwm (kv-vector-high-water-mark kv-vector)))
+       (if ,(cond ((eq test 'eq) nil)
+                  (use-eq-pred `(not (,use-eq-pred key)))
+                  (t t))
+           (let ((limit (* hwm 2)))
+             (loop for i upfrom 2 upto limit by 2
+                   when (,test key (aref kv-vector i))
+                     return (values (aref kv-vector (1+ i)) t)
+                   finally (return (values default nil))))
+           ;; For EQ, unroll the loop a tiny bit.
+           (let* ((hwm/2 (ash hwm -1))
+                  (limit (* hwm/2 4))
+                  (i 2))
+             (tagbody
+                (loop while (<= i limit)
+                      do (when (eq key (aref kv-vector i))
+                           (go found))
+                         (incf i 2)
+                         (when (eq key (aref kv-vector i))
+                           (go found))
+                         (incf i 2))
+                (when (and (logtest hwm 1) (eq key (aref kv-vector i)))
+                  (go found))
+                (return-from ,name (values default nil))
+              found
+                (return-from ,name
+                  (values (aref kv-vector (1+ i)) t))))))))
+
+(define-gethash/flat gethash/eq-hash/flat eq)
+(define-gethash/flat gethash/eql-hash/flat %eql eql-implies-eq-p)
+
+(declaim (ftype (sfunction (hash-table)
+                           (values (and index/2 (unsigned-byte 32))))
+                grow-hash-table))
+
+(defmacro define-puthash/flat (name test &optional use-eq-pred)
+  `(defun ,name (key hash-table value)
+     (declare (optimize speed (safety 0))
+              (type hash-table hash-table))
+     (let* ((kv-vector (hash-table-pairs hash-table))
+            (empty-kv-index 0)
+            (hwm (kv-vector-high-water-mark kv-vector))
+            (count (hash-table-%count hash-table)))
+       (declare (type index empty-kv-index))
+       (if (= count hwm)
+           ;; No empty slots below HWM.
+           (if ,(cond ((eq test 'eq) nil)
+                      (use-eq-pred `(not (,use-eq-pred key)))
+                      (t t))
+               (let ((limit (* hwm 2)))
+                 (loop for i upfrom 2 upto limit by 2
+                       do (let ((ht-key (aref kv-vector i)))
+                            (when (,test key ht-key)
+                              (setf (aref kv-vector (1+ i)) value)
+                              (return-from ,name value)))))
+               ;; For EQ, unroll the loop a tiny bit.
+               (let* ((hwm/2 (ash hwm -1))
+                      (limit (* hwm/2 4))
+                      (i 2))
+                 (tagbody
+                    (loop while (<= i limit)
+                          do (when (eq key (aref kv-vector i))
+                               (go found))
+                             (incf i 2)
+                             (when (eq key (aref kv-vector i))
+                               (go found))
+                             (incf i 2))
+                    (when (and (logtest hwm 1) (eq key (aref kv-vector i)))
+                      (go found))
+                    (go not-found)
+                  found
+                    (setf (aref kv-vector (1+ i)) value)
+                    (return-from ,name value)
+                  not-found)))
+           (let ((limit (* hwm 2)))
+             (if ,(cond ((eq test 'eq) nil)
+                        (use-eq-pred `(not (,use-eq-pred key)))
+                        (t t))
+                 (loop for i upfrom 2 upto limit by 2
+                       do (let ((ht-key (aref kv-vector i)))
+                            (when (,test key ht-key)
+                              (setf (aref kv-vector (1+ i)) value)
+                              (return-from ,name value))
+                            (when (empty-ht-slot-p ht-key)
+                              (setq empty-kv-index i))))
+                 (loop for i upfrom 2 upto limit by 2
+                       do (let ((ht-key (aref kv-vector i)))
+                            (when (eq key ht-key)
+                              (setf (aref kv-vector (1+ i)) value)
+                              (return-from ,name value))
+                            (when (empty-ht-slot-p ht-key)
+                              (setq empty-kv-index i)))))))
+       (when (and (zerop empty-kv-index)
+                  (= hwm (hash-table-pairs-capacity kv-vector)))
+         (if (zerop (grow-hash-table hash-table))
+             ;; It's still a flat hash table without KEY but a new
+             ;; kv-vector.
+             (setq kv-vector (hash-table-pairs hash-table))
+             ;; The new puthash implementation will inevitably find
+             ;; that KEY is not there.
+             (return-from ,name (funcall (hash-table-puthash-impl hash-table)
+                                         key hash-table value))))
+       (locally (declare (optimize (safety 0)))
+         (incf (hash-table-%count hash-table)))
+       (when (zerop empty-kv-index)
+         (setf (kv-vector-high-water-mark kv-vector) (1+ hwm))
+         (setq empty-kv-index (truly-the index (* 2 (1+ hwm)))))
+       (setf (aref kv-vector empty-kv-index) key)
+       (setf (aref kv-vector (truly-the index (1+ empty-kv-index)))
+             value))))
+
+(define-puthash/flat puthash/eq-hash/flat eq)
+(define-puthash/flat puthash/eql-hash/flat %eql eql-implies-eq-p)
+
+(defmacro define-remhash/flat (name test &optional use-eq-pred)
+  `(defun ,name (key table)
+     (declare (optimize speed (sb-c:verify-arg-count 0)
+                        (sb-c:insert-array-bounds-checks 0)))
+     (let* ((hash-table (truly-the hash-table table))
+            (kv-vector (hash-table-pairs hash-table))
+            (hwm (kv-vector-high-water-mark kv-vector))
+            (limit (* 2 hwm)))
+       (if ,(if use-eq-pred `(,use-eq-pred key) nil)
+           (loop for i upfrom 2 upto limit by 2
+                 do (let ((ht-key (aref kv-vector i)))
+                      (when (eq key ht-key)
+                        (locally (declare (optimize (safety 0)))
+                          (decf (hash-table-%count hash-table)))
+                        (setf (aref kv-vector i) +empty-ht-slot+
+                              (aref kv-vector (1+ i)) +empty-ht-slot+)
+                        (return-from ,name t))))
+           (loop for i upfrom 2 upto limit by 2
+                 do (let ((ht-key (aref kv-vector i)))
+                      (when (,test key ht-key)
+                        (locally (declare (optimize (safety 0)))
+                          (decf (hash-table-%count hash-table)))
+                        (setf (aref kv-vector i) +empty-ht-slot+
+                              (aref kv-vector (1+ i)) +empty-ht-slot+)
+                        (return-from ,name t)))))
+       nil)))
+
+(define-remhash/flat remhash/eq-hash/flat eq)
+(define-remhash/flat remhash/eql-hash/flat %eql eql-implies-eq-p)
+
+;;; Flat tables do not track address-sensitivity
+;;; (SB-VM:VECTOR-ADDR-HASHING-FLAG), so we must compute it when
+;;; switching.
+(defun compute-flat-hash-address-hashing-p (table)
+  (declare (optimize speed (sb-c:verify-arg-count 0)
+                     (sb-c:insert-array-bounds-checks 0)))
+  (let* ((hash-table (truly-the hash-table table))
+         (kv-vector (hash-table-pairs hash-table))
+         (hwm (kv-vector-high-water-mark kv-vector))
+         (limit (* 2 hwm)))
+    (if (eq (hash-table-test table) 'eq)
+        (loop
+          for i upfrom 2 upto limit by 2
+          do (let ((key (aref kv-vector i)))
+               (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
+                 (return t))))
+        (loop
+          for i upfrom 2 upto limit by 2
+          do (let ((key (aref kv-vector i)))
+               (when (and (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
+                          (eql-hash-defer-to-eq-hash-p key))
+                 (return t)))))))
+
+
 ;;;; accessing functions
 
 ;;; Clear rehash bit and bump the rolling count, wrapping around to keep it a fixnum.
@@ -736,6 +1006,7 @@ multiple threads accessing the same hash-table without locking."
            (type (simple-array hash-table-index (*)) next-vector index-vector)
            (type (or null (simple-array hash-table-index (*))) hash-vector)
            (optimize (sb-c:insert-array-bounds-checks 0)))
+  (aver (not (flat-hash-table-p table)))
   (macrolet ((with-key ((key-var) &body body)
                ;; If KEY-VAR is empty, then push I onto the freelist, otherwise invoke BODY
                `(let* ((key-index (* 2 i))
@@ -794,6 +1065,7 @@ multiple threads accessing the same hash-table without locking."
   (declare (hash-table table) (fixnum epoch))
   #+hash-table-metrics (atomic-incf (hash-table-n-rehash+find table))
   ;; Verify some invariants prior to disabling array bounds checking
+  (aver (not (flat-hash-table-p table)))
   (aver (>= (length kv-vector) #.(+ (* 2 +min-hash-table-size+)
                                     kv-pairs-overhead-slots)))
   (aver (= (ash (length kv-vector) -1) (length next-vector)))
@@ -950,184 +1222,232 @@ multiple threads accessing the same hash-table without locking."
                   (aref default-ht-sizes (1+ (* 2 old-size)))))
         (%recompute-ht-vector-sizes rehash-size old-size))))
 
+(defmacro allocating-for-hash-table ((hash-table) &body body)
+  #-system-tlabs (declare (ignore hash-table))
+  #-system-tlabs `(progn ,@body)
+  #+system-tlabs
+  ;; If allocation was directed off the main heap when this table was
+  ;; made, then we assume that reallocation will allocate off the
+  ;; heap. If the old table is in dynamic space, then the new storage
+  ;; should be forced to dynamic space even if the user TLAB currently
+  ;; points outside of dynamic space.
+  ;;
+  ;; The reason for looking at TABLE here and not its storage, is that
+  ;; MAKE-HASH-TABLE can install a k/v pair vector that does not
+  ;; inform us where the table is:
+  ;;
+  ;; (heap-allocated-p (sb-impl::hash-table-pairs (make-hash-table)))
+  ;; => :READ-ONLY
+  ;;
+  ;; The read-only vector is an optimization reducing the size of
+  ;; never-used tables down to the absolute minimum.
+  `(if (dynamic-space-obj-p ,hash-table)
+       (locally (declare (sb-c::tlab :system))
+         ,@body)
+       (progn ,@body)))
+
 ;;; Enlarge TABLE.  If it is weak, then both the old and new vectors are temporarily
 ;;; made non-weak so that we don't have to deal with GC-related shenanigans.
 (defun grow-hash-table (table)
   (declare (type hash-table table))
   (flet
+      ;; Return KV-VECTOR NEXT-VECTOR HASH-VECTOR INDEX-VECTOR)
       ((realloc (size n-buckets initial-stamp &aux (hash-vector-p (hash-table-hash-vector table)))
-         (declare (type (integer 0 #.(- array-dimension-limit 2)) size n-buckets))
-         (macrolet ((new-vectors ()
-                      ;; Return KV-VECTOR NEXT-VECTOR HASH-VECTOR INDEX-VECTOR)
-                      `(values (%alloc-kv-pairs size)
-                               (make-array size+1 :element-type 'hash-table-index
-                                           ;; for robustness testing, as explained in %MAKE-HASH-TABLE
-                                           #+sb-devel :initial-element #+sb-devel bad-next-value)
-                               (when hash-vector-p
-                                 (make-array size+1 :element-type 'hash-table-index))
-                               (let ((old-index-vector (hash-table-index-vector table)))
-                                 ;; When the index vector is not
-                                 ;; growing and hashes are valid,
-                                 ;; rehashing _may_ not be necessary.
-                                 (if (and (eq n-buckets (length old-index-vector))
-                                          (not (logtest 3 initial-stamp)))
-                                     old-index-vector
-                                     (make-index-vector n-buckets))))))
-           (declare (optimize (sb-c::type-check 0)))
-           (let ((size+1 (1+ size)))
-             #-system-tlabs (new-vectors)
-             #+system-tlabs
-             ;; If allocation was directed off the main heap when this table was made, then we assume
-             ;; that reallocation will allocate off the heap. If the old table is in dynamic space,
-             ;; then the new storage should be forced to dynamic space even if the user TLAB currently
-             ;; points outside of dynamic space.
-             ;; The reason for looking at TABLE here and not its storage, is that MAKE-HASH-TABLE can
-             ;; install a k/v pair vector that does not inform us where the table is:
-             ;;   * (heap-allocated-p (sb-impl::hash-table-pairs (make-hash-table))) => :READ-ONLY
-             ;; The read-only vector is an optimization reducing the size of never-used tables
-             ;; down to the absolute minimum.
-             (if (dynamic-space-obj-p table)
-                 (locally (declare (sb-c::tlab :system)) (new-vectors))
-                 (new-vectors))))))
-    (when (= (hash-table-%count table) 0) ; special case for new table
-      ;; CACHE holds the desired initial size. Read it and then set it to a bogusly high value
-      (binding* ((size (- (hash-table-cache table)))
-                 (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
-                 (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
-                 ((kv-vector next-vector hash-vector index-vector) (realloc size bucket-count 1)))
-        (setf (kv-vector-supplement kv-vector) (or hash-vector (eq (hash-table-test table) 'eql))
-              (hash-table-pairs table) kv-vector
-              (hash-table-index-vector table) index-vector
-              (hash-table-next-vector table) next-vector
-              (hash-table-hash-vector table) hash-vector)
-        (return-from grow-hash-table 1)))
-    (binding* (((new-size new-n-buckets)
-                (recompute-ht-vector-sizes table))
+         (declare (type (integer 0 #.(- array-dimension-limit 2)) size n-buckets)
+                  (optimize (sb-c::type-check 0)))
+         (let ((size+1 (1+ size)))
+           (allocating-for-hash-table (table)
+             (values (%alloc-kv-pairs size)
+                     (make-array size+1 :element-type 'hash-table-index
+                                 ;; for robustness testing, as explained in %MAKE-HASH-TABLE
+                                 #+sb-devel :initial-element #+sb-devel bad-next-value)
+                     (when hash-vector-p
+                       (make-array size+1 :element-type 'hash-table-index))
+                     (let ((old-index-vector (hash-table-index-vector table)))
+                       ;; When the index vector is not
+                       ;; growing and hashes are valid,
+                       ;; rehashing _may_ not be necessary.
+                       (if (and (eq n-buckets (length old-index-vector))
+                                (not (logtest 3 initial-stamp)))
+                           old-index-vector
+                           (make-index-vector n-buckets))))))))
+    (binding* ((new-table-p (= (hash-table-%count table) 0))
+               ((new-size new-n-buckets)
+                (if new-table-p
+                    ;; For new tables, CACHE holds the desired initial
+                    ;; size. Read it and then set it to a bogusly high
+                    ;; value.
+                    (binding* ((size (- (hash-table-cache table)))
+                               (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table)))))
+                      (values size (power-of-two-ceiling (max scaled-size +min-hash-table-size+))))
+                    (recompute-ht-vector-sizes table)))
+               (is-eql (eq (hash-table-test table) 'eql))
+               (old-flat-p (flat-hash-table-p table))
+               (new-flat-p (and old-flat-p (<= new-n-buckets
+                                               (if is-eql
+                                                   +flat-limit/eql+
+                                                   +flat-limit/eq+))))
                (old-kv-vector (hash-table-pairs table))
-               (initial-stamp (kv-vector-rehash-stamp old-kv-vector))
-               ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
-                (realloc new-size new-n-buckets initial-stamp))
-               (hwm (kv-vector-high-water-mark old-kv-vector))
-               (old-kv-vector-addr-hashing-p
-                (test-header-data-bit old-kv-vector (ash sb-vm:vector-addr-hashing-flag
-                                                         sb-vm:array-flags-data-position))))
-
-      (declare (type simple-vector new-kv-vector)
-               (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
-
+               (hwm (kv-vector-high-water-mark old-kv-vector)))
       ;; Rehash + resize only occurs when:
       ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
       ;;  (2) no cells below HWM are available (so COUNT = SIZE)
       (aver (= hwm (hash-table-pairs-capacity old-kv-vector)))
-      (when (and (not (hash-table-weak-p table)) (/= (hash-table-%count table) hwm))
-        ;; If the table is not weak, then every cell pair has to be in use
-        ;; as a precondition to resizing. If weak, this might not be true.
+      (when (and (not (hash-table-weak-p table))
+                 (/= (hash-table-%count table) hwm))
         (signal-corrupt-hash-table table))
+      (when new-flat-p
+        (aver old-flat-p)
+        ;; Flat hash tables use less memory because they have no
+        ;; INDEX-VECTOR and NEXT-VECTOR, so we can grow them more
+        ;; aggressively. In particular, we use NEW-N-BUCKETS (instead
+        ;; of NEW-SIZE) pairs. It so happens that for both EQ and EQL
+        ;; with +MIN-HASH-TABLE-SIZE+ and DEFAULT-REHASH-SIZE the size
+        ;; progression differs from what it would be without flat
+        ;; tables only until size 108. So, whether a hash table starts
+        ;; out as flat or not does not introduce performance jitter
+        ;; above that size.
+        (let ((new-kv-vector (allocating-for-hash-table (table)
+                               (make-array (+ kv-pairs-overhead-slots
+                                              (* 2 new-n-buckets))))))
+          (unless new-table-p
+            (replace new-kv-vector old-kv-vector))
+          (aver (< (length old-kv-vector) (length new-kv-vector)))
+          (setf (hash-table-pairs table) new-kv-vector)
+          ;; Flat hash tables do not maintain NEXT-FREE-KV.
+          (return-from grow-hash-table 0)))
+      (binding* ((initial-stamp (kv-vector-rehash-stamp old-kv-vector))
+                 ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
+                  (realloc new-size new-n-buckets initial-stamp)))
+        (declare (type simple-vector new-kv-vector)
+                 (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
+        (when new-table-p
+          (setf (kv-vector-supplement new-kv-vector) (or new-hash-vector is-eql)
+                (hash-table-pairs table) new-kv-vector
+                (hash-table-index-vector table) new-index-vector
+                (hash-table-next-vector table) new-next-vector
+                (hash-table-hash-vector table) new-hash-vector)
+          (return-from grow-hash-table 1))
+        (let ((old-addr-hashing-p
+                (if old-flat-p
+                    (compute-flat-hash-address-hashing-p table)
+                    (test-header-data-bit old-kv-vector
+                                          (ash sb-vm:vector-addr-hashing-flag
+                                               sb-vm:array-flags-data-position)))))
 
-      ;; Copy over the hash-vector,
-      ;; This is done early because when GC scans the new vector, it needs to see
-      ;; each hash to know which keys were hashed address-sensitively.
-      (awhen (hash-table-hash-vector table)
-        (replace (the (simple-array hash-table-index (*)) new-hash-vector)
-                 it :start1 1 :start2 1)) ; 1st element not used
+          (unless old-flat-p
+            ;; Copy over the hash-vector,
+            ;; This is done early because when GC scans the new vector, it needs to see
+            ;; each hash to know which keys were hashed address-sensitively.
+            (awhen (hash-table-hash-vector table)
+              (replace (the (simple-array hash-table-index (*)) new-hash-vector)
+                       it :start1 1 :start2 1))) ; 1st element not used
 
-      ;; The high-water-mark remains unchanged.
-      ;; Set this before copying pairs, otherwise they would not be seen
-      ;; in the new vector since GC scanning ignores elements below the HWM.
-      (setf (kv-vector-high-water-mark new-kv-vector) hwm)
-      ;; Reference the hash-vector from the KV vector.
-      ;; Normally a weak hash-table's KV vector would reference the table
-      ;; (because cull needs to examine the table bucket-by-bucket), and
-      ;; not the hash-vector directly. But we can't reference the table
-      ;; since using the table's hash-vector gets the OLD hash vector.
-      ;; It might be OK to point the table at the new hash-vector now,
-      ;; but I'd rather the table remain in a consistent state, in case we
-      ;; ever devise a way to allow concurrent reads with a single writer,
-      ;; for example.
-      (setf (kv-vector-supplement new-kv-vector)
-            (or new-hash-vector (eq (hash-table-test table) 'eql)))
+          ;; The high-water-mark remains unchanged.
+          ;; Set this before copying pairs, otherwise they would not be seen
+          ;; in the new vector since GC scanning ignores elements below the HWM.
+          (setf (kv-vector-high-water-mark new-kv-vector) hwm)
+          ;; Reference the hash-vector from the KV vector.
+          ;; Normally a weak hash-table's KV vector would reference the table
+          ;; (because cull needs to examine the table bucket-by-bucket), and
+          ;; not the hash-vector directly. But we can't reference the table
+          ;; since using the table's hash-vector gets the OLD hash vector.
+          ;; It might be OK to point the table at the new hash-vector now,
+          ;; but I'd rather the table remain in a consistent state, in case we
+          ;; ever devise a way to allow concurrent reads with a single writer,
+          ;; for example.
+          (setf (kv-vector-supplement new-kv-vector)
+                (or new-hash-vector (eq (hash-table-test table) 'eql)))
 
-      ;; Here and also in FINDHASH-WEAK, we keep the
-      ;; SB-VM:VECTOR-ADDR-HASHING-FLAG. If a hash table is
-      ;; address-based at any time, it'll remain so until CLRHASH even
-      ;; if all address-based keys had been removed. This allows
-      ;; rehashing to do less work and makes EQ hash tables a few
-      ;; percents faster. In the rare case where the flag errs on the
-      ;; side of conservativeness, the GC needs to do a bit more work.
-      ;; If this ever becomes a problem, maybe the GC can detect this
-      ;; and clear the flag. -- MG, 2023-10-13
-      (when old-kv-vector-addr-hashing-p
-        (logior-array-flags new-kv-vector sb-vm:vector-addr-hashing-flag))
+          ;; Here and also in FINDHASH-WEAK, we keep the
+          ;; SB-VM:VECTOR-ADDR-HASHING-FLAG. If a hash table is
+          ;; address-based at any time, it'll remain so until CLRHASH
+          ;; even if all address-based keys had been removed. This
+          ;; allows rehashing to do less work and makes EQ hash tables
+          ;; a few percents faster. In the rare case where the flag
+          ;; errs on the side of conservativeness, the GC needs to do
+          ;; a bit more work. If this ever becomes a problem, maybe
+          ;; the GC can detect this and clear the flag. -- MG,
+          ;; 2023-10-13
+          (when (and old-addr-hashing-p (not new-flat-p))
+            (logior-array-flags new-kv-vector sb-vm:vector-addr-hashing-flag))
 
-      ;; Copy the k/v pairs excluding leading and trailing metadata.
-      (replace new-kv-vector old-kv-vector
-               :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
+          ;; Copy the k/v pairs excluding leading and trailing metadata.
+          (replace new-kv-vector old-kv-vector
+                   :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
 
-      ;; If the index hasn't grown, try to avoid rehashing.
-      (when (eq new-index-vector (hash-table-index-vector table))
-        (let ((old-next-vector (hash-table-next-vector table)))
-          (replace new-next-vector old-next-vector
-                   :start1 1 :start2 1 :end1 (1+ hwm)))
-        ;; We know from REALLOC that the hashes were valid and no
-        ;; rehashing was in progress, but a GC that happened before
-        ;; REPLACE above might have marked only OLD-KV-VECTOR (and not
-        ;; NEW-KV-VECTOR) as needs-rehash, in which case we must do a
-        ;; normal rehash after all. Note that looking at the low two
-        ;; bits of the stamp is not enough here because they could
-        ;; have been cleared already in another thread.
-        (when (or (/= (kv-vector-rehash-stamp old-kv-vector) initial-stamp)
-                  (not (zerop (kv-vector-rehash-stamp new-kv-vector))))
-          (setq new-index-vector (make-index-vector new-n-buckets))))
+          ;; If the index hasn't grown, try to avoid rehashing.
+          (when (eq new-index-vector (hash-table-index-vector table))
+            (let ((old-next-vector (hash-table-next-vector table)))
+              (replace new-next-vector old-next-vector
+                       :start1 1 :start2 1 :end1 (1+ hwm)))
+            ;; We know from REALLOC that the hashes were valid and no
+            ;; rehashing was in progress, but a GC that happened before
+            ;; REPLACE above might have marked only OLD-KV-VECTOR (and not
+            ;; NEW-KV-VECTOR) as needs-rehash, in which case we must do a
+            ;; normal rehash after all. Note that looking at the low two
+            ;; bits of the stamp is not enough here because they could
+            ;; have been cleared already in another thread.
+            (when (or (/= (kv-vector-rehash-stamp old-kv-vector) initial-stamp)
+                      (not (zerop (kv-vector-rehash-stamp new-kv-vector))))
+              (setq new-index-vector (make-index-vector new-n-buckets))))
 
-      ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
-      ;; its high-water-mark can meaningfully be reduced to 0 when done.
-      ;; Clearing the address-sensitivity is a performance improvement
-      ;; since GC won't check on a per-key basis whether to flag the vector
-      ;; for rehash (it's going to be zeroed out).
-      ;; Clearing the weakness causes all entries to stay alive.
-      ;; Furthermore, clearing both makes the trailing metadata ignorable.
-      (assign-vector-flags old-kv-vector sb-vm:vector-hashing-flag)
-      (setf (kv-vector-supplement old-kv-vector) nil)
+          ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
+          ;; its high-water-mark can meaningfully be reduced to 0 when done.
+          ;; Clearing the address-sensitivity is a performance improvement
+          ;; since GC won't check on a per-key basis whether to flag the vector
+          ;; for rehash (it's going to be zeroed out).
+          ;; Clearing the weakness causes all entries to stay alive.
+          ;; Furthermore, clearing both makes the trailing metadata ignorable.
+          (assign-vector-flags old-kv-vector sb-vm:vector-hashing-flag)
+          (setf (kv-vector-supplement old-kv-vector) nil)
 
-      (let ((next-free (cond ((eq new-index-vector (hash-table-index-vector table))
-                              (let ((old-next-free (hash-table-next-free-kv table)))
-                                (if (/= 0 old-next-free)
-                                    old-next-free
-                                    (1+ hwm))))
-                             (t
-                              (rehash new-kv-vector new-hash-vector
-                                      new-index-vector new-next-vector table)))))
-        (setf (hash-table-pairs table)        new-kv-vector
-              (hash-table-hash-vector table)  new-hash-vector
-              (hash-table-index-vector table) new-index-vector
-              (hash-table-next-vector table)  new-next-vector
-              (hash-table-next-free-kv table) next-free)
+          (let ((next-free (cond ((eq new-index-vector (hash-table-index-vector table))
+                                  (let ((old-next-free (hash-table-next-free-kv table)))
+                                    (if (/= 0 old-next-free)
+                                        old-next-free
+                                        (1+ hwm))))
+                                 (t
+                                  (when old-flat-p
+                                    (if is-eql
+                                        (set-hash-fun table #'eql-hash
+                                                      +hft-normal+)
+                                        (set-hash-fun table #'eq-hash
+                                                      +hft-normal+)))
+                                  (rehash new-kv-vector new-hash-vector
+                                          new-index-vector new-next-vector table)))))
+            (setf (hash-table-pairs table)        new-kv-vector
+                  (hash-table-hash-vector table)  new-hash-vector
+                  (hash-table-index-vector table) new-index-vector
+                  (hash-table-next-vector table)  new-next-vector
+                  (hash-table-next-free-kv table) next-free)
 
-        (when (hash-table-weak-p table)
-          (setf (hash-table-smashed-cells table) nil)
-          ;; Now that the table points to the right hash-vector
-          ;; we can set the vector's backpointer and turn it weak.
-          (setf (kv-vector-supplement new-kv-vector) table)
-          (logior-array-flags new-kv-vector sb-vm:vector-weak-flag))
+            (when (hash-table-weak-p table)
+              (setf (hash-table-smashed-cells table) nil)
+              ;; Now that the table points to the right hash-vector
+              ;; we can set the vector's backpointer and turn it weak.
+              (setf (kv-vector-supplement new-kv-vector) table)
+              (logior-array-flags new-kv-vector sb-vm:vector-weak-flag))
 
-        ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
-        ;; strong references to each k/v. For non-weak vectors there is no technical
-        ;; reason to do this except for safety. GC will not scavenge past the high water
-        ;; mark, but if you had your hands on the old vector and decide to dereference
-        ;; it (which is probably indicates a data race), you could deference a dangling
-        ;; pointer. In other words, even if the vector were considered a root,
-        ;; it wouldn't matter from a heap consistency perspective because it would
-        ;; not transitively enliven anything, but you can't stop people from using
-        ;; SVREF on it past the high water mark. To to make things safe,
-        ;; we sort of have to zero-fill.
-        ;; Also fwiw, it would be necessary to fix verify_range() to understand
-        ;; that it MUST NOT verify past the hwm, and similary the low-level debugger
-        ;; if we didn't zero-fill.
-        ;; Or, if we could trust people not to look at the old vector, we could just
-        ;; change the widetag into simple-array-word instead of scribbling over it.
-        (fill old-kv-vector 0 :start 2 :end (* (1+ hwm) 2))
-        (setf (kv-vector-high-water-mark old-kv-vector) 0)
-        next-free))))
+            ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
+            ;; strong references to each k/v. For non-weak vectors there is no technical
+            ;; reason to do this except for safety. GC will not scavenge past the high water
+            ;; mark, but if you had your hands on the old vector and decide to dereference
+            ;; it (which is probably indicates a data race), you could deference a dangling
+            ;; pointer. In other words, even if the vector were considered a root,
+            ;; it wouldn't matter from a heap consistency perspective because it would
+            ;; not transitively enliven anything, but you can't stop people from using
+            ;; SVREF on it past the high water mark. To to make things safe,
+            ;; we sort of have to zero-fill.
+            ;; Also fwiw, it would be necessary to fix verify_range() to understand
+            ;; that it MUST NOT verify past the hwm, and similary the low-level debugger
+            ;; if we didn't zero-fill.
+            ;; Or, if we could trust people not to look at the old vector, we could just
+            ;; change the widetag into simple-array-word instead of scribbling over it.
+            (unless old-flat-p
+              (fill old-kv-vector 0 :start 2 :end (* (1+ hwm) 2))
+              (setf (kv-vector-high-water-mark old-kv-vector) 0))
+            next-free))))))
 
 (defun gethash (key hash-table &optional default)
   "Finds the entry in HASH-TABLE whose key is KEY and returns the
@@ -1605,8 +1925,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                    (values default nil)
                    (values probed-value t)))))
 
-(define-ht-getter gethash/eq eq eq-hash*)
-(define-ht-getter gethash/eql eql eql-hash)
+(define-ht-getter gethash/eq-hash eq eq-hash*)
+(define-ht-getter gethash/eql-hash eql eql-hash)
 (define-ht-getter gethash/equal equal equal-hash)
 (define-ht-getter gethash/equalp equalp equalp-hash)
 (define-ht-getter gethash/any nil nil)
@@ -1655,53 +1975,115 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
           (t
            (values default nil)))))
 
-(defun make-synchronized-table-methods (getter setter remover)
+(defun make-synchronized-table-methods (getter setter remover hash-fun-state)
   (declare (optimize (safety 0)))
   ;; We might want to think about inlining the guts of
   ;; CALL-WITH-...LOCK into these methods.
   (values
-   (lambda (key table default)
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
-     (truly-the
-      (values t t &optional)
-      (let ((table (truly-the hash-table table)))
-        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
-          (funcall getter key table default)))))
-   (lambda (key table value)
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
-     (truly-the
-      (values t &optional)
-      (let ((table (truly-the hash-table table)))
-        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
-          (funcall setter key table value)))))
-   (lambda (key table)
-     (declare (optimize speed (sb-c:verify-arg-count 0)))
-     (truly-the
-      (values t &optional)
-      (let ((table (truly-the hash-table table)))
-        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
-          (funcall remover key table)))))))
+   (if hash-fun-state
+       (lambda (key table default)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t t &optional)
+          (let ((table (truly-the hash-table table)))
+            ;; Use the private slot accessor, because we know that
+            ;; the mutex has been constructed.
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              ;; Check within the lock if hash fun had been changed by
+              ;; another thread.
+              (funcall (if (eql (hash-table-hash-fun-state table)
+                                hash-fun-state)
+                           getter
+                           (hash-table-gethash-impl table))
+                       key table default)))))
+       (lambda (key table default)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t t &optional)
+          (let ((table (truly-the hash-table table)))
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              (funcall getter key table default))))))
+   (if hash-fun-state
+       (lambda (key table value)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t &optional)
+          (let ((table (truly-the hash-table table)))
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              (funcall (if (eql (hash-table-hash-fun-state table)
+                                hash-fun-state)
+                           setter
+                           (hash-table-puthash-impl table))
+                       key table value)))))
+       (lambda (key table value)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t &optional)
+          (let ((table (truly-the hash-table table)))
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              (funcall setter key table value))))))
+   (if hash-fun-state
+       (lambda (key table)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t &optional)
+          (let ((table (truly-the hash-table table)))
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              (funcall (if (eql (hash-table-hash-fun-state table)
+                                hash-fun-state)
+                           remover
+                           (hash-table-remhash-impl table))
+                       key table)))))
+       (lambda (key table)
+         (declare (optimize speed (sb-c:verify-arg-count 0)))
+         (truly-the
+          (values t &optional)
+          (let ((table (truly-the hash-table table)))
+            (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+              (funcall remover key table))))))))
 
-(defmacro pick-table-methods-1 (synchronized getter setter remover)
+(defmacro pick-table-methods-1 (synchronized getter setter remover
+                                &optional hash-fun-state)
   `(locally (declare (optimize (safety 0)))
      (if ,synchronized
-         (make-synchronized-table-methods #',getter #',setter #',remover)
+         (make-synchronized-table-methods #',getter #',setter #',remover
+                                          ,hash-fun-state)
          (values #',getter #',setter #',remover))))
 
-(defun pick-table-methods (synchronized kind)
-  (declare ((integer -1 3) kind))
-  ;; test is specified as 0..3 for a standard fun or -1 for userfun
-  (case kind
-    (-1 (pick-table-methods-1 synchronized gethash/any puthash/any
-                              remhash/any))
-    (0  (pick-table-methods-1 synchronized gethash/eq puthash/eq
-                              remhash/eq))
-    (1  (pick-table-methods-1 synchronized gethash/eql puthash/eql
-                              remhash/eql))
-    (2  (pick-table-methods-1 synchronized gethash/equal puthash/equal
-                              remhash/equal))
-    (3  (pick-table-methods-1 synchronized gethash/equalp puthash/equalp
-                              remhash/equalp))))
+(macrolet
+    ((define-pick-table-methods ()
+       `(defun pick-table-methods (synchronized test hash-fun-state)
+          (declare (type fixnum hash-fun-state))
+          (ecase test
+            (eq
+             (cond ((eql hash-fun-state +hft-flat+)
+                    (pick-table-methods-1
+                     synchronized gethash/eq-hash/flat puthash/eq-hash/flat
+                     remhash/eq-hash/flat hash-fun-state))
+                   (t
+                    (pick-table-methods-1
+                     synchronized gethash/eq-hash puthash/eq-hash
+                     remhash/eq-hash hash-fun-state))))
+            (eql
+             (if (eql hash-fun-state +hft-flat+)
+                 (pick-table-methods-1
+                  synchronized gethash/eql-hash/flat puthash/eql-hash/flat
+                  remhash/eql-hash/flat hash-fun-state)
+                 (pick-table-methods-1
+                  synchronized gethash/eql-hash puthash/eql-hash
+                  remhash/eql-hash)))
+            (equal (pick-table-methods-1 synchronized gethash/equal
+                                         puthash/equal remhash/equal))
+            (equalp (pick-table-methods-1 synchronized gethash/equalp
+                                          puthash/equalp remhash/equalp))
+            ((nil) (pick-table-methods-1 synchronized gethash/any
+                                         puthash/any remhash/any))))))
+  (declaim (ftype (sfunction (t t t)
+                             (values (sfunction * (values t boolean))
+                                     (sfunction * t)
+                                     (sfunction * t)))
+                  pick-table-methods))
+  (define-pick-table-methods))
 
 ;;; so people can call #'(SETF GETHASH)
 ;;; FIXME: this function is not mandated. Why do we have it?
@@ -1902,8 +2284,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                  (neq (weak-kvv-ref kv-vector physical-index) probed-key))
              (signal-corrupt-hash-table hash-table))
             (t value))))
-  (define-ht-setter puthash/eq eq eq-hash*)
-  (define-ht-setter puthash/eql eql eql-hash)
+  (define-ht-setter puthash/eq-hash eq eq-hash*)
+  (define-ht-setter puthash/eql-hash eql eql-hash)
   (define-ht-setter puthash/equal equal equal-hash)
   (define-ht-setter puthash/equalp equalp equalp-hash)
   (define-ht-setter puthash/any nil nil))
@@ -2042,8 +2424,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                (return (clear-slot this hash-table kv-vector next-vector)))
              (check-excessive-probes 1))))
 
-  (define-remhash remhash/eq eq eq-hash*)
-  (define-remhash remhash/eql eql eql-hash)
+  (define-remhash remhash/eq-hash eq eq-hash*)
+  (define-remhash remhash/eql-hash eql eql-hash)
   (define-remhash remhash/equal equal equal-hash)
   (define-remhash remhash/equalp equalp equalp-hash)
   (define-remhash remhash/any nil nil))
@@ -2056,9 +2438,6 @@ there was such an entry, or NIL if not."
 (defun clrhash (hash-table)
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
-  (funcall (hash-table-clrhash-impl hash-table) hash-table))
-
-(defun clrhash-impl (hash-table)
   ;; This used to do nothing at all for tables that has a COUNT of 0,
   ;; but that wasn't quite right, because some steps below pertain to
   ;; getting the initial state back to that of a freshly made table.
@@ -2076,23 +2455,26 @@ table itself."
   (when (plusp (kv-vector-high-water-mark (hash-table-pairs hash-table)))
     (dx-flet ((clear ()
                 (let* ((kv-vector (hash-table-pairs hash-table))
-                       (high-water-mark (kv-vector-high-water-mark kv-vector)))
+                       (high-water-mark (kv-vector-high-water-mark kv-vector))
+                       (flatp (flat-hash-table-p hash-table)))
                   (when (hash-table-weak-p hash-table)
                     (aver (eq (kv-vector-supplement kv-vector) hash-table)))
                   ;; Remove address-sensitivity.
                   (reset-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
                   ;; Do this only after unsetting the address-sensitive bit,
                   ;; otherwise GC might come along and touch this bit again.
-                  (setf (kv-vector-rehash-stamp kv-vector) 0)
+                  (unless flatp
+                    (setf (kv-vector-rehash-stamp kv-vector) 0))
                   ;; We always deposit empty markers into k/v pairs that are REMHASHed,
                   ;; so a count of 0 implies no clearing need be done.
                   (when (plusp (hash-table-%count hash-table))
                     (setf (hash-table-%count hash-table) 0)
                     ;; Fill all slots with the empty marker.
                     (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
-                    ;; Clear the index-vector.
-                    ;; Don't need to clear the hash-vector or the next-vector.
-                    (fill (hash-table-index-vector hash-table) 0))
+                    ;; Clear the index-vector if in use. Don't need to
+                    ;; clear the hash-vector or the next-vector.
+                    (unless flatp
+                      (fill (hash-table-index-vector hash-table) 0)))
                   (when (typep hash-table 'general-hash-table)
                     (setf (hash-table-smashed-cells hash-table) nil))
                   (setf (hash-table-next-free-kv hash-table) 1
