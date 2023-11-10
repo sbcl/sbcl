@@ -124,7 +124,8 @@
 
 (defun enormous-byte-rotate (c)
   (declare (type (signed-byte 32) c))
-  (rotate-byte 2 (byte 3 100000000000) c))
+  (rotate-byte 2 (byte 3 (min 100000000000
+                              (ash most-positive-fixnum -1))) c))
 
 (assert (= (enormous-byte-rotate #x7fffffff) #x7fffffff))
 (assert (= (enormous-byte-rotate #x-80000000) #x-80000000))
