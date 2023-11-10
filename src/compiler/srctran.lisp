@@ -3469,7 +3469,7 @@
     (frob y t)))
 
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
-(deftransform truncate ((x y) (integer (constant-arg integer)) *  :result result  :node node)
+(deftransform truncate ((x y) (integer (constant-arg integer)) *  :result result :node node)
   "convert division by 2^k to shift"
   (let* ((y (lvar-value y))
          (y-abs (abs y))
@@ -3482,6 +3482,9 @@
       (let ((shift (- len))
             (mask (1- y-abs)))
         (cond (zerop
+               (setf (node-derived-type node)
+                     (values-specifier-type '(values integer bit &optional)))
+               (erase-lvar-type result)
                `(values
                  ;; transform again for
                  ;; COMBINATION-IMPLEMENTATION-STYLE to trigger

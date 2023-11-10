@@ -252,3 +252,12 @@
      (declare ((or (integer 1 5) (integer 9 10)) x))
      (integer-length x))
    (integer 1 4)))
+
+(with-test (:name :rem-transform-erase-types)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((integer * 0) a))
+      (zerop (rem a 2)))
+   ((-1) nil)
+   ((-2) t)))
