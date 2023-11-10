@@ -2337,7 +2337,7 @@
       (let ((target (first succ)))
         (cond ((eq target (component-tail (block-component block)))
                (cond ((and (basic-combination-p last)
-                           (or (eq (basic-combination-kind last) :full)
+                           (or (memq (basic-combination-kind last) '(:full :unknown-keys))
                                (and (eq (basic-combination-kind last) :known)
                                     (eq (basic-combination-info last) :full))))
                       (let* ((fun (basic-combination-fun last))
