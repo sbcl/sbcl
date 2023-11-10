@@ -3483,7 +3483,7 @@
             (mask (1- y-abs)))
         (cond (zerop
                (setf (node-derived-type node)
-                     (values-specifier-type '(values integer bit &optional)))
+                     (values-specifier-type '(values integer unsigned-byte &optional)))
                (erase-lvar-type result)
                `(values
                  ;; transform again for

@@ -260,4 +260,11 @@
       (declare ((integer * 0) a))
       (zerop (rem a 2)))
    ((-1) nil)
-   ((-2) t)))
+   ((-2) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((member 7 -9) a))
+      (zerop (rem a 8)))
+   ((7) nil)
+   ((-9) nil)))
