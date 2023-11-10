@@ -117,15 +117,17 @@
                  (dpb (logand (logior (ash chunk 1) (ash chunk -31)) #xffffffff)
                       (byte 32 p)
                       x))))))
+(defconstant +large+
+  (min 100000000000
+       (ash most-positive-fixnum -1)))
 
-(assert (= (rotate-byte 1 (byte 2 100000000000) 17) 17))
-(assert (= (rotate-byte 2 (byte 13 100000000000) (1- most-negative-fixnum))
+(assert (= (rotate-byte 1 (byte 2 +large+) 17) 17))
+(assert (= (rotate-byte 2 (byte 13 +large+) (1- most-negative-fixnum))
            (1- most-negative-fixnum)))
 
 (defun enormous-byte-rotate (c)
   (declare (type (signed-byte 32) c))
-  (rotate-byte 2 (byte 3 (min 100000000000
-                              (ash most-positive-fixnum -1))) c))
+  (rotate-byte 2 (byte 3 +large+) c))
 
 (assert (= (enormous-byte-rotate #x7fffffff) #x7fffffff))
 (assert (= (enormous-byte-rotate #x-80000000) #x-80000000))
