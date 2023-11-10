@@ -619,7 +619,7 @@
                   (power-of-two-p (lvar-value d))
                   (and (csubtypep (sb-c::lvar-type n) (specifier-type 'signed-word))
                        (not (csubtypep (sb-c::lvar-type n) (specifier-type 'word)))))
-             (values :direct nil)
+             (values :maybe nil)
              (values :default nil))))
       (%dpb
        (flet ((validp (type result-type)

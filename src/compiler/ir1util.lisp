@@ -145,7 +145,6 @@
                    use))))
     (recurse lvar)))
 
-
 (defun map-lvar-dest-casts (fun lvar)
   (labels ((pld (lvar)
              (and lvar
@@ -154,6 +153,43 @@
                       (funcall fun dest)
                       (pld (cast-lvar dest)))))))
     (pld lvar)))
+
+(defun let-lvar-dest (lvar)
+  (let ((dest (lvar-dest (principal-lvar lvar))))
+    (if (and (combination-p dest)
+             (eq (basic-combination-kind dest) :local))
+        (let* ((fun (combination-lambda dest))
+               (n (position lvar
+                            (combination-args dest)))
+               (var (nth n (lambda-vars fun)))
+               (refs (leaf-refs var)))
+          (when (and refs
+                     (not (cdr refs)))
+            (let-lvar-dest (node-lvar (car refs)))))
+        dest)))
+
+(defun mv-bind-dest (lvar nth-value)
+  (let ((dest (lvar-dest lvar)))
+    (when (and (mv-combination-p dest)
+               (eq (basic-combination-kind dest) :local))
+      (let ((fun (combination-lambda dest)))
+        (let* ((var (nth nth-value (lambda-vars fun)))
+               (refs (leaf-refs var)))
+          (when (and refs
+                     (not (cdr refs)))
+            (when (eq (lambda-kind fun) :mv-let)
+              (let-lvar-dest (node-lvar (car refs))))))))))
+
+(defun combination-matches (name args combination)
+  (and (combination-p combination)
+       (let ((fun (combination-fun combination)))
+         (when (eq (lvar-fun-name fun) name)
+           (loop for arg in (combination-args combination)
+                 for arg-m in args
+                 always (or (eq arg arg-m)
+                            (eq arg-m '*)
+                            (and (constant-lvar-p arg)
+                                 (eql (lvar-value  arg) arg-m))))))))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.

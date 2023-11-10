@@ -3469,24 +3469,36 @@
     (frob y t)))
 
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
-(deftransform truncate ((x y) (integer (constant-arg integer)))
+(deftransform truncate ((x y) (integer (constant-arg integer)) *  :result result  :node node)
   "convert division by 2^k to shift"
   (let* ((y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
-    (let ((shift (- len))
-          (mask (1- y-abs)))
-      `(if (minusp x)
-           (values ,(if (minusp y)
-                        `(ash (- x) ,shift)
-                        `(- (ash (- x) ,shift)))
-                   (- (logand (- x) ,mask)))
-           (values ,(if (minusp y)
-                        `(- (ash x ,shift))
-                        `(ash x ,shift))
-                   (logand x ,mask))))))
+    (delay-ir1-transform node :ir1-phases)
+    (let* ((rem (mv-bind-dest result 1))
+           (zerop (combination-matches 'eq '(* 0) rem)))
+      (let ((shift (- len))
+            (mask (1- y-abs)))
+        (cond (zerop
+               `(values
+                 ;; transform again for
+                 ;; COMBINATION-IMPLEMENTATION-STYLE to trigger
+                 (values (truncate x y))
+                 (logand x ,mask)))
+              ((neq :default (combination-implementation-style node))
+               (give-up-ir1-transform))
+              (t
+               `(if (minusp x)
+                    (values ,(if (minusp y)
+                                 `(ash (- x) ,shift)
+                                 `(- (ash (- x) ,shift)))
+                            (- (logand (- x) ,mask)))
+                    (values ,(if (minusp y)
+                                 `(- (ash x ,shift))
+                                 `(ash x ,shift))
+                            (logand x ,mask)))))))))
 
 ;;; Floats could be transformed if we had some declaration to ignore NaNs
 (deftransform truncate ((x y) (rational (or (rational (0) *)
