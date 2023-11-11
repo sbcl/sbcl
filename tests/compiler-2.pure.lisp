@@ -4284,3 +4284,14 @@
                                    (f1 (f1 f))))))
           (x 0))
      (assert (funcall f (lambda () (when (= (incf x) 2) (return t)))))))
+
+(with-test (:name :the*-exits)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (if x
+          10
+          (block nil
+            (hash-table-test (return)))))
+   ((t) 10)
+   ((nil) nil)))

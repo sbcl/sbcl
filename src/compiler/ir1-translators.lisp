@@ -1124,13 +1124,12 @@ care."
                ;; Would be great for IR1-CONVERT to return the uses it creates
                (let ((new-uses (lvar-uses result)))
                  (derive-node-type (cond ((consp new-uses)
-                                          ;; Handle just a single use for now,
-                                          ;; doubt it'll be useful for multiple uses.
-                                          (aver (= (1- (length new-uses))
-                                                   (if (consp before-uses)
-                                                       (length before-uses)
-                                                       1)))
-                                          (car new-uses))
+                                          (loop for other in (cdr new-uses)
+                                                do (aver (or (exit-p other)
+                                                             (eq before-uses other)
+                                                             (and (consp before-uses)
+                                                                  (memq other before-uses)))))
+                                          (the (not exit) (car new-uses)))
                                          (t
                                           new-uses))
                                    value-type)))))
