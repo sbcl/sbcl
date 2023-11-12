@@ -35,7 +35,7 @@
   (values chunk 0))
 
 (defmethod print-object ((reg reg) stream)
-  (if *print-readably*
+  (if (or *print-escape* *print-readably*)
       ;; cross-compiled DEFMETHOD can't use call-next-method
       (default-structure-print reg stream *current-level-in-print*)
       (write-string (reg-name reg) stream)))

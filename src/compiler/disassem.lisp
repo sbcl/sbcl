@@ -13,8 +13,6 @@
 
 ;;; types and defaults
 
-(defconstant label-column-width 7)
-
 (deftype text-width () '(integer 0 1000))
 (deftype alignment () '(integer 0 64))
 (deftype offset () 'fixnum)

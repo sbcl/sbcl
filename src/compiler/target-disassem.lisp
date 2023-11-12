@@ -1245,6 +1245,8 @@
         ;; 4 bits per hex digit
         (ceiling (integer-length (logxor from (+ from length))) 4)))
 
+(defconstant label-column-width 7)
+
 ;;; Print the current address in DSTATE to STREAM, plus any labels that
 ;;; correspond to it, and leave the cursor in the instruction column.
 (defun print-current-address (stream dstate)
@@ -2090,7 +2092,7 @@
            (code-component thing)))
          (dstate (make-dstate))
          (segments
-          (if (eq code-component sb-fasl:*assembler-routines*)
+          (if (typep (%code-debug-info code-component) '(or hash-table (cons hash-table)))
               (collect ((segs))
                 (dohash ((name locs) (sb-fasl::%asm-routine-table code-component))
                   (destructuring-bind (start end . index) locs

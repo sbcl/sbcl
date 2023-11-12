@@ -2328,15 +2328,20 @@
                      #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00
                      #x66 #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00)
                    '(vector (unsigned-byte 8))))
-         (max-length (isqrt (* 2 (length bytes)))))
+         (max-length 9))
     (loop
-      (let* ((count (min amount max-length))
+      (let* ((count
+              ;; Disassembly looks better if encodings are 8 bytes or fewer,
+              ;; so when 10 to 15 bytes remain, emit two more NOPs of roughly
+              ;; equal length rather than say a 9-byte + 1-byte.
+              (if (<= 10 amount 15)
+                  (ceiling amount 2)
+                  (min amount max-length)))
              (start (ash (* count (1- count)) -1)))
         (dotimes (i count)
-          (emit-byte segment (aref bytes (+ start i)))))
-      (if (> amount max-length)
-          (decf amount max-length)
-          (return)))))
+          (emit-byte segment (aref bytes (+ start i))))
+        (when (zerop (decf amount count))
+          (return))))))
 
 (define-instruction syscall (segment)
   (:printer two-bytes ((op '(#x0F #x05))))
