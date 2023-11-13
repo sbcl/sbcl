@@ -80,7 +80,12 @@
   (gethash-impl #'error :type (sfunction * (values t boolean)))
   (puthash-impl #'error :type (sfunction * t))
   (remhash-impl #'error :type (sfunction * t))
-  ;; +HFT-FLAT+ if FLAT-HASH-TABLE-P, +HFT-NORMAL+ otherwise.
+  ;; If non-negative, this gets passed to HASH-TABLE-HASH-FUN as its
+  ;; second argument (see HASH-KEY and HT-HASH-SETUP). For a given
+  ;; HASH-TABLE-TEST, the same HASH-FUN-STATE cannot be an argument
+  ;; for the different HASH-FUNs. Thus, it completely identifies the
+  ;; hash function. It may be changed during the lifetime of the hash
+  ;; table, which allows us to do adaptive hashing.
   (hash-fun-state 0 :type fixnum)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
@@ -134,7 +139,7 @@
   (test-fun nil :type function :read-only t)
   ;; The function used to compute the hashing of a key. Returns two
   ;; values: the index hashing and T if that might change with the
-  ;; next GC.
+  ;; next GC. It may take HASH-FUN-STATE as an extra argument.
   (hash-fun nil :type function)
 
   ;; The type of hash table this is. Part of the exported interface,
@@ -224,16 +229,29 @@
 ;;; but is not meaningful with a user-provided test or hash function.
 (sb-xc:defmacro pack-ht-flags-kind (x) `(ash ,x 4))
 (defmacro ht-flags-kind (flags) `(ldb (byte 2 4) ,flags))
+(defconstant ht-flags-kind-mask #b110000)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant default-rehash-size 1.5)
   ;; Don't raise this number to 8 - if you do it'll increase the memory
   ;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
   ;; padding slots.  This is a "perfect" minimal size.
-  (defconstant +min-hash-table-size+ 7)
-  ;; Possible HASH-TABLE-HASH-FUN-STATEs.
-  (defconstant +hft-flat+ -1)
-  (defconstant +hft-normal+ 0))
+  (defconstant +min-hash-table-size+ 7))
+
+;;; HASH-TABLE-HASH-FUN-STATEs not specific to a particular hash test
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +hft-default+ -5)
+  ;; This is redundant with HASH-TABLE-USERFUN-FLAG, but sometimes
+  ;; more convenient to inspect the state. User-defined hash functions
+  ;; are never adaptive.
+  (defconstant +hft-user-defined+ -4)
+  ;; State for our own non-adaptive hash functions.
+  (defconstant +hft-non-adaptive+ -3)
+  ;; The state denoting a traditional, general-purpose hash function
+  ;; that tries to be as "random" as opossible.
+  (defconstant +hft-safe+ -2)
+  ;; State for the FLAT-HASH-TABLE-P.
+  (defconstant +hft-flat+ -1))
 
 (sb-xc:defmacro make-system-hash-table (&key test synchronized weakness)
   (multiple-value-bind (kind args)
@@ -241,7 +259,7 @@
       ;; :WEAKNESS, so we need not bother with flat hash tables
       ;; because they are not implemented for weak hash tables.
       (cond ((equal test '(quote eq))
-             (values 0 '('eq  #'eq  #'eq-hash)))
+             (values 0 '('eq  #'eq  #'non-adaptive-eq-hash)))
             ((equal test '(quote eql))
              (values 1 '('eql #'eql #'eql-hash)))
             (t
@@ -258,7 +276,7 @@
       ;; MAKE-SYSTEM-HASH-TABLE before the constants are known to make-host-2, as happens
       ;; when compiling type-class. hash-table.lisp can't be moved earlier in build-order
       ;; (without pain) so the expanded code can't use the values.
-      ,+hft-normal+
+      ,+hft-non-adaptive+
       ,+min-hash-table-size+
       ,default-rehash-size
       1.0)))

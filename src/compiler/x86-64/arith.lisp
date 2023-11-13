@@ -4295,3 +4295,23 @@
     (let* ((step (svref steps (1- (length steps))))
            (tn (second step)))
       (inst lea :dword res (ea tn tn)))))
+
+(defknown zero-or-one ((unsigned-byte 32))
+    (integer 0 1)
+    (flushable))
+(define-vop (zero-or-one/ub32)
+  (:translate zero-or-one)
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+   (cond ((location= res arg)
+          (inst test arg arg)
+          (inst mov arg 0)
+          (inst set :nz arg))
+         (t
+          (inst xor res res)
+          (inst test arg arg)
+          (inst set :nz res)))))

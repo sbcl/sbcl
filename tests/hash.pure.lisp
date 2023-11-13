@@ -524,9 +524,16 @@
            (dolist (sap list-of-saps foo)
              (setq foo (logxor foo (sxhash sap)))))))))
 
+(defconstant +flat-limit/eq+ 32)
+(defconstant +flat-limit/eql+ 16)
+(defconstant +hft-flat+ -1)
+(defconstant +hft-safe+ -2)
+(defconstant +hft-non-adaptive+ -3)
+(defconstant +hft-default+ -5)
+
 (with-test (:name :eq-flat-switch)
   (let ((h (make-hash-table :test 'eq)))
-    (loop for i below 32 do
+    (loop for i below +flat-limit/eq+ do
       (setf (gethash i h) t))
     (assert (sb-impl::flat-hash-table-p h))
     (assert (eq (sb-impl::hash-table-gethash-impl h)
@@ -535,18 +542,18 @@
                 #'sb-impl::puthash/eq-hash/flat))
     (assert (eq (sb-impl::hash-table-remhash-impl h)
                 #'sb-impl::remhash/eq-hash/flat))
-    (setf (gethash 33 h) t)
+    (setf (gethash (1+ +flat-limit/eq+) h) t)
     (assert (not (sb-impl::flat-hash-table-p h)))
     (assert (eq (sb-impl::hash-table-gethash-impl h)
-                #'sb-impl::gethash/eq-hash))
+                #'sb-impl::gethash/eq-hash/default))
     (assert (eq (sb-impl::hash-table-puthash-impl h)
-                #'sb-impl::puthash/eq-hash))
+                #'sb-impl::puthash/eq-hash/default))
     (assert (eq (sb-impl::hash-table-remhash-impl h)
-                #'sb-impl::remhash/eq-hash))))
+                #'sb-impl::remhash/eq-hash/default))))
 
 (with-test (:name :eql-flat-switch-point)
   (let ((h (make-hash-table)))
-    (loop for i below 16 do
+    (loop for i below +flat-limit/eql+ do
       (setf (gethash i h) t))
     (assert (sb-impl::flat-hash-table-p h))
     (assert (eq (sb-impl::hash-table-gethash-impl h)
@@ -555,7 +562,7 @@
                 #'sb-impl::puthash/eql-hash/flat))
     (assert (eq (sb-impl::hash-table-remhash-impl h)
                 #'sb-impl::remhash/eql-hash/flat))
-    (setf (gethash 17 h) t)
+    (setf (gethash (1+ +flat-limit/eql+) h) t)
     (assert (not (sb-impl::flat-hash-table-p h)))
     (assert (eq (sb-impl::hash-table-gethash-impl h)
                 #'sb-impl::gethash/eql-hash))
@@ -563,3 +570,16 @@
                 #'sb-impl::puthash/eql-hash))
     (assert (eq (sb-impl::hash-table-remhash-impl h)
                 #'sb-impl::remhash/eql-hash))))
+
+(with-test (:name :eq-hash-growth-from-non-flat-init)
+  (let ((h (make-hash-table :size 222 :test 'eq)))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-default+))
+    (dotimes (i 1000)
+      (setf (gethash i h) i))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-default+))))
+
+(with-test (:name :eq-hash-switch-to-safe)
+  (let ((h (make-hash-table :test 'eq)))
+    (dotimes (i (1+ +flat-limit/eq+))
+      (setf (gethash (float i) h) i))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-safe+))))

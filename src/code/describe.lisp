@@ -294,6 +294,10 @@
   (format stream "~%Rehash-size: ~S" (hash-table-rehash-size object))
   (format stream "~%Size: ~S" (hash-table-size object))
   (format stream "~%Synchronized: ~:[no~;yes~]" (hash-table-synchronized-p object))
+  (format stream "~%Hash function: ~S" (hash-table-hash-fun object))
+  (let ((state (hash-table-hash-fun-state object)))
+    (when (plusp state)
+      (format stream "~%Hash function state: ~S" state)))
   (terpri stream))
 
 (defmethod describe-object ((symbol symbol) stream)
