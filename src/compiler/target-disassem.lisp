@@ -1865,7 +1865,20 @@
            (type disassem-length length))
   (unless (sb-c::compiled-debug-info-p (%code-debug-info code))
     (return-from get-code-segments
-      (list (make-code-segment code start-offset length))))
+      (if (typep (%code-debug-info code) '(or hash-table (cons hash-table)))
+          (collect ((segs))
+            (dohash ((name locs) (sb-fasl::%asm-routine-table code))
+              (destructuring-bind (start end . index) locs
+                (declare (ignore index))
+                (let ((seg (make-code-segment code start (- (1+ end) start))))
+                  (push (make-offs-hook :offset 0
+                                        :fun (lambda (stream dstate)
+                                               (declare (ignore stream))
+                                               (note (string name) dstate)))
+                        (seg-hooks seg))
+                  (segs seg))))
+            (sort (segs) #'< :key #'seg-virtual-location))
+          (list (make-code-segment code start-offset length)))))
   (let ((segments nil)
         (sfcache (make-source-form-cache))
         (last-offset (code-n-unboxed-data-bytes code))
@@ -2091,22 +2104,7 @@
            (function (fun-code-header (%fun-fun thing)))
            (code-component thing)))
          (dstate (make-dstate))
-         (segments
-          (if (typep (%code-debug-info code-component) '(or hash-table (cons hash-table)))
-              (collect ((segs))
-                (dohash ((name locs) (sb-fasl::%asm-routine-table code-component))
-                  (destructuring-bind (start end . index) locs
-                    (declare (ignore index))
-                    (let ((seg (make-code-segment
-                                code-component start (- (1+ end) start))))
-                      (push (make-offs-hook :offset 0
-                                            :fun (lambda (stream dstate)
-                                                   (declare (ignore stream))
-                                                   (note (string name) dstate)))
-                            (seg-hooks seg))
-                      (segs seg))))
-                (sort (segs) #'< :key #'seg-virtual-location))
-              (get-code-segments code-component))))
+         (segments (get-code-segments code-component)))
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)
