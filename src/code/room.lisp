@@ -953,31 +953,9 @@ We could try a few things to mitigate this:
                   ;; between layout bitmap indices and indices as given to
                   ;; FUNCALLABLE-INSTANCE-INFO is not so obvious, and it's
                   ;; both tricky and unnecessary to generalize iteration.
-                  ;; So just hardcode the few cases that exist.
-                  #+compact-instance-header
-                  (ecase (layout-bitmap (%fun-layout ,obj))
-                    (-1 ; external trampoline, all slots are tagged
-                     ;; In this case, the trampoline word is scanned, with no ill effect.
-                     (loop for .i. from 0
-                           to (- (get-closure-length ,obj) funcallable-instance-info-offset)
-                           do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))
-                    (#b0110 ; internal trampoline, 2 raw slots, 1 tagged slot
-                     ;;   ^ ---- trampoline
-                     ;;  ^------ implementation function
-                     ;; ^------- (FUNCALLABLE-INSTANCE-INFO 0)
-                     ;; and the rest of the words are raw.
-                     (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
-                  #-compact-instance-header
-                  (progn
-                    (aver (eql (layout-bitmap (%fun-layout ,obj)) -4))
-                    ;;            v ----trampoline
-                    ;; = #b1...1100
-                    ;;           ^----- layout
-                    ;;          ^------ implementation function
-                    ;;         ^------- (FUNCALLABLE-INSTANCE-INFO 0)
-                    (loop for .i. from 0
-                          to (- (get-closure-length ,obj) funcallable-instance-info-offset)
-                          do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))))
+                  (loop for .i. from 0
+                        to (- (get-closure-length ,obj) funcallable-instance-info-offset)
+                        do (,functoid (%funcallable-instance-info ,obj .i.) ,@more))))
             .,(make-case 'function))) ; in case there was code provided for it
          (t
           ;; TODO: the generated code is pretty horrible. OTHER-POINTER-LOWTAG
