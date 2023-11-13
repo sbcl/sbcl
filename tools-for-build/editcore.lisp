@@ -2109,9 +2109,9 @@
        (declare (ignore vaddr size large))
        (when (symbolp obj)
          (when (or (and (eq (symbol-package-id obj) #.(symbol-package-id 'sb-impl:+internal-features+))
-                        (string= (symbol-name obj) "+INTERNAL-FEATURES+"))
+                        (string= (translate (symbol-name obj) spacemap) "+INTERNAL-FEATURES+"))
                    (and (eq (symbol-package-id obj) #.(symbol-package-id '*features*))
-                        (string= (symbol-name obj) "*FEATURES*")))
+                        (string= (translate (symbol-name obj) spacemap) "*FEATURES*")))
            (scan obj))))))
   ;;(format t "~&Target-features=~S~%" result)
   result)
@@ -2377,6 +2377,31 @@
             (write-sequence buffer output)))))
     (force-output output)))
 
+(defun walk-target-space (function space-id spacemap)
+  (let* ((space (get-space space-id spacemap))
+         (paddr (space-physaddr space spacemap)))
+    (map-objects-in-range function
+                          (%make-lisp-obj
+                           (if (= space-id static-core-space-id)
+                               ;; must not visit NIL, bad things happen
+                               (translate-ptr (+ static-space-start sb-vm::static-space-objects-offset)
+                                              spacemap)
+                               (sap-int paddr)))
+                          (%make-lisp-obj (sap-int (sap+ paddr (space-size space)))))))
+
+(defun find-target-asm-code (spacemap)
+  (walk-target-space (lambda (obj widetag size)
+                       (declare (ignore size))
+                       (when (= widetag code-header-widetag)
+                         (return-from find-target-asm-code
+                           (let* ((space (get-space static-core-space-id spacemap))
+                                  (vaddr (space-addr space))
+                                  (paddr (space-physaddr space spacemap)))
+                             (%make-lisp-obj
+                              (+ vaddr (- (get-lisp-obj-address obj)
+                                          (sap-int paddr))))))))
+                     static-core-space-id spacemap))
+
 (defun move-dynamic-code-to-text-space (input-pathname output-pathname)
   ;; Remove old files
   (ignore-errors (delete-file output-pathname))
@@ -2398,7 +2423,10 @@
                  (fwdmap (make-hash-table))
                  (n-objects)
                  (reserved-amount)
-                 (freeptr 0)
+                 ;; text space will contain a copy of the asm code so it can use call rel32 form
+                 (asm-code (find-target-asm-code spacemap))
+                 (asm-code-size (primitive-object-size (translate asm-code spacemap)))
+                 (freeptr asm-code-size)
                  (page-ranges
                   (walk-dynamic-space
                    :code spacemap
@@ -2409,12 +2437,16 @@
                        ;; new object will be at FREEPTR bytes from new space start
                        (setf (gethash (sap-int vaddr) fwdmap) freeptr)
                        (incf freeptr size))))))
+            (format t "~&scrotabeek ~s~%" asm-code)
             ;; FIXME: this _still_ doesn't work, because if the buid has :IMMOBILE-SPACE
             ;; then the symbols CL:*FEATURES* and SB-IMPL:+INTERNAL-FEATURES+
             ;; are not in dynamic space.
             (when (member :immobile-space target-features)
               (error "Can't relocate code to text space since text space already exists"))
-            (setq codeblobs (nreverse codeblobs)
+            (setq codeblobs
+                  (acons (int-sap (logandc2 (get-lisp-obj-address asm-code) lowtag-mask))
+                         asm-code-size
+                         (nreverse codeblobs))
                   n-objects (length codeblobs))
             ;; Preceding the code objects is a vector of uint32_t indicating the
             ;; starting offset (from the space start) of each code object.
@@ -2451,18 +2483,12 @@
                        (paddr (space-physaddr space spacemap))
                        (diff (+ (- (sap-int paddr)) vaddr)))
                   (format t "~&Fixing ~A~%" space)
-                  (map-objects-in-range
+                  (walk-target-space
                     (lambda (object widetag size)
                       (declare (ignore widetag size))
                       (unless (and (code-component-p object) (= space-id dynamic-core-space-id))
                         (update-quasi-static-code-ptrs object spacemap fwdmap diff)))
-                    (%make-lisp-obj
-                     (if (= space-id static-core-space-id)
-                         ;; must not visit NIL, bad things happen
-                         (translate-ptr (+ static-space-start sb-vm::static-space-objects-offset)
-                                        spacemap)
-                         (sap-int paddr)))
-                    (%make-lisp-obj (sap-int (sap+ paddr (space-size space)))))))
+                   space-id spacemap)))
               ;; Walk new space and fix pointers into itself
               (format t "~&Fixing newspace~%")
               (map-objects-in-range
@@ -2471,7 +2497,8 @@
                    (update-quasi-static-code-ptrs object spacemap fwdmap 0))
                  (%make-lisp-obj (sap-int new-space))
                  (%make-lisp-obj (sap-int (sap+ new-space freeptr))))
-              (zerofill-old-code spacemap codeblobs page-ranges)
+              ;; don't zerofill asm code in static space
+              (zerofill-old-code spacemap (cdr codeblobs) page-ranges)
               ;; Update the core header to contain newspace
               (let ((spaces (nreconc
                              (mapcar (lambda (space)
@@ -2482,7 +2509,7 @@
                                      space-list)
                              `((0 ,immobile-text-core-space-id ,new-space
                                   ,+code-space-nominal-address+
-                                  ,(ash new-space-nbytes (- word-shift)))))))
+                                  ,(ash freeptr (- word-shift)))))))
                 (rewrite-core spaces spacemap card-mask-nbits initfun
                               core-header core-dir-start output)
                 ))))))))
