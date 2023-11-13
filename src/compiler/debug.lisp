@@ -927,8 +927,9 @@
      (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
     (clambda
      (format stream "lambda ~@[~S ~]~:S"
-             (and (leaf-has-source-name-p leaf)
-                  (functional-debug-name leaf))
+             (if (leaf-has-source-name-p leaf)
+                 (leaf-source-name leaf)
+                 (functional-debug-name leaf))
              (mapcar #'leaf-debug-name (lambda-vars leaf))))
     (optional-dispatch
      (format stream "optional-dispatch ~S" (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))

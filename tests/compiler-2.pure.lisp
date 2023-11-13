@@ -4295,3 +4295,16 @@
             (hash-table-test (return)))))
    ((t) 10)
    ((nil) nil)))
+
+(with-test (:name :inlining-deleted-go-tag)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+     (tagbody
+        (labels ((f () (go t)))
+          (declare (inline f))
+          (funcall a #'f)
+          (multiple-value-call #'f (values)))
+      t)
+     2)
+   ((#'list) 2)))

@@ -231,6 +231,8 @@ constrained to be used only within the dynamic extent of the TAGBODY."
                                     tag)))
          (entry (first found))
          (exit (make-exit :entry entry)))
+    (when (ctran-deleted-p (second found))
+      (throw 'locall-already-let-converted (second found)))
     (push exit (entry-exits entry))
     (link-node-to-previous-ctran exit start)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
