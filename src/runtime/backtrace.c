@@ -610,6 +610,7 @@ log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE 
     print_backtrace_frame(ra, next_fp, i, f);
     fp = next_fp;
   }
+  fflush(f);
 }
 void backtrace_from_fp(void *fp, int nframes, int start) {
     log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
