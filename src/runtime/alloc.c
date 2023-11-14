@@ -365,18 +365,6 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;
-        // Unroll x 4
-        int n_unrolled_iterations = ncells >> 2;
-        struct cons* limit = c + n_unrolled_iterations * 4;
-        while (c < limit) {
-            c[0].car = context[ 0]; c[0].cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
-            c[1].car = context[-1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
-            c[2].car = context[-2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
-            c[3].car = context[-3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
-            c += 4;
-            context -= 4;
-        }
-        ncells -= n_unrolled_iterations * 4;
         while (ncells--) {
             c->car = *context--;
             c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
@@ -406,18 +394,6 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;
-        // Unroll x 4
-        int n_unrolled_iterations = ncells >> 2;
-        struct cons* limit = c + n_unrolled_iterations * 4;
-        while (c < limit) {
-            c[0].car = context[ 0]; c[0].cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
-            c[1].car = context[ 1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
-            c[2].car = context[ 2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
-            c[3].car = context[ 3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
-            c += 4;
-            context += 4;
-        }
-        ncells -= n_unrolled_iterations * 4;
         while (ncells--) {
             c->car = *context++;
             c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
