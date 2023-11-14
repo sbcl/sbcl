@@ -505,3 +505,16 @@
                (when (and (eq (first data) :declare)
                           (eq (second data) 'sb-c::tlab))
                  (return (eq (third data) :system))))))))
+
+(defun call-out-pseudo-atomic-p (vop)
+  (declare (ignorable vop))
+  ;; If #+sb-safepoint, the decision to poll for a safepoint
+  ;; occurs at the end. In that case, we can not prevent stop-for-GC
+  ;; from occurring in the C code, because foreign code is allowed
+  ;; to run during GC; it just can't go back into Lisp until GC is over.
+  #-sb-safepoint
+  (loop for e = (sb-c::node-lexenv (sb-c::vop-node vop))
+        then (sb-c::lexenv-parent e)
+        while e
+        thereis (sb-c::lexenv-find 'sb-vm::.pseudo-atomic-call-out.
+                                   vars :lexenv e)))
