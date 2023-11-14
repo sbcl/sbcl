@@ -4308,3 +4308,15 @@
       t)
      2)
    ((#'list) 2)))
+
+(with-test (:name :inling-non-convertible-locals)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (labels ((f (&key m)
+                 (values m x)))
+        (declare (inline f))
+        (eval (f))
+        (f x 30)))
+   ((:m) (values 30 :m))
+   ((:allow-other-keys) (values nil :allow-other-keys))))

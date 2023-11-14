@@ -932,7 +932,11 @@
                  (functional-debug-name leaf))
              (mapcar #'leaf-debug-name (lambda-vars leaf))))
     (optional-dispatch
-     (format stream "optional-dispatch ~S" (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))
+     (format stream "optional-dispatch ~a ~S"
+             (if (leaf-has-source-name-p leaf)
+                 (leaf-source-name leaf)
+                 (functional-debug-name leaf))
+             (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))
     (functional
      (case (functional-kind leaf)
        (:toplevel-xep

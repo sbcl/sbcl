@@ -547,7 +547,15 @@
         ((lambda-p fun)
          t)
         (t ;; Hairy
-         t)))
+         (let ((min-args (optional-dispatch-min-args fun))
+               (max-args (optional-dispatch-max-args fun))
+               (call-args (length (combination-args call))))
+           (cond ((< call-args min-args)
+                  nil)
+                 ((<= call-args max-args)
+                  t)
+                 ((optional-dispatch-more-entry fun)
+                  (convert-more-call-p call fun)))))))
 
 ;;; Attempt to convert a multiple-value call. The only interesting
 ;;; case is a call to a function that LOOKS-LIKE-AN-MV-BIND, has
@@ -858,6 +866,53 @@
                                  (ignores) (call-args)))))
 
   (values))
+
+(defun convert-more-call-p (call fun)
+  (let* ((max (optional-dispatch-max-args fun))
+         (arglist (optional-dispatch-arglist fun))
+         (args (combination-args call))
+         (more (nthcdr max args))
+         (loser nil)
+         (allowp nil)
+         (allow-found nil))
+    (dolist (var arglist)
+      (let ((info (lambda-var-arg-info var)))
+        (when info
+          (case (arg-info-kind info)
+            ((:more-context :more-count)
+             (return-from convert-more-call-p nil))))))
+
+    (when (optional-dispatch-keyp fun)
+      (when (oddp (length more))
+        (return-from convert-more-call-p nil))
+
+      (do ((key more (cddr key)))
+          ((null key))
+        (let ((lvar (first key)))
+          (unless (constant-lvar-p lvar)
+            (return-from convert-more-call-p nil))
+
+          (let ((name (lvar-value lvar)))
+            (when (and (eq name :allow-other-keys) (not allow-found))
+              (let ((val (second key)))
+                (cond ((constant-lvar-p val)
+                       (setq allow-found t
+                             allowp (lvar-value val)))
+                      (t
+                       (return-from convert-more-call-p nil)))))
+            (dolist (var arglist
+                         (unless (eq name :allow-other-keys)
+                           (setq loser (list name))))
+              (let ((info (lambda-var-arg-info var)))
+                (when info
+                  (case (arg-info-kind info)
+                    (:keyword
+                     (when (eq (arg-info-key info) name)
+                       (return))))))))))
+
+      (when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
+        (return-from convert-more-call-p nil)))
+    t))
 
 ;;;; LET conversion
 ;;;;
