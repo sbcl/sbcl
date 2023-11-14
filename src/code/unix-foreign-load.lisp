@@ -11,6 +11,7 @@
 
 (in-package "SB-ALIEN")
 
+(sb-vm:with-pseudo-atomic-foreign-calls
 (define-alien-routine dlopen system-area-pointer
   (file c-string) (mode int))
 
@@ -24,7 +25,7 @@
     #+openbsd ("os_dlsym" dlsym)
     system-area-pointer
   (handle system-area-pointer)
-  (symbol c-string))
+  (symbol c-string)))
 
 (defun dlopen-or-lose (&optional (obj nil objp))
   (when objp

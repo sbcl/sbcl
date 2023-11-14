@@ -196,7 +196,11 @@ symbol designates a variable. May enter the symbol into the linkage-table."
       ;; How exactly was this deadlocking?  A reductio ad absurdum argument
       ;; says that every call into a system API could potentially acquire
       ;; a lock, and therefore every one should inhibit GC. But they don't.
-      (let ((err (alien-funcall dladdr addr (addr info))))
+      ;; However: We now try to allow libdl to acquire its internal locks in a GCing
+      ;; thread, which means that we need all user threads to agree not to stop
+      ;; for GC in the midst of _any_ libdl call.
+      (let ((err (sb-vm:with-pseudo-atomic-foreign-calls
+                     (alien-funcall dladdr addr (addr info)))))
         (if (zerop err)
             nil
             (slot info 'symbol))))
