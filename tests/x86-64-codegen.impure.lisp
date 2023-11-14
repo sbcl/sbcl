@@ -710,23 +710,6 @@
   (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
     (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
 
-#+immobile-code
-(with-test (:name :debug-fun-from-pc-more-robust)
-  ;; This test verifies that debug-fun-from-pc does not croak when the PC points
-  ;; within a trampoline allocated to wrap a closure in a simple-funifying layout
-  ;; for installation into a global symbol.
-  (let ((closure (funcall (compile nil '(lambda (x)  (lambda () x))) 0))
-        (symbol (gensym)))
-    (assert (sb-kernel:closurep closure))
-    (setf (fdefinition symbol) closure)
-    (let ((trampoline
-            (sb-di::code-header-from-pc
-             (sb-sys:int-sap (sb-vm::fdefn-raw-addr
-                              (sb-int:find-fdefn symbol))))))
-      (assert (zerop (sb-kernel:code-n-entries trampoline)))
-      (assert (typep (sb-di::debug-fun-from-pc trampoline 8)
-                     'sb-di::bogus-debug-fun)))))
-
 (defstruct foo (s 0 :type (or null string)))
 (with-test (:name :reduce-stringp-to-not-null)
   (let ((f1 (disassembly-lines

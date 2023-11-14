@@ -221,28 +221,13 @@
 
 #+immobile-code
 (progn
-(defconstant trampoline-entry-offset n-word-bytes)
-(defun make-simplifying-trampoline (fun)
-  ;; 'alloc' is compiled after this file so we don't see the derived type.
-  ;; But slam found a conflict on recompile.
-  (let ((code (truly-the (values code-component (integer 0) &optional)
-                         (allocate-code-object :dynamic 3 24)))) ; KLUDGE
-    (setf (%code-debug-info code) fun)
-    (with-pinned-objects (code)
-      (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
-            (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
-                   (ash code-debug-info-slot word-shift))))
-        (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
-              (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7)); disp
-              (sap-ref-32 sap 7) #xFD60FF))) ; JMP [RAX-3]
-    ;; Verify that the jump table size reads as  0.
-    (aver (zerop (code-jump-table-words code)))
-    ;; It is critical that there be a trailing 'uint16' of 0 in this object
-    ;; so that CODE-N-ENTRIES reports 0.  By luck, there is exactly enough
-    ;; room in the object to hold two 0 bytes. It would be easy enough to enlarge
-    ;; by 2 words if it became necessary. The assertions makes sure we stay ok.
-    (aver (zerop (code-n-entries code)))
-    code))
+(sb-kernel:!defstruct-with-alternate-metaclass closure-trampoline
+  :slot-names ()
+  :constructor %alloc-closure-trampoline
+  :superclass-name function
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
+  :dd-type funcallable-structure)
 
 (defun fdefn-has-static-callers (fdefn)
   (declare (type fdefn fdefn))
@@ -262,20 +247,18 @@
            (values function))
   (when (fdefn-has-static-callers fdefn)
     (remove-static-links fdefn))
-  (let ((trampoline (when (closurep fun)
-                      (make-simplifying-trampoline fun)))) ; a newly made CODE object
-    (with-pinned-objects (fdefn trampoline fun)
-      (let* ((jmp-target
-              (if trampoline
-                  ;; Jump right to code-instructions + N. There's no simple-fun.
-                  (sap-int (sap+ (code-instructions trampoline)
-                                 trampoline-entry-offset))
-                  ;; CLOSURE-CALLEE accesses the self pointer of a funcallable
-                  ;; instance w/ builtin trampoline, or a simple-fun.
-                  ;; But the result is shifted by N-FIXNUM-TAG-BITS because
-                  ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
-                  (get-lisp-obj-address (%closure-callee fun)))))
-        (%primitive sb-vm::set-direct-callable-fdefn-fun fdefn fun jmp-target))))
+  (let ((jmp-target (if (closurep fun)
+                        (let ((instance (%alloc-closure-trampoline)))
+                          (setf (%funcallable-instance-fun instance) fun)
+                          instance)
+                        fun)))
+    (with-pinned-objects (jmp-target)
+      ;; CLOSURE-CALLEE accesses the self pointer of a funcallable
+      ;; instance w/ builtin trampoline, or a simple-fun.
+      ;; But the result is shifted by N-FIXNUM-TAG-BITS because
+      ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
+      (%primitive sb-vm::set-direct-callable-fdefn-fun fdefn fun
+                  (get-lisp-obj-address (%closure-callee jmp-target)))))
   fun)
 
 ) ; end PROGN

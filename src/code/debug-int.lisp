@@ -1271,8 +1271,6 @@ register."
                                                       sb-vm::undefined-alien-tramp))
                                       "undefined function")
                                      (routine)))))
-      (closure ; interrupted in an immobile code trampoline
-       (make-bogus-debug-fun "closure-calling trampoline"))
       ((eql :bpt-lra)
        (make-bogus-debug-fun "function end breakpoint")))))
 

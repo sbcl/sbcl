@@ -580,56 +580,25 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-static __attribute__((unused)) bool codeblob_p(lispobj ptr) {
-    return lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
-           widetag_of((lispobj*)(ptr-OTHER_POINTER_LOWTAG)) == CODE_HEADER_WIDETAG;
-}
-
 /* Return the tagged pointer for which 'entrypoint' is the starting address.
- * This will be one of the following:
- * 1. a fun-pointer which is either
- *   - a simple-fun header located 2 words before the entrypoint.
- *     N.B.: This returns the SIMPLE-FUN, and _not_ its containing codeblob.
- *   - a funcallable-instance with an embedded trampoline that make it
- *     equivalent to a simple-fun
- * 2. a code-component with no simple-fun within it, that makes closures
- *    callable like simple-funs. The code header is at entrypoint minus 4 words.
- *
- * By first reading at (entrypoint - 2*N_WORD_BYTES) this does the right thing
- * when 'entrypoint' is actually type 2, because the word accessed will not be
- * an object header or forwarding marker (it will be whatever %CODE-DEBUG-INFO is).
- * Whereis if this were type 1, but we read at (entrypoint - 4*N_WORD_BYTES) first,
- * then we could perceive random uninitialized bytes of the preceding object.
+ * This result will have SIMPLE_FUN_WIDETAG or FUNCALLABLE_INSTANCE_WIDETAG.
+ * If the thing has been forwarded, we do NOT return the newspace copy.
  */
 lispobj entrypoint_taggedptr(uword_t entrypoint) {
     if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
-    // First try
     lispobj* phdr = (lispobj*)(entrypoint - 2*N_WORD_BYTES);
+    unsigned char widetag = widetag_of(phdr);
     if (forwarding_pointer_p(phdr)) {
-        gc_dcheck(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
+        lispobj fpval = forwarding_pointer_value(phdr);
+        gc_assert(lowtag_of(fpval) == FUN_POINTER_LOWTAG);
+        // We can't assert on the widetag if forwarded, because defragmentation
+        // puts the new logical object at some totally different physical address.
+        // This function doesn't know if defrag is occurring.
         return make_lispobj(phdr, FUN_POINTER_LOWTAG);
     }
-    int widetag = widetag_of(phdr);
-    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG || widetag == SIMPLE_FUN_WIDETAG) {
-        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
-    }
-    // Second try
-    phdr = (lispobj*)(entrypoint - 4*N_WORD_BYTES);
-    /* It is nearly impossible for forwarding to arise, by this reasoning:
-     * Case A: if some thread references the codeblob that wraps a closure,
-     *  then the codeblob is pinned; hence not forwarded.
-     * Case B: if not executing (or otherwise referenced from stack/registers),
-     *  there can exist no other tagged reference to the codeblob.
-     * Aside from the FDEFN that owns it, the only other untagged reference would
-     * be from the search tree, which isn't scavenged. (The entire tree dies after GC.)
-     * It's conceivable the debugger could store a tagged pointer to this entrypoint
-     * in something, but I tried to make it do so, and couldn't. I was, however, able
-     * to artificially cause forwarding by putting closure trampolines in symbols */
-    if (forwarding_pointer_p(phdr))
-        gc_dcheck(codeblob_p(forwarding_pointer_value(phdr)));
-    else
-        gc_dcheck(widetag_of(phdr) == CODE_HEADER_WIDETAG);
-    return make_lispobj(phdr, OTHER_POINTER_LOWTAG);
+    gc_assert(widetag == SIMPLE_FUN_WIDETAG || widetag == FUNCALLABLE_INSTANCE_WIDETAG);
+    return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+
 }
 /* Return the lisp object that fdefn's raw_addr slot jumps to.
  * In the event that the referenced object was forwarded, this returns the un-forwarded
