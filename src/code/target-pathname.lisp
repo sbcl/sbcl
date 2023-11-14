@@ -74,7 +74,7 @@
   ;; Specifically, hashes that depend on object identity (address) are impermissible.
   (dolist (piece pieces)
     (aver (typep piece '(or string symbol (cons (eql :character-set) string)))))
-  (%make-pattern (sxhash pieces) pieces))
+  (%make-pattern (pathname-sxhash pieces) pieces))
 
 (declaim (inline %pathname-directory))
 (defun %pathname-directory (pathname) (car (%pathname-dir+hash pathname)))
@@ -574,14 +574,16 @@
 (sb-kernel::assign-equalp-impl 'pathname #'pathname=)
 (sb-kernel::assign-equalp-impl 'logical-pathname #'pathname=)
 
-;;; Hash either a PATHNAME or a PATHNAME-DIRECTORY. This is called by both SXHASH
-;;; and by the interning of pathnames, which uses a multi-step approaching to
-;;; coalescing shared subparts. If an EQUAL directory was used before, we share that.
+;;; Hash a PATHNAME or a PATHNAME-DIRECTORY or pieces of a PATTERN.
+;;; This is called by both SXHASH and by the interning of pathnames, which uses a
+;;; multi-step approaching to coalescing shared subparts.
+;;; If an EQUAL directory was used before, we share that.
 ;;; Since a directory is stored with its hash precomputed, hashing a PATHNAME as a
 ;;; whole entails at most 4 more MIX operations. So using pathnames as keys in
 ;;; a hash-table pays a small up-front price for later speed improvement.
 (defun pathname-sxhash (x)
-  (flet ((hash-piece (piece)
+  (labels
+      ((hash-piece (piece)
            (etypecase piece
              (string
               (let ((res (length piece)))
@@ -591,6 +593,8 @@
                     (sxhash piece))))
              (symbol (sxhash piece)) ; transformed
              (pattern (pattern-hash piece))
+             ;; next case is only for MAKE-PATTERN
+             ((cons (eql :character-set)) (hash-piece (the string (cdr piece))))
              ((cons (eql :home) (cons string null))
               ;; :HOME has two representations- one is just '(:absolute :home ...)
               ;; and the other '(:absolute (:home "user") ...)
@@ -610,7 +614,7 @@
          ;; and the observation that in this implementation of Lisp:
          ;;  (equal (make-pathname :version 1) (make-pathname :version 15)) => T
          hash))
-      (list ;; a directory
+      (list ;; a directory, or the PIECES argument to MAKE-PATTERN
        (let ((hash 0))
          (dolist (piece x hash)
            (mixf hash (hash-piece piece))))))))

@@ -983,4 +983,6 @@
   ;; examples from xof's email
   (assert (/= (sxhash #P"APPVA") (sxhash #P"APPKZ")))
   (assert (/= (sxhash #P"AVERA") (sxhash #P"AVEQR")))
-  (assert (/= (sxhash #P"AVERB") (sxhash #P"AVEQS"))))
+  (assert (/= (sxhash #P"AVERB") (sxhash #P"AVEQS")))
+  ;; still more
+  (assert (/= (sxhash #P"a[bc]d?x") (sxhash #P"a[bc]d?z"))))
