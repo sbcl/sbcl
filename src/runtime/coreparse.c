@@ -84,7 +84,7 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
-#if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_CODE)
+#if defined LISP_FEATURE_LINUX && defined LISP_FEATURE_X86_64
 #define ELFCORE 1
 #elif !defined(ELFCORE)
 #define ELFCORE 0
@@ -645,10 +645,16 @@ void calc_asm_routine_bounds()
     } else {
         lispobj *where = (lispobj*)STATIC_SPACE_OBJECTS_START;
         for (; where < static_space_free_pointer; where += object_size(where))
-            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
+            if (widetag_of(where) == CODE_HEADER_WIDETAG) {
                 asm_routines_start = (uword_t)where;
                 break;
             }
+        if (!asm_routines_start && TEXT_SPACE_START != 0) {
+            lispobj *where = (lispobj*)TEXT_SPACE_START;
+            where += object_size(where);
+            gc_assert(widetag_of(where) == CODE_HEADER_WIDETAG);
+            asm_routines_start = (uword_t)where;
+        }
         if (!asm_routines_start) lose("Can't find asm routines");
     }
 #endif
@@ -740,6 +746,9 @@ process_directory(int count, struct ndir_entry *entry,
                   struct coreparse_space *spaces,
                   struct heap_adjust *adj)
 {
+    // If ELF core is supported, then test whether the weak symbol
+    // 'lisp_code_start' exists in this executable. If it does, then parse
+    // the ELF sections containing Lisp code and everything else.
 #if ELFCORE
     if (&lisp_code_start) {
         TEXT_SPACE_START = (uword_t)&lisp_code_start;
@@ -757,17 +766,22 @@ process_directory(int count, struct ndir_entry *entry,
         // unprotect the pages
         os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        // ELF core without immobile space has alien linkage space below static space.
         ALIEN_LINKAGE_TABLE_SPACE_START =
             (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
                                        ALIEN_LINKAGE_TABLE_SPACE_SIZE);
+#endif
     } else
 #endif
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // NB: The preceding 'else', if it's there, needs at least an empty
+    // statement following it if there is no immobile space.
     {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
         spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size +=
             text_space_size + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
-    }
 #endif
+    }
 
     for ( ; --count >= 0 ; ++entry) {
         long id = entry->identifier;

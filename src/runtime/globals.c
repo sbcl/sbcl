@@ -95,3 +95,16 @@ void globals_init(void)
 
 uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 lispobj *text_space_highwatermark;
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+/* this is a KLUDGE. If #+immobile-space then text_space_size gets statically
+ * initialized from the genesis constant TEXT_SPACE_SIZE, as it requires because
+ * the text space card table is allocated before parsing the core.
+ * But if #-immobile-space then genesis does not emit that constant.
+ * The right thing might be to read the space size from the core before making
+ * the card table. But I don't want to, since I have WIP to remove the card table
+ * for code and instead track written objects in a linked list. (Card table scan
+ * time is proportional to space size, but remembered set scan time is proportional
+ * to old object mutation rate which is near zero for pages of code)
+ */
+unsigned int text_space_size;
+#endif
