@@ -92,10 +92,12 @@ open_binary(char *filename, int mode)
 
 #if !ELFCORE
 int lisp_code_in_elf() { return 0; }
+lispobj* get_alien_linkage_table_initializer() { return 0; }
 #else
 extern __attribute__((weak)) lispobj
  lisp_code_start, lisp_jit_code, lisp_code_end, alien_linkage_values;
 int lisp_code_in_elf() { return &lisp_code_start != 0; }
+lispobj* get_alien_linkage_table_initializer() { return &alien_linkage_values; }
 #endif
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
@@ -758,19 +760,6 @@ process_directory(int count, struct ndir_entry *entry,
         ALIEN_LINKAGE_TABLE_SPACE_START =
             (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
                                        ALIEN_LINKAGE_TABLE_SPACE_SIZE);
-        // Prefill the alien linkage table so that shrinkwrapped executables which link in
-        // all their C library dependencies can avoid linking with -ldl
-        // but extern-alien still works for newly compiled code.
-        lispobj* ptr = &alien_linkage_values;
-        gc_assert(ptr);
-        extern int alien_linkage_table_n_prelinked;
-        int n = alien_linkage_table_n_prelinked = *ptr++;
-        int index = 0;
-        for ( ; n-- ; index++ ) {
-            bool datap = *ptr == (lispobj)-1; // -1 can't be a function address
-            if (datap) ++ptr;
-            arch_write_linkage_table_entry(index, (void*)*ptr++, datap);
-        }
     } else
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

@@ -176,24 +176,38 @@ os_dlsym_default(char *name)
 #endif
 
 int alien_linkage_table_n_prelinked;
+extern lispobj* get_alien_linkage_table_initializer();
 void os_link_runtime()
 {
-    if (alien_linkage_table_n_prelinked)
-        return; // Linkage was already performed by coreparse
+    lispobj* table = get_alien_linkage_table_initializer();
+    if (table) {
+        // Prefill the alien linkage table so that shrinkwrapped executables which
+        // link in all their C library dependencies can avoid linking with -ldl
+        // but extern-alien still works for newly compiled code.
+        lispobj* ptr = table;
+        int n = alien_linkage_table_n_prelinked = *ptr++;
+        int index = 0;
+        for ( ; n-- ; index++ ) {
+            bool datap = *ptr == (lispobj)-1; // -1 can't be a function address
+            if (datap) ++ptr;
+            arch_write_linkage_table_entry(index, (void*)*ptr++, datap);
+        }
+        return;
+    }
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    alien_linkage_table_n_prelinked = vector_len(symbols);
-    int j;
-    for (j = 0 ; j < alien_linkage_table_n_prelinked ; ++j)
+    int n = alien_linkage_table_n_prelinked = vector_len(symbols);
+    int index;
+    for (index = 0 ; index < n ; ++index)
     {
-        lispobj item = symbols->data[j];
+        lispobj item = symbols->data[index];
         bool datap = listp(item);
         lispobj symbol_name = datap ? CONS(item)->car : item;
         char *namechars = vector_sap(symbol_name);
         void* result = os_dlsym_default(namechars);
 
         if (result) {
-            arch_write_linkage_table_entry(j, result, datap);
+            arch_write_linkage_table_entry(index, result, datap);
         } else { // startup might or might not work. ymmv
             fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
         }
