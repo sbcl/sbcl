@@ -2620,6 +2620,14 @@
                                 #-sb-xc-host type))))
                        nil))
 
+(deftransform code-char ((code))
+  (splice-fun-args code 'char-code 1)
+  'code)
+
+(deftransform char-code ((char))
+  (splice-fun-args char 'code-char 1)
+  'char)
+
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
 
