@@ -268,3 +268,36 @@
       (zerop (rem a 8)))
    ((7) nil)
    ((-9) nil)))
+
+(with-test (:name :unexpected-immediates-in-vops)
+  (checked-compile
+   `(lambda (n)
+      (declare (fixnum n))
+      (loop for i below 2
+            do (print (logbitp i n))
+               (the (satisfies minusp) i))))
+  (checked-compile
+   `(lambda ()
+      (loop for i below 2
+            do (print (lognot i))
+               (the (satisfies minusp) i))))
+  (checked-compile
+   `(lambda ()
+      (loop for i below 2
+            do (print (- i))
+               (the (satisfies minusp) i))))
+  (checked-compile
+   `(lambda ()
+      (loop for i below 2
+            do (print (* i 3))
+               (the (satisfies minusp) i))))
+  (checked-compile
+   `(lambda ()
+      (loop for i below 2
+            do (print (* i 3))
+               (the (satisfies minusp) i))))
+  (checked-compile
+   `(lambda ()
+      (loop for i of-type fixnum below 2
+            do (print (logand most-positive-word (* i 4)))
+               (the (satisfies minusp) i)))))

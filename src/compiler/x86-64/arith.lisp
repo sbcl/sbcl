@@ -25,16 +25,16 @@
   (:policy :fast-safe))
 
 (define-vop (fixnum-unop fast-safe-arith-op)
-  (:args (x :scs (any-reg control-stack) :target res :load-if nil))
-  (:results (res :scs (any-reg control-stack) :load-if nil))
+  (:args (x :scs (any-reg control-stack) :target res))
+  (:results (res :scs (any-reg control-stack)))
   (:temporary (:sc unsigned-reg) temp)
   (:note "inline fixnum arithmetic")
   (:arg-types tagged-num)
   (:result-types tagged-num))
 
 (define-vop (signed-unop fast-safe-arith-op)
-  (:args (x :scs (signed-reg signed-stack) :target res :load-if nil))
-  (:results (res :scs (signed-reg signed-stack) :load-if nil))
+  (:args (x :scs (signed-reg signed-stack) :target res))
+  (:results (res :scs (signed-reg signed-stack)))
   (:temporary (:sc unsigned-reg) temp)
   (:note "inline (signed-byte 64) arithmetic")
   (:arg-types signed-num)
@@ -69,14 +69,14 @@
   (:generator 2 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-negate/unsigned signed-unop)
-  (:args (x :scs (unsigned-reg unsigned-stack) :target res :load-if nil))
+  (:args (x :scs (unsigned-reg unsigned-stack) :target res))
   (:arg-types unsigned-num)
   (:translate %negate)
   (:vop-var vop)
   (:generator 3 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-negate/signed-unsigned signed-unop)
-  (:results (res :scs (unsigned-reg unsigned-stack) :load-if nil))
+  (:results (res :scs (unsigned-reg unsigned-stack)))
   (:result-types unsigned-num)
   (:translate %negate)
   (:vop-var vop)
@@ -403,32 +403,29 @@
                           &aux (note (format nil "inline ~(~a~) arithmetic" type))
                                (op (ecase fun-name (+ 'add) (- 'sub) (* 'mul)))
                                (emit (if (eq op 'mul) 'emit-inline-smul 'emit-inline-add-sub)))
-             ;; Avoid some unnecessary code in the vop generator by specifying
-             ;; ":load-if nil" everywhere. This is not about semantics -
-             ;; it's just removing code that would be unreachable.
              `(progn
                 (define-vop (,name fast-safe-arith-op)
                   (:translate ,fun-name)
-                  (:args (x :scs (,@scs immediate) :load-if nil ,@(if (eq op 'sub)
-                                                                      '(:target r)))
-                         (y :scs (,@scs immediate) :load-if nil))
+                  (:args (x :scs (,@scs) ,@(if (eq op 'sub)
+                                               '(:target r)))
+                         (y :scs (,@scs immediate)))
                   (:arg-types ,primtype ,primtype)
                   (:results (r :scs ,scs :load-if nil))
                   (:result-types ,primtype)
                   (:temporary (:sc unsigned-reg) temp)
-                  (:vop-var vop) ;; (:node-var node)
+                  (:vop-var vop)
                   (:note ,note)
                   (:generator ,(1+ cost)
                    (,emit ',op x y r temp vop ',val-xform ,@extra)))
                 (define-vop (,name/c fast-safe-arith-op)
                   (:translate ,fun-name)
-                  (:args (x :scs ,scs :load-if nil))
+                  (:args (x :scs ,scs))
                   (:info y)
                   (:arg-types ,primtype (:constant ,type))
                   (:results (r :scs ,scs :load-if nil))
                   (:result-types ,primtype)
                   (:temporary (:sc unsigned-reg) temp)
-                  (:vop-var vop) ;; (:node-var node)
+                  (:vop-var vop)
                   (:note ,note)
                   (:generator ,cost
                    (,emit ',op x (,val-xform y) r temp vop ',val-xform ,@extra))))))
@@ -461,7 +458,7 @@
 
 (define-vop (fast--/unsigned=>signed fast-safe-arith-op)
   (:translate -)
-  (:args (x :scs (unsigned-reg unsigned-stack immediate) :target r :load-if nil)
+  (:args (x :scs (unsigned-reg unsigned-stack) :target r)
          (y :scs (unsigned-reg unsigned-stack immediate) :load-if nil))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (signed-reg signed-stack) :load-if nil))
@@ -2656,7 +2653,7 @@
   (:translate logbitp)
   (:conditional :c)
   (:args (bit :scs (signed-reg signed-stack unsigned-reg unsigned-stack
-                    any-reg control-stack) :load-if nil)
+                    any-reg control-stack))
          ;; CONSTANT here is to allow integers exceeding a fixnum which get NIL
          ;; from IMMEDIATE-CONSTANT-SC. This is only an issue for vops which don't
          ;; take a codegen info for the constant.
@@ -2681,7 +2678,7 @@
   (:conditional :c)
   (:info bit)
   (:args (int :scs (signed-reg signed-stack unsigned-reg unsigned-stack
-                    any-reg control-stack) :load-if nil))
+                    any-reg control-stack)))
   (:arg-types (:constant (mod 64)) untagged-num)
   (:vop-var vop)
   (:generator 1
@@ -3056,7 +3053,7 @@
          (:result-types unsigned-num)
          (:translate ,function))
       `(define-vop (,name ,prototype)
-         (:args (x :target r :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :load-if nil))
+         (:args (x :target r :scs (unsigned-reg signed-reg unsigned-stack signed-stack)))
          (:info y)
          (:arg-types untagged-num (:constant (or (unsigned-byte 64) (signed-byte 64))))
          (:results (r :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :load-if nil))
