@@ -205,3 +205,9 @@
                                    (char-downcase char-b))
                 do (assert (eql (funcall fun char-a char-b)
                                 equal))))))
+(with-test (:name :code-char-type-unions)
+  (assert-type
+   (lambda (b)
+     (declare ((or (eql 5) (eql 10)) b))
+     (typep (code-char b) 'base-char))
+   (member t)))

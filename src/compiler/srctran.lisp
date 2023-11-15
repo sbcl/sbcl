@@ -2598,29 +2598,27 @@
             `(mod ,char-code-limit))))))
 
 (defoptimizer (code-char derive-type) ((code))
-  (let ((type (lvar-type code)))
-    ;; FIXME: unions of integral ranges?  It ought to be easier to do
-    ;; this, given that CHARACTER-SET is basically an integral range
-    ;; type.  -- CSR, 2004-10-04
-    (when (numeric-type-p type)
-      (let* ((lo (numeric-type-low type))
-             (hi (numeric-type-high type))
-             (type (specifier-type `(character-set ((,lo . ,hi))))))
-        (cond
-          ;; KLUDGE: when running on the host, we lose a slight amount
-          ;; of precision so that we don't have to "unparse" types
-          ;; that formally we can't, such as (CHARACTER-SET ((0
-          ;; . 0))).  -- CSR, 2004-10-06
-          #+sb-xc-host
-          ((csubtypep type (specifier-type 'standard-char)) type)
-          #+sb-xc-host
-          ((csubtypep type (specifier-type 'base-char))
-           (specifier-type 'base-char))
-          #+sb-xc-host
-          ((csubtypep type (specifier-type 'extended-char))
-           (specifier-type 'extended-char))
-          (t #+sb-xc-host (specifier-type 'character)
-             #-sb-xc-host type))))))
+  (one-arg-derive-type code
+                       (lambda (type)
+                         (let* ((lo (numeric-type-low type))
+                                (hi (numeric-type-high type))
+                                (type (specifier-type `(character-set ((,lo . ,hi))))))
+                           (cond
+                             ;; KLUDGE: when running on the host, we lose a slight amount
+                             ;; of precision so that we don't have to "unparse" types
+                             ;; that formally we can't, such as (CHARACTER-SET ((0
+                             ;; . 0))).  -- CSR, 2004-10-06
+                             #+sb-xc-host
+                             ((csubtypep type (specifier-type 'standard-char)) type)
+                             #+sb-xc-host
+                             ((csubtypep type (specifier-type 'base-char))
+                              (specifier-type 'base-char))
+                             #+sb-xc-host
+                             ((csubtypep type (specifier-type 'extended-char))
+                              (specifier-type 'extended-char))
+                             (t #+sb-xc-host (specifier-type 'character)
+                                #-sb-xc-host type))))
+                       nil))
 
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
