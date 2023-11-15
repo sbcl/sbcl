@@ -18,7 +18,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
