@@ -752,6 +752,9 @@ process_directory(int count, struct ndir_entry *entry,
                (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                text_space_highwatermark);
 #endif
+        // unprotect the pages
+        os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
+
         ALIEN_LINKAGE_TABLE_SPACE_START =
             (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
                                        ALIEN_LINKAGE_TABLE_SPACE_SIZE);
@@ -760,19 +763,14 @@ process_directory(int count, struct ndir_entry *entry,
         // but extern-alien still works for newly compiled code.
         lispobj* ptr = &alien_linkage_values;
         gc_assert(ptr);
-        int entry_index = 0;
-        int count;
         extern int alien_linkage_table_n_prelinked;
-        count = alien_linkage_table_n_prelinked = *ptr++;
-        for ( ; count-- ; entry_index++ ) {
+        int n = alien_linkage_table_n_prelinked = *ptr++;
+        int index = 0;
+        for ( ; n-- ; index++ ) {
             bool datap = *ptr == (lispobj)-1; // -1 can't be a function address
-            if (datap)
-                ++ptr;
-            arch_write_linkage_table_entry(entry_index, (void*)*ptr++, datap);
+            if (datap) ++ptr;
+            arch_write_linkage_table_entry(index, (void*)*ptr++, datap);
         }
-
-        // unprotect the pages
-        os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
     } else
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -782,7 +780,7 @@ process_directory(int count, struct ndir_entry *entry,
     }
 #endif
 
-    for ( ; --count>= 0; ++entry) {
+    for ( ; --count >= 0 ; ++entry) {
         long id = entry->identifier;
         uword_t addr = entry->address;
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
