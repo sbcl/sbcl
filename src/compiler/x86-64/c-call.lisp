@@ -340,9 +340,8 @@
 #+win32
 (defconstant win64-seh-indirect-thunk-addr (+ win64-seh-data-addr 8))
 
-(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx
-                    &aux (pseudo-atomic (call-out-pseudo-atomic-p vop)))
-  (declare (ignorable varargsp pseudo-atomic))
+(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
+  (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
   #+sb-safepoint
@@ -389,8 +388,7 @@
   ;; the UNDEFINED-ALIEN-TRAMP lisp asm routine to recognize the various shapes
   ;; this instruction sequence can take.
   #-win32
-  (progn
-    (when pseudo-atomic (emit-begin-pseudo-atomic))
+  (pseudo-atomic (:elide-if (not (call-out-pseudo-atomic-p vop)))
     (inst call (if (tn-p fun)
                  fun
                  #-immobile-space (ea (make-fixup fun :foreign 8))
@@ -401,8 +399,7 @@
                         ;; RAX has a designated purpose, and RBX is nonvolatile (not always
                         ;; spilled by Lisp because a C function has to save it if used)
                         (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
-                        (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn)))))
-    (when pseudo-atomic (emit-end-pseudo-atomic)))
+                        (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn))))))
 
   ;; On win64, we don't support immobile space (yet) and calls go through one of
   ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is
