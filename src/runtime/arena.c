@@ -170,20 +170,11 @@ static page_index_t close_heap_region(struct alloc_region* r, int page_type) {
     return result;
 }
 
-void switch_to_arena(lispobj arena_taggedptr,
-                     __attribute__((unused)) lispobj* ra) // return address
+void switch_to_arena(lispobj arena_taggedptr)
 {
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
     struct thread* th = get_sb_vm_thread();
-#if 0
-    struct code* c = (void*)component_ptr_from_pc((void*)ra);
-    int id = c ? code_serialno(c) : 0;
-    fprintf(stderr, "arena switch %s %p. caller=(PC=%lx ID=#x%x)\n",
-            (arena ? "to" : "from"),
-            (arena ? arena : (void*)th->arena),
-            (uword_t)ra, id);
     struct extra_thread_data *extra_data = thread_extra_data(th);
-#endif
     if (arena) { // switching from the dynamic space to an arena
         if (th->arena)
             lose("arena error: can't switch from %p to %p", (void*)th->arena,
@@ -197,10 +188,8 @@ void switch_to_arena(lispobj arena_taggedptr,
             arena_chain = arena_taggedptr;
         }
         // Close only the non-system regions
-        thread_extra_data(th)->mixed_page_hint =
-            close_heap_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
-        thread_extra_data(th)->cons_page_hint =
-            close_heap_region(&th->cons_tlab, PAGE_TYPE_CONS);
+        extra_data->mixed_page_hint = close_heap_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
+        extra_data->cons_page_hint = close_heap_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
 #if 0 // this causes a data race, the very thing it's trying to avoid
         int arena_index = fixnum_value(arena->index);

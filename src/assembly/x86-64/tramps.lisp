@@ -84,7 +84,6 @@
     (inst pop rdx-tn)))
 
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
-  (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC
   ;; RSI and RDI are vop temps, so don't bother preserving them
   (with-registers-preserved (c :except (rsi rdi))
     (pseudo-atomic ()
