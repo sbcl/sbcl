@@ -761,7 +761,8 @@
       (setf (fill-pointer a) f))
    (((make-array 0 :fill-pointer 0) -1) (condition 'type-error))))
 
-(with-test (:name :large-index)
+(with-test (:name :large-index
+            :skipped-on (not :64-bit))
   (checked-compile
    `(lambda ()
       (make-array
@@ -770,4 +771,9 @@
        :initial-element #\a)))
   (checked-compile
    `(lambda (x a)
-      (setf (sbit x (ash 1 34)) a))))
+      (setf (sbit x (ash 1 34)) a)))
+  (checked-compile
+   `(lambda (fn)
+      (let ((s (make-string 536870910)))
+        (declare (dynamic-extent s))
+        (funcall fn s)))))

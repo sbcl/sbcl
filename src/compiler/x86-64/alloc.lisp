@@ -695,7 +695,9 @@
     #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
-           (words :scs (any-reg immediate)))
+           (words :scs (any-reg (immediate
+                                 (typep (pad-data-block (+ (tn-value tn) vector-data-offset))
+                                        '(signed-byte 32))))))
     (:results (result :scs (descriptor-reg) :from :load))
     (:node-var node)
     (:vop-var vop)
