@@ -587,19 +587,18 @@ arch_set_fp_modes(unsigned int mxcsr)
 lispobj entrypoint_taggedptr(uword_t entrypoint) {
     if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
     lispobj* phdr = (lispobj*)(entrypoint - 2*N_WORD_BYTES);
-    unsigned char widetag = widetag_of(phdr);
     if (forwarding_pointer_p(phdr)) {
-        lispobj fpval = forwarding_pointer_value(phdr);
-        gc_assert(lowtag_of(fpval) == FUN_POINTER_LOWTAG);
+        gc_assert(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
         // We can't assert on the widetag if forwarded, because defragmentation
         // puts the new logical object at some totally different physical address.
         // This function doesn't know if defrag is occurring.
-        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+    } else {
+        __attribute__((unused)) unsigned char widetag = widetag_of(phdr);
+        gc_assert(widetag == SIMPLE_FUN_WIDETAG || widetag == FUNCALLABLE_INSTANCE_WIDETAG);
     }
-    gc_assert(widetag == SIMPLE_FUN_WIDETAG || widetag == FUNCALLABLE_INSTANCE_WIDETAG);
     return make_lispobj(phdr, FUN_POINTER_LOWTAG);
-
 }
+
 /* Return the lisp object that fdefn's raw_addr slot jumps to.
  * In the event that the referenced object was forwarded, this returns the un-forwarded
  * object (the forwarded value is used to assert some invariants though).
