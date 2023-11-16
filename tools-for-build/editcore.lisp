@@ -1856,12 +1856,12 @@
             ;; ELF cores created from #-immobile-space cores use +required-foreign-symbols+.
             ;; But if #+immobile-space the alien-linkage-table values are computed
             ;; by 'ld' and we don't scan +required-foreign-symbols+.
-            #+immobile-code
-            (let* ((sym (find-target-symbol (package-id "SB-VM")
-                                            "+REQUIRED-FOREIGN-SYMBOLS+" spacemap :physical))
-                   (vector (translate (symbol-global-value sym) spacemap)))
-              (fill vector 0)
-              (setf (%array-fill-pointer vector) 0))
+            (when (get-space immobile-fixedobj-core-space-id spacemap)
+              (let* ((sym (find-target-symbol (package-id "SB-VM")
+                                              "+REQUIRED-FOREIGN-SYMBOLS+" spacemap :physical))
+                     (vector (translate (symbol-global-value sym) spacemap)))
+                (fill vector 0)
+                (setf (%array-fill-pointer vector) 0)))
             ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
             ;; and SB-C::*COMPILE-TO-MEMORY-SPACE* to :AUTO
             ;; in case the resulting executable needs to compile anything.
@@ -1888,26 +1888,25 @@
             ;; Sort the hash-table in emit order.
             (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
               (output-bignum nil (car x) asm-file))
-            #-immobile-space
-            (progn
-            (format asm-file "~% .section .rodata~%")
-            (format asm-file " .globl anchor_junk~%")
-            (format asm-file "anchor_junk: .quad lseek_largefile, get_timezone, compute_udiv_magic32~%"))
-            #+immobile-space
-            (progn
-            (format asm-file (if (member :darwin *features*)
+            (cond
+              ((get-space immobile-fixedobj-core-space-id spacemap)
+               (format asm-file (if (member :darwin *features*)
                                  "~% .data~%"
                                  "~% .section .rodata~%"))
-            (format asm-file " .globl ~A~%~:*~A:
+               (format asm-file " .globl ~A~%~:*~A:
  .quad ~d # ct~%"
                     (labelize "alien_linkage_values")
                     (length (core-linkage-symbols core)))
-            ;; -1 (not a plausible function address) signifies that word
-            ;; following it is a data, not text, reference.
-            (loop for s across (core-linkage-symbols core)
-                  do (format asm-file " .quad ~:[~;-1, ~]~a~%"
-                             (consp s)
-                             (if (consp s) (car s) s)))))))
+               ;; -1 (not a plausible function address) signifies that word
+               ;; following it is a data, not text, reference.
+               (loop for s across (core-linkage-symbols core)
+                     do (format asm-file " .quad ~:[~;-1, ~]~a~%"
+                                (consp s)
+                                (if (consp s) (car s) s))))
+              (t
+               (format asm-file "~% .section .rodata~%")
+               (format asm-file " .globl anchor_junk~%")
+               (format asm-file "anchor_junk: .quad lseek_largefile, get_timezone, compute_udiv_magic32~%"))))))
       (when (member :linux *features*)
         (format asm-file "~% ~A~%" +noexec-stack-note+)))))
 
