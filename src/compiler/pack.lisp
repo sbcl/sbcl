@@ -1232,14 +1232,13 @@
 ;;; not a pure advisory to pack. It allows pack to do some packing it
 ;;; wouldn't have done before.
 (defun pack-load-tn (load-scs op)
-  (declare (type sc-vector load-scs) (type tn-ref op))
+  (declare (type list load-scs) (type tn-ref op))
   (let ((vop (tn-ref-vop op)))
     (compute-live-tns (vop-block vop) vop))
 
   (let* ((tn (tn-ref-tn op))
-         (ptype (tn-primitive-type tn))
-         (scs (svref load-scs (sc-number (tn-sc tn)))))
-    (let ((current-scs scs)
+         (ptype (tn-primitive-type tn)))
+    (let ((current-scs load-scs)
           (allowed ()))
       (loop
         (cond
@@ -1282,12 +1281,12 @@
         (let* ((load-tn (tn-ref-load-tn op))
                (load-scs (svref (car scs)
                                 (sc-number
-                                 (tn-sc (or load-tn (tn-ref-tn op)))))))
+                                 (tn-sc (or load-tn tn))))))
           (if load-tn
               (aver (eq load-scs t))
               (unless (eq load-scs t)
                 (setf (tn-ref-load-tn op)
-                      (pack-load-tn (car scs) op))))))))
+                      (pack-load-tn load-scs op))))))))
 
   (do ((scs scs (cdr scs))
        (op ops (tn-ref-across op)))
@@ -1301,11 +1300,15 @@
                (load-scs (svref (car scs)
                                 (sc-number
                                  (tn-sc (or load-tn tn))))))
-          (if load-tn
-              (aver (eq load-scs t))
-              (unless (eq load-scs t)
-                (setf (tn-ref-load-tn op)
-                      (pack-load-tn (car scs) op))))))))
+          (cond (load-tn
+                 (aver (eq load-scs t)))
+                (t
+                 ;; conditional sc
+                 (when (functionp load-scs)
+                   (setf load-scs (funcall load-scs tn)))
+                 (unless (eq load-scs t)
+                   (setf (tn-ref-load-tn op)
+                         (pack-load-tn load-scs op)))))))))
 
   (values))
 

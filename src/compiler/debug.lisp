@@ -829,11 +829,11 @@
              (let ((tn (tn-ref-tn op))
                    (load-tn (tn-ref-load-tn op)))
                (unless (or (eq (tn-kind tn) :unused)
-                           (eq (svref (car scs)
-                                      (sc-number
-                                       (tn-sc
-                                        (or load-tn tn))))
-                               t))
+                           (typep (svref (car scs)
+                                         (sc-number
+                                          (tn-sc
+                                           (or load-tn tn))))
+                                  '(or (eql t) function)))
                  (barf "operand restriction not satisfied: ~S" op))))))
     (do-ir2-blocks (block component)
       (do ((vop (ir2-block-last-vop block) (vop-prev vop)))

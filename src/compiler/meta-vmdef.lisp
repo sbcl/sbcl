@@ -623,34 +623,36 @@
 (defun find-move-funs (op load-p)
   (collect ((funs))
     (dolist (sc-name (operand-parse-scs op))
-      (let* ((sc (sc-or-lose sc-name))
-             (scn (sc-number sc))
-             (load-scs (append (when load-p
-                                 (sc-constant-scs sc))
-                               (sc-alternate-scs sc))))
-        (cond
-         (load-scs
-          (dolist (alt load-scs)
-            (unless (member (sc-name alt) (operand-parse-scs op) :test #'eq)
-              (let* ((altn (sc-number alt))
-                     (name (if load-p
-                               (svref (sc-move-funs sc) altn)
-                               (svref (sc-move-funs alt) scn)))
-                     (found (or (assoc alt (funs) :test #'member)
-                                (rassoc name (funs)))))
-                (unless name
-                  (error "no move function defined to ~:[save~;load~] SC ~S ~
+      (unless (or (consp sc-name)
+                  (getf *backend-cond-scs* sc-name))
+        (let* ((sc (sc-or-lose sc-name))
+               (scn (sc-number sc))
+               (load-scs (append (when load-p
+                                   (sc-constant-scs sc))
+                                 (sc-alternate-scs sc))))
+          (cond
+            (load-scs
+             (dolist (alt load-scs)
+               (unless (member (sc-name alt) (operand-parse-scs op) :test #'eq)
+                 (let* ((altn (sc-number alt))
+                        (name (if load-p
+                                  (svref (sc-move-funs sc) altn)
+                                  (svref (sc-move-funs alt) scn)))
+                        (found (or (assoc alt (funs) :test #'member)
+                                   (rassoc name (funs)))))
+                   (unless name
+                     (error "no move function defined to ~:[save~;load~] SC ~S ~
                           ~:[to~;from~] from SC ~S"
-                         load-p sc-name load-p (sc-name alt)))
-                (cond (found
-                       (pushnew alt (car found)))
-                      (t
-                       (funs (cons (list alt) name))))))))
-         ((member (sb-kind (sc-sb sc)) '(:non-packed :unbounded)))
-         (t
-          (error "SC ~S has no alternate~:[~; or constant~] SCs, yet it is~@
+                            load-p sc-name load-p (sc-name alt)))
+                   (cond (found
+                          (pushnew alt (car found)))
+                         (t
+                          (funs (cons (list alt) name))))))))
+            ((member (sb-kind (sc-sb sc)) '(:non-packed :unbounded)))
+            (t
+             (error "SC ~S has no alternate~:[~; or constant~] SCs, yet it is~@
                   mentioned in the restriction for operand ~S"
-                 sc-name load-p (operand-parse-name op))))))
+                    sc-name load-p (operand-parse-name op)))))))
     (funs)))
 
 ;;; Return a form to load/save the specified operand when it has a
@@ -1153,43 +1155,63 @@
   (declare (type operand-parse op))
   (let ((scs (operand-parse-scs op))
         (costs (make-array sb-vm:sc-number-limit :initial-element nil))
-        (load-scs (make-array sb-vm:sc-number-limit :initial-element nil)))
+        (load-scs (make-array sb-vm:sc-number-limit :initial-element nil))
+        (cond-scs))
     (dolist (sc-name (reverse scs))
-      (let* ((load-sc (sc-or-lose sc-name))
-             (load-scn (sc-number load-sc)))
-        (setf (svref costs load-scn) 0)
-        (setf (svref load-scs load-scn) t)
-        (dolist (op-sc (append (when load-p
-                                 (sc-constant-scs load-sc))
-                               (sc-alternate-scs load-sc)))
-          (let* ((op-scn (sc-number op-sc))
-                 (load (if load-p
-                           (aref (sc-load-costs load-sc) op-scn)
-                           (aref (sc-load-costs op-sc) load-scn))))
-            (unless load
-              (error "no move function defined to move ~:[from~;to~] SC ~
+      (let ((load-sc (gethash sc-name *backend-sc-names*)))
+        (cond (load-sc
+               (let* ((load-scn (sc-number load-sc)))
+                 (setf (svref costs load-scn) 0)
+                 (setf (svref load-scs load-scn) t)
+                 (dolist (op-sc (append (when load-p
+                                          (sc-constant-scs load-sc))
+                                        (sc-alternate-scs load-sc)))
+                   (let* ((op-scn (sc-number op-sc))
+                          (load (if load-p
+                                    (aref (sc-load-costs load-sc) op-scn)
+                                    (aref (sc-load-costs op-sc) load-scn))))
+                     (unless load
+                       (error "no move function defined to move ~:[from~;to~] SC ~
                       ~S~%~:[to~;from~] alternate or constant SC ~S"
-                     load-p sc-name load-p (sc-name op-sc)))
+                              load-p sc-name load-p (sc-name op-sc)))
 
-            (let ((op-cost (svref costs op-scn)))
-              (when (or (not op-cost) (< load op-cost))
-                (setf (svref costs op-scn) load)))
+                     (let ((op-cost (svref costs op-scn)))
+                       (when (or (not op-cost) (< load op-cost))
+                         (setf (svref costs op-scn) load)))
 
-            (let ((op-load (svref load-scs op-scn)))
-              (unless (eq op-load t)
-                (pushnew load-scn (svref load-scs op-scn))))))
+                     (let ((op-load (svref load-scs op-scn)))
+                       (unless (eq op-load t)
+                         (pushnew load-scn (svref load-scs op-scn))))))
 
-        (dotimes (i sb-vm:sc-number-limit)
-          (unless (svref costs i)
-            (let ((op-sc (svref *backend-sc-numbers* i)))
-              (when op-sc
-                (let ((cost (if load-p
-                                (svref (sc-move-costs load-sc) i)
-                                (svref (sc-move-costs op-sc) load-scn))))
-                  (when cost
-                    (setf (svref costs i) cost)))))))))
+                 (dotimes (i sb-vm:sc-number-limit)
+                   (unless (svref costs i)
+                     (let ((op-sc (svref *backend-sc-numbers* i)))
+                       (when op-sc
+                         (let ((cost (if load-p
+                                         (svref (sc-move-costs load-sc) i)
+                                         (svref (sc-move-costs op-sc) load-scn))))
+                           (when cost
+                             (setf (svref costs i) cost)))))))))
+              ((let ((cond-sc (getf *backend-cond-scs* sc-name)))
+                 (when cond-sc
+                   (push cond-sc cond-scs))))
+              ((consp sc-name)
+               (push sc-name cond-scs))
+              (t
+               (error "~S is not a defined storage class." sc-name)))))
 
-    (values costs load-scs)))
+    (values costs load-scs
+            (loop for (cond-sc . test) in cond-scs
+                  collect
+                  (let* ((load-sc (sc-or-lose cond-sc))
+                         (load-scn (sc-number load-sc)))
+                    `(setf (svref load-scs ,load-scn)
+                           ,(if (symbolp test)
+                                `(,test ',(svref load-scs load-scn))
+                                `(lambda (tn)
+                                   (if (progn ,@test)
+                                       t
+                                       ',(svref load-scs load-scn))))))))))
 
 (defconstant-eqx +no-costs+
   (make-array sb-vm:sc-number-limit :initial-element 0)
@@ -1208,16 +1230,24 @@
 
 (defun compute-costs-and-restrictions-list (ops load-p)
   (declare (list ops))
-  (collect ((costs)
-            (scs))
-    (dolist (op ops)
-      (multiple-value-bind (costs scs) (compute-loading-costs-if-any op load-p)
-        (costs costs)
-        (scs scs)))
-    (values (costs) (scs))))
+  (let ((fixups))
+   (collect ((costs)
+             (scs))
+     (dolist (op ops)
+       (multiple-value-bind (costs scs fixup) (compute-loading-costs-if-any op load-p)
+         (costs costs)
+         (cond (fixup
+                (setf fixups t)
+                (scs `(let ((load-scs (vector ,@(loop for sc across scs
+                                                      collect `',sc))))
+                        ,@fixup
+                        load-scs)))
+               (t
+                (scs scs)))))
+     (values (costs) (scs) fixups))))
 
 (defun make-costs-and-restrictions (parse)
-  (multiple-value-bind (arg-costs arg-scs)
+  (multiple-value-bind (arg-costs arg-scs fixups)
       (compute-costs-and-restrictions-list (vop-parse-args parse) t)
     (multiple-value-bind (result-costs result-scs)
         (compute-costs-and-restrictions-list (vop-parse-results parse) nil)
@@ -1227,7 +1257,9 @@
           `(:cost ,(vop-parse-cost parse)
 
             :arg-costs ',arg-costs
-            :arg-load-scs ',arg-scs
+            :arg-load-scs ,(if fixups
+                               `(list ,@arg-scs)
+                               `',arg-scs)
             :result-costs ',result-costs
             :result-load-scs ',result-scs
 
@@ -1321,7 +1353,12 @@
         (unless (or (eq type '*)
                     (dolist (ptype ptypes nil)
                       (when (sc-allowed-by-primitive-type
-                             (sc-or-lose sc)
+                             (or (gethash (if (consp sc)
+                                              (car sc)
+                                              sc)
+                                          *backend-sc-names*)
+                                 (sc-or-lose (car (getf *backend-cond-scs* sc)))
+                                 (error "~S is not a defined storage class." sc))
                              (primitive-type-or-lose ptype))
                         (return t)))
                     #+arm64

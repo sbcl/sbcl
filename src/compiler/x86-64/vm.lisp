@@ -659,3 +659,7 @@
 #+sb-xc-host
 (setq *backend-cross-foldable-predicates*
       '(power-of-two-p))
+
+#+nil
+(define-cond-sc 32-bit-immediate immediate
+  (typep (tn-value tn) '(signed-byte 32)))

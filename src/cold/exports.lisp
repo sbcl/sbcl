@@ -1323,6 +1323,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "DEFINE-MOVE-FUN"
            "DEFINE-MOVE-VOP" "!DEFINE-STORAGE-BASES"
            "!DEFINE-STORAGE-CLASS" "DEFINE-VOP"
+           "DEFINE-COND-SC"
            "DEFKNOWN" "DEFOPTIMIZER"
            "DEFTRANSFORM" "DERIVE-TYPE"
            "DIS"

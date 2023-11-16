@@ -267,4 +267,12 @@
           (lambda (node block)
             (ir2-convert-casser node block name offset lowtag)))))
 
-;;; Modular functions
+(defglobal *backend-cond-scs* nil)
+
+(defmacro define-cond-sc (name sc &body test)
+  `(setf (getf *backend-cond-scs* ',name)
+         (cons ',sc (defun ,(symbolicate 'make- name '-test) (load-scs)
+                      (lambda (tn)
+                        (if (progn ,@test)
+                            t
+                            load-scs))))))
