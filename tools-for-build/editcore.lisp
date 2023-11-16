@@ -20,6 +20,7 @@
 (defpackage "SB-EDITCORE"
   (:use "CL" "SB-ALIEN" "SB-COREFILE" "SB-INT" "SB-EXT"
         "SB-KERNEL" "SB-SYS" "SB-VM")
+  (:export #:move-dynamic-code-to-text-space :split-core)
   (:import-from "SB-ALIEN-INTERNALS"
                 #:alien-type-bits #:parse-alien-type
                 #:alien-value-sap #:alien-value-type)
@@ -202,7 +203,9 @@
 
 (defun space-bounds (id spacemap)
   (let ((space (get-space id spacemap)))
-    (make-bounds (space-addr space) (space-end space))))
+    (if space
+        (make-bounds (space-addr space) (space-end space))
+        (make-bounds 0 0))))
 (defun in-bounds-p (addr bounds)
   (and (>= addr (bounds-low bounds)) (< addr (bounds-high bounds))))
 
@@ -400,28 +403,36 @@
 (defmacro package-id (name) (sb-impl::package-id (find-package name)))
 
 ;;; Return either the physical or logical address of the specified symbol.
-(defun find-target-symbol (package-id symbol-name spacemap
-                           &optional (address-mode :physical))
-  (dolist (id `(,immobile-fixedobj-core-space-id ,static-core-space-id))
-    (let* ((space (get-space id spacemap))
-           (start (translate-ptr (space-addr space) spacemap))
-           (end (+ start (space-size space)))
-           (physaddr start))
+(defun %find-target-symbol (package-id symbol-name spacemap
+                            &optional (address-mode :physical))
+  (dolist (id `(,immobile-fixedobj-core-space-id
+                ,static-core-space-id
+                ,dynamic-core-space-id))
+    (binding* ((space (get-space id spacemap) :exit-if-null)
+               (start (translate-ptr (space-addr space) spacemap))
+               (end (+ start (space-size space)))
+               (physaddr start))
      (loop
-      (when (>= physaddr end) (return))
-      (let* ((obj (reconstitute-object (ash physaddr (- n-fixnum-tag-bits))))
-             (size (primitive-object-size obj)))
-        (when (and (symbolp obj)
-                   (string= symbol-name (translate (symbol-name obj) spacemap))
-                   (= (symbol-package-id obj) package-id))
-          (return-from find-target-symbol
-            (%make-lisp-obj
-                   (logior (ecase address-mode
-                             (:physical physaddr)
-                             (:logical (+ (space-addr space) (- physaddr start))))
-                           other-pointer-lowtag))))
-        (incf physaddr size)))))
-  (bug "Can't find symbol ~A::~A" package-id symbol-name))
+       (when (>= physaddr end) (return))
+       (let* ((word (sap-ref-word (int-sap physaddr) 0))
+              (size
+               (if (= (logand word widetag-mask) filler-widetag)
+                   (ash (ash word -32) word-shift)
+                   (let ((obj (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))))
+                     (when (and (symbolp obj)
+                                (string= symbol-name (translate (symbol-name obj) spacemap))
+                                (= (symbol-package-id obj) package-id))
+                       (return-from %find-target-symbol
+                         (%make-lisp-obj
+                          (logior (ecase address-mode
+                                    (:physical physaddr)
+                                    (:logical (+ (space-addr space) (- physaddr start))))
+                                  other-pointer-lowtag))))
+                     (primitive-object-size obj)))))
+         (incf physaddr size))))))
+(defun find-target-symbol (package-id symbol-name spacemap &optional (address-mode :physical))
+  (or (%find-target-symbol package-id symbol-name spacemap address-mode)
+      (bug "Can't find symbol ~A::~A" package-id symbol-name)))
 
 (defparameter label-prefix (if (member :darwin *features*) "_" ""))
 (defun labelize (x) (concatenate 'string label-prefix x))
@@ -984,6 +995,91 @@
           (member :darwin *features*)
           label-prefix label-prefix label-prefix label-prefix))
 
+(defun %widetag-of (word) (logand word widetag-mask))
+
+(defun make-code-obj (addr spacemap)
+  (let ((translation (translate-ptr addr spacemap)))
+    (aver (= (%widetag-of (sap-ref-word (int-sap translation) 0))
+             code-header-widetag))
+    (%make-lisp-obj (logior translation other-pointer-lowtag))))
+
+(defun output-lisp-asm-routines (core spacemap code-addr output &aux (skip 0))
+  (write-preamble output)
+  (let* ((paddr (int-sap (translate-ptr code-addr spacemap)))
+         (word (sap-ref-word paddr 0)))
+    ;; After running the converter which moves dynamic-space code to text space,
+    ;; to text space starts with an array of uint32 for the offsets to each object.
+    (when (= (%widetag-of word) simple-array-unsigned-byte-32-widetag)
+      (let* ((array (%make-lisp-obj (logior (sap-int paddr) other-pointer-lowtag)))
+             (size (primitive-object-size array))
+             (nwords (ash size (- word-shift))))
+        (dotimes (i nwords)
+          (format output "~A 0x~x"
+                  (case (mod i 8)
+                    (0 #.(format nil "~% .quad"))
+                    (t ","))
+                  (sap-ref-word paddr (ash i word-shift))))
+        (terpri output)
+        (setq skip size)
+        (incf code-addr size))))
+  (let* ((code-component (make-code-obj code-addr spacemap))
+         (obj-sap (int-sap (- (get-lisp-obj-address code-component)
+                              other-pointer-lowtag)))
+         (header-len (code-header-words code-component))
+         (jump-table-count (sap-ref-word (code-instructions code-component) 0)))
+    ;; Write the code component header
+    (format output "lar: # lisp assembly routines~%")
+    (emit-asm-directives :qword obj-sap header-len output #())
+    ;; Write the jump table
+    (format output " .quad ~D" jump-table-count)
+    (dotimes (i (1- jump-table-count))
+      (format output ",lar+0x~x"
+              (- (sap-ref-word (code-instructions code-component)
+                               (ash (1+ i) word-shift))
+                 code-addr)))
+    (terpri output)
+    (let ((name->addr
+           ;; the CDR of each alist item is a target cons (needing translation)
+           (sort
+            (mapcar (lambda (entry &aux (name (translate (undescriptorize (car entry)) spacemap)) ; symbol
+                                   ;; VAL is (start end . index)
+                                   (val (translate (undescriptorize (cdr entry)) spacemap))
+                                   (start (car val))
+                                   (end (car (translate (cdr val) spacemap))))
+                      (list* (translate (symbol-name name) spacemap) start end))
+                    (target-hash-table-alist (%code-debug-info code-component) spacemap))
+            #'< :key #'cadr)))
+      ;; Possibly unboxed words and/or padding
+      (let ((here (ash jump-table-count word-shift))
+            (first-entry-point (cadar name->addr)))
+        (when (> first-entry-point here)
+          (format output " .quad ~{0x~x~^,~}~%"
+                  (loop for offs = here then (+ offs 8)
+                        while (< offs first-entry-point)
+                        collect (sap-ref-word (code-instructions code-component) offs)))))
+      ;; Loop over the embedded routines
+      (let ((list name->addr)
+            (obj-size (code-object-size code-component)))
+        (loop
+          (destructuring-bind (name start-offs . end-offs) (pop list)
+            (let ((nbytes (- (if (endp list)
+                                 (- obj-size (* header-len n-word-bytes))
+                                 (1+ end-offs))
+                             start-offs)))
+              (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
+              (let ((fixups
+                     (emit-lisp-function
+                      (+ (sap-int (code-instructions code-component))
+                         start-offs)
+                      (+ code-addr
+                         (ash (code-header-words code-component) word-shift)
+                         start-offs)
+                      nbytes output nil core)))
+                (aver (null fixups)))))
+          (when (endp list) (return)))
+        (format output "~%# end of lisp asm routines~2%")
+        (+ skip obj-size)))))
+
 ;;; Convert immobile text space to an assembly file in OUTPUT.
 (defun write-assembler-text
     (spacemap output
@@ -1016,75 +1112,11 @@
                            (svref exceptions i)
                            (format nil "CS+0x~x"
                                    (- word (bounds-low code-bounds))))))))
-             (emit-asm-directives :qword sap count stream exceptions))
-           (make-code-obj (addr)
-             (let ((translation (translate-ptr addr spacemap)))
-               (aver (= (%widetag-of (sap-ref-word (int-sap translation) 0))
-                        code-header-widetag))
-               (%make-lisp-obj (logior translation other-pointer-lowtag))))
-           (%widetag-of (word)
-             (logand word widetag-mask)))
+             (emit-asm-directives :qword sap count stream exceptions)))
 
-    (write-preamble output)
-
-    ;; Scan the assembly routines.
-    (let* ((code-component (make-code-obj code-addr))
-           (obj-sap (int-sap (- (get-lisp-obj-address code-component)
-                                other-pointer-lowtag)))
-           (header-len (code-header-words code-component))
-           (jump-table-count (sap-ref-word (code-instructions code-component) 0)))
-      ;; Write the code component header
-      (emit-asm-directives :qword obj-sap header-len output #())
-      ;; Write the jump table
-      (format output " .quad ~D" jump-table-count)
-      (dotimes (i (1- jump-table-count))
-        (format output ",CS+0x~x"
-                (- (sap-ref-word (code-instructions code-component)
-                                 (ash (1+ i) word-shift))
-                   code-addr)))
-      (terpri output)
-      (let ((name->addr
-             ;; the CDR of each alist item is a target cons (needing translation)
-             (sort
-              (mapcar (lambda (entry &aux (name (translate (undescriptorize (car entry)) spacemap)) ; symbol
-                                          ;; VAL is (start end . index)
-                                          (val (translate (undescriptorize (cdr entry)) spacemap))
-                                          (start (car val))
-                                          (end (car (translate (cdr val) spacemap))))
-                        (list* (translate (symbol-name name) spacemap) start end))
-                      (target-hash-table-alist (%code-debug-info code-component) spacemap))
-              #'< :key #'cadr)))
-        ;; Possibly unboxed words and/or padding
-        (let ((here (ash jump-table-count word-shift))
-              (first-entry-point (cadar name->addr)))
-          (when (> first-entry-point here)
-            (format output " .quad ~{0x~x~^,~}~%"
-                    (loop for offs = here then (+ offs 8)
-                          while (< offs first-entry-point)
-                          collect (sap-ref-word (code-instructions code-component) offs)))))
-        ;; Loop over the embedded routines
-        (let ((list name->addr)
-              (obj-size (code-object-size code-component)))
-          (loop
-            (destructuring-bind (name start-offs . end-offs) (pop list)
-              (let ((nbytes (- (if (endp list)
-                                   (- obj-size (* header-len n-word-bytes))
-                                   (1+ end-offs))
-                               start-offs)))
-                (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
-                (let ((fixups
-                       (emit-lisp-function
-                        (+ (sap-int (code-instructions code-component))
-                           start-offs)
-                        (+ code-addr
-                           (ash (code-header-words code-component) word-shift)
-                           start-offs)
-                        nbytes output nil core)))
-                  (aver (null fixups)))))
-            (when (endp list) (return)))
-          (incf code-addr obj-size)
-          (setf total-code-size obj-size))))
-    (format output "~%# end of lisp asm routines~2%")
+    (let ((skip (output-lisp-asm-routines core spacemap code-addr output)))
+      (incf code-addr skip)
+      (incf total-code-size skip))
 
     (loop
       (when (>= code-addr (bounds-high code-bounds))
@@ -1092,7 +1124,7 @@
         (return))
       (ecase (%widetag-of (sap-ref-word (int-sap (translate-ptr code-addr spacemap)) 0))
         (#.code-header-widetag
-         (let* ((code (make-code-obj code-addr))
+         (let* ((code (make-code-obj code-addr spacemap))
                 (objsize (code-object-size code)))
            (incf total-code-size objsize)
            (cond
@@ -1151,7 +1183,20 @@
                 (nwords (ash word -32))
                 (nbytes (* nwords n-word-bytes)))
            (format output " .quad 0x~x~% .fill ~d~%" word (- nbytes n-word-bytes))
-           (incf code-addr nbytes))))))
+           (incf code-addr nbytes)))
+        ;; This is a trailing array which contains a jump instruction for each
+        ;; element of *C-LINKAGE-REDIRECTS* (see "rewrite-asmcalls.lisp").
+        (#.simple-array-unsigned-byte-64-widetag
+         (let* ((paddr (translate-ptr code-addr spacemap))
+                (array (%make-lisp-obj (logior paddr other-pointer-lowtag)))
+                (nwords (+ vector-data-offset (align-up (length array) 2))))
+           (format output "# alien linkage redirects:~% .quad")
+           (dotimes (i nwords (terpri output))
+             (format output "~a0x~x" (if (= i 0) " " ",")
+                     (sap-ref-word (int-sap paddr) (ash i word-shift))))
+           (incf code-addr (ash nwords word-shift))
+           (setq end-loc code-addr)
+           (return))))))
 
   ;; coreparse uses the 'lisp_jit_code' symbol to set text_space_highwatermark
   ;; The intent is that compilation to memory can use this reserved area
@@ -1808,7 +1853,10 @@
                   (if enable-pie +code-space-nominal-address+ 0))
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
-            ;; os_link_runtime() doesn't need to process the "required" symbols now
+            ;; ELF cores created from #-immobile-space cores use +required-foreign-symbols+.
+            ;; But if #+immobile-space the alien-linkage-table values are computed
+            ;; by 'ld' and we don't scan +required-foreign-symbols+.
+            #+immobile-code
             (let* ((sym (find-target-symbol (package-id "SB-VM")
                                             "+REQUIRED-FOREIGN-SYMBOLS+" spacemap :physical))
                    (vector (translate (symbol-global-value sym) spacemap)))
@@ -1821,9 +1869,9 @@
             (dolist (item '(("*COMPILE-FILE-TO-MEMORY-SPACE*" . "DYNAMIC")
                             ("*COMPILE-TO-MEMORY-SPACE*" . "DYNAMIC")))
               (destructuring-bind (symbol . value) item
-                (%set-symbol-global-value
-                 (find-target-symbol (package-id "SB-C") symbol spacemap)
-                 (find-target-symbol (package-id "KEYWORD") value spacemap :logical))))
+                (awhen (%find-target-symbol (package-id "SB-C") symbol spacemap)
+                  (%set-symbol-global-value
+                   it (find-target-symbol (package-id "KEYWORD") value spacemap :logical)))))
             ;;
             (dolist (space data-spaces) ; Copy pages from memory
               (let ((start (space-physaddr space spacemap))
@@ -1840,6 +1888,13 @@
             ;; Sort the hash-table in emit order.
             (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
               (output-bignum nil (car x) asm-file))
+            #-immobile-space
+            (progn
+            (format asm-file "~% .section .rodata~%")
+            (format asm-file " .globl anchor_junk~%")
+            (format asm-file "anchor_junk: .quad lseek_largefile, get_timezone, compute_udiv_magic32~%"))
+            #+immobile-space
+            (progn
             (format asm-file (if (member :darwin *features*)
                                  "~% .data~%"
                                  "~% .section .rodata~%"))
@@ -1852,7 +1907,7 @@
             (loop for s across (core-linkage-symbols core)
                   do (format asm-file " .quad ~:[~;-1, ~]~a~%"
                              (consp s)
-                             (if (consp s) (car s) s))))))
+                             (if (consp s) (car s) s)))))))
       (when (member :linux *features*)
         (format asm-file "~% ~A~%" +noexec-stack-note+)))))
 
@@ -2437,7 +2492,6 @@
                        ;; new object will be at FREEPTR bytes from new space start
                        (setf (gethash (sap-int vaddr) fwdmap) freeptr)
                        (incf freeptr size))))))
-            (format t "~&scrotabeek ~s~%" asm-code)
             ;; FIXME: this _still_ doesn't work, because if the buid has :IMMOBILE-SPACE
             ;; then the symbols CL:*FEATURES* and SB-IMPL:+INTERNAL-FEATURES+
             ;; are not in dynamic space.
@@ -2470,11 +2524,6 @@
                     (sap-ref-word new-space n-word-bytes) (ash n-objects n-fixnum-tag-bits))
               ;; Transport code contiguously into new space
               (transport-dynamic-space-code codeblobs spacemap new-space reserved-amount)
-              #+nil
-              (with-open-file (s "fwdmap.txt"
-                               :direction :output :if-existS :supersede :if-does-not-exist :create)
-                (maphash (lambda (k v) (format s "~x -> ~x~%" k (+ +code-space-nominal-address+ v)))
-                         fwdmap))
               ;; Walk static space and dynamic-space changing any pointers that
               ;; should point to new space.
               (dolist (space-id `(,dynamic-core-space-id ,static-core-space-id))
@@ -2513,7 +2562,7 @@
                 (rewrite-core spaces spacemap card-mask-nbits initfun
                               core-header core-dir-start output)
                 ))))))))
-(export 'move-dynamic-code-to-text-space)
+
 ;;;;
 
 (defun cl-user::elfinate (&optional (args (cdr *posix-argv*)))

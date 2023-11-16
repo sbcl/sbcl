@@ -136,8 +136,6 @@ $ diff dis2.txt dis3.txt
             (sap-ref-32 freeptr (+ i 3)) (sap-int (sap+ (cdr item) 8))
             (sap-ref-8 freeptr (+ i 7)) #x90) ; nop
       (incf i 8))
-    (sb-c:dis (sap+ freeptr (* 2 n-word-bytes))
-              (* nelts n-word-bytes))
     ;; Scan the original blob of code, not the replica.
     ;; Otherwise the "CALL rel32" instructions would be bogus.
     (let ((insts (get-code-instruction-model old-code)))
@@ -161,8 +159,7 @@ $ diff dis2.txt dis3.txt
                      (new-next-ip (sap+ (code-instructions new-code)
                                         old-next-ip-rel))
                      (disp (sap- branch-target new-next-ip)))
-                (setf (signed-sap-ref-32 new-next-ip -4) disp)
-                (format t "~X is ~D. disp=~X~%" inst index disp)))))))))
+                (setf (signed-sap-ref-32 new-next-ip -4) disp)))))))))
 
 (defun get-mov-src-constant (code insts i ea)
   (let ((abs-addr (+ (second (svref insts (1+ i))) ; next instruction's address
