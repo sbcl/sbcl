@@ -415,7 +415,10 @@
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate signed-reg unsigned-reg))
+              (index :scs (any-reg signed-reg unsigned-reg
+                                   (immediate
+                                    (typep (- (* (+ ,offset (tn-value tn)) n-word-bytes) ,lowtag)
+                                           '(signed-byte 32)))))
               (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
        (:vop-var vop)

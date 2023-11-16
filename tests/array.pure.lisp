@@ -760,3 +760,11 @@
    `(lambda (a f)
       (setf (fill-pointer a) f))
    (((make-array 0 :fill-pointer 0) -1) (condition 'type-error))))
+
+(with-test (:name :large-index)
+  (checked-compile
+   `(lambda ()
+      (make-array
+       (1+ (ash 1 32))
+       :element-type 'base-char
+       :initial-element #\a))))
