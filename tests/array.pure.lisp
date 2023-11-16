@@ -767,4 +767,7 @@
       (make-array
        (1+ (ash 1 32))
        :element-type 'base-char
-       :initial-element #\a))))
+       :initial-element #\a)))
+  (checked-compile
+   `(lambda (x a)
+      (setf (sbit x (ash 1 34)) a))))

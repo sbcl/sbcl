@@ -456,15 +456,10 @@
      (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
 
 (defun emit-sbit-op (inst bv index &optional word temp)
-  (cond ((integerp index)
-         (multiple-value-bind (dword-index bit) (floor index 32)
+  (cond ((sc-is index immediate)
+         (multiple-value-bind (dword-index bit) (floor (tn-value index) 32)
            (let ((disp (bit-base dword-index)))
-             (cond ((typep disp '(signed-byte 32))
-                    (inst* inst :dword (ea disp bv) bit))
-                   (t                   ; excessive index, really?
-                    (aver temp)
-                    (inst mov temp index)
-                    (inst* inst (ea (bit-base 0) bv) temp))))))
+             (inst* inst :dword (ea disp bv) bit))))
         (t
          ;; mem/reg BT[SR] are really slow.
          (inst mov word index)
@@ -481,7 +476,8 @@
   ;; Arg order is (VECTOR INDEX ADDEND VALUE)
   (:arg-types simple-bit-vector positive-fixnum (:constant (eql 0)) positive-fixnum)
   (:args (bv :scs (descriptor-reg))
-         (index :scs (unsigned-reg))
+         (index :scs (unsigned-reg (immediate
+                                    (typep (bit-base (floor (tn-value tn) 32)) '(signed-byte 32)))))
          (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
                                 signed-stack unsigned-stack)))
   (:temporary (:sc unsigned-reg) word temp)
@@ -489,47 +485,32 @@
   (:ignore addend)
   (:generator 6
     (unpoison-element bv index)
-    (if (sc-is value immediate)
-        (ecase (tn-value value)
-          (1 (emit-sbit-op 'bts bv index word temp))
-          (0 (emit-sbit-op 'btr bv index word temp)))
-        (emit-sbit-op (lambda ()
-                        (assemble ()
-                          (inst test :byte value
-                                (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
-                          (inst jmp :z ZERO)
-                          (inst bts temp index)
-                          (inst jmp OUT)
-                          ZERO
-                          (inst btr temp index)
-                          OUT))
-                      bv index word temp))))
-
-(define-vop (data-vector-set-with-offset/simple-bit-vector/c-index)
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
-  ;; Arg order is (VECTOR INDEX ADDEND VALUE)
-  (:arg-types simple-bit-vector (:constant fixnum) (:constant (eql 0)) positive-fixnum)
-  (:args (bv :scs (descriptor-reg))
-         (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
-                                signed-stack unsigned-stack)))
-  (:info index addend)
-  (:ignore addend)
-  (:generator 5
-    (unpoison-element bv index)
-    (when (sc-is value immediate)
-      (ecase (tn-value value)
-        (1 (emit-sbit-op 'bts bv index))
-        (0 (emit-sbit-op 'btr bv index)))
-      (return-from data-vector-set-with-offset/simple-bit-vector/c-index))
-    (inst test :byte value
-          (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
-    (inst jmp :z ZERO)
-    (emit-sbit-op 'bts bv index)
-    (inst jmp OUT)
-    ZERO
-    (emit-sbit-op 'btr bv index)
-    OUT))
+    (cond ((sc-is value immediate)
+           (ecase (tn-value value)
+             (1 (emit-sbit-op 'bts bv index word temp))
+             (0 (emit-sbit-op 'btr bv index word temp))))
+          ((sc-is index immediate)
+           (assemble ()
+             (inst test :byte value
+                   (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
+             (inst jmp :z ZERO)
+             (emit-sbit-op 'bts bv index)
+             (inst jmp OUT)
+             ZERO
+             (emit-sbit-op 'btr bv index)
+             OUT))
+          (t
+           (emit-sbit-op (lambda ()
+                           (assemble ()
+                             (inst test :byte value
+                                   (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
+                             (inst jmp :z ZERO)
+                             (inst bts temp index)
+                             (inst jmp OUT)
+                             ZERO
+                             (inst btr temp index)
+                             OUT))
+                         bv index word temp)))))
 
 (define-vop (data-vector-ref-with-offset/simple-bit-vector-c dvref)
   (:args (object :scs (descriptor-reg)))
