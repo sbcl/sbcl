@@ -16,7 +16,7 @@
 . ./subr.sh
 
 run_sbcl <<EOF
-  #+(and linux sb-thread)
+  #+(and linux x86-64 sb-thread)
   (unless (member :immobile-space sb-impl:+internal-features+)
     (exit :code 0)) ; proceed with test
  (exit :code 2) ; otherwise skip the test
