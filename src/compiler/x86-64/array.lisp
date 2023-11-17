@@ -991,11 +991,10 @@
            (:results (value :scs ,scs))
            (:result-types ,type)
            (:generator 4 (inst ,mov-inst ',opcode-modifier value ,ea-expr-const)))
-         ;; FIXME: these all need to accept immediate SC for the value
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype) dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))
                   (index :scs ,index-scs :to (:eval 0))
-                  (value :scs ,scs))
+                  (value :scs (,@scs immediate)))
            (:info addend)
            (:arg-types ,ptype tagged-num
                        (:constant (constant-displacement other-pointer-lowtag
@@ -1003,10 +1002,10 @@
                        ,type)
            (:generator 5
             (unpoison-element object index addend)
-            (inst mov ,operand-size ,ea-expr value)))
+            (inst mov ,operand-size ,ea-expr (encode-value-if-immediate value nil))))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C") dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))
-                  (value :scs ,scs))
+                  (value :scs (,@scs immediate)))
            (:info index addend)
            (:arg-types ,ptype (:constant low-index)
                        (:constant (constant-displacement other-pointer-lowtag
@@ -1014,7 +1013,7 @@
                        ,type)
            (:generator 4
             (unpoison-element object (+ index addend))
-            (inst mov ,operand-size ,ea-expr-const value)))))))
+            (inst mov ,operand-size ,ea-expr-const (encode-value-if-immediate value nil))))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 movzx :byte
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 movzx :byte
