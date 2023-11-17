@@ -267,9 +267,10 @@
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
-              (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
-                               '(immediate))
-                           any-reg signed-reg unsigned-reg) :to :eval)
+              (index :scs (any-reg signed-reg unsigned-reg
+                                   (immediate
+                                    (typep (- (* (+ (tn-value tn) ,offset) n-word-bytes) ,lowtag) '(signed-byte 32))))
+                     :to :eval)
               (old-value :scs (,@scs immediate) #|:target rax|#)
               (new-value :scs ,scs))
        (:vop-var vop)
