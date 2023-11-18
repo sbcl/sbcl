@@ -843,3 +843,20 @@
                               sum (aref v i)))
                      nil))
              0)))
+
+(with-test (:name :reoptimize)
+  (assert-type
+   (lambda ()
+     (let ((m 0))
+       (incf m)
+       (incf m)
+       m))
+   (eql 2))
+  (assert-type
+   (lambda (n j)
+     (declare (integer j)
+              (optimize (debug 1)))
+     (the (integer 5) n)
+     (when (> j n)
+       j))
+   (or (integer 6) null)))

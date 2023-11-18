@@ -406,7 +406,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (event ir1-optimize-until-done)
   (let ((count 0)
         (cleared-reanalyze nil)
-        (fastp nil))
+        (fastp nil)
+        reoptimized)
     (loop
       (when (component-reanalyze component)
         (setf count 0
@@ -416,6 +417,7 @@ necessary, since type inference may take arbitrarily long to converge.")
       (setf (component-reoptimize component) nil)
       (ir1-optimize component fastp)
       (cond ((component-reoptimize component)
+             (setf reoptimized t)
              (incf count)
              (when (and (>= count *max-optimize-iterations*)
                         (not (component-reanalyze component))
@@ -431,8 +433,8 @@ necessary, since type inference may take arbitrarily long to converge.")
       (maybe-mumble (if fastp "-" ".")))
     (when cleared-reanalyze
       (setf (component-reanalyze component) t))
-    (maybe-mumble " "))
-  (values))
+    (maybe-mumble " ")
+    reoptimized))
 
 (defparameter *constraint-propagate* t)
 
@@ -456,18 +458,18 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 (defun ir1-optimize-phase-1 (component)
   (let ((loop-count 0)
-        (constraint-propagate *constraint-propagate*))
+        (constraint-propagate *constraint-propagate*)
+        reoptimized)
     (tagbody
      again
        (loop
-        (ir1-optimize-until-done component)
+        (setf reoptimized (ir1-optimize-until-done component))
         (cond ((or (component-new-functionals component)
                    (component-reanalyze-functionals component))
                (maybe-mumble "Locall ")
                (locall-analyze-component component))
               ((and (>= loop-count 1)
-                    (not (or (component-reoptimize component)
-                             (component-reanalyze component))))
+                    (not reoptimized))
                ;; Constraint propagation did something but that
                ;; information didn't lead to any new optimizations.
                ;; Don't run constraint-propagate again.
