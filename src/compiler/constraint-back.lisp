@@ -22,7 +22,7 @@
   (case kind
     (typep
      ;; (integerp (+ integer y)) means Y is an integer too.
-     ;; (integerp (+ x y)) means X and Y are rational.
+     ;; (integerp (+ y-real x-real)) means X and Y are rational.
      (flet ((add (lvar type)
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
@@ -36,12 +36,19 @@
                       ((and y-integerp
                             (not x-integerp))
                        (add x (specifier-type 'integer)))
-                      (t
+                      ((or (csubtypep (lvar-type x) (specifier-type 'real))
+                           (csubtypep (lvar-type y) (specifier-type 'real)))
                        (add x (specifier-type 'rational))
                        (add y (specifier-type 'rational))))))
              ((csubtypep constraint (specifier-type 'real))
-              (add x (specifier-type 'real))
-              (add y (specifier-type 'real))))))))
+              (let ((x-realp (csubtypep (lvar-type x) (specifier-type 'real)))
+                    (y-realp (csubtypep (lvar-type y) (specifier-type 'real))))
+                (cond ((and x-realp
+                            (not y-realp))
+                       (add y (specifier-type 'real)))
+                      ((and y-realp
+                            (not x-realp))
+                       (add x (specifier-type 'real)))))))))))
 
 ;;; If the remainder is non-zero then X can't be zero.
 (defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
