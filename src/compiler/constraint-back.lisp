@@ -22,19 +22,26 @@
   (case kind
     (typep
      ;; (integerp (+ integer y)) means Y is an integer too.
-     (flet ((add (lvar)
+     ;; (integerp (+ x y)) means X and Y are rational.
+     (flet ((add (lvar type)
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
-                  (conset-add-constraint-to-eql consequent 'typep var (specifier-type 'integer) nil)))))
-       (when (csubtypep constraint (specifier-type 'integer))
-         (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
-               (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
-           (cond ((and x-integerp
-                       (not y-integerp))
-                  (add y))
-                 ((and y-integerp
-                       (not x-integerp))
-                  (add x)))))))))
+                  (conset-add-constraint-to-eql consequent 'typep var type nil)))))
+       (cond ((csubtypep constraint (specifier-type 'integer))
+              (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
+                    (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
+                (cond ((and x-integerp
+                            (not y-integerp))
+                       (add y (specifier-type 'integer)))
+                      ((and y-integerp
+                            (not x-integerp))
+                       (add x (specifier-type 'integer)))
+                      (t
+                       (add x (specifier-type 'rational))
+                       (add y (specifier-type 'rational))))))
+             ((csubtypep constraint (specifier-type 'real))
+              (add x (specifier-type 'real))
+              (add y (specifier-type 'real))))))))
 
 ;;; If the remainder is non-zero then X can't be zero.
 (defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
