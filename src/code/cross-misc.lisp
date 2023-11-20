@@ -242,6 +242,9 @@
   (declare (ignore depth))
   (write structure :stream stream :circle t))
 
+(defun unreachable ()
+  (bug "Unreachable reached"))
+
 (in-package "SB-KERNEL")
 
 ;;; These functions are required to emulate SBCL kernel functions
@@ -399,3 +402,4 @@
 (defun range<= (l x h) (<= l x h))
 (defun range<<= (l x h) (and (< l x) (<= x h)))
 (defun range<=< (l x h) (and (<= l x) (< x h)))
+

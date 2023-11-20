@@ -2436,7 +2436,7 @@
                       ,@(when safe
                           '(((eq slow fast)
                              (circular-list-error sequence)))))
-                (bug "never"))
+                (sb-impl::unreachable))
              (declare (list slow ,@(and safe '(fast)))
                       ;; If you have as many as INDEX conses on a 32-bit build,
                       ;; then you've either used up 4GB of memory (impossible)

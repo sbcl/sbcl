@@ -1609,8 +1609,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
   (defun handle-condition-handler (condition)
     (let ((muffles (get-handled-conditions)))
-      (aver muffles) ; FIXME: looks redundant with "fell through"
-      (dolist (muffle muffles (bug "fell through"))
+      (aver muffles) ; FIXME: looks redundant with UNREACHABLE
+      (dolist (muffle muffles (sb-impl::unreachable))
         (destructuring-bind (type . restart-name) muffle
           (when (handle-p condition type)
             (awhen (find-restart restart-name condition)

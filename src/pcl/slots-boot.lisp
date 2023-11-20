@@ -371,7 +371,7 @@
          (:standard
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) (instance-slots))
                (instance-read-standard
                 .pv. instance-slots 0
@@ -379,7 +379,7 @@
          ((:custom :accessor)
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) nil)
                (instance-read-custom .pv. 0 instance)))))))))
 
@@ -392,7 +392,7 @@
           (macrolet ((writer-method-function (safe)
                        `(make-method-function
                          (lambda (nv instance)
-                           (pv-binding1 ((bug "Please report this")
+                           (pv-binding1 ((sb-impl::unreachable)
                                          (instance) (instance-slots))
                              (instance-write-standard
                               .pv. instance-slots 0 nv
@@ -405,7 +405,7 @@
          ((:custom :accessor)
           (make-method-function
            (lambda (nv instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) nil)
                (instance-write-custom .pv. 0 instance nv)))))))))
 
@@ -417,7 +417,7 @@
          (:standard
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) (instance-slots))
                (instance-boundp-standard
                 .pv. instance-slots 0
@@ -425,7 +425,7 @@
          ((:custom :accessor)
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) nil)
                (instance-boundp-custom .pv. 0 instance)))))))))
 
@@ -437,7 +437,7 @@
          (:standard
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) (instance-slots))
                           (instance-makunbound-standard
                            .pv. instance-slots 0 instance
@@ -445,7 +445,7 @@
          ((:custom :accessor)
           (make-method-function
            (lambda (instance)
-             (pv-binding1 ((bug "Please report this")
+             (pv-binding1 ((sb-impl::unreachable)
                            (instance) nil)
                (instance-makunbound-custom .pv. 0 instance)))))))))
 

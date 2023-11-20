@@ -604,7 +604,7 @@ bootstrapping.
              (eq (car fn) 'function)
              (consp (setq fn-lambda (cadr fn)))
              (eq (car fn-lambda) 'lambda)
-             (bug "Really got here"))
+             (sb-impl::unreachable))
         (let* ((specls (mapcar (lambda (specl)
                                  (if (consp specl)
                                      ;; CONSTANT-FORM-VALUE?  What I

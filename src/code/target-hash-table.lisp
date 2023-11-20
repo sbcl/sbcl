@@ -528,7 +528,7 @@ Examples:
                    (or (loop for i below 4
                              when (eq (decode-hash-table-weakness i) weakness)
                              do (return (pack-ht-flags-weakness i)))
-                       (bug "Unreachable"))
+                       (unreachable))
                    0)
                (pack-ht-flags-kind (logand kind 3)) ; kind -1 becomes 3
                (if (or weakness synchronized) hash-table-synchronized-flag 0)

@@ -41,7 +41,7 @@
                             (or
                              (sb-fasl:get-asm-routine 'sb-vm::undefined-alien-tramp)
                              (find-foreign-symbol-address "undefined_alien_function")
-                             (bug "unreachable")))))))))
+                             (unreachable)))))))))
 
 ;;; Return the index of NAME+DATAP in the table, adding it if it doesn't exist.
 (defun ensure-alien-linkage-index (name datap)

@@ -925,7 +925,7 @@
                          (dolist (ref (lambda-var-refs var) t)
                            (unless (ref-good-for-dx-p ref)
                              (return nil)))))
-                  finally (bug "unreachable")))))))
+                  finally (sb-impl::unreachable)))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.

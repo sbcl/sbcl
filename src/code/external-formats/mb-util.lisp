@@ -170,11 +170,11 @@
   (defun mb-char-len (code)
     (declare (optimize speed #.*safety-0*)
              (type fixnum code))
-    (cond ((< code 0) (bug "can't happen"))
+    (cond ((< code 0) (unreachable))
           ((< code #x100) 1)
           ((< code #x10000) 2)
           ((< code #x1000000) 3)
-          (t (bug "can't happen"))))
+          (t (unreachable))))
   )
 
 (defmacro define-multibyte-encoding (format aliases
