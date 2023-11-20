@@ -134,3 +134,9 @@
 (with-test (:name :map-into)
   (assert (equal (coerce (map-into (my-list 1 2 3) #'identity '(4 5 6)) 'list)
                  '(4 5 6))))
+
+(with-test (:name (write-sequence :user-defined-sequence))
+  (let ((sequence (my-list #\a #\b #\c)))
+    (assert (string= "abc"
+                     (with-output-to-string (stream)
+                       (write-sequence sequence stream))))))

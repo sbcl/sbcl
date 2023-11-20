@@ -2500,9 +2500,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (write-sequence/vector
                 (data (simple-array * (*))) stream start end write-function))
              (write-generic-sequence (write-function)
-               (declare (ignore write-function))
-               (error "~@<~A does not yet support generic sequences.~@:>"
-                      'write-sequence)))
+               (multiple-value-bind (iterator limit from-end step endp element)
+                   (sb-sequence:make-sequence-iterator seq :start start :end end)
+                 (declare (type function step endp element))
+                 (loop until (funcall endp seq iterator limit from-end)
+                       for object = (funcall element seq iterator)
+                       do (funcall write-function stream object)
+                          (setf iterator (funcall step seq iterator from-end))))))
       (declare (dynamic-extent #'compute-write-function
                                #'write-element/bivalent #'write-list
                                #'write-vector  #'write-generic-sequence))
@@ -2748,4 +2752,3 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                 (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))
   (values))
-
