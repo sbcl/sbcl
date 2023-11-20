@@ -2364,9 +2364,16 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                      (return (+ start (- i offset-start))))
                    (setf (aref data i) el))))
              (read-generic-sequence (read-function)
-               (declare (ignore read-function))
-               (error "~@<~A does not yet support generic sequences.~@:>"
-                      'read-sequence)))
+               (multiple-value-bind (iterator limit from-end step endp elt set-elt)
+                   (sb-sequence:make-sequence-iterator seq :start start :end end)
+                 (declare (ignore elt)
+                          (type function step endp set-elt))
+                 (loop for i of-type index from start
+                       until (funcall endp seq iterator limit from-end)
+                       do (let ((object (funcall read-function stream nil :eof nil)))
+                            (funcall set-elt object seq iterator))
+                          (setf iterator (funcall step seq iterator from-end))
+                       finally (return i)))))
       (declare (dynamic-extent #'compute-read-function
                                #'read-list #'read-vector/fast #'read-vector
                                #'read-generic-sequence))
