@@ -1040,7 +1040,7 @@
              (bug "excluded case in INTERVAL-MUL"))))))
 
 ;;; Divide two intervals.
-(defun interval-div (top bot)
+(defun interval-div (top bot &optional integer)
   (declare (type interval top bot))
   (flet ((bound-div (x y y-low-p)
            ;; Compute x/y
@@ -1049,14 +1049,20 @@
                   ;; we need to watch out for the sign of the result,
                   ;; to correctly handle signed zeros. We also need
                   ;; to watch out for positive or negative infinity.
-                  (if (floatp (type-bound-number x))
-                      (if y-low-p
-                          (sb-xc:- (float-sign (type-bound-number x) $0.0))
-                          (float-sign (type-bound-number x) $0.0))
-                      0))
+                  (cond ((floatp (type-bound-number x))
+                         (if y-low-p
+                             (sb-xc:- (float-sign (type-bound-number x) $0.0))
+                             (float-sign (type-bound-number x) $0.0)))
+                        ((and integer
+                             (not (interval-contains-p 0 top)))
+                         '(0))
+                        (t
+                         0)))
                  ((zerop (type-bound-number y))
-                  ;; Divide by zero means result is infinity
-                  nil)
+                  (if integer
+                      x
+                      ;; Divide by zero means result is infinity
+                      nil))
                  ((and (numberp x) (zerop x))
                   ;; Zero divided by anything is zero, but don't lose the sign
                   (sb-xc:/ x (signum (type-bound-number y))))
@@ -1065,23 +1071,29 @@
     (let ((top-range (interval-range-info top))
           (bot-range (interval-range-info bot)))
       (cond ((null bot-range)
-             ;; The denominator contains zero, so anything goes!
-             (make-interval))
+             (if integer
+                 (destructuring-bind (bot- bot+) (interval-split 0 bot t t)
+                   (let ((r- (interval-div top bot- integer))
+                         (r+ (interval-div top bot+ integer)))
+                     (or (interval-merge-pair r- r+)
+                         (list r- r+))))
+                 ;; The denominator contains zero, so anything goes!
+                 (make-interval)))
             ((eq bot-range '-)
              ;; Denominator is negative so flip the sign, compute the
              ;; result, and flip it back.
-             (interval-neg (interval-div top (interval-neg bot))))
+             (interval-neg (interval-div top (interval-neg bot) integer)))
             ((null top-range)
              ;; Split top into two positive and negative parts, and
              ;; divide each separately
              (destructuring-bind (top- top+) (interval-split 0 top t t)
-               (or (interval-merge-pair (interval-div top- bot)
-                                        (interval-div top+ bot))
+               (or (interval-merge-pair (interval-div top- bot integer)
+                                        (interval-div top+ bot integer))
                    (make-interval))))
             ((eq top-range '-)
              ;; Top is negative so flip the sign, divide, and flip the
              ;; sign of the result.
-             (interval-neg (interval-div (interval-neg top) bot)))
+             (interval-neg (interval-div (interval-neg top) bot integer)))
             ((and (eq top-range '+) (eq bot-range '+))
              ;; the easy case
              (make-interval
@@ -1655,6 +1667,9 @@
                 (y-interval (if same-arg
                                 x-interval
                                 (numeric-type->interval y)))
+                (result-type (numeric-contagion x y))
+                (x-integerp (eq (numeric-type-class x) 'integer))
+                (y-integerp (eq (numeric-type-class y) 'integer))
                 (result
                   ;; (/ X X) is always 1, except if X can contain 0. In
                   ;; that case, we shouldn't optimize the division away
@@ -1663,24 +1678,34 @@
                            (not (interval-contains-p
                                  0 (interval-closure x-interval))))
                       (make-interval :low 1 :high 1)
-                      (interval-div x-interval y-interval)))
-                (result-type (numeric-contagion x y)))
-           ;; If the result type is a float, we need to be sure to coerce
-           ;; the bounds into the correct type.
-           (when (eq (numeric-type-class result-type) 'float)
-             (setf result (interval-func
-                           #'(lambda (x)
-                               (coerce-for-bound x (or (numeric-type-format result-type)
-                                                       'float)))
-                           result)))
-           (let ((numeric (make-numeric-type :class (numeric-type-class result-type)
-                                             :format (numeric-type-format result-type)
-                                             :low (interval-low result)
-                                             :high (interval-high result))))
-             (if (and (eq (numeric-type-class y) 'integer)
-                      (interval-ratio-p x-interval))
-                 (type-intersection numeric (specifier-type 'ratio))
-                 numeric))))
+                      (interval-div x-interval y-interval
+                                    (and x-integerp y-integerp)))))
+           (cond ((consp result)
+                  (type-union (make-numeric-type :class (numeric-type-class result-type)
+                                                 :format (numeric-type-format result-type)
+                                                 :low (interval-low (first result))
+                                                 :high (interval-high (first result)))
+                              (make-numeric-type :class (numeric-type-class result-type)
+                                                 :format (numeric-type-format result-type)
+                                                 :low (interval-low (second result))
+                                                 :high (interval-high (second result)))))
+                 (t
+                  ;; If the result type is a float, we need to be sure to coerce
+                  ;; the bounds into the correct type.
+                  (when (eq (numeric-type-class result-type) 'float)
+                    (setf result (interval-func
+                                  #'(lambda (x)
+                                      (coerce-for-bound x (or (numeric-type-format result-type)
+                                                              'float)))
+                                  result)))
+                  (let ((numeric (make-numeric-type :class (numeric-type-class result-type)
+                                                    :format (numeric-type-format result-type)
+                                                    :low (interval-low result)
+                                                    :high (interval-high result))))
+                    (if (and (eq (numeric-type-class y) 'integer)
+                             (interval-ratio-p x-interval))
+                        (type-intersection numeric (specifier-type 'ratio))
+                        numeric))))))
         ((and (eq x (specifier-type 'ratio))
               (cond (same-arg
                      (specifier-type '(integer 1 1)))
