@@ -1083,8 +1083,6 @@ alloc_thread_struct(void* spaces) {
      * The thread alignment is BACKEND_PAGE_BYTES (from thread.h), but seeing as this is
      * a similar-but-different requirement, it pays to double-check */
     if ((lispobj)th & 0xFF) lose("Thread struct not at least 256-byte-aligned");
-    extern unsigned char* gc_card_mark;
-    th->card_table = (lispobj)gc_card_mark;
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1107,6 +1105,8 @@ alloc_thread_struct(void* spaces) {
     thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
 #endif
     th->stepping = 0;
+    extern unsigned char* gc_card_mark;
+    th->card_table = (lispobj)gc_card_mark;
     return th;
 }
 #ifdef LISP_FEATURE_SB_THREAD

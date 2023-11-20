@@ -612,7 +612,7 @@ during backtrace.
   ;; print an approximation of the CSP as needed.
   #+sb-thread
   (control-stack-pointer :c-type "lispobj *")
-  #+ppc64 (card-table)
+  (card-table)
 
   ;; A few extra thread-local allocation buffers for special purposes
   ;; #-sb-thread probably won't use these, to be determined...
