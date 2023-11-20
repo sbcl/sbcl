@@ -411,32 +411,37 @@
        ,@body)))
 
 (defmacro sequence:with-sequence-iterator-functions
-    ((step endp elt setf index copy)
+    ((&optional step endp elt setf index copy)
      (sequence &rest args &key from-end start end)
      &body body)
   "Executes BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
-  bound to local functions which execute the iteration state query and
-  mutation functions returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE
-  and ARGS. STEP, ENDP, ELT, SETF, INDEX and COPY have dynamic
-  extent."
+bound to local functions which execute the iteration state query and
+mutation functions returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
+ARGS. When some names are not supplied or NIL is supplied for a given
+name, no local functions are established for those names. The
+functions established for STEP, ENDP, ELT, SETF, INDEX and COPY have
+dynamic extent."
   (declare (ignore from-end start end))
   (let ((nstate (gensym "STATE")) (nlimit (gensym "LIMIT"))
         (nfrom-end (gensym "FROM-END-")) (nstep (gensym "STEP"))
         (nendp (gensym "ENDP")) (nelt (gensym "ELT"))
         (nsetf (gensym "SETF")) (nindex (gensym "INDEX"))
         (ncopy (gensym "COPY")))
-    `(sequence:with-sequence-iterator
-         (,nstate ,nlimit ,nfrom-end ,nstep ,nendp ,nelt ,nsetf ,nindex ,ncopy)
-       (,sequence,@args)
-       (flet ((,step () (setq ,nstate (funcall ,nstep ,sequence,nstate ,nfrom-end)))
-              (,endp () (funcall ,nendp ,sequence,nstate ,nlimit ,nfrom-end))
-              (,elt () (funcall ,nelt ,sequence,nstate))
-              (,setf (new-value) (funcall ,nsetf new-value ,sequence,nstate))
-              (,index () (funcall ,nindex ,sequence,nstate))
-              (,copy () (funcall ,ncopy ,sequence,nstate)))
-         (declare (dynamic-extent #',step #',endp #',elt
-                                  #',setf #',index #',copy))
-         ,@body))))
+    (flet ((binding (name lambda-list body)
+             (when name
+               `((,name ,lambda-list ,body)))))
+     `(sequence:with-sequence-iterator
+          (,nstate ,nlimit ,nfrom-end ,nstep ,nendp ,nelt ,nsetf ,nindex ,ncopy)
+          (,sequence,@args)
+        (declare (ignorable ,nstate ,nlimit ,nfrom-end ,nstep ,nendp ,nelt
+                            ,nsetf ,nindex ,ncopy))
+        (flet (,@(binding step '() `(setq ,nstate (funcall ,nstep ,sequence,nstate ,nfrom-end)))
+               ,@(binding endp '() `(funcall ,nendp ,sequence,nstate ,nlimit ,nfrom-end))
+               ,@(binding elt '() `(funcall ,nelt ,sequence,nstate))
+               ,@(binding setf '(new-value) `(funcall ,nsetf new-value ,sequence ,nstate))
+               ,@(binding index '() `(funcall ,nindex ,sequence,nstate))
+               ,@(binding copy '() `(funcall ,ncopy ,sequence,nstate)))
+          ,@body)))))
 
 (defun sequence:canonize-test (test test-not)
   (cond
@@ -1211,14 +1216,11 @@
                  result-prototype (+ (length sequence1) (length sequence2))))
         endp1 elt1 key1 endp2 elt2 key2)
     (sequence:with-sequence-iterator-functions
-        (step-result endp-result elt-result setelt-result index-result copy-result) (result) ; TODO allow nil and fewer number of elements
-      (declare (ignorable #'endp-result #'elt-result #'copy-result))
+        (step-result nil nil setelt-result index-result) (result)
       (sequence:with-sequence-iterator-functions
-          (step1 endp1 elt1 setelt1 index1 copy1) (sequence1)
-          (declare (ignorable #'setelt1 #'copy1))
+          (step1 endp1 elt1 nil index1) (sequence1)
         (sequence:with-sequence-iterator-functions
-            (step2 endp2 elt2 setelt2 index2 copy2) (sequence2)
-          (declare (ignorable #'setelt2 #'copy2))
+            (step2 endp2 elt2 nil index2) (sequence2)
           (labels ((pop/no-key1 ()
                      (unless (setf endp1 (endp1))
                        (setf elt1 (elt1))))
