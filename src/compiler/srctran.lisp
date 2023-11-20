@@ -1668,7 +1668,6 @@
                                 x-interval
                                 (numeric-type->interval y)))
                 (result-type (numeric-contagion x y))
-                (x-integerp (eq (numeric-type-class x) 'integer))
                 (y-integerp (eq (numeric-type-class y) 'integer))
                 (result
                   ;; (/ X X) is always 1, except if X can contain 0. In
@@ -1679,7 +1678,8 @@
                                  0 (interval-closure x-interval))))
                       (make-interval :low 1 :high 1)
                       (interval-div x-interval y-interval
-                                    (and x-integerp y-integerp)))))
+                                    (and (memq (numeric-type-class x) '(integer rational))
+                                         y-integerp)))))
            (cond ((consp result)
                   (type-union (make-numeric-type :class (numeric-type-class result-type)
                                                  :format (numeric-type-format result-type)
@@ -1702,7 +1702,7 @@
                                                     :format (numeric-type-format result-type)
                                                     :low (interval-low result)
                                                     :high (interval-high result))))
-                    (if (and (eq (numeric-type-class y) 'integer)
+                    (if (and y-integerp
                              (interval-ratio-p x-interval))
                         (type-intersection numeric (specifier-type 'ratio))
                         numeric))))))
