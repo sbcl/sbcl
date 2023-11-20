@@ -4517,6 +4517,55 @@ used for a COMPLEX component.~:@>"
                                      string-type)))
                    (rplaca tail nil) ; We'll delete these list elements later
                    (rplaca peer nil))))
+      (let (double
+            single
+            rational)
+        (loop for x in remainder
+              when (and (numeric-type-p x)
+                        (eq (numeric-type-complexp x) :real))
+              do (case (numeric-type-class x)
+                   (rational
+                    (setf rational x))
+                   (float
+                    (case (numeric-type-format x)
+                      (double-float
+                       (setf double x))
+                      (single-float
+                       (setf single x))))))
+        (when (and double single)
+          (let ((low (numeric-type-low single))
+                (high (numeric-type-high single)))
+            (labels ((n= (x y)
+                       (and (not (float-infinity-or-nan-p x))
+                            (sb-xc:= x y)))
+                     (match (x y)
+                       ;; equalp doesn't work on floats in sb-xc-host
+                       (cond ((null x)
+                              (null y))
+                             ((consp x)
+                              (and (consp y)
+                                   (n= (car x)
+                                       (car y))))
+                             ((numberp y)
+                              (n= x y)))))
+              (when (and (match low (numeric-type-low double))
+                         (match high (numeric-type-high double)))
+                (setf remainder (delq1 double (delq1 single remainder)))
+                (cond ((and rational
+                            (match low (numeric-type-low rational))
+                            (match high (numeric-type-high rational)))
+                       (setf remainder (delq1 rational remainder))
+                       (let ((low (numeric-type-low rational))
+                             (high (numeric-type-high rational)))
+                         (recognized (cond (high
+                                            `(real ,(or low '*) ,high))
+                                           (low
+                                            `(real ,low))))))
+                      (t
+                       (recognized (cond (high
+                                          `(float ,(or low '*) ,high))
+                                         (low
+                                          `(float ,low)))))))))))
       (let ((list (nconc (recognized)
                          (type-unparse flags (delete nil remainder)))))
         (if (cdr list) `(or ,@list) (car list))))))
