@@ -1032,7 +1032,7 @@
   (values))
 
 (eval-when (:compile-toplevel)
-  (assert (<= (length +fixup-kinds+) 8))) ; fixup-kind fits in 3 bits
+  (assert (<= (length +fixup-kinds+) 16))) ; fixup-kind fits in 4 bits
 
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine*
@@ -1050,25 +1050,25 @@
 ;;; so the fixup can be reduced to one word instead of an integer and a symbol.
 (declaim (inline !pack-fixup-info))
 (defun !pack-fixup-info (offset kind flavor data)
-  (logior ;; 3 bits
-          (the (mod 8) (or (position kind +fixup-kinds+)
+  (logior ;; 4 bits
+          (the (mod 16) (or (position kind +fixup-kinds+)
                            (error "Bad fixup kind ~s" kind)))
           ;; 4 bits
           (ash (the (mod 16) (or (position flavor +fixup-flavors+)
                                  (error "Bad fixup flavor ~s" flavor)))
-               3)
+               4)
           ;; 8 bits
-          (ash (the (mod 256) data) 7)
+          (ash (the (mod 256) data) 8)
           ;; whatever it needs
-          (ash offset 15)))
+          (ash offset 16)))
 
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
 (declaim (inline !unpack-fixup-info))
 (defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor data)
-  (values (ash packed-info -15)
-          (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
-          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))
-          (ldb (byte 8 7) packed-info)))
+  (values (ash packed-info -16)
+          (aref +fixup-kinds+ (ldb (byte 4 0) packed-info))
+          (aref +fixup-flavors+ (ldb (byte 4 4) packed-info))
+          (ldb (byte 8 8) packed-info)))
 
 #+(or arm arm64 riscv sparc) ; these don't have any retained packed fixups (yet)
 (defun sb-c::pack-retained-fixups (fixup-notes)
