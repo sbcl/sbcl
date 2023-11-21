@@ -26,6 +26,8 @@
           (dx (node-stack-allocate-p node))
           (prev-constant))
      (macrolet ((maybe-load (tn &optional (temp 'temp))
+                  ;; TODO: surely this logic should be factored out
+                  ;; and shared with INSTANCE-SET-MULTIPLE
                   (once-only ((tn tn))
                     `(sc-case ,tn
                        ((any-reg descriptor-reg)
