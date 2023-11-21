@@ -26,11 +26,16 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg zero)))
   (:info name offset lowtag)
-  (:ignore name)
   (:results)
   (:vop-var vop)
+  ;(:node-var node)
   (:generator 1
-    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value)
+    (unless (or
+             ;; gencgc does not need to emit the barrier for constructors
+             (eq name :allocator)
+             ;; (sb-c::set-slot-old-p node)
+             )
+      (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value))
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
