@@ -583,6 +583,47 @@
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
 
+(define-vop (instance-set-multiple)
+  (:args (instance :scs (descriptor-reg))
+         (values :more t :scs (descriptor-reg any-reg)))
+  (:temporary (:sc descriptor-reg) val-temp)
+  (:info indices)
+  (:generator 1
+    (do ((tn-ref values (tn-ref-across tn-ref))
+         (indices indices (cdr indices)))
+        ((null tn-ref))
+      (let* ((value (tn-ref-tn tn-ref))
+             (source
+              (sc-case value
+               (immediate
+                ;; Pretty sure this should not be a copy-and-paste from
+                ;; LOAD-IMMEDIATE. What am I doing wrong?
+                (let ((val (tn-value value)))
+                  (etypecase val
+                    (integer
+                     ;; This is a FIXNUM, as IMMEDIATE-CONSTANT-SC only
+                     ;; accepts integers if they are FIXNUMs.
+                     (load-immediate-word val-temp (fixnumize val)))
+                    (character
+                     (let* ((codepoint (char-code val))
+                            (tagged (dpb codepoint (byte 24 8) character-widetag)))
+                       (load-immediate-word val-temp tagged)))
+                    (symbol
+                     (load-symbol val-temp val))))
+                val-temp)
+               (constant
+                (inst load-constant val-temp (tn-byte-offset value))
+                val-temp)
+               (control-stack
+                (load-stack-tn val-temp value)
+                val-temp)
+               ((any-reg descriptor-reg)
+                value))))
+        (inst str source
+              (@ instance (load-store-offset
+                           (- (ash (+ instance-slots-offset (car indices)) word-shift)
+                              instance-pointer-lowtag))))))))
+
 (define-vop (%instance-cas word-index-cas)
   (:policy :fast-safe)
   (:translate %instance-cas)
