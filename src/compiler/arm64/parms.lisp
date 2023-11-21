@@ -21,10 +21,13 @@
   ;; Can be in the range 4K-64K
 (defconstant +backend-page-bytes+ 65536)
 
-;;; The size in bytes of GENCGC cards, i.e. the granularity at which
-;;; writes to old generations are logged.  With mprotect-based write
-;;; barriers, this must be a multiple of the OS page size.
+;;; The size in bytes of GENCGC pages. A page is essentially
+;;; the granularity at which we claim memory for TLABs.
 (defconstant gencgc-page-bytes +backend-page-bytes+)
+;;; The divisor relative to page-bytes which computes the granularity
+;;; at which writes to old generations are logged.
+(defconstant cards-per-page 32)
+
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding

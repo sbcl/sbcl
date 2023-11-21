@@ -279,7 +279,7 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun destroyed-c-registers ()
     (let ((gprs (list nl0-offset nl1-offset nl2-offset nl3-offset
-                      nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset nl9-offset
+                      nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset tmp-offset
                       r0-offset r1-offset r2-offset r3-offset
                       r4-offset r5-offset r6-offset r7-offset
                       #-darwin r8-offset

@@ -408,7 +408,7 @@ char *copied_string(char *string)
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+#if defined LISP_FEATURE_SOFT_CARD_MARKS && !defined LISP_FEATURE_DARWIN_JIT
     // dynamic space should not have protections manipulated
     if (find_page_index(address) >= 0)
         lose("unexpected call to os_protect with software card marks");

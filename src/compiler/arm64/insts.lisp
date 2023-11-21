@@ -883,6 +883,9 @@
               :tab rd  ", " rn ", "
               (:using #'print-ubfm-alias ubfm-alias)))
   (:emitter
+   (when (and (fixup-p imms) (eq (fixup-flavor imms) :card-table-index-mask))
+     (note-fixup segment :ubfm-imms imms)
+     (setq imms 0))
    (emit-bitfield segment +64-bit-size+ #b10 +64-bit-size+
                   immr imms (gpr-offset rn) (gpr-offset rd))))
 
@@ -3440,6 +3443,11 @@
        (setf (ldb (byte 12 10) (sap-ref-32 sap offset))
              (ash (the (unsigned-byte #.(+ 12 word-shift)) value)
                   (- word-shift))))
+      (:ubfm-imms
+       ;; The 'imms' value is is the inclusive index of the final
+       ;; bit in the unsigned bitfield to copy (or "move").
+       (setf (ldb (byte 6 10) (sb-vm::sap-ref-32 sap offset))
+             (+ sb-vm::gencgc-card-shift value -1)))
       (:move-wide
        (setf (ldb (byte 16 5) (sap-ref-32 sap offset))
              (the (unsigned-byte 16) value)))))

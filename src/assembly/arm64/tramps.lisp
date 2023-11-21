@@ -104,7 +104,17 @@
 
         (inst mov tmp-tn nl0) ;; result
 
-        (map-pairs ldp nsp-tn 64 nl-registers :post-index 80 :delta -16)
+        (aver (location= tmp-tn (reg 9 'any-reg))) ; Change detector assertion
+        ;; Do not reload r9 (= NL9 = TMP-TN) as it just got moved from NL0 which holds
+        ;; the result from C and which will be returned from this asm routine.
+        (inst ldr (reg 8 'any-reg) (@ nsp-tn 64))
+        ;; I'm unsure how to utilize map-pairs on the others now :-(
+        ;; (It took more lines of code to alter MAP-PAIRS to accept another keyword
+        ;; asking it not to clobber TMP-TN than it did to just hand-write 4 instructions)
+        (inst ldp (reg 6 'any-reg) (reg 7 'any-reg) (@ nsp-tn 48))
+        (inst ldp (reg 4 'any-reg) (reg 5 'any-reg) (@ nsp-tn 32))
+        (inst ldp (reg 2 'any-reg) (reg 3 'any-reg) (@ nsp-tn 16))
+        (inst ldp (reg 0 'any-reg) (reg 1 'any-reg) (@ nsp-tn 80 :post-index))
         (inst ret)))))))
   (define-alloc-tramp alloc-tramp "alloc")
   (define-alloc-tramp list-alloc-tramp "alloc_list")

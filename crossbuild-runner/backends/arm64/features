@@ -1,5 +1,5 @@
 :64-bit :gencgc :fp-and-pc-standard-save
-:use-cons-region
+:use-cons-region :soft-card-marks
 :alien-callbacks
 :unbind-in-unwind
 :compare-and-swap-vops :undefined-fun-restarts

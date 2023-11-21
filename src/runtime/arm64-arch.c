@@ -168,3 +168,11 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
  DONE:
   THREAD_JIT(1);
 }
+
+void gcbarrier_patch_code(void* where, int nbits)
+{
+    // Patch in the 'imms' value for UBFM
+    unsigned* pc = where;
+    unsigned int mask = ~0x0000FC00; // 6 bits at position 10
+    *pc = (*pc & mask) | ((GENCGC_CARD_SHIFT + nbits - 1) << 10);
+}

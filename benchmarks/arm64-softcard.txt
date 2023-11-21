@@ -1,0 +1,10 @@
+Tested on a fairly recent iMac
+
+time ./parallel-exec.sh 8
+
+baseline                       soft card marks
+--------                       ---------------
+Total realtime: 73677 msec     Total realtime: 72886 msec 
+real	1m13.943s              real	1m13.152s          
+user	5m35.184s              user	5m35.356s          
+sys	1m27.364s              sys	1m23.214s          

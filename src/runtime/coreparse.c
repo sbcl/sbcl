@@ -1072,7 +1072,8 @@ bool gc_allocate_ptes()
 }
 
 extern void gcbarrier_patch_code(void*, int);
-#if !(defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64   \
+// Architectures that lack a method for gcbarrier_patch_code get this dummy stub.
+#if !(defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64  \
       || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64)
 void gcbarrier_patch_code(void* __attribute__((unused)) where, int __attribute__((unused)) nbits)
 {
@@ -1224,6 +1225,23 @@ void gc_load_corefile_ptes(int card_table_nbits,
         page_index_t p;
         for (p = 0; p < next_free_page; ++p)
             if (page_words_used(p)) assign_page_card_marks(p, CARD_UNMARKED);
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+        page_index_t start = 0, end;
+        while (start  < next_free_page) {
+            if (is_code(page_table[start].type)) {
+                for (end = start + 1; end < next_free_page; end++) {
+                    if (!page_words_used(end) || !is_code(page_table[end].type))
+                        break;
+                }
+                os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_ALL);
+                start = end+1;
+                continue;
+            }
+            ++start;
+        }
+#endif
+
 #else
         // coreparse can avoid hundreds to thousands of mprotect() calls by
         // treating the whole range from the corefile as protectable, except

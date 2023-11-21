@@ -11,6 +11,11 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn)
+    (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
+    (inst strb zr-tn (@ cardtable-tn temp))))
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
@@ -28,7 +33,9 @@
          (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
+  (:vop-var vop)
   (:generator 4
+    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value)
     (storew value object offset lowtag)))
 
 ;;;
@@ -43,6 +50,7 @@
   (:result-types *)
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
+  (:vop-var vop)
   (:generator 5
     (cond
       ((sc-is index immediate)
@@ -51,6 +59,13 @@
       (t
        (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
+    ;; Avoid emitting a barrier for %RAW-INSTANCE-CAS/{SIGNED-}WORD
+    ;; which inherits the generator of this vop.
+    (when (sc-is new-value descriptor-reg)
+      ;; LOWTAG determines whether to mark the card containing the object header
+      ;; (if instance-pointer-lowtag) versus element (if other-pointer-lowtag)
+      (emit-gengc-barrier object (if (eq lowtag other-pointer-lowtag) lip nil)
+                          tmp-tn (vop-nth-arg 3 vop) new-value))
     (inst dsb)
     LOOP
     ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
@@ -75,6 +90,7 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
+  (:vop-var vop)
   (:generator 3
     (cond
       ((sc-is index immediate)
@@ -83,6 +99,10 @@
       (t
        (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))))
+    ;; just like above
+    (when (sc-is new-value descriptor-reg)
+      (emit-gengc-barrier object (if (eq lowtag other-pointer-lowtag) lip nil)
+                          tmp-tn (vop-nth-arg 3 vop) new-value))
     (move result old-value)
     (inst casal result new-value lip)))
 

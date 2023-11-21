@@ -59,8 +59,8 @@
 #define reg_OCFP        REG(25)
 #define reg_CFP         REG(26)
 #define reg_CSP         REG(27)
-#define reg_TMP         REG(28)
-#define reg_wTMP        w28
+#define reg_TMP         REG(9)
+#define reg_wTMP        w9
 #define reg_NULL        REG(29)
 #define reg_wNULL       w29
 #define reg_LR          REG(30)
