@@ -2365,6 +2365,7 @@
                                     :element-type 'base-char)))
            (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
            (format t "Build ID [~a] len=~D ptr=~D actual-len=~D~%" string len ptr (length string))))
+        (#.runtime-options-magic) ; ignore
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
     (values total-npages space-list card-mask-nbits core-dir-start initfun)))

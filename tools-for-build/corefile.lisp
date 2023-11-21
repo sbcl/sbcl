@@ -2,6 +2,7 @@
 (defpackage "SB-COREFILE"
   (:use "CL")
   (:export #:core-magic
+           #:runtime-options-magic
            #:build-id-core-entry-type-code
            #:directory-core-entry-type-code
            #:initial-fun-core-entry-type-code
@@ -30,6 +31,7 @@
 ;;; so it's not easily shared between genesis and editcore
 ;;; without a bit of computation by hand.
 (defconstant core-magic #x5342434C)
+(defconstant runtime-options-magic #x31EBF355)
 
 ;;; magic numbers to identify entries in a core file
 ;;;
