@@ -148,7 +148,13 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
       if (test) return where;                           \
     return fail; }
 
-DEF_FINDER(find_free_line, line_index_t, !line_bytemap[where], -1);
+static line_index_t find_free_line(line_index_t start, line_index_t end) {
+  /* memchr tends to have some vectorisation (e.g. GNU) or SWAR behind
+   * it (musl, FreeBSD 12), so we use that instead of a naive loop. */
+  unsigned char *where = memchr(line_bytemap + start, 0, end - start);
+  if (!where) return end;
+  return where - line_bytemap;
+}
 DEF_FINDER(find_used_line, line_index_t, line_bytemap[where], end);
 
 /* Try to find a page which could fit a new object. This should be
@@ -157,20 +163,23 @@ DEF_FINDER(find_used_line, line_index_t, line_bytemap[where], end);
 void pre_search_for_small_space(sword_t nbytes, int page_type,
                                 struct allocator_state *state, page_index_t end) {
   sword_t nlines = ALIGN_UP(nbytes, LINE_SIZE) / LINE_SIZE;
-  for (page_index_t where = state->page; where < end; where++) {
-    if (page_bytes_used(where) <= GENCGC_PAGE_BYTES - nbytes &&
-        !target_pages[where] &&
-        ((state->allow_free_pages && page_free_p(where)) ||
-         (page_table[where].type == page_type &&
-          page_table[where].gen != PSEUDO_STATIC_GENERATION))) {
-      line_index_t first_line = address_line(page_address(where));
-      line_index_t last_line = address_line(page_address(where + 1));
-      line_index_t chunk_start = find_free_line(first_line, last_line);
-      if (chunk_start == -1) continue;
-      line_index_t chunk_end = find_used_line(chunk_start, last_line);
-      if (chunk_end - chunk_start >= nlines) {
-        state->page = where;
-        return;
+  for (page_index_t page = state->page; page < end; page++) {
+    if (page_bytes_used(page) <= GENCGC_PAGE_BYTES - nbytes &&
+        !target_pages[page] &&
+        ((state->allow_free_pages && page_free_p(page)) ||
+         (page_table[page].type == page_type &&
+          page_table[page].gen != PSEUDO_STATIC_GENERATION))) {
+      line_index_t where = address_line(page_address(page));
+      line_index_t last_line = address_line(page_address(page + 1));
+      while (where < last_line) {
+        line_index_t chunk_start = find_free_line(where, last_line);
+        if (chunk_start == -1) break;
+        line_index_t chunk_end = find_used_line(chunk_start, last_line);
+        if (chunk_end - chunk_start >= nlines) {
+          state->page = page;
+          return;
+        }
+        where = chunk_end + 1;
       }
     }
   }
