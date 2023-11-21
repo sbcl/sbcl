@@ -28,13 +28,12 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
-  ;(:node-var node)
+  (:node-var node)
   (:generator 1
     (unless (or
              ;; gencgc does not need to emit the barrier for constructors
              (eq name :allocator)
-             ;; (sb-c::set-slot-old-p node)
-             )
+             (sb-c::set-slot-old-p node))
       (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value))
     (storew value object offset lowtag)))
 
