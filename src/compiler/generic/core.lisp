@@ -185,7 +185,7 @@
             (when (typep const '(cons (eql :fdefinition)))
               (incf count)
               (setf (second const) (find-or-create-fdefn (second const)))))))
-       (retained-fixups (pack-retained-fixups fixup-notes))
+       (retained-fixups (sb-fasl::pack-fixups-for-reapplication fixup-notes))
        ((code-obj total-nwords)
         (allocate-code-object (component-mem-space component)
                               (align-up n-boxed-words code-boxed-words-align)

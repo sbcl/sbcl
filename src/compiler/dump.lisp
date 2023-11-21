@@ -1070,10 +1070,13 @@
           (aref +fixup-flavors+ (ldb (byte 4 4) packed-info))
           (ldb (byte 8 8) packed-info)))
 
-#+(or arm arm64 riscv sparc) ; these don't have any retained packed fixups (yet)
-(defun sb-c::pack-retained-fixups (fixup-notes)
-  (declare (ignore fixup-notes))
-  0) ; as if from PACK-CODE-FIXUP-LOCS
+#-(or x86 x86-64) ; these two architectures provide an overriding definition
+(defun pack-fixups-for-reapplication (fixup-notes)
+  (let (result)
+    (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil nil result))
+      (let ((fixup (fixup-note-fixup note)))
+        (when (eq (fixup-flavor fixup) :card-table-index-mask)
+          (push (fixup-note-position note) result))))))
 
 ;;; Dump all the fixups.
 ;;;  - foreign (C) symbols: named by a string
@@ -1084,7 +1087,7 @@
   ;; "retained" fixups are those whose offset in the code needs to be
   ;; remembered for subsequent reapplication by the garbage collector,
   ;; or in some cases, on core startup.
-  (dump-object (sb-c::pack-retained-fixups fixup-notes) fasl-output)
+  (dump-object (pack-fixups-for-reapplication fixup-notes) fasl-output)
   (dump-object alloc-points fasl-output)
   (dolist (note fixup-notes nelements)
     (let* ((fixup (fixup-note-fixup note))

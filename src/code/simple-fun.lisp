@@ -383,7 +383,7 @@
   newval)
 
 (defun (setf sb-vm::%code-fixups) (newval code)
-  (code-header-set code sb-vm::code-fixups-slot newval)
+  (setf (code-header-ref code sb-vm::code-fixups-slot) newval)
   newval)
 
 #+(or sparc ppc64)

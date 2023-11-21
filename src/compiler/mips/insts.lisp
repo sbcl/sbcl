@@ -1462,13 +1462,6 @@
              (ldb (byte 16 0) value)))))
   nil)
 
-(defun sb-c::pack-retained-fixups (fixup-notes)
-  (let (result)
-    (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil nil result))
-      (let ((fixup (fixup-note-fixup note)))
-        (when (eq (fixup-flavor fixup) :card-table-index-mask)
-          (push (fixup-note-position note) result))))))
-
 (define-instruction store-coverage-mark (segment mark-index)
   ;; Don't need to annotate the dependence on code-tn, I think?
   (:dependencies (writes :memory))
