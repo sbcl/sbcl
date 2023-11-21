@@ -197,7 +197,7 @@
     (if (= (length value) 3)
         (destructuring-bind (size opc reg) value
           (cond ((zerop v)
-                 (when (= size #b10)
+                 (when (/= size #b11)
                    (princ "W" stream))
                  (princ (svref *register-names* reg) stream))
                 (t

@@ -1339,7 +1339,7 @@
      :default-printer '(:name :tab rt  ", [" rn ", " rm option "]" ldr-str-annotation)
      :include ldr-str)
   (op4 :field (byte 1 21) :value 1)
-  (rm :field (byte 5 16) :type 'reg)
+  (rm :field (byte 5 16) :type 'x-reg)
   (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
   (op5 :field (byte 2 10) :value #b10)
   (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
