@@ -16,8 +16,8 @@
 (defconstant lpn-layout-id (layout-id (find-layout 'logical-pathname)))
 (defconstant pattern-layout-id (layout-id (find-layout 'sb-impl::pattern)))
 (defconstant physhost-layout-id (layout-id
-                                 (find-layout #+unix 'sb-impl::unix-host)
-                                              #+win32 'sb-impl::win32-host))
+                                 (find-layout #+unix 'sb-impl::unix-host
+                                              #+win32 'sb-impl::win32-host)))
 (defconstant loghost-layout-id (layout-id (find-layout 'sb-impl::logical-host)))
 
 (defconstant keyword-package-id (sb-impl::package-id (find-package 'keyword)))
