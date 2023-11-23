@@ -860,3 +860,31 @@
      (when (> j n)
        j))
    (or (integer 6) null)))
+
+(with-test (:name :+back)
+  (assert-type
+   (lambda (x y)
+     (when (> (+ x 1) y)
+       x))
+   (or real null))
+  (assert-type
+   (lambda (x y)
+     (when (= (+ x 1) y)
+       x))
+   (or number null))
+  (assert-type
+   (lambda (x y)
+     (when (integerp (+ x y))
+       x))
+   (or number null))
+  (assert-type
+   (lambda (x y)
+     (declare (real y))
+     (when (integerp (+ x y))
+       x))
+   (or rational null))
+  (assert-type
+   (lambda (x)
+     (when (integerp (+ x 1))
+       x))
+   (or integer null)))
