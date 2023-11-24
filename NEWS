@@ -41,12 +41,26 @@ changes relative to sbcl-2.3.10:
   * bug fix: SB-ROTATE-BYTE recognizes out-of-relevant-range BYTE
     specifications for integers before attempting to cons up enormous bignums
     for masking and shifting.  (lp#2042937)
+  * bug fix: fix type derivation on compiling SB-ROTATE-BYTE forms with
+    non-zero POSITION in the byte specifier.  (lp#2042775)
+  * bug fix: fix multiple assembler errors when compiling MAKE-ARRAY,
+    MAKE-STRING and similar with a large constant size.  (lp#2037347, lp#2038744)
+  * bug fix: fix internal error when compiling (SETF SBIT) with a large
+    constant index.  (lp#2037415)
+  * bug fix: fix internal compiler error on invalid lambda list parameters in
+    LABELS.  (lp#2040334)
+  * bug fix: fix internal compiler error when compiling some
+    infinitely-recursive LABELS forms.  (lp#2042704)
+  * bug fix: FILL-POINTER should never be made to go negative.  (lp#2042452)
   * optimization: external formats with :REPLACEMENT no longer bind handlers
     for coding errors around conversion functions, and so should cons less and
     be faster.
   * optimization: when the :EXTERNAL-FORMAT argument to STRING-TO-OCTETS or
     OCTETS-TO-STRING is a compile-time constant, the external format is
     resolved at load time rather than on each call.
+  * optimization: the compiler is able to constrain the types of inputs to
+    some functions given a derived or asserted type of the function's return
+    value.
 
 changes in sbcl-2.3.10 relative to sbcl-2.3.9:
   * enhancement: The compiler now allows stack allocating vectors of any size
