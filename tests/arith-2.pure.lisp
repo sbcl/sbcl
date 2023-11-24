@@ -301,3 +301,23 @@
       (loop for i of-type fixnum below 2
             do (print (logand most-positive-word (* i 4)))
                (the (satisfies minusp) i)))))
+
+(with-test (:name :/-by-integer-type)
+  (assert-type
+   (lambda (x y)
+     (declare ((integer 1 9) x)
+              (integer y))
+     (/ x y))
+   (or (rational -9 (0)) (rational (0) 9)))
+  (assert-type
+   (lambda (x y)
+     (declare ((integer 1 9) x)
+              ((integer 0) y))
+     (/ x y))
+   (rational (0) 9))
+  (assert-type
+   (lambda (x y)
+     (declare ((rational 0 9) x)
+              ((integer 0) y))
+     (/ x y))
+   (rational 0 9)))
