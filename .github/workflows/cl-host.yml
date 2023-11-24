@@ -165,6 +165,6 @@ jobs:
         tar xf cmucl-host-fasls.tgz
     - name: compare xc-host fasls
       run: |
-        diff -ur sbcl-host/ ccl-host/   || true
+        diff -ur sbcl-host/ ccl-host/
         diff -ur sbcl-host/ clisp-host/ || true
         diff -ur sbcl-host/ cmucl-host/ || true
