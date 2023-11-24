@@ -321,3 +321,14 @@
               ((integer 0) y))
      (/ x y))
    (rational 0 9)))
+
+(with-test (:name :truncate-unused-q)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (fixnum a))
+      (rem a 4))
+   ((3) 3)
+   ((-3) -3)
+   ((4) 0)
+   ((-4) 0)))

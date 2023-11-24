@@ -428,7 +428,7 @@
                 ((eq (tn-kind quo) :unused)
                  (inst negs rem x)
                  (inst and tmp-tn x (1- abs-y))
-                 (inst and rem x (1- abs-y))
+                 (inst and rem rem (1- abs-y))
                  (inst csneg rem tmp-tn rem :mi))
                 ((minusp y)
                  (let ((not-y (add-sub-immediate (lognot y))))
