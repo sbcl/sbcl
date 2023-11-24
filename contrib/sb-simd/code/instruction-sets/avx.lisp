@@ -145,7 +145,7 @@
    (make-f32.4          nil            (f32.4) (f32 f32 f32 f32) :cost 1 :encoding :fake-vop)
    (f32.4-values        nil            (f32 f32 f32 f32) (f32.4) :cost 1 :encoding :fake-vop)
    (f32.4-broadcast     #:vbroadcastss (f32.4) (f32)         :cost 1)
-   (f32.4-from-f64.4    #:vcvtpd2ps    (f32.4) (f64.4)       :cost 5) ;; wrong code is generated VCVTPD2PS XMM0, XMM0
+   (f32.4-from-f64.4    #:vcvtpd2ps    (f32.4) (f64.4)       :cost 5)
    (f32.4-blend         #:vblendvps    (f32.4) (f32.4 f32.4 u32.4) :cost 1)
    (f32.4-blendc        #:vblendps     (f32.4) (f32.4 f32.4 imm4) :cost 1)
    (two-arg-f32.4-and   #:vandps       (f32.4) (f32.4 f32.4) :cost 1 :associative t)
@@ -548,7 +548,7 @@
    (s32.4-values        nil            (s32 s32 s32 s32) (s32.4) :cost 1 :encoding :fake-vop)
    (s32.4-broadcast     nil            (s32.4) (s32)         :cost 1 :encoding :fake-vop)
    (s32.4-blend         #:vpblendvb    (s32.4) (s32.4 s32.4 u32.4) :cost 1)
-   (s32.4-from-f64.4    #:vcvtpd2dq    (s32.4) (f64.4)       :cost 5) ;; wrong code is generated VCVTPD2DQ XMM0, XMM0. 3rd and 4th elements are 0s
+   (s32.4-from-f64.4    #:vcvtpd2dq    (s32.4) (f64.4)       :cost 5)
    (s32.4-from-f32.4    #:vcvtps2dq    (s32.4) (f32.4)       :cost 5)
    (two-arg-s32.4-and   #:vpand        (s32.4) (s32.4 s32.4) :cost 1 :associative t)
    (two-arg-s32.4-or    #:vpor         (s32.4) (s32.4 s32.4) :cost 1 :associative t)

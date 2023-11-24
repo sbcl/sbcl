@@ -1828,10 +1828,6 @@
                 '(complex double-float))
                (complex-single-float
                 '(complex single-float))
-               (single-float
-                'sb-vm::single-reg)
-               (double-float
-                'sb-vm::double-reg)
                (* t)
                (t (primitive-type-specifier (primitive-type-or-lose type))))))
       (loop for (var arg) in vars

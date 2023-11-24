@@ -221,7 +221,9 @@
                   1)
                  ((xmm-register-p r)
                   0))))
-    (let ((l (cond (l)
+    (let ((l (cond ((eq l :from-thing)
+                    (xmm-size thing))
+                   (l)
                    ((xmm-register-p reg)
                     (xmm-size reg))
                    ((xmm-register-p thing)
@@ -517,13 +519,15 @@
   (def vaesdeclast #x66 #xdf #x0f38))
 
 ;;; Two arg instructions
-(macrolet ((def (name prefix opcode &optional (opcode-prefix #x0F))
+(macrolet ((def (name prefix opcode &optional (opcode-prefix #x0F) l)
              `(define-instruction ,name (segment dst src)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode
                                           :opcode-prefix opcode-prefix)
                 (:emitter
                  (emit-avx2-inst segment src dst ,prefix ,opcode
-                                 :opcode-prefix ,opcode-prefix)))))
+                                 :opcode-prefix ,opcode-prefix
+                                 ,@(and l
+                                       `(:l ,l)))))))
   ;; moves
   (def vmovshdup #xf3 #x16)
   (def vmovsldup #xf3 #x12)
@@ -540,13 +544,13 @@
   ;; conversion
   (def vcvtdq2pd #xf3 #xe6)
   (def vcvtdq2ps nil  #x5b)
-  (def vcvtpd2dq #xf2 #xe6)
-  (def vcvtpd2ps #x66 #x5a)
+  (def vcvtpd2dq #xf2 #xe6 #x0F :from-thing)
+  (def vcvtpd2ps #x66 #x5a #x0F :from-thing)
   (def vcvtps2dq #x66 #x5b)
   (def vcvtps2pd nil  #x5a)
   (def vcvtsd2ss #xf2 #x5a)
   (def vcvtss2sd #xf3 #x5a)
-  (def vcvttpd2dq #x66 #xe6)
+  (def vcvttpd2dq #x66 #xe6 #x0F :from-thing)
   (def vcvttps2dq #xf3 #x5b)
 
   (def vptest #x66 #x17 #x0f38)
