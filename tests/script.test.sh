@@ -26,6 +26,10 @@ echo '(exit :code 7)' > $tmpscript
 run_sbcl --script $tmpscript
 check_status_maybe_lose "--script exit status from EXIT" $? 7 "(status good)"
 
+echo '(when (and (null *load-verbose*) (null *compile-verbose*)) (exit :code 7))' > $tmpscript
+run_sbcl --script $tmpscript
+check_status_maybe_lose "--script verbosity" $? 7 "(silent)"
+
 echo '(error "oops")' > $tmpscript
 run_sbcl --script $tmpscript 1> $tmpout 2> $tmperr
 check_status_maybe_lose "--script exit status from ERROR" $? 1 "(error implies 1)"

@@ -381,7 +381,13 @@ any non-negative real number."
                    (*debug-io* (make-two-way-stream *stdin* *stderr*))
                    (*standard-input* *stdin*)
                    (*standard-output* *stdout*)
-                   (*error-output* *stderr*))
+                   (*error-output* *stderr*)
+                   ;; Compile/load messages from the language implementation
+                   ;; are not really what one would expect from a script. And
+                   ;; these messages are printed on stdout interfere when
+                   ;; scripts are used as part as a UNIX pipeline.
+                   (*compile-verbose* nil)
+                   (*load-verbose* nil))
                (load stream :verbose nil :print nil)))))
     (handling-end-of-the-world
       (if (eq t script)

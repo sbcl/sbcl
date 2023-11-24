@@ -338,6 +338,11 @@ broken pipe) on either standard input, standard output, or standard
 error, the script silently exits with code 0. This allows e.g. safely
 piping output from SBCL to @code{head -n1} or similar.
 
+Additionally, the option sets @code{*compile-verbose*} and
+@code{*load-verbose*} to @code{nil} while loading the file to avoid
+potentially verbose diagnostic messages printed on the standard
+output.
+
 @end table
 
 @node Initialization Files
