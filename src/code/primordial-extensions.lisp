@@ -234,20 +234,73 @@
                                        (1- max))))
         (t nil)))
 
+;;; Brent's cycle detection algorithm for sequences of iterated
+;;; function values (the rabbit). It's faster than Floyd's. See
+;;; PROPER-LIST-P for a simple example.
+;;;
+;;; TURTLE is lexically bound to INITIAL-VALUE, which should be one
+;;; step behind the rabbit. BODY computes the next value in the
+;;; sequence. Assuming the next value is in the variable RABBIT, BODY
+;;; can detect a circularity with (EQ TURTLE RABBIT). If no
+;;; circularity is detected, then (and only then) BODY must call
+;;; (UPDATE-TURTLE RABBIT).
+;;;
+;;; Positive N-LAG-BITS values make the turtle slower to start moving,
+;;; which slightly reduces the overhead in the non-circular case but
+;;; catches circularities a bit later.
+(defmacro with-turtle (((turtle &optional initial-value) &key (n-lag-bits 0))
+                       &body body)
+  ;; Instead of the usual implementation with two variables (one to
+  ;; count the steps the turtle rested, another for the current power
+  ;; of two limit), we use a single STEP variable and test it for
+  ;; being a power of 2, which tightens the code and lessens register
+  ;; pressure.
+  ;;
+  ;; This should be WITH-UNIQUE-NAMES, but GENSYM is not yet defined
+  ;; in the cross-compiler.
+  (let ((step (make-symbol "STEP")))
+    (flet ((update-turtle-body ()
+             `(progn
+                ;; Is STEP + 1 a power of 2?
+                ;;
+                ;; Because the standard algorithm (when N-LAG-BITS is
+                ;; 0) finds the STEP with the smallest
+                ;; POWER-OF-TWO-CEILING that's greater than the
+                ;; position of both the cycle's start and its length,
+                ;; we run out of memory before STEP ceases to be a
+                ;; WORD provided that the values in the sequence do
+                ;; exist at the same time in the image (i.e. not
+                ;; lazily generated).
+                (when (zerop (let ((step ,step))
+                               (logand step (locally #-sb-xc-host
+                                              (declare (optimize (safety 0)))
+                                                     (setq ,step (1+ step))))))
+                  (setq ,turtle rabbit)))))
+      `(let ((,turtle ,initial-value)
+             (,step ,(ash 1 n-lag-bits)))
+         #-sb-xc-host (declare (type sb-vm:word ,step))
+         (macrolet ((update-turtle (rabbit)
+                      ;; Avoid nested backquotes ...
+                      (subst rabbit 'rabbit ',(update-turtle-body)))
+                    (reset-turtle ()
+                      '(setq ,turtle ,initial-value
+                        ,step ,(ash 1 n-lag-bits))))
+           ,@body)))))
+
 (defun proper-list-p (x)
   (unless (consp x)
     (return-from proper-list-p (null x)))
-  (let ((rabbit (cdr x))
-        (turtle x))
-    (flet ((pop-rabbit ()
-             (when (eql rabbit turtle) ; circular
-               (return-from proper-list-p nil))
-             (when (atom rabbit)
-               (return-from proper-list-p (null rabbit)))
-             (pop rabbit)))
-      (loop (pop-rabbit)
-            (pop-rabbit)
-            (pop turtle)))))
+  (let ((rabbit (cdr x)))
+    (with-turtle ((turtle x) :n-lag-bits 2)
+      (loop
+        ;; Check for circularity. Use EQ because TURTLE is a CONS.
+        (when (eq rabbit turtle)
+          (return nil))
+        (when (atom rabbit)
+          (return (null rabbit)))
+        ;; RABBIT is a CONS here.
+        (update-turtle rabbit)
+        (pop rabbit)))))
 
 (declaim (inline ensure-list))
 (defun ensure-list (thing)
