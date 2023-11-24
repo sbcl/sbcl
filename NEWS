@@ -19,7 +19,9 @@ changes relative to sbcl-2.3.10:
     octet functions now provide a USE-VALUE restart for handlers to provide
     replacement input or output.
   * enhancement: READ-SEQUENCE and WRITE-SEQUENCE support user-defined
-    sequences.
+    sequences; the default implementation proceeds element-by-element, reading
+    or writing single bytes or characters to or from the stream as
+    appropriate.
   * bug fix: OCTETS-TO-STRING using unibyte external formats with unallocated
     codepoints (e.g. iso-8859-3) correctly signal or use replacements rather
     than taking bits from the address of NIL and converting those bits to
@@ -51,6 +53,8 @@ changes relative to sbcl-2.3.10:
     LABELS.  (lp#2040334)
   * bug fix: fix internal compiler error when compiling some
     infinitely-recursive LABELS forms.  (lp#2042704)
+  * bug fix: fix internal compiler error when attempting to inline a jump to a
+    label that has been deleted.  (lp#2043262)
   * bug fix: FILL-POINTER should never be made to go negative.  (lp#2042452)
   * optimization: external formats with :REPLACEMENT no longer bind handlers
     for coding errors around conversion functions, and so should cons less and
@@ -61,6 +65,8 @@ changes relative to sbcl-2.3.10:
   * optimization: the compiler is able to constrain the types of inputs to
     some functions given a derived or asserted type of the function's return
     value.
+  * optimization: the compiler performs fewer redundant type checks in ASSOC,
+    GETF and similar functions.
 
 changes in sbcl-2.3.10 relative to sbcl-2.3.9:
   * enhancement: The compiler now allows stack allocating vectors of any size
