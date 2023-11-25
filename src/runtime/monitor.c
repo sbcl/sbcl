@@ -975,7 +975,7 @@ static size_t checked_read(char *legend, int fd, void* buf, size_t n)
 {
     size_t result = read(fd, buf, n);
     if (result != n) { lose("read failed, errno=%d", errno); }
-    if (legend) fprintf(stderr, "%s: %lx bytes\n", legend, n);
+    if (legend) fprintf(stderr, "%s: %zu bytes\n", legend, n);
     return result;
 }
 
