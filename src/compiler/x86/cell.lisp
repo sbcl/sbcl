@@ -476,20 +476,24 @@
     (inst mov table (make-ea :dword :disp (make-fixup "gc_card_mark" :foreign-dataref)))
     (inst mov table (make-ea :dword :base table))
     (pseudo-atomic ()
-      ;; Compute card mark index and touch the mark byte
-      (inst mov card object)
-      (inst shr card gencgc-card-shift)
-      (inst and card (make-fixup nil :card-table-index-mask))
-      (inst mov (make-ea :byte :base table :index card) 1) ; CARD_MARKED
-      ;; set 'written' flag in the code header
-      ;; this doesn't need to use :LOCK because the only other writer
-      ;; would be a GCing thread, but we're pseudo-atomic here.
-      ;; If two threads actually did write the byte, then they would write
-      ;; the same value, and that works fine.
-      (inst or (make-ea :byte :base object :disp (- 3 other-pointer-lowtag)) #x40)
-      ;; store
-      (inst mov (make-ea :dword :base object :index index :disp (- other-pointer-lowtag))
-            value))))
+      (let ((do-not-mark (gen-label)))
+        (inst cmp object static-space-end)
+        (inst jmp :b DO-NOT-MARK)
+        ;; Compute card mark index and touch the mark byte
+        (inst mov card object)
+        (inst shr card gencgc-card-shift)
+        (inst and card (make-fixup nil :card-table-index-mask))
+        (inst mov (make-ea :byte :base table :index card) 1) ; CARD_MARKED
+        (emit-label DO-NOT-MARK)
+        ;; set 'written' flag in the code header
+        ;; this doesn't need to use :LOCK because the only other writer
+        ;; would be a GCing thread, but we're pseudo-atomic here.
+        ;; If two threads actually did write the byte, then they would write
+        ;; the same value, and that works fine.
+        (inst or (make-ea :byte :base object :disp (- 3 other-pointer-lowtag)) #x40)
+        ;; store
+        (inst mov (make-ea :dword :base object :index index :disp (- other-pointer-lowtag))
+              value)))))
 
 ;;;; raw instance slot accessors
 
