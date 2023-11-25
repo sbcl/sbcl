@@ -51,9 +51,7 @@ mv build-id.inc output
 
 # make-host-1 and copy the generated C headers to the target machine
 sh make-host-1.sh
-# workaround small amounts of clock skew by using --touch on the extraction
-# You'll probably have to remove the --touch when building for SunOS
-tar cf - src/runtime/genesis | ssh $ssh_port_opt $host cd $root \; tar xf - --touch
+tar cf - src/runtime/genesis | ssh $ssh_port_opt $host cd $root \; tar xf -
 
 # make-target-1 and copy back the artifacts
 ssh $ssh_port_opt $host cd $root \; $ENV sh make-target-1.sh
