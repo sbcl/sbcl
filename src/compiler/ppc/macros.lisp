@@ -199,7 +199,10 @@
          (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))))
      ,@forms
      (unless ,elide-if
-       (when ,sync ; why???
+       (when ,sync
+         ;; sync is generally needed so that stores aren't delayed past the end of P-A,
+         ;; which is important for GC-correctness.
+         ;; Given that, I'm unsure why it's ever not needed.
          (inst sync))
        (without-scheduling ()
          (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))

@@ -516,7 +516,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    (inst store-coverage-mark index)))
 
 (define-vop ()
-  (:translate sb-lockless::get-next)
+  (:translate sb-lockless:get-next)
   (:policy :fast-safe)
   (:args (node :scs (descriptor-reg)))
   (:results (next-tagged :scs (descriptor-reg))

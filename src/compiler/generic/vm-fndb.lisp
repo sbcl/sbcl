@@ -827,8 +827,8 @@
 (defknown (%unary-floor %unary-ceiling) (real) integer
   (movable foldable flushable))
 
-#+(or arm64 x86-64)
-(defknown sb-lockless::get-next (sb-lockless::list-node) (values sb-lockless::list-node t))
+#+(or arm64 ppc x86-64)
+(defknown sb-lockless:get-next (sb-lockless::list-node) (values sb-lockless::list-node t))
 
 (defknown sb-vm::fastrem-32 ((unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
   (unsigned-byte 32)

@@ -368,8 +368,8 @@
   ;; is a dummy node, so head->next is "ANT" and head->next->next is "BAT"
   ;; which can be construed as the CDR and not the CDDR of the list.
   (let ((cdr
-       (sb-lockless::get-next
-        (sb-lockless::get-next
+       (sb-lockless:get-next
+        (sb-lockless:get-next
          (sb-lockless::list-head lflist)))))
     (assert (sb-lockless:lfl-find lflist "BAT"))
     ;; starting at CDR you can't find "ANT"
