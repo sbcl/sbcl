@@ -2719,7 +2719,15 @@ expansion happened."
       (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
-    (new-ctype numeric-type 0 (get-numtype-aspects complexp class format) low high)))
+    (flet ((normalize-zero (x)
+             (case x
+               ($-0d0 $0d0)
+               ($-0f0 $0f0)
+               (t x))))
+      (declare (inline normalize-zero))
+     (new-ctype numeric-type 0 (get-numtype-aspects complexp class format)
+                (normalize-zero low)
+                (normalize-zero high)))))
 
 (defun modified-numeric-type (base
                               &key
