@@ -300,8 +300,8 @@ extern pthread_key_t ignore_stop_for_gc;
 #define COLLECT_GC_STATS
 #endif
 #ifdef COLLECT_GC_STATS
-static struct timespec gc_start_time;
-static long stw_elapsed,
+__attribute__((unused)) static struct timespec gc_start_time;
+__attribute__((unused)) static long stw_elapsed,
     stw_min_duration = LONG_MAX, stw_max_duration, stw_sum_duration,
     gc_min_duration = LONG_MAX, gc_max_duration, gc_sum_duration;
 int show_gc_stats, n_gcs_done;

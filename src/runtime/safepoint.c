@@ -180,7 +180,7 @@ void
 gc_state_lock()
 {
     odxprint(safepoints,"GC state to be locked");
-    int result = mutex_acquire(&gc_state.lock);
+    int __attribute__((unused)) result = mutex_acquire(&gc_state.lock);
     gc_assert(result);
     if (gc_state.master) {
         fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d (%s)\n",
@@ -201,7 +201,7 @@ gc_state_unlock()
              gc_state.phase, gc_phase_names[gc_state.phase]);
     gc_assert(get_sb_vm_thread()==gc_state.master);
     gc_state.master = NULL;
-    int result = mutex_release(&gc_state.lock);
+    int __attribute__((unused)) result = mutex_release(&gc_state.lock);
     gc_assert(result);
     odxprint(safepoints,"%s","GC state unlocked");
 }
