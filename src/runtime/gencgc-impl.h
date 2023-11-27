@@ -429,8 +429,6 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     weak_pointer_chain = wp;
 }
 
-extern unsigned char* gc_card_mark;
-
 // "assign" as the operation name is a little clearer than "set"
 // which tends to be synonymous with setting a bit to 1.
 #define assign_page_card_marks(page, val) \
