@@ -597,7 +597,13 @@
    ()
    `(lambda ()
       (reduce #'funcall #*1 :from-end t :initial-value 1 :key (lambda (x) x 'list)))
-   (() '(1) :test #'equal)))
+   (() '(1) :test #'equal))
+  (checked-compile-and-assert
+   ()
+   `(lambda (f l)
+      (reduce (the (function ((unsigned-byte 16) (unsigned-byte 8))) f) l
+              :initial-value 300))
+   ((#'+ '(1 2 3)) 306)))
 
 (with-test (:name :get-defined-fun-lambda-list-error)
   (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))

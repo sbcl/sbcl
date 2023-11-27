@@ -55,10 +55,11 @@
                                              (let ((value-lvar (getf optional-args (car value*))))
                                                (when value-lvar
                                                  (let ((if (getf optional-args (second value*))))
-                                                   (if if
-                                                       (list (record-lvar value-lvar)
-                                                             (record-lvar if) (third value*))
-                                                       (record-lvar value-lvar)))))
+                                                   (cond (if
+                                                          (list (record-lvar value-lvar)
+                                                                (record-lvar if) (third value*)))
+                                                         ((null (third value*))
+                                                          (record-lvar value-lvar))))))
                                              (let ((lvar (getf optional-args value*)))
                                                (and lvar
                                                     (record-lvar lvar))))
