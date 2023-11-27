@@ -684,20 +684,6 @@ case "$sbcl_os" in
 esac
 cd "$original_dir"
 
-# FIXME: Things like :c-stack-grows-..., etc, should be
-# *derived-target-features* or equivalent, so that there was a nicer
-# way to specify them then sprinkling them in this file. They should
-# still be tweakable by advanced users, though, but probably not
-# appear in *features* of target. #+/- should be adjusted to take
-# them in account as well. At minimum the nicer specification stuff,
-# though:
-#
-# (define-feature :dlopen (features)
-#   (union '(:bsd :linux :darwin :sunos) features))
-#
-# (define-feature :c-stack-grows-downwards-not-upwards (features)
-#   (member :x86 features))
-
 if $android
 then
     . tools-for-build/android_run.sh
