@@ -4527,13 +4527,16 @@ used for a COMPLEX component.~:@>"
                    (rplaca peer nil))))
       (let (double
             single
-            rational)
+            rational
+            integer)
         (loop for x in remainder
               when (and (numeric-type-p x)
                         (eq (numeric-type-complexp x) :real))
               do (case (numeric-type-class x)
                    (rational
                     (setf rational x))
+                   (integer
+                    (setf integer x))
                    (float
                     (case (numeric-type-format x)
                       (double-float
@@ -4559,9 +4562,15 @@ used for a COMPLEX component.~:@>"
               (when (and (match low (numeric-type-low double))
                          (match high (numeric-type-high double)))
                 (setf remainder (delq1 double (delq1 single remainder)))
-                (cond ((and rational
-                            (match low (numeric-type-low rational))
-                            (match high (numeric-type-high rational)))
+                (cond ((or (and rational
+                                (match low (numeric-type-low rational))
+                                (match high (numeric-type-high rational)))
+                           (and (setf rational integer)
+                                (numberp (numeric-type-low rational))
+                                (eql (numeric-type-low rational)
+                                     (numeric-type-high rational)) ;; (rational 1 1) is an integer.
+                                (match low (numeric-type-low rational))
+                                (match high (numeric-type-high rational))))
                        (setf remainder (delq1 rational remainder))
                        (let ((low (numeric-type-low rational))
                              (high (numeric-type-high rational)))
