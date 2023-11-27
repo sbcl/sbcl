@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.10:
+changes in sbcl-2.3.11 relative to sbcl-2.3.10:
   * minor incompatible change: streams with an external-format specified with
     :REPLACEMENT will use their replacement data once per stream unit that
     causes a decoding error (rather than, in some cases, once for a sequence
