@@ -4644,7 +4644,9 @@ static void finish_code_metadata()
         for (i = 0; i < block->count; ++i) {
             struct code*c = block->list[i];
             gc_assert(!forwarding_pointer_p((lispobj*)c));
-            scavenge(&c->debug_info, 2); // debug_info and fixups
+            // first two words are non-pointer, then come debug_info and fixups
+            // in whatever order they were defined in objdef.
+            scavenge((lispobj*)c + 2, 2);
             CLEAR_WRITTEN_FLAG((lispobj*)c);
         }
     }

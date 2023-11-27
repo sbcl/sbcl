@@ -189,6 +189,16 @@ during backtrace.
   (boxed-size :type fixnum ; see above figure
               :ref-known (flushable movable)
               :ref-trans %code-boxed-size)
+  ;;
+  ;; Caution! the first few slots have a slight amount of order-sensitivity.
+  ;; When saving a core we try to defer the scavenge of FIXUPS and DEBUG-INFO
+  ;; so that they reside relatively near the end of the consumed space.
+  ;; This is similar to what 'purify.c' would do.  It's tricky to express a range
+  ;; without either hardwiring the indices or else assuming that you know the order
+  ;; in which they appear, as in "&obj->firstslot" up to "&obj->lastslot".
+  ;; See in particular how scav_code_blob() and delay_code_metadata_scavenge()
+  ;; conspire to skip over 2 slots and then come back to visit them later.
+  ;;
   ;; Not all architectures use fixups. The slot is always present for consistency.
   ;; The corresponding SETF function is defined using code-header-set
   ;; on the slot index.
