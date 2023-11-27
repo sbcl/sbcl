@@ -83,9 +83,8 @@
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
   system-area-pointer)
 
-(eval-when (:compile-toplevel) ; FIXME: these assertions look irrelevant now
-  (assert (eql code-boxed-size-slot 1))
-  (assert (eql code-debug-info-slot 2)))
+(eval-when (:compile-toplevel)
+  (aver (eql code-boxed-size-slot 1)))
 
 ;;; Size-class segregation (implying which page we try to allocate to)
 ;;; is done from lisp now, not C. There are 3 objects types we'll see,

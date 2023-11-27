@@ -371,6 +371,7 @@ structure representations")
            "CLOSURE-INFO-OFFSET"
            "CODE-BOXED-SIZE-SLOT"
            "CODE-CONSTANTS-OFFSET" "CODE-SLOTS-PER-SIMPLE-FUN"
+           "CODE-FIXUPS-SLOT"
            "CODE-DEBUG-INFO-SLOT"
            "CODE-HEADER-SIZE-SHIFT"
            "CODE-HEADER-WIDETAG" "COMPLEX-ARRAY-WIDETAG"

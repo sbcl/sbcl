@@ -1157,7 +1157,7 @@
                        (header-exceptions (vector nil nil nil nil))
                        (fixups-ptr))
                   (when altered-fixups
-                    (setf (aref header-exceptions 3)
+                    (setf (aref header-exceptions sb-vm:code-fixups-slot)
                           (cond ((fixnump altered-fixups)
                                  (format nil "0x~x" (ash altered-fixups n-fixnum-tag-bits)))
                                 (t
