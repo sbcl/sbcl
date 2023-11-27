@@ -332,3 +332,10 @@
    ((-3) -3)
    ((4) 0)
    ((-4) 0)))
+
+(with-test (:name :*-by-integer-type)
+  (assert-type
+   (lambda (x)
+     (declare (integer x))
+     (* x 5))
+   (or (integer 5) (integer * -5) (integer 0 0))))
