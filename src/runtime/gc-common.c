@@ -2770,7 +2770,7 @@ uword_t primitive_object_size(lispobj ptr) {
 /* We hunt for pointers to old-space, when GCing generations >= verify_gen.
  * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
  * check. */
-generation_index_t verify_gens = 0; // HIGHEST_NORMAL_GENERATION + 2;
+generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan of the heap before it's GCed? */
 int pre_verify_gen_0 = 0;
