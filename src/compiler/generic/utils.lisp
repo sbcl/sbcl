@@ -522,3 +522,18 @@
         while e
         thereis (sb-c::lexenv-find 'sb-vm::.pseudo-atomic-call-out.
                                    vars :lexenv e)))
+
+;;; The SET vop should alway get a symbol that is known at compile-time
+;;; even though the compiler might have already done you a "favor" of
+;;; producing a load-TN for a random constant. This tries to undo that.
+(defun known-symbol-use-p (vop symbol)
+  (cond ((sc-is symbol constant immediate)
+         (tn-value symbol))
+        (t
+         ;; Given a DESCRIPTOR-REG you can refer back to the vop args
+         ;; to figure out what was loaded.
+         (let ((type (tn-ref-type (vop-args vop))))
+           ;; I'm pretty sure this _must_ be a MEMBER type.
+           (when (and (member-type-p type)
+                      (= (member-type-size type) 1))
+             (the symbol (first (member-type-members type))))))))

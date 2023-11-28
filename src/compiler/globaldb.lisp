@@ -461,6 +461,12 @@
 ;;     Note that this does not affect elision of the check for unbound-marker
 ;;     which is under control of the :ALWAYS-BOUND info.
 ;;  - an integer is a permanent index, and also implies :ALWAYS-THREAD-LOCAL.
+;;    This last case is theoretically subsumed by the former, because
+;;    :ALWAYS-THREAD-LOCAL can resolve to a TLS index at load-time, at least for
+;;    the SET vop. The down-side is that some CPU architectures might have trouble
+;;    with an unknown integer in instructions that have [thread+n] addressing mode
+;;    where the immediate operand size is not as generous as for x86.
+;;    e.g.. what if the imm operand exceeds (signed-byte 16) for PPC?
 ;; Specials in the CL package (notably reader/printer controls) use a wired-tls,
 ;; whether or not we bind per-thread [if we don't, that's a bug!]
 ;; We don't assume wired TLS more generally, because user code often defines
