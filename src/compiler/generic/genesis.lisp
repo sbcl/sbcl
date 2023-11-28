@@ -3204,18 +3204,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
             "#define PSEUDO_ATOMIC_TRAP ~D /* 0x~:*~X */~%"
             sb-vm::pseudo-atomic-trap)
     (terpri))
-  ;; possibly this is another candidate for a rename (to
-  ;; pseudo-atomic-trap-number or pseudo-atomic-magic-constant
-  ;; [possibly applicable to other platforms])
-
-  #+sb-safepoint
+  #+(and sb-safepoint (not 64-bit))
+  (progn
   (format t "#define GC_SAFEPOINT_PAGE_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
             sb-vm:gc-safepoint-page-addr)
-  #+sb-safepoint
   (format t "#define GC_SAFEPOINT_TRAP_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
             (+ sb-vm:gc-safepoint-page-addr
                sb-c:+backend-page-bytes+
-               (- sb-vm:gc-safepoint-trap-offset)))
+               (- sb-vm:gc-safepoint-trap-offset))))
 
   (dolist (symbol '(sb-vm:float-traps-byte
                     sb-vm::float-exceptions-byte

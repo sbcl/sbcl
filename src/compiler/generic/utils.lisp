@@ -208,15 +208,6 @@
   "Cause a continuable error.  ERROR-CODE is the error to cause."
   (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))
 
-;; C header generation can't execute DEFINE-VOP
-;; Perhaps this belongs somewhere different
-#+(and sb-safepoint (not :c-headers-only))
-(define-vop (insert-safepoint)
-  (:policy :fast-safe)
-  (:translate sb-kernel::gc-safepoint)
-  (:generator 0
-    (emit-safepoint)))
-
 ;;; Does the TN definitely hold *any* of the 4 pointer types
 (defun pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)

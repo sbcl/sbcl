@@ -82,7 +82,7 @@
 (defconstant msan-temp-reg-number 0)
 
 ;;; The encoding anomaly for r12 makes it a perfect choice for the card table base.
-;;; It will never be used with a constant displacement.
+;;; It will seldom be used with a constant displacement.
 (define-symbol-macro card-table-reg 12)
 (define-symbol-macro gc-card-table-reg-tn r12-tn)
 (define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))

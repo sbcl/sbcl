@@ -2227,7 +2227,7 @@
                 #-(and x86-64 immobile-code) (+ sb-vm:nil-value (sb-vm:static-fun-offset name))))
           (setf (gethash address addr->name) name))))
     ;; Not really a routine, but it uses the similar logic for annotations
-    #+sb-safepoint
+    #+(and sb-safepoint (not 64-bit))
     (setf (gethash (+ sb-vm:gc-safepoint-page-addr
                       sb-c:+backend-page-bytes+
                       (- sb-vm:gc-safepoint-trap-offset)) addr->name)

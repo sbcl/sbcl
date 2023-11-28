@@ -39,6 +39,13 @@
   (:generator 0
      (emit-label the-label)))
 
+#+sb-safepoint
+(define-vop (sb-vm::insert-safepoint)
+  (:policy :fast-safe)
+  (:translate sb-kernel::gc-safepoint)
+  (:generator 0
+    (sb-vm::emit-safepoint)))
+
 #-x86-64 (define-vop (fixed-alloc-to-stack fixed-alloc))
 
 ;;; x86-64 defines this vop for real

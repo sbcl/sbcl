@@ -202,7 +202,7 @@
   ;; straight-line code, e.g. (LIST (LIST X Y) (LIST Z W)) should emit 1 safepoint
   ;; not 3, even if we consider it 3 separate pointer bumps.
   ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
-  (inst test :byte rax-tn (ea (- static-space-start gc-safepoint-trap-offset))))
+  (inst test :byte rax-tn (ea -8 gc-card-table-reg-tn)))
 
 (macrolet ((pa-bits-ea ()
              #+sb-thread `(thread-slot-ea

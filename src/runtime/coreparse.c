@@ -1037,7 +1037,17 @@ bool gc_allocate_ptes()
     num_gc_cards = 1L << gc_card_table_nbits;
 
     gc_card_table_mask =  num_gc_cards - 1;
+#if defined LISP_FEATURE_SB_SAFEPOINT && defined LISP_FEATURE_64_BIT
+    /* The card table is hardware-page-aligned. Preceding it and occupying a whole
+     * "backend page" - which by the way is overkill - is the global safepoint trap page.
+     * The dummy TEST instruction for safepoints encodes shorter this way */
+    void* result = os_alloc_gc_space(0, MOVABLE, 0,
+                                     ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
+    gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
+#else
     gc_card_mark = successful_malloc(num_gc_cards);
+#endif
+
     /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
      * is 0 - or equivalently the "WP'ed" state - which is the value that calloc()
      * fills with. If using malloc() we have to fill with CARD_MARKED,

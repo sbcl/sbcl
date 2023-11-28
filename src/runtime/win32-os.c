@@ -114,8 +114,10 @@ static void set_seh_frame(void *frame)
 
 void alloc_gc_page()
 {
+#ifndef LISP_FEATURE_64_BIT // 64-bit uses the page below the card mark table
     gc_assert(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
                            MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE));
+#endif
 }
 
 /* Permit loads from GC_SAFEPOINT_PAGE_ADDR (NB page state change is

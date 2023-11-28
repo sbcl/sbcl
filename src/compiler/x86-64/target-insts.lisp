@@ -436,6 +436,10 @@
     ;; Always try to add an end-of-line comment about the EA.
     ;; Assembler routines were already handled above (not really sure why)
     ;; so now we have to figure out everything else.
+    #+sb-safepoint
+    (when (and (eql (machine-ea-base value) sb-vm::card-table-reg)
+               (eql (machine-ea-disp value) -8))
+      (return-from print-mem-ref (note "safepoint" dstate)))
 
     (when (and (eq (machine-ea-base value) :rip) (neq mode :compute))
       (block nil
