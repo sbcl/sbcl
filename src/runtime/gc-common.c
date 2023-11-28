@@ -3081,6 +3081,9 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
         memset(addr, 0, length);
     }
 #else
+    // As described above, this branch has a bug! We want to hold the reservation
+    // on the address range, but de-commmit the storage,
+    // and I don't think a generic POSIX system can do that.
     void *new_addr;
     os_deallocate(addr, length);
     new_addr = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, NOT_MOVABLE, addr, length);

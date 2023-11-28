@@ -632,9 +632,7 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
         for (unsigned i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
             lispobj word = *os_context_register_addr(context, boxed_registers[i]);
             if (is_lisp_pointer(word)) {
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
                 impart_mark_stickiness(word);
-#endif
                 pin_exact_root(word);
             }
         }
@@ -1298,6 +1296,17 @@ int gc_card_table_nbits;
 long gc_card_table_mask;
 
 
+void remap_for_code(void* base, int npages)
+{
+    /* Remap before releasing the mutex so that no other thread can manipulate
+     * this range of code until it has been correctly set up. If page(s) were
+     * previously utilized for code, this is not necessary, but there's no way
+     * to know what page type it had, because unused pages all have type 0 */
+    sword_t length = npage_bytes(npages);
+    os_deallocate(base, length);
+    mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+}
+
 /*
  * The vops that allocate assume that the returned space is zero-filled.
  * (E.g. the most significant word of a 2-word bignum in MOVE-FROM-UNSIGNED.)
@@ -1409,6 +1418,11 @@ lisp_alloc(__attribute__((unused)) int flags,
                                                    &alloc_start, page_table_pages, &largest_hole);
         if (new_page == -1) gc_heap_exhausted_error_or_lose(largest_hole, nbytes);
         set_alloc_start_page(page_type, alloc_start);
+#ifdef LISP_FEATURE_DARWIN_JIT
+        if (page_type == PAGE_TYPE_CODE)
+            remap_for_code(page_address(new_page),
+                           ALIGN_UP(nbytes, GENCGC_PAGE_BYTES)/GENCGC_PAGE_BYTES);
+#endif
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = page_address(new_page);
@@ -1428,10 +1442,19 @@ lisp_alloc(__attribute__((unused)) int flags,
                                           &alloc_start, page_table_pages);
         if (!success) gc_heap_exhausted_error_or_lose(0, nbytes);
         set_alloc_start_page(page_type, alloc_start);
+        int zerofill = 1;
+#ifdef LISP_FEATURE_DARWIN_JIT
+        if (page_type == PAGE_TYPE_CODE
+            && PTR_IS_ALIGNED(region->start_addr, GENCGC_PAGE_BYTES)) {
+            remap_for_code(region->start_addr, 1);
+            zerofill = 0;
+            fprintf(stderr, "Page @ %p becomes PAGE_TYPE_CODE\n", region->start_addr);
+        }
+#endif
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = region->start_addr;
-        memset(new_obj, 0, addr_diff(region->end_addr, new_obj));
+        if (zerofill) memset(new_obj, 0, addr_diff(region->end_addr, new_obj));
     }
 
     return new_obj;
