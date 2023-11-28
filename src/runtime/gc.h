@@ -133,5 +133,6 @@ extern lispobj *component_ptr_from_pc(char *pc);
 #define GC_SAFEPOINT_PAGE_ADDR (void*)(gc_card_mark-BACKEND_PAGE_BYTES)
 #define GC_SAFEPOINT_TRAP_ADDR (void*)(gc_card_mark-8)
 #endif
+void remap_free_pages(page_index_t,page_index_t);
 
 #endif /* _GC_H_ */

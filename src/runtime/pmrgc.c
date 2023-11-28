@@ -150,62 +150,9 @@ static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
 void acquire_gc_page_table_lock() { ignore_value(mutex_acquire(&free_pages_lock)); }
 void release_gc_page_table_lock() { ignore_value(mutex_release(&free_pages_lock)); }
 
-extern os_vm_size_t gencgc_release_granularity;
-os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
-
-
-/* Zero the memory at ADDR for LENGTH bytes, but use mmap/munmap instead
- * of zeroing it ourselves, i.e. in practice give the memory back to the
- * OS. Generally done after a large GC.
- */
-static void __attribute__((unused))
-zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
-#ifdef LISP_FEATURE_WIN32
-    os_decommit_mem(addr, length);
-#elif defined LISP_FEATURE_LINUX
-    // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
-    // Linux treats it as a demand that the memory be 0-filled, or refreshed
-    // from a file that backs the range. BSD takes it as a hint that you don't
-    // care if the memory has to brought in from swap when next accessed,
-    // i.e. it's not a request to make a user-visible alteration to memory.
-    // So in theory this can bring a page in from the core file, if we happen
-    // to hit a page that resides in the portion of memory mapped by coreparse.
-    // In practice this should not happen because objects from a core file can't
-    // become garbage. Except in save-lisp-and-die they can, and we must be
-    // cautious not to resurrect bytes that originally came from the file.
-    if ((os_vm_address_t)addr >= anon_dynamic_space_start) {
-        if (madvise(addr, length, MADV_DONTNEED) != 0)
-            lose("madvise failed");
-    } else { // See doc/internals-notes/zero-with-mmap-bug.txt
-        // Trying to see how often this happens.
-        // fprintf(stderr, "zero_range_with_mmap: fallback to memset()\n");
-        memset(addr, 0, length);
-    }
-#else
-    void *new_addr;
-    os_deallocate(addr, length);
-    new_addr = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, NOT_MOVABLE, addr, length);
-    if (new_addr == NULL || new_addr != addr) {
-        lose("remap_free_pages: page moved, %p ==> %p",
-             addr, new_addr);
-    }
-#endif
-}
-
-/* Zero the pages from START to END (inclusive). Generally done just after
- * a new region has been allocated.
- */
-static inline void zero_pages(page_index_t start, page_index_t end) {
-    if (start <= end)
-#ifdef LISP_FEATURE_DARWIN_JIT
-        zero_range_with_mmap(page_address(start), npage_bytes(1+end-start));
-#else
-        memset(page_address(start), 0, npage_bytes(1+end-start));
-#endif
-}
-
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
+generation_index_t get_alloc_generation() { return gc_alloc_generation; }
 
 /*
  * To support quick and inline allocation, regions of memory can be
@@ -1082,75 +1029,6 @@ find_next_free_page(void)
 
     /* 1 page beyond the last used page is the next free page */
     return last_page + 1;
-}
-
-/*
- * Supposing the OS can only operate on ranges of a certain granularity
- * (which we call 'gencgc_release_granularity'), then given any page rage,
- * align the lower bound up and the upper down to match the granularity.
- *
- *     |-->| OS page | OS page |<--|
- *
- * If the interior of the aligned range is nonempty,
- * perform three operations: unmap/remap, fill before, fill after.
- * Otherwise, just one operation to fill the whole range.
- */
-static void
-remap_page_range (page_index_t from, page_index_t to)
-{
-    /* There's a mysterious Solaris/x86 problem with using mmap
-     * tricks for memory zeroing. See sbcl-devel thread
-     * "Re: patch: standalone executable redux".
-     */
-    /* I have no idea what the issue with Haiku is, but using the simpler
-     * zero_pages() works where the unmap,map technique does not. Yet the
-     * trick plus a post-check that the pages were correctly zeroed finds
-     * no problem at that time. So what's failing later and why??? */
-#if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
-    zero_pages(from, to);
-#else
-    size_t granularity = gencgc_release_granularity;
-    // page_address "works" even if 'to' == page_table_pages-1
-    char* start = page_address(from);
-    char* end   = page_address(to+1);
-    char* aligned_start = PTR_ALIGN_UP(start, granularity);
-    char* aligned_end   = PTR_ALIGN_DOWN(end, granularity);
-
-    /* NOTE: this is largely pointless because gencgc-release-granularity
-     * is everywhere defined to be EXACTLY +backend-page-bytes+
-     * which by definition is the quantum at which we'll unmap/map.
-     * Maybe we should remove the needless complexity? */
-    if (aligned_start < aligned_end) {
-        zero_range_with_mmap(aligned_start, aligned_end-aligned_start);
-        memset(start, 0, aligned_start - start);
-        memset(aligned_end, 0, end - aligned_end);
-    } else {
-        zero_pages(from, to);
-    }
-#endif
-    page_index_t i;
-    for (i = from; i <= to; i++) set_page_need_to_zero(i, 0);
-}
-
-static void
-remap_free_pages (page_index_t from, page_index_t to)
-{
-    page_index_t first_page, last_page;
-
-    for (first_page = from; first_page <= to; first_page++) {
-        if (!page_free_p(first_page) || !page_need_to_zero(first_page))
-            continue;
-
-        last_page = first_page + 1;
-        while (page_free_p(last_page) &&
-               (last_page <= to) &&
-               (page_need_to_zero(last_page)))
-            last_page++;
-
-        remap_page_range(first_page, last_page-1);
-
-        first_page = last_page;
-    }
 }
 
 generation_index_t small_generation_limit = 1;

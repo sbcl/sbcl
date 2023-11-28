@@ -205,9 +205,6 @@ static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
 void acquire_gc_page_table_lock() { ignore_value(mutex_acquire(&free_pages_lock)); }
 void release_gc_page_table_lock() { ignore_value(mutex_release(&free_pages_lock)); }
 
-extern os_vm_size_t gencgc_release_granularity;
-os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
-
 extern os_vm_size_t gencgc_alloc_granularity;
 os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
 
@@ -249,177 +246,12 @@ count_generation_bytes_allocated (generation_index_t gen)
 }
 
 
-/* Zero the memory at ADDR for LENGTH bytes, but use mmap/munmap instead
- * of zeroing it ourselves, i.e. in practice give the memory back to the
- * OS. Generally done after a large GC.
- */
-static void __attribute__((unused))
-zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
-#ifdef LISP_FEATURE_WIN32
-    os_decommit_mem(addr, length);
-#elif defined LISP_FEATURE_LINUX
-    // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
-    // Linux treats it as a demand that the memory be 0-filled, or refreshed
-    // from a file that backs the range. BSD takes it as a hint that you don't
-    // care if the memory has to brought in from swap when next accessed,
-    // i.e. it's not a request to make a user-visible alteration to memory.
-    // So in theory this can bring a page in from the core file, if we happen
-    // to hit a page that resides in the portion of memory mapped by coreparse.
-    // In practice this should not happen because objects from a core file can't
-    // become garbage. Except in save-lisp-and-die they can, and we must be
-    // cautious not to resurrect bytes that originally came from the file.
-    if ((os_vm_address_t)addr >= anon_dynamic_space_start) {
-        if (madvise(addr, length, MADV_DONTNEED) != 0)
-            lose("madvise failed");
-    } else { // See doc/internals-notes/zero-with-mmap-bug.txt
-        // Trying to see how often this happens.
-        // fprintf(stderr, "zero_range_with_mmap: fallback to memset()\n");
-        memset(addr, 0, length);
-    }
-#else
-    void *new_addr;
-    os_deallocate(addr, length);
-    new_addr = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, NOT_MOVABLE, addr, length);
-    if (new_addr == NULL || new_addr != addr) {
-        lose("remap_free_pages: page moved, %p ==> %p",
-             addr, new_addr);
-    }
-#endif
-}
-
-/*
-Regarding zero_pages(), if the next operation would be memcpy(),
-then zeroing is a total waste of time and we should skip it.
-
-The most simple case seems to be ALLOCATE-CODE-OBJECT because we can treat pages
-of code consistently in terms of whether the newly allocated page is for Lisp or
-for the garbage collector's transport function. The object is basically an unboxed
-object, so there are no "wild pointers" in it, at least until the boxed size is
-written. So we can skip prezeroing because the bulk of the object will be subject
-to memcpy() from either an octet vector produced by the assember, or a fasl stream.
-We only need to prezero the boxed words. GC avoids prezeroing of its code pages.
-
-The next simplest case seems to be unboxed pages - Lisp can never directly request
-an unboxed page (at least in the current design), so any unboxed page is for GC,
-and will always be used for a transport function. We can skip zeroing those pages,
-because even if GC does not fill the page completely, it can not be used for other
-object allocations from Lisp.
-
-Boxed pages are the problem. Except for pages which are 100% used by GC, they  might
-later by consumed in part by Lisp. Unfortunately we don't know whether it will be
-100% used until it's 100% used. So we can't skip zeroing.
-However, in general, we should try to convert Lisp allocators to be aware of
-the issue of zeroing rather than relying on C to do it, as this will relieve
-a pain point (a so-called "impedence mismatch") when trying to plug in other
-allocators that do not intrinsically give you zero-initialized memory.
-
-The cases can be broken down as follows:
- - unboxed objects can always be zeroed at leisure in Lisp. This is hard only because
-   Lisp does not distinguish in the slow path allocator whether it is asking for boxed
-   or unboxed memory, so even if we made the Lisp code perform explicit zero-filling of
-   strings and numeric vectors, the allocation macros needs to be enhanced
-   to inform C of the fact that zeroing will happen in Lisp whenever we have to go to
-   the slow path; and we'll need unboxed thread-local regions of course.
-
- - structure objects almost always have all slots written immediately after
-   allocation, so they don't necessarily demand prezeroing, but we have to think about
-   to the scope of the pseudatomic wrapping. One of the following must pertain:
-   * Widen the pseudo-atomic scope so that initialization happens within it,
-     never permitting GC to see old garbage, OR
-   * Store the layout last rather than first, and say that until the layout is stored,
-     GC might see garbage, treating any bit pattern as a conservative pointer.
-     (because there are two separate issues: ignoring old values, and ensuring that
-     newly written slots are perceived as enlivening what they point to)
-   * Add some bits indicating how many slots of the object are initialized.
-     This seems impractical
-
- - general arrays present the largest problem - the choice of when to zero should be
-   based on whether the object is large or not and whether one of :initial-element
-   or :initial-contents were specified. If the initial-element is NIL, then the initial
-   zero-fill was a waste.
-
- - closures and everything else except arrays are basically structure-like
-   and have the same issue. Fixed-sized objects are simple though - e.g. value-cells
-   can move the store of the 1 word payload inside pseudo-atomic if it isn't already.
-   Thusly, any value-cell could go on a non-prezeroed page.
-
-In general, deciding when to zero-initialize to attain maximum performance is nontrivial.
-See "Why Nothing Matters: The Impact of Zeroing"
-https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/zero-oopsla-2011.pdf
-
- */
-
-/* Zero the pages from START to END (inclusive). Generally done just after
- * a new region has been allocated.
- */
-static inline void zero_pages(page_index_t start, page_index_t end) {
-    if (start <= end)
-#ifdef LISP_FEATURE_DARWIN_JIT
-        zero_range_with_mmap(page_address(start), npage_bytes(1+end-start));
-#else
-        memset(page_address(start), 0, npage_bytes(1+end-start));
-#endif
-}
-
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
+generation_index_t get_alloc_generation() { return gc_alloc_generation; }
+
 __attribute__((unused)) static const char * const page_type_description[8] =
   {0, "unboxed", "boxed", "mixed", "sm_mix", "cons", "?", "code"};
-
-/* Zero the pages from START to END (inclusive), except for those
- * pages which: (a) don't require pre-clearing, or (b) do but are already clear.
- * For each page in the range that got cleared right now, change the
- * page's need_to_zero flag to 0; otherwise, leave that flag alone.
- */
-#if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
-int mmap_does_not_zero;
-#endif
-void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type) {
-    // If allocating mixed pages to gen0 (or scratch which becomes gen0) then
-    // this allocation is potentially going to be extended by lisp (if it happens to
-    // pick up the tail of the page as its next available region)
-    // and we really have to zeroize the page. Otherwise, if not mixed or allocating
-    // memory that is entirely within GC, then lisp will never use parts of the page.
-    // So we can avoid pre-zeroing all codes pages, all unboxed pages,
-    // all strictly boxed pages, and all mixed pages allocated to gen>=1.
-
-    page_index_t i;
-#ifdef LISP_FEATURE_DARWIN_JIT
-    /* Must always zero, as it may need changing the protection bits. */
-    bool any_need_to_zero = 0;
-    for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
-    if (any_need_to_zero) {
-        zero_pages(start, end);
-        for (i = start; i <= end; i++) set_page_need_to_zero(i, 0);
-    }
-#elif defined LISP_FEATURE_MIPS
-    /* Technically this case is for "if BACKEND_PAGE_BYTES > GENCGC_CARD_BYTES"
-     * but #+win32 has that, and works fine because we don't map the core to memory
-     * from the file directly. The issue is that load_core_bytes() has a larger
-     * granularity than saving thinks it used, so loading picks up junk from pages
-     * that are supposedly zeroed. Until I fix it better, just zeroize always.
-     * Basically we want to decouple the allocator's quantum of GENCGC_PAGE_BYTES
-     * from the OS's requirement on file mappings. I don't know why rev 2faf4b79a7
-     * exposed the bug, but it seems that the older  strategy for gc_and_save left
-     * zeroed pages in exactly the right places either by accident or by design */
-    for (i = start; i <= end; i++) {
-        zero_pages(i, i);
-        set_page_need_to_zero(i, 0);
-    }
-#else
-    bool usable_by_lisp =
-        gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
-                                     && from_space == 0);
-    if ((page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0) {
-        for (i = start; i <= end; i++)
-            if (page_need_to_zero(i)) {
-                zero_pages(i, i);
-                set_page_need_to_zero(i, 0);
-            }
-    }
-#endif
-}
-
 
 /*
  * To support quick and inline allocation, regions of memory can be
@@ -3951,75 +3783,6 @@ find_next_free_page(void)
 
     /* 1 page beyond the last used page is the next free page */
     return last_page + 1;
-}
-
-/*
- * Supposing the OS can only operate on ranges of a certain granularity
- * (which we call 'gencgc_release_granularity'), then given any page rage,
- * align the lower bound up and the upper down to match the granularity.
- *
- *     |-->| OS page | OS page |<--|
- *
- * If the interior of the aligned range is nonempty,
- * perform three operations: unmap/remap, fill before, fill after.
- * Otherwise, just one operation to fill the whole range.
- */
-static void
-remap_page_range (page_index_t from, page_index_t to)
-{
-    /* There's a mysterious Solaris/x86 problem with using mmap
-     * tricks for memory zeroing. See sbcl-devel thread
-     * "Re: patch: standalone executable redux".
-     */
-    /* I have no idea what the issue with Haiku is, but using the simpler
-     * zero_pages() works where the unmap,map technique does not. Yet the
-     * trick plus a post-check that the pages were correctly zeroed finds
-     * no problem at that time. So what's failing later and why??? */
-#if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
-    zero_pages(from, to);
-#else
-    size_t granularity = gencgc_release_granularity;
-    // page_address "works" even if 'to' == page_table_pages-1
-    char* start = page_address(from);
-    char* end   = page_address(to+1);
-    char* aligned_start = PTR_ALIGN_UP(start, granularity);
-    char* aligned_end   = PTR_ALIGN_DOWN(end, granularity);
-
-    /* NOTE: this is largely pointless because gencgc-release-granularity
-     * is everywhere defined to be EXACTLY +backend-page-bytes+
-     * which by definition is the quantum at which we'll unmap/map.
-     * Maybe we should remove the needless complexity? */
-    if (aligned_start < aligned_end) {
-        zero_range_with_mmap(aligned_start, aligned_end-aligned_start);
-        memset(start, 0, aligned_start - start);
-        memset(aligned_end, 0, end - aligned_end);
-    } else {
-        zero_pages(from, to);
-    }
-#endif
-    page_index_t i;
-    for (i = from; i <= to; i++) set_page_need_to_zero(i, 0);
-}
-
-static void
-remap_free_pages (page_index_t from, page_index_t to)
-{
-    page_index_t first_page, last_page;
-
-    for (first_page = from; first_page <= to; first_page++) {
-        if (!page_free_p(first_page) || !page_need_to_zero(first_page))
-            continue;
-
-        last_page = first_page + 1;
-        while (page_free_p(last_page) &&
-               (last_page <= to) &&
-               (page_need_to_zero(last_page)))
-            last_page++;
-
-        remap_page_range(first_page, last_page-1);
-
-        first_page = last_page;
-    }
 }
 
 generation_index_t small_generation_limit = 1;
