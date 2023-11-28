@@ -78,9 +78,8 @@
   (:info name offset lowtag)
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:vop-var vop)
-  (:ignore name)
   (:generator 1
-    (emit-gengc-barrier object nil (list t1) (vop-nth-arg 1 vop) value)
+    (emit-gengc-barrier object nil (list t1) (vop-nth-arg 1 vop) value name)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)

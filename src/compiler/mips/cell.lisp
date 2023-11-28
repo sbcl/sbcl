@@ -26,12 +26,11 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg null zero)))
   (:info name offset lowtag)
-  (:ignore name)
   (:temporary (:sc non-descriptor-reg) temp)
   (:vop-var vop)
   (:generator 1
     (without-scheduling ()
-      (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value)
+      (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value name)
       (storew value object offset lowtag))))
 
 ;;;; Symbol hacking VOPs:

@@ -12,9 +12,9 @@
 
 (in-package "SB-VM")
 
-(defun emit-gengc-barrier (object cell-address temps &optional value-tn-ref value-tn)
+(defun emit-gengc-barrier (object cell-address temps &optional value-tn-ref value-tn allocator)
   (aver (neq (car temps) cell-address)) ; LD would clobber the cell-address
-  (when (require-gengc-barrier-p object value-tn-ref value-tn)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn allocator)
     ;; (inst ld (car temps) thread-base-tn (ash thread-card-table-slot word-shift))
     ;; RLIDCL dest, source, (64-rightshift), (64-indexbits)
     (inst rldicl (car temps) (or cell-address object) (- 64 gencgc-card-shift)

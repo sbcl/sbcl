@@ -2,8 +2,8 @@
 
 ;;; You should generally put WITHOUT-SCHEDULING around this because the fixup patcher
 ;;; wants to see the two shifts as consecutive instructions.
-(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn)
-  (when (require-gengc-barrier-p object value-tn-ref value-tn)
+(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn allocator)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn allocator)
     (inst sll temp (or cell-address object) (make-fixup nil :card-table-index-mask))
     (inst srl temp temp 0)
     (inst addu temp temp cardbase-tn)
