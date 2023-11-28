@@ -40,7 +40,7 @@
     ;; passed to C do not cause a WP violation in foreign code.
     ;; Do that before storing length, since nil-arrays don't have any
     ;; space, but may have non-zero length.
-    #-gencgc
+    #-generational
     (storew zr-tn pa-flag -1)
     (storew-pair ndescr 0 length vector-length-slot tmp-tn)))
 

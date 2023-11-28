@@ -962,12 +962,6 @@ void mr_preserve_leaf(lispobj obj) {
   }
 }
 
-/* Trace through an object outside dynamic space.
- * Used by immobile space. */
-void mr_trace_object(lispobj *obj) {
-  trace_object(compute_lispobj(obj));
-}
-
 /* Preserve an exact pointer, trace and pin it.
  * Used by pin_exact_root. */
 void mr_preserve_object(lispobj obj) {

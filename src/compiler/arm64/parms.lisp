@@ -26,7 +26,9 @@
 (defconstant gencgc-page-bytes +backend-page-bytes+)
 ;;; The divisor relative to page-bytes which computes the granularity
 ;;; at which writes to old generations are logged.
-(defconstant cards-per-page 32)
+(defconstant cards-per-page
+             #+gencgc 32
+             #+mark-region-gc (/ +backend-page-bytes+ 128))
 
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than

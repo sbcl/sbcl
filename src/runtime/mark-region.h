@@ -86,7 +86,6 @@ extern void mr_preserve_ambiguous(uword_t address);
 extern void mr_preserve_range(lispobj *from, sword_t nwords);
 extern void mr_preserve_leaf(lispobj obj);
 extern void mr_preserve_object(lispobj obj);
-extern void mr_trace_object(lispobj *obj);
 extern void mr_trace_bump_range(lispobj* start, lispobj *end);
 //extern bool pointer_survived_gc_yet(lispobj object);
 

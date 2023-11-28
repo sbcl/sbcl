@@ -2314,11 +2314,13 @@ scrub_thread_control_stack(struct thread *th)
 void
 scavenge_control_stack(struct thread *th)
 {
+#ifndef LISP_FEATURE_MARK_REGION_GC
     if (!compacting_p()) {
         long nwords = (lispobj*)access_control_stack_pointer(th) - th->control_stack_start;
         gc_mark_range(th->control_stack_start, nwords);
         return;
     }
+#endif
     lispobj *object_ptr;
 
     /* In order to properly support dynamic-extent allocation of
@@ -2339,7 +2341,13 @@ scavenge_control_stack(struct thread *th)
         if (word == FORWARDING_HEADER)
             lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p",
                  object_ptr, th->control_stack_start, access_control_stack_pointer(th));
-        else if (is_lisp_pointer(word)) { scav1(object_ptr, word); }
+        else if (is_lisp_pointer(word)) {
+#ifdef LISP_FEATURE_MARK_REGION_GC
+          mr_preserve_object(word);
+#else
+          scav1(object_ptr, word);
+#endif
+        }
 #ifdef LISP_FEATURE_PPC64
         /* For ppc64, ~0 does not satisfy is_lisp_pointer() or is_lisp_immediate(),
          * but it can be ignored. It nominally satisfies is_lisp_pointer() on other
