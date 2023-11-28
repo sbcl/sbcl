@@ -221,9 +221,6 @@
         (link-allocator-to-inits allocator-vop last-init-vop node))
       (move-lvar-result node block locs lvar))))
 
-;;; FIXME: this causes emission of GC store barriers, but it should not.
-;;; The vector is freshly consed, so anything being stored into it
-;;; is at least as old.
 (defoptimizer (initialize-vector ir2-convert)
     ((vector &rest initial-contents) node block)
   (let* ((vector-ctype (lvar-type vector))

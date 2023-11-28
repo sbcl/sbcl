@@ -377,6 +377,7 @@
         (:arg-types ,type tagged-num ,el-type)
         (:temporary (:sc non-descriptor-reg) ea)
         (:vop-var vop)
+        (:node-var node)
         (:generator 2
           (sc-case index
             (immediate
@@ -389,7 +390,8 @@
                (inst add ea object (lsl index (- word-shift unshift))))
              ;; Calculate the exact cell address to ensure the right card is marked
              (inst add ea ea (- (ash vector-data-offset word-shift) other-pointer-lowtag))))
-          (emit-gengc-barrier object ea tmp-tn (vop-nth-arg 2 vop) value)
+          (unless (sb-c::set-slot-old-p node 2)
+            (emit-gengc-barrier object ea tmp-tn (vop-nth-arg 2 vop) value))
           (storew value ea 0 0))))
     (t
      `(define-vop (,name)

@@ -488,20 +488,32 @@
             (find-dominators component))
           (dominates-p block1 block2)))))
 
-(defun set-slot-old-p (node)
+(defun set-slot-old-p (node &optional nth-value)
+  (when (lvar-fun-is (combination-fun node) '(initialize-vector))
+    (return-from set-slot-old-p t))
   (let ((args (combination-args node)))
     (multiple-value-bind (object-lvar value-lvar)
-        (if (lvar-fun-is (combination-fun node) '(%%primitive))
-            (values (car (last args 2))
-                    (car (last args)))
-            (values (first args) (second args)))
+        (cond (nth-value
+               (values (first args)
+                       (nth nth-value args)))
+              ((lvar-fun-is (combination-fun node) '(%%primitive))
+               (values (car (last args 2))
+                       (car (last args))))
+              (t
+               (values (first args) (second args))))
       (let ((allocator (principal-lvar-ref-use object-lvar))
             (value-ref (principal-lvar-ref value-lvar))
             (uses (lvar-uses value-lvar)))
         (when (and (combination-p allocator)
-                   (lvar-fun-is (combination-fun allocator) '(list* list
-                                                              %make-instance
-                                                              %make-funcallable-instance)))
+                   (or
+                    (lvar-fun-is (combination-fun allocator) '(list* list
+                                                               %make-instance
+                                                               %make-funcallable-instance))
+                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
+                         (let ((allocator (principal-lvar-ref-use
+                                           (principal-lvar (first (combination-args allocator))))))
+                           (and (combination-p allocator)
+                                (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))))
 
           (when value-ref
             (let ((var (ref-leaf value-ref)))
