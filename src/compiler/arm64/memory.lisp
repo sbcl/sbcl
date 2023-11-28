@@ -12,9 +12,9 @@
 
 (in-package "SB-VM")
 
-(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn)
+(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn allocator)
   (when (or (eq value-tn-ref t)
-            (require-gengc-barrier-p object value-tn-ref value-tn))
+            (require-gengc-barrier-p object value-tn-ref value-tn allocator))
     (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
     (inst strb zr-tn (@ cardtable-tn temp))))
 

@@ -33,13 +33,13 @@
 ;;;    be younger than the newly constructed thing.
 ;;; 2. hash-table k/v pair should mark once only.
 ;;;    (the vector elements are certainly on the same card)
-(defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
-  #-soft-card-marks (declare (ignore object cell-address scratch-reg value-tn-ref value-tn))
+(defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn allocator)
+  #-soft-card-marks (declare (ignore object cell-address scratch-reg value-tn-ref value-tn allocator))
   #+soft-card-marks
   (progn
   (when (sc-is object constant immediate)
     (aver (symbolp (tn-value object))))
-  (when (require-gengc-barrier-p object value-tn-ref value-tn)
+  (when (require-gengc-barrier-p object value-tn-ref value-tn allocator)
     (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
         (inst lea scratch-reg cell-address)
         ;; OBJECT could be a symbol in immobile space

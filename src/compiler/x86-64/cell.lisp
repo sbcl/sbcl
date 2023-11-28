@@ -38,7 +38,6 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
-  (:arg-refs args)
   (:temporary (:sc unsigned-reg) val-temp)
   (:generator 1
     (cond #+ubsan
@@ -59,17 +58,7 @@
              (emit-code-page-gengc-barrier object val-temp)
              (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
-           (let* ((value-tn (tn-ref-tn (tn-ref-across args)))
-                  (prim-type (sb-c::tn-primitive-type value-tn))
-                  (scs (and prim-type
-                            (sb-c::primitive-type-scs prim-type))))
-             (unless (and
-                      ;; Can this TN be boxed after the allocator?
-                      (or (singleton-p scs)
-                          (not (member descriptor-reg-sc-number scs)))
-                      ;; gencgc does not need to emit the barrier for constructors
-                      (eq name :allocator))
-               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)))
+           (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value name)
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
 (define-vop (compare-and-swap-slot)

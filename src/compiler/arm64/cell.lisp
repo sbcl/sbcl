@@ -29,9 +29,7 @@
   (:results)
   (:vop-var vop)
   (:generator 1
-    ;; gencgc does not need to emit the barrier for constructors
-    (unless (eq name :allocator)
-      (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value))
+    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value name)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)

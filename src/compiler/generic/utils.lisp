@@ -345,7 +345,7 @@
 (define-load-time-global *store-barriers-potentially-emitted* 0)
 (define-load-time-global *store-barriers-emitted* 0)
 
-(defun require-gengc-barrier-p (object value-tn-ref value-tn)
+(defun require-gengc-barrier-p (object value-tn-ref value-tn &optional allocator)
   (incf *store-barriers-potentially-emitted*)
   ;; If OBJECT is stack-allocated, elide the barrier
   (when (stack-consed-p object)
@@ -369,7 +369,13 @@
              (when (csubtypep type (specifier-type '(or character sb-xc:fixnum boolean
                                                         #+64-bit single-float)))
                (return-from potential-heap-pointer-p nil)))
-           t))
+           t)
+         (boxed-tn-p (value-tn)
+           (let* ((prim-type (sb-c::tn-primitive-type value-tn))
+                  (scs (and prim-type
+                            (sb-c::primitive-type-scs prim-type))))
+             (or (singleton-p scs)
+                 (not (member descriptor-reg-sc-number scs))))))
     (cond (value-tn
            (unless (eq (tn-ref-tn value-tn-ref) value-tn)
              (aver (eq (tn-ref-load-tn value-tn-ref) value-tn)))
@@ -383,12 +389,16 @@
                     (when (potential-heap-pointer-p (tn-ref-tn ref) ref)
                       (return t)))))
              (unless any-pointer
-               (return-from require-gengc-barrier-p nil))))))
-  (unless (and value-tn-ref
-               (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
-                                     (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref))))
-    (incf *store-barriers-emitted*)
-    t))
+               (return-from require-gengc-barrier-p nil)))))
+    (unless (and value-tn
+                 value-tn-ref
+                 ;; Can this TN be boxed after the allocator?
+                 (boxed-tn-p value-tn)
+                 (or (eq allocator :allocator)
+                     (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
+                                           (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref)))))
+      (incf *store-barriers-emitted*)
+      t)))
 
 (defun vop-nth-arg (n vop)
   (let ((ref (vop-args vop)))
