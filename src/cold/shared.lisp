@@ -364,7 +364,7 @@
        '(("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
-         ("(and mark-region-gc (not x86-64))"
+         ("(and mark-region-gc (not (or x86-64 arm64)))"
           "mark-region is not supported on selected architecture")
          ("(and (not sb-thread) (or arm64 ppc64))"
           "The selected architecture requires :SB-THREAD")

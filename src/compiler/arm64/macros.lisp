@@ -158,7 +158,7 @@
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
 
-#+gencgc
+#+generational
 (defun allocation-tramp (type alloc-tn size back-label)
   (if (integerp size)
       (load-immediate-word tmp-tn size)

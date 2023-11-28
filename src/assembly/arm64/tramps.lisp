@@ -5,7 +5,7 @@
 
 (in-package "SB-VM")
 
-#+gencgc
+#+generational
 (macrolet ((define-alloc-tramp (lisp-name c-name &body process-args)
  `(define-assembly-routine (,lisp-name (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)

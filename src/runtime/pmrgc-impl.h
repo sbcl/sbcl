@@ -16,7 +16,7 @@
 /* Use AVX2 versions of code when we can, since blasting bytes faster
  * is always nice.
  * If used more widely, we should put these in runtime.h */
-#ifdef __linux__
+#if defined(__linux__) && defined(LISP_FEATURE_X86_64)
 #define CPU_SPLIT __attribute__((target_clones("default,avx2")))
 /* clang on linux seems to demand that the prototype of a multi-versioned function
  * have the same attribute as the definition. If omitted, then link errors occur such as
