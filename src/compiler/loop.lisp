@@ -23,6 +23,7 @@
   (let ((head (loop-head (component-outer-loop component)))
         changed)
     (setf (block-dominator head) head)
+    (dfo-as-needed component)
     (labels ((intersect (block1 block2)
                (cond ((eq block1 block2) block1)
                      ((< (block-number block1) (block-number block2))
@@ -30,18 +31,18 @@
                      (t
                       (intersect block1 (block-dominator block2))))))
       (loop
-        (setq changed nil)
-        (do-blocks (block component :tail)
-          (let ((dom))
-            (dolist (pred (block-pred block))
-              (unless (null (block-dominator pred))
-                (setq dom (if dom
-                              (intersect pred dom)
-                              pred))))
-            (unless (eq (block-dominator block) dom)
-              (setf (block-dominator block) dom)
-              (setq changed t))))
-        (unless changed (return))))
+       (setq changed nil)
+       (do-blocks (block component :tail)
+         (let ((dom))
+           (dolist (pred (block-pred block))
+             (unless (null (block-dominator pred))
+               (setq dom (if dom
+                             (intersect pred dom)
+                             pred))))
+           (unless (eq (block-dominator block) dom)
+             (setf (block-dominator block) dom)
+             (setq changed t))))
+       (unless changed (return))))
     (setf (block-dominator head) nil)
     (setf (component-dominators-computed component) t)))
 
