@@ -488,50 +488,50 @@
             (find-dominators component))
           (dominates-p block1 block2)))))
 
-(defun set-slot-old-p (node &optional nth-value)
-  (when (lvar-fun-is (combination-fun node) '(initialize-vector))
-    (return-from set-slot-old-p t))
-  (let ((args (combination-args node)))
-    (multiple-value-bind (object-lvar value-lvar)
-        (cond (nth-value
-               (values (first args)
-                       (nth nth-value args)))
-              ((lvar-fun-is (combination-fun node) '(%%primitive))
-               (values (car (last args 2))
-                       (car (last args))))
-              (t
-               (values (first args) (second args))))
-      (let ((allocator (principal-lvar-ref-use object-lvar))
-            (value-ref (principal-lvar-ref value-lvar))
-            (uses (lvar-uses value-lvar)))
-        (when (and (combination-p allocator)
-                   (or
-                    (lvar-fun-is (combination-fun allocator) '(list* list
-                                                               %make-instance
-                                                               %make-funcallable-instance))
-                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
-                         (let ((allocator (principal-lvar-ref-use
-                                           (principal-lvar (first (combination-args allocator))))))
-                           (and (combination-p allocator)
-                                (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))))
+(defun set-slot-old-p (node nth-value)
+  (when (combination-p node)
+    (when (lvar-fun-is (combination-fun node) '(initialize-vector))
+      (return-from set-slot-old-p t))
+    (let ((args (combination-args node)))
+      (multiple-value-bind (object-lvar value-lvar)
+          (cond
+            ((lvar-fun-is (combination-fun node) '(%%primitive))
+             (values (car (last args 2))
+                     (car (last args))))
+            (t
+             (values (first args)
+                     (nth nth-value args))))
+        (let ((allocator (principal-lvar-ref-use object-lvar))
+              (value-ref (principal-lvar-ref value-lvar))
+              (uses (lvar-uses value-lvar)))
+          (when (and (combination-p allocator)
+                     (or
+                      (lvar-fun-is (combination-fun allocator) '(list* list
+                                                                 %make-instance
+                                                                 %make-funcallable-instance))
+                      (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
+                           (let ((allocator (principal-lvar-ref-use
+                                             (principal-lvar (first (combination-args allocator))))))
+                             (and (combination-p allocator)
+                                  (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))))
 
-          (when value-ref
-            (let ((var (ref-leaf value-ref)))
-              (when (and (lambda-var-p (ref-leaf value-ref))
-                         (not (lambda-var-sets (ref-leaf value-ref))))
-                (let ((home (lambda-var-home var)))
-                  (when (member (functional-kind home) '(:external :optional))
-                    (return-from set-slot-old-p
-                      (eq (lambda-environment (if (eq (functional-kind home) :external)
-                                                  (main-entry (functional-entry-fun home))
-                                                  home))
-                          (node-environment allocator)))))
-                (setf uses (principal-lvar-ref-use value-lvar)))))
-          (when uses
-            (if (consp uses)
-                (loop for use in uses
-                      always (node-dominates-p use allocator))
-                (node-dominates-p uses allocator))))))))
+            (when value-ref
+              (let ((var (ref-leaf value-ref)))
+                (when (and (lambda-var-p (ref-leaf value-ref))
+                           (not (lambda-var-sets (ref-leaf value-ref))))
+                  (let ((home (lambda-var-home var)))
+                    (when (member (functional-kind home) '(:external :optional))
+                      (return-from set-slot-old-p
+                        (eq (lambda-environment (if (eq (functional-kind home) :external)
+                                                    (main-entry (functional-entry-fun home))
+                                                    home))
+                            (node-environment allocator)))))
+                  (setf uses (principal-lvar-ref-use value-lvar)))))
+            (when uses
+              (if (consp uses)
+                  (loop for use in uses
+                        always (node-dominates-p use allocator))
+                  (node-dominates-p uses allocator)))))))))
 
 ;;;; block starting/creation
 

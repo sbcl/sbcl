@@ -38,7 +38,6 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
-  (:node-var node)
   (:arg-refs args)
   (:temporary (:sc unsigned-reg) val-temp)
   (:generator 1
@@ -68,10 +67,8 @@
                       ;; Can this TN be boxed after the allocator?
                       (or (singleton-p scs)
                           (not (member descriptor-reg-sc-number scs)))
-                      (or
-                       ;; gencgc does not need to emit the barrier for constructors
-                       (eq name :allocator)
-                       (sb-c::set-slot-old-p node)))
+                      ;; gencgc does not need to emit the barrier for constructors
+                      (eq name :allocator))
                (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 

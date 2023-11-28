@@ -384,12 +384,25 @@
                       (return t)))))
              (unless any-pointer
                (return-from require-gengc-barrier-p nil))))))
-  (incf *store-barriers-emitted*)
-  t)
+  (unless (and value-tn-ref
+               (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
+                                     (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref))))
+    (incf *store-barriers-emitted*)
+    t))
 
 (defun vop-nth-arg (n vop)
   (let ((ref (vop-args vop)))
     (dotimes (i n ref) (setq ref (tn-ref-across ref)))))
+
+(defun vop-arg-position (tn-ref vop)
+  (let ((types (sb-c::vop-info-arg-types (sb-c::vop-info vop))))
+    (loop with i = -1
+          for ref = (vop-args vop) then (tn-ref-across ref)
+          do
+          (loop for type = (pop types)
+                do (incf i)
+                while (typep (car types) '(cons (eql :constant))))
+          when (eq ref tn-ref) return i)))
 
 (defun length-field-shift (widetag)
   (if (= widetag instance-widetag)
