@@ -378,19 +378,30 @@
         (:temporary (:sc non-descriptor-reg) ea)
         (:vop-var vop)
         (:generator 2
-          (sc-case index
-            (immediate
-             (inst add ea object (load-store-offset
-                                  (- (ash (+ ,offset (tn-value index)) word-shift)
-                                     ,lowtag))))
-            (t
-             ;; Scale the index
-             (let ((unshift (if (sc-is index any-reg) n-fixnum-tag-bits 0)))
-               (inst add ea object (lsl index (- word-shift unshift))))
-             ;; Calculate the exact cell address to ensure the right card is marked
-             (inst add ea ea (- (ash vector-data-offset word-shift) other-pointer-lowtag))))
-          (emit-gengc-barrier object ea tmp-tn (vop-nth-arg 2 vop) value)
-          (storew value ea 0 0))))
+          (cond ((require-gengc-barrier-p object (vop-nth-arg 2 vop) value)
+                 (sc-case index
+                   (immediate
+                    (inst add ea object (load-store-offset
+                                         (- (ash (+ ,offset (tn-value index)) word-shift)
+                                            ,lowtag))))
+                   (t
+                    ;; Scale the index
+                    (let ((unshift (if (sc-is index any-reg) n-fixnum-tag-bits 0)))
+                      (inst add ea object (lsl index (- word-shift unshift))))
+                    ;; Calculate the exact cell address to ensure the right card is marked
+                    (inst add ea ea (- (ash vector-data-offset word-shift) other-pointer-lowtag))))
+                 (emit-gengc-barrier object ea tmp-tn t)
+                 (storew value ea 0 0))
+                (t
+                 (sc-case index
+                   (immediate
+                    (inst str value (@ object (load-store-offset
+                                               (- (ash (+ ,offset (tn-value index)) word-shift)
+                                                  ,lowtag)))))
+                   (t
+                    (let ((unshift (if (sc-is index any-reg) n-fixnum-tag-bits 0)))
+                      (inst add tmp-tn object (lsl index (- word-shift unshift))))
+                    (storew value tmp-tn ,offset ,lowtag))))))))
     (t
      `(define-vop (,name)
         (:translate ,translate)
