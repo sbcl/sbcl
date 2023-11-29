@@ -15,4 +15,6 @@
 ;;; Don't loop infinitely in mark_obj() on circular lists
 (defvar *foo* (cons nil nil))
 (rplacd *foo* *foo*)
-(with-test (:name :circular-list) (gc :gen 7))
+(with-test (:name :circular-list :skipped-on (and :arm64 :gc-stress))
+  (gc :gen 7))
+(setf *l* nil)

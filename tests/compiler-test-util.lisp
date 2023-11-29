@@ -145,12 +145,14 @@
       (collect-consing-stats thunk times)
     (let* ((consed-bytes (- after before))
            (bytes-per-iteration (float (/ consed-bytes times))))
-      (assert (funcall (if yes/no #'not #'identity)
-                       ;; If allocation really happened, it can't have been less than one cons cell
-                       ;; per iteration (unless the test is nondeterministic - but in that case
-                       ;; we can't really use this strategy anyway). So consider it to have consed
-                       ;; nothing if the fraction is too small.
-                       (< bytes-per-iteration (* 2 sb-vm:n-word-bytes)))
+      (assert (progn
+                (funcall (if yes/no #'not #'identity)
+                         ;; If allocation really happened, it can't have been less than one cons cell
+                         ;; per iteration (unless the test is nondeterministic - but in that case
+                         ;; we can't really use this strategy anyway). So consider it to have consed
+                         ;; nothing if the fraction is too small.
+                         (< bytes-per-iteration (* 2 sb-vm:n-word-bytes)))
+                #+gc-stress t)
               ()
               "~@<Expected the form ~
                       ~4I~@:_~A ~0I~@:_~

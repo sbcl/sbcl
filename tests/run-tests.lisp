@@ -1,3 +1,6 @@
+(when (member "--gc-stress" *posix-argv* :test #'equal)
+  (push :gc-stress *features*))
+
 (load "test-util.lisp")
 (load "assertoid.lisp")
 (load "compiler-test-util.lisp")
@@ -19,50 +22,67 @@
 (load "test-funs")
 
 (defun run-all (&aux (start-time (get-internal-real-time)))
-  (loop :with remainder = (rest *posix-argv*)
-        :for arg = (car remainder)
-        :while remainder
-        :do
-           (pop remainder)
-           (cond
-             ((string= arg "--evaluator-mode")
-              (let ((mode (pop remainder)))
-                (cond
-                  ((string= mode "interpret")
-                   (setf *test-evaluator-mode* :interpret))
-                  ((string= mode "compile")
-                   (setf *test-evaluator-mode* :compile))
-                  (t
-                   (error "~@<Invalid evaluator mode: ~A. Must be one ~
+  (let (skip-to)
+    (loop :with remainder = (rest *posix-argv*)
+          :for arg = (car remainder)
+          :while remainder
+          :do
+          (pop remainder)
+          (cond
+            ((string= arg "--evaluator-mode")
+             (let ((mode (pop remainder)))
+               (cond
+                 ((string= mode "interpret")
+                  (setf *test-evaluator-mode* :interpret))
+                 ((string= mode "compile")
+                  (setf *test-evaluator-mode* :compile))
+                 (t
+                  (error "~@<Invalid evaluator mode: ~A. Must be one ~
                            of interpret, compile.~@:>"
-                          mode)))))
-             ((string= arg "--break-on-failure")
-              (setf *break-on-error* t)
-              (setf test-util:*break-on-failure* t))
-             ((string= arg "--break-on-expected-failure")
-              (setf test-util:*break-on-expected-failure* t))
-             ((string= arg "--report-skipped-tests")
-              (setf *report-skipped-tests* t))
-             ((string= arg "--no-color"))
-             ((string= arg "--slow")
-              (push :slow *features*))
-             (t
-              (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
-  (setf *explicit-test-files* (nreverse *explicit-test-files*))
-  ;; FIXME: randomizing the order tests are run in, especially the "pure" ones,
-  ;; might help detect accidental side-effects by inducing failures elsewhere.
-  ;; And/or try all permutations using an infinite number of machines.
-  (with-open-file (log "test.log" :direction :output
-                       :if-exists :supersede
-                       :if-does-not-exist :create)
-    (pure-runner (pure-load-files) 'load-test log)
-    (pure-runner (pure-cload-files) 'cload-test log)
-    (impure-runner (impure-load-files) 'load-test log)
-    (impure-runner (impure-cload-files) 'cload-test log)
-    (impure-runner (sh-files) 'sh-test log)
-    (log-file-elapsed-time "GRAND TOTAL" start-time log))
-  (report)
-  (sb-ext:exit :code (if (unexpected-failures) 1 104)))
+                         mode)))))
+            ((string= arg "--break-on-failure")
+             (setf *break-on-error* t)
+             (setf test-util:*break-on-failure* t))
+            ((string= arg "--break-on-expected-failure")
+             (setf test-util:*break-on-expected-failure* t))
+            ((string= arg "--report-skipped-tests")
+             (setf *report-skipped-tests* t))
+            ((string= arg "--no-color"))
+            ((string= arg "--slow")
+             (push :slow *features*))
+            ((string= arg "--gc-stress"))
+            ((string= arg "--skip-to")
+             (setf skip-to (pop remainder)))
+            (t
+             (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
+   (setf *explicit-test-files* (nreverse *explicit-test-files*))
+   ;; FIXME: randomizing the order tests are run in, especially the "pure" ones,
+   ;; might help detect accidental side-effects by inducing failures elsewhere.
+   ;; And/or try all permutations using an infinite number of machines.
+   (with-open-file (log "test.log" :direction :output
+                                   :if-exists :supersede
+                                   :if-does-not-exist :create)
+     (let ((pure-load (pure-load-files))
+           (pure-cload (pure-cload-files))
+           (impure-load (impure-load-files))
+           (impure-cload (impure-cload-files))
+           (sh (sh-files)))
+       (when skip-to
+         (flet ((skip (files)
+                  (member skip-to files :key #'file-namestring :test #'equal)))
+           (or (setf pure-load (skip pure-load))
+               (setf pure-cload (skip pure-cload))
+               (setf impure-load (skip impure-load))
+               (setf impure-cload (skip impure-cload))
+               (setf sh (skip sh)))))
+       (pure-runner pure-load 'load-test log)
+       (pure-runner pure-cload 'cload-test log)
+       (impure-runner impure-load 'load-test log)
+       (impure-runner impure-cload 'cload-test log)
+       (impure-runner sh 'sh-test log))
+     (log-file-elapsed-time "GRAND TOTAL" start-time log))
+   (report)
+   (sb-ext:exit :code (if (unexpected-failures) 1 104))))
 
 (defun report ()
   (terpri)
@@ -517,6 +537,7 @@
            "--no-userinit"
            "--noprint"
            "--disable-debugger"
+           #+gc-sress "--eval" #+gc-sress "(push :gc-stress *features*)"
            "--load" load
            "--eval" (write-to-string eval
                                      :right-margin 1000))

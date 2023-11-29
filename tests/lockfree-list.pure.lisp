@@ -249,7 +249,8 @@
 
 ;; Show that nodes which are referenced only via a "fixnum" pointer
 ;; can and do actually move via GC, which adjusts the fixnum accordingly.
-(test-util:with-test (:name :lfl-not-pinned)
+(test-util:with-test (:name :lfl-not-pinned
+                      :skipped-on :gc-stress)
   (gc)
   (assert (= (sb-kernel:generation-of *5*) 0))
   (assert (= (sb-kernel:generation-of *10*) 0))

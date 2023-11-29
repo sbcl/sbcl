@@ -52,6 +52,7 @@
     (funcall fun0b)
     (funcall fun1 1/7)
     (funcall fun1 1/100000000000000000000000000)
+    #-gc-stress
     (assert (< (- (get-universal-time) start-time) 2))))
 
 (with-test (:name (sleep :return-value))

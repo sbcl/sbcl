@@ -118,7 +118,7 @@
     (mapc #'join-thread threads)
     (assert (not oops))))
 
-(with-test (:name :semaphore-multiple-waiters :skipped-on (not :sb-thread))
+(with-test (:name :semaphore-multiple-waiters :skipped-on (or (not :sb-thread) :gc-stress))
   (let ((semaphore (make-semaphore :name "test sem")))
     (labels ((make-readers (n i)
                (values
@@ -341,14 +341,15 @@
                     (error "oops"))
                 (sb-sys:deadline-timeout () :deadline)))))
 
-(with-test (:name (:condition-wait :timeout :one-thread))
+(with-test (:name (:condition-wait :timeout :one-thread)
+                  :skipped-on :gc-stress)
   (let ((mutex (make-mutex))
         (waitqueue (make-waitqueue)))
     (assert (not (with-mutex (mutex)
                    (condition-wait waitqueue mutex :timeout 0.01))))))
 
 (with-test (:name (:condition-wait :timeout :many-threads)
-            :skipped-on (not :sb-thread))
+            :skipped-on (or (not :sb-thread) :gc-stress))
   (let* ((mutex (make-mutex))
          (waitqueue (make-waitqueue))
          (sem (make-semaphore))
