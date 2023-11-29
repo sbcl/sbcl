@@ -460,20 +460,6 @@ static page_index_t find_single_page(int page_type, sword_t nbytes, generation_i
     gc_heap_exhausted_error_or_lose(bytes_avail, nbytes);
 }
 
-/* CONS pages have a subrange (about 1/128th or 1/64th of the page)
- * that demands prezeroing, but the bulk of the page does not require zeroing.
- * We can't accurately represent the need_to_zero state on a part of the page.
- * So if the page is in need_to_zero state, clear that subrange,
- * but KEEP the need_to_zero state, because overall it is in that state. */
-static inline void ensure_cons_markbits_clear(page_index_t page)
-{
-    // If and only if the page was already completely zeroed, skip this
-    if (page_need_to_zero(page)) {
-        char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
-        memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
-    }
-}
-
 #if 0
 bool page_is_zeroed(page_index_t page)
 {
@@ -510,9 +496,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         // don't incur access violations
         os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
 #endif
-        // TODO: move this out of the mutex scope
-        if (page_type == PAGE_TYPE_CONS && !page_words_used(page))
-            ensure_cons_markbits_clear(page);
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
