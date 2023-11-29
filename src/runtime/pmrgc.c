@@ -1296,6 +1296,7 @@ int gc_card_table_nbits;
 long gc_card_table_mask;
 
 
+#ifdef LISP_FEATURE_DARWIN_JIT
 void remap_for_code(void* base, int npages)
 {
     /* Remap before releasing the mutex so that no other thread can manipulate
@@ -1306,6 +1307,7 @@ void remap_for_code(void* base, int npages)
     os_deallocate(base, length);
     mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
 }
+#endif
 
 /*
  * The vops that allocate assume that the returned space is zero-filled.
