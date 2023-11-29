@@ -93,7 +93,7 @@
                    use))))
     (plu lvar)))
 
-(defun principal-lvar-ref-use (lvar)
+(defun principal-lvar-ref-use (lvar &optional casts)
   (let (seen)
     (labels ((recurse (lvar)
                (when lvar
@@ -104,6 +104,9 @@
                             (if (memq lvar seen)
                                 use
                                 (recurse lvar))))
+                         ((and casts
+                               (cast-p use))
+                          (recurse (cast-value use)))
                          (t
                           use))))))
       (recurse lvar))))
@@ -504,7 +507,7 @@
              (object-ref (principal-lvar-ref object-lvar t))
              (object-lambda-var (and (ref-p object-ref)
                                      (ref-leaf object-ref)))
-             (allocator (principal-lvar-ref-use object-lvar))
+             (allocator (principal-lvar-ref-use object-lvar t))
              (value-ref (principal-lvar-ref value-lvar t))
              (uses (lvar-uses value-lvar))
              (external-p 0))
@@ -531,13 +534,17 @@
           (let ((old-p (when (and (combination-p allocator)
                                   (or
                                    (lvar-fun-is (combination-fun allocator) '(list* list
+                                                                              %make-structure-instance
                                                                               %make-instance
                                                                               %make-funcallable-instance))
                                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
                                         (let ((allocator (principal-lvar-ref-use
                                                           (principal-lvar (first (combination-args allocator))))))
                                           (and (combination-p allocator)
-                                               (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))))
+                                               (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))
+                                   (let* ((name (lvar-fun-name (combination-fun allocator) t)))
+                                     (typep (info :function :source-transform name)
+                                            '(cons * (eql :constructor))))))
                          (born-before-p allocator))))
             (when (and (lambda-var-p object-lambda-var)
                        (not old-p)
