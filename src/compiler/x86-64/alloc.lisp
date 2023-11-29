@@ -329,37 +329,53 @@
                  x)))
 
 ;;;; CONS, ACONS, LIST and LIST*
+
+(defun init-list (prev-constant tn list slot lowtag temp zeroed)
+  ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
+  ;; but other other GC strategies might.
+  (let* ((immediate-value)
+         (reg
+          (sc-case tn
+           (constant
+           ;; a CONSTANT sc does not imply that we have a compile-time constant-
+           ;; it could be load-time in which case it does not satisfy constant-tn-p.
+            (unless (and (constant-tn-p tn) (eql prev-constant (tn-value tn)))
+              (setf prev-constant (if (constant-tn-p tn) (tn-value tn) temp))
+              (move temp tn))
+            temp)
+           (immediate
+            (if (eql prev-constant (setf immediate-value (tn-value tn)))
+                temp
+                ;; Note1:
+                ;; 1. "-if-immediate" is slighty misleading since it _is_ immediate.
+                ;; 2. This unfortunately treats STOREW* as a leaky abstraction
+                ;;    because we have to know exactly what it rejects up front
+                ;;    rather than asking it whether it can emit a single instruction
+                ;;    that will do the trick.
+                (let ((bits (encode-value-if-immediate tn)))
+                  (when (and zeroed (typep bits '(unsigned-byte 31)))
+                    (storew* bits list slot lowtag zeroed)
+                    (return-from init-list prev-constant)) ; Return our "in/out" arg
+                  bits)))
+           (control-stack
+            (setf prev-constant temp) ;; a non-eq initial value
+            (move temp tn)
+            temp)
+           (t
+            tn))))
+    ;; STOREW returns TEMP if and only if it stored using it.
+    ;; (Perhaps not the clearest idiom.)
+    (when (eq (storew reg list slot lowtag temp) temp)
+      (setf prev-constant immediate-value)))
+  prev-constant) ; Return our "in/out" arg
+
 (macrolet ((pop-arg (ref)
              `(prog1 (tn-ref-tn ,ref) (setf ,ref (tn-ref-across ,ref))))
-           (store-slot (arg list &optional (slot cons-car-slot)
-                                           (lowtag list-pointer-lowtag))
-             ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
-             ;; but other other GC strategies might.
-             `(let* (immediate-value
-                     (tn ,arg)
-                     (reg
-                       (sc-case tn
-                         (constant
-                          (unless (and (constant-tn-p tn)
-                                       (eql prev-constant (tn-value tn)))
-                            (setf prev-constant (if (constant-tn-p tn)
-                                                    (tn-value tn)
-                                                    temp))
-                            (move temp tn))
-                          temp)
-                         (immediate
-                          (if (eql prev-constant (setf immediate-value (tn-value tn)))
-                              temp
-                              (encode-value-if-immediate tn)))
-                         (control-stack
-                          (setf prev-constant temp) ;; a non-eq initial value
-                          (move temp tn)
-                          temp)
-                         (t
-                          tn))))
-                (when (eq (storew reg ,list ,slot ,lowtag temp)
-                          temp)
-                  (setf prev-constant immediate-value)))))
+           (store-slot (arg list slot &optional (lowtag list-pointer-lowtag))
+             ;; PREV-CONSTANT is akin to a pass-by-reference arg to the function which
+             ;; used to be all inside this macro.
+             `(setq prev-constant
+                    (init-list prev-constant ,arg ,list ,slot ,lowtag temp zeroed))))
 
 (define-vop (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
@@ -393,6 +409,7 @@
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size n-word-bytes))
+             (zeroed #+mark-region-gc t)
              (prev-constant temp)) ;; a non-eq initial value
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
@@ -416,6 +433,7 @@
   (:policy :fast-safe)
   (:generator 10
     (let ((nbytes (* cons-size 2 n-word-bytes))
+          (zeroed #+mark-region-gc t)
           (prev-constant temp))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
@@ -425,7 +443,7 @@
         (store-slot temp alloc cons-car-slot 0)
         (setf prev-constant temp)
         (let ((pair temp) (temp alloc)) ; give STORE-SLOT the ALLOC as its TEMP
-          (store-slot key pair)
+          (store-slot key pair cons-car-slot)
           (store-slot val pair cons-cdr-slot))
         ;; ALLOC could have been clobbered by using it as a temp for
         ;; loading a constant.
@@ -459,6 +477,7 @@
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size 2 n-word-bytes))
+             (zeroed #+mark-region-gc t)
              (prev-constant temp))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
@@ -482,9 +501,10 @@
   (:node-var node)
   (:generator 0
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
-    (let ((stack-allocate-p (node-stack-allocate-p node))
-          (size (* (pad-data-block cons-size) cons-cells))
-          (prev-constant temp))
+    (let* ((stack-allocate-p (node-stack-allocate-p node))
+           (size (* (pad-data-block cons-size) cons-cells))
+           (zeroed #+mark-region-gc (not stack-allocate-p))
+           (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
@@ -493,13 +513,13 @@
             (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
         (move ptr res)
         (dotimes (i (1- cons-cells))
-          (store-slot (pop-arg things) ptr)
+          (store-slot (pop-arg things) ptr cons-car-slot)
           (inst add ptr (pad-data-block cons-size))
           (storew ptr ptr (- cons-cdr-slot cons-size) list-pointer-lowtag))
         (store-slot (pop-arg things) ptr cons-car-slot list-pointer-lowtag)
         (if star
             (store-slot (pop-arg things) ptr cons-cdr-slot list-pointer-lowtag)
-            (storew nil-value ptr cons-cdr-slot list-pointer-lowtag))))
+            (storew* nil-value ptr cons-cdr-slot list-pointer-lowtag zeroed))))
     (aver (null things))
     (move result res)))
 )
@@ -511,6 +531,10 @@
 ;;; This will always write 8 bytes if WORD is a negative number.
 (defun storew* (word object slot lowtag zeroed &optional temp)
   (cond
+    ;; FIXME: I this misses some cases that could use a dword store
+    ;; when the heap is prezeroed. Why can't it take (UNSIGNED-BYTE 32) ?
+    ;; For example #x8000FFFF would work as a :DWORD and we leave the upper 4
+    ;; bytes alone.
     ((or (not zeroed) (not (typep word '(unsigned-byte 31))))
      ;; Will use temp reg if WORD can't be encoded as an imm32
     (storew word object slot lowtag temp))

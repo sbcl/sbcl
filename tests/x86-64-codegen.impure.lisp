@@ -1375,3 +1375,14 @@
                (setf (car x) y)
                x)))))
     (assert (not vops-with-barrier))))
+
+(with-test (:name :smaller-than-qword-cons-slot-init
+                  :skipped-on (:not :mark-region-gc))
+  (let ((lines (disassembly-lines
+                (compile nil '(lambda (a) (list 1 a #\a))))))
+    (assert (loop for line in lines
+                  thereis (search "MOV BYTE PTR" line))) ; constant 1
+    (assert (loop for line in lines
+                  thereis (search "MOV WORD PTR" line))) ; constant #\a
+    (assert (loop for line in lines
+                  thereis (search "MOV DWORD PTR" line))))) ; constant NIL
