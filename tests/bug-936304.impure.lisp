@@ -14,7 +14,8 @@
     (setf (elt x 0) t)
     (elt x 0)))
 
-(with-test (:name :bug-936304)
+(with-test (:name :bug-936304
+                  :skipped-on :gc-stress)
   (gc :full t)
   (assert (eq :ok (handler-case
                        (progn

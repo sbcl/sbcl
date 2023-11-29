@@ -96,7 +96,8 @@
 ;;;  0       1004CBB93F [   2] a (simple-vector 1)
 ;;;  0       1004D28AE7 [   3] a cons = (A B C ...) ; = (NTHCDR 3 object)
 ;;;  0       1004D28B17 [   0] a cons = ("hi" D)
-(with-test (:name :traceroot-collapse-lists)
+(with-test (:name :traceroot-collapse-lists
+                  :skipped-on :gc-stress)
   (let* ((string (with-output-to-string (*standard-output*)
                    (search-roots *string-hi* :print :verbose)))
          (lines (split-string string #\newline)))

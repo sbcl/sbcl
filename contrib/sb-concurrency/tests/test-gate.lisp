@@ -11,6 +11,7 @@
 
 (in-package :sb-concurrency-test)
 
+#-gc-stress
 (deftest gate.0
     (let ((gate (make-gate :open t)))
       (values (wait-on-gate gate)
@@ -136,6 +137,7 @@
         (values (join-thread waiter) cancel))
     t t)
 
+  #-gc-stress
   (deftest gate-timeout.1
       (let* ((gate (make-gate))
              (waiter (make-thread (lambda ()
@@ -143,6 +145,7 @@
         (join-thread waiter))
     nil)
 
+  #-gc-stress
   (deftest gate-timeout.2
       (let* ((gate (make-gate))
              (waiter (make-thread (lambda ()

@@ -449,7 +449,8 @@
 (defun get-small-bignum-allocation-information ()
   (setq *small-bignum* (+ (+ *b* (ash 1 100)) *negb*))
   (nth-value 1 (allocation-information *small-bignum*)))
-#-mark-region-gc
+
+#-(or mark-region-gc gc-stress)
 (deftest allocation-information.7
     (locally
       (declare (notinline format))

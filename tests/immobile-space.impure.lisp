@@ -1,5 +1,5 @@
 
-#-immobile-space (invoke-restart 'run-tests::skip-file)
+#+(or (not immobile-space) gc-stress) (invoke-restart 'run-tests::skip-file)
 
 ;;; If an instance was allocated but its layout not stored yet
 ;;; it could crash

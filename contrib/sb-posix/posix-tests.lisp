@@ -419,7 +419,7 @@
                sb-posix::o-nonblock))
   t)
 
-#-(or win32 netbsd) ; fix: cant handle c-vargs
+#-(or gc-stress win32 netbsd) ; fix: cant handle c-vargs
 (deftest fcntl.flock.1
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
@@ -454,7 +454,7 @@
   42)
 
 
-#-(or win32 netbsd)
+#-(or gc-stress win32 netbsd)
 (deftest fcntl.flock.2
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock

@@ -28,7 +28,7 @@
                           `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
                             "-o" ,solib "fcb-threads.c"))
       (sb-alien:load-shared-object solib)))
-
+#+(and linux gc-stress) (invoke-restart 'run-tests::skip-file)
 ;;; Final test: EXIT does not lock up due to (simulated) C++ destructors
 ;;; or free() or most anything else involved in stopping the main thread.
 ;;; The point of the test is to mock a Lisp thread that uses foreign code

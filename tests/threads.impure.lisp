@@ -74,7 +74,8 @@
 
 ;;;; Now the real tests...
 
-(with-test (:name (with-mutex :timeout))
+(with-test (:name (with-mutex :timeout)
+            :broken-on :gc-stress)
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (null (join-thread (make-thread
@@ -251,7 +252,8 @@
                               (with-recursive-lock (m :wait-p nil)
                                 t))))))))
 
-(with-test (:name (with-recursive-lock :timeout))
+(with-test (:name (with-recursive-lock :timeout)
+                  :broken-on :gc-stress)
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (null (join-thread (make-thread

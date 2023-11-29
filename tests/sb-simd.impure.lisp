@@ -4,8 +4,7 @@
 ;;;    RESULT-0 = #<SIMD-PACK   33554433        127       8191    2097153>,
 ;;;    OUTPUT-0 = #<SIMD-PACK          3       8193       2303 1073741823>.
 ;;; maybe there are other problems but I didn't investigate further.
-
-#+interpreter (invoke-restart 'run-tests::skip-file)
+#+(or interpreter gc-stress) (invoke-restart 'run-tests::skip-file)
 
 (handler-case (require :sb-simd)
   (condition (c)

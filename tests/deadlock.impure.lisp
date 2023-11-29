@@ -75,7 +75,8 @@
        (assert (stringp err)))
     (assert (eq :ok (join-thread t1)))))
 
-(with-test (:name :deadlock-detection.3)
+(with-test (:name :deadlock-detection.3
+                  :broken-on (and :darwin :gc-stress))
   (let* ((m1 (make-mutex :name "M1"))
          (m2 (make-mutex :name "M2"))
          (s1 (make-semaphore :name "S1"))

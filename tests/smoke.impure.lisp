@@ -23,10 +23,12 @@
                                              #-x86-64 undefined-function))
 
 ;;; ROOM should run without signalling an error. (bug 247)
-(let ((*standard-output* (make-broadcast-stream)))
-  (room)
-  (room t)
-  (room nil))
+(with-test (:name :room
+                  :broken-on (and :immobile-space :gc-stress))
+ (let ((*standard-output* (make-broadcast-stream)))
+   (room)
+   (room t)
+   (room nil)))
 
 ;;; COPY-SYMBOL should work without signalling an error, even if the
 ;;; symbol is unbound.

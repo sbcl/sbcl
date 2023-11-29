@@ -94,7 +94,8 @@
     (assert (not final))))
 
 (with-test (:name (:deadline sb-thread:grab-mutex)
-                  :skipped-on (not :sb-thread))
+                  :skipped-on (not :sb-thread)
+            :broken-on (and :gc-stress :darwin))
   (assert-timeout ("A deadline was reached after 1 second.")
     (let ((lock (sb-thread:make-mutex))
           (waitp t))
@@ -123,7 +124,7 @@
 
 (with-test (:name (:deadline :futex-wait-eintr)
             :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :broken-on (or :win32 (and :darwin :gc-stress)))
   (let ((lock (sb-thread:make-mutex))
         (waitp t))
     (make-join-thread (lambda ()
@@ -392,7 +393,8 @@
                     B-result))))))
 
 ;;; Test from git rev 5e55f426de8fa579a0d6cfbfb3ac5433d530d3c9 formerly in threads.impure
-(test-util:with-test (:name (:deadline :interrupts-enabled) :skipped-on (:not :sb-thread))
+(test-util:with-test (:name (:deadline :interrupts-enabled) :skipped-on (:not :sb-thread)
+                      :fails-on :gc-stress)
   ;; I cranked this up to 1000 (and ran it on lots of machines) to get examples of failure,
   ;; but that's more than a reasonable amount of time to spend in the test.
   (loop repeat 2 do (signal-dealine-check-interrupt-enablement)))

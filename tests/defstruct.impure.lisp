@@ -570,17 +570,22 @@
   (terpri s)
   (write-string "(defun dumped-huge-manyraw () '#.(make-huge-manyraw))" s)
   (write-string "(defun dumped-hugest-manyraw () '#.(make-hugest-manyraw))" s))
-(defvar *tempfasl* (compile-file *tempfile*))
-(delete-file *tempfile*)
+(defvar *tempfasl*)
+(with-test (:name :compile-huge-manyraw
+            :skipped-on :gc-stress)
+  (setf *tempfasl* (compile-file *tempfile*))
+  (delete-file *tempfile*)
 
-;;; nuke the objects and try another GC just to be extra careful
-(setf *manyraw* nil)
-(sb-ext:gc :full t)
+  ;; nuke the objects and try another GC just to be extra careful
+  (setf *manyraw* nil)
+  (sb-ext:gc :full t)
 
-;;; re-read the dumped structures and check them
-(load *tempfasl*)
-(delete-file *tempfasl*)
-(with-test (:name (:defstruct-raw-slot load))
+  ;; re-read the dumped structures and check them
+  (load *tempfasl*)
+  (delete-file *tempfasl*))
+
+(with-test (:name (:defstruct-raw-slot load)
+                  :skipped-on :gc-stress)
   (check-manyraws (dumped-manyraws))
   (check-huge-manyraw (make-huge-manyraw))
   (assert (equalp (make-huge-manyraw) (dumped-huge-manyraw)))

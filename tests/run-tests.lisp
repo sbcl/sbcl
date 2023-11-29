@@ -68,13 +68,17 @@
            (impure-cload (impure-cload-files))
            (sh (sh-files)))
        (when skip-to
-         (flet ((skip (files)
-                  (member skip-to files :key #'file-namestring :test #'equal)))
-           (or (setf pure-load (skip pure-load))
-               (setf pure-cload (skip pure-cload))
-               (setf impure-load (skip impure-load))
-               (setf impure-cload (skip impure-cload))
-               (setf sh (skip sh)))))
+         (cond ((equal skip-to "impure")
+                (setf pure-load nil
+                      pure-cload nil))
+               (t
+                (flet ((skip (files)
+                         (member skip-to files :key #'file-namestring :test #'equal)))
+                  (or (setf pure-load (skip pure-load))
+                      (setf pure-cload (skip pure-cload))
+                      (setf impure-load (skip impure-load))
+                      (setf impure-cload (skip impure-cload))
+                      (setf sh (skip sh)))))))
        (pure-runner pure-load 'load-test log)
        (pure-runner pure-cload 'cload-test log)
        (impure-runner impure-load 'load-test log)
@@ -537,7 +541,7 @@
            "--no-userinit"
            "--noprint"
            "--disable-debugger"
-           #+gc-sress "--eval" #+gc-sress "(push :gc-stress *features*)"
+           #+gc-stress "--eval" #+gc-stress "(push :gc-stress *features*)"
            "--load" load
            "--eval" (write-to-string eval
                                      :right-margin 1000))
