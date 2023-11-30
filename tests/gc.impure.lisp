@@ -456,6 +456,7 @@
     (assert (= slow-bytes fast-bytes)))))
 
 (defglobal *wp-for-signal-handler-gc-test* nil)
+#-win32
 (with-test (:name :signal-handler-gc-test
                   :skipped-on (not (and :generational :unix :sb-thread))
                   :broken-on (and :arm64 :gc-stress))
