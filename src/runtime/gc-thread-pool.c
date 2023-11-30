@@ -15,6 +15,10 @@ static void *worker(void *index) {
   uword_t i = (uword_t)index;
   while (1) {
     os_sem_wait(start_semaphores + i);
+    // We don't need pthread_jit_write_protect_np(0) here because workers
+    // never alter Lisp objects- they'll only touch side tables.
+    // Though how does incremental compaction work? I guess _only_ the main thread
+    // transports objects after marking is done?
     action();
     os_sem_post(&join_semaphore);
   }
@@ -66,4 +70,5 @@ void run_on_thread_pool(void (*act)(void)) {
   wake_gc_threads();
   act();
   join_gc_threads();
+  action = 0; // tidy up
 }

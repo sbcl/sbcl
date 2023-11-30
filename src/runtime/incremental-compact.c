@@ -190,8 +190,12 @@ static void move_objects() {
       generations[target_generation].bytes_allocated -= LINE_SIZE * decrement;
       bytes_allocated -= LINE_SIZE * decrement;
       if (page_words_used(p) == 0) {
+#ifdef LISP_FEATURE_DARWIN_JIT
+        reset_page_flags(p);
+#else
         page_table[p].type = FREE_PAGE_FLAG;
         page_table[p].scan_start_offset_ = 0;
+#endif
       }
     }
   if (force_compaction) fprintf(stderr, "Forced compaction moved %ld pages\n", pages_moved);

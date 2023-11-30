@@ -242,6 +242,10 @@ bool try_allocate_small_from_pages(sword_t nbytes, struct alloc_region *region,
         try_allocate_small(nbytes, region,
                            address_line(page_address(where)),
                            address_line(page_address(where + 1)))) {
+#ifdef LISP_FEATURE_DARWIN_JIT
+      if (page_type == PAGE_TYPE_CODE && !page_words_used(where))
+          page_remap_as_type(PAGE_TYPE_CODE, page_address(where), GENCGC_PAGE_BYTES);
+#endif
       page_table[where].type = page_type | OPEN_REGION_PAGE_FLAG;
       page_table[where].gen = 0;
       set_page_scan_start_offset(where, 0);
@@ -285,6 +289,15 @@ page_index_t try_allocate_large(uword_t nbytes,
     uword_t hole_size = chunk_end - chunk_start;
     if (hole_size >= pages_needed) {
       page_index_t last_page = chunk_start + pages_needed - 1;
+#ifdef LISP_FEATURE_DARWIN_JIT
+        /* FIXME: #+darwin-jit should should track what mode each page was most recently
+         * mapped in to avoid re-mapping for no purpose */
+        if (page_type == PAGE_TYPE_CODE)
+            page_remap_as_type(PAGE_TYPE_CODE, page_address(chunk_start),
+                               ALIGN_UP(nbytes, GENCGC_PAGE_BYTES));
+        else
+            zeroize_pages_if_needed(chunk_start, last_page, page_type);
+#endif
       for (page_index_t p = chunk_start; p <= last_page; p++) {
         page_table[p].type = SINGLE_OBJECT_FLAG | page_type;
         page_table[p].gen = gen;
@@ -861,6 +874,14 @@ static void __attribute__((noinline)) sweep_pages() {
       /* Remove allocation bit for the large object here. */
       if (page_single_obj_p(p))
         allocation_bitmap[mark_bitmap_word_index(page_address(p))] = 0;
+#ifdef LISP_FEATURE_DARWIN_JIT
+      // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
+      // This avoids any affect of pthread_jit_write_protect_np when next used.
+      if (is_code(page_table[p].type) && generation_to_collect==PSEUDO_STATIC_GENERATION) {
+        set_page_need_to_zero(p, 1);
+        page_remap_as_type(0, page_address(p), GENCGC_PAGE_BYTES);
+      }
+#endif
       /* Why is reset_page_flags(p) much slower here? It does other stuff
        * for gencgc, sure, but not that much more stuff. */
       page_table[p].type = FREE_PAGE_FLAG;
@@ -1215,7 +1236,7 @@ void mr_collect_garbage(bool raise) {
           dirty_root_objects, root_objects_checked,
           next_free_page, raise ? ", raised" : "");
 #endif
-  if (gencgc_verbose) mr_print_meters();
+  if (gencgc_verbose>1) mr_print_meters();
   reset_alloc_start_pages(false);
   reset_pinned_pages();
 }

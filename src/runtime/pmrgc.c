@@ -105,7 +105,7 @@ void reset_page_flags(page_index_t page) {
 #ifdef LISP_FEATURE_DARWIN_JIT
     // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
     // This avoids any affect of pthread_jit_write_protect_np when next used.
-    if (page_table[page].type == PAGE_TYPE_CODE) set_page_need_to_zero(page, 1);
+    if (is_code(page_table[page].type)) set_page_need_to_zero(page, 1);
 #endif
     page_table[page].type = 0;
     gc_page_pins[page] = 0;
@@ -1282,15 +1282,26 @@ long gc_card_table_mask;
 
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-void remap_for_code(void* base, int npages)
+void page_remap_as_type(int type, void* base, sword_t length)
 {
     /* Remap before releasing the mutex so that no other thread can manipulate
      * this range of code until it has been correctly set up. If page(s) were
      * previously utilized for code, this is not necessary, but there's no way
-     * to know what page type it had, because unused pages all have type 0 */
-    sword_t length = npage_bytes(npages);
+     * to know what page type it had, because unused pages all have type 0.
+     * It's horrible that mprotect() can't do this but as you can see, the JIT bit
+     * is not part of the protections but rather the flags. So this is vulnerable
+     * to the bug described in zero-with-mmap-bug.txt
+     */
     os_deallocate(base, length);
-    mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+    void* new_addr;
+    if (type == PAGE_TYPE_CODE) {
+        new_addr = mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+    } else {
+        new_addr = mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+    }
+    if (new_addr != base)
+        lose("remap: page moved, %p ==> %p", base, new_addr);
+
 }
 #endif
 
@@ -1305,6 +1316,14 @@ void remap_for_code(void* base, int npages)
 int small_allocation_count = 0;
 
 int gencgc_alloc_profiler;
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define gc_memclr(pt, addr, len) \
+    do { if (gc_active_p || pt != PAGE_TYPE_CODE) memset(addr, 0, len); \
+    else { THREAD_JIT(0); memset(addr, 0, len); THREAD_JIT(1); } } while (0)
+#else
+#define gc_memclr(pt, addr, len) memset(addr, 0, len)
+#endif
 
 NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(__attribute__((unused)) int flags,
@@ -1339,7 +1358,7 @@ lisp_alloc(__attribute__((unused)) int flags,
     }
 
     if (try_allocate_small_after_region(nbytes, region)) {
-      memset(region->start_addr, 0, addr_diff(region->end_addr, region->start_addr));
+      gc_memclr(page_type, region->start_addr, addr_diff(region->end_addr, region->start_addr));
       return region->start_addr;
     }
 
@@ -1405,16 +1424,11 @@ lisp_alloc(__attribute__((unused)) int flags,
                                                    &alloc_start, page_table_pages, &largest_hole);
         if (new_page == -1) gc_heap_exhausted_error_or_lose(largest_hole, nbytes);
         set_alloc_start_page(page_type, alloc_start);
-#ifdef LISP_FEATURE_DARWIN_JIT
-        if (page_type == PAGE_TYPE_CODE)
-            remap_for_code(page_address(new_page),
-                           ALIGN_UP(nbytes, GENCGC_PAGE_BYTES)/GENCGC_PAGE_BYTES);
-#endif
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = page_address(new_page);
         set_allocation_bit_mark(new_obj);
-        memset(new_obj, 0, nbytes);
+        gc_memclr(page_type, new_obj, nbytes);
     } else {
         /* Try to find a page before acquiring free_pages_lock. */
         pre_search_for_small_space(nbytes, page_type, &alloc_start, page_table_pages);
@@ -1429,19 +1443,18 @@ lisp_alloc(__attribute__((unused)) int flags,
                                           &alloc_start, page_table_pages);
         if (!success) gc_heap_exhausted_error_or_lose(0, nbytes);
         set_alloc_start_page(page_type, alloc_start);
-        int zerofill = 1;
 #ifdef LISP_FEATURE_DARWIN_JIT
-        if (page_type == PAGE_TYPE_CODE
-            && PTR_IS_ALIGNED(region->start_addr, GENCGC_PAGE_BYTES)) {
-            remap_for_code(region->start_addr, 1);
-            zerofill = 0;
-            fprintf(stderr, "Page @ %p becomes PAGE_TYPE_CODE\n", region->start_addr);
+        if (page_type == PAGE_TYPE_CODE && !page_words_used(find_page_index(region->start_addr))) {
+            page_remap_as_type(PAGE_TYPE_CODE, region->start_addr, GENCGC_PAGE_BYTES);
+            mutex_release(&free_pages_lock);
+            gc_assert(ret);
+            return new_obj;
         }
 #endif
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = region->start_addr;
-        if (zerofill) memset(new_obj, 0, addr_diff(region->end_addr, new_obj));
+        gc_memclr(page_type, new_obj, addr_diff(region->end_addr, new_obj));
     }
 
     return new_obj;
@@ -1845,22 +1858,23 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
             }
 #endif
             if (widetag != FILLER_WIDETAG && pg >= 0) {
+                    int pt = page_table[pg].type;
                     // Assert proper page type
                     if (state->object_header) // is not a cons
-                        gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
+                        gc_assert(pt != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
-                    else if (page_table[pg].type != PAGE_TYPE_CONS) {
+                    else if (pt != PAGE_TYPE_CONS) {
                       if (is_cons_half(where[0]))
                           gc_assert(acceptable_filler_cons_p(where));
                     }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {
-                        if (!is_code(page_table[pg].type))
+                        if (!is_code(pt))
                             lose("object @ %p is code on non-code page", where);
                     } else if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
                         // where these reside depends on the architecture
                     } else {
-                        if (is_code(page_table[pg].type))
+                        if (is_code(pt))
                             lose("object @ %p is non-code on code page", where);
                     }
             }
@@ -2083,17 +2097,17 @@ void gc_gen_report_to_file(int filedes, FILE *file) {
   uword_t large_generation_type[PSEUDO_STATIC_GENERATION + 1][8] = { 0 };
   uword_t large_generation_total[8] = { 0 };
   for (page_index_t p = 0; p < page_table_pages; p++) {
-    unsigned char type = page_table[p].type & PAGE_TYPE_MASK;
+    unsigned char pt = page_table[p].type & PAGE_TYPE_MASK;
     if (page_free_p(p)) continue;
     else if (page_single_obj_p(p)) {
       generation_index_t gen = page_table[p].gen;
-      large_generation_type[gen][type] += GENCGC_PAGE_BYTES;
+      large_generation_type[gen][pt] += GENCGC_PAGE_BYTES;
       large_generation_total[gen] += GENCGC_PAGE_BYTES;
     } else {
       for_lines_in_page (l, p) {
         if (line_bytemap[l]) {
           generation_index_t gen = DECODE_GEN(line_bytemap[l]);
-          small_generation_type[gen][type] += LINE_SIZE;
+          small_generation_type[gen][pt] += LINE_SIZE;
           small_generation_total[gen] += LINE_SIZE;
         }
       }
