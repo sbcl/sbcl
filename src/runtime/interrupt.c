@@ -814,8 +814,7 @@ check_interrupt_context_or_lose(os_context_t *context)
  */
 #ifdef LISP_FEATURE_ARM64
 static void
-build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
-                                os_context_t __attribute__((unused)) *context)
+build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {
 
     lispobj oldcont;
@@ -840,7 +839,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 
     /* Build a fake stack frame or frames */
 
-#if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
+#if !defined(LISP_FEATURE_ARM)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
         (*os_context_register_addr(context, reg_CSP));
@@ -872,9 +871,6 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
     } else
 #elif defined (LISP_FEATURE_ARM)
         access_control_frame_pointer(th) = (lispobj*) SymbolValue(CONTROL_STACK_POINTER, th);
-#elif defined (LISP_FEATURE_ARM64)
-    access_control_frame_pointer(th) =
-        (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP)) + 2;
 #endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
@@ -1763,6 +1759,10 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 #ifndef LISP_FEATURE_WIN32
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        /* fake_foreign_function_call wants to write to the stack. */
+        protect_control_stack_hard_guard_page(0, th);
+#endif
         fake_foreign_function_call(context);
         lose("Control stack exhausted, fault: %p, PC: %p",
              addr, (void*)os_context_pc(context));
@@ -1784,6 +1784,10 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
                  addr, (void*)os_context_pc(context));
         }
         if (lose_on_corruption_p) {
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            /* fake_foreign_function_call wants to write to the stack. */
+            protect_control_stack_guard_page(0, th);
+#endif
             fake_foreign_function_call(context);
             lose("Control stack exhausted, fault: %p, PC: %p",
                  addr, (void*)os_context_pc(context));
