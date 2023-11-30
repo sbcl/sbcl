@@ -3233,3 +3233,21 @@ void remap_free_pages (page_index_t from, page_index_t to)
         first_page = last_page;
     }
 }
+
+#if !(defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64)
+// This function pertains only to the CPUs for which instructions are 4-byte-aligned
+lispobj *
+dynamic_space_code_from_pc(char *pc)
+{
+    /* Only look at untagged pointers, otherwise they won't be in the PC.
+     * (which is a valid precondition for fixed-length 4-byte instructions,
+     * not variable-length) */
+    if((uword_t)pc % 4 == 0 && is_code(page_table[find_page_index(pc)].type)) {
+        lispobj *object = search_dynamic_space(pc);
+        if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
+            return object;
+    }
+
+    return NULL;
+}
+#endif

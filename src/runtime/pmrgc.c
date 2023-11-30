@@ -571,21 +571,6 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     return 0;
 }
 
-lispobj *
-dynamic_space_code_from_pc(char *pc)
-{
-    /* Only look at untagged pointers, otherwise they won't be in the PC.
-     * (which is a valid precondition for fixed-length 4-byte instructions,
-     * not variable-length) */
-    if((uword_t)pc % 4 == 0 && is_code(page_table[find_page_index(pc)].type)) {
-        lispobj *object = search_dynamic_space(pc);
-        if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
-            return object;
-    }
-
-    return NULL;
-}
-
 static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
