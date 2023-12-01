@@ -1,4 +1,12 @@
-#+interpreter (invoke-restart 'run-tests::skip-file)
+#+(or interpreter (and x86-64 (not sb-devel) gc-stress)) (invoke-restart 'run-tests::skip-file)
+
+#-sb-devel
+(let ((*evaluator-mode* :compile))
+  (handler-bind ((warning #'muffle-warning))
+    (unless (member "SB-XC" (package-nicknames "CL") :test #'string=)
+      (unlock-package "CL")
+      (rename-package "COMMON-LISP" "COMMON-LISP" '("CL" "SB-XC")))
+    (load "../src/code/brothertree.lisp")))
 
 (in-package sb-brothertree)
 
