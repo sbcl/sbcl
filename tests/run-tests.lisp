@@ -536,6 +536,7 @@
    (sb-ext:run-program
     (first *POSIX-ARGV*)
     (list "--core" SB-INT:*CORE-STRING*
+          "--lose-on-corruption"
            "--noinform"
            "--no-sysinit"
            "--no-userinit"

@@ -551,6 +551,7 @@
 ;;; unhidden and potentially rewound. So any use of it is like a use-after-free bug,
 ;;; except that the memory is still there so we can figure out what went wrong
 ;;; with user code. This might pass on #+-linux but has not been tested.
+(setf (extern-alien "lose_on_corruption_p" int) 0)
 (test-util:with-test (:name :arena-use-after-free :skipped-on (:not :linux))
   ;; scary messages scare me
   (format t "::: NOTE: Expect a \"CORRUPTION WARNING\" from this test~%")
@@ -559,17 +560,18 @@
     (block foo
       (handler-bind
           ((sb-sys:memory-fault-error
-            (lambda (c)
-              (format t "~&Uh oh spaghetti-o: tried to read @ ~x~%"
-                      (sb-sys:system-condition-address c))
-              (setq caught t)
-              (return-from foo))))
+             (lambda (c)
+               (format t "~&Uh oh spaghetti-o: tried to read @ ~x~%"
+                       (sb-sys:system-condition-address c))
+               (setq caught t)
+               (return-from foo))))
         (aref *vect* 3)))
     (assert caught))
   ;; Assert that it becomes usable again
   (unhide-arena *another-arena*)
   (rewind-arena *another-arena*)
   (dotimes (i 10) (f *another-arena* 1000)))
+(setf (extern-alien "lose_on_corruption_p" int) 1)
 
 ;; #+sb-devel preserves some symbols that the test doesn't care about
 ;; as the associated function will never be called.

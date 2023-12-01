@@ -36,6 +36,8 @@
 ;; Gotta do with fork() or something that I don't care to diagnose.
 #+(and darwin x86-64 parallel-test-runner) (invoke-restart 'run-tests::skip-file)
 
+(setf (extern-alien "lose_on_corruption_p" int) 0)
+
 ;;; Base-case: detecting exhaustion
 (with-test (:name (:exhaust :basic))
   (assert (eq :exhausted
