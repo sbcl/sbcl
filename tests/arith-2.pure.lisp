@@ -339,3 +339,12 @@
      (declare (integer x))
      (* x 5))
    (or (integer 5) (integer * -5) (integer 0 0))))
+
+(with-test (:name :truncate-transform-unused-result)
+  (assert-type
+   (lambda (c)
+     (declare ((integer -1000 0) c)
+              (optimize speed))
+     (values
+      (truncate (truncate (rem c -89) -16) 20)))
+   (or (integer 0 0))))

@@ -175,16 +175,17 @@
         dest)))
 
 (defun mv-bind-dest (lvar nth-value)
-  (let ((dest (lvar-dest lvar)))
-    (when (and (mv-combination-p dest)
-               (eq (basic-combination-kind dest) :local))
-      (let ((fun (combination-lambda dest)))
-        (let* ((var (nth nth-value (lambda-vars fun)))
-               (refs (leaf-refs var)))
-          (when (and refs
-                     (not (cdr refs)))
-            (when (eq (lambda-kind fun) :mv-let)
-              (let-lvar-dest (node-lvar (car refs))))))))))
+  (when lvar
+    (let ((dest (lvar-dest lvar)))
+      (when (and (mv-combination-p dest)
+                 (eq (basic-combination-kind dest) :local))
+        (let ((fun (combination-lambda dest)))
+          (let* ((var (nth nth-value (lambda-vars fun)))
+                 (refs (leaf-refs var)))
+            (when (and refs
+                       (not (cdr refs)))
+              (when (eq (lambda-kind fun) :mv-let)
+                (let-lvar-dest (node-lvar (car refs)))))))))))
 
 (defun combination-matches (name args combination)
   (and (combination-p combination)
