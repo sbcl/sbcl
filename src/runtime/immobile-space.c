@@ -62,7 +62,7 @@
 #include "lispstring.h"
 #include "pseudo-atomic.h"
 #include "search.h"
-#include "unaligned.h"
+#include "align.h"
 #include "validate.h"
 #include "var-io.h"
 #include <stdlib.h>

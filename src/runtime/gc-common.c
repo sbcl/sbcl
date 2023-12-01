@@ -40,6 +40,7 @@
 #include "gc.h"
 #include "hopscotch.h"
 #include "code.h"
+#include "align.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/binding.h"
 #include "genesis/hash-table.h"

@@ -330,7 +330,7 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 }
 
 #include "var-io.h"
-#include "unaligned.h"
+#include "align.h"
 static void
 adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
                  struct code __attribute__((unused)) *code,

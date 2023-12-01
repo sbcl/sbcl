@@ -57,7 +57,6 @@
 #include "validate.h"
 #include "thread.h"
 #include "align.h"
-#include "unaligned.h"
 
 #include "gc.h"
 #include <wincrypt.h>

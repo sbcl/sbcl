@@ -26,7 +26,7 @@
 #include "breakpoint.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
-#include "unaligned.h"
+#include "align.h"
 #include "search.h"
 #include "var-io.h"
 

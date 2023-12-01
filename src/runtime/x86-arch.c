@@ -26,7 +26,7 @@
 #include "gc.h"
 #include "var-io.h"
 #include "code.h"
-#include "unaligned.h"
+#include "align.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
