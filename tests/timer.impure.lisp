@@ -87,7 +87,7 @@
 
 (with-test (:name (:timer :relative)
             :fails-on (and :sparc :linux)
-            :skipped-on :win32)
+            :skipped-on (or :win32 :gc-stress))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -100,7 +100,7 @@
 
 (with-test (:name (:timer :absolute)
             :fails-on (and :sparc :linux)
-            :skipped-on :win32)
+            :skipped-on (or :win32 :gc-stress))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))

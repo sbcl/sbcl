@@ -61,7 +61,8 @@
     (assert-error (format* "~2@*" '()) format-error-with-control-string)
     (assert-error (format* "~1:*" '()) format-error-with-control-string)))
 
-(with-test (:name :encapsulated-~/-formatter)
+(with-test (:name :encapsulated-~/-formatter
+            :broken-on (and :gc-stress :x86-64))
   (let ((s (make-string-output-stream)))
     (declare (notinline format))
     (sb-int:encapsulate 'sb-ext:print-symbol-with-prefix 'test
