@@ -766,3 +766,9 @@
                                         (fix d 0 l))))
                                   (finish (nil)))))
                       :allow-failure t))))
+
+(with-test (:name :muffle-unknown-type)
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda () (declare (sb-ext:muffle-conditions foo)) nil)
+                      :allow-style-warnings t))))

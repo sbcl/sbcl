@@ -243,6 +243,7 @@
           #-sb-xc-host
           (let ((type (compiler-specifier-type typespec)))
             (cond ((not type))
+                  ((contains-unknown-type-p type))
                   (ospec
                    (setf (car ospec) (type-union (car ospec) type)))
                   (t
