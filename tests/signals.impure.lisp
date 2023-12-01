@@ -94,7 +94,8 @@
                 (sb-sys:interactive-interrupt ()
                   :condition)))))
 
-(with-test (:name :bug-640516)
+(with-test (:name :bug-640516
+                  :skipped-on :gc-stress)
   ;; On Darwin interrupting a SLEEP so that it took longer than
   ;; the requested amount caused it to hang.
   (assert

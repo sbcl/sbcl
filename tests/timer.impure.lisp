@@ -177,7 +177,8 @@
            (sb-ext:with-timeout 0.2
              (sleep 1)))))
 
-(with-test (:name (:with-timeout :fall-through) :skipped-on :win32)
+(with-test (:name (:with-timeout :fall-through) 
+            :skipped-on (or :win32 :gc-stress))
   (assert (not (raises-timeout-p
                 (sb-ext:with-timeout 0.3
                   (sleep 0.1))))))

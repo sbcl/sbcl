@@ -80,7 +80,7 @@
 ;;; EQL tables don't hash symbols address-sensitively,
 ;;; so use a bunch of cons cells.
 (with-test (:name :gc-while-growing-weak-hash-table
-            :skipped-on :mark-region-gc)
+            :skipped-on (or :mark-region-gc :gc-stress))
   (let ((h (make-hash-table :weakness :key)))
     (setq *gc-after-rehash-me* h)
     (dotimes (i 50) (setf (gethash (list (gensym)) h) i))

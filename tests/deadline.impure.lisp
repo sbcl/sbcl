@@ -123,7 +123,7 @@
        (make-kill-thread (lambda () (loop (sleep 1))))))))
 
 (with-test (:name (:deadline :futex-wait-eintr)
-            :skipped-on (not :sb-thread)
+            :skipped-on (or (not :sb-thread) :gc-stress)
             :broken-on (or :win32 (and :darwin :gc-stress)))
   (let ((lock (sb-thread:make-mutex))
         (waitp t))
