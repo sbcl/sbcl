@@ -80,10 +80,15 @@
   (f0))
 
 ;;; Employ circumlocution so the file loader doesn't hold on to a string "hi"
-(defvar *string-hi* (make-weak-pointer (concatenate 'string "h" "i")))
+(defvar *string-hi*)
 (defstruct s1 foo)
+;;; Ensure that *STRING-HI* does not get smashed before we ever got to both
+;;; DEFVARS (if GC executed in between the two) but that we don't hold a reference
+;;; from the stack. (which we can't really guarantee though)
 (defparameter *top*
-  `(p q r w x y ,(make-s1 :foo `#((a b c ,(weak-pointer-value *string-hi*) d))) z))
+  (let ((s (concatenate 'string "h" "i")))
+    (setq *string-hi* (make-weak-pointer s))
+    `(p q r w x y ,(make-s1 :foo `#((a b c ,s d))) z)))
 
 ;;; Sample output:
 ;;; Path to "hi":
