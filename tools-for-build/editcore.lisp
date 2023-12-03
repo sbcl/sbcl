@@ -20,7 +20,8 @@
 (defpackage "SB-EDITCORE"
   (:use "CL" "SB-ALIEN" "SB-COREFILE" "SB-INT" "SB-EXT"
         "SB-KERNEL" "SB-SYS" "SB-VM")
-  (:export #:move-dynamic-code-to-text-space :split-core)
+  (:export #:move-dynamic-code-to-text-space #:redirect-text-space-calls
+           #:split-core #:copy-to-elf-obj)
   (:import-from "SB-ALIEN-INTERNALS"
                 #:alien-type-bits #:parse-alien-type
                 #:alien-value-sap #:alien-value-type)
@@ -28,13 +29,14 @@
   (:import-from "SB-VM" #:map-objects-in-range #:reconstitute-object
                 #:%closure-callee #:code-object-size)
   (:import-from "SB-DISASSEM" #:get-inst-space #:find-inst
-                #:make-dstate #:%make-segment
+                #:make-dstate #:%make-segment #:make-code-segment
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
                 #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement
                 #:near-cond-jump-displacement #:mov #:call #:jmp
-                #:get-gpr #:reg-name)
+                #:get-gpr #:reg-name
+                #:machine-ea #:machine-ea-base #:machine-ea-index #:machine-ea-disp)
   (:import-from "SB-IMPL" #:symbol-hashset #:package-%name
                 #:symtbl-%cells
                 #:hash-table-pairs #:hash-table-%count))
@@ -464,8 +466,11 @@
 
 (defun make-core (spacemap code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
-          (let ((text (space-addr (get-space immobile-text-core-space-id spacemap))))
-            (make-bounds (- text alien-linkage-table-space-size) text)))
+          (let ((text-space (get-space immobile-text-core-space-id spacemap)))
+            (if text-space
+                (let ((text-addr (space-addr text-space)))
+                  (make-bounds (- text-addr alien-linkage-table-space-size) text-addr))
+                (make-bounds 0 0))))
          (linkage-entry-size
           (symbol-global-value
            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
@@ -1005,11 +1010,15 @@
 
 (defun output-lisp-asm-routines (core spacemap code-addr output &aux (skip 0))
   (write-preamble output)
-  (let* ((paddr (int-sap (translate-ptr code-addr spacemap)))
-         (word (sap-ref-word paddr 0)))
-    ;; After running the converter which moves dynamic-space code to text space,
-    ;; to text space starts with an array of uint32 for the offsets to each object.
-    (when (= (%widetag-of word) simple-array-unsigned-byte-32-widetag)
+  (dotimes (i 2)
+    (let* ((paddr (int-sap (translate-ptr code-addr spacemap)))
+           (word (sap-ref-word paddr 0)))
+      ;; After running the converter which moves dynamic-space code to text space,
+      ;; the text space starts with an array of uint32 for the offsets to each object
+      ;; and an array of uint64 containing some JMP instructions.
+      (unless (or (= (%widetag-of word) simple-array-unsigned-byte-32-widetag)
+                  (= (%widetag-of word) simple-array-unsigned-byte-64-widetag))
+        (return))
       (let* ((array (%make-lisp-obj (logior (sap-int paddr) other-pointer-lowtag)))
              (size (primitive-object-size array))
              (nwords (ash size (- word-shift))))
@@ -1020,7 +1029,7 @@
                     (t ","))
                   (sap-ref-word paddr (ash i word-shift))))
         (terpri output)
-        (setq skip size)
+        (incf skip size)
         (incf code-addr size))))
   (let* ((code-component (make-code-obj code-addr spacemap))
          (obj-sap (int-sap (- (get-lisp-obj-address code-component)
@@ -1889,7 +1898,7 @@
             (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
               (output-bignum nil (car x) asm-file))
             (cond
-              ((get-space immobile-fixedobj-core-space-id spacemap)
+              (t ; (get-space immobile-fixedobj-core-space-id spacemap)
                (format asm-file (if (member :darwin *features*)
                                  "~% .data~%"
                                  "~% .section .rodata~%"))
@@ -2327,7 +2336,7 @@
                    (object-index (calc-object-index (sap-int vaddr))))
               (setf (sbit (page-bitmap pte) object-index) 0)
               (cond ((= (page-single-obj-p pte) 1)
-                     (format t "~&Cleared large-object pages @ ~x~%" (sap-int vaddr))
+                     ;(format t "~&Cleared large-object pages @ ~x~%" (sap-int vaddr))
                      (loop for p from page-index to (calc-page-index (sap+ vaddr (1- size)) space)
                            do (let ((pte (svref (space-page-table space) p)))
                                 (aver (not (find 1 (page-bitmap pte))))
@@ -2357,14 +2366,14 @@
                            (data-page (%vector-raw-bits core-header (+ ptr 3))))
            (aver (= data-page total-npages))
            (setf card-mask-nbits (%vector-raw-bits core-header ptr))
-           (format t "~&card-nbits = ~D~%" card-mask-nbits)
+           (format nil "~&card-nbits = ~D~%" card-mask-nbits)
            (let ((space (get-space dynamic-core-space-id (cons nil space-list))))
              (setf (space-page-table space) (read-page-table input n-ptes nbytes data-page)))))
         (#.build-id-core-entry-type-code
          (let ((string (make-string (%vector-raw-bits core-header ptr)
                                     :element-type 'base-char)))
            (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
-           (format t "Build ID [~a] len=~D ptr=~D actual-len=~D~%" string len ptr (length string))))
+           (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D~%" string len ptr (length string))))
         (#.runtime-options-magic) ; ignore
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
@@ -2429,7 +2438,19 @@
           (dovector (pte (space-page-table dynamic-space))
             (setf (sap-ref-64 sap 0) (logior (page-scan-start pte) (page-type pte))
                   (sap-ref-16 sap 8) (logior (page-words-used pte) (page-single-obj-p pte)))
-            (write-sequence buffer output)))))
+            (write-sequence buffer output)))
+        (let* ((bytes-written (* 10 (length (space-page-table dynamic-space))))
+               (diff (- (align-up bytes-written sb-vm:n-word-bytes)
+                        bytes-written)))
+          (fill buffer 0)
+          (write-sequence buffer output :end diff))))
+    ;; write the trailer
+    (let ((buffer (make-array 16 :element-type '(unsigned-byte 8)
+                                 :initial-element 0)))
+      (sb-sys:with-pinned-objects (buffer)
+        (setf (%vector-raw-bits buffer 0) 0
+              (%vector-raw-bits buffer 1) core-magic)
+        (write-sequence buffer output)))
     (force-output output)))
 
 (defun walk-target-space (function space-id spacemap)
@@ -2477,6 +2498,12 @@
                  (codeblobs nil)
                  (fwdmap (make-hash-table))
                  (n-objects)
+                 (offsets-vector-size)
+                 ;; We only need enough space to write C linkage call redirections from the
+                 ;; assembler routine codeblob, because those are the calls which assume that
+                 ;; asm code can directly call into the linkage space using "CALL rel32" form.
+                 ;; Dynamic-space calls do not assume that - they use "CALL [ea]" form.
+                 (c-linkage-reserved-words 12) ; arbitrary overestimate
                  (reserved-amount)
                  ;; text space will contain a copy of the asm code so it can use call rel32 form
                  (asm-code (find-target-asm-code spacemap))
@@ -2502,26 +2529,37 @@
                          asm-code-size
                          (nreverse codeblobs))
                   n-objects (length codeblobs))
-            ;; Preceding the code objects is a vector of uint32_t indicating the
-            ;; starting offset (from the space start) of each code object.
-            ;; The size of the new space has to account for the size of the vector.
-            (let* ((n-vector-data-words (ceiling n-objects 2)) ; two uint32s fit in a lispword
-                   (vector-size-in-bytes
-                    (ash (+ (align-up n-vector-data-words 2) ; round to even
-                            2) ; vector header
-                         word-shift)))
+            ;; Preceding the code objects are two vectors:
+            ;; (1) a vector of uint32_t indicating the starting offset (from the space start)
+            ;;    of each code object.
+            ;; (2) a vector of uint64_t which embeds a JMP instruction to a C linkage table entry.
+            ;;    These instructions are near enough to be called via 'rel32' form. (The ordinary
+            ;;    alien linkage space is NOT near enough, after code is moved to text space)
+            ;; The size of the new text space has to account for the sizes of the vectors.
+            (let* ((n-vector1-data-words (ceiling n-objects 2)) ; two uint32s fit in a lispword
+                   (vector1-size (ash (+ (align-up n-vector1-data-words 2) ; round to even
+                                         vector-data-offset)
+                                      word-shift))
+                   (n-vector2-data-words c-linkage-reserved-words)
+                   (vector2-size (ash (+ n-vector2-data-words vector-data-offset)
+                                      word-shift)))
+              (setf offsets-vector-size vector1-size
+                    reserved-amount (+ vector1-size vector2-size))
               ;; Adjust all code offsets upward to avoid doing more math later
               (maphash (lambda (k v)
-                         (setf (gethash k fwdmap) (+ v vector-size-in-bytes)))
+                         (setf (gethash k fwdmap) (+ v reserved-amount)))
                        fwdmap)
-              (setq reserved-amount vector-size-in-bytes)
               (incf freeptr reserved-amount)
-              (format t "~&Code: ~D objects, ~D bytes~%" (length codeblobs) freeptr))
+              (format nil "~&Code: ~D objects, ~D bytes~%" (length codeblobs) freeptr))
             (let* ((new-space-nbytes (align-up freeptr sb-c:+backend-page-bytes+))
                    (new-space (sb-sys:allocate-system-memory new-space-nbytes)))
-              ;; Write a vector header
+              ;; Write header of "vector 1"
               (setf (sap-ref-word new-space 0) simple-array-unsigned-byte-32-widetag
-                    (sap-ref-word new-space n-word-bytes) (ash n-objects n-fixnum-tag-bits))
+                    (sap-ref-word new-space n-word-bytes) (fixnumize n-objects))
+              ;; write header of "vector 2"
+              (setf (sap-ref-word new-space offsets-vector-size) simple-array-unsigned-byte-64-widetag
+                    (sap-ref-word new-space (+ offsets-vector-size n-word-bytes))
+                    (fixnumize c-linkage-reserved-words))
               ;; Transport code contiguously into new space
               (transport-dynamic-space-code codeblobs spacemap new-space reserved-amount)
               ;; Walk static space and dynamic-space changing any pointers that
@@ -2531,7 +2569,7 @@
                        (vaddr (space-addr space))
                        (paddr (space-physaddr space spacemap))
                        (diff (+ (- (sap-int paddr)) vaddr)))
-                  (format t "~&Fixing ~A~%" space)
+                  (format nil "~&Fixing ~A~%" space)
                   (walk-target-space
                     (lambda (object widetag size)
                       (declare (ignore widetag size))
@@ -2539,7 +2577,7 @@
                         (update-quasi-static-code-ptrs object spacemap fwdmap diff)))
                    space-id spacemap)))
               ;; Walk new space and fix pointers into itself
-              (format t "~&Fixing newspace~%")
+              (format nil "~&Fixing newspace~%")
               (map-objects-in-range
                (lambda (object widetag size)
                    (declare (ignore widetag size))
@@ -2587,6 +2625,404 @@
             input output binary (parse-integer start-sym :radix 16))))
         (t
          (error "Unknown command: ~S" args))))
+
+;;; Processing a core without immobile-space
+
+;;; This file provides a recipe which gets a little bit closer to being able to
+;;; emulate #+immobile-space in so far as producing an ELF core is concerned.
+;;; The recipe is a bit more complicated than I'd like, but it works.
+;;; Let's say you want a core with contiguous text space containing the code
+;;; of a quicklisp system.
+
+;;; $ run-sbcl.sh
+;;; * (ql:quickload :one-more-re-nightmare-tests)
+;;; * (save-lisp-and-die "step1.core")
+;;; $ run-sbcl.sh
+;;; * (load "tools-for-build/editcore")
+;;; * (sb-editcore:move-dynamic-code-to-text-space "step1.core" "step2.core")
+;;; * (sb-editcore:redirect:text-space-calls "step2.core")
+;;; Now "step2.core" has a text space, and all lisp-to-lisp calls bypass their FDEFN.
+;;; The new core is strictly less featureful than #+immobie-space because global
+;;; function redefinition does not work - REMOVE-STATIC-LINKS is missing.
+;;; At this point split-core on "step2.core" can run in the manner of elfcore.test.sh
+
+(defun get-code-segments (code vaddr spacemap)
+  (let ((di (%code-debug-info code))
+        (inst-base (+ vaddr (ash (code-header-words code) word-shift)))
+        (result))
+    (aver (%instancep di))
+    (if (zerop (code-n-entries code)) ; assembler routines
+        (dolist (entry (target-hash-table-alist di spacemap))
+          (let* ((val (translate (undescriptorize (cdr entry)) spacemap))
+                 ;; VAL is (start end . index)
+                 (start (the fixnum (car val)))
+                 (end (the fixnum (car (translate (cdr val) spacemap)))))
+            (push (make-code-segment code start (- (1+ end) start)
+                                     :virtual-location (+ inst-base start))
+                  result)))
+        (dolist (range (get-text-ranges code spacemap))
+          (let ((car (car range)))
+            (when (integerp car)
+              (push (make-code-segment code car (- (cdr range) car)
+                                       :virtual-location (+ inst-base car))
+                    result)))))
+    (sort result #'< :key #'sb-disassem:seg-virtual-location)))
+
+(defstruct (range (:constructor make-range (labeled vaddr bytecount)))
+  labeled vaddr bytecount)
+
+(defun inst-vaddr (inst) (range-vaddr (car inst)))
+(defun inst-length (inst) (range-bytecount (car inst)))
+(defun inst-end (inst &aux (range (car inst)))
+  (+ (range-vaddr range) (range-bytecount range)))
+
+(defmethod print-object ((self range) stream)
+  (format stream "~A~x,~x"
+          (if (range-labeled self) "L:" "  ")
+          (range-vaddr self)
+          (range-bytecount self)))
+(defun get-code-instruction-model (code vaddr spacemap)
+  (let* ((segments (get-code-segments code vaddr spacemap))
+         (insts-vaddr (+ vaddr (ash (code-header-words code) word-shift)))
+         (dstate (sb-disassem:make-dstate))
+         (fun-header-locs
+          (loop for i from 0 below (code-n-entries code)
+                collect (+ insts-vaddr (%code-fun-offset code i))))
+         (labels))
+    (sb-disassem:label-segments segments dstate)
+    ;; are labels not already sorted?
+    (setq labels (sort (sb-disassem::dstate-labels dstate) #'< :key #'car))
+    (sb-int:collect ((result))
+      (dolist (seg segments (coerce (result) 'vector))
+        (setf (sb-disassem:dstate-segment dstate) seg
+              (sb-disassem:dstate-segment-sap dstate)
+              (funcall (sb-disassem:seg-sap-maker seg)))
+        (setf (sb-disassem:dstate-cur-offs dstate) 0)
+        (loop
+          (when (eql (sb-disassem:dstate-cur-addr dstate) (car fun-header-locs))
+            (incf (sb-disassem:dstate-cur-offs dstate) (* simple-fun-insts-offset n-word-bytes))
+            (pop fun-header-locs))
+          (let* ((pc (sb-disassem:dstate-cur-addr dstate))
+                 (labeled (when (and labels (= pc (caar labels)))
+                            (pop labels)
+                            t))
+                 (inst (sb-disassem:disassemble-instruction dstate))
+                 (nbytes (- (sb-disassem:dstate-cur-addr dstate) pc)))
+            (result (cons (make-range labeled pc nbytes) inst)))
+          (when (>= (sb-disassem:dstate-cur-offs dstate) (sb-disassem:seg-length seg))
+            (return)))))))
+
+;; The extra copy of ASM routines, particularly C-calling trampolines, that now reside in text
+;; space have to be modified to correctly reference their C functions. They assume that static
+;; space is near alien-linkage space, and so they use this form:
+;;   xxxx: E8A1F0EFFF  CALL #x50000060 ; alloc
+;; which unforuntately means that after relocating to text space, that instruction refers
+;; to random garbage, and more unfortunately there is no room to squeeze in an instruction
+;; that encodes to 7 bytes.
+;; So we have to create an extra jump "somewhere" that indirects through the linkage table
+;; but is callable from the text-space code.
+;;; I don't feel like programmatically scanning the asm code to determine these.
+;;; Hardcoded is good enough (until it isn't)
+(defparameter *c-linkage-redirects*
+  (mapcar (lambda (x) (cons x (foreign-symbol-sap x)))
+          '("switch_to_arena"
+            "alloc"
+            "alloc_list"
+            "listify_rest_arg"
+            "make_list"
+            "alloc_funinstance"
+            "allocation_tracker_counted"
+            "allocation_tracker_sized")))
+
+(defun get-text-space-asm-code-replica (space spacemap)
+  (let* ((physaddr (sap-int (space-physaddr space spacemap)))
+         (offsets-vector (%make-lisp-obj (logior physaddr other-pointer-lowtag)))
+         (offset (aref offsets-vector 0)))
+    (values (+ (space-addr space) offset)
+            (%make-lisp-obj (+ physaddr offset other-pointer-lowtag)))))
+
+(defun get-static-space-asm-code (space spacemap)
+  (let ((found
+         (block nil
+           (sb-editcore::walk-target-space
+            (lambda (x widetag size)
+              (declare (ignore widetag size))
+              (when (code-component-p x)
+                (return x)))
+            static-core-space-id spacemap))))
+    (values (+ (- (get-lisp-obj-address found)
+                  (sap-int (space-physaddr space spacemap))
+                  other-pointer-lowtag)
+               (space-addr space))
+            found)))
+
+(defun patch-assembly-codeblob (spacemap)
+  (binding* ((static-space (get-space static-core-space-id spacemap))
+             (text-space (get-space immobile-text-core-space-id spacemap))
+             ((new-code-vaddr new-code) (get-text-space-asm-code-replica text-space spacemap))
+             ((old-code-vaddr old-code) (get-static-space-asm-code static-space spacemap))
+             (code-offsets-vector
+              (%make-lisp-obj (logior (sap-int (space-physaddr text-space spacemap))
+                                      other-pointer-lowtag)))
+             (header-bytes (ash (code-header-words old-code) word-shift))
+             (old-insts-vaddr (+ old-code-vaddr header-bytes))
+             (new-insts-vaddr (+ new-code-vaddr header-bytes))
+             (items *c-linkage-redirects*)
+             (inst-buffer (make-array 8 :element-type '(unsigned-byte 8)))
+             (code-offsets-vector-size (primitive-object-size code-offsets-vector))
+             (c-linkage-vector-vaddr (+ (space-addr text-space) code-offsets-vector-size))
+             (c-linkage-vector ; physical
+              (%make-lisp-obj (logior (sap-int (sap+ (space-physaddr text-space spacemap)
+                                                     code-offsets-vector-size))
+                                      other-pointer-lowtag))))
+    (aver (<= (length items) (length c-linkage-vector)))
+    (with-pinned-objects (inst-buffer)
+      (do ((sap (vector-sap inst-buffer))
+           (item-index 0 (1+ item-index))
+           (items items (cdr items)))
+          ((null items))
+        ;; Each new quasi-linkage-table entry takes 8 bytes to encode.
+        ;; The JMP is 7 bytes, followed by a nop.
+        ;; FF2425nnnnnnnn = JMP [ea]
+        (setf (sap-ref-8 sap 0) #xFF
+              (sap-ref-8 sap 1) #x24
+              (sap-ref-8 sap 2) #x25
+              (sap-ref-32 sap 3) (sap-int (sap+ (cdar items) 8))
+              (sap-ref-8 sap 7) #x90) ; nop
+        (setf (aref c-linkage-vector item-index) (%vector-raw-bits inst-buffer 0))))
+    ;; Produce a model of the instructions. It doesn't really matter whether we scan
+    ;; OLD-CODE or NEW-CODE since we're supplying the proper virtual address either way.
+    (let ((insts (get-code-instruction-model old-code old-code-vaddr spacemap)))
+;;  (dovector (inst insts) (write inst :base 16 :pretty nil :escape nil) (terpri))
+      (dovector (inst insts)
+        ;; Look for any call to a linkage table entry.
+        (when (eq (second inst) 'call)
+          (let ((operand (third inst)))
+            (when (and (integerp operand)
+                       (>= operand alien-linkage-table-space-start)
+                       (< operand (+ alien-linkage-table-space-start
+                                     alien-linkage-table-space-size)))
+              (let* ((index (position (int-sap operand) *c-linkage-redirects*
+                                      :key #'cdr :test #'sap=))
+                     (branch-target (+ c-linkage-vector-vaddr
+                                       (ash vector-data-offset word-shift)
+                                       ;; each new linkage entry takes up exactly 1 word
+                                       (* index n-word-bytes)))
+                     (old-next-ip-abs (int-sap (inst-end inst))) ; virtual
+                     (next-ip-rel (sap- old-next-ip-abs (int-sap old-insts-vaddr)))
+                     (new-next-ip (+ new-insts-vaddr next-ip-rel)))
+                (setf (signed-sap-ref-32 (code-instructions new-code) (- next-ip-rel 4))
+                      (- branch-target new-next-ip))))))))))
+
+(defun get-mov-src-constant (code code-vaddr inst ea spacemap)
+  (let* ((next-ip (inst-end inst))
+         ;; this is a virtual adrress
+         (abs-addr (+ next-ip (machine-ea-disp ea))))
+    (when (and (not (logtest abs-addr #b111)) ; lispword-aligned
+               (>= abs-addr code-vaddr)
+               (< abs-addr (+ code-vaddr (ash (code-header-words code) word-shift))))
+      (let ((paddr (translate-ptr abs-addr spacemap)))
+        (translate (sap-ref-lispobj (int-sap paddr) 0) spacemap)))))
+
+(defun locate-const-move-to-rax (code vaddr insts start spacemap)
+  ;; Look for a MOV to RAX from a code header constant
+  ;; Technically this should fail if it finds _any_ instruction
+  ;; that affects RAX before it finds the one we're looking for.
+  (loop for i downfrom start to 1
+        do (let ((inst (svref insts i)))
+             (cond ((range-labeled (first inst)) (return)) ; labeled statement - fail
+                   ((and (eq (second inst) 'mov)
+                         (eq (third inst) #.(get-gpr :qword 0))
+                         (typep (fourth inst) '(cons machine-ea (eql :qword))))
+                    (let ((ea (car (fourth inst))))
+                      (when (and (eq (machine-ea-base ea) :rip)
+                                 (minusp (machine-ea-disp ea)))
+                        (return
+                          (let ((const (get-mov-src-constant code vaddr inst ea spacemap)))
+                            (when (fdefn-p const)
+                              (let ((fun (fdefn-fun const)))
+                                (when (simple-fun-p (translate fun spacemap))
+                                  (values i fun)))))))))))))
+
+(defun replacement-opcode (inst)
+  (ecase (second inst) ; opcode
+    (jmp #xE9)
+    (call #xE8)))
+
+(defun patch-fdefn-call (code vaddr insts inst i spacemap &optional print)
+;;  (unless (= (%code-serialno code) #x6884) (return-from patch-fdefn-call))
+  ;; START is the index into INSTS of the instructon that loads RAX
+  (multiple-value-bind (start callee) (locate-const-move-to-rax code vaddr insts (1- i) spacemap)
+    (when (and start
+               (let ((text-space (get-space immobile-text-core-space-id spacemap)))
+                 (< (space-addr text-space)
+                    ;; CALLEE is an untranslated address
+                    (get-lisp-obj-address callee)
+                    (space-end text-space))))
+      (when print
+        (let ((addr (inst-vaddr (svref insts start))) ; starting address
+              (end (inst-end inst)))
+          (sb-c:dis (translate-ptr addr spacemap) (- end addr))))
+      ;; Several instructions have to be replaced to make room for the new CALL
+      ;; which is a longer than the old, but it's ok since a MOV is eliminated.
+      (let* ((sum-lengths
+              (loop for j from start to i sum (inst-length (svref insts j))))
+             (new-bytes (make-array sum-lengths :element-type '(unsigned-byte 8)))
+             (new-index 0))
+        (loop for j from (1+ start) below i
+              do (let* ((old-inst (svref insts j))
+                        (ip (inst-vaddr old-inst))
+                        (physaddr (int-sap (translate-ptr ip spacemap)))
+                        (nbytes (inst-length old-inst)))
+                   (dotimes (k nbytes)
+                     (setf (aref new-bytes new-index) (sap-ref-8 physaddr k))
+                     (incf new-index))))
+        ;; insert padding given that the new call takes 5 bytes to encode
+        (let* ((nop-len (- sum-lengths (+ new-index 5)))
+               (nop-pattern (ecase nop-len
+                              (5 '(#x0f #x1f #x44 #x00 #x00)))))
+          (dolist (byte nop-pattern)
+            (setf (aref new-bytes new-index) byte)
+            (incf new-index)))
+        ;; change the call
+        (let* ((branch-target
+                (simple-fun-entry-sap (translate callee spacemap)))
+               (next-pc (int-sap (inst-end inst)))
+               (rel32 (sap- branch-target next-pc)))
+          (setf (aref new-bytes new-index) (replacement-opcode inst))
+          (with-pinned-objects (new-bytes)
+            (setf (signed-sap-ref-32 (vector-sap new-bytes) (1+ new-index)) rel32)
+            (when print
+              (format t "~&Replaced by:~%")
+              (let ((s (sb-disassem::make-vector-segment new-bytes 0 sum-lengths
+                                                         :virtual-location vaddr)))
+                (sb-disassem::disassemble-segment
+                 s *standard-output* (sb-disassem:make-dstate))))
+            (let* ((vaddr (inst-vaddr (svref insts start)))
+                   (paddr (translate-ptr vaddr spacemap)))
+              (%byte-blt new-bytes 0 (int-sap paddr) 0 sum-lengths))))))))
+
+(defun find-static-call-target-in-text-space (inst addr spacemap static-asm-code text-asm-code)
+  (declare (ignorable inst))
+  ;; this will (for better or for worse) find static fdefns as well as asm routines,
+  ;; so we have to figure out which it is.
+  (let ((asm-codeblob-size
+         (primitive-object-size
+          (%make-lisp-obj (logior (translate-ptr static-asm-code spacemap)
+                                  other-pointer-lowtag)))))
+    (cond ((<= static-asm-code addr (+ static-asm-code (1- asm-codeblob-size)))
+           (let* ((offset-from-base (- addr static-asm-code))
+                  (new-vaddr (+ text-asm-code offset-from-base)))
+             (sap-ref-word (int-sap (translate-ptr new-vaddr spacemap)) 0)))
+          (t
+           (let* ((fdefn-vaddr (- addr (ash fdefn-raw-addr-slot word-shift)))
+                  (fdefn-paddr (int-sap (translate-ptr fdefn-vaddr spacemap))))
+             ;; Confirm it looks like a static fdefn
+             (aver (= (logand (sap-ref-word fdefn-paddr 0) widetag-mask) fdefn-widetag))
+             (let ((entrypoint (sap-ref-word fdefn-paddr (ash fdefn-raw-addr-slot word-shift))))
+               ;; Confirm there is a simple-fun header where expected
+               (let ((header
+                      (sap-ref-word (int-sap (translate-ptr entrypoint spacemap))
+                                    (- (ash simple-fun-insts-offset word-shift)))))
+                 (aver (= (logand header widetag-mask) simple-fun-widetag))
+                 ;; Return the entrypoint which already point to text space
+                 entrypoint)))))))
+
+;; Patch either a ca through a static-space fdefn or an asm routine indirect jump.
+(defun patch-static-space-call (inst spacemap static-asm-code text-asm-code)
+  (let* ((new-bytes (make-array 7 :element-type '(unsigned-byte 8)))
+         (addr (machine-ea-disp (car (third inst))))
+         (branch-target
+          (find-static-call-target-in-text-space
+           inst addr spacemap static-asm-code text-asm-code)))
+    (when  branch-target
+      (setf (aref new-bytes 0) #x66 (aref new-bytes 1) #x90) ; 2-byte NOP
+      (setf (aref new-bytes 2) (replacement-opcode inst))
+      (let ((next-ip (inst-end inst)))
+        (with-pinned-objects (new-bytes)
+          (setf (signed-sap-ref-32 (vector-sap new-bytes) 3) (- branch-target next-ip)))
+        (%byte-blt new-bytes 0 (int-sap (translate-ptr (inst-vaddr inst) spacemap)) 0 7)))))
+
+;;; Since dynamic-space code is pretty much relocatable,
+;;; disassembling it at a random physical address is fine.
+(defun patch-lisp-codeblob
+    (code vaddr spacemap static-asm-code text-asm-code
+     &aux (insts (get-code-instruction-model code vaddr spacemap)))
+  (declare (simple-vector insts))
+  (do ((i 0 (1+ i)))
+      ((>= i (length insts)))
+    (let* ((inst (svref insts i))
+           (this-op (second inst)))
+      (when (member this-op '(call jmp))
+        ;; is it potentially a call via an fdefn or an asm code indirection?
+        (let* ((operand (third inst))
+               (ea (if (listp operand) (car operand))))
+          (when (and (typep operand '(cons machine-ea (eql :qword)))
+                     (or (and (eql (machine-ea-base ea) 0) ; [RAX-9]
+                              (eql (machine-ea-disp ea) 9)
+                              (not (machine-ea-index ea)))
+                         (and (not (machine-ea-base ea))
+                              (not (machine-ea-index ea))
+                              (<= static-space-start (machine-ea-disp ea)
+                                  (sap-int *static-space-free-pointer*)))))
+            (if (eql (machine-ea-base ea) 0) ; based on RAX
+                (patch-fdefn-call code vaddr insts inst i spacemap)
+                (patch-static-space-call inst spacemap
+                                         static-asm-code text-asm-code))))))))
+
+(defun persist-to-file (spacemap core-offset stream)
+  (aver (zerop core-offset))
+  (dolist (space-id `(,static-core-space-id
+                      ,immobile-text-core-space-id
+                      ,dynamic-core-space-id))
+    (let ((space (get-space space-id spacemap)))
+      (file-position stream (* (1+ (space-data-page space)) +backend-page-bytes+))
+      (sb-unix:unix-write (sb-impl::fd-stream-fd stream)
+                          (space-physaddr space spacemap)
+                          0
+                          (align-up (* (space-nwords space) n-word-bytes)
+                                    +backend-page-bytes+)))))
+
+(defun redirect-text-space-calls (pathname)
+  (with-open-file (stream pathname :element-type '(unsigned-byte 8)
+                         :direction :io :if-exists :overwrite)
+    (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
+               (core-offset (read-core-header stream core-header t))
+               ((npages space-list card-mask-nbits core-dir-start initfun)
+                (parse-core-header stream core-header)))
+      (declare (ignore card-mask-nbits core-dir-start initfun))
+      (with-mapped-core (sap core-offset npages stream)
+        (let ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr))))
+          (patch-assembly-codeblob spacemap)
+          (let* ((text-space (get-space immobile-text-core-space-id spacemap))
+                 (offsets-vector (%make-lisp-obj (logior (sap-int (space-physaddr text-space spacemap))
+                                                         lowtag-mask)))
+                 (static-space-asm-code
+                  (get-static-space-asm-code (get-space static-core-space-id spacemap) spacemap))
+                 (text-space-asm-code
+                  (get-text-space-asm-code-replica text-space spacemap)))
+            (assert text-space)
+            ;; offset 0 is the offset of the ASM routine codeblob which was already processed.
+            (loop for j from 1 below (length offsets-vector)
+                  do (let ((vaddr (+ (space-addr text-space) (aref offsets-vector j)))
+                           (physobj (%make-lisp-obj
+                                     (logior (sap-int (sap+ (space-physaddr text-space spacemap)
+                                                            (aref offsets-vector j)))
+                                             other-pointer-lowtag))))
+                       ;; Assert that there are no fixups other than GC card table mask fixups
+                       (let ((fixups (sb-vm::%code-fixups physobj)))
+                         (unless (fixnump fixups)
+                           (setq fixups (translate fixups spacemap))
+                           (aver (typep fixups 'bignum)))
+                         (multiple-value-bind (list1 list2 list3)
+                             (sb-c::unpack-code-fixup-locs fixups)
+                           (declare (ignore list3))
+                           (aver (null list1))
+                           (aver (null list2))))
+                       (patch-lisp-codeblob physobj vaddr spacemap
+                                            static-space-asm-code text-space-asm-code))))
+          (persist-to-file spacemap core-offset stream))))))
+;;;;
 
 ;; If loaded as a script, do this
 (eval-when (:execute)

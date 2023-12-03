@@ -649,7 +649,10 @@ void calc_asm_routine_bounds()
                 asm_routines_start = (uword_t)where;
                 break;
             }
-        if (!asm_routines_start && TEXT_SPACE_START != 0) {
+        /* I thought it would be possible to erase the static-space copy of asm routines
+         * after converting to text space but maybe not. So they'll still be here.
+         * But I want to erase them. This disabled block represents such aspiration */
+        if (0) { // !asm_routines_start && TEXT_SPACE_START != 0) {
             lispobj *where = (lispobj*)TEXT_SPACE_START;
             where += object_size(where);
             gc_assert(widetag_of(where) == CODE_HEADER_WIDETAG);
