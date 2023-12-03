@@ -15,11 +15,6 @@
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
-  #+mark-region-gc
-  (let ((bytes (extern-alien "bytes_allocated" os-vm-size-t)))
-    (values bytes
-            (- (* (pages-allocated) sb-vm:gencgc-page-bytes) bytes)))
-  #+gencgc
   (extern-alien "bytes_allocated" os-vm-size-t))
 
 (defun static-space-usage ()
