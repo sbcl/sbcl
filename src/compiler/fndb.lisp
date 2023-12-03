@@ -533,17 +533,17 @@
   (movable foldable flushable no-verify-arg-count))
 
 (defknown character (t) character (movable foldable unsafely-flushable))
-(defknown char-code (character) char-code (movable foldable flushable))
+(defknown char-code (character) %char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character
   (movable foldable flushable))
 (defknown digit-char (unsigned-byte &optional (integer 2 36))
   (or character null) (movable foldable flushable))
-(defknown char-int (character) char-code (movable foldable flushable))
+(defknown char-int (character) %char-code (movable foldable flushable))
 (defknown char-name (character) (or simple-string null)
   (movable foldable flushable))
 (defknown name-char (string-designator) (or character null)
   (movable foldable flushable))
-(defknown code-char (char-code) character
+(defknown code-char (%char-code) character
   ;; By suppressing constant folding on CODE-CHAR when the
   ;; cross-compiler is running in the cross-compilation host vanilla
   ;; ANSI Common Lisp, we can use CODE-CHAR expressions to delay until

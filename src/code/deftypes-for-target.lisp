@@ -218,8 +218,8 @@
 (sb-xc:deftype irrational ()
   '(or float (complex float)))
 
-;;; character components
-(sb-xc:deftype char-code () `(integer 0 (,char-code-limit)))
+;;; this corresponds to the CLHS glossary entry for "character code"
+(sb-xc:deftype %char-code () `(integer 0 (,char-code-limit)))
 
 ;;; a consed sequence result. If a vector, is a simple array.
 (sb-xc:deftype consed-sequence ()

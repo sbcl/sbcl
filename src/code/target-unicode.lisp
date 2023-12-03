@@ -49,7 +49,7 @@
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
   (declare (type (simple-array (unsigned-byte 32) 1) vector)
-           (type char-code item)
+           (%char-code item)
            (optimize speed))
   (labels ((recurse (start end)
              (declare (type index start end)

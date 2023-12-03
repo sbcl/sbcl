@@ -17,9 +17,6 @@
 (declaim (maybe-inline upper-case-p lower-case-p both-case-p
                        digit-char-p))
 
-(deftype char-code ()
-  `(integer 0 (,char-code-limit)))
-
 (declaim (inline pack-3-codepoints))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun pack-3-codepoints (first &optional (second 0) (third 0))
@@ -553,7 +550,7 @@ lowercase eszet (U+DF)."
     (let ((code (aref cases (1+ index))))
       (if (zerop code)
           char
-          (code-char (truly-the char-code code))))))
+          (code-char (truly-the %char-code code))))))
 
 (defun char-downcase (char)
   "Return CHAR converted to lower-case if that is possible."
@@ -562,7 +559,7 @@ lowercase eszet (U+DF)."
     (let ((code (aref cases index)))
       (if (zerop code)
           char
-          (code-char (truly-the char-code code))))))
+          (code-char (truly-the %char-code code))))))
 
 (defun alphanumericp (char)
   "Given a character-object argument, ALPHANUMERICP returns T if the argument

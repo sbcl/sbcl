@@ -3277,6 +3277,7 @@ possibly temporarily, because it might be used internally.")
 
             ;; various CHAR-CODEs
 
+           "%CHAR-CODE" ; the type formerly known as CHAR-CODE
            "BACKSPACE-CHAR-CODE" "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE"
            "FORM-FEED-CHAR-CODE" "LINE-FEED-CHAR-CODE"
            "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"

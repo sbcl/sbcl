@@ -3444,17 +3444,21 @@ used for a COMPLEX component.~:@>"
   ;; aver that the cars of the list elements are sorted into increasing order
   (do ((p pairs (cdr p)))
       ((null (cdr p)))
-    (aver (<= (caar p) (caadr p))))
+    (aver (<= (the %char-code (caar p)) (the %char-code (caadr p)))))
   (let ((pairs
-         (if (and (singleton-p pairs) (eql (caar pairs) (cdar pairs)))
+         (if (and (singleton-p pairs)
+                  (eql (truly-the %char-code (caar pairs))
+                       ;; only the CARs were checked above
+                       (the %char-code (cdar pairs))))
              pairs ; don't need to preprocess the pairs
              (let (result)
                 (do ((pairs pairs (cdr pairs)))
                     ((null pairs) (nreverse result))
                   (destructuring-bind (low . high) (car pairs)
+                    (declare (%char-code low high))
                     (loop for (low1 . high1) in (cdr pairs)
-                          if (<= low1 (1+ high))
-                          do (progn (setf high (max high high1))
+                          if (<= (the %char-code low1) (1+ high))
+                          do (progn (setf high (max high (the %char-code high1)))
                                     (setf pairs (cdr pairs)))
                           else do (return nil))
                     (cond

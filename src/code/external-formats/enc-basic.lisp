@@ -243,7 +243,7 @@
 (declaim (inline code->ascii-mapper))
 (defun code->ascii-mapper (code)
   (declare (optimize speed #.*safety-0*)
-           (type char-code code))
+           (%char-code code))
   (if (> code 127) nil code))
 
 (declaim (inline ascii->code-mapper))
@@ -270,7 +270,7 @@
 (declaim (inline code->latin1-mapper))
 (defun code->latin1-mapper (code)
   (declare (optimize speed #.*safety-0*)
-           (type char-code code))
+           (%char-code code))
   (and (< code 256) code))
 
 (define-unibyte-to-octets-functions :latin-1 get-latin1-bytes string->latin1 code->latin1-mapper)

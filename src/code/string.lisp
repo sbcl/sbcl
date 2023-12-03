@@ -642,17 +642,17 @@ new string COUNT long filled with the fill character."
                  ((simple-array character)
                   (let ((length (length string)))
                     (sb-vm::simd-string-case ,a string string
-                                      i
-                                      (do ((index i (1+ index))
-                                           (cases +character-cases+))
-                                          ((>= index length))
-                                        (let ((char (schar string index)))
-                                          (with-case-info (char case-index cases
-                                                           :cases cases)
-                                            (let ((code (aref cases ,case-index)))
-                                              (unless (zerop code)
-                                                (setf (schar string index)
-                                                      (code-char (truly-the char-code code))))))))))
+                          i
+                          (do ((index i (1+ index))
+                               (cases +character-cases+))
+                              ((>= index length))
+                            (let ((char (schar string index)))
+                              (with-case-info (char case-index cases
+                                               :cases cases)
+                                (let ((code (aref cases ,case-index)))
+                                  (unless (zerop code)
+                                    (setf (schar string index)
+                                          (code-char (truly-the %char-code code))))))))))
                   string))))
          (t
           (with-one-string (string start end)
@@ -664,7 +664,7 @@ new string COUNT long filled with the fill character."
                      (let ((char (char-code (schar string index))))
                        (when (<= (char-code ,a) char (char-code ,z))
                          (setf (schar string index)
-                               (code-char (truly-the char-code (logxor char #x20))))))))
+                               (code-char (truly-the %char-code (logxor char #x20))))))))
                   (t
                    (do ((index start (1+ index))
                         (cases +character-cases+))
@@ -675,7 +675,7 @@ new string COUNT long filled with the fill character."
                          (let ((code (aref cases ,case-index)))
                            (unless (zerop code)
                              (setf (schar string index)
-                                   (code-char (truly-the char-code code))))))))))))))
+                                   (code-char (truly-the %char-code code))))))))))))))
 
 (defun nstring-upcase (string &key (start 0) end)
   (nstring-case (1+ case-index) #\a #\z)
@@ -717,19 +717,19 @@ new string COUNT long filled with the fill character."
              ((simple-array character)
               (let ((new (make-string length)))
                 (sb-vm::simd-string-case ,a string new
-                                         i
-                                         (do ((index i (1+ index))
-                                              (cases +character-cases+))
-                                             ((>= index length))
-                                           (let* ((char (schar string index))
-                                                  (cased (with-case-info (char case-index cases
-                                                                          :cases cases
-                                                                          :miss-value char)
-                                                           (let ((code (aref cases ,case-index)))
-                                                             (if (zerop code)
-                                                                 char
-                                                                 (code-char (truly-the char-code code)))))))
-                                             (setf (schar new index) cased))))
+                     i
+                     (do ((index i (1+ index))
+                          (cases +character-cases+))
+                         ((>= index length))
+                       (let* ((char (schar string index))
+                              (cased (with-case-info (char case-index cases
+                                                      :cases cases
+                                                      :miss-value char)
+                                       (let ((code (aref cases ,case-index)))
+                                         (if (zerop code)
+                                             char
+                                             (code-char (truly-the %char-code code)))))))
+                         (setf (schar new index) cased))))
                 new))))
       (with-array-data ((string-data string :offset-var offset)
                         (s-start start)
@@ -761,7 +761,7 @@ new string COUNT long filled with the fill character."
                      (setf (schar new d-i)
                            (code-char
                             (if (<= (char-code ,a) char (char-code ,z))
-                                (truly-the char-code (logxor char #x20))
+                                (truly-the %char-code (logxor char #x20))
                                 char)))))
                  new))
               (t
@@ -792,7 +792,7 @@ new string COUNT long filled with the fill character."
                                    (let ((code (aref cases ,case-index)))
                                      (if (zerop code)
                                          char
-                                         (code-char (truly-the char-code code)))))))
+                                         (code-char (truly-the %char-code code)))))))
                      (setf (schar new d-i) cased)))
                  new)))))))
 

@@ -225,7 +225,7 @@
                          byte))))
          (defun ,code-byte-name (code)
            (declare (optimize speed #.*safety-0*)
-                    (type char-code code))
+                    (%char-code code))
            (if (< code ,lowest-non-equivalent-code)
                code
                (loop with code-to-byte-table =
@@ -244,7 +244,7 @@
 (declaim (inline get-latin-bytes))
 (defun get-latin-bytes (mapper external-format replacement string pos)
   (let ((code (funcall mapper (char-code (char string pos)))))
-    (declare (type (or null char-code) code))
+    (declare (type (or null %char-code) code))
     (values (cond
               ((and code (< code 256)) code)
               (t

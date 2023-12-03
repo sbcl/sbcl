@@ -188,4 +188,9 @@
 ;;; END of the global safepoint page.
 (defconstant gc-safepoint-trap-offset n-word-bytes)
 
-#+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
+#+sb-xc-host
+(progn
+  (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
+  ;; %char-code seems to belong in 'cross-char' but our CHAR-CODE-LIMIT
+  ;; is not defined by then.
+  (deftype %char-code () `(integer 0 (,sb-xc:char-code-limit))))

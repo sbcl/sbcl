@@ -14,7 +14,7 @@
          (aref ,byte-to-code-table byte))
        (defun ,code-byte-name (code)
          (declare (optimize speed #.*safety-0*)
-                  (type char-code code))
+                  (%char-code code))
          (if (> code 255)
              nil
              (aref ,code-to-byte-table code))))))
