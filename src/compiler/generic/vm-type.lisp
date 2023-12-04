@@ -42,15 +42,16 @@
 (sb-xc:deftype byte-specifier () 'cons)
 
 ;;; PATHNAME pieces, as returned by the PATHNAME-xxx functions
-(sb-xc:deftype pathname-host () '(or sb-impl::host null))
-(sb-xc:deftype pathname-device ()
+;;; CLHS conformance mandates that these type names not be CL: symbols.
+(sb-xc:deftype sb-impl::%pathname-host () '(or sb-impl::host null))
+(sb-xc:deftype sb-impl::%pathname-device ()
   '(or simple-string (member nil :unspecific :unc)))
-(sb-xc:deftype pathname-directory () 'list)
-(sb-xc:deftype pathname-name ()
+(sb-xc:deftype sb-impl::%pathname-directory () 'list)
+(sb-xc:deftype sb-impl::%pathname-name ()
   '(or simple-string sb-impl::pattern (member nil :unspecific :wild)))
-(sb-xc:deftype pathname-type ()
+(sb-xc:deftype sb-impl::%pathname-type ()
   '(or simple-string sb-impl::pattern (member nil :unspecific :wild)))
-(sb-xc:deftype pathname-version ()
+(sb-xc:deftype sb-impl::%pathname-version ()
   '(or integer (member nil :newest :wild :unspecific)))
 
 (sb-xc:deftype internal-time () `(unsigned-byte ,internal-time-bits))

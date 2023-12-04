@@ -58,7 +58,7 @@
   ;; the host (at present either a UNIX or logical host)
   ;; Host and device could be reduced to small integers and packed in one slot
   ;; by keeping tables of the observed values.
-  (host nil :type (or host null) :read-only t)
+  (host nil :type %pathname-host :read-only t)
   ;; the name of a logical or physical device holding files
   (device nil :type (or simple-string pathname-component-tokens) :read-only t)
   ;; an interned list of strings headed by :ABSOLUTE or :RELATIVE
@@ -71,7 +71,7 @@
   (type nil :type (or simple-string pattern pathname-component-tokens) :read-only t)
   ;; the version number of the file, a positive integer (not supported
   ;; on standard Unix filesystems)
-  (version nil :type pathname-version :read-only t))
+  (version nil :type %pathname-version :read-only t))
 
 (let ((to (find-layout 'logical-pathname))
       (from (find-layout 'pathname)))

@@ -1638,39 +1638,39 @@
   (recursive))
 
 (defknown merge-pathnames
-  (pathname-designator &optional pathname-designator pathname-version)
+  (pathname-designator &optional pathname-designator sb-impl::%pathname-version)
   pathname
   ())
 
 (defknown make-pathname
  (&key (:defaults pathname-designator)
-       (:host (or string pathname-host))
-       (:device (or string pathname-device))
-       (:directory (or pathname-directory string (member :wild)))
-       (:name (or pathname-name string (member :wild)))
-       (:type (or pathname-type string (member :wild)))
-       (:version pathname-version) (:case pathname-component-case))
+       (:host (or string sb-impl::%pathname-host))
+       (:device (or string sb-impl::%pathname-device))
+       (:directory (or sb-impl::%pathname-directory string (member :wild)))
+       (:name (or sb-impl::%pathname-name string (member :wild)))
+       (:type (or sb-impl::%pathname-type string (member :wild)))
+       (:version sb-impl::%pathname-version) (:case pathname-component-case))
   pathname (unsafely-flushable))
 
 (defknown pathnamep (t) boolean (movable flushable))
 
 (defknown pathname-host (pathname-designator
                          &key (:case pathname-component-case))
-  pathname-host (flushable))
+  sb-impl::%pathname-host (flushable))
 (defknown pathname-device (pathname-designator
                            &key (:case pathname-component-case))
-  pathname-device (flushable))
+  sb-impl::%pathname-device (flushable))
 (defknown pathname-directory (pathname-designator
                               &key (:case pathname-component-case))
-  pathname-directory (flushable))
+  sb-impl::%pathname-directory (flushable))
 (defknown pathname-name (pathname-designator
                          &key (:case pathname-component-case))
-  pathname-name (flushable))
+  sb-impl::%pathname-name (flushable))
 (defknown pathname-type (pathname-designator
                          &key (:case pathname-component-case))
-  pathname-type (flushable))
+  sb-impl::%pathname-type (flushable))
 (defknown pathname-version (pathname-designator)
-  pathname-version (flushable))
+  sb-impl::%pathname-version (flushable))
 
 (defknown pathname= (pathname pathname) boolean (movable foldable flushable))
 
