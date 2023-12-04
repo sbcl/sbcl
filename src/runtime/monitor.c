@@ -66,7 +66,8 @@ struct crash_preamble {
     uword_t readonly_start;
     uword_t readonly_nbytes;
     uword_t dynspace_start;
-    long dynspace_npages;
+    long dynspace_npages_total;
+    long dynspace_npages_used;
     int card_size;
     int card_table_nbits;
     // fixedobj data dumped: pages, page table
@@ -97,11 +98,38 @@ const uword_t CRASH_PREAMBLE_SIGNATURE =
 
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
 #include <errno.h>
-static void checked_write(char *legend, int fd, void* buf, long nbytes)
+struct filewriter { long total; int fd; };
+
+static void maybe_show_contents(__attribute__((unused)) char *legend,
+                                __attribute__((unused)) void* buf,
+                                __attribute__((unused)) long nbytes)
 {
-    ssize_t wrote = write(fd, buf, nbytes);
-    if (wrote != nbytes) lose("short write, errno=%d", errno);
-    fprintf(stderr, "%s: %lx bytes\n", legend, nbytes);
+#if 0 // def LISP_FEATURE_64_BIT
+    int want = legend && (!strcmp(legend, "preamble") || legend[0] == ' ');
+    if (!want) return;
+    int nwords = nbytes>>WORD_SHIFT;
+    int i;
+    for (i=0;i<nwords;++i)
+        fprintf(stderr, "%s %16lx", (i%8)?"":(i?"\n   ":"   "), ((uword_t*)buf)[i]);
+    putc('\n', stderr);
+#endif
+}
+
+static void checked_write(char *section, struct filewriter* writer, void* buf, long nbytes)
+{
+    char label[8];
+    // I don't know why strncpy() gets a warning here. Isn't truncation exactly the point?
+    // monitor.c:118:5: warning: ‘strncpy’ output truncated before terminating nul copying 8 bytes
+    //   from a string of the same length [-Wstringop-truncation]
+    memset(label, 0, sizeof label);
+    memcpy(label, section, strlen(section)<sizeof label?strlen(section):sizeof label);
+    ssize_t wrote;
+    if (write(writer->fd, label, sizeof label) != sizeof label
+        || (wrote = write(writer->fd, buf, nbytes)) != nbytes)
+        lose("short write, errno=%d", errno);
+    fprintf(stderr, "%s: %lx bytes\n", section, nbytes + sizeof label);
+    maybe_show_contents(section, buf, nbytes);
+    writer->total += nbytes + sizeof label;
 }
 
 #include "immobile-space.h"
@@ -109,7 +137,7 @@ void save_gc_crashdump(char *pathname,
                        lispobj* cur_thread_approx_stackptr)
 {
     extern int pin_all_dynamic_space_code;
-    int fd = open(pathname, O_WRONLY|O_CREAT, 0666);
+    int fd = open(pathname, O_WRONLY|O_CREAT|O_TRUNC, 0666);
     struct thread* th;
     int nthreads = 0;
     for_each_thread(th) ++nthreads;
@@ -123,7 +151,8 @@ void save_gc_crashdump(char *pathname,
     preamble.readonly_start = READ_ONLY_SPACE_START;
     preamble.readonly_nbytes = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
     preamble.dynspace_start = DYNAMIC_SPACE_START;
-    preamble.dynspace_npages = next_free_page;
+    preamble.dynspace_npages_total = dynamic_space_size / GENCGC_PAGE_BYTES;
+    preamble.dynspace_npages_used = next_free_page;
     preamble.card_size = GENCGC_CARD_BYTES;
     preamble.card_table_nbits = gc_card_table_nbits;
     preamble.nthreads = nthreads;
@@ -145,31 +174,39 @@ void save_gc_crashdump(char *pathname,
     preamble.tlsf_control_size = tlsf_size();
     memcpy(preamble.sentinel_block, tlsf_memory_end-3*N_WORD_BYTES, 3*N_WORD_BYTES);
 #endif
+    struct filewriter writer;
+    writer.fd = fd;
+    writer.total = 0;
     // write the preamble and static + readonly spaces
-    checked_write("preamble", fd, &preamble, sizeof preamble);
-    checked_write("static", fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
-    checked_write("R/O", fd, (char*)READ_ONLY_SPACE_START, preamble.readonly_nbytes);
+    checked_write("preamble", &writer, &preamble, sizeof preamble);
+    checked_write("static", &writer, (char*)STATIC_SPACE_START, preamble.static_nbytes);
+    checked_write("R/O", &writer, (char*)READ_ONLY_SPACE_START, preamble.readonly_nbytes);
 
     // write the dynamic-space, PTEs, card table
-    checked_write("dynamic", fd, (char*)DYNAMIC_SPACE_START, nbytes_heap);
-    checked_write("PTE", fd, page_table, sizeof (struct page) * next_free_page);
-    checked_write("cardmark", fd, gc_card_mark, 1+gc_card_table_mask);
+    checked_write("dynamic", &writer, (char*)DYNAMIC_SPACE_START, nbytes_heap);
+    checked_write("PTE", &writer, page_table, sizeof (struct page) * next_free_page);
+    checked_write("cardmark", &writer, gc_card_mark, 1+gc_card_table_mask);
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    checked_write("allocated", &writer, allocation_bitmap, bitmap_size(next_free_page));
+    extern line_index_t line_count;
+    checked_write("linemap", &writer, line_bytemap, line_count);
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     int usage = (uword_t)fixedobj_free_pointer - FIXEDOBJ_SPACE_START;
-    checked_write("fixedobj", fd, (char*)FIXEDOBJ_SPACE_START, usage);
+    checked_write("fixedobj", &writer, (char*)FIXEDOBJ_SPACE_START, usage);
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
-    checked_write("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    checked_write("fixedobj_PTE", &writer, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
     // write the block_header_t that is just beyond the high water mark
-    checked_write("text", fd, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
+    checked_write("text", &writer, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
     total_npages = text_space_size / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
-    checked_write("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
-    checked_write("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
-    checked_write("TLSF_control", fd, tlsf_control, preamble.tlsf_control_size);
+    checked_write("text_gen", &writer, text_page_genmask, total_npages); // 1 byte per page
+    checked_write("text_WP", &writer, text_page_touched_bits, n_bitmap_elts * sizeof (int));
+    checked_write("TLSF_control", &writer, tlsf_control, preamble.tlsf_control_size);
     int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
     int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
-    checked_write("TLSF_sso", fd, tlsf_page_sso, n_tlsf_pages * sizeof (short));
+    checked_write("TLSF_sso", &writer, tlsf_page_sso, n_tlsf_pages * sizeof (short));
 #endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {
@@ -216,19 +253,20 @@ void save_gc_crashdump(char *pathname,
         thread_preamble.control_stack_nbytes = nbytes_control_stack;
         thread_preamble.binding_stack_nbytes = nbytes_binding_stack;
         // write the preamble
-        checked_write("thread", fd, &thread_preamble, sizeof thread_preamble);
+        checked_write("thread", &writer, &thread_preamble, sizeof thread_preamble);
         // write 0 or 1 contexts, control-stack, binding-stack, TLS
-        if (ici) checked_write(" ctxt", fd, threadcontext, preamble.sizeof_context);
+        if (ici) checked_write(" ctxt", &writer, threadcontext, preamble.sizeof_context);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        checked_write(" stack", fd, (char*)sp, nbytes_control_stack);
+        checked_write(" stack", &writer, (char*)sp, nbytes_control_stack);
 #else
-        checked_write(" stack", fd, th->control_stack_start, nbytes_control_stack);
+        checked_write(" stack", &writer, th->control_stack_start, nbytes_control_stack);
 #endif
-        checked_write(" bindings", fd, th->binding_stack_start, nbytes_binding_stack);
-        checked_write(" TLS", fd, th, nbytes_tls);
+        checked_write(" bindings", &writer, th->binding_stack_start, nbytes_binding_stack);
+        checked_write(" TLS", &writer, th, nbytes_tls);
     }
-    checked_write("sig", fd, "SB.Crash", 8); // trailing signature
+    checked_write("sig", &writer, "SB.Crash", 8); // trailing signature
     close(fd);
+    fprintf(stderr, "Total: %ld bytes\n", writer.total);
 }
 #endif
 
@@ -971,12 +1009,16 @@ bool save_to_filehandle(__attribute__((unused)) FILE *file,
     lose("Can't save_to_filehandle");
 }
 
-static size_t checked_read(char *legend, int fd, void* buf, size_t n)
+static size_t checked_read(char *section, int fd, void* buf, size_t n)
 {
+    char label[8];
+    if (read(fd, label, sizeof label) != 8 || strncmp(label, section, 8))
+        lose("section messup: %.8s when expecting %s\n", label, section);
     size_t result = read(fd, buf, n);
     if (result != n) { lose("read failed, errno=%d", errno); }
-    if (legend) fprintf(stderr, "%s: %zu bytes\n", legend, n);
-    return result;
+    fprintf(stderr, "%s: %zx bytes\n", section, n + sizeof label);
+    maybe_show_contents(section, buf, n);
+    return n + sizeof label;
 }
 
 char *pagetypedesc(int type)
@@ -1001,7 +1043,6 @@ int load_gc_crashdump(char* pathname)
     int fd;
     os_context_t *contexts[10], *context;
     struct thread* threads = 0;
-    struct thread dummy;
     fd = open(pathname, O_RDONLY);
     if (fd < 0) {
         fprintf(stderr, "can't open %s\n", pathname);
@@ -1011,7 +1052,8 @@ int load_gc_crashdump(char* pathname)
     struct crash_thread_preamble thread_preamble;
     checked_read("preamble", fd, &preamble, sizeof preamble);
     printf("static=%"OBJ_FMTX" nbytes=%x\n", preamble.static_start, (int)preamble.static_nbytes);
-    printf("heap_start=%"OBJ_FMTX" npages=%d\n", preamble.dynspace_start, (int)preamble.dynspace_npages);
+    printf("heap_start=%"OBJ_FMTX" npages=%d\n", preamble.dynspace_start,
+           (int)preamble.dynspace_npages_used);
     // pin_dynspace_code is for display only. It gets recomputed as the
     // logical OR of all threads' values of *GC-PIN-CODE-PAGES*.
     printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
@@ -1025,21 +1067,30 @@ int load_gc_crashdump(char* pathname)
     if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
-    gc_allocate_ptes();
-    next_free_page = preamble.dynspace_npages;
     // static + readonly
     checked_read("static", fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
     if (preamble.readonly_nbytes) {
-      // READ_ONLY_SPACE_START = preamble.readonly_start;
-      os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, 0, (char*)preamble.readonly_start,
-                        ALIGN_UP(preamble.readonly_nbytes, 4096));
-      checked_read("R/O", fd, (char*)preamble.readonly_start, preamble.readonly_nbytes);
+        // READ_ONLY_SPACE_START = preamble.readonly_start;
+        void* actual =
+            os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, 0, (char*)preamble.readonly_start,
+                              ALIGN_UP(preamble.readonly_nbytes, 4096));
+        if (actual != (void*)preamble.readonly_start)
+            fprintf(stderr, "WARNING: wanted R/O space @ %p but got %p\n",
+                    (char*)preamble.readonly_start, actual);
+        checked_read("R/O", fd, (char*)preamble.readonly_start, preamble.readonly_nbytes);
+#ifndef READ_ONLY_SPACE_START /* if non-constant */
+        READ_ONLY_SPACE_START = preamble.readonly_start;
+        READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + preamble.readonly_nbytes;
+        read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_END;
+#endif
     }
-    read_only_space_free_pointer = (lispobj*)(READ_ONLY_SPACE_START + preamble.readonly_nbytes);
     //
+    gc_allocate_ptes();
+    dynamic_space_size = preamble.dynspace_npages_total * GENCGC_PAGE_BYTES;
+    next_free_page = preamble.dynspace_npages_used;
     DYNAMIC_SPACE_START = preamble.dynspace_start;
-    long dynspace_nbytes = preamble.dynspace_npages * GENCGC_PAGE_BYTES;
+    long dynspace_nbytes = preamble.dynspace_npages_used * GENCGC_PAGE_BYTES;
     char* dynspace = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, 0, (char*)preamble.dynspace_start,
                                        DEFAULT_DYNAMIC_SPACE_SIZE);
     if (dynspace != (char*)preamble.dynspace_start)
@@ -1049,8 +1100,16 @@ int load_gc_crashdump(char* pathname)
     fprintf(stderr, "snapshot: %"PRIdPTR" pages in use (%ld bytes)\n",
             next_free_page, dynspace_nbytes);
     checked_read("PTE", fd, page_table, sizeof (struct page) * next_free_page);
-    recompute_gen_bytes_allocated();
     checked_read("cardmark", fd, gc_card_mark, 1+gc_card_table_mask);
+    // mrgc_init needs to know the dynamic space size so that's why this is delayed
+    // until after reading the crash preamble.
+    gc_init();
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    checked_read("allocated", fd, allocation_bitmap, bitmap_size(next_free_page));
+    extern line_index_t line_count;
+    checked_read("linemap", fd, line_bytemap, line_count);
+#endif
+    recompute_gen_bytes_allocated();
     print_generation_stats();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern void gc_init_immobile(),
@@ -1122,12 +1181,16 @@ int load_gc_crashdump(char* pathname)
 #endif
         checked_read(" stack", fd, stackptr, thread_preamble.control_stack_nbytes);
         checked_read(" bindings", fd, th->binding_stack_start, thread_preamble.binding_stack_nbytes);
-        // Skip over the initial words of the thread structure that was saved
-        // in the file, so that binding_stack_start remains as is in the
-        // newly allocated structure. The last word is the only one we want to keep.
-        int skip = sizeof dummy-N_WORD_BYTES;
-        checked_read(0, fd, &dummy, skip);
-        checked_read(" TLS", fd, &th->lisp_thread, preamble.tls_size-skip);
+        {
+        // Capture the 'struct thread' portion of TLS so that things like
+        // binding stack pointer, and prev,next links stay as they are,
+        // after copying them back. This way the visual display of number of bytes
+        // read comes out correctly
+        struct thread preserve;
+        memcpy(&preserve, th, sizeof *th);
+        checked_read(" TLS", fd, th, preamble.tls_size);
+        memcpy(th, &preserve, sizeof *th - N_WORD_BYTES);
+        }
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
         struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
         lispobj name = instance->_name;
@@ -1187,7 +1250,6 @@ int main(int argc, char *argv[], char **envp)
     }
     bool have_hardwired_spaces = os_preinit(argv, envp);
     allocate_lisp_dynamic_space(have_hardwired_spaces);
-    gc_init();
     load_gc_crashdump(argv[1]);
     calc_asm_routine_bounds();
     gencgc_verbose = 1;
