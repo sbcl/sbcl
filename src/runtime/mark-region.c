@@ -1176,14 +1176,6 @@ static void CPU_SPLIT raise_survivors(void) {
 /* Main entrypoints into GC */
 
 void mrgc_init() {
-#ifndef LISP_FEATURE_GCC_TLS
-  int ok = !pthread_key_create(&recycle_list_key, 0) &&
-    !pthread_key_create(&output_block_key, 0) &&
-    !pthread_key_create(&dirty_generation_source_key, 0) &&
-    !pthread_key_create(&dirty_key, 0) &&
-    !pthread_key_create(&source_object_key, 0);
-  gc_assert(ok);
-#endif
   allocate_bitmaps();
   thread_pool_init();
   compactor_init();
