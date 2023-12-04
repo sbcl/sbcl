@@ -96,10 +96,6 @@ struct crash_thread_preamble {
 const uword_t CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
-#include <errno.h>
-struct filewriter { long total; int fd; };
-
 static void maybe_show_contents(__attribute__((unused)) char *legend,
                                 __attribute__((unused)) void* buf,
                                 __attribute__((unused)) long nbytes)
@@ -114,6 +110,12 @@ static void maybe_show_contents(__attribute__((unused)) char *legend,
     putc('\n', stderr);
 #endif
 }
+
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
+#include <errno.h>
+struct filewriter { long total; int fd; };
+
+
 
 static void checked_write(char *section, struct filewriter* writer, void* buf, long nbytes)
 {
