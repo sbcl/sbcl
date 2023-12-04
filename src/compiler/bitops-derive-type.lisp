@@ -235,11 +235,18 @@
       (cond
        ((and (not x-neg) (not y-neg))
         ;; Both are positive.
-        (if (and x-len y-len)
-            (multiple-value-bind (low high)
-                (logior-derive-unsigned-bounds x y)
-              (specifier-type `(integer ,low ,high)))
-            (specifier-type `(unsigned-byte* *))))
+        (cond ((and x-len y-len)
+               (multiple-value-bind (low high)
+                   (logior-derive-unsigned-bounds x y)
+                 (specifier-type `(integer ,low ,high))))
+              (y-high
+               (specifier-type `(integer ,(logior-derive-unsigned-bounds (specifier-type `(integer 0 ,y-high))
+                                                                         y))))
+              (x-high
+               (specifier-type `(integer ,(logior-derive-unsigned-bounds x
+                                                                         (specifier-type `(integer 0 ,x-high))))))
+              (t
+               (specifier-type `unsigned-byte))))
        ((not x-pos)
         ;; X must be negative.
         (if (not y-pos)
