@@ -2832,7 +2832,7 @@
         do (let ((inst (svref insts i)))
              (cond ((range-labeled (first inst)) (return)) ; labeled statement - fail
                    ((and (eq (second inst) 'mov)
-                         (eq (third inst) #.(get-gpr :qword 0))
+                         (eq (third inst) (load-time-value (get-gpr :qword 0)))
                          (typep (fourth inst) '(cons machine-ea (eql :qword))))
                     (let ((ea (car (fourth inst))))
                       (when (and (eq (machine-ea-base ea) :rip)
