@@ -2777,36 +2777,50 @@
         (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
         (specifier-type 'unsigned-byte))))
 
-(defun %deposit-field-derive-type-aux (size posn int)
-  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
-        (posn-high (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
-        (int (lvar-type int)))
-    (multiple-value-bind (low high) (integer-type-numeric-bounds int)
-      (when (and size-high posn-high high low
-                 ;; KLUDGE: we need this cutoff here, otherwise we
-                 ;; will merrily derive the type of %DPB as
-                 ;; (UNSIGNED-BYTE 1073741822), and then attempt to
-                 ;; canonicalize this type to (INTEGER 0 (1- (ASH 1
-                 ;; 1073741822))), with hilarious consequences.  We
-                 ;; cutoff at 4*SB-VM:N-WORD-BITS to allow inference
-                 ;; over a reasonable amount of shifting, even on
-                 ;; the alpha/32 port, where N-WORD-BITS is 32 but
-                 ;; machine integers are 64-bits.  -- CSR,
-                 ;; 2003-09-12
-                 (<= (+ size-high posn-high) (* 4 sb-vm:n-word-bits)))
-        (let ((raw-bit-count (max (integer-length high)
-                                  (integer-length low)
-                                  (+ size-high posn-high))))
-          (specifier-type
-           (if (minusp low)
-               `(signed-byte ,(1+ raw-bit-count))
-               `(unsigned-byte* ,raw-bit-count))))))))
+(defun %deposit-field-derive-type-aux (new size posn int)
+  ;; (let ((mask (lognot (ash -1 size))))
+  ;;        (logior (ash (logand new mask) posn)
+  ;;                (logandc2 int (ash mask posn))))
+  (block nil
+    (let* ((minus-one (specifier-type '(eql -1)))
+           (mask
+             (or (one-arg-derive-type size
+                                      (lambda (x)
+                                        (lognot-derive-type-aux
+                                         (ash-derive-type-aux minus-one x nil)))
+                                      (lambda (x)
+                                        (lognot (ash -1 x))))
+                 (return)))
+           (mask-shifted
+             (or (%two-arg-derive-type mask (lvar-type posn)
+                                       #'ash-derive-type-aux #'ash)
+                 (return)))
+           (int
+             (or (%two-arg-derive-type (lvar-type int) mask-shifted
+                                       (lambda (int mask same)
+                                         (declare (ignore same))
+                                         (%two-arg-derive-type
+                                          int
+                                          (lognot-derive-type-aux mask)
+                                          #'logand-derive-type-aux
+                                          #'logand))
+                                       (lambda (int mask)
+                                         (logandc2 int mask)))
+                 (return)))
+           (new-masked (or (%two-arg-derive-type mask (lvar-type new)
+                                                 #'logand-derive-type-aux #'logand)
+                           (return)))
+           (new
+             (or (%two-arg-derive-type new-masked (lvar-type posn)
+                                       #'ash-derive-type-aux #'ash)
+                 (return))))
+      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
-  (%deposit-field-derive-type-aux size posn int))
+  (%deposit-field-derive-type-aux newbyte size posn int))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
-  (%deposit-field-derive-type-aux size posn int))
+  (%deposit-field-derive-type-aux newbyte size posn int))
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word :node node)
   "convert to inline logical operations"
