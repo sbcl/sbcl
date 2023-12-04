@@ -180,8 +180,8 @@
   '(or list symbol classoid class))
 
 ;;; array rank, total size...
-(sb-xc:deftype array-rank () `(integer 0 (,array-rank-limit)))
-(sb-xc:deftype array-total-size ()
+(sb-xc:deftype %array-rank () `(integer 0 (,array-rank-limit)))
+(sb-xc:deftype %array-total-size ()
   `(integer 0 (,array-total-size-limit)))
 
 ;;; The range returned by SXHASH and PSXHASH

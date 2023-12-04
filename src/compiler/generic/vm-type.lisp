@@ -27,10 +27,13 @@
 (sb-xc:deftype float-exponent ()
   #-long-float 'double-float-exponent
   #+long-float 'long-float-exponent)
-(sb-xc:deftype float-digits ()
+(sb-xc:deftype %float-digits ()
   #-long-float `(integer 0 ,sb-vm:double-float-digits)
   #+long-float `(integer 0 ,sb-vm:long-float-digits))
-(sb-xc:deftype float-radix () '(integer 2 2))
+
+;;; Better keep this type around just in case we want to port to a machine
+;;; that uses decimal or base 16.
+(sb-xc:deftype %float-radix () '(integer 2 2))
 (sb-xc:deftype float-int-exponent ()
   #-long-float 'double-float-int-exponent
   #+long-float 'long-float-int-exponent)

@@ -200,14 +200,14 @@
   (flushable))
 (defknown %set-array-dimension (array index index) (values)
   ())
-(defknown %array-rank (array) array-rank
+(defknown %array-rank (array) %array-rank
   (flushable))
 
 #+(or x86 x86-64 arm64)
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
-(defknown simple-array-header-of-rank-p (t array-rank) boolean
+(defknown simple-array-header-of-rank-p (t %array-rank) boolean
   (flushable))
 (defknown sb-kernel::check-array-shape (simple-array list)
   (simple-array)

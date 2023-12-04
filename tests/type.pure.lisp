@@ -842,7 +842,7 @@
             (sb-kernel:%simple-fun-type
              (checked-compile
               `(lambda (a) (array-rank (the (not (array t)) a))))))
-           `(values array-rank &optional))))
+           `(values (mod 129) &optional))))
 
 (with-test (:name (:rational-intersection :lp1998008))
   (flet ((bug101 ()

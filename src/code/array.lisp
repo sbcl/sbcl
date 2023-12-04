@@ -478,7 +478,7 @@
   (cond ((not (listp dims)) (values 1 (the index dims)))
         ((not dims) (values 0 1))
         (t (let ((rank 1) (product (car dims)))
-             (declare (array-rank rank) (index product))
+             (declare (%array-rank rank) (index product))
              (dolist (dim (cdr dims) (values rank product))
                (setq product (* product (the index dim)))
                (incf rank))))))

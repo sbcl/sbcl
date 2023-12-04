@@ -407,7 +407,7 @@
   (movable foldable unsafely-flushable))
 (defknown scale-float (float integer) float
   (movable foldable unsafely-flushable))
-(defknown float-radix (float) float-radix
+(defknown float-radix (float) sb-kernel::%float-radix
   (movable foldable unsafely-flushable))
 ;;; This says "unsafely flushable" as if to imply that there is a possibility
 ;;; of signaling a condition in safe code, but in practice we can never trap
@@ -429,7 +429,7 @@
                        (t
                         (specifier-type 'float)))))
 
-(defknown (float-digits float-precision) (float) float-digits
+(defknown (float-digits float-precision) (float) sb-kernel::%float-digits
   (movable foldable unsafely-flushable))
 (defknown integer-decode-float (float)
     (values double-float-significand float-int-exponent (member -1 1))
@@ -1213,19 +1213,19 @@
 
 (defknown array-element-type (array) (or list symbol)
   (foldable flushable))
-(defknown array-rank (array) array-rank (foldable flushable))
+(defknown array-rank (array) %array-rank (foldable flushable))
 ;; FIXME: there's a fencepost bug, but for all practical purposes our
 ;; ARRAY-RANK-LIMIT is infinite, thus masking the bug. e.g. if the
 ;; exclusive limit on rank were 8, then your dimension numbers can
 ;; be in the range 0 through 6, not 0 through 7.
-(defknown array-dimension (array array-rank) index (foldable flushable))
+(defknown array-dimension (array %array-rank) index (foldable flushable))
 (defknown array-dimensions (array) list (foldable flushable))
 (defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable)
   :call-type-deriver #'array-call-type-deriver)
-(defknown array-row-major-index (array &rest index) array-total-size
+(defknown array-row-major-index (array &rest index) sb-kernel::%array-total-size
   (foldable flushable)
   :call-type-deriver #'array-call-type-deriver)
-(defknown array-total-size (array) array-total-size (foldable flushable))
+(defknown array-total-size (array) sb-kernel::%array-total-size (foldable flushable))
 (defknown adjustable-array-p (array) boolean (movable foldable flushable))
 
 (defknown svref (simple-vector index) t (foldable flushable))
