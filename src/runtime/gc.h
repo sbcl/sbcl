@@ -129,7 +129,7 @@ extern lispobj *component_ptr_from_pc(char *pc);
 #define MEASURE_STOP_THE_WORLD_PAUSE
 #endif
 
-#ifdef LISP_FEATURE_64_BIT
+#ifdef LISP_FEATURE_X86_64
 #define GC_SAFEPOINT_PAGE_ADDR (void*)(gc_card_mark-BACKEND_PAGE_BYTES)
 #define GC_SAFEPOINT_TRAP_ADDR (void*)(gc_card_mark-8)
 #endif

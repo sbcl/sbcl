@@ -1040,7 +1040,7 @@ bool gc_allocate_ptes()
     num_gc_cards = 1L << gc_card_table_nbits;
 
     gc_card_table_mask =  num_gc_cards - 1;
-#if defined LISP_FEATURE_SB_SAFEPOINT && defined LISP_FEATURE_64_BIT
+#if defined LISP_FEATURE_SB_SAFEPOINT && defined LISP_FEATURE_X86_64
     /* The card table is hardware-page-aligned. Preceding it and occupying a whole
      * "backend page" - which by the way is overkill - is the global safepoint trap page.
      * The dummy TEST instruction for safepoints encodes shorter this way */

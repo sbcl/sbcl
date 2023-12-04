@@ -88,7 +88,7 @@
                            #-immobile-space (alien-linkage-table ,alien-linkage-table-space-size)
                            ;; safepoint on 64-bit uses a relocatable trap page just below the card mark
                            ;; table, which works nicely assuming a register is wired to the card table
-                           #+(and sb-safepoint (not 64-bit))
+                           #+(and sb-safepoint (not x86-64))
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
                            (static ,small-space-size)
