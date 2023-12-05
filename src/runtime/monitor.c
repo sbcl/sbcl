@@ -989,7 +989,6 @@ void gc_start_the_world() { } // do nothing
 struct lisp_startup_options lisp_startup_options;
 char gc_coalesce_string_literals;
 
-void unwind_binding_stack() { lose("Can't unwind binding stack"); }
 FILE *prepare_to_save(__attribute__((unused)) char *filename,
                       __attribute__((unused)) bool prepend_runtime,
                       __attribute__((unused)) void **runtime_bytes,

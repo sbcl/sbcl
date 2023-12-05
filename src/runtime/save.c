@@ -229,10 +229,9 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
-void unwind_binding_stack()
+static void unwind_binding_stack(struct thread* th)
 {
     bool verbose = !lisp_startup_options.noinform;
-    struct thread *th = all_threads;
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
@@ -561,34 +560,6 @@ prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes,
     return file;
 }
 
-#ifdef LISP_FEATURE_CHENEYGC
-bool save(char *filename, lispobj init_function, bool prepend_runtime,
-          bool save_runtime_options, bool compressed, int compression_level,
-          int application_type)
-{
-    FILE *file;
-    void *runtime_bytes = NULL;
-    size_t runtime_size;
-
-    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes, &runtime_size);
-    if (file == NULL)
-        return 1;
-
-    if (prepend_runtime)
-        save_runtime_to_filehandle(file, runtime_bytes, runtime_size, application_type);
-
-    /* This unwinding is necessary for proper restoration of the
-     * symbol-value slots to their toplevel values, but it occurs
-     * too late to remove old references from the binding stack.
-     * There's probably no safe way to do that from Lisp */
-    unwind_binding_stack();
-    os_unlink_runtime();
-    return save_to_filehandle(file, filename, init_function, prepend_runtime,
-                              save_runtime_options,
-                              compressed ? compressed : COMPRESSION_LEVEL_NONE);
-}
-#endif
-
 #include "incremental-compact.h"
 
 /* Things to do before doing a final GC before saving a core.
@@ -758,7 +729,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     pre_verify_gen_0 = 1;
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc();
-    unwind_binding_stack();
+    unwind_binding_stack(thread);
     // Avoid tenuring of otherwise-dead objects referenced by bindings which
     // disappear on image restart. This must occcur *after* unwind_binding_stack()
     // because unwinding moves values from the binding stack into TLS.

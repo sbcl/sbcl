@@ -17,8 +17,6 @@
 
 #define COMPRESSION_LEVEL_NONE INT_MIN
 
-void unwind_binding_stack(void);
-
 extern FILE *prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes, size_t *runtime_size);
 extern bool save_runtime_to_filehandle(FILE *output, void *runtime_bytes,
                                           size_t runtime_size, int application_type);
