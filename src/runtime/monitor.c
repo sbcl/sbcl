@@ -321,7 +321,9 @@ static int gc_and_save_cmd(char **ptr) {
         fprintf(stderr, "Need filename\n");
         return 0;
     }
+#ifdef LISP_FEATURE_SB_THREAD
     current_thread = all_threads;
+#endif
     extern void gc_and_save(char*,bool,bool,bool,bool,int,int);
     gc_and_save(name, 0, 0, 0, 0, 0, 0); // never returns
     return 0;
