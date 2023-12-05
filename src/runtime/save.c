@@ -571,7 +571,7 @@ prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes,
  * + Instances on unboxed pages need to have their layout pointer visited,
  *   so all pages have to be turned to boxed.
  */
-static void prepare_dynamic_space_for_final_gc()
+static void prepare_dynamic_space_for_final_gc(struct thread* thread)
 {
     page_index_t i;
 
@@ -616,7 +616,6 @@ static void prepare_dynamic_space_for_final_gc()
 #ifdef LISP_FEATURE_SB_THREAD
     // Avoid tenuring of otherwise-dead objects referenced by
     // dynamic bindings which disappear on image restart.
-    struct thread *thread = get_sb_vm_thread();
     char *start = (char*)&thread->lisp_thread;
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);
@@ -719,6 +718,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     struct thread *thread = get_sb_vm_thread();
     gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
+    pre_verify_gen_0 = 1;
 #ifdef LISP_FEATURE_MARK_REGION_GC
     /* Do a minor GC to instate allocation bitmap for new objects.
      * This is needed to make heap walking in move_rospace_to_dynamic
@@ -726,9 +726,8 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     collect_garbage(0);
 #endif
     move_rospace_to_dynamic(0);
-    pre_verify_gen_0 = 1;
     prepare_immobile_space_for_final_gc(); // once is enough
-    prepare_dynamic_space_for_final_gc();
+    prepare_dynamic_space_for_final_gc(thread);
     unwind_binding_stack(thread);
     // Avoid tenuring of otherwise-dead objects referenced by bindings which
     // disappear on image restart. This must occcur *after* unwind_binding_stack()
@@ -764,7 +763,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     collect_garbage(1+PSEUDO_STATIC_GENERATION);
     prepare_readonly_space(purify, 0);
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
-    prepare_dynamic_space_for_final_gc();
+    prepare_dynamic_space_for_final_gc(thread);
     save_lisp_gc_iteration = 2;
     gencgc_alloc_start_page = 0;
     collect_garbage(0);
