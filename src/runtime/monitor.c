@@ -306,6 +306,26 @@ static int save_cmd(char **ptr) {
 #endif
     return 0;
 }
+static int gc_and_save_cmd(char **ptr) {
+    /* The use-case for this is as follows: suppose you're testing a shiny new GC
+     * on a large Lisp application, but gc_and_save crashes 1 time in 10.
+     * How do you effectively debug that if merely getting to the point where you
+     * would run S-L-A-D takes significant time?  Just inject save_gc_crashdump()
+     * into every save at the top of prepare_to_save() or thereabouts, and run
+     * until you collect at least one crash dump. Then iterate on editing the
+     * runtime including the GC, and restarting 'ldb' on the saved state from a
+     * crashed run to try to isolate what went wrong without having to build up
+     * the Lisp heap again from scratch */
+    char *name  = parse_token(ptr);
+    if (!name) {
+        fprintf(stderr, "Need filename\n");
+        return 0;
+    }
+    current_thread = all_threads;
+    extern void gc_and_save(char*,bool,bool,bool,bool,int,int);
+    gc_and_save(name, 0, 0, 0, 0, 0, 0); // never returns
+    return 0;
+}
 void list_lisp_threads(int regions) {
     struct thread* th;
     fprintf(stderr, "(thread*,pthread,sb-vm:thread,name)\n");
@@ -451,6 +471,7 @@ static struct cmd {
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
     {"save", 0, save_cmd}, // snapshot heap to file ("best effort" though)
+    {"gc_and_save", 0, gc_and_save_cmd},
     {"threads", "List threads", threads_cmd},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     {"tlsfdump", 0, tlsf_cmd}, // (unsafely) dump TLSF structures
@@ -987,38 +1008,18 @@ void gc_start_the_world() { } // do nothing
 #include <errno.h>
 #include "core.h"
 struct lisp_startup_options lisp_startup_options;
-char gc_coalesce_string_literals;
-
-FILE *prepare_to_save(__attribute__((unused)) char *filename,
-                      __attribute__((unused)) bool prepend_runtime,
-                      __attribute__((unused)) void **runtime_bytes,
-                      __attribute__((unused)) size_t *runtime_size) {
-    lose("Can't prepare_to_save");
-}
-bool save_runtime_to_filehandle(__attribute__((unused)) FILE *output,
-                                __attribute__((unused)) void *runtime,
-                                __attribute__((unused)) size_t runtime_size,
-                                __attribute__((unused)) int application_type) {
-    lose("Can't save_runtime_to_filehandle");
-}
-bool save_to_filehandle(__attribute__((unused)) FILE *file,
-                        __attribute__((unused)) char *filename,
-                        __attribute__((unused)) lispobj init_function,
-                        __attribute__((unused)) bool make_executable,
-                        __attribute__((unused)) bool save_runtime_options,
-                        __attribute__((unused)) int core_compression_level) {
-    lose("Can't save_to_filehandle");
-}
 
 static size_t checked_read(char *section, int fd, void* buf, size_t n)
 {
     char label[8];
     if (read(fd, label, sizeof label) != 8 || strncmp(label, section, 8))
         lose("section messup: %.8s when expecting %s\n", label, section);
-    size_t result = read(fd, buf, n);
-    if (result != n) { lose("read failed, errno=%d", errno); }
-    fprintf(stderr, "%s: %zx bytes\n", section, n + sizeof label);
-    maybe_show_contents(section, buf, n);
+    if (n) {
+        size_t result = read(fd, buf, n);
+        if (result != n) { lose("read failed, errno=%d", errno); }
+        fprintf(stderr, "%s: %zx bytes\n", section, n + sizeof label);
+        maybe_show_contents(section, buf, n);
+    }
     return n + sizeof label;
 }
 
@@ -1071,8 +1072,9 @@ int load_gc_crashdump(char* pathname)
     // static + readonly
     checked_read("static", fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
-    if (preamble.readonly_nbytes) {
-        // READ_ONLY_SPACE_START = preamble.readonly_start;
+    if (!preamble.readonly_nbytes) {
+        checked_read("R/O", fd, 0, 0);
+    } else {
         void* actual =
             os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, 0, (char*)preamble.readonly_start,
                               ALIGN_UP(preamble.readonly_nbytes, 4096));
@@ -1193,10 +1195,13 @@ int load_gc_crashdump(char* pathname)
         memcpy(th, &preserve, sizeof *th - N_WORD_BYTES);
         }
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
-        struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
-        lispobj name = instance->_name;
-        char* cname = gc_managed_addr_p(name) && simple_base_string_p(name)
-                      ? vector_sap(name) : 0;
+        char* cname = "(no lisp thread)";
+        if (th->lisp_thread) {
+            struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+            lispobj name = instance->_name;
+            cname = gc_managed_addr_p(name) && simple_base_string_p(name)
+                    ? vector_sap(name) : 0;
+        }
         fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
                 th, (void*)thread_preamble.address,
                 (int)(thread_preamble.binding_stack_nbytes>>WORD_SHIFT),
@@ -1242,6 +1247,7 @@ int load_gc_crashdump(char* pathname)
     return 0;
 }
 
+char *sbcl_runtime;
 int main(int argc, char *argv[], char **envp)
 {
     extern void calc_asm_routine_bounds();

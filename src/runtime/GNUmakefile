@@ -98,7 +98,7 @@ endif
 
 targets: $(TARGET) $(OBJTARGET) $(LDB_TARGET) sbcl.mk
 
-LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o safepoint.o,$(OBJS))
+LDB_OBJS = $(filter-out main.o runtime.o monitor.o thread.o safepoint.o,$(OBJS))
 ldb: $(LIBSBCL)
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-thread.o thread.c
