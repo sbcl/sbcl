@@ -338,7 +338,18 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
      */
     int avail = (char*)region->end_addr - (char*)region->free_pointer;
     int min_keep = (page_type == PAGE_TYPE_CONS) ? 4*CONS_SIZE*N_WORD_BYTES : 128;
+    /* What's the point of a different filler for CONS? Well, once upon a time
+     * I figured that an ambiguous pointer having LIST-POINTER-LOWTAG could be excluded
+     * if it points to (uword_t)-1 because no valid cons can hold those bits in the CAR.
+     * However, mark-region always zero-fills unused lines, and so the compiler takes
+     * advantage of that by using a :DWORD operand when storing NIL to the CDR of a
+     * fresh cons. Since the two GCs have different behaviors here, as does the compiler,
+     * any unused ranges in an arenas must resemble an unused range in the heap */
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    int filler = 0;
+#else
     int filler = (page_type == PAGE_TYPE_CONS) ? 255 : 0;
+#endif
     /* Precondition: free space in the TLAB was not enough to satisfy the request.
      * We want to do exactly one claim_new_subrange operation. There are 2 cases:
      *

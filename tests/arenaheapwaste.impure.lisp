@@ -35,7 +35,8 @@
       (sb-thread:wait-on-semaphore (second semaphores) :n nthreads)
       (let* ((used-bytes (generation-bytes-allocated 0))
              (consumed-bytes
-              (* (alien-funcall (extern-alien "count_generation_pages" (function long char unsigned))
+              (* (alien-funcall (extern-alien "count_generation_pages"
+                                              (function long char unsigned))
                                 0 0)
                  sb-vm:gencgc-page-bytes))
              (waste-bytes (- consumed-bytes used-bytes))
@@ -48,7 +49,9 @@
     (mapc 'sb-thread:join-thread threads)
     (/ sum-fractional-waste niter)))
 
-(with-test (:name :waste-heap)
+(with-test (:name :waste-heap
+                  ;; don't have count_generation_pages()
+            :skipped-on :mark-region-gc)
   ;; Prior to the logic that picked up where we left off in the heap
   ;; it was easily demonstrated that the heap waste could rise to as much
   ;; as 70% before starting a GC.
@@ -74,6 +77,7 @@
 (gc :gen 2)
 (test-util:with-test (:name :huge-objects-scavenged-in-gc)
   (let ((cell (aref *biggy* 0)))
+    #-mark-region-gc ; cons doesn't move
     (assert (/= (sb-kernel:get-lisp-obj-address cell) *cons-address*))
     (assert (string= (car cell) "try"))
     (assert (string= (cadr cell) "this")))
