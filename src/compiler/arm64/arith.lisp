@@ -396,7 +396,6 @@
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 64) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 10
     (let* ((abs-y (abs y))
            (shift (1- (integer-length abs-y))))
