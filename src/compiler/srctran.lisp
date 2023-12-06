@@ -3776,6 +3776,33 @@
                             (- x (* quot ,y)))))
        (values quot rem))))
 
+;;; No-op when Y is greater than X
+(deftransform truncate ((x y) (rational rational) * :important nil)
+  (flet ((strip (x)
+           (if (consp x)
+               (car x)
+               x)))
+    (let* ((x-interval (or (type-approximate-interval (lvar-type x))
+                           (give-up-ir1-transform)))
+           (x-low (strip (interval-low x-interval)))
+           (x-high (strip (interval-high x-interval)))
+           (y-interval (or (type-approximate-interval (lvar-type y))
+                           (give-up-ir1-transform)))
+           (y-low (strip (interval-low y-interval)))
+           (y-high (strip (interval-high y-interval)))
+           (x-max (and x-low x-high
+                       (max (abs x-low) (abs x-high))))
+           (y-min (cond ((and y-low
+                              (> y-low 0))
+                         y-low)
+                        ((and y-high
+                              (< y-high 0))
+                         (abs y-high)))))
+      (if (and x-max y-min
+               (> y-min x-max))
+          `(values 0 x)
+          (give-up-ir1-transform)))))
+
 
 ;;;; arithmetic and logical identity operation elimination
 
