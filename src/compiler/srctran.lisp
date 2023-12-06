@@ -2777,9 +2777,9 @@
         (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
         (specifier-type 'unsigned-byte))))
 
-(defun %deposit-field-derive-type-aux (new size posn int)
+(defoptimizer (%dpb derive-type) ((newbyte size posn int))
   ;; (let ((mask (lognot (ash -1 size))))
-  ;;        (logior (ash (logand new mask) posn)
+  ;;        (logior (ash (logand newbyte mask) posn)
   ;;                (logandc2 int (ash mask posn))))
   (block nil
     (let* ((minus-one (specifier-type '(eql -1)))
@@ -2807,7 +2807,7 @@
                                        (lambda (int mask)
                                          (logandc2 int mask)))
                  (return)))
-           (new-masked (or (%two-arg-derive-type mask (lvar-type new)
+           (new-masked (or (%two-arg-derive-type mask (lvar-type newbyte)
                                                  #'logand-derive-type-aux #'logand)
                            (return)))
            (new
@@ -2816,11 +2816,39 @@
                  (return))))
       (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
 
-(defoptimizer (%dpb derive-type) ((newbyte size posn int))
-  (%deposit-field-derive-type-aux newbyte size posn int))
-
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
-  (%deposit-field-derive-type-aux newbyte size posn int))
+  ;; (let ((mask (ash (lognot (ash -1 size)) posn)))
+  ;;   (logior (logand newbyte mask)
+  ;;           (logandc2 int mask)))
+  (block nil
+    (let* ((minus-one (specifier-type '(eql -1)))
+           (mask
+             (or (two-arg-derive-type size posn
+                                      (lambda (size posn same)
+                                        (declare (ignore same))
+                                        (ash-derive-type-aux
+                                         (lognot-derive-type-aux
+                                          (ash-derive-type-aux minus-one size nil))
+                                         posn nil))
+                                      (lambda (x)
+                                        (lognot (ash -1 x))))
+                 (return)))
+           (int
+             (or (%two-arg-derive-type (lvar-type int) mask
+                                       (lambda (int mask same)
+                                         (declare (ignore same))
+                                         (%two-arg-derive-type
+                                          int
+                                          (lognot-derive-type-aux mask)
+                                          #'logand-derive-type-aux
+                                          #'logand))
+                                       (lambda (int mask)
+                                         (logandc2 int mask)))
+                 (return)))
+           (new (or (%two-arg-derive-type mask (lvar-type newbyte)
+                                          #'logand-derive-type-aux #'logand)
+                    (return))))
+      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word :node node)
   "convert to inline logical operations"

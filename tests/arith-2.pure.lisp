@@ -359,3 +359,10 @@
    ((-3) -1)
    ((2) 0)
    ((3) 1)))
+
+(with-test (:name :deposit-field-derive-type)
+  (assert-type
+   (lambda (s)
+     (declare ((member 8 10) s))
+     (deposit-field -21031455 (byte s 9) 1565832649825))
+   (or (integer 1565832320097 1565832320097) (integer 1565832713313 1565832713313))))
