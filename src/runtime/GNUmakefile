@@ -141,7 +141,7 @@ libsbcl.so: $(PIC_OBJS)
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
-		../../output/sbcl.core shrinkwrap-sbcl.s
+	--dynamic-space-size 256 ../../output/sbcl.core shrinkwrap-sbcl.s
 pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \
 		../../output/sbcl.core pie-shrinkwrap-sbcl.s

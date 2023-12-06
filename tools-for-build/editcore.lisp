@@ -1711,6 +1711,33 @@
                         (function void system-area-pointer unsigned))
           ,sap-var (* ,npages +backend-page-bytes+))))))
 
+(defun core-header-nwords (core-header &aux (sum 2))
+  ;; SUM starts as 2, as the core's magic number occupies 1 word
+  ;; and the ending tag of END-CORE-ENTRY-TYPE-CODE counts as 1.
+  (do-core-header-entry ((id len ptr) core-header)
+    ;; LEN as bound by the macro does not count 1 for the
+    ;; the entry identifier or LEN itself so add them in.
+    (incf sum (+ len 2)))
+  sum)
+
+(defun change-dynamic-space-size (core-header new-size) ; expressed in MiB
+  (unless new-size
+    (return-from change-dynamic-space-size core-header))
+  (let ((new (copy-seq core-header)))
+    ;; memsize options if present must immediately follow the core magic number
+    ;; so it might require a byte-blt to move other entries over.
+    (unless (= (%vector-raw-bits new 1) runtime-options-magic)
+      ;; slide the header to right by 5 words
+      (replace new core-header :start1 (* 6 n-word-bytes) :start2 (* 1 n-word-bytes))
+      ;; see write_memsize_options for the format of this entry
+      ;; All words have to be stored since we're creating it from nothing.
+      (setf (%vector-raw-bits new 1) runtime-options-magic
+            (%vector-raw-bits new 2) 5 ; number of words in this entry
+            (%vector-raw-bits new 4) (extern-alien "thread_control_stack_size" unsigned)
+            (%vector-raw-bits new 5) (extern-alien "dynamic_values_bytes" (unsigned 32))))
+    (setf (%vector-raw-bits new 3) (* new-size 1024 1024))
+    new))
+
 ;;; Given a native SBCL '.core' file, or one attached to the end of an executable,
 ;;; separate it into pieces.
 ;;; ASM-PATHNAME is the name of the assembler file that will hold all the Lisp code.
@@ -1720,7 +1747,7 @@
 ;;; is for linking in to a binary that needs no "--core" argument.
 (defun split-core
     (input-pathname asm-pathname
-     &key enable-pie (verbose nil)
+     &key enable-pie (verbose nil) dynamic-space-size
      &aux (elf-core-pathname
            (merge-pathnames
             (make-pathname :name (concatenate 'string (pathname-name asm-pathname) "-core")
@@ -1847,6 +1874,12 @@
           (with-open-file (output elf-core-pathname
                                   :direction :output :if-exists :supersede
                                   :element-type '(unsigned-byte 8))
+            ;; If we're going to write memory size options and they weren't already
+            ;; present, then it will be inserted after the core magic,
+            ;; and the rest of the header moves over by 5 words.
+            (when (and dynamic-space-size
+                       (/= (%vector-raw-bits core-header 1) runtime-options-magic))
+              (incf code-start-fixup-ofs 5))
             (unless enable-pie
               ;; This fixup sets the 'address' field of the core directory entry
               ;; for code space. If PIE-enabled, we'll figure it out in the C code
@@ -1857,10 +1890,11 @@
                             +backend-page-bytes+ ; core header
                             pte-nbytes)
                          relocs output enable-pie)
-            ;; This word will be fixed up by the system linker for non-PIE.
-            (setf (%vector-raw-bits core-header code-start-fixup-ofs)
-                  (if enable-pie +code-space-nominal-address+ 0))
-            (write-sequence core-header output) ; Copy prepared header
+            (let ((new-header (change-dynamic-space-size core-header dynamic-space-size)))
+              ;; This word will be fixed up by the system linker
+              (setf (%vector-raw-bits new-header code-start-fixup-ofs)
+                    (if enable-pie +code-space-nominal-address+ 0))
+              (write-sequence new-header output))
             (force-output output)
             ;; ELF cores created from #-immobile-space cores use +required-foreign-symbols+.
             ;; But if #+immobile-space the alien-linkage-table values are computed
@@ -2081,8 +2115,6 @@
            (pte (aref (space-page-table space) first-page))
            (start-vaddr (page-addr first-page space))
            (end-vaddr (+ (page-addr last-page space) (page-bytes-used last-page ptes))))
-      (format t "~&Page ~4d..~4d ~X ~X ~S~%" first-page last-page start-vaddr end-vaddr
-              (decode-page-type (page-type pte)))
       (when (and (plusp (page-type pte))
                  (or (null page-type) (eq page-type (decode-page-type (page-type pte)))))
         ;; Because gencgc has page-spanning objects, it's easiest to zero-fill later
@@ -2383,10 +2415,6 @@
 
 (defun rewrite-core (directory spacemap card-mask-nbits initfun core-header offset output
                      &aux (dynamic-space (get-space dynamic-core-space-id spacemap)))
-  ;;(format t "~&Header dump: (offs=~D)~%" offset)
-  ;;(dotimes (i 50)
-  ;;  (format t "~2d = ~16x~%" i (%vector-raw-bits core-header i)))
-  ;;(terpri)
   (aver (= (%vector-raw-bits core-header offset) directory-core-entry-type-code))
   (let ((nwords (+ (* (length directory) 5) 2)))
     (setf (%vector-raw-bits core-header (incf offset)) nwords))
@@ -2606,14 +2634,18 @@
 (defun cl-user::elfinate (&optional (args (cdr *posix-argv*)))
   (cond ((string= (car args) "split")
          (pop args)
-         (let (pie)
+         (let (pie dss)
            (loop (cond ((string= (car args) "--pie")
                         (setq pie t)
                         (pop args))
+                       ((string= (car args) "--dynamic-space-size")
+                        (pop args)
+                        (setq dss (parse-integer (pop args))))
                        (t
                         (return))))
            (destructuring-bind (input asm) args
-             (split-core input asm :enable-pie pie))))
+             (split-core input asm :enable-pie pie
+                                   :dynamic-space-size dss))))
         ((string= (car args) "copy")
          (apply #'copy-to-elf-obj (cdr args)))
         ((string= (car args) "extract")
