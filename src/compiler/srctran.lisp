@@ -3694,7 +3694,8 @@
                          *
                          :policy (and (> speed compilation-speed)
                                       (> speed space))
-                         :node node)
+                         :node node
+                         :important nil)
    "convert integer division to multiplication"
    (delay-ir1-transform node :ir1-phases)
    (let* ((y      (lvar-value y))
@@ -3757,7 +3758,8 @@
                         *
                         :policy (and (> speed compilation-speed)
                                      (> speed space))
-                        :node node)
+                        :node node
+                        :important nil)
   "convert integer division to multiplication"
   (delay-ir1-transform node :ir1-phases)
   (let* ((y      (lvar-value y))
