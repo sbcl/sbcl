@@ -348,3 +348,14 @@
      (values
       (truncate (truncate (rem c -89) -16) 20)))
    (or (integer 0 0))))
+
+(with-test (:name :rem^2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (fixnum a))
+      (rem a 2))
+   ((-2) 0)
+   ((-3) -1)
+   ((2) 0)
+   ((3) 1)))
