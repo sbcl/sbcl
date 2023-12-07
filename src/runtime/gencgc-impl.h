@@ -477,9 +477,9 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
 #define NON_FAULTING_STORE(operation, addr) { \
   page_index_t page_index = find_page_index(addr); \
   if (page_index < 0 || !PAGE_WRITEPROTECTED_P(page_index)) { operation; } \
-  else { os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL); \
+  else { os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_ALL); \
          operation; \
-         os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ); } }
+         os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_READ); } }
 
 /* This is used by the fault handler, and potentially during GC
  * if we need to remember that a pointer store occurred.
@@ -489,7 +489,7 @@ static inline void unprotect_page(void* addr, unsigned char mark)
 {
     // No atomic op needed for a 1-byte store.
     gc_card_mark[addr_to_card_index(addr)] = mark;
-    os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL);
+    os_protect(PAGE_BASE(addr), GENCGC_PAGE_BYTES, OS_VM_PROT_ALL);
 }
 #endif
 

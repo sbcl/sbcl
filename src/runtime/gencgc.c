@@ -2203,7 +2203,7 @@ static bool ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
 static inline void protect_page(void* page_addr)
 {
-    os_protect((void *)page_addr, GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ);
+    os_protect((void *)page_addr, GENCGC_PAGE_BYTES, OS_VM_PROT_READ);
     gc_card_mark[addr_to_card_index(page_addr)] = CARD_UNMARKED;
 }
 #endif
@@ -2801,9 +2801,6 @@ static void
 unprotect_oldspace(void)
 {
     page_index_t i;
-    char *region_addr = 0;
-    __attribute__((unused)) char *page_addr = 0;
-    uword_t region_bytes = 0;
 
     /* Gen0 never has protection applied, so we can usually skip the un-protect step,
      * however, in the final GC, because everything got moved to gen0 by brute force
@@ -2811,8 +2808,8 @@ unprotect_oldspace(void)
      * Therefore only skip out if NOT in the final GC */
     if (conservative_stack && from_space == 0) return;
 
-    for (i = 0; i < next_free_page; i++) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    for (i = 0; i < next_free_page; i++)
         /* Why does this even matter? Obviously it did for physical protection
          * (storing the forwarding pointers shouldn't fault)
          * but there's no physical protection, so ... why bother?
@@ -2820,6 +2817,10 @@ unprotect_oldspace(void)
         if (page_words_used(i) && page_table[i].gen == from_space)
             assign_page_card_marks(i, CARD_MARKED);
 #else
+    char *page_addr = 0;
+    char *region_addr = 0;
+    uword_t region_bytes = 0;
+    for (i = 0; i < next_free_page; i++) {
         if ((page_words_used(i) != 0)
             && (page_table[i].gen == from_space)) {
 
@@ -2838,7 +2839,7 @@ unprotect_oldspace(void)
                         region_bytes += GENCGC_PAGE_BYTES;
                     } else {
                         /* Unprotect previous region. */
-                        os_protect(region_addr, region_bytes, OS_VM_PROT_JIT_ALL);
+                        os_protect(region_addr, region_bytes, OS_VM_PROT_ALL);
                         /* First page in new region. */
                         region_addr = page_addr;
                         region_bytes = GENCGC_PAGE_BYTES;
@@ -2846,12 +2847,12 @@ unprotect_oldspace(void)
                 }
             }
         }
-#endif
     }
     if (region_addr) {
         /* Unprotect last region. */
-        os_protect(region_addr, region_bytes, OS_VM_PROT_JIT_ALL);
+        os_protect(region_addr, region_bytes, OS_VM_PROT_ALL);
     }
+#endif
 }
 
 /* Work through all the pages and free any in from_space.
@@ -2972,7 +2973,7 @@ write_protect_generation_pages(generation_index_t generation)
         }
 
         n_hw_prot += end - start;
-        os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_JIT_READ);
+        os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_READ);
 
         start = end;
     }

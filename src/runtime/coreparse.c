@@ -1231,8 +1231,14 @@ void gc_load_corefile_ptes(int card_table_nbits,
         gengcbarrier_patch_code_range(TEXT_SPACE_START, text_space_highwatermark);
     }
 
-    // Apply physical page protection as needed.
-    // The non-soft-card-mark code is disgusting and I do not understand it.
+    // Toggle page protection bits as needed. There are essentially two major cases:
+    // - when soft card marking is used, all cards are "clean" but since that's
+    //   not the default state of the mark bit, we have to set it.
+    //   Additionally, with darwin-jit the mapping type on on pages of code
+    //   needs to change from 'rw-' to 'rwx'
+    // - when MMU-based marking is used, then all pages except code get
+    //   mprotected; but code pages writes are tracked with soft marking.
+
     if (gen != 0 && ENABLE_PAGE_PROTECTION) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         page_index_t p;
@@ -1258,26 +1264,16 @@ void gc_load_corefile_ptes(int card_table_nbits,
 #else
         // coreparse can avoid hundreds to thousands of mprotect() calls by
         // treating the whole range from the corefile as protectable, except
-        // that soft-marked code pages must NOT be subject to mprotect.
-        // So just watch out for empty pages and code.  Unboxed object pages
-        // will get unprotected on demand.
+        // that code pages must NOT be subject to mprotect.
+        // So just watch out for empty pages and code.
+        // Unboxed pages do not technically need to be mprotected since we don't
+        // need to track writes, but they are lumped in with other pages for simplicity
+        // of this loop. Optimistically assume that doing so won't cause too many
+        // extra page faults if the unboxed pages do get written.
 #define non_protectable_page_p(x) !page_words_used(x) || is_code(page_table[x].type)
         page_index_t start = 0, end;
         // cf. write_protect_generation_pages()
         while (start  < next_free_page) {
-#ifdef LISP_FEATURE_DARWIN_JIT
-            if(is_code(page_table[start].type)) {
-              SET_PAGE_PROTECTED(start,1);
-                for (end = start + 1; end < next_free_page; end++) {
-                    if (!page_words_used(end) || !is_code(page_table[end].type))
-                        break;
-                    SET_PAGE_PROTECTED(end,1);
-                }
-                os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_ALL);
-                start = end+1;
-                continue;
-            }
-#endif
             if (non_protectable_page_p(start)) {
                 ++start;
                 continue;
@@ -1288,7 +1284,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
                     break;
                 SET_PAGE_PROTECTED(end,1);
             }
-            os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_JIT_READ);
+            os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_READ);
             start = end;
         }
 #endif
