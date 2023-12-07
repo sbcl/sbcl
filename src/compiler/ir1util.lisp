@@ -119,7 +119,7 @@
                           (recurse (lambda-var-ref-lvar use) use))
                          ((and casts
                                (cast-p use))
-                          (recurse (cast-value use) nil))
+                          (recurse (cast-value use) ref))
                          (t
                           ref)))
                  ref)))
@@ -537,6 +537,7 @@
                                    (lvar-fun-is (combination-fun allocator) '(list* list
                                                                               %make-structure-instance
                                                                               %make-instance
+                                                                              %make-instance/mixed
                                                                               %make-funcallable-instance
                                                                               copy-structure))
                                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
