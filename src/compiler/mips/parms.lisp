@@ -21,7 +21,6 @@
 (defconstant gencgc-page-bytes 8192)
 (defconstant cards-per-page 8)
 (defconstant gencgc-alloc-granularity 0)
-(defconstant gencgc-release-granularity +backend-page-bytes+)
 
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)

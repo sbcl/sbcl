@@ -842,11 +842,6 @@ void os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
     if (len) gc_assert(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
-void os_decommit_mem(os_vm_address_t addr,  os_vm_size_t len) {
-    gc_assert(gc_active_p);
-    gc_assert(VirtualFree(addr, len, MEM_DECOMMIT));
-}
-
 /*
  * load_core_bytes() is called to load a chunk of the core file into memory.
  *

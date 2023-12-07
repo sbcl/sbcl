@@ -3069,11 +3069,10 @@ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/zero-oopsla-
  * of zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
  */
+#ifndef LISP_FEATURE_WIN32
 static void __attribute__((unused))
 zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
-#ifdef LISP_FEATURE_WIN32
-    os_decommit_mem(addr, length);
-#elif defined LISP_FEATURE_LINUX
+#ifdef LISP_FEATURE_LINUX
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
     // from a file that backs the range. BSD takes it as a hint that you don't
@@ -3105,6 +3104,7 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
     }
 #endif
 }
+#endif
 
 /* Zero the pages from START to END (inclusive). Generally done just after
  * a new region has been allocated.
@@ -3175,9 +3175,6 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
 #endif
 }
 
-extern os_vm_size_t gencgc_release_granularity;
-os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
-
 /*
  * Supposing the OS can only operate on ranges of a certain granularity
  * (which we call 'gencgc_release_granularity'), then given any page rage,
@@ -3189,8 +3186,10 @@ os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
  * perform three operations: unmap/remap, fill before, fill after.
  * Otherwise, just one operation to fill the whole range.
  */
+#ifndef LISP_FEATURE_WIN32
+const os_vm_size_t gencgc_release_granularity = BACKEND_PAGE_BYTES;
 static void
-remap_page_range (page_index_t from, page_index_t to)
+release_page_range (page_index_t from, page_index_t to)
 {
     /* There's a mysterious Solaris/x86 problem with using mmap
      * tricks for memory zeroing. See sbcl-devel thread
@@ -3225,6 +3224,7 @@ remap_page_range (page_index_t from, page_index_t to)
     page_index_t i;
     for (i = from; i <= to; i++) set_page_need_to_zero(i, 0);
 }
+#endif
 
 void remap_free_pages (page_index_t from, page_index_t to)
 {
@@ -3240,7 +3240,12 @@ void remap_free_pages (page_index_t from, page_index_t to)
                (page_need_to_zero(last_page)))
             last_page++;
 
-        remap_page_range(first_page, last_page-1);
+#ifdef LISP_FEATURE_WIN32
+        gc_assert(VirtualFree(page_address(first_page), npage_bytes(last_page-first_page),
+                              MEM_DECOMMIT));
+#else
+        release_page_range(first_page, last_page-1);
+#endif
 
         first_page = last_page;
     }
