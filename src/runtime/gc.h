@@ -137,4 +137,11 @@ void remap_free_pages(page_index_t,page_index_t);
 void page_remap_as_type(int,void*,sword_t);
 extern lispobj *dynamic_space_code_from_pc(char *pc);
 
+#ifdef TRACE_MMAP_SYSCALLS
+extern void set_page_type_impl(struct page*, int newval);
+#define set_page_type(pte, newval) set_page_type_impl(&(pte), newval)
+#else
+#define set_page_type(pte, newval) pte.type = newval
+#endif
+
 #endif /* _GC_H_ */

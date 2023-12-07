@@ -246,7 +246,7 @@ bool try_allocate_small_from_pages(sword_t nbytes, struct alloc_region *region,
       if (page_type == PAGE_TYPE_CODE && !page_words_used(where))
           page_remap_as_type(PAGE_TYPE_CODE, page_address(where), GENCGC_PAGE_BYTES);
 #endif
-      page_table[where].type = page_type | OPEN_REGION_PAGE_FLAG;
+      set_page_type(page_table[where], page_type | OPEN_REGION_PAGE_FLAG);
       page_table[where].gen = 0;
       set_page_scan_start_offset(where, 0);
       start->page = where + 1;
@@ -299,7 +299,7 @@ page_index_t try_allocate_large(uword_t nbytes,
             zeroize_pages_if_needed(chunk_start, last_page, page_type);
 #endif
       for (page_index_t p = chunk_start; p <= last_page; p++) {
-        page_table[p].type = SINGLE_OBJECT_FLAG | page_type;
+        set_page_type(page_table[p], SINGLE_OBJECT_FLAG | page_type);
         page_table[p].gen = gen;
         set_page_bytes_used(p,
                             (p == last_page && remainder > 0) ? remainder
@@ -884,7 +884,7 @@ static void __attribute__((noinline)) sweep_pages() {
 #endif
       /* Why is reset_page_flags(p) much slower here? It does other stuff
        * for gencgc, sure, but not that much more stuff. */
-      page_table[p].type = FREE_PAGE_FLAG;
+      set_page_type(page_table[p], FREE_PAGE_FLAG);
       page_table[p].scan_start_offset_ = 0;
     } else {
       bytes_allocated += page_bytes_used(p);

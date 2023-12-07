@@ -27,6 +27,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/split-ordered-list.h"
 #include "thread.h"
+#include "sys_mmap.inc"
 
 /* forward declarations */
 extern FILE *gc_activitylog();
@@ -107,7 +108,7 @@ void reset_page_flags(page_index_t page) {
     // This avoids any affect of pthread_jit_write_protect_np when next used.
     if (is_code(page_table[page].type)) set_page_need_to_zero(page, 1);
 #endif
-    page_table[page].type = 0;
+    set_page_type(page_table[page], FREE_PAGE_FLAG);
     gc_page_pins[page] = 0;
 }
 
@@ -1295,9 +1296,9 @@ void page_remap_as_type(int type, void* base, sword_t length)
     os_deallocate(base, length);
     void* new_addr;
     if (type == PAGE_TYPE_CODE) {
-        new_addr = mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+        new_addr = sbcl_mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
     } else {
-        new_addr = mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        new_addr = sbcl_mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
     }
     if (new_addr != base)
         lose("remap: page moved, %p ==> %p", base, new_addr);

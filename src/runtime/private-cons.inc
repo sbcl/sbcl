@@ -92,7 +92,7 @@ static struct cons* private_cons_impl()
         gc_assert(last_page == page);
 #endif
         page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
-        page_table[page].type = PAGE_TYPE_UNBOXED;
+        set_page_type(page_table[page], PAGE_TYPE_UNBOXED);
 #ifdef LISP_FEATURE_DARWIN_JIT
         // UNBOXED pages do not generally required zero-fill.
         // arm64+Darwin might perform zeroing to alter MMU-based protection.

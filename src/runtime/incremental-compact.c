@@ -193,7 +193,7 @@ static void move_objects() {
 #ifdef LISP_FEATURE_DARWIN_JIT
         reset_page_flags(p);
 #else
-        page_table[p].type = FREE_PAGE_FLAG;
+        set_page_type(page_table[p], FREE_PAGE_FLAG);
         page_table[p].scan_start_offset_ = 0;
 #endif
       }

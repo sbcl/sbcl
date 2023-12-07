@@ -107,7 +107,7 @@ os_deallocate(os_vm_address_t addr, os_vm_size_t len)
 #ifdef LISP_FEATURE_WIN32
     gc_assert(VirtualFree(addr, 0, MEM_RELEASE));
 #else
-    if (munmap(addr, len) == -1) perror("munmap");
+    if (sbcl_munmap(addr, len) == -1) perror("munmap");
 #endif
 }
 #endif
@@ -404,6 +404,17 @@ char *copied_string(char *string)
     return strcpy(successful_malloc(1+strlen(string)), string);
 }
 
+lispobj* duplicate_codeblob_offheap(lispobj code)
+{
+    int nwords = code_total_nwords((struct code*)(code-OTHER_POINTER_LOWTAG));
+    lispobj* mem = malloc((nwords+1) * N_WORD_BYTES);
+    if ((uword_t)mem & LOWTAG_MASK) lose("this is unexpected\n");
+    // add 1 word if not dualword aligned
+    lispobj* copy = (lispobj*)((uword_t)mem + ((uword_t)mem & N_WORD_BYTES));
+    memcpy(copy, (char*)code-OTHER_POINTER_LOWTAG, nwords<<WORD_SHIFT);
+    return mem;
+}
+
 #ifdef LISP_FEATURE_UNIX
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
@@ -413,7 +424,7 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     if (find_page_index(address) >= 0)
         lose("unexpected call to os_protect with software card marks");
 #endif
-    if (mprotect(address, length, prot) < 0) {
+    if (sbcl_mprotect(address, length, prot) < 0) {
 #ifdef LISP_FEATURE_LINUX
         if (errno == ENOMEM) {
             lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
@@ -428,18 +439,9 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 }
 #endif
 
-lispobj* duplicate_codeblob_offheap(lispobj code)
-{
-    int nwords = code_total_nwords((struct code*)(code-OTHER_POINTER_LOWTAG));
-    lispobj* mem = malloc((nwords+1) * N_WORD_BYTES);
-    if ((uword_t)mem & LOWTAG_MASK) lose("this is unexpected\n");
-    // add 1 word if not dualword aligned
-    lispobj* copy = (lispobj*)((uword_t)mem + ((uword_t)mem & N_WORD_BYTES));
-    memcpy(copy, (char*)code-OTHER_POINTER_LOWTAG, nwords<<WORD_SHIFT);
-    return mem;
-}
-
-#if 0 // interceptors for debugging so I don't have to reinvent them every time
+#ifdef TRACE_MMAP_SYSCALLS
+FILE* mmgr_debug_logfile;
+// interceptors for debugging so I don't have to reinvent them every time
 static void decode_protbits(int prot, char result[4]) {
     result[0] = (prot & PROT_READ) ? 'r' : '-';
     result[1] = (prot & PROT_WRITE) ? 'w' : '-';
@@ -457,25 +459,25 @@ static void decode_flagbits(int flags, char result[40]) {
 #undef APPEND
     strcpy(p, "}");
 }
-void* sbcl_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
+void* traced_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
     char decoded_prot[4], decoded_flags[40];
     decode_protbits(prot, decoded_prot);
     decode_flagbits(flags, decoded_flags);
     void* result = mmap(addr, length, prot, flags, fd, offset);
-    fprintf(stderr, "mmap(%p,%lx,%s,%s,%d,%llx)=%p\n", addr, length,
+    fprintf(mmgr_debug_logfile, "mmap(%p,%lx,%s,%s,%d,%llx)=%p\n", addr, length,
             decoded_prot, decoded_flags, fd, offset, result);
     return result;
 }
-int sbcl_munmap(void* addr, size_t length) {
+int traced_munmap(void* addr, size_t length) {
     int result = munmap(addr, length);
-    fprintf(stderr, "munmap(%p,%lx)=%d\n", addr, length, result);
+    fprintf(mmgr_debug_logfile, "munmap(%p,%lx)=%d\n", addr, length, result);
     return result;
 }
 int sbcl_mprotect(void* addr, size_t length, int prot) {
     char decoded_prot[4];
     decode_protbits(prot, decoded_prot);
     int result = mprotect(addr, length, prot);
-    fprintf(stderr, "mprotect(%p,%lx,%s)=%d\n", addr, length, decoded_prot, result);
+    fprintf(mmgr_debug_logfile, "mprotect(%p,%lx,%s)=%d\n", addr, length, decoded_prot, result);
     return result;
 }
 #endif

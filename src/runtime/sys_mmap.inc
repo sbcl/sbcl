@@ -1,6 +1,15 @@
 /* -*- Mode: C -*- */
 
-#ifdef LISP_FEATURE_USE_SYS_MMAP
+#ifdef TRACE_MMAP_SYSCALLS
+
+#define sbcl_mmap traced_mmap
+#define sbcl_munmap traced_munmap
+#define sbcl_mprotect traced_mprotect
+void* traced_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+int traced_munmap(void *addr, size_t len);
+int traced_mprotect(void *addr, size_t len, int prot);
+
+#elif defined LISP_FEATURE_USE_SYS_MMAP
 
 ///
 ///                **********************************
@@ -32,9 +41,12 @@ static inline int sbcl_munmap(void* addr, size_t length) {
     return syscall(__NR_munmap, addr, length);
 }
 
+#define sbcl_mprotect mprotect
+
 #else
 
 #define sbcl_mmap mmap
 #define sbcl_munmap munmap
+#define sbcl_mprotect mprotect
 
 #endif

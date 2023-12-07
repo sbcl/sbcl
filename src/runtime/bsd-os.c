@@ -42,6 +42,7 @@
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
 #include "gc.h"
+#include "sys_mmap.inc"
 
 
 
@@ -230,7 +231,7 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
 #endif
     {
         os_vm_address_t requested = addr;
-        addr = mmap(addr, len, protection, flags, -1, 0);
+        addr = sbcl_mmap(addr, len, protection, flags, -1, 0);
         if (requested && requested != addr && !(attributes & MOVABLE)) {
             return 0;
         }

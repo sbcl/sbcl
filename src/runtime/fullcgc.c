@@ -49,7 +49,7 @@ static void* get_free_page() {
     --free_page;
     if (free_page < next_free_page)
         lose("Needed more space to GC");
-    page_table[free_page].type = PAGE_TYPE_UNBOXED;
+    set_page_type(page_table[free_page], PAGE_TYPE_UNBOXED);
     char* mem = page_address(free_page);
 #ifdef LISP_FEATURE_DARWIN_JIT
     // Might need to alter MMU-based protection
@@ -456,7 +456,7 @@ void dispose_markbits() {
         gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
         gc_assert(!page_bytes_used(page));
         set_page_need_to_zero(page, 1);
-        page_table[page].type = FREE_PAGE_FLAG;
+        set_page_type(page_table[page], FREE_PAGE_FLAG);
       }
 }
 

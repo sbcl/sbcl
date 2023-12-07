@@ -148,7 +148,7 @@ void reset_page_flags(page_index_t page) {
     // This avoids any affect of pthread_jit_write_protect_np when next used.
     if (page_table[page].type == PAGE_TYPE_CODE) set_page_need_to_zero(page, 1);
 #endif
-    page_table[page].type = 0;
+    set_page_type(page_table[page], FREE_PAGE_FLAG);
     gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
@@ -487,7 +487,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
                       et_find_freeish_page);
         if (page+1 > next_free_page) next_free_page = page+1;
         page_table[page].gen = gc_alloc_generation;
-        page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
+        set_page_type(page_table[page], OPEN_REGION_PAGE_FLAG | page_type);
 #ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
@@ -536,11 +536,11 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     } else {
         page_table[first_page].gen = gc_alloc_generation;
     }
-    page_table[first_page].type = OPEN_REGION_PAGE_FLAG | page_type;
+    set_page_type(page_table[first_page], OPEN_REGION_PAGE_FLAG | page_type);
 
     page_index_t i;
     for (i = first_page+1; i <= last_page; i++) {
-        page_table[i].type = OPEN_REGION_PAGE_FLAG | page_type;
+        set_page_type(page_table[i], OPEN_REGION_PAGE_FLAG | page_type);
         page_table[i].gen = gc_alloc_generation;
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
@@ -802,7 +802,7 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     for (page = first_page; page <= last_page; ++page) {
         /* Large objects don't share pages with other objects. */
         gc_assert(page_words_used(page) == 0);
-        page_table[page].type = SINGLE_OBJECT_FLAG | page_type;
+        set_page_type(page_table[page], SINGLE_OBJECT_FLAG | page_type);
         page_table[page].gen = gc_alloc_generation;
     }
 
@@ -1116,7 +1116,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
                 page_table[page].gen = new_gen;
         } else {
             for (page = first_page; page <= final_page; ++page) {
-                page_table[page].type = new_allocated;
+                set_page_type(page_table[page], new_allocated);
                 page_table[page].gen = new_gen;
             }
         }
@@ -1130,7 +1130,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         gc_assert(page_table[page].gen == from_space); \
         gc_assert(page_scan_start_offset(page) == npage_bytes(page-first_page)); \
         page_table[page].gen = new_gen; \
-        page_table[page].type = new_allocated
+        set_page_type(page_table[page], new_allocated)
 
     gc_assert(page_starts_contiguous_block_p(first_page));
     page_index_t page = first_page;

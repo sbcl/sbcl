@@ -1440,6 +1440,17 @@ void finalizer_thread_stop () {
 }
 #endif
 
+#ifdef TRACE_MMAP_SYSCALLS
+FILE* mmgr_debug_logfile;
+void set_page_type_impl(struct page* pte, int newval)
+{
+    if (newval != pte->type) /* too "noisy" without this pre-test */
+        fprintf(mmgr_debug_logfile, "pg @ %p : was %x is %x\n",
+                page_address(pte-page_table), pte->type, newval);
+    pte->type = newval;
+}
+#endif
+
 void gc_common_init()
 {
 #ifdef LISP_FEATURE_WIN32
