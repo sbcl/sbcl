@@ -536,6 +536,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 (declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
          (type (member :immobile :dynamic) *compile-file-to-memory-space*))
 (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
+(export '*compile-file-to-memory-space*) ; silly user code looks at, even if no immobile-space
 (defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
 
 #-immobile-code
