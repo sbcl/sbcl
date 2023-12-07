@@ -537,7 +537,8 @@
                                    (lvar-fun-is (combination-fun allocator) '(list* list
                                                                               %make-structure-instance
                                                                               %make-instance
-                                                                              %make-funcallable-instance))
+                                                                              %make-funcallable-instance
+                                                                              copy-structure))
                                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
                                         (let ((allocator (principal-lvar-ref-use
                                                           (principal-lvar (first (combination-args allocator))))))
