@@ -652,20 +652,31 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     /* Check early to see if this executable has an embedded core,
      * which also populates runtime_options if the core has runtime
      * options */
-    if (!(sbcl_runtime = os_get_runtime_executable_path()))
-        sbcl_runtime = search_for_executable(argv[0]);
+    sbcl_runtime = os_get_runtime_executable_path();
+    if (sbcl_runtime) {
+        os_vm_offset_t offset = search_for_embedded_core(sbcl_runtime, &memsize_options);
+        if (offset != -1) {
+            core = sbcl_runtime;
+            embedded_core_offset = offset;
+        }
+    }
+
+    if (!core) {
+        char *exe_path = search_for_executable(argv[0]);
+        if (exe_path) {
+            os_vm_offset_t offset = search_for_embedded_core(exe_path, &memsize_options);
+            if (offset != -1) {
+                free(core);
+                sbcl_runtime = exe_path;
+                core = exe_path;
+                embedded_core_offset = offset;
+            }
+        }
+    }
 
     if (!(sbcl_runtime_home = dir_name(argv[0])))
       if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
         sbcl_runtime_home = libpath;
-
-    if (sbcl_runtime) {
-        os_vm_offset_t offset = search_for_embedded_core(sbcl_runtime, &memsize_options);
-        if (offset != -1) {
-            embedded_core_offset = offset;
-            core = sbcl_runtime;
-        }
-    }
 
     struct cmdline_options options = parse_argv(memsize_options, argc, argv, envp, core);
 
