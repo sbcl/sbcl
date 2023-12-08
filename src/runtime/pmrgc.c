@@ -1281,30 +1281,6 @@ int gc_card_table_nbits;
 long gc_card_table_mask;
 
 
-#ifdef LISP_FEATURE_DARWIN_JIT
-void page_remap_as_type(int type, void* base, sword_t length)
-{
-    /* Remap before releasing the mutex so that no other thread can manipulate
-     * this range of code until it has been correctly set up. If page(s) were
-     * previously utilized for code, this is not necessary, but there's no way
-     * to know what page type it had, because unused pages all have type 0.
-     * It's horrible that mprotect() can't do this but as you can see, the JIT bit
-     * is not part of the protections but rather the flags. So this is vulnerable
-     * to the bug described in zero-with-mmap-bug.txt
-     */
-    os_deallocate(base, length);
-    void* new_addr;
-    if (type == PAGE_TYPE_CODE) {
-        new_addr = sbcl_mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
-    } else {
-        new_addr = sbcl_mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
-    }
-    if (new_addr != base)
-        lose("remap: page moved, %p ==> %p", base, new_addr);
-
-}
-#endif
-
 /*
  * The vops that allocate assume that the returned space is zero-filled.
  * (E.g. the most significant word of a 2-word bignum in MOVE-FROM-UNSIGNED.)

@@ -1012,6 +1012,9 @@ bool gc_allocate_ptes()
     ++page_table;
     gc_page_pins = calloc(page_table_pages, 1);
     gc_assert(gc_page_pins);
+#ifdef LISP_FEATURE_DARWIN_JIT
+    page_execp = calloc(page_table_pages, 1);
+#endif
 
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
@@ -1249,9 +1252,11 @@ void gc_load_corefile_ptes(int card_table_nbits,
         page_index_t start = 0, end;
         while (start  < next_free_page) {
             if (is_code(page_table[start].type)) {
+                set_page_executable(start, 1);
                 for (end = start + 1; end < next_free_page; end++) {
                     if (!page_words_used(end) || !is_code(page_table[end].type))
                         break;
+                    set_page_executable(end, 1);
                 }
                 os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_ALL);
                 start = end+1;

@@ -143,11 +143,6 @@ page_scan_start(page_index_t page_index)
  * Particularly the 'need_zerofill' bit MUST remain as-is */
 void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
-#ifdef LISP_FEATURE_DARWIN_JIT
-    // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
-    // This avoids any affect of pthread_jit_write_protect_np when next used.
-    if (page_table[page].type == PAGE_TYPE_CODE) set_page_need_to_zero(page, 1);
-#endif
     set_page_type(page_table[page], FREE_PAGE_FLAG);
     gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
@@ -538,31 +533,11 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
     }
-#ifdef LISP_FEATURE_DARWIN_JIT
-    if (page_type == PAGE_TYPE_CODE) {
-        /* Remap before releasing the mutex so that no other thread can manipulate
-         * this range of code until it has been correctly set up. If page(s) were
-         * previously utilized for code, this is not necessary, but there's no way
-         * to know that.  If the first page was already in use, remapping would trash
-         * what's there, so don't do that */
-        int remap_from = first_page + (page_words_used(first_page)?1:0);
-        if (last_page >= remap_from) {
-            long len = npage_bytes(1+last_page-remap_from);
-            os_deallocate(page_address(remap_from), len);
-            mmap(page_address(remap_from), len,
-                 OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
-            page_index_t p;
-            // Ensure no redundant work in prepare_pages
-            for(p=remap_from; p<=last_page; ++p) set_page_need_to_zero(p,0);
-        }
-    }
-#endif
     if (unlock) {
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
 
-    // Like above: if first page was in use, don't zeroize
     if (page_words_used(first_page)) ++first_page;
     if (first_page <= last_page)
         INSTRUMENTING(prepare_pages(1, first_page, last_page, page_type, gc_alloc_generation),
@@ -783,7 +758,6 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
                                       SINGLE_OBJECT_FLAG | page_type,
                                       gc_alloc_generation),
     et_find_freeish_page);
-
     // No need to check whether last_page > old max; it's gotta be.
     max_alloc_start_page = last_page;
 
@@ -811,9 +785,13 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     // Anyway it's best if the new page resembles a valid object ASAP.
     uword_t nwords = nbytes >> WORD_SHIFT;
     lispobj* addr = (lispobj*)page_address(first_page);
+
+    /* The test of whether to use THREAD_JIT_WP here is not based on 'page_type'
+     * but rather how the page _is_mapped_now_. Conservatively do the call
+     * because thning about all 4 combinations of how-it-was-mapped x how-it-will-be-mapped,
+     * here and down below is too confusing */
     if (locked) { THREAD_JIT_WP(0); }
     *addr = make_filler_header(nwords);
-    if (locked) { THREAD_JIT_WP(1); } // avoid enabling while GCing
 
     os_vm_size_t scan_start_offset = 0;
     for (page = first_page; page < last_page; ++page) {
@@ -843,12 +821,7 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     // turning the putative object temporarily into a page filler object.
     // Now turn it back into free space.
     *addr = 0;
-
-#ifdef LISP_FEATURE_DARWIN_JIT
-    if (page_type == PAGE_TYPE_CODE) {
-        os_protect(page_address(first_page), npage_bytes(1+last_page-first_page), OS_VM_PROT_ALL);
-    }
-#endif
+    if (locked) { THREAD_JIT_WP(1); }
 
     return addr;
 }
@@ -4442,6 +4415,7 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
         }
 #endif
 
+        // What does this have to do with DARWIN_JIT?
 #if defined LISP_FEATURE_64_BIT && !defined LISP_FEATURE_DARWIN_JIT
         /* If any function in this code object redirects to a function outside
          * the object, then scavenge all entry points. Otherwise there is no need,

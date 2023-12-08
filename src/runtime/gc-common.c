@@ -3003,8 +3003,41 @@ void recompute_gen_bytes_allocated() {
 }
 #endif
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+#include "sys_mmap.inc"
+#include <errno.h>
+/* darwin-jit has another reason to remap besides just zeroing, namely,
+ * changing betwee RWX|JIT and RW-, so we don't ever want to call
+ * zero_range_with_mmap because among other things it doesn't know
+ * to change the bit that reflects how the range was mapped */
+void remap_page_range(int executable, page_index_t from, page_index_t to)
+{
+    void* base = page_address(from);
+    sword_t length = npage_bytes(to + 1 - from);
+    void* new_addr;
+    /* It's horrible that mprotect() can't do this but as you can see, the JIT bit
+     * is not part of the protections but rather the flags.
+     * It's even more horrible that passing MAP_FIXED to replace the mapping
+     * fails with EINVAL unles you unmap first, making this highly vulnerable
+     * to the bug described in zero-with-mmap-bug.txt
+     */
+    sbcl_munmap(base, length);
+    if (executable)
+        new_addr = sbcl_mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+    else {
+        new_addr = sbcl_mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+    }
+    if (new_addr != base) lose("remap: page moved, %p ==> %p errno=%d", base, new_addr, errno);
+    page_index_t p;
+    for (p = from; p <= to; ++p) {
+        set_page_executable(p, executable);
+        set_page_need_to_zero(p, 0);
+    }
+}
+#endif
+
 /*
-Regarding zero_pages(), if the next operation would be memcpy(),
+Regarding page zero-filling, if the next operation would be memcpy(),
 then zeroing is a total waste of time and we should skip it.
 
 The most simple case seems to be ALLOCATE-CODE-OBJECT because we can treat pages
@@ -3069,7 +3102,7 @@ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/zero-oopsla-
  * of zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
  */
-#ifndef LISP_FEATURE_WIN32
+#if !defined LISP_FEATURE_DARWIN_JIT && !defined LISP_FEATURE_WIN32
 static void __attribute__((unused))
 zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 #ifdef LISP_FEATURE_LINUX
@@ -3109,13 +3142,9 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 /* Zero the pages from START to END (inclusive). Generally done just after
  * a new region has been allocated.
  */
-static inline void zero_pages(page_index_t start, page_index_t end) {
+static inline void memset_page_range(int byte, page_index_t start, page_index_t end) {
     if (start <= end)
-#ifdef LISP_FEATURE_DARWIN_JIT
-        zero_range_with_mmap(page_address(start), npage_bytes(1+end-start));
-#else
-        memset(page_address(start), 0, npage_bytes(1+end-start));
-#endif
+        memset(page_address(start), byte, npage_bytes(1+end-start));
 }
 
 /* Ensure that pages from START to END (inclusive) are ready for use,
@@ -3148,14 +3177,15 @@ void prepare_pages(__attribute__((unused)) bool commit,
 
     page_index_t i;
 #ifdef LISP_FEATURE_DARWIN_JIT
-    /* Must always zero, as it may need changing the protection bits. */
-    bool any_need_to_zero = 0;
-    for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
-    if (any_need_to_zero) {
-        zero_pages(start, end);
-        for (i = start; i <= end; i++) set_page_need_to_zero(i, 0);
-    }
-#else
+    /* Ensure that the whole range is mapped properly for page_type. If so
+     * then fall into the regular logic that avoids zero-filling when possible.
+     * Otherwise, remap the range even if partially ok */
+    char logior = 0, logand = 1;
+    for (i = start; i <= end; i++)
+        logior |= page_execp[i], logand &= page_execp[i];
+    if ((logior != logand) || (logior != is_code(page_type)))
+        return remap_page_range(is_code(page_type), start, end);
+#endif
     /* FIXME: There is a bug if BACKEND_PAGE_BYTES exceeds GENCGC_PAGE_BYTES,
      * because it can inaccurately reflect the need_to_zero state of GC pages
      * overlapping the last "backend" page mapped from the core file.
@@ -3165,11 +3195,10 @@ void prepare_pages(__attribute__((unused)) bool commit,
     if (page_type == PAGE_TYPE_MIXED && usable_by_lisp) {
         for (i = start; i <= end; i++)
             if (page_need_to_zero(i)) {
-                zero_pages(i, i);
+                memset_page_range(0, i, i);
                 set_page_need_to_zero(i, 0);
             }
     }
-#endif
 }
 
 /*
@@ -3183,7 +3212,7 @@ void prepare_pages(__attribute__((unused)) bool commit,
  * perform three operations: unmap/remap, fill before, fill after.
  * Otherwise, just one operation to fill the whole range.
  */
-#ifndef LISP_FEATURE_WIN32
+#if !defined LISP_FEATURE_WIN32 && !defined LISP_FEATURE_DARWIN_JIT
 const os_vm_size_t gencgc_release_granularity = BACKEND_PAGE_BYTES;
 static void
 release_page_range (page_index_t from, page_index_t to)
@@ -3192,12 +3221,12 @@ release_page_range (page_index_t from, page_index_t to)
      * tricks for memory zeroing. See sbcl-devel thread
      * "Re: patch: standalone executable redux".
      */
-    /* I have no idea what the issue with Haiku is, but using the simpler
-     * zero_pages() works where the unmap,map technique does not. Yet the
+    /* I have no idea what the issue with Haiku is, but using memset
+     * works where the unmap,map technique does not. Yet using the remap
      * trick plus a post-check that the pages were correctly zeroed finds
      * no problem at that time. So what's failing later and why??? */
 #if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
-    zero_pages(from, to);
+    memset_page_range(0, from, to);
 #else
     size_t granularity = gencgc_release_granularity;
     // page_address "works" even if 'to' == page_table_pages-1
@@ -3215,7 +3244,7 @@ release_page_range (page_index_t from, page_index_t to)
         memset(start, 0, aligned_start - start);
         memset(aligned_end, 0, end - aligned_end);
     } else {
-        zero_pages(from, to);
+        memset_page_range(0, from, to);
     }
 #endif
     page_index_t i;
@@ -3223,6 +3252,7 @@ release_page_range (page_index_t from, page_index_t to)
 }
 #endif
 
+// "Release" (i.e. try to give the OS back physical memory for) any wholly unused pages
 void remap_free_pages (page_index_t from, page_index_t to)
 {
     page_index_t first_page, last_page;
@@ -3240,6 +3270,8 @@ void remap_free_pages (page_index_t from, page_index_t to)
 #ifdef LISP_FEATURE_WIN32
         gc_assert(VirtualFree(page_address(first_page), npage_bytes(last_page-first_page),
                               MEM_DECOMMIT));
+#elif defined LISP_FEATURE_DARWIN_JIT
+        remap_page_range(0, first_page, last_page-1); // change to non-executable
 #else
         release_page_range(first_page, last_page-1);
 #endif

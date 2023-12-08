@@ -146,4 +146,13 @@ extern void set_page_type_impl(struct page*, int newval);
 extern void prepare_pages(bool commit, page_index_t start, page_index_t end,
                           int page_type, generation_index_t);
 
+/* One byte per page indicating data vs code, but only if the OS generally
+ * prohibits memory from being writable + executable. There's probably a way to
+ * squeeze a bit into the 'type' field of the page table, but it's clearer to
+ * have this externally so that page type 0 remains as "free" */
+#ifdef LISP_FEATURE_DARWIN_JIT
+_Atomic(char) *page_execp;
+static inline void set_page_executable(page_index_t i, bool val) { page_execp[i] = val; }
+#endif
+
 #endif /* _GC_H_ */

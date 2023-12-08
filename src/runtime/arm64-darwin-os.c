@@ -67,13 +67,11 @@ void jit_memcpy(void* dst, void* src, size_t n) {
 }
 
 void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
-    /* It is critical that we NOT touch the mark table if the object is off-heap.
-     * With soft protection, it's doesn't matter - it's merely suboptimal - but arm64
-     * uses physical protection for now, and a page fault on a page that is erroneously
-     * marked (i.e. not write-protected, allegedly) would be an error.
-     * Disallow GC in between setting the WRITTEN flag and doing the assigmment */
+    /* It is better not to the touch a card mark if the object is off-heap,
+     * though it's not terribly important any more */
     if (find_page_index((void*)code) >= 0) {
         sigset_t mask;
+        // Disallow GC in between setting the WRITTEN flag and doing the assigmment
         block_blockable_signals(&mask);
         THREAD_JIT_WP(0);
 
@@ -84,6 +82,7 @@ void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
         THREAD_JIT_WP(1);
         thread_sigmask(SIG_SETMASK, &mask, 0);
     } else { // Off-heap code objects can't be executed (or GC'd)
+             // umm, so why do they exist? I wish I could remember...
         SET_WRITTEN_FLAG(native_pointer(code));
         native_pointer(code)[index] = value;
     }
