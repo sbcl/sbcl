@@ -153,7 +153,6 @@ void release_gc_page_table_lock() { ignore_value(mutex_release(&free_pages_lock)
 
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
-generation_index_t get_alloc_generation() { return gc_alloc_generation; }
 
 /*
  * To support quick and inline allocation, regions of memory can be

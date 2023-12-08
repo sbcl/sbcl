@@ -296,7 +296,7 @@ page_index_t try_allocate_large(uword_t nbytes,
             page_remap_as_type(PAGE_TYPE_CODE, page_address(chunk_start),
                                ALIGN_UP(nbytes, GENCGC_PAGE_BYTES));
         else
-            zeroize_pages_if_needed(chunk_start, last_page, page_type);
+            prepare_pages(1, chunk_start, last_page, page_type, gc_alloc_generation);
 #endif
       for (page_index_t p = chunk_start; p <= last_page; p++) {
         set_page_type(page_table[p], SINGLE_OBJECT_FLAG | page_type);

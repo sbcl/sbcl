@@ -3118,17 +3118,26 @@ static inline void zero_pages(page_index_t start, page_index_t end) {
 #endif
 }
 
-extern generation_index_t get_alloc_generation();
-
-/* Zero the pages from START to END (inclusive), except for those
- * pages which: (a) don't require pre-clearing, or (b) do but are already clear.
- * For each page in the range that got cleared right now, change the
- * page's need_to_zero flag to 0; otherwise, leave that flag alone.
+/* Ensure that pages from START to END (inclusive) are ready for use,
+ * which entails one or more of the following:
+ * - ensuring that the OS commits to backing them (#+win32 only)
+ * - proper mapping for read/write (#+darwin-jit only)
+ * - ensuring zero-fill if need be. Not all page types need zero-fill.
+ *   Otherwise, pages which are already zero-filled are skipped.
+ *   For each newly zeroed page, clear the need_to_zero flag.
  */
 #if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
 int mmap_does_not_zero;
 #endif
-void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type) {
+void prepare_pages(__attribute__((unused)) bool commit,
+                   page_index_t start, page_index_t end,
+                   int page_type, generation_index_t generation) {
+    gc_assert(end >= start);
+    gc_assert(page_type);
+#ifdef LISP_FEATURE_WIN32
+    if (commit)
+        os_commit_memory(page_address(start), npage_bytes(end+1-start));
+#endif
     // If allocating mixed pages to gen0 (or scratch which becomes gen0) then
     // this allocation is potentially going to be extended by lisp (if it happens to
     // pick up the tail of the page as its next available region)
@@ -3161,11 +3170,9 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
         set_page_need_to_zero(i, 0);
     }
 #else
-    generation_index_t alloc_generation = get_alloc_generation();
     bool usable_by_lisp =
-        alloc_generation == 0 || (alloc_generation == SCRATCH_GENERATION
-                                     && from_space == 0);
-    if ((page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0) {
+        generation == 0 || (generation == SCRATCH_GENERATION && from_space == 0);
+    if (page_type == PAGE_TYPE_MIXED && usable_by_lisp) {
         for (i = start; i <= end; i++)
             if (page_need_to_zero(i)) {
                 zero_pages(i, i);

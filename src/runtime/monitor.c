@@ -129,7 +129,7 @@ static void checked_write(char *section, struct filewriter* writer, void* buf, l
     if (write(writer->fd, label, sizeof label) != sizeof label
         || (wrote = write(writer->fd, buf, nbytes)) != nbytes)
         lose("short write, errno=%d", errno);
-    fprintf(stderr, "%s: %lx bytes\n", section, nbytes + sizeof label);
+    fprintf(stderr, "%s: %lx bytes\n", section, (long)(nbytes + sizeof label));
     maybe_show_contents(section, buf, nbytes);
     writer->total += nbytes + sizeof label;
 }

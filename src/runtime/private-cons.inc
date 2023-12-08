@@ -93,13 +93,8 @@ static struct cons* private_cons_impl()
 #endif
         page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         set_page_type(page_table[page], PAGE_TYPE_UNBOXED);
-#ifdef LISP_FEATURE_DARWIN_JIT
         // UNBOXED pages do not generally required zero-fill.
-        // arm64+Darwin might perform zeroing to alter MMU-based protection.
-        zeroize_pages_if_needed(page, page, PAGE_TYPE_UNBOXED);
-#elif defined LISP_FEATURE_WIN32
-        os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
-#endif
+        prepare_pages(1, page, page, PAGE_TYPE_UNBOXED, -1);
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
             fprintf(stderr, "GC-private page @ %p\n", page_header);

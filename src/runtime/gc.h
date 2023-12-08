@@ -143,5 +143,7 @@ extern void set_page_type_impl(struct page*, int newval);
 #else
 #define set_page_type(pte, newval) pte.type = newval
 #endif
+extern void prepare_pages(bool commit, page_index_t start, page_index_t end,
+                          int page_type, generation_index_t);
 
 #endif /* _GC_H_ */

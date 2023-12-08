@@ -572,8 +572,6 @@ static inline os_vm_size_t npage_bytes(page_index_t npages)
 }
 extern os_vm_size_t auto_gc_trigger;
 
-void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type);
-
 typedef unsigned int page_bytes_t;
 #define page_words_used(index) page_table[index].words_used_
 #define page_bytes_used(index) ((page_bytes_t)page_table[index].words_used_<<WORD_SHIFT)

@@ -248,7 +248,6 @@ count_generation_bytes_allocated (generation_index_t gen)
 
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
-generation_index_t get_alloc_generation() { return gc_alloc_generation; }
 
 __attribute__((unused)) static const char * const page_type_description[8] =
   {0, "unboxed", "boxed", "mixed", "sm_mix", "cons", "?", "code"};
@@ -488,14 +487,8 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         if (page+1 > next_free_page) next_free_page = page+1;
         page_table[page].gen = gc_alloc_generation;
         set_page_type(page_table[page], OPEN_REGION_PAGE_FLAG | page_type);
-#ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
-            /* May need to be remapped from PAGE_TYPE_CODE */
-            zeroize_pages_if_needed(page, page, page_type);
-#elif defined LISP_FEATURE_WIN32
-        // don't incur access violations
-        os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
-#endif
+            prepare_pages(1, page, page, page_type, gc_alloc_generation);
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
@@ -559,15 +552,10 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
             mmap(page_address(remap_from), len,
                  OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
             page_index_t p;
-            // Ensure that zeroize_pages_if_needed() below does ABSOLUTELY NOTHING!
+            // Ensure no redundant work in prepare_pages
             for(p=remap_from; p<=last_page; ++p) set_page_need_to_zero(p,0);
         }
     }
-#elif defined LISP_FEATURE_WIN32
-    // don't incur access violations
-    long commit_from = first_page + (page_words_used(first_page)?1:0);
-    long len = npage_bytes(1+last_page-commit_from);
-    os_commit_memory(page_address(commit_from), len);
 #endif
     if (unlock) {
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
@@ -575,8 +563,10 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     }
 
     // Like above: if first page was in use, don't zeroize
-    INSTRUMENTING(zeroize_pages_if_needed(first_page+(page_words_used(first_page)?1:0),
-                                          last_page, page_type), et_bzeroing);
+    if (page_words_used(first_page)) ++first_page;
+    if (first_page <= last_page)
+        INSTRUMENTING(prepare_pages(1, first_page, last_page, page_type, gc_alloc_generation),
+                      et_bzeroing);
 
     return alloc_region->free_pointer;
 }
@@ -843,7 +833,8 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
-    INSTRUMENTING(zeroize_pages_if_needed(first_page, last_page, page_type), et_bzeroing);
+    INSTRUMENTING(prepare_pages(0, first_page, last_page, page_type, gc_alloc_generation),
+                  et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
     if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
