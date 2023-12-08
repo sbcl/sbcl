@@ -663,20 +663,24 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 
     if (!core) {
         char *exe_path = search_for_executable(argv[0]);
-        if (exe_path) {
+        if (exe_path && !(sbcl_runtime && strcmp(sbcl_runtime, exe_path) == 0)) {
             os_vm_offset_t offset = search_for_embedded_core(exe_path, &memsize_options);
             if (offset != -1) {
                 free(core);
                 sbcl_runtime = exe_path;
                 core = exe_path;
                 embedded_core_offset = offset;
+            } else {
+                free(exe_path);
             }
+        } else {
+            free(exe_path);
         }
     }
 
     if (!(sbcl_runtime_home = dir_name(argv[0])))
-      if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
-        sbcl_runtime_home = libpath;
+        if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
+            sbcl_runtime_home = libpath;
 
     struct cmdline_options options = parse_argv(memsize_options, argc, argv, envp, core);
 
