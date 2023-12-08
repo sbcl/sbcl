@@ -63,6 +63,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include "print.h"
+#include <Shlobj.h>
 
 /* missing definitions for modern mingws */
 #ifndef EH_UNWINDING

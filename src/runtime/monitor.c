@@ -96,6 +96,7 @@ struct crash_thread_preamble {
 const uword_t CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
+__attribute__((unused))
 static void maybe_show_contents(__attribute__((unused)) char *legend,
                                 __attribute__((unused)) void* buf,
                                 __attribute__((unused)) long nbytes)

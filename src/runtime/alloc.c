@@ -457,7 +457,7 @@ void write_heap_exhaustion_report(FILE *file, long available, long requested,
             read_TLS(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
 #endif
     fprintf(file, "Collection trigger variables:\n");
-    fprintf(file, "   dynamic_space_size = %ld\n   bytes_allocated = %ld\n   auto_gc_trigger = %ld\n   bytes_consed_between_gcs = %ld\n",
+    fprintf(file, "   dynamic_space_size = %zd\n   bytes_allocated = %zd\n   auto_gc_trigger = %zd\n   bytes_consed_between_gcs = %zd\n",
             dynamic_space_size,
             bytes_allocated,
             auto_gc_trigger,
