@@ -366,3 +366,11 @@
      (declare ((member 8 10) s))
      (deposit-field -21031455 (byte s 9) 1565832649825))
    (or (integer 1565832320097 1565832320097) (integer 1565832713313 1565832713313))))
+
+(with-test (:name :logior-negative-bound)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (declare ((integer 7703 1903468060) c))
+      (logandc1 (/ (logorc2 c b) -1) c))
+   ((-1 7703) 7702)))

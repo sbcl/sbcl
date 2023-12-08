@@ -265,7 +265,7 @@
                           -1)))
               ((and y-low
                     (> y-low 0))
-               (specifier-type `(or (integer * -1)
+               (specifier-type `(or (integer ,(or x-low '*) -1)
                                     ,(if (and x-high
                                               y-len)
                                          (multiple-value-bind (low high)
@@ -275,7 +275,7 @@
                                          `(integer ,y-low)))))
               ((and x-low
                     (> x-low 0))
-               (specifier-type `(or (integer * -1)
+               (specifier-type `(or (integer ,(or y-low '*) -1)
                                     ,(if (and y-high
                                               x-len)
                                          (multiple-value-bind (low high)
