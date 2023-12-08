@@ -1032,7 +1032,7 @@ void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
     ++n_gcs;
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     generation_index_t gen = 0;
     bool gc_mark_only = 0;
     int raise, more = 0;
@@ -1253,7 +1253,7 @@ collect_garbage(generation_index_t last_gen)
         // as that causes the thread to exit.
         finalizer_thread_runflag = newval ? newval : 1;
     }
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
     // Clear all pin bits for the next GC cycle.
     // This could be done in the background somehow maybe.
     page_index_t max_nfp = initial_nfp > next_free_page ? initial_nfp : next_free_page;
@@ -1321,7 +1321,7 @@ int gencgc_alloc_profiler;
 #ifdef LISP_FEATURE_DARWIN_JIT
 #define gc_memclr(pt, addr, len) \
     do { if (gc_active_p || pt != PAGE_TYPE_CODE) memset(addr, 0, len); \
-    else { THREAD_JIT(0); memset(addr, 0, len); THREAD_JIT(1); } } while (0)
+    else { THREAD_JIT_WP(0); memset(addr, 0, len); THREAD_JIT(1); } } while (0)
 #else
 #define gc_memclr(pt, addr, len) memset(addr, 0, len)
 #endif

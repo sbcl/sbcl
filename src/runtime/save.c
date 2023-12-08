@@ -745,7 +745,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     collect_garbage(0);
     verify_heap(0, VERIFY_POST_GC);
 
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
 
     // We always coalesce copyable numbers. Additional coalescing is done
     // only on request, in which case a message is shown (unless verbose=0).
@@ -774,7 +774,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     if (verbose)
         printf(" done]\n");
 
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     // Scrub remaining garbage
     extern void zero_all_free_ranges(void);
     zero_all_free_ranges();

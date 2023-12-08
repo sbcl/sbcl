@@ -20,9 +20,9 @@ void set_thread_stack(void *address) {
 }
 
 void jit_patch(lispobj* address, lispobj value) {
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     *address = value;
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
 }
 
 void jit_copy_code_insts(lispobj dst, lispobj* src)
@@ -31,11 +31,11 @@ void jit_copy_code_insts(lispobj dst, lispobj* src)
     struct code* code = (struct code*)(dst-OTHER_POINTER_LOWTAG);
     int nwords = code_total_nwords(code);
     gc_assert(code_total_nwords((struct code*)aligned_src));
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     // Leave the header word alone
     memcpy(&code->boxed_size, aligned_src + 1, (nwords-1)<<WORD_SHIFT);
     for_each_simple_fun(i, fun, code, 1, { fun->self = fun_self_from_baseptr(fun); })
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
     free(src);
     // FINISH-FIXUPS didn't call SB-VM:SANCTIFY-FOR-EXECUTION
     // because the copy of the code on which it operates was only temporary.
@@ -52,18 +52,18 @@ void jit_copy_code_constants(lispobj lispcode, lispobj constants)
 
     sigset_t mask;
     block_blockable_signals(&mask);
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
     SET_WRITTEN_FLAG((lispobj*)code);
     memcpy(&code->constants, v->data, vector_len(v) * N_WORD_BYTES);
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
     thread_sigmask(SIG_SETMASK, &mask, 0);
 }
 
 void jit_memcpy(void* dst, void* src, size_t n) {
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     memcpy(dst, src, n);
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
 }
 
 void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
@@ -75,13 +75,13 @@ void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
     if (find_page_index((void*)code) >= 0) {
         sigset_t mask;
         block_blockable_signals(&mask);
-        THREAD_JIT(0);
+        THREAD_JIT_WP(0);
 
         gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
         SET_WRITTEN_FLAG(native_pointer(code));
         native_pointer(code)[index] = value;
 
-        THREAD_JIT(1);
+        THREAD_JIT_WP(1);
         thread_sigmask(SIG_SETMASK, &mask, 0);
     } else { // Off-heap code objects can't be executed (or GC'd)
         SET_WRITTEN_FLAG(native_pointer(code));

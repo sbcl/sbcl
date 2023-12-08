@@ -351,9 +351,9 @@ extern int sb_GetTID();
 #endif
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-#define THREAD_JIT(x) pthread_jit_write_protect_np((x))
+#define THREAD_JIT_WP(x) pthread_jit_write_protect_np((x))
 #else
-#define THREAD_JIT(x)
+#define THREAD_JIT_WP(x)
 #endif
 
 extern bool is_in_stack_space(lispobj);

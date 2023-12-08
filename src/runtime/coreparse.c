@@ -1119,7 +1119,7 @@ static void gengcbarrier_patch_code_range(uword_t start, lispobj* limit)
  * it's not written to after changing its protection flags.
  * Touch every page... */
 void darwin_jit_code_pages_kludge () {
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     page_index_t page;
     for (page = 0; page  < next_free_page; page++) {
         if(is_code(page_table[page].type)) {
@@ -1130,7 +1130,7 @@ void darwin_jit_code_pages_kludge () {
             }
         }
     }
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
 }
 #endif
 

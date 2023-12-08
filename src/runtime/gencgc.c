@@ -821,9 +821,9 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     // Anyway it's best if the new page resembles a valid object ASAP.
     uword_t nwords = nbytes >> WORD_SHIFT;
     lispobj* addr = (lispobj*)page_address(first_page);
-    if (locked) { THREAD_JIT(0); }
+    if (locked) { THREAD_JIT_WP(0); }
     *addr = make_filler_header(nwords);
-    if (locked) { THREAD_JIT(1); } // avoid enabling while GCing
+    if (locked) { THREAD_JIT_WP(1); } // avoid enabling while GCing
 
     os_vm_size_t scan_start_offset = 0;
     for (page = first_page; page < last_page; ++page) {
@@ -3771,7 +3771,7 @@ void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
     ++n_gcs;
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
     generation_index_t gen = 0, i;
     bool gc_mark_only = 0;
     int raise, more = 0;
@@ -4005,7 +4005,7 @@ collect_garbage(generation_index_t last_gen)
         // as that causes the thread to exit.
         finalizer_thread_runflag = newval ? newval : 1;
     }
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
     // Clear all pin bits for the next GC cycle.
     // This could be done in the background somehow maybe.
     page_index_t max_nfp = initial_nfp > next_free_page ? initial_nfp : next_free_page;

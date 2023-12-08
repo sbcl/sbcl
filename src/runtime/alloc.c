@@ -277,7 +277,7 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
         (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, code_region, nbytes, PAGE_TYPE_CODE, th);
     result = mutex_release(&code_allocator_lock);
     gc_assert(result);
-    THREAD_JIT(0);
+    THREAD_JIT_WP(0);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
     // 'boxed_size' is an untagged word expressing the number of *bytes* in the boxed section
@@ -291,7 +291,7 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
     for ( ; p < end ; ++p) *p = 0;
     *p = 0; // 'p' now points to the jump table count word which must be 0
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
-    THREAD_JIT(1);
+    THREAD_JIT_WP(1);
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 
