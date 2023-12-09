@@ -469,6 +469,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                (maybe-mumble "Locall ")
                (locall-analyze-component component))
               ((and (>= loop-count 1)
+                    (not (component-reanalyze component))
                     (not reoptimized))
                ;; Constraint propagation did something but that
                ;; information didn't lead to any new optimizations.

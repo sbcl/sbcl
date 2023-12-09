@@ -4320,3 +4320,14 @@
         (f x 30)))
    ((:m) (values 30 :m))
    ((:allow-other-keys) (values nil :allow-other-keys))))
+
+(with-test (:name :undeleted-exits)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (tagbody
+         (flet ((f (a) a (go 5)))
+           (print (list #'f (loop for i in (f 1)
+                                  do (print i)))))
+       5))
+   (() nil)))
