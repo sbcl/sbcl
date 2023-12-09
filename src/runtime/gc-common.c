@@ -3162,7 +3162,6 @@ void prepare_pages(__attribute__((unused)) bool commit,
                    page_index_t start, page_index_t end,
                    int page_type, generation_index_t generation) {
     gc_assert(end >= start);
-    gc_assert(page_type);
 #ifdef LISP_FEATURE_WIN32
     if (commit)
         os_commit_memory(page_address(start), npage_bytes(end+1-start));

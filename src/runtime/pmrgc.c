@@ -103,11 +103,6 @@ page_scan_start(page_index_t page_index)
  * Particularly the 'need_zerofill' bit MUST remain as-is */
 void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
-#ifdef LISP_FEATURE_DARWIN_JIT
-    // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
-    // This avoids any affect of pthread_jit_write_protect_np when next used.
-    if (is_code(page_table[page].type)) set_page_need_to_zero(page, 1);
-#endif
     set_page_type(page_table[page], FREE_PAGE_FLAG);
     gc_page_pins[page] = 0;
 }
@@ -153,6 +148,7 @@ void release_gc_page_table_lock() { ignore_value(mutex_release(&free_pages_lock)
 
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
+generation_index_t get_alloc_generation() { return gc_alloc_generation; }
 
 /*
  * To support quick and inline allocation, regions of memory can be
@@ -355,25 +351,6 @@ copy_unboxed_object(lispobj object, sword_t nwords)
  * a reference to the codeblob, then either you'll find it in the generation 0
  * tree, or else can linearly scan for it in an older generation */
 static lispobj dynspace_codeblob_tree_snapshot; // valid only during GC
-
-/* Return true if and only if everything on the specified page is NOT subject
- * to evacuation, i.e. either the page is not in 'from_space', or is entirely
- * pinned.  "Entirely pinned" is predicated on being marked as pinned,
- * and satisfying one of two additional criteria:
- *   1. the page is a single-object page
- *   2. the page contains only code, and all code objects are pinned.
- *
- * A non-large-object page that is marked "pinned" does not suffice
- * to be considered entirely pinned if it contains other than code.
- */
-int pin_all_dynamic_space_code;
-static inline int immune_set_memberp(page_index_t page)
-{
-    return (page_table[page].gen != from_space)
-        || (gc_page_pins[page] &&
-            (page_single_obj_p(page) ||
-             (is_code(page_table[page].type) && pin_all_dynamic_space_code)));
-}
 
 int pin_all_dynamic_space_code;
 
@@ -579,12 +556,8 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
             immobile_space_preserve_pointer((void*)addr);
         return;
     }
-    if (immune_set_memberp(page)) return;
-
     struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
-    if (code) {
-        pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
-    }
+    if (code) pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
 }
 
 #if GENCGC_IS_PRECISE && !defined(reg_CODE)
@@ -1293,14 +1266,6 @@ int small_allocation_count = 0;
 
 int gencgc_alloc_profiler;
 
-#ifdef LISP_FEATURE_DARWIN_JIT
-#define gc_memclr(pt, addr, len) \
-    do { if (gc_active_p || pt != PAGE_TYPE_CODE) memset(addr, 0, len); \
-    else { THREAD_JIT_WP(0); memset(addr, 0, len); THREAD_JIT(1); } } while (0)
-#else
-#define gc_memclr(pt, addr, len) memset(addr, 0, len)
-#endif
-
 NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(__attribute__((unused)) int flags,
            struct alloc_region *region, sword_t nbytes,
@@ -1334,7 +1299,8 @@ lisp_alloc(__attribute__((unused)) int flags,
     }
 
     if (try_allocate_small_after_region(nbytes, region)) {
-      gc_memclr(page_type, region->start_addr, addr_diff(region->end_addr, region->start_addr));
+      if (page_type != PAGE_TYPE_CODE) // alloc_code doesn't need zero-fill
+          memset(region->start_addr, 0, addr_diff(region->end_addr, region->start_addr));
       return region->start_addr;
     }
 
@@ -1404,7 +1370,7 @@ lisp_alloc(__attribute__((unused)) int flags,
         gc_assert(ret);
         new_obj = page_address(new_page);
         set_allocation_bit_mark(new_obj);
-        gc_memclr(page_type, new_obj, nbytes);
+        if (page_type != PAGE_TYPE_CODE) memset(new_obj, 0, nbytes);
     } else {
         /* Try to find a page before acquiring free_pages_lock. */
         pre_search_for_small_space(nbytes, page_type, &alloc_start, page_table_pages);
@@ -1419,18 +1385,11 @@ lisp_alloc(__attribute__((unused)) int flags,
                                           &alloc_start, page_table_pages);
         if (!success) gc_heap_exhausted_error_or_lose(0, nbytes);
         set_alloc_start_page(page_type, alloc_start);
-#ifdef LISP_FEATURE_DARWIN_JIT
-        if (page_type == PAGE_TYPE_CODE && !page_words_used(find_page_index(region->start_addr))) {
-            page_remap_as_type(PAGE_TYPE_CODE, region->start_addr, GENCGC_PAGE_BYTES);
-            mutex_release(&free_pages_lock);
-            gc_assert(ret);
-            return new_obj;
-        }
-#endif
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = region->start_addr;
-        gc_memclr(page_type, new_obj, addr_diff(region->end_addr, new_obj));
+        if (page_type != PAGE_TYPE_CODE) // alloc_code doesn't need zero-fill
+            memset(new_obj, 0, addr_diff(region->end_addr, new_obj));
     }
 
     return new_obj;
