@@ -182,7 +182,7 @@
 
 ;;; CLOSING a non-new streams should not delete them, and superseded
 ;;; files should be restored.
-(with-test (:name :test-file-for-close-should-not-delete :fails-on :win32)
+(with-test (:name :test-file-for-close-should-not-delete)
   (let ((test (scratch-file-name)))
     (macrolet ((test-mode (mode)
                           `(progn
