@@ -85,7 +85,7 @@
 
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 r8 r9 #-darwin r10 #-sb-thread r11 #+sb-thread thread lexenv)
+      r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
 
   ;; registers used to pass arguments
   ;;
