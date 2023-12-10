@@ -8,7 +8,7 @@ jobs:
     runs-on: macOS-latest
     strategy: 
       matrix: 
-        options: [--with-sb-thread, --without-sb-thread]
+        options: [--with-sb-thread, --without-sb-thread, --with-mark-region-gc]
       fail-fast: false
 
     steps:
