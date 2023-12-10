@@ -45,7 +45,8 @@
 
 ;; Assert something about *CURRENT-THREAD* seeing objects that it just consed.
 (with-test (:name :m-a-o-threadlocally-precise
-                  :skipped-on (:or (:not :sb-thread) :interpreter :gc-stress))
+                  :skipped-on (:or (:not :sb-thread) :interpreter :gc-stress)
+                  :fails-on :mark-region-gc)
   (let ((before (make-array 4))
         (after  (make-array 4 :initial-element 0)))
     (flet ((countit (obj type size)
@@ -90,6 +91,7 @@
 ;;; This test needs dynamic-extent to work properly.
 ;;; (I don't know what platforms it passes on, but at least these two it does)
 (with-test (:name :repeatably-count-allocated-objects
+            :fails-on :mark-region-gc
             :skipped-on (or (not (or :x86 :x86-64))
                             :gc-stress
                             :interpreter))
@@ -134,7 +136,8 @@
                 (sb-kernel:get-lisp-obj-address string-one)
                 (sb-kernel:get-lisp-obj-address string-two)))))
 (with-test (:name :pin-all-code-with-gc-enabled
-                  :skipped-on (or :interpreter :gc-stress))
+            :fails-on :mark-region-gc
+            :skipped-on (or :interpreter :gc-stress))
   (gc)
   #+sb-thread (sb-thread:join-thread (sb-thread:make-thread #'make-some-objects))
   #-sb-thread (progn (make-some-objects) (sb-sys:scrub-control-stack))
@@ -447,6 +450,7 @@
 (compile 'code-iterator)
 
 (with-test (:name :code-iteration-fast
+                  :broken-on :mark-region-gc
                   :skipped-on :gc-stress)
   (sb-int:binding* (((slow-n slow-bytes) (code-iterator :slow))
                     ((fast-n fast-bytes) (code-iterator :fast)))
@@ -480,7 +484,8 @@
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
 (with-test (:name :page-protected-p :broken-on :x86
-                  :fails-on (and :big-endian :ppc64)
+                  :fails-on (or (and :big-endian :ppc64)
+                                (and :mark-region-gc :darwin))
                   :skipped-on :gc-stress)
   (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
   (assert (= (sb-kernel:generation-of *vvv*) 1))

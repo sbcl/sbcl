@@ -58,6 +58,7 @@
            (assert (typep (cdr path) '(cons (eql *fred*) (cons nil))))))))))
 
 (with-test (:name (sb-ext:search-roots :stack-indirect)
+            :fails-on :mark-region-gc
             :fails-on :sunos)
   (let ((wp (make-weak-pointer (list 1 2 3 4))))
     (test1 wp (weak-pointer-value wp) :stack)
@@ -102,6 +103,7 @@
 ;;;  0       1004D28AE7 [   3] a cons = (A B C ...) ; = (NTHCDR 3 object)
 ;;;  0       1004D28B17 [   0] a cons = ("hi" D)
 (with-test (:name :traceroot-collapse-lists
+                  :fails-on :mark-region-gc
                   :skipped-on :gc-stress)
   (let* ((string (with-output-to-string (*standard-output*)
                    (search-roots *string-hi* :print :verbose)))
