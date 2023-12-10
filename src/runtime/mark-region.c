@@ -872,6 +872,7 @@ static void __attribute__((noinline)) sweep_pages() {
         allocation_bitmap[mark_bitmap_word_index(page_address(p))] = 0;
       /* Why is reset_page_flags(p) much slower here? It does other stuff
        * for gencgc, sure, but not that much more stuff. */
+      set_page_need_to_zero(p, 1);
       set_page_type(page_table[p], FREE_PAGE_FLAG);
       page_table[p].scan_start_offset_ = 0;
     } else {

@@ -1060,7 +1060,7 @@ collect_garbage(generation_index_t last_gen)
         (lispobj*)ALIGN_DOWN((uword_t)&last_gen, N_WORD_BYTES);
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0)
-        verify_heap(cur_thread_approx_stackptr, VERIFY_PRE_GC);
+        hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1) {
         fprintf(stderr, "Pre-GC:\n");

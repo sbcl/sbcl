@@ -2893,8 +2893,8 @@ void hexdump_spaces(struct verify_state* state, char *reason, char* pathname)
             fprintf(f, "%s", page_card_mark_string(p, marks));
         }
         fprintf(f, ")\n");
-        lispobj *where = base;
-        while (where<limit){
+        lispobj *where = next_object(base, 0, limit);
+        while (where){
             sword_t nwords = object_size(where);
             /* If your'e having trouble with a subset of objects, and you can get
              * a reliable reproducer, this predicate can decide which objects to
@@ -2946,7 +2946,7 @@ void hexdump_spaces(struct verify_state* state, char *reason, char* pathname)
                 else
                   fprintf(f, "\n");
             }
-            where += nwords;
+            where = next_object(where, nwords, limit);
         }
         fprintf(f,"--\n");
         firstpage = 1+lastpage;
@@ -3010,8 +3010,10 @@ void recompute_gen_bytes_allocated() {
  * changing betwee RWX|JIT and RW-, so we don't ever want to call
  * zero_range_with_mmap because among other things it doesn't know
  * to change the bit that reflects how the range was mapped */
-void remap_page_range(int executable, page_index_t from, page_index_t to)
+void remap_page_range(int option, page_index_t from, page_index_t to)
 {
+    int executable = option == 1;
+    int noreserve = (option == 2) ? MAP_NORESERVE : 0; // for "de-commit"
     void* base = page_address(from);
     sword_t length = npage_bytes(to + 1 - from);
     void* new_addr;
@@ -3025,7 +3027,8 @@ void remap_page_range(int executable, page_index_t from, page_index_t to)
     if (executable)
         new_addr = sbcl_mmap(base, length, OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
     else {
-        new_addr = sbcl_mmap(base, length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        new_addr = sbcl_mmap(base, length, PROT_READ|PROT_WRITE,
+                             MAP_ANON|MAP_PRIVATE|noreserve, -1, 0);
     }
     if (new_addr != base) lose("remap: page moved, %p ==> %p errno=%d", base, new_addr, errno);
     page_index_t p;
@@ -3270,7 +3273,7 @@ void remap_free_pages (page_index_t from, page_index_t to)
         gc_assert(VirtualFree(page_address(first_page), npage_bytes(last_page-first_page),
                               MEM_DECOMMIT));
 #elif defined LISP_FEATURE_DARWIN_JIT
-        remap_page_range(0, first_page, last_page-1); // change to non-executable
+        remap_page_range(2, first_page, last_page-1); // change to non-executable noreserve
 #else
         release_page_range(first_page, last_page-1);
 #endif

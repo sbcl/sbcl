@@ -190,6 +190,7 @@ static void move_objects() {
       generations[target_generation].bytes_allocated -= LINE_SIZE * decrement;
       bytes_allocated -= LINE_SIZE * decrement;
       if (page_words_used(p) == 0) {
+        set_page_need_to_zero(p, 1);
 #ifdef LISP_FEATURE_DARWIN_JIT
         reset_page_flags(p);
 #else
