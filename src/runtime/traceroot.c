@@ -1017,7 +1017,7 @@ gc_pathfind_aux(lispobj* stackptr, lispobj input, lispobj results,
     for_each_thread(th) {
         lispobj* stackptr = get_stackptr(th);
         os_context_t* context = get_register_context(th);
-        fprintf(stderr, "thread %p stack range %p..%p\n", th, stackptr, th->control_stack_end);
+        /* fprintf(stderr, "thread %p stack range %p..%p\n", th, stackptr, th->control_stack_end); */
         if (context) visit_context_registers(add_to_roots, context, &roots);
         for ( ; stackptr < th->control_stack_end ; ++stackptr ) {
             lispobj word = *stackptr;
