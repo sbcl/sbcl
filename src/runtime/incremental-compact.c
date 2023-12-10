@@ -199,7 +199,9 @@ static void move_objects() {
 #endif
       }
     }
-  if (force_compaction) fprintf(stderr, "Forced compaction moved %ld pages\n", pages_moved);
+
+  if (force_compaction && !lisp_startup_options.noinform)
+      fprintf(stderr, "Forced compaction moved %ld pages\n", pages_moved);
 }
 
 /* Fix up the address of a slot, when the object containing the slot
