@@ -1266,6 +1266,14 @@ int small_allocation_count = 0;
 
 int gencgc_alloc_profiler;
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define gc_memclear(pt, addr, len) \
+    do { if (gc_active_p || pt != PAGE_TYPE_CODE) memset(addr, 0, len); \
+    else { THREAD_JIT_WP(0); memset(addr, 0, len); THREAD_JIT_WP(1); } } while (0)
+#else
+#define gc_memclear(pt, addr, len) memset(addr, 0, len)
+#endif
+
 NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(__attribute__((unused)) int flags,
            struct alloc_region *region, sword_t nbytes,
@@ -1299,8 +1307,7 @@ lisp_alloc(__attribute__((unused)) int flags,
     }
 
     if (try_allocate_small_after_region(nbytes, region)) {
-      if (page_type != PAGE_TYPE_CODE) // alloc_code doesn't need zero-fill
-          memset(region->start_addr, 0, addr_diff(region->end_addr, region->start_addr));
+      gc_memclear(page_type, region->start_addr, addr_diff(region->end_addr, region->start_addr));
       return region->start_addr;
     }
 
@@ -1370,7 +1377,7 @@ lisp_alloc(__attribute__((unused)) int flags,
         gc_assert(ret);
         new_obj = page_address(new_page);
         set_allocation_bit_mark(new_obj);
-        if (page_type != PAGE_TYPE_CODE) memset(new_obj, 0, nbytes);
+        gc_memclear(page_type, new_obj, nbytes);
     } else {
         /* Try to find a page before acquiring free_pages_lock. */
         pre_search_for_small_space(nbytes, page_type, &alloc_start, page_table_pages);
@@ -1388,8 +1395,7 @@ lisp_alloc(__attribute__((unused)) int flags,
         ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
         new_obj = region->start_addr;
-        if (page_type != PAGE_TYPE_CODE) // alloc_code doesn't need zero-fill
-            memset(new_obj, 0, addr_diff(region->end_addr, new_obj));
+        gc_memclear(page_type, new_obj, addr_diff(region->end_addr, new_obj));
     }
 
     return new_obj;
