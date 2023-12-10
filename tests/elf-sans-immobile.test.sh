@@ -37,10 +37,12 @@ run_sbcl --load ../tools-for-build/editcore \
   --eval '(sb-editcore:redirect-text-space-calls "'${temp}'-patched.core")' \
   --eval '(sb-editcore:split-core "'${temp}'-patched.core" "'${temp}'-src.s")' --quit
 
+m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lzstd") #+x86 (princ " -m32"))' --quit`
+
 (cd ../src/runtime ; make libsbcl.a)
 exefile=$TEST_DIRECTORY/sbcl-new-elf
 cc -no-pie -o ${exefile} -Wl,--export-dynamic -Wl,-no-as-needed \
-   ${temp}-src.s ${temp}-src-core.o ../src/runtime/libsbcl.a -lm -ldl
+   ${temp}-src.s ${temp}-src-core.o ../src/runtime/libsbcl.a -lm -ldl ${m_arg}
 
 result=`${exefile} --eval '(princ "Success")' --quit`
 echo $result
