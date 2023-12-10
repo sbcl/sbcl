@@ -195,7 +195,7 @@
                  (let ((target (sap-ref-word (int-sap (machine-ea-disp value)) 0)))
                    (maybe-note-assembler-routine target t dstate)))))))
         ((null stream) (operand value dstate))
-        (t (write value :stream stream))))
+        (t (write value :stream stream :escape nil))))
 
 (defun print-sized-byte-reg/mem (value stream dstate)
   (print-reg/mem-with-width value :byte t stream dstate))
