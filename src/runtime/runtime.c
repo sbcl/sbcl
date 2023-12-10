@@ -671,7 +671,10 @@ initialize_lisp(int argc, char *argv[], char *envp[])
                 core = exe_path;
                 embedded_core_offset = offset;
             } else {
-                free(exe_path);
+                if (!sbcl_runtime)
+                    sbcl_runtime = exe_path;
+                else
+                    free(exe_path);
             }
         } else {
             free(exe_path);
