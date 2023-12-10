@@ -3127,6 +3127,14 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
         // fprintf(stderr, "zero_range_with_mmap: fallback to memset()\n");
         memset(addr, 0, length);
     }
+#elif defined LISP_FEATURE_DARWIN // and NOT darwin-jit
+    // Replace the mapping using MAP_FIXED (even though the man page says "Use of this
+    // option is discouraged") which avoids succumbing to the vulnerability of unmap/remap.
+    // Other BSD variants can do this but I don't know which they are.
+    void *new_addr = mmap(addr, length, OS_VM_PROT_ALL,
+                          MAP_ANON|MAP_PRIVATE|MAP_FIXED|MAP_NORESERVE,
+                          -1, 0);
+    if (new_addr != addr) lose("zero_range_with_mmap: page moved, %p ==> %p", addr, new_addr);
 #else
     // As described above, this branch has a bug! We want to hold the reservation
     // on the address range, but de-commmit the storage,
