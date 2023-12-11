@@ -98,11 +98,13 @@ endif
 
 targets: $(TARGET) $(OBJTARGET) $(LDB_TARGET) sbcl.mk
 
-LDB_OBJS = $(filter-out main.o runtime.o monitor.o thread.o safepoint.o,$(OBJS))
+LDB_OBJS = $(filter-out main.o interr.o runtime.o monitor.o thread.o safepoint.o,$(OBJS))
 ldb: $(LIBSBCL)
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
+	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-interr.o interr.c
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-thread.o thread.c
-	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-thread.o $(LDB_OBJS) $(LIBS)
+	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-interr.o standalone-thread.o \
+		$(LDB_OBJS) $(LIBS)
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)

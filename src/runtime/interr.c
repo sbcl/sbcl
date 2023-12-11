@@ -115,10 +115,20 @@ call_lossage_handler()
     exit(1);
 }
 
+#include <setjmp.h>
 void
 lose(char *fmt, ...)
 {
     va_list ap;
+#ifdef STANDALONE_LDB
+    extern jmp_buf ldb_toplevel;
+    va_start(ap, fmt);
+    print_message(fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "\n");
+    fflush(stderr);
+    longjmp(ldb_toplevel, 1);
+#else
     /* Block signals to prevent other threads, timers and such from
      * interfering. If only all threads could be stopped somehow. */
 
@@ -136,6 +146,7 @@ lose(char *fmt, ...)
     fprintf(stderr, "\n");
     fflush(stderr);
     call_lossage_handler();
+#endif
 }
 
 #if 0

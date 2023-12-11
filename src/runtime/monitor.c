@@ -1009,6 +1009,7 @@ ldb_monitor(void)
 void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing
 #include <errno.h>
+#include <setjmp.h>
 #include "core.h"
 struct lisp_startup_options lisp_startup_options;
 
@@ -1195,6 +1196,14 @@ int load_gc_crashdump(char* pathname)
         struct thread preserve;
         memcpy(&preserve, th, sizeof *th);
         checked_read(" TLS", fd, th, preamble.tls_size);
+        // Copy _into_ preserve the values of the allocation regions so that when
+        // copied back into 'th' we have access to the regions as they were at dump.
+        preserve.boxed_tlab = th->boxed_tlab;
+        preserve.cons_tlab = th->cons_tlab;
+        preserve.mixed_tlab = th->mixed_tlab;
+        preserve.symbol_tlab = th->symbol_tlab; // not used yet
+        preserve.sys_mixed_tlab = th->sys_mixed_tlab;
+        preserve.sys_cons_tlab = th->sys_cons_tlab;
         memcpy(th, &preserve, sizeof *th - N_WORD_BYTES);
         }
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
@@ -1251,6 +1260,7 @@ int load_gc_crashdump(char* pathname)
 }
 
 char *sbcl_runtime;
+jmp_buf ldb_toplevel;
 int main(int argc, char *argv[], char **envp)
 {
     extern void calc_asm_routine_bounds();
@@ -1263,6 +1273,8 @@ int main(int argc, char *argv[], char **envp)
     load_gc_crashdump(argv[1]);
     calc_asm_routine_bounds();
     gencgc_verbose = 1;
+    if (setjmp(ldb_toplevel) != 0)
+      fprintf(stderr, "Back in ldb, hope everything's Ok\n");
     ldb_monitor();
 }
 #endif
