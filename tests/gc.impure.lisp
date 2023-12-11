@@ -483,10 +483,10 @@
 (defvar *vvv* (make-array
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
-(with-test (:name :page-protected-p :broken-on :x86
+(with-test (:name :page-protected-p
                   :fails-on (or (and :big-endian :ppc64)
                                 (and :mark-region-gc :darwin))
-                  :broken-on (and :mark-region-gc (not :darwin))
+                  :broken-on (or :x86 (and :mark-region-gc (not :darwin)))
                   :skipped-on :gc-stress)
   (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
   (assert (= (sb-kernel:generation-of *vvv*) 1))
