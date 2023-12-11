@@ -125,6 +125,23 @@
                  ref)))
     (recurse lvar nil)))
 
+;;; Look through casts and variables
+(defun map-all-uses (function lvar)
+  (labels ((recurse-lvar (lvar)
+             (do-uses (use lvar)
+               (recurse use)))
+           (recurse (use)
+             (cond ((ref-p use)
+                    (let ((lvar (lambda-var-ref-lvar use)))
+                      (if lvar
+                          (recurse-lvar lvar)
+                          (funcall function use))))
+                   ((cast-p use)
+                    (recurse-lvar (cast-value use)))
+                   (t
+                    (funcall function use)))))
+    (recurse-lvar lvar)))
+
 (defun mv-principal-lvar-ref-use (lvar)
   (labels ((recurse (lvar)
              (let ((use (lvar-uses lvar)))
@@ -509,29 +526,26 @@
              (object-lambda-var (and (ref-p object-ref)
                                      (ref-leaf object-ref)))
              (allocator (principal-lvar-ref-use object-lvar t))
-             (value-ref (principal-lvar-ref value-lvar t))
-             (uses (lvar-uses value-lvar))
-             (external-p 0))
-        (flet ((born-before-p (node)
-                 (when (eql external-p 0)
-                   (setf external-p
-                         (when value-ref
-                           (setf uses (principal-lvar-ref-use value-lvar))
-                           (let ((var (ref-leaf value-ref)))
-                             (when (and (lambda-var-p (ref-leaf value-ref))
-                                        (not (lambda-var-sets (ref-leaf value-ref))))
-                               (let ((home (lambda-var-home var)))
-                                 (when (member (functional-kind home) '(:external :optional))
-                                   (lambda-environment (if (eq (functional-kind home) :external)
-                                                           (main-entry (functional-entry-fun home))
-                                                           home)))))))))
-                 (if external-p
-                     (eq (node-environment node) external-p)
-                     (and uses
-                          (if (consp uses)
-                              (loop for use in uses
-                                    always (node-dominates-p use node))
-                              (node-dominates-p uses node))))))
+             (uses (lvar-uses value-lvar)))
+        (labels ((born-before-p (node)
+                   (block nil
+                     (map-all-uses
+                      (lambda (use)
+                        (cond ((and (ref-p use)
+                                    (let ((var (ref-leaf use)))
+                                      (when (and (lambda-var-p var)
+                                                 (not (lambda-var-sets var)))
+                                        (let ((home (lambda-var-home var)))
+                                          (and (member (functional-kind home) '(:external :optional))
+                                               (or (eq (node-environment node)
+                                                       (lambda-environment (if (eq (functional-kind home) :external)
+                                                                               (main-entry (functional-entry-fun home))
+                                                                               home)))
+                                                   (return))))))))
+                              ((not (node-dominates-p use node))
+                               (return))))
+                      value-lvar)
+                     t)))
           (let ((old-p (when (and (combination-p allocator)
                                   (or
                                    (lvar-fun-is (combination-fun allocator) '(list* list
