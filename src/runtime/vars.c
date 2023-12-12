@@ -152,16 +152,6 @@ struct var *define_var(char *name, lispobj obj, bool perm)
     return var;
 }
 
-struct var *define_dynamic_var(char *name, lispobj updatefn(struct var *),
-                               bool perm)
-{
-    struct var *var = make_var(name, perm);
-
-    var->update_fn = updatefn;
-
-    return var;
-}
-
 char *var_name(struct var *var)
 {
     return var->name;
