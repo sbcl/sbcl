@@ -359,10 +359,13 @@
            ;; If immediate non-pointer, elide the barrier
            (when (sc-is tn immediate)
              (let ((value (tn-value tn)))
-               (when (sb-xc:typep value '(or character sb-xc:fixnum
-                                          #+64-bit single-float
-                                          ;; if a symbol is immediate then it's in immobile or static space
-                                          symbol))
+               (when (or (sb-xc:typep value ' (or character sb-xc:fixnum
+                                                  #+64-bit single-float
+                                                  boolean))
+                         (and (symbolp value)
+                              #-sb-xc-host
+                              (and (immobile-space-obj-p value)
+                                   (= (generation-of value) +pseudo-static-generation+))))
                  (return-from potential-heap-pointer-p nil))))
            (when (sb-c::unbound-marker-tn-p tn)
              (return-from potential-heap-pointer-p nil))
