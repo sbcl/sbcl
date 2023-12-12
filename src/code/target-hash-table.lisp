@@ -625,7 +625,7 @@ Examples:
       ;; GC can't get the table kind since it doesn't have access to the table.
       (cond (defaultp
              ;; Stash the desired size for the first time the vectors are grown.
-             (setf (hash-table-cache table) size
+             (setf (hash-table-cache table) (- size)
                    ;; Cause the overflow logic to be invoked on the first insert.
                    (hash-table-next-free-kv table) 0))
             (t
@@ -991,7 +991,7 @@ multiple threads accessing the same hash-table without locking."
                  (new-vectors))))))
     (when (= (hash-table-%count table) 0) ; special case for new table
       ;; CACHE holds the desired initial size. Read it and then set it to a bogusly high value
-      (binding* ((size (shiftf (hash-table-cache table) (- array-dimension-limit 2)))
+      (binding* ((size (- (hash-table-cache table)))
                  (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
                  (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
                  ((kv-vector next-vector hash-vector index-vector) (realloc size bucket-count 1)))
@@ -1374,8 +1374,13 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
      (declare (optimize speed (sb-c:verify-arg-count 0)
                         (sb-c:insert-array-bounds-checks 0)))
      (let ((index (hash-table-cache hash-table)))
+       ;; When INDEX is negative (implies that the hash table is
+       ;; empty), we could return DEFAULT here, but that is an overall
+       ;; performance loss. Maybe it's worth it to start with a
+       ;; GETHASH/EMPTY getter. -- MG, 2023-10-12
+       ;;
        ;; First check the cache using EQ, not the test fun, for speed.
-       (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
+       (when (and (plusp index) (eq (aref kv-vector index) key))
          (return-from ,name (values (aref kv-vector (1+ index)) t))))
      (with-pinned-objects (key)
        (binding* (,@(ht-hash-setup hash-fun-name)
@@ -1738,7 +1743,7 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
      (block done
        (let ((index (hash-table-cache hash-table)))
          ;; Check the most-recently-used cell
-         (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
+         (when (and (plusp index) (eq (aref kv-vector index) key))
            (return-from done (setf (aref kv-vector (1+ index)) value))))
        (with-pinned-objects (key)
          ;; Read the 'rehash' bit as soon as possible after pinning KEY,
@@ -1866,7 +1871,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
            ;; in a non-findable key which we'd have to heuristically allow based on
            ;; implicit pinning.
            (let ((i (* 2 index)))
-             (setf (aref kv-vector i) key (aref kv-vector (1+ i)) value)))
+             (setf (aref kv-vector i) key (aref kv-vector (1+ i)) value
+                   (hash-table-cache hash-table) i)))
          (incf (hash-table-%count hash-table))
          value))
 

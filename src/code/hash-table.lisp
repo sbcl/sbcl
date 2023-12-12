@@ -87,11 +87,13 @@
   ;; above the high water mark.  If you store non-immediate data past
   ;; that mark, you're sure to have problems.
   (pairs nil :type simple-vector)
-  ;; MRU physical index of a key in the k/v vector. If < (LENGTH PAIRS)
-  ;; the cell can be examined first in GETHASH and PUTHASH. The "unknown" value
-  ;; is not 0 because that would look valid but could accidentally return a
-  ;; false match if the user's key is EQ to element 0 in the pair vector.
-  (cache (- array-dimension-limit 2) :type index)
+  ;; If positive, this is the MRU physical index of a key in the k/v
+  ;; vector to be examined first in GETHASH and PUTHASH. Negative
+  ;; values stand for the desired initial hash table size in the
+  ;; deferred initialization scheme between %MAKE-HASH-TABLE and
+  ;; GROW-HASH-TABLE.
+  (cache -1 :type (integer (#.(- (1- array-dimension-limit)))
+                           (#.(1- array-dimension-limit))))
   ;; The index vector. This may be larger than the capacity to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))
