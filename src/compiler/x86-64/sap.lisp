@@ -143,7 +143,19 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 (defun emit-sap-ref (size insn modifier result ea node vop temp)
   (declare (ignorable node size vop temp))
   (cond
-   #+linux
+   ;; MSAN as implemented can't correctly interact with the C sanitizer because
+   ;; C msan shadow memory indicates bit-for-bit whether the user-visible memory
+   ;; was written, whereas in Lisp we only have byte granularity. When Lisp users
+   ;; need to read bit fields they have to mask off bits explicitly after doing
+   ;; a 1, 2, 4, or 8-byte load. Unfortunately that load could spuriously report
+   ;; that it was uninitialized if only _part_ was uninitialized, but we didn't
+   ;; want to examine the uninitialized bits. The problem is, it doesn't know that.
+   ;; Even though DEFINE-ALIEN-TYPE conveys the sematics of sub-byte fields, the
+   ;; compiler is itself unable to extract partial bytes.
+   ;; (You get "cannot extract 4-bit integers" for example)
+   ;; So unfortunately, because the IR can't convey what we mean, we have to do
+   ;; a larger load than wanted, which may fail.
+   #+nil
    ((and (sb-c:msan-unpoison sb-c:*compilation*) (policy node (> safety 0)))
     ;; Must not clobber TEMP with the load.
     (aver (not (location= temp result)))
