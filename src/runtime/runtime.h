@@ -9,9 +9,6 @@
  * files for more information.
  */
 
-/* FIXME: Aren't symbols with underscore prefixes supposed to be
- * reserved for system libraries? Perhaps rename stuff like this
- * to names like INCLUDED_SBCL_RUNTIME_H. */
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
