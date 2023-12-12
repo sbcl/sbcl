@@ -337,10 +337,13 @@ Please check that all strings which were not recognizable to the compiler
   ;; SAVE-LISP-AND-DIE.
   #-sb-devel (!unintern-init-only-stuff)
 
-  ;; A symbol whose INFO slot underwent any kind of manipulation
-  ;; such that it now has neither properties nor globaldb info,
-  ;; can have the slot set back to NIL if it wasn't already.
+
   (do-all-symbols (symbol)
+    (sb-kernel:logior-header-bits symbol sb-vm::+symbol-initial-core+)
+
+    ;; A symbol whose INFO slot underwent any kind of manipulation
+    ;; such that it now has neither properties nor globaldb info,
+    ;; can have the slot set back to NIL if it wasn't already.
     (when (and (sb-kernel:symbol-%info symbol) ; "raw" value is something
                ;; but both "cooked" values are empty
                (null (sb-kernel:symbol-dbinfo symbol))

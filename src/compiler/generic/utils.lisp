@@ -359,20 +359,25 @@
            ;; If immediate non-pointer, elide the barrier
            (when (sc-is tn immediate)
              (let ((value (tn-value tn)))
-               (when (or (sb-xc:typep value ' (or character sb-xc:fixnum
-                                                  #+64-bit single-float
-                                                  boolean))
-                         (and (symbolp value)
-                              #-sb-xc-host
-                              (and (immobile-space-obj-p value)
-                                   (= (generation-of value) +pseudo-static-generation+))))
+               (when (sb-xc:typep value '(or character sb-xc:fixnum
+                                          #+64-bit single-float
+                                          boolean))
                  (return-from potential-heap-pointer-p nil))))
            (when (sb-c::unbound-marker-tn-p tn)
              (return-from potential-heap-pointer-p nil))
            ;; And elide for things like (OR FIXNUM NULL)
            (let ((type (tn-ref-type tn-ref)))
-             (when (csubtypep type (specifier-type '(or character sb-xc:fixnum boolean
-                                                        #+64-bit single-float)))
+             (when (or (csubtypep type #1=(specifier-type '(or character sb-xc:fixnum boolean
+                                                         #+64-bit single-float)))
+                       (let ((diff (type-difference type #1#)))
+                         (and (member-type-p diff)
+                              #-sb-xc-host
+                              (loop for member in (member-type-members diff)
+                                    always
+                                    (and (eql (generation-of member) +pseudo-static-generation+)
+                                         (or (not (sb-c::producing-fasl-file))
+                                             (and (symbolp member)
+                                                  (logtest +symbol-initial-core+ (get-header-data member)))))))))
                (return-from potential-heap-pointer-p nil)))
            t)
          (boxed-tn-p (value-tn)

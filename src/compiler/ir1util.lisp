@@ -514,77 +514,96 @@
           (dominates-p block1 block2)))))
 
 (defun set-slot-old-p (node nth-value)
-  (when (combination-p node)
-    (when (lvar-fun-is (combination-fun node) '(initialize-vector))
-      (return-from set-slot-old-p t))
-    (let ((args (combination-args node)))
-      (when (lvar-fun-is (combination-fun node) '(%%primitive))
-        (pop args))
-      (let* ((object-lvar (first args))
-             (value-lvar (nth nth-value args))
-             ;; (object-ref (principal-lvar-ref object-lvar t))
-             ;; (object-lambda-var (and (ref-p object-ref)
-             ;;                         (ref-leaf object-ref)))
-             ;; (uses (lvar-uses value-lvar))
-             (allocator (principal-lvar-ref-use object-lvar t)))
-        (labels ((born-before-p (node)
-                   (block nil
-                     (map-all-uses
-                      (lambda (use)
-                        (cond ((and (ref-p use)
-                                    (let ((var (ref-leaf use)))
-                                      (or (constant-p var)
-                                          (when (and (lambda-var-p var)
-                                                     (not (lambda-var-sets var)))
-                                            (let ((home (lambda-var-home var)))
-                                              (and (member (functional-kind home) '(:external :optional))
-                                                   (or (eq (node-environment node)
-                                                           (lambda-environment (if (eq (functional-kind home) :external)
-                                                                                   (main-entry (functional-entry-fun home))
-                                                                                   home)))
-                                                       (return)))))))))
-                              ((not (node-dominates-p use node))
-                               (return))))
-                      value-lvar)
-                     t)))
-          (let ((old-p (when (and (combination-p allocator)
-                                  (or
-                                   (lvar-fun-is (combination-fun allocator) '(list* list
-                                                                              %make-structure-instance
-                                                                              %make-instance
-                                                                              %make-instance/mixed
-                                                                              %make-funcallable-instance
-                                                                              copy-structure))
-                                   (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
-                                        (let ((allocator (principal-lvar-ref-use
-                                                          (principal-lvar (first (combination-args allocator))))))
-                                          (and (combination-p allocator)
-                                               (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))
-                                   (let* ((name (lvar-fun-name (combination-fun allocator) t)))
-                                     (typep (info :function :source-transform name)
-                                            '(cons * (eql :constructor))))))
-                         (born-before-p allocator))))
-            ;;; Doesn't work because if there's a GC between two
-            ;;; stores and the object doesn't get a sticky-mark
-            ;;; (because it was on the stack, or the gc is triggered
-            ;;; by the current thread) it won't preserve the mark.
-            ;; (when (and (lambda-var-p object-lambda-var)
-            ;;            (not old-p)
-            ;;            (not (lvar-fun-is (combination-fun node)
-            ;;                              '(sb-kernel:data-vector-set
-            ;;                                sb-kernel:data-vector-set-with-offset))))
-            ;;   (let ((previous-sets (lambda-var-constraints object-lambda-var)))
-            ;;     (cond ((consp previous-sets)
-            ;;            (if (and uses
-            ;;                     (loop for set in previous-sets
-            ;;                           thereis (and (node-dominates-p set node)
-            ;;                                        (born-before-p set))))
-            ;;                (setf old-p t)
-            ;;                (push node (lambda-var-constraints object-lambda-var))))
-            ;;           (t
-            ;;            ;; Reuse the slot
-            ;;            (setf (lambda-var-constraints object-lambda-var) (list node))))))
-            old-p))))))
+  (flet ((pseudo-static-value-p (lvar)
+           (block nil
+             (map-all-uses
+              (lambda (use)
+                (unless (and (ref-p use)
+                             (constant-p (ref-leaf use))
+                             #-sb-xc-host
+                             (let ((value (constant-value (ref-leaf use))))
+                               (or (typep value '(or character sb-xc:fixnum #+64-bit single-float boolean))
+                                   (and (eql (generation-of value) sb-vm:+pseudo-static-generation+)
+                                        (or (not (sb-c::producing-fasl-file))
+                                            (and (symbolp value)
+                                                 (logtest sb-vm::+symbol-initial-core+ (get-header-data value))))))))
+                  (return)))
+              lvar)
+             t)))
+    (cond ((set-p node)
+           (pseudo-static-value-p (set-value node)))
+          ((combination-p node)
+           (when (lvar-fun-is (combination-fun node) '(initialize-vector))
+             (return-from set-slot-old-p t))
+           (let ((args (combination-args node)))
+             (when (lvar-fun-is (combination-fun node) '(%%primitive))
+               (pop args))
+             (let* ((object-lvar (first args))
+                    (value-lvar (nth nth-value args))
+                    ;; (object-ref (principal-lvar-ref object-lvar t))
+                    ;; (object-lambda-var (and (ref-p object-ref)
+                    ;;                         (ref-leaf object-ref)))
+                    ;; (uses (lvar-uses value-lvar))
+                    (allocator (principal-lvar-ref-use object-lvar t)))
+               (labels ((born-before-p (node)
+                          (block nil
+                            (map-all-uses
+                             (lambda (use)
+                               (cond ((and (ref-p use)
+                                           (let ((var (ref-leaf use)))
+                                             (or (constant-p var)
+                                                 (when (and (lambda-var-p var)
+                                                            (not (lambda-var-sets var)))
+                                                   (let ((home (lambda-var-home var)))
+                                                     (and (member (functional-kind home) '(:external :optional))
+                                                          (or (eq (node-environment node)
+                                                                  (lambda-environment (if (eq (functional-kind home) :external)
+                                                                                          (main-entry (functional-entry-fun home))
+                                                                                          home)))
+                                                              (return)))))))))
+                                     ((not (node-dominates-p use node))
+                                      (return))))
+                             value-lvar)
+                            t)))
+                 (let ((old-p (when (and (combination-p allocator)
+                                         (or
+                                          (lvar-fun-is (combination-fun allocator) '(list* list
+                                                                                     %make-structure-instance
+                                                                                     %make-instance
+                                                                                     %make-instance/mixed
+                                                                                     %make-funcallable-instance
+                                                                                     copy-structure))
+                                          (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
+                                               (let ((allocator (principal-lvar-ref-use
+                                                                 (principal-lvar (first (combination-args allocator))))))
+                                                 (and (combination-p allocator)
+                                                      (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))
+                                          (let* ((name (lvar-fun-name (combination-fun allocator) t)))
+                                            (typep (info :function :source-transform name)
+                                                   '(cons * (eql :constructor))))))
+                                (born-before-p allocator))))
+                   ;; Doesn't work because if there's a GC between two
+                   ;; stores and the object doesn't get a sticky-mark
+                   ;; (because it was on the stack, or the gc is triggered
+                   ;; by the current thread) it won't preserve the mark.
+                   ;; (when (and (lambda-var-p object-lambda-var)
+                   ;;            (not old-p)
+                   ;;            (not (lvar-fun-is (combination-fun node)
+                   ;;                              '(sb-kernel:data-vector-set
+                   ;;                                sb-kernel:data-vector-set-with-offset))))
+                   ;;   (let ((previous-sets (lambda-var-constraints object-lambda-var)))
+                   ;;     (cond ((consp previous-sets)
+                   ;;            (if (and uses
+                   ;;                     (loop for set in previous-sets
+                   ;;                           thereis (and (node-dominates-p set node)
+                   ;;                                        (born-before-p set))))
+                   ;;                (setf old-p t)
+                   ;;                (push node (lambda-var-constraints object-lambda-var))))
+                   ;;           (t
+                   ;;            ;; Reuse the slot
+                   ;;            (setf (lambda-var-constraints object-lambda-var) (list node))))))
+                   (or old-p
+                       (pseudo-static-value-p value-lvar))))))))))
 
 ;;;; block starting/creation
 
