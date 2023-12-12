@@ -830,7 +830,7 @@
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (any-reg descriptor-reg immediate constant) * %instance-set)
+  instance-pointer-lowtag (any-reg descriptor-reg constant) * %instance-set)
 
 ;;; Try to group consecutive %INSTANCE-SET vops on the same instance
 ;;; so that:

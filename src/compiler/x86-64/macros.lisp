@@ -412,7 +412,10 @@
 ;;; used for: INSTANCE-INDEX-SET %CLOSURE-INDEX-SET
 ;;;           SB-BIGNUM:%BIGNUM-SET %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS
 (defmacro define-full-setter (name type offset lowtag scs el-type translate)
-  `(define-vop (,name)
+  (let ((tagged (and (member 'any-reg scs)
+                     t))
+        (barrier (member name '(instance-index-set %closure-index-set %weakvec-set))))
+    `(define-vop (,name)
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
@@ -420,10 +423,16 @@
                                    (immediate
                                     (typep (- (* (+ ,offset (tn-value tn)) n-word-bytes) ,lowtag)
                                            '(signed-byte 32)))))
-              (value :scs ,scs))
+              (value :scs (,@scs
+                           ,(if barrier ;; will use value-temp anyway
+                                'immediate
+                                `(immediate (let ((value (tn-value tn)))
+                                              (and (integerp value)
+                                                   (plausible-signed-imm32-operand-p (,(if tagged 'fixnumize 'progn) value)))))))))
        (:arg-types ,type tagged-num ,el-type)
        (:vop-var vop)
-       (:temporary (:sc unsigned-reg) val-temp)
+       ,@(and barrier
+              `((:temporary (:sc unsigned-reg) val-temp)))
        (:generator 4
          ,@(when (eq translate 'sb-bignum:%bignum-set)
              '((bignum-index-check object index 0 vop)))
@@ -432,9 +441,10 @@
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index)))))
-           ,@(when (member name '(instance-index-set %closure-index-set %weakvec-set))
-               '((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
-           (emit-store ea value val-temp)))))
+           ,@(if barrier
+                 `((emit-store ea value val-temp)
+                   (emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value))
+                 `((inst mov :qword ea (encode-value-if-immediate value ,tagged)))))))))
 
 (defmacro pc-size (vop)
   `(if (sb-c::code-immobile-p ,vop)

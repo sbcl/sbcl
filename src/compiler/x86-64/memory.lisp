@@ -63,10 +63,10 @@
   (inst and :dword scratch-reg card-index-mask)
   (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
 
-(defun emit-store (ea value val-temp)
+(defun emit-store (ea value val-temp &optional (tag-immediate t))
   (sc-case value
    (immediate
-      (let ((bits (encode-value-if-immediate value)))
+      (let ((bits (encode-value-if-immediate value tag-immediate)))
         ;; Try to move imm-to-mem if BITS fits
         (acond ((or (and (fixup-p bits)
                          ;; immobile-object fixups must fit in 32 bits
