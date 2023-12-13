@@ -566,30 +566,39 @@
                                       (return))))
                              value-lvar)
                             t))
-                        (allocator-p (allocator)
-                          (and (combination-p allocator)
-                               (or
-                                (lvar-fun-is (combination-fun allocator) '(list* list
-                                                                           %make-structure-instance
-                                                                           %make-instance
-                                                                           %make-instance/mixed
-                                                                           %make-funcallable-instance
-                                                                           allocate-vector
-                                                                           initialize-vector
-                                                                           copy-structure
-                                                                           copy-list
-                                                                           copy-tree
-                                                                           copy-seq
-                                                                           subseq
-                                                                           vector-subseq*))
-                                (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
-                                     (let ((allocator (principal-lvar-ref-use
-                                                       (principal-lvar (first (combination-args allocator))))))
-                                       (and (combination-p allocator)
-                                            (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))
-                                (let ((name (lvar-fun-name (combination-fun allocator) t)))
-                                  (typep (info :function :source-transform name)
-                                         '(cons * (eql :constructor))))))))
+                        (allocator-p (allocator &optional any)
+                          (or (and (combination-p allocator)
+                                   (or
+                                    (lvar-fun-is (combination-fun allocator) '(list* list %make-list
+                                                                               %make-structure-instance
+                                                                               %make-instance
+                                                                               %make-instance/mixed
+                                                                               %make-funcallable-instance
+                                                                               allocate-vector
+                                                                               initialize-vector
+                                                                               copy-structure
+                                                                               copy-list
+                                                                               copy-tree
+                                                                               copy-seq
+                                                                               subseq
+                                                                               vector-subseq*))
+                                    (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
+                                         (let ((allocator (principal-lvar-ref-use
+                                                           (principal-lvar (first (combination-args allocator))))))
+                                           (and (combination-p allocator)
+                                                (lvar-fun-is (combination-fun allocator) '(allocate-vector)))))
+                                    (let ((name (lvar-fun-name (combination-fun allocator) t)))
+                                      (typep (info :function :source-transform name)
+                                             '(cons * (eql :constructor))))
+                                    (and any
+                                         (lvar-fun-is (combination-fun allocator) '(sb-impl::make-hash-table-using-defaults
+                                                                                    %make-array)))))
+                              (and any
+                                   (and (ref-p allocator)
+                                        (let ((lambda (ref-leaf allocator)))
+                                          (and (lambda-p lambda)
+                                               (environment-closure (get-lambda-environment lambda))
+                                               (xep-enclose lambda))))))))
                  (let ((old-p (when (allocator-p allocator)
                                 (born-before-p allocator))))
                    ;; Doesn't work in general because if there's a GC
@@ -622,9 +631,12 @@
                                                   (block nil
                                                     (map-all-uses
                                                      (lambda (use)
-                                                       (unless (and (allocator-p use)
-                                                                    (born-before-p use))
-                                                         (return)))
+                                                       (let ((allocator (allocator-p use t)))
+                                                         (unless (cond ((eq allocator t)
+                                                                        (born-before-p use))
+                                                                       (allocator
+                                                                        (born-before-p allocator)))
+                                                           (return))))
                                                      lvar)
                                                     t))
                                                  (node-dominates-p set node)
