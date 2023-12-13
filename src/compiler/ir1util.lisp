@@ -637,10 +637,10 @@
                                                     (map-all-uses
                                                      (lambda (use)
                                                        (let ((allocator (allocator-p use t)))
-                                                         (unless (cond ((eq allocator t)
-                                                                        (born-before-p use))
+                                                         (unless (cond ((node-p allocator)
+                                                                        (born-before-p allocator))
                                                                        (allocator
-                                                                        (born-before-p allocator)))
+                                                                        (born-before-p use)))
                                                            (return))))
                                                      lvar)
                                                     t))
