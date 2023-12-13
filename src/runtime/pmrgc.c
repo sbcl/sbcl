@@ -856,7 +856,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     // preserves the SB-THREAD:THREAD instance and its startup function,
     // neither of which will move.
 
-#if 0 // was: ifdef STARTING_THREADS
+#ifdef STARTING_THREADS
     lispobj pin_list = SYMBOL(STARTING_THREADS)->value;
     for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
         lispobj thing = CONS(pin_list)->car;
