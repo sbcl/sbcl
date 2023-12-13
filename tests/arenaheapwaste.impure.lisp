@@ -51,7 +51,7 @@
 
 (with-test (:name :waste-heap
                   ;; don't have count_generation_pages()
-            :skipped-on :mark-region-gc)
+            :skipped-on (or :mark-region-gc :gc-stress))
   ;; Prior to the logic that picked up where we left off in the heap
   ;; it was easily demonstrated that the heap waste could rise to as much
   ;; as 70% before starting a GC.

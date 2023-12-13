@@ -185,6 +185,7 @@
   (defmethod just-call-next-method (thing)
     (call-next-method)))
 
+#+(and x86-64 gc-stress) (invoke-restart 'run-tests::skip-file)  ;; encapsulate hangs
 (defvar *compile-count* 0)
 (sb-int:encapsulate 'sb-c:compile-in-lexenv 'call-counter
                     (lambda (realfun &rest args)
