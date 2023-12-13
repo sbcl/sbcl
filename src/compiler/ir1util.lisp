@@ -569,6 +569,7 @@
                                                                            %make-instance
                                                                            %make-instance/mixed
                                                                            %make-funcallable-instance
+                                                                           allocate-vector
                                                                            copy-structure
                                                                            copy-list
                                                                            copy-tree
