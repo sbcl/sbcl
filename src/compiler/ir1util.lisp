@@ -552,11 +552,15 @@
                                                             (not (lambda-var-sets leaf)))
                                                    (let ((home (lambda-var-home leaf)))
                                                      (and (member (functional-kind home) '(:external :optional))
-                                                          (or (eq (node-environment node)
-                                                                  (lambda-environment (if (eq (functional-kind home) :external)
-                                                                                          (main-entry (functional-entry-fun home))
-                                                                                          home)))
-                                                              (return)))))
+                                                          (let ((entry (if (eq (functional-kind home) :external)
+                                                                           (main-entry (functional-entry-fun home))
+                                                                           home))
+                                                                (node-home (node-home-lambda node)))
+                                                            (or (eq (lambda-environment node-home)
+                                                                    (lambda-environment entry))
+                                                                (lexenv-contains-lambda node-home
+                                                                                        (lambda-lexenv entry))
+                                                                (return))))))
                                                  (and (lambda-p leaf)
                                                       (or (not (environment-closure (get-lambda-environment leaf)))
                                                           (let ((enclose (xep-enclose leaf)))
@@ -570,6 +574,7 @@
                           (or (and (combination-p allocator)
                                    (or
                                     (lvar-fun-is (combination-fun allocator) '(list* list %make-list
+                                                                               %listify-rest-args
                                                                                %make-structure-instance
                                                                                %make-instance
                                                                                %make-instance/mixed
