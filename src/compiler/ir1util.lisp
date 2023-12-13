@@ -569,7 +569,12 @@
                                                                            %make-instance
                                                                            %make-instance/mixed
                                                                            %make-funcallable-instance
-                                                                           copy-structure))
+                                                                           copy-structure
+                                                                           copy-list
+                                                                           copy-tree
+                                                                           copy-seq
+                                                                           subseq
+                                                                           vector-subseq*))
                                 (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
                                      (let ((allocator (principal-lvar-ref-use
                                                        (principal-lvar (first (combination-args allocator))))))
