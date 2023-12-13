@@ -70,7 +70,8 @@
 (progn
   (defun type-other-pointer-p (type)
     (csubtypep type (specifier-type '(not #1=(or fixnum #+64-bit single-float
-                                                     list function instance character)))))
+                                                 list function instance character
+                                                 extended-sequence)))))
 
   (defun type-not-other-pointer-p (type)
     (csubtypep type (specifier-type '#1#))))
