@@ -546,17 +546,22 @@
                             (map-all-uses
                              (lambda (use)
                                (cond ((and (ref-p use)
-                                           (let ((var (ref-leaf use)))
-                                             (or (constant-p var)
-                                                 (when (and (lambda-var-p var)
-                                                            (not (lambda-var-sets var)))
-                                                   (let ((home (lambda-var-home var)))
+                                           (let ((leaf (ref-leaf use)))
+                                             (or (constant-p leaf)
+                                                 (when (and (lambda-var-p leaf)
+                                                            (not (lambda-var-sets leaf)))
+                                                   (let ((home (lambda-var-home leaf)))
                                                      (and (member (functional-kind home) '(:external :optional))
                                                           (or (eq (node-environment node)
                                                                   (lambda-environment (if (eq (functional-kind home) :external)
                                                                                           (main-entry (functional-entry-fun home))
                                                                                           home)))
-                                                              (return)))))))))
+                                                              (return)))))
+                                                 (and (lambda-p leaf)
+                                                      (or (not (environment-closure (get-lambda-environment leaf)))
+                                                          (let ((enclose (xep-enclose leaf)))
+                                                            (and enclose
+                                                                 (node-dominates-p enclose node)))))))))
                                      ((not (node-dominates-p use node))
                                       (return))))
                              value-lvar)
@@ -570,6 +575,7 @@
                                                                            %make-instance/mixed
                                                                            %make-funcallable-instance
                                                                            allocate-vector
+                                                                           initialize-vector
                                                                            copy-structure
                                                                            copy-list
                                                                            copy-tree
