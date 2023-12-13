@@ -1281,10 +1281,10 @@
   ;; This is a trivial test of the control case for :stack-instance-set
   (let ((vops-with-barrier
          (find-gc-barriers
-          '(lambda ()
+          '(lambda (x)
             (declare (inline make-wordpair))
             (let ((pair (make-wordpair :a 'foo)))
-              (setf (wordpair-b pair) "hi")
+              (setf (wordpair-b pair) (car x))
               (values (func pair)))))))
     (assert (equal vops-with-barrier '("INSTANCE-INDEX-SET")))))
 
