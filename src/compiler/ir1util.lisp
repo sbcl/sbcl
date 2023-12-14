@@ -519,14 +519,18 @@
              (map-all-uses
               (lambda (use)
                 (unless (and (ref-p use)
-                             (constant-p (ref-leaf use))
-                             #-sb-xc-host
-                             (let ((value (constant-value (ref-leaf use))))
-                               (or (sb-xc:typep value '(or character sb-xc:fixnum #+64-bit single-float boolean))
-                                   (and (eql (generation-of value) sb-vm:+pseudo-static-generation+)
-                                        (or (not (sb-c::producing-fasl-file))
-                                            (and (symbolp value)
-                                                 (logtest sb-vm::+symbol-initial-core+ (get-header-data value))))))))
+                             (let ((leaf (ref-leaf use)))
+                               (or (and (constant-p leaf)
+                                        #-sb-xc-host
+                                        (let ((value (constant-value leaf)))
+                                          (or (sb-xc:typep value '(or character sb-xc:fixnum #+64-bit single-float boolean))
+                                              (and (eql (generation-of value) sb-vm:+pseudo-static-generation+)
+                                                   (or (not (sb-c::producing-fasl-file))
+                                                       (and (symbolp value)
+                                                            (logtest sb-vm::+symbol-initial-core+ (get-header-data value))))))))
+                                   #+sb-xc-host
+                                   (and (lambda-p leaf)
+                                        (not (environment-closure (get-lambda-environment leaf)))))))
                   (return)))
               lvar)
              t)))
