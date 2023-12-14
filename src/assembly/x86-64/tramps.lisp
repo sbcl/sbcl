@@ -243,6 +243,14 @@
 
 #+debug-gc-barriers
 (define-assembly-routine (check-barrier (:return-style :none)) ()
+  (inst push rax-tn)
+  (inst mov rax-tn (ea 16 rsp-tn))
+  (inst not rax-tn)
+  (inst test :byte rax-tn 3)
+  (inst pop rax-tn)
+  (inst jmp :e check)
+  (inst ret 24)
+  check
   (with-registers-preserved (c :except fp) ;; shouldn't have any fp operations
     (call-c (make-fixup "check_barrier" :foreign)
             (ea 16 rbp-tn)

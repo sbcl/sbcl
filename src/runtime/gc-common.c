@@ -3320,8 +3320,6 @@ static bool card_markedp(void* addr)
 }
 
 extern void check_barrier (lispobj young, lispobj old, int wp) {
-    if (!is_lisp_pointer(young))
-        return;
     generation_index_t old_gen = gc_gen_of(old, -1);
     if (old_gen == -1 || (!wp && card_markedp(native_pointer(old))))
         return;
