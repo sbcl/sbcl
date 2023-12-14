@@ -97,15 +97,18 @@
   ;;   Lisp = save GPRs that lisp call can change
   (aver (member convention '(lisp c)))
   (aver (eql card-table-reg 12)) ; change detector
-  (let ((fpr-align 64)
-        (except (ensure-list except))
-        (clobberables
-         (remove frame-reg
-                 `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
-           ;; 13 is usable only if not permanently wired to the thread base
-                       #+gs-seg r13
-                       r14 r15)))
-        (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
+  (let* ((dont-save-fpr (eq except 'fp))
+         (fpr-align 64)
+         (except (ensure-list except))
+         (clobberables
+           (remove frame-reg
+                   `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
+                         ;; 13 is usable only if not permanently wired to the thread base
+                         #+gs-seg r13
+                         r14 r15)))
+         (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
+    (when dont-save-fpr
+      (setf except nil))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
     ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
     ;; routine (by *not* preserving it) will be meaningless.
@@ -119,28 +122,31 @@
     (when (member 'rax except)
       (error "Excluding RAX from preserved GPRs probably will not do what you want."))
     (let* ((gprs ; take SET-DIFFERENCE with EXCEPT but in a predictable order
-            (remove-if (lambda (x) (member x except))
-                       (ecase convention
-                         ;; RBX and R12..R15 are preserved across C call
-                         (c '(rax rcx rdx rsi rdi r8 r9 r10 r11))
-                         ;; all GPRs are potentially destroyed across lisp call
-                         (lisp clobberables))))
+             (remove-if (lambda (x) (member x except))
+                        (ecase convention
+                          ;; RBX and R12..R15 are preserved across C call
+                          (c '(rax rcx rdx rsi rdi r8 r9 r10 r11))
+                          ;; all GPRs are potentially destroyed across lisp call
+                          (lisp clobberables))))
            ;; each 8 registers pushed preserves 64-byte alignment
            (alignment-bytes
-            (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
+             (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
       `(progn
          ,@(when frame-tn
              `((inst push ,frame-tn)
                (inst mov ,frame-tn rsp-tn)))
-         (inst and rsp-tn ,(- fpr-align))
+         ,@(unless dont-save-fpr
+             `((inst and rsp-tn ,(- fpr-align))))
          (regs-pushlist ,@gprs)
-         (inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
-         (call-fpr-save/restore-routine :save)
+         ,@(unless dont-save-fpr
+             `((inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
+               (call-fpr-save/restore-routine :save)))
          (assemble () ,@body)
-         (call-fpr-save/restore-routine :restore)
-         (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))
+         ,@(unless dont-save-fpr
+             `((call-fpr-save/restore-routine :restore)
+               (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))))
          (regs-poplist ,@gprs)
-        ,@(cond ((eq frame-tn 'rbp)
+         ,@(cond ((eq frame-tn 'rbp)
                   '((inst leave)))
                  (frame-tn
                   `((inst mov rsp-tn ,frame-tn)

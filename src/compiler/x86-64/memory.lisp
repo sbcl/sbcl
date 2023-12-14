@@ -39,22 +39,58 @@
   (progn
   (when (sc-is object constant immediate)
     (aver (symbolp (tn-value object))))
-  (when (require-gengc-barrier-p object value-tn-ref value-tn allocator)
-    (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
-        (inst lea scratch-reg cell-address)
-        ;; OBJECT could be a symbol in immobile space
-        (inst mov scratch-reg (encode-value-if-immediate object)))
-    (inst shr scratch-reg gencgc-card-shift)
-    ;; gc_allocate_ptes() asserts mask to be < 32 bits, which is hugely generous.
-    (inst and :dword scratch-reg card-index-mask)
-    ;; I wanted to use thread-tn as the source of the store, but it isn't 256-byte-aligned
-    ;; due to presence of negatively indexed thread header slots.
-    ;; Probably word-alignment is enough, because we can just check the lowest bit,
-    ;; borrowing upon the idea from PSEUDO-ATOMIC which uses RBP-TN as the source.
-    ;; I'd like to measure to see if using a register is actually better.
-    ;; If all threads store 0, it might be easier on the CPU's store buffer.
-    ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
-    (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))))
+  (multiple-value-bind (require #+debug-gc-barriers why-not)
+      (require-gengc-barrier-p object value-tn-ref value-tn allocator)
+    (cond (require
+           (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
+               (inst lea scratch-reg cell-address)
+               ;; OBJECT could be a symbol in immobile space
+               (inst mov scratch-reg (encode-value-if-immediate object)))
+           (inst shr scratch-reg gencgc-card-shift)
+           ;; gc_allocate_ptes() asserts mask to be < 32 bits, which is hugely generous.
+           (inst and :dword scratch-reg card-index-mask)
+           ;; I wanted to use thread-tn as the source of the store, but it isn't 256-byte-aligned
+           ;; due to presence of negatively indexed thread header slots.
+           ;; Probably word-alignment is enough, because we can just check the lowest bit,
+           ;; borrowing upon the idea from PSEUDO-ATOMIC which uses RBP-TN as the source.
+           ;; I'd like to measure to see if using a register is actually better.
+           ;; If all threads store 0, it might be easier on the CPU's store buffer.
+           ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
+           (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
+          #+debug-gc-barriers
+          (t
+           (flet ((encode (x)
+                    (sc-case x
+                      (constant
+                       (load-constant nil x scratch-reg)
+                       scratch-reg)
+                      (t
+                       (let ((value (encode-value-if-immediate x)))
+                         (if (integerp value)
+                             (constantize value)
+                             value))))))
+             (cond (value-tn
+                    (unless (and (sc-is value-tn immediate)
+                                 (typep (tn-value value-tn) '(or integer boolean)))
+                      (inst push (if (eq why-not :consecutive)
+                                     0
+                                     1))
+                      (inst push (encode object))
+                      (inst push (encode value-tn))
+
+                      (invoke-asm-routine 'call 'check-barrier sb-assem::*current-vop*)))
+                   (value-tn-ref
+                    (loop do
+                          (unless (and (sc-is (tn-ref-tn value-tn-ref) immediate)
+                                       (typep (tn-value (tn-ref-tn value-tn-ref)) '(or integer boolean)))
+                            (inst push (if (eq why-not :consecutive)
+                                           0
+                                           1))
+                            (inst push (encode object))
+                            (inst push (encode (tn-ref-tn value-tn-ref)))
+                            (invoke-asm-routine 'call 'check-barrier sb-assem::*current-vop*))
+                          (setf value-tn-ref (tn-ref-across value-tn-ref))
+                          while value-tn-ref)))))))))
 
 #-soft-card-marks
 (defun emit-code-page-gengc-barrier (object scratch-reg)

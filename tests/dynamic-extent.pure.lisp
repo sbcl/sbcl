@@ -327,7 +327,8 @@
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
     (values (funcall (the function thunk) s))))
 ;; stack-allocatable lists are necessary but not sufficient
-(with-test (:name (:dx-list :make-list) :fails-on (not :x86-64))
+(with-test (:name (:dx-list :make-list) :fails-on (not :x86-64)
+                  :skipped-on :debug-gc-barriers)
   (let ((calls (ctu:asm-search "CALL" #'make-var-length-dx-list)))
     ;; Call nothing but the funarg
     (assert (eql (length calls) 1)))

@@ -1140,7 +1140,8 @@
 ;;; one per item. It is still suboptimal in that it can not discern
 ;;; between initializing and updating, so it always uses a :QWORD move
 ;;; despite the prezeroed pages.
-(with-test (:name :init-vector-mov-to-mem)
+(with-test (:name :init-vector-mov-to-mem
+            :skipped-on :debug-gc-barriers)
   (let* ((lines (disassembly-lines
                  '(lambda () (vector #\x 1 2 3))))
          (magic-value

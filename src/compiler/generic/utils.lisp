@@ -400,15 +400,19 @@
                       (return t)))))
              (unless any-pointer
                (return-from require-gengc-barrier-p nil)))))
-    (unless (and value-tn
-                 value-tn-ref
-                 ;; Can this TN be boxed after the allocator?
-                 (boxed-tn-p value-tn)
-                 (or (eq allocator :allocator)
-                     (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
-                                           (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref)))))
-      (incf *store-barriers-emitted*)
-      t)))
+    (let (why)
+      (cond ((and value-tn
+                  value-tn-ref
+                  ;; Can this TN be boxed after the allocator?
+                  (boxed-tn-p value-tn)
+                  (or (eq allocator :allocator)
+                      (setf why
+                            (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
+                                                  (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref))))))
+             (values nil why))
+            (t
+             (incf *store-barriers-emitted*)
+             t)))))
 
 (defun vop-nth-arg (n vop)
   (let ((ref (vop-args vop)))

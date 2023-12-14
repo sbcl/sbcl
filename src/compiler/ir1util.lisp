@@ -650,7 +650,7 @@
                                                     t))
                                                  (node-dominates-p set node)
                                                  (born-before-p set)))
-                                      (setf old-p t)
+                                      (setf old-p :consecutive)
                                       (push (list node value-var value-lvar) (lambda-var-constraints object-lambda-var))))
                                  (t
                                   ;; Reuse the slot

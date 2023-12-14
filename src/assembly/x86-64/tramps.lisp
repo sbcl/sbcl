@@ -241,6 +241,15 @@
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
 
+#+debug-gc-barriers
+(define-assembly-routine (check-barrier (:return-style :none)) ()
+  (with-registers-preserved (c :except fp) ;; shouldn't have any fp operations
+    (call-c (make-fixup "check_barrier" :foreign)
+            (ea 16 rbp-tn)
+            (ea 24 rbp-tn)
+            (ea 32 rbp-tn)))
+  (inst ret 24))
+
 ;;; Perform a store to code, updating the GC card mark bit.
 ;;; This has two additional complications beyond the ordinary
 ;;; generational barrier:

@@ -3307,3 +3307,30 @@ dynamic_space_code_from_pc(char *pc)
     return NULL;
 }
 #endif
+
+#ifdef LISP_FEATURE_DEBUG_GC_BARRIERS
+
+static bool card_markedp(void* addr)
+{
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p((lispobj)addr))
+        return !immobile_card_protected_p(addr);
+#endif
+    return gc_card_mark[addr_to_card_index(addr)] != CARD_UNMARKED;
+}
+
+extern void check_barrier (lispobj young, lispobj old, int wp) {
+    if (!is_lisp_pointer(young))
+        return;
+    generation_index_t old_gen = gc_gen_of(old, -1);
+    if (old_gen == -1 || (!wp && card_markedp(native_pointer(old))))
+        return;
+    generation_index_t young_gen = gc_gen_of(young, -1);
+    if (young_gen == -1)
+        return;
+    if (old_gen > young_gen) {
+        lose("check_barrier: young gen %d %lx, old gen %d %lx", young_gen, young, old_gen, old);
+
+    }
+}
+#endif
