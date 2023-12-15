@@ -398,9 +398,9 @@ static void impart_mark_stickiness(lispobj word)
     // At worst this will spurisouly mark a card as sticky,
     // which can happen only if it was already marked as dirty.
     page_index_t page = find_page_index((void*)word);
+    // Unlike for gencgc, do not check page_bytes_used or generation
+    // (maybe could/should for large object pages?)
     if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
-        && (word & (GENCGC_PAGE_BYTES - 1)) < page_bytes_used(page)
-        && page_table[page].gen != 0
         && lowtag_ok_for_page_type(word, page_table[page].type)
         && plausible_tag_p(word)) { // "plausible" is good enough
         /* if 'word' is the correctly-tagged pointer to the base of a SIMPLE-VECTOR,
