@@ -442,8 +442,8 @@
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index)))))
            ,@(if barrier
-                 `((emit-store ea value val-temp)
-                   (emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value))
+                 `((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop) value)
+                   (emit-store ea value val-temp))
                  `((inst mov :qword ea (encode-value-if-immediate value ,tagged)))))))))
 
 (defmacro pc-size (vop)
