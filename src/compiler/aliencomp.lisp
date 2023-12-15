@@ -61,9 +61,9 @@
   (flushable movable))
 (defknown deport-alloc (alien alien-type) t
   (flushable movable))
-(defknown %alien-value (system-area-pointer unsigned-byte alien-type) t
+(defknown %alien-value (system-area-pointer word alien-type) t
   (flushable))
-(defknown (setf %alien-value) (t system-area-pointer unsigned-byte alien-type) t
+(defknown (setf %alien-value) (t system-area-pointer word alien-type) t
   ())
 
 (defknown alien-funcall (alien-value &rest t) *

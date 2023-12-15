@@ -398,8 +398,14 @@ statistics are appended to it."
             (sb-vm::flags (unsigned 8)) ; this named 'type' in C
             (sb-vm::gen (signed 8))))
 (define-alien-variable ("page_table" sb-vm:page-table) (* (struct sb-vm::page)))
-(declaim (inline sb-vm:find-page-index))
-(define-alien-routine ("ext_find_page_index" sb-vm:find-page-index) page-index-t (address unsigned))
+
+(declaim (ftype (sfunction (t) (integer -1 #.(floor most-positive-word sb-vm:gencgc-page-bytes)))
+                sb-vm:find-page-index)
+         (inline sb-vm:find-page-index))
+(defun sb-vm:find-page-index (address)
+  (with-alien ((find-page-index (function page-index-t unsigned) :extern "ext_find_page_index"))
+    (truly-the (integer -1 #.(floor most-positive-word sb-vm:gencgc-page-bytes))
+               (alien-funcall find-page-index address))))
 
 (defun pages-allocated ()
   (loop for n below (extern-alien "next_free_page" signed)
