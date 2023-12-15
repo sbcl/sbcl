@@ -447,12 +447,12 @@ necessary, since type inference may take arbitrarily long to converge.")
   (when (component-reanalyze component)
     (maybe-mumble "DFO")
     (loop
-      (find-dfo component)
+     (find-dfo component)
       (unless (component-reanalyze component)
         (maybe-mumble " ")
         (return))
-      (maybe-mumble ".")))
-  (values))
+      (maybe-mumble "."))
+    t))
 
 (defparameter *reoptimize-limit* 10)
 
