@@ -374,3 +374,10 @@
       (declare ((integer 7703 1903468060) c))
       (logandc1 (/ (logorc2 c b) -1) c))
    ((-1 7703) 7702)))
+
+(with-test (:name :set-numeric-contagion)
+  (assert-type
+   (lambda (n)
+     (loop for i below n
+           sum (coerce n 'single-float)))
+   (or (integer 0 0) single-float)))

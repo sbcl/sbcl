@@ -1943,46 +1943,68 @@
                   (t '*))
             set-types every-set-type-suitable-p)))
 
+(defun sets-numeric-contagion (sets var initial-type)
+  (let (union)
+    (dolist (set sets)
+      (let* ((set-use (principal-lvar-use (set-value set)))
+             (function (%inc-or-dec-p set-use)))
+        (unless function                ; every use must be + or -
+          (return-from sets-numeric-contagion nil))
+        (let ((args (basic-combination-args set-use)))
+          ;; Every use must be of the form ({+,-} VAR STEP).
+          (unless (and (proper-list-of-length-p args 2 2)
+                       (let ((first (principal-lvar-use (first args))))
+                         (and (ref-p first)
+                              (eq (ref-leaf first) var))))
+            (return-from sets-numeric-contagion nil))
+          (let ((step-type (lvar-type (second args))))
+            (setf union (if union
+                            (type-union union step-type)
+                            step-type))))))
+    (type-union initial-type
+                (numeric-contagion initial-type union))))
+
 (defun maybe-infer-iteration-var-type (var initial-type)
   (binding* ((sets (lambda-var-sets var) :exit-if-null)
              (initial-type (weaken-numeric-union-type initial-type))
              ((direction set-types every-set-type-suitable-p)
               (when (numeric-type-p initial-type)
-                (%analyze-set-uses sets var initial-type))
-              :exit-if-null))
-    (labels ((leftmost (x y cmp cmp=)
-               (cond ((eq x nil) nil)
-                     ((eq y nil) nil)
-                     ((listp x)
-                      (let ((x1 (first x)))
-                        (cond ((listp y)
-                               (let ((y1 (first y)))
-                                 (if (funcall cmp x1 y1) x y)))
-                              (t
-                               (if (funcall cmp x1 y) x y)))))
-                     ((listp y)
-                      (let ((y1 (first y)))
-                        (if (funcall cmp= x y1) x y)))
-                     (t (if (funcall cmp x y) x y)))))
-      (multiple-value-bind (low high)
-          (ecase direction
-            (+
-             (values (numeric-type-low initial-type)
-                     (when every-set-type-suitable-p
-                       (reduce (lambda (x y) (leftmost x y #'> #'>=)) set-types
-                               :initial-value (numeric-type-high initial-type)
-                               :key #'numeric-type-high)))
-             )
-            (-
-             (values (when every-set-type-suitable-p
-                       (reduce (lambda (x y) (leftmost x y #'< #'<=)) set-types
-                               :initial-value (numeric-type-low initial-type)
-                               :key #'numeric-type-low))
-                     (numeric-type-high initial-type)))
-            (*
-             (values nil nil)))
-        (modified-numeric-type initial-type :low low
-                                            :high high)))))
+                (%analyze-set-uses sets var initial-type))))
+    (if direction
+        (labels ((leftmost (x y cmp cmp=)
+                   (cond ((eq x nil) nil)
+                         ((eq y nil) nil)
+                         ((listp x)
+                          (let ((x1 (first x)))
+                            (cond ((listp y)
+                                   (let ((y1 (first y)))
+                                     (if (funcall cmp x1 y1) x y)))
+                                  (t
+                                   (if (funcall cmp x1 y) x y)))))
+                         ((listp y)
+                          (let ((y1 (first y)))
+                            (if (funcall cmp= x y1) x y)))
+                         (t (if (funcall cmp x y) x y)))))
+          (multiple-value-bind (low high)
+              (ecase direction
+                (+
+                 (values (numeric-type-low initial-type)
+                         (when every-set-type-suitable-p
+                           (reduce (lambda (x y) (leftmost x y #'> #'>=)) set-types
+                                   :initial-value (numeric-type-high initial-type)
+                                   :key #'numeric-type-high)))
+                 )
+                (-
+                 (values (when every-set-type-suitable-p
+                           (reduce (lambda (x y) (leftmost x y #'< #'<=)) set-types
+                                   :initial-value (numeric-type-low initial-type)
+                                   :key #'numeric-type-low))
+                         (numeric-type-high initial-type)))
+                (*
+                 (values nil nil)))
+            (modified-numeric-type initial-type :low low
+                                                :high high)))
+        (sets-numeric-contagion sets var initial-type))))
 
 (deftransform + ((x y) * * :result result)
   "check for iteration variable reoptimization"
