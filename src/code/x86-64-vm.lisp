@@ -242,9 +242,8 @@
       (%primitive set-fdefn-has-static-callers fdefn))
   fdefn)
 
-(defun %set-fdefn-fun (fdefn fun)
-  (declare (type fdefn fdefn) (type function fun)
-           (values function))
+(defun set-fdefn-fun (fun fdefn)
+  (declare (type fdefn fdefn) (type function fun))
   (when (fdefn-has-static-callers fdefn)
     (remove-static-links fdefn))
   (let ((jmp-target (if (closurep fun)
@@ -259,7 +258,7 @@
       ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
       (%primitive sb-vm::set-direct-callable-fdefn-fun fdefn fun
                   (get-lisp-obj-address (%closure-callee jmp-target)))))
-  fun)
+  nil)
 
 ) ; end PROGN
 

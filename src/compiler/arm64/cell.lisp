@@ -349,12 +349,10 @@
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-fun))
-  (:args (function :scs (descriptor-reg) :target result)
+  (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
     (emit-gengc-barrier fdefn nil lip)
     (inst add-sub lip function (- (* simple-fun-insts-offset n-word-bytes)
@@ -365,8 +363,7 @@
     (load-asm-routine lip 'closure-tramp)
     SIMPLE-FUN
     (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-    (move result function)))
+    (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

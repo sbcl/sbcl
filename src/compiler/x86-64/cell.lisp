@@ -525,11 +525,9 @@
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  #-immobile-code (:translate (setf fdefn-fun))
-  (:args (function :scs (descriptor-reg) :target result)
+  (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
     (emit-gengc-barrier fdefn nil raw)
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
@@ -538,8 +536,7 @@
     (inst cmov :e raw
           (ea (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag) function))
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move result function)))
+    (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 #+immobile-code
 (progn
 (define-vop (set-direct-callable-fdefn-fun)

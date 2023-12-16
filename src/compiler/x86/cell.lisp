@@ -240,10 +240,9 @@
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
-  (:args (function :scs (descriptor-reg) :target result)
+  (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     (inst cmp (make-ea :byte :base function :disp (- fun-pointer-lowtag))
@@ -252,8 +251,7 @@
           (make-ea :dword :base function
                    :disp (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag)))
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move result function)))
+    (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

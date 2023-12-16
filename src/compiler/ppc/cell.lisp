@@ -240,25 +240,21 @@
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-fun))
-  (:args (function :scs (descriptor-reg) :target result)
+  (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
       (inst cmpwi type simple-fun-widetag)
       ;;(inst mr lip function)
       (inst addi lip function
             (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
-      (inst beq normal-fn)
+      (inst beq SIMPLE)
       (load-asm-rtn-addr lip 'closure-tramp)
-      (emit-label normal-fn)
+      SIMPLE
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-      (move result function))))
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

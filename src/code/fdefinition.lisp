@@ -28,10 +28,10 @@
 
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
-           (type fdefn fdefn)
-           (values function))
-  #+(and immobile-code x86-64) (sb-vm::%set-fdefn-fun fdefn fun)
-  #-(and immobile-code x86-64) (setf (fdefn-fun fdefn) fun))
+           (type fdefn fdefn))
+  #+(and immobile-code x86-64) (sb-vm::set-fdefn-fun fun fdefn)
+  #-(and immobile-code x86-64) (%primitive sb-vm::set-fdefn-fun fun fdefn)
+  fun)
 
 ;;; Return the FDEFN object for NAME, or NIL if there is no fdefn.
 ;;; Signal an error if name isn't valid.

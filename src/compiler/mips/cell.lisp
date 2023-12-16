@@ -127,18 +127,16 @@
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-fun))
-  (:args (function :scs (descriptor-reg) :target result)
+  (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
       (without-scheduling ()
         (emit-gengc-barrier fdefn nil type)) ; type = temp
       (load-type type function (- fun-pointer-lowtag))
       (inst xor type simple-fun-widetag)
-      (inst beq type normal-fn)
+      (inst beq type SIMPLE)
       (inst addu lip function
             (- (ash simple-fun-insts-offset word-shift)
                fun-pointer-lowtag))
@@ -152,10 +150,9 @@
       ;;   - lack of thread support makes a GC interrupt somewhat unlikely,
       ;;     (though any interrupt could call into lisp, also unlikely)
       (inst li lip (make-fixup 'closure-tramp :assembly-routine))
-    NORMAL-FN
+    SIMPLE
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-      (move result function)))
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
