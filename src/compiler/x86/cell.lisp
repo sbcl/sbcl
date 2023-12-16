@@ -239,7 +239,6 @@
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
