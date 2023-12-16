@@ -10,9 +10,9 @@
  public domain. The software is in the public domain and is
  provided with absolutely no warranty. See the COPYING and CREDITS
  files for more information.
-
+|#
 (in-package "SB-C")
-
+#|
  In copy propagation, we manipulate sets of TNs. We only consider
  TNs whose sole write is by a MOVE VOP. This allows us to use a
  degenerate version of reaching definitions: since each such TN has
