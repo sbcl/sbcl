@@ -274,6 +274,17 @@
                        sb-c::deftransform
                        :source-transform))))))
 
+;;; Using mark-region-gc, map-allocated-objects can miss objects because the 'allocated'
+;;; bits are not materialized until a garbage collection occurs. This can cause problems
+;;; for identical-code-folding as follows:
+;;; (1) after "Pass 1: count code objects" there could be an overrun of the code-objects
+;;;     array because "Pass 2: collect them" sees more objects then pass 1 saw.
+;;; (2) if, through extraordinarily bad luck, among the missed objects is #'MAKE-HASH-TABLE
+;;;     then the map-allocated-objects in apply-forwarding-map could fail to fix constants
+;;;     in that code header, which is among the worst possible objects to miss,
+;;;     as it cares very much about the identity of #'EQL. If #'EQL becomes #'%EQL
+;;;     or vice-versa, then whichever is bound to (symbol-function 'eql) had better be
+;;;     the same in the header constants of make-hash-table, or you're totally screwed.
 (defun fold-identical-code (&key aggressive preserve-docstrings (print nil))
   (loop
     (gc :gen 7)
@@ -281,7 +292,9 @@
     ;; to have a mode that scans only GC pages with that can hold code
     ;; (or any subset of page types). This is fine though.
     (let ((code-objects
-           (let ((count 0))
+           ;; arbitrary fudge factor because mark-region-gc can enumerate _more_
+           ;; objects on the second pass than on the first pass.
+           (let ((count 100))
              (map-allocated-objects
               (lambda (obj widetag size)
                 (declare (ignore size))
@@ -341,6 +354,8 @@
             ;; recurse into constants during the binning step.
             (constants (make-hash-table :test 'eq))
             (n 0))
+        ;; KLUDGE and FIXME: never mess with #'EQL for the time being
+        (setq code-objects (delete (fun-code-header #'eql) code-objects))
         (dovector (x code-objects)
           (when (or (not (gethash x referenced-objects))
                     (default-allow-icf-p x))

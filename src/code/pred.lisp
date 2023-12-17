@@ -241,7 +241,6 @@
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)
-  "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
   #+x86-64 (eql obj1 obj2) ; vop fully implements all cases of EQL
   #-x86-64 ; else this is the only full implementation of EQL
   (or (eq obj1 obj2)
@@ -285,6 +284,7 @@
                      (eql (imagpart x) (imagpart y))))))))))
 
 (defun eql (x y)
+  "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
   ;; On x86-64, EQL is just an interpreter stub for a vop.
   ;; For others it's a call to the implementation of generic EQL.
   (#+x86-64 eql #-x86-64 %eql x y))
