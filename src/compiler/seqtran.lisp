@@ -829,6 +829,9 @@
                          (type index index))
                 (setf (%vector-raw-bits seq index) value))
               seq))
+          ;; FIXME: this case takes over before we get a chance to select
+          ;; a variant of the SPLAT vop that can use XMM registers.
+          ;; Should this be #-x86-64 then?
           ((and (array-type-p type)
                 (not (array-type-complexp type))
                 (or (not start)
