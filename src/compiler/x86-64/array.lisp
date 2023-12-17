@@ -319,7 +319,7 @@
 ;;; variants which affect an entire lispword-sized value.
 ;;; Toplevel macro for ease of viewing the expansion.
 (defmacro define-full-setter+addend (name type offset lowtag scs el-type)
-  (let ((scs (union '(immediate) scs)))
+  (let ((scs (adjoin 'immediate scs)))
    `(progn
      (define-vop (,name dvset)
        (:args (object :scs (descriptor-reg))
