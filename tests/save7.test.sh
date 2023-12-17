@@ -7,7 +7,7 @@ tmpcore=$TEST_FILESTEM.core
 echo "::: Running :SAVE-CORE-MEM-SIZES"
 # executable core used as "--core" option should not save the memory sizes
 # that were originally saved, but the sizes in the process doing the save.
-run_sbcl_with_args --noinform --control-stack-size 320KB --dynamic-space-size 200MB \
+run_sbcl_with_args --noinform --control-stack-size 320KB --dynamic-space-size 260MB \
     --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
@@ -16,7 +16,7 @@ echo "::: INFO: prepared test core"
 ./"$tmpcore" --no-userinit --no-sysinit --noprint <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 320 1024)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
-  (assert (<= 0 (- (* 200 1048576) (dynamic-space-size)) 65536))
+  (assert (<= 0 (- (* 260 1048576) (dynamic-space-size)) 65536))
 EOF
 echo "::: Success"
 
@@ -48,13 +48,13 @@ echo "::: Success"
 echo "::: Running :DYNAMIC-SPACE-SIZE-ARG"
 run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 640KB \
     --tls-limit 5000 \
-    --dynamic-space-size 250MB --no-userinit --no-sysinit --noprint <<EOF
+    --dynamic-space-size 260MB --no-userinit --no-sysinit --noprint <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 640 1024)))
   (assert (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
                (* 5000 sb-vm:n-word-bytes)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (defun dynamic-space-size-good-p ()
-    (<= 0 (- (* 250 1048576) (dynamic-space-size)) 65536))
+    (<= 0 (- (* 260 1048576) (dynamic-space-size)) 65536))
   (assert (dynamic-space-size-good-p))
   (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
 EOF
