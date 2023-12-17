@@ -814,7 +814,8 @@
 (defun ir2-convert-let (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (mapc (lambda (var arg)
-          (when arg
+          (when (and arg
+                     (neq (leaf-ever-used var) 'initial-unused))
             (let ((src (lvar-tn node block arg))
                   (dest (leaf-info var)))
               (if (and (lambda-var-indirect var)

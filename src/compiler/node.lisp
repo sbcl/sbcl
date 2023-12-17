@@ -829,7 +829,7 @@
   ;; SET if there was a set but no REF.
   ;; T if there was a REF.
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
-  (ever-used nil :type (member nil set t))
+  (ever-used nil :type (member nil set t initial-unused))
   ;; True if declared dynamic-extent.
   (dynamic-extent nil :type boolean)
   ;; some kind of info used by the back end

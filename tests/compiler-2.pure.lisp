@@ -4331,3 +4331,11 @@
                                   do (print i)))))
        5))
    (() nil)))
+
+(with-test (:name :unused-initial-values)
+  (checked-compile-and-assert
+    (:allow-notes nil)
+    `(lambda (v)
+       (declare ((simple-array double-float (*)) v))
+       (loop for e across v count (> e 0)))
+    (((make-array 9 :element-type 'double-float :initial-element 1d0)) 9)))
