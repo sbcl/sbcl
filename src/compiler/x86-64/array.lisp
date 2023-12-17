@@ -319,7 +319,8 @@
 ;;; variants which affect an entire lispword-sized value.
 ;;; Toplevel macro for ease of viewing the expansion.
 (defmacro define-full-setter+addend (name type offset lowtag scs el-type)
-  `(progn
+  (let ((scs (union '(immediate) scs)))
+   `(progn
      (define-vop (,name dvset)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg signed-reg unsigned-reg))
@@ -339,7 +340,8 @@
                            object index (index-scale n-word-bytes index))))
            ,@(when (eq type 'simple-vector)
                '((emit-gengc-barrier object ea val-temp (vop-nth-arg 2 vop) value)))
-           (emit-store ea value val-temp))))
+           (emit-store ea value val-temp
+                       ,(not (intersection '(signed-reg unsigned-reg) scs))))))
      (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
@@ -359,7 +361,8 @@
          (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
            ,@(when (eq type 'simple-vector)
                '((emit-gengc-barrier object ea val-temp (vop-nth-arg 1 vop) value)))
-           (emit-store ea value val-temp))))))
+           (emit-store ea value val-temp
+                       ,(not (intersection '(signed-reg unsigned-reg) scs)))))))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
