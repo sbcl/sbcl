@@ -115,8 +115,11 @@ int
 futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
     unsigned long timeout;
+    if (sec == 0 && usec == 0)
+        return 1;
+
     if (sec < 0) {
-       timeout = 0;
+        timeout = 0;
     } else {
         if (__builtin_umull_overflow((unsigned long)sec, 1000000000ul, &timeout)
             || __builtin_umull_overflow(usec, 1000ul, &usec)
