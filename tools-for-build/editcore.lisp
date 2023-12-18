@@ -2674,8 +2674,6 @@
 ;;; * (sb-editcore:move-dynamic-code-to-text-space "step1.core" "step2.core")
 ;;; * (sb-editcore:redirect:text-space-calls "step2.core")
 ;;; Now "step2.core" has a text space, and all lisp-to-lisp calls bypass their FDEFN.
-;;; The new core is strictly less featureful than #+immobie-space because global
-;;; function redefinition does not work - REMOVE-STATIC-LINKS is missing.
 ;;; At this point split-core on "step2.core" can run in the manner of elfcore.test.sh
 
 (defun get-code-segments (code vaddr spacemap)
@@ -2856,7 +2854,7 @@
       (let ((paddr (translate-ptr abs-addr spacemap)))
         (translate (sap-ref-lispobj (int-sap paddr) 0) spacemap)))))
 
-(defun locate-const-move-to-rax (code vaddr insts start spacemap)
+(defun locate-const-move-to-rax (code vaddr insts start spacemap fdefns)
   ;; Look for a MOV to RAX from a code header constant
   ;; Technically this should fail if it finds _any_ instruction
   ;; that affects RAX before it finds the one we're looking for.
@@ -2870,21 +2868,20 @@
                       (when (and (eq (machine-ea-base ea) :rip)
                                  (minusp (machine-ea-disp ea)))
                         (return
-                          (let ((const (get-mov-src-constant code vaddr inst ea spacemap)))
-                            (when (fdefn-p const)
-                              (let ((fun (fdefn-fun const)))
-                                (when (simple-fun-p (translate fun spacemap))
-                                  (values i fun)))))))))))))
+                          (let ((fdefn (get-mov-src-constant code vaddr inst ea spacemap)))
+                            (when (and (fdefn-p fdefn) (memq fdefn fdefns))
+                              (sb-vm::set-fdefn-has-static-callers fdefn 1)
+                              (values i (fdefn-fun fdefn))))))))))))
 
 (defun replacement-opcode (inst)
   (ecase (second inst) ; opcode
     (jmp #xE9)
     (call #xE8)))
 
-(defun patch-fdefn-call (code vaddr insts inst i spacemap &optional print)
-;;  (unless (= (%code-serialno code) #x6884) (return-from patch-fdefn-call))
+(defun patch-fdefn-call (code vaddr insts inst i spacemap fdefns &optional print)
   ;; START is the index into INSTS of the instructon that loads RAX
-  (multiple-value-bind (start callee) (locate-const-move-to-rax code vaddr insts (1- i) spacemap)
+  (multiple-value-bind (start callee)
+      (locate-const-move-to-rax code vaddr insts (1- i) spacemap fdefns)
     (when (and start
                (let ((text-space (get-space immobile-text-core-space-id spacemap)))
                  (< (space-addr text-space)
@@ -2975,11 +2972,31 @@
           (setf (signed-sap-ref-32 (vector-sap new-bytes) 3) (- branch-target next-ip)))
         (%byte-blt new-bytes 0 (int-sap (translate-ptr (inst-vaddr inst) spacemap)) 0 7)))))
 
+;;; Avoid splicing out any fdefn not uniquely identified by its function binding.
+(defun get-patchable-fdefns (code spacemap &aux alist result)
+  (multiple-value-bind (start count) (code-header-fdefn-range code)
+    (loop for i from start repeat count
+          do (let* ((fdefn (translate (code-header-ref code i) spacemap))
+                    (fun (translate (fdefn-fun fdefn) spacemap)))
+               (when (simple-fun-p fun)
+                 ;; It is dangerous to create heap cons cells holding pointers to
+                 ;; objects at their logical address in the target core.
+                 ;; TBH, all target objects should be wrapped in a DESCRIPTOR
+                 ;; structure defined at the top of this file.
+                 (push (cons fun fdefn) alist)))))
+  (dolist (cell alist result)
+    (destructuring-bind (fun . fdefn) cell
+      (unless (find-if (lambda (other)
+                         (and (eq (car other) fun) (neq (cdr other) fdefn)))
+                       alist)
+        (push fdefn result)))))
+
 ;;; Since dynamic-space code is pretty much relocatable,
 ;;; disassembling it at a random physical address is fine.
 (defun patch-lisp-codeblob
     (code vaddr spacemap static-asm-code text-asm-code
-     &aux (insts (get-code-instruction-model code vaddr spacemap)))
+     &aux (insts (get-code-instruction-model code vaddr spacemap))
+          (fdefns (get-patchable-fdefns code spacemap)))
   (declare (simple-vector insts))
   (do ((i 0 (1+ i)))
       ((>= i (length insts)))
@@ -2998,7 +3015,7 @@
                               (<= static-space-start (machine-ea-disp ea)
                                   (sap-int *static-space-free-pointer*)))))
             (if (eql (machine-ea-base ea) 0) ; based on RAX
-                (patch-fdefn-call code vaddr insts inst i spacemap)
+                (patch-fdefn-call code vaddr insts inst i spacemap fdefns)
                 (patch-static-space-call inst spacemap
                                          static-asm-code text-asm-code))))))))
 

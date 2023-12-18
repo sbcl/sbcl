@@ -612,8 +612,8 @@
 ;;; make-target-2 build steps
 (("src/code/early-ntrace" ; lets PCL hook into tracing
   "src/code/room" ; for MAP-ALLOCATED-OBJECTS
-  #+(and x86-64 immobile-code) "src/code/immobile-space" ; needs src/code/room
-  ;; Delay (re)defining WARN until after remove-static-links works.
+  #+x86-64 "src/code/text-space" ; needs src/code/room
+  ;; Delay (re)defining WARN until after undo-static-linkage works.
   ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
   "src/code/icf"

@@ -12,7 +12,7 @@
 (in-package "SB-X86-64-ASM")
 
 (eval-when (:compile-toplevel) ; not needed outside this file
-(defmacro do-immobile-code ((code-var) &body body)
+(defmacro do-text-space-code ((code-var) &body body)
   ;; Loop over all code objects
   `(let* ((call (find-inst #xE8 (get-inst-space)))
           (jmp  (find-inst #xE9 (get-inst-space)))
@@ -40,11 +40,12 @@
         (lambda (,code-var obj-type obj-size)
           (declare (ignore obj-size))
           (when (= obj-type code-header-widetag) ,@body))
-        ;; Slowness here is bothersome, especially for SB-VM::REMOVE-STATIC-LINKS,
+        ;; Slowness here is bothersome, especially for UNDO-STATIC-LINKAGE,
         ;; so skip right over all fixedobj pages.
         (ash text-space-start (- n-fixnum-tag-bits))
         (%make-lisp-obj (sap-int *text-space-free-pointer*)))))))
 
+#+immobile-code
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components
          (make-array 20000 :element-type 'sb-vm:word :fill-pointer 0 :adjustable t))
@@ -119,8 +120,9 @@
 (declaim (inline rip-relative-p))
 (defun rip-relative-p (modrm-byte) (= (logand modrm-byte #b11000111) #b00000101))
 
+#+immobile-code
 (defun sb-vm::statically-link-core (&key callers)
-  (do-immobile-code (code)
+  (do-text-space-code (code)
     (when (or (not callers)
               (and (plusp (code-n-entries code))
                    (member (%simple-fun-name (%code-entry-point code 0)) callers)))
@@ -194,44 +196,70 @@
 ;;; The only way to detect the current set of references is to find uses of the
 ;;; current jump address, which means we need to fix them *all* before anyone
 ;;; else gets an opportunity to change the fdefn-fun of this same fdefn again.
-(defun sb-vm::remove-static-links (fdefn)
+(defun sb-impl::undo-static-linkage (fdefn &aux (fun-entry (sb-vm::fdefn-raw-addr fdefn)))
+  (unless (sb-vm::fdefn-has-static-callers fdefn)
+    (return-from sb-impl::undo-static-linkage))
   (sb-int:with-system-mutex (sb-vm::*static-linker-lock*)
-    (let ((fun-entry (sb-vm::fdefn-raw-addr fdefn))
-          (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
-      (flet ((code-statically-links-fdefn-p (code)
-               (multiple-value-bind (fdefns-start count) (code-header-fdefn-range code)
-                 (dotimes (i count)
-                   (let ((constant (code-header-ref code (+ fdefns-start i))))
-                     (when (or (eq constant fdefn)
-                               (and (consp constant) (eq (car constant) fdefn)))
-                       (return (+ fdefns-start i)))))))
-             (fix (sap oldval)
-               (let ((newval (the (signed-byte 32)
-                                  (- fdefn-entry (sap-int (sap+ sap 4))))))
-                 ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
-                 ;; that self-modifying code works correctly, so the fetcher
-                 ;; should never see a torn write.
-                 (cas (sap-ref-32 sap 0)
-                      (ldb (byte 32 0) oldval)
-                      (ldb (byte 32 0) newval)))))
-        (do-immobile-code (code)
-          ;; Examine only those code components which potentially use FDEFN.
-          (binding* ((constant-index (code-statically-links-fdefn-p code) :exit-if-null)
-                     (constant (code-header-ref code constant-index)))
-            (setf (code-header-ref code constant-index) fdefn)
+    (do-text-space-code (code)
+      ;; Examine only those code components which potentially use FDEFN.
+      (binding* ((fdefn-index
+                  (multiple-value-bind (fdefns-start count) (code-header-fdefn-range code)
+                    (dotimes (i count)
+                      (let ((constant (code-header-ref code (+ fdefns-start i))))
+                        (when (or (eq constant fdefn)
+                                  (and (consp constant) (eq (car constant) fdefn)))
+                          (return (+ fdefns-start i))))))
+                  :exit-if-null))
+        #-immobile-code
+        (let ((header-slot-addr
+               (+ (get-lisp-obj-address code)
+                  (- (ash fdefn-index word-shift) other-pointer-lowtag))))
+          (do-functions (fun addr)
+            (map-segment-instructions
+             (lambda (chunk inst)
+               (when (or (eq inst jmp) (eq inst call))
+                 ;; If the jump is to FUN-ENTRY, rewrite this call into
+                 ;; MOV RAX,[RIP-n] ; CALL [RAX+9]
+                 (let ((disp (truly-the (signed-byte 32) (near-jump-displacement chunk dstate))))
+                   (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
+                     ;; 5 bytes prior has to be the start of a 5-byte NOP.
+                     ;; Just trust that it is that.
+                     (let ((sap (sap+ (int-sap (dstate-cur-addr dstate)) -5)))
+                       (setf (sap-ref-8 sap 0) #x48
+                             (sap-ref-8 sap 1) #x8B
+                             (sap-ref-8 sap 2) #x05
+                             (signed-sap-ref-32 sap 3)
+                             (- 3 (- (dstate-next-addr dstate) header-slot-addr))
+                             (sap-ref-8 sap 7) #xFF
+                             (sap-ref-8 sap 8) (if (eq inst jmp) #x60 #x50)
+                             (sap-ref-8 sap 9) 9))))))
+             seg dstate)))
+        #+immobile-code
+        (flet ((fix (sap oldval)
+                 (let* ((fdefn-entry (sb-vm::fdefn-entry-address fdefn))
+                        (newval (the (signed-byte 32)
+                                     (- fdefn-entry (sap-int (sap+ sap 4))))))
+                   ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
+                   ;; that self-modifying code works correctly, so the fetcher
+                   ;; should never see a torn write.
+                   (cas (sap-ref-32 sap 0)
+                        (ldb (byte 32 0) oldval)
+                        (ldb (byte 32 0) newval)))))
+          (let ((constant (code-header-ref code fdefn-index)))
+            (setf (code-header-ref code fdefn-index) fdefn)
             (if (listp constant) ; list of saved fixup offsets
                 (dolist (offset (cdr constant))
                   (let ((sap (sap+ (code-instructions code) offset)))
                     (fix sap (signed-sap-ref-32 sap 0))))
                 (do-functions (fun addr)
                   (map-segment-instructions
-                    (lambda (chunk inst)
-                      (when (or (eq inst jmp) (eq inst call))
-                        ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
-                        ;; TRULY-THE because near-jump-displacement isn't a known fun.
-                        (let ((disp (truly-the (signed-byte 32)
-                                               (near-jump-displacement chunk dstate))))
-                          (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
-                            (fix (sap+ (int-sap (dstate-cur-addr dstate)) 1) disp)))))
-                    seg dstate)))))))
+                   (lambda (chunk inst)
+                     (when (or (eq inst jmp) (eq inst call))
+                       ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
+                       ;; TRULY-THE because near-jump-displacement isn't a known fun.
+                       (let ((disp (truly-the (signed-byte 32)
+                                              (near-jump-displacement chunk dstate))))
+                         (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
+                           (fix (sap+ (int-sap (dstate-cur-addr dstate)) 1) disp)))))
+                   seg dstate)))))))
     (sb-vm::set-fdefn-has-static-callers fdefn 0)))

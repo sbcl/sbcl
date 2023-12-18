@@ -1,7 +1,7 @@
 
 ;;; Assert that save-lisp-and-die didn't accidentally recreate the inst space.
 ;;; Fails in parallel-exec which uses PURE-RUNNER which performs ENCAPSULATE
-;;; which calls REMOVE-STATIC-LINKS which invokes the disassembler
+;;; which calls UNDO-STATIC-LINKAGE which invokes the disassembler
 ;;; which constructs the inst-space.
 (with-test (:name :inst-space-jit-constructed
                   :fails-on :parallel-test-runner)

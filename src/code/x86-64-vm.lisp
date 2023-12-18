@@ -256,8 +256,6 @@
 
 (defun set-fdefn-fun (fun fdefn)
   (declare (type fdefn fdefn) (type function fun))
-  (when (fdefn-has-static-callers fdefn)
-    (remove-static-links fdefn))
   (let ((jmp-target (if (closurep fun)
                         (let ((instance (%alloc-closure-trampoline)))
                           (setf (%funcallable-instance-fun instance) fun)

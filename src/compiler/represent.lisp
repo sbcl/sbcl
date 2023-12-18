@@ -887,7 +887,7 @@
 ;;;    because lowtag subtraction can't be had "for free" due to the architectural
 ;;;    requirement that lispword-aligned loads need a displacement that is
 ;;;    a multiple of 4, which OTHER-POINTER-LOWTAG does not satisfy.
-;;;  * In the current approach for so-called "static" linking of immobile code,
+;;;  * In the current approach for so-called "static" linking of text-space code,
 ;;;    we change code instruction bytes so that they call into a simple-fun
 ;;;    directly rather than through an fdefn, but the approach is subject to a
 ;;;    data race when redefining an fdefn. It's conceivable that the race can be
@@ -897,7 +897,7 @@
 ;;;    distinguish between fdefns that are needed for FDEFN-FUN
 ;;;    (via IR2-CONVERT-GLOBAL-VAR) versus those which are present to satisfy
 ;;;    a GC invariant and are not otherwise actually used.
-;;;  * Even without the preceding change, remove-static-links can avoid
+;;;  * Even without the preceding change, undo-static-linkage can avoid
 ;;;    scanning code constants that are not FDEFNs.
 (defun sort-boxed-constants (2comp)
   (let* ((sorted (ir2-component-constants 2comp))

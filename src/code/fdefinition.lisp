@@ -26,9 +26,12 @@
     (fdefn-makunbound fdefn)
     fdefn))
 
+(defun undo-static-linkage (fdefn) (declare (ignore fdefn)))
+
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
            (type fdefn fdefn))
+  (undo-static-linkage fdefn)
   (sb-c::when-vop-existsp (:named sb-vm::set-fdefn-fun)
     (%primitive sb-vm::set-fdefn-fun fun fdefn))
   (sb-c::unless-vop-existsp (:named sb-vm::set-fdefn-fun)
@@ -423,9 +426,7 @@
       (:symbol name "removing the function or macro definition of ~A")
     (let ((fdefn (find-fdefn name)))
       (when fdefn
-        #+(and immobile-code x86-64)
-        (when (sb-vm::fdefn-has-static-callers fdefn)
-          (sb-vm::remove-static-links fdefn))
+        (undo-static-linkage fdefn)
         (fdefn-makunbound fdefn)))
     (undefine-fun-name name)
     name))

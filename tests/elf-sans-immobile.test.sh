@@ -58,7 +58,28 @@ result=`${exefile} --eval '(defun fib (n) (if (<= n 1) 1 (+ (fib (- n 1)) (fib (
 if [ $result = OK ]
 then
   echo "COMPILE: PASS"
-  exit $EXIT_TEST_WIN
 else
   exit 1
 fi
+
+set +e # no exit on error
+${exefile} --noprint n<<EOF
+(in-package sb-impl)
+(defun disassembly-contains-query-read-char ()
+  (search "FDEFN QUERY-READ-CHAR"
+          (with-output-to-string (ss) (disassemble 'y-or-n-p :stream ss))))
+(assert (not (disassembly-contains-query-read-char)))
+(defun query-read-char () #\y) ; will undo static linkage
+(assert (disassembly-contains-query-read-char))
+(if (y-or-n-p) (exit :code 42))
+EOF
+status=$?
+if [ $status -eq 42 ]
+then
+  echo
+  echo "Undo static linkage: PASS"
+else
+  exit 1
+fi
+
+exit $EXIT_TEST_WIN

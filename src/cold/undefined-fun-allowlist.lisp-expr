@@ -18,8 +18,7 @@
   slot-makunbound
   make-load-form-saving-slots
   sb-vm:symbol-from-tls-index
-  sb-ext:primitive-object-size
-  sb-vm::remove-static-links)
+  sb-ext:primitive-object-size)
  ;; CLOS implementation
  (sb-mop:class-finalized-p
   sb-mop:class-prototype
