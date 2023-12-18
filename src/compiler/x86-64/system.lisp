@@ -497,17 +497,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    (move c ecx)
    (move d edx)))
 
-(define-vop (set-fdefn-has-static-callers)
-  (:args (fdefn :scs (descriptor-reg)))
-  (:generator 1
-    ;; atomic because the immobile gen# is in the same byte
-    (inst or :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x80)))
-(define-vop (unset-fdefn-has-static-callers)
-  (:args (fdefn :scs (descriptor-reg)))
-  (:generator 1
-    ;; atomic because the immobile gen# is in the same byte
-    (inst and :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x7f)))
-
 (define-vop (sb-c::mark-covered)
  (:info index)
  (:generator 1

@@ -29,8 +29,10 @@
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
            (type fdefn fdefn))
-  #+(and immobile-code x86-64) (sb-vm::set-fdefn-fun fun fdefn)
-  #-(and immobile-code x86-64) (%primitive sb-vm::set-fdefn-fun fun fdefn)
+  (sb-c::when-vop-existsp (:named sb-vm::set-fdefn-fun)
+    (%primitive sb-vm::set-fdefn-fun fun fdefn))
+  (sb-c::unless-vop-existsp (:named sb-vm::set-fdefn-fun)
+    (sb-vm::set-fdefn-fun fun fdefn))
   fun)
 
 ;;; Return the FDEFN object for NAME, or NIL if there is no fdefn.

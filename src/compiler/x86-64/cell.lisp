@@ -523,6 +523,7 @@
       (inst jmp :e err-lab))
     RETRY))
 
+#-immobile-code
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))

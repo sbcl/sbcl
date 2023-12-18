@@ -235,6 +235,14 @@ during backtrace.
   ;;   wrapped in a simplifying trampoline.
   (raw-addr :c-type "char *"))
 
+;;; Reader for FDEFN-RAW-ADDR. The usual IR2 converter would return
+;;; descriptor-reg and so its result would need shifting by n-fixnum-tag-bits.
+#-sb-xc-host
+(defun fdefn-raw-addr (fdefn)
+  (with-pinned-objects (fdefn)
+    (sap-ref-word (int-sap (get-lisp-obj-address fdefn))
+                  (- (ash fdefn-raw-addr-slot word-shift) other-pointer-lowtag))))
+
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
 (define-primitive-object (simple-fun :type function
