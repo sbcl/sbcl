@@ -103,10 +103,9 @@
            (loop for (space size var-name) in spaces
                  appending
                  (let* ((relocatable
-                          ;; READONLY is usually movable now.
                           (member space '(fixedobj text #+relocatable-static-space static
                                           #+immobile-space alien-linkage-table
-                                          #-darwin-jit read-only)))
+                                          read-only)))
                         (start ptr)
                         (end (+ ptr size)))
                    (setf ptr end)
@@ -141,7 +140,7 @@
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
          ;; an arbitrary value to avoid kludging genesis
-         #+(and sb-xc-host (not darwin-jit))
+         #+sb-xc-host
          (defparameter read-only-space-end read-only-space-start)
          #-soft-card-marks (defconstant cards-per-page 1)
          (defconstant gencgc-card-bytes (/ gencgc-page-bytes cards-per-page))

@@ -2857,7 +2857,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (header-n-words (sb-c::asm-routines-boxed-header-nwords))
          (space (or #+immobile-code *immobile-text*
                     ;; If there is a read-only space, use it, else use static space.
-                    (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
+                    (if (> sb-vm:read-only-space-end
+                           #-darwin-jit sb-vm:read-only-space-start
+                           ;; Always use read-only space on darwin-jit.
+                           #+darwin-jit 0)
                         *read-only*
                         *static*)))
          (asm-code

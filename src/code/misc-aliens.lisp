@@ -14,7 +14,6 @@
 ;;; Declare each of the free space pointers (except dynamic) as an alien var
 ;;; with darwin-jit, READ-ONLY-SPACE-START is a constant from genesis
 ;;; Maybe this whole file should go in sb-kernel to avoid sb-kernel::
-#-darwin-jit
 (define-alien-variable ("READ_ONLY_SPACE_START" sb-vm:read-only-space-start) sb-kernel::os-vm-size-t)
 (define-alien-variable ("read_only_space_free_pointer"
                         sb-vm:*read-only-space-free-pointer*)
@@ -38,8 +37,7 @@
 (declaim (inline read-only-space-obj-p dynamic-space-obj-p))
 (defun read-only-space-obj-p (x)
   (let ((a (get-lisp-obj-address x))
-        (rospace-start #-darwin-jit (extern-alien "READ_ONLY_SPACE_START" unsigned)
-                       #+darwin-jit sb-vm:read-only-space-start)
+        (rospace-start sb-vm:read-only-space-start)
         (rospace-end (extern-alien "read_only_space_free_pointer" unsigned)))
     (and (< rospace-start a rospace-end))))
 

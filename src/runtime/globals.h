@@ -55,9 +55,7 @@ extern os_vm_size_t thread_control_stack_size;
 extern uword_t STATIC_SPACE_START, STATIC_SPACE_END;
 #endif
 
-#ifndef LISP_FEATURE_DARWIN_JIT
 extern uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
-#endif
 #ifdef LISP_FEATURE_CHENEYGC
 extern uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
 #else

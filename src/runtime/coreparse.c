@@ -794,11 +794,7 @@ process_directory(int count, struct ndir_entry *entry,
         if (id < 1 || id > MAX_CORE_SPACE_ID)
             lose("unknown space ID %ld addr %p", id, (void*)addr);
 
-#ifdef LISP_FEATURE_DARWIN_JIT
-        int enforce_address = (id == READ_ONLY_CORE_SPACE_ID);
-#else
         int enforce_address = 0;
-#endif
 #ifndef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
         enforce_address |= (id == STATIC_CORE_SPACE_ID);
 #endif
@@ -818,7 +814,6 @@ process_directory(int count, struct ndir_entry *entry,
                  (unsigned long)len >> 10,
                  (unsigned long)dynamic_space_size >> 10);
         }
-#ifndef LISP_FEATURE_DARWIN_JIT
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
         if (id == READ_ONLY_CORE_SPACE_ID || id == STATIC_CORE_SPACE_ID) {
 #else
@@ -833,7 +828,6 @@ process_directory(int count, struct ndir_entry *entry,
                 READ_ONLY_SPACE_START = READ_ONLY_SPACE_END = addr;
             }
         }
-#endif
         if (len != 0) {
             spaces[id].len = len;
             size_t request = spaces[id].desired_size;
@@ -852,12 +846,10 @@ process_directory(int count, struct ndir_entry *entry,
                 STATIC_SPACE_END = addr + len;
 #endif
                 break;
-#ifndef LISP_FEATURE_DARWIN_JIT
             case READ_ONLY_CORE_SPACE_ID:
                 READ_ONLY_SPACE_START = addr;
                 READ_ONLY_SPACE_END = addr + len;
                 break;
-#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
             case IMMOBILE_TEXT_CORE_SPACE_ID:
@@ -939,9 +931,7 @@ process_directory(int count, struct ndir_entry *entry,
 
     calc_asm_routine_bounds();
     struct cons spaceadj = {(lispobj)spaces, (lispobj)adj};
-#ifndef LISP_FEATURE_DARWIN_JIT
     set_adjustment(&spaceadj, READ_ONLY_CORE_SPACE_ID, READ_ONLY_SPACE_START);
-#endif
     set_adjustment(&spaceadj, DYNAMIC_CORE_SPACE_ID, DYNAMIC_SPACE_START);
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
     set_adjustment(&spaceadj, STATIC_CORE_SPACE_ID, STATIC_SPACE_START);
