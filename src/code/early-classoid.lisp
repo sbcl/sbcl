@@ -423,44 +423,9 @@
           +layout-all-tagged+)
        ;; Then check that there are no additional words.
        (= (bitmap-nwords layout) 1)))
-
-;;; Extract the bitmap from 1 or more words of bits that have the same format
-;;; as a BIGNUM - least-significant word first, native bit order within each word,
-;;; all but the last are unsigned, and the last is signed.
-(defun %layout-bitmap (layout)
-  (declare (type layout layout))
-  (do ((accumulator 0)
-       (shift 0)
-       (index (bitmap-start layout) (1+ index))
-       (last (1- (%instance-length layout))))
-      ((> index last) accumulator)
-    (setf accumulator (logior accumulator
-                              (ash (if (= index last)
-                                       (%raw-instance-ref/signed-word layout index)
-                                       (%raw-instance-ref/word layout index))
-                                   shift)))
-    (incf shift sb-vm:n-word-bits)))
-
-(defun layout-bitmap (layout)
-  (declare (type layout layout))
-  ;; Whenever we call LAYOUT-BITMAP on a structure-object subtype,
-  ;; it's supposed to have the INFO slot populated, linking it to a defstruct-description.
-  (acond ((layout-info layout) (dd-bitmap it))
-         ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
-         ;; raw slots, except that funcallable-instances may have 2 raw slots -
-         ;; the trampoline and the layout. The trampoline can have a tag, depending
-         ;; on the platform, and the layout is tagged but a special case.
-         ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
-         ;; words preceding it.
-         (t
-          (aver (not (logtest +structure-layout-flag+ (layout-flags layout))))
-          (the fixnum
-               (%raw-instance-ref/signed-word layout
-                                              (type-dd-length layout))))))
 #+64-bit
 (defmacro layout-length (layout) ; SETFable
   `(ldb (byte 16 16) (layout-flags ,layout)))
-
 ) ; end PROGN #-sb-xc-host
 
 ;;; True of STANDARD-OBJECT, which include generic functions.

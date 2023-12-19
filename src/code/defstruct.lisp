@@ -1548,7 +1548,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun mutable-layout-p (old-layout new-layout)
   (declare (type layout old-layout new-layout))
   (if (layout-info old-layout)
-      (let ((old-bitmap (layout-bitmap old-layout))
+      (let ((old-bitmap (%layout-bitmap old-layout))
             (new-bitmap (%layout-bitmap new-layout)))
         ;; The number of extra ID words has to match, as does the number of bitmap
         ;; words, or else GC will croak when parsing the bitmap.

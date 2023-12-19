@@ -77,6 +77,38 @@
     (aver (= (%layout-bitmap layout) bitmap)) ; verify it reads back the same
     layout))
 
+;;; Extract the bitmap from 1 or more words of bits that have the same format
+;;; as a BIGNUM - least-significant word first, native bit order within each word,
+;;; all but the last are unsigned, and the last is signed.
+(defun %layout-bitmap (layout &aux (nwords (bitmap-nwords layout))
+                                   (start (bitmap-start layout)))
+  (declare (type layout layout))
+  (if (and (= nwords 1) (fixnump (%raw-instance-ref/signed-word layout start)))
+      (the fixnum (%raw-instance-ref/signed-word layout start))
+      (do* ((res (sb-bignum:%allocate-bignum nwords))
+            (i 0 (1+ i))
+            (j start (1+ j)))
+           ((= i nwords)
+            ;; not sure if this NORMALIZE call is needed, but it can't hurt
+            (sb-bignum::%normalize-bignum res nwords))
+       (setf (sb-bignum:%bignum-ref res i) (%raw-instance-ref/word layout j)))))
+
+(defun layout-bitmap (layout)
+  (declare (type layout layout))
+  ;; Whenever we call LAYOUT-BITMAP on a structure-object subtype,
+  ;; it's supposed to have the INFO slot populated, linking it to a defstruct-description.
+  (acond ((layout-info layout) (dd-bitmap it))
+         ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
+         ;; raw slots, except that funcallable-instances may have 2 raw slots -
+         ;; the trampoline and the layout. The trampoline can have a tag, depending
+         ;; on the platform, and the layout is tagged but a special case.
+         ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
+         ;; words preceding it.
+         (t
+          (aver (not (logtest +structure-layout-flag+ (layout-flags layout))))
+          (the fixnum
+               (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
+
 ;;; This allocator is used by the expansion of MAKE-LOAD-FORM-SAVING-SLOTS
 ;;; when given a STRUCTURE-OBJECT.
 (defun allocate-struct (type)
