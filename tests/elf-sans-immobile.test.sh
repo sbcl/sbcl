@@ -71,7 +71,7 @@ ${exefile} --noprint n<<EOF
 (assert (not (disassembly-contains-query-read-char)))
 (defun query-read-char () #\y) ; will undo static linkage
 (assert (disassembly-contains-query-read-char))
-(if (y-or-n-p) (exit :code 42))
+(if (let ((*query-io* (make-broadcast-stream))) (y-or-n-p)) (exit :code 42))
 EOF
 status=$?
 if [ $status -eq 42 ]
