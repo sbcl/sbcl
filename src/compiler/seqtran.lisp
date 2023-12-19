@@ -611,6 +611,31 @@
                  `(,(specialized-list-seek-function-name name (when key '(key)))
                     ,pred-expr list ,@(when key (list key-form))))))))))
 
+(defun change-test-based-on-item (test item)
+  (let ((type (lvar-type item)))
+   (or
+    (case test
+      (eql
+       (when (csubtypep type (specifier-type 'eq-comparable-type))
+         'eq))
+      (equal
+       (when (csubtypep type (specifier-type '(not (or
+                                                    cons
+                                                    bit-vector
+                                                    string
+                                                    pathname))))
+         (change-test-based-on-item 'eql item)))
+      (equalp
+       (when (csubtypep type (specifier-type '(not (or number
+                                                    character
+                                                    cons
+                                                    array
+                                                    pathname
+                                                    instance
+                                                    hash-table))))
+         (change-test-based-on-item 'eql item))))
+    test)))
+
 (macrolet ((def (name &optional if/if-not)
              (let ((basic (symbolicate "%" name))
                    (basic-eq (symbolicate "%" name "-EQ"))
@@ -621,26 +646,30 @@
                `(progn
                   (deftransform ,name ((item list &key key test test-not) * * :node node)
                     (transform-list-item-seek ',name item list key test test-not node))
-                  (deftransform ,basic ((item list) (eq-comparable-type t))
+                  (deftransform ,basic ((item list) (eq-comparable-type t) * :important nil)
                     `(,',basic-eq item list))
-                  (deftransform ,basic-key ((item list) (eq-comparable-type t))
-                    `(,',basic-key-eq item list))
-                  (deftransform ,test ((item list test) (t t t))
-                    (let ((test (lvar-fun-is test '(eq eql))))
-                      (case test
+                  ,(unless (eq name 'adjoin) ;; applies KEY to ITEM.
+                     `(deftransform ,basic-key ((item list key) (eq-comparable-type t t) * :important nil)
+                        `(,',basic-key-eq item list key)))
+                  (deftransform ,test ((item list test) (t t t) * :node node)
+                    (let ((test (lvar-fun-is test '(eq eql equal equalp))))
+                      (case (change-test-based-on-item test item)
                         (eq
                          `(,',basic-eq item list))
                         (eql
                          `(,',basic item list))
                         (t
                          (give-up-ir1-transform)))))
-                  (deftransform ,key-test ((item list key test) (t t t))
-                    (let ((test (lvar-fun-is test '(eq eql))))
-                      (case test
+                  (deftransform ,key-test ((item list key test) (t t t t) * :important nil)
+                    (let ((test (lvar-fun-is test '(eq eql ,@(unless (eq name 'adjoin)
+                                                               '(equal equalp))))))
+                      (case ,(if (eq name 'adjoin)
+                                 'test
+                                 '(change-test-based-on-item test item))
                         (eq
-                         `(,',basic-key-eq item list))
+                         `(,',basic-key-eq item list key))
                         (eql
-                         `(,',basic-key item list))
+                         `(,',basic-key item list key))
                         (t
                          (give-up-ir1-transform)))))
                   ,@(when if/if-not
