@@ -40,9 +40,10 @@
   ;; hashes.
   (let ((win 0) (n-trials 10) (prev (sb-int:address-based-counter-val)))
     (dotimes (i n-trials)
-      (declare (notinline cons sb-sys:int-sap)) ; it's flushable, but don't flush it
-      #+use-cons-region (sb-sys:int-sap #xf00fa) ; 2 words in mixed-region
-      #-use-cons-region (cons 1 2)
+      (locally
+          (declare (notinline cons sb-sys:int-sap)) ; it's flushable, but don't flush it
+        #+use-cons-region (sb-sys:int-sap #xf00fa) ; 2 words in mixed-region
+        #-use-cons-region (cons 1 2))
       (let ((ptr (sb-int:address-based-counter-val)))
         (when (= ptr (1+ prev))
           (incf win))
