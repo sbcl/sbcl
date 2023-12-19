@@ -775,17 +775,13 @@
         (n-data-words (- size sb-vm:instance-data-start)))
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
-      ;; FIXME: this is basically DO-LAYOUT-BITMAP, but probably not as efficient.
-      (let ((bitmap (sb-kernel::%layout-bitmap layout)))
-        ;; Values on the stack are in the same order as in the structure itself.
-        (do ((i sb-vm:instance-data-start (1+ i)))
-            ((>= i size))
-          (declare (type index i))
-          (let ((val (fop-stack-ref ptr)))
-            (if (logbitp i bitmap)
-                (%instance-set res i val)
-                (%raw-instance-set/word res i val))
-            (incf ptr)))))
+      ;; Values on the stack are in the same order as in the structure itself.
+      (do-layout-bitmap (i taggedp layout size)
+        (let ((val (fop-stack-ref ptr)))
+          (if taggedp
+              (%instance-set res i val)
+              (%raw-instance-set/word res i val)))
+        (incf ptr)))
     res))
 
 ;;; Symbol-like entities
