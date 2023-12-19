@@ -51,75 +51,62 @@
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
     (when (leaf-refs var)
-      (if (and let-p
-               (var-unused-before-sets-p var)
-               (not (lambda-var-indirect var)))
-          (let* ((type (loop with union
-                             for set in (lambda-var-sets var)
-                             for type = (lvar-type (set-value set))
-                             do (setf union
-                                      (if union
-                                          (type-union union type)
-                                          type))
-                             finally (return union)))
-                 (ptype (primitive-type type))
-                 (res (make-normal-tn ptype))
-                 (node (lambda-bind fun))
-                 (debug-variable-p (not (or (and let-p (policy node (< debug 3)))
-                                            (policy node (zerop debug))
-                                            (policy node (= speed 3))))))
-            (cond
-              (debug-variable-p
-               ;; If it's a constant it may end up being never read,
-               ;; replaced by COERCE-FROM-CONSTANT.
-               ;; Yet it might get saved on the stack, but since it's
-               ;; never read no stack space is allocated for it in the
-               ;; callee frame.
-               (unless (type-singleton-p type)
-                 (environment-debug-live-tn res (lambda-environment fun)))))
+      (let* ((node (lambda-bind fun))
+             (debug-variable-p (not (or (and let-p (policy node (< debug 3)))
+                                        (policy node (zerop debug))
+                                        (policy node (= speed 3))))))
+        (if (and let-p
+                 (not debug-variable-p)
+                 (not (lambda-var-indirect var))
+                 (var-unused-before-sets-p var))
+            (let* ((type (loop with union
+                               for set in (lambda-var-sets var)
+                               for type = (lvar-type (set-value set))
+                               do (setf union
+                                        (if union
+                                            (type-union union type)
+                                            type))
+                               finally (return union)))
+                   (ptype (primitive-type type))
+                   (res (make-normal-tn ptype)))
+              (setf (tn-leaf res) var)
+              (setf (tn-type res) type)
+              (setf (leaf-info var) res
+                    (leaf-ever-used var) 'initial-unused))
+            (let* (ptype-info
+                   (type (if (lambda-var-indirect var)
+                             (if (lambda-var-explicit-value-cell var)
+                                 *backend-t-primitive-type*
+                                 (or (first
+                                      (setf ptype-info
+                                            (primitive-type-indirect-cell-type
+                                             (primitive-type (leaf-type var)))))
+                                     *backend-t-primitive-type*))
+                             (primitive-type (leaf-type var))))
+                   (res (make-normal-tn type)))
+              (cond
+                ((and (lambda-var-indirect var)
+                      (not (lambda-var-explicit-value-cell var)))
+                 ;; Force closed-over indirect LAMBDA-VARs without explicit
+                 ;; VALUE-CELLs to the stack, and make sure that they are
+                 ;; live over the dynamic contour of the environment.
+                 (setf (tn-sc res) (if ptype-info
+                                       (second ptype-info)
+                                       (sc-or-lose 'sb-vm::control-stack)))
+                 (environment-live-tn res (lambda-environment fun)))
 
-            (setf (tn-leaf res) var)
-            (setf (tn-type res) type)
-            (setf (leaf-info var) res
-                  (leaf-ever-used var) 'initial-unused))
-          (let* (ptype-info
-                 (type (if (lambda-var-indirect var)
-                           (if (lambda-var-explicit-value-cell var)
-                               *backend-t-primitive-type*
-                               (or (first
-                                    (setf ptype-info
-                                          (primitive-type-indirect-cell-type
-                                           (primitive-type (leaf-type var)))))
-                                   *backend-t-primitive-type*))
-                           (primitive-type (leaf-type var))))
-                 (res (make-normal-tn type))
-                 (node (lambda-bind fun))
-                 (debug-variable-p (not (or (and let-p (policy node (< debug 3)))
-                                            (policy node (zerop debug))
-                                            (policy node (= speed 3))))))
-            (cond
-              ((and (lambda-var-indirect var)
-                    (not (lambda-var-explicit-value-cell var)))
-               ;; Force closed-over indirect LAMBDA-VARs without explicit
-               ;; VALUE-CELLs to the stack, and make sure that they are
-               ;; live over the dynamic contour of the environment.
-               (setf (tn-sc res) (if ptype-info
-                                     (second ptype-info)
-                                     (sc-or-lose 'sb-vm::control-stack)))
-               (environment-live-tn res (lambda-environment fun)))
+                (debug-variable-p
+                 ;; If it's a constant it may end up being never read,
+                 ;; replaced by COERCE-FROM-CONSTANT.
+                 ;; Yet it might get saved on the stack, but since it's
+                 ;; never read no stack space is allocated for it in the
+                 ;; callee frame.
+                 (unless (type-singleton-p (leaf-type var))
+                   (environment-debug-live-tn res (lambda-environment fun)))))
 
-              (debug-variable-p
-               ;; If it's a constant it may end up being never read,
-               ;; replaced by COERCE-FROM-CONSTANT.
-               ;; Yet it might get saved on the stack, but since it's
-               ;; never read no stack space is allocated for it in the
-               ;; callee frame.
-               (unless (type-singleton-p (leaf-type var))
-                 (environment-debug-live-tn res (lambda-environment fun)))))
-
-            (setf (tn-leaf res) var)
-            (setf (tn-type res) (leaf-type var))
-            (setf (leaf-info var) res)))))
+              (setf (tn-leaf res) var)
+              (setf (tn-type res) (leaf-type var))
+              (setf (leaf-info var) res))))))
   (values))
 
 ;;; Give CLAMBDA an IR2-ENVIRONMENT structure. (And in order to

@@ -4334,7 +4334,7 @@
 
 (with-test (:name :unused-initial-values)
   (checked-compile-and-assert
-    (:allow-notes nil)
+    (:allow-notes nil :optimize '(:debug 2 :speed 3 :safety 1))
     `(lambda (v)
        (declare ((simple-array double-float (*)) v))
        (loop for e across v count (> e 0)))

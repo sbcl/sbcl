@@ -2822,8 +2822,9 @@ is :ANY, the function name is not checked."
                                    ;; Case 3: 'NAME
                                    (member value names
                                            :test #'equal))))))))
-           (and name
-                (not (fun-lexically-notinline-p name)))))))
+           (when (and name
+                      (not (fun-lexically-notinline-p name)))
+             name)))))
 
 ;;; Return true if LVAR's only use is a call to one of the named functions
 ;;; (or any function if none are specified) with the specified number of
