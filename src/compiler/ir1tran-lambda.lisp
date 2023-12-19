@@ -1128,7 +1128,12 @@
       (if (eq (car fun) 'lambda-with-lexenv)
           (cdr fun)
           `(() . ,(cdr fun)))
-    (let* ((*lexenv*
+    (let* ((notinlines
+             (loop for fun in (lexenv-funs *lexenv*)
+                   when (and (defined-fun-p (cdr fun))
+                             (defined-fun-inlinep (cdr fun)))
+                   collect fun))
+           (*lexenv*
              (if decls
                  (make-lexenv
                   :default (process-decls decls nil nil
@@ -1148,9 +1153,13 @@
                   (lexenv-lambda *lexenv*)
                   *lexenv*)))
            (*inlining* (1+ *inlining*))
-           (clambda (ir1-convert-lambda `(lambda ,@body)
-                                        :source-name source-name
-                                        :debug-name debug-name)))
+           (clambda (progn
+                      (when notinlines
+                        (setf (lexenv-funs *lexenv*)
+                              notinlines))
+                      (ir1-convert-lambda `(lambda ,@body)
+                                          :source-name source-name
+                                          :debug-name debug-name))))
       (setf (functional-inline-expanded clambda) t)
       clambda)))
 
