@@ -3020,7 +3020,7 @@
           (t
            (give-up-ir1-transform)))))
 
-(deftransforms (union nunion) ((list1 list2 &key key test test-not))
+(deftransform nunion ((list1 list2 &key key test test-not))
   (let ((null-type (specifier-type 'null)))
     (cond ((csubtypep (lvar-type list1) null-type)
            'list2)
@@ -3034,6 +3034,31 @@
            'list1)
           (t
            (give-up-ir1-transform)))))
+
+(deftransform union ((list1 list2 &key key test test-not))
+  (let ((null-type (specifier-type 'null)))
+    (flet ((to-adjoin (a b)
+             (when (constant-lvar-p a)
+               (let ((value (lvar-value a)))
+                 (when (typep value '(cons * null))
+                   `(adjoin ',(car value) ,b
+                            ,@(and test '(:test test))
+                            ,@(and test-not '(:test-not test-not))))))))
+      (cond ((csubtypep (lvar-type list1) null-type)
+             'list2)
+            ((csubtypep (lvar-type list2) null-type)
+             'list1)
+            ((and (same-leaf-ref-p list1 list2)
+                  (not test-not)
+                  (not key)
+                  (or (not test)
+                      (lvar-fun-is test '(eq eql equal equalp))))
+             'list1)
+            ((and (not key)
+                  (or (to-adjoin list1 'list2)
+                      (to-adjoin list2 'list1))))
+            (t
+             (give-up-ir1-transform))))))
 
 (defoptimizer (union derive-type) ((list1 list2 &rest args))
   (let ((cons-type (specifier-type 'cons)))
