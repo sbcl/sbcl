@@ -612,29 +612,30 @@
                     ,pred-expr list ,@(when key (list key-form))))))))))
 
 (defun change-test-based-on-item (test item)
-  (let ((type (lvar-type item)))
-   (or
-    (case test
-      (eql
-       (when (csubtypep type (specifier-type 'eq-comparable-type))
-         'eq))
-      (equal
-       (when (csubtypep type (specifier-type '(not (or
-                                                    cons
-                                                    bit-vector
-                                                    string
-                                                    pathname))))
-         (change-test-based-on-item 'eql item)))
-      (equalp
-       (when (csubtypep type (specifier-type '(not (or number
-                                                    character
-                                                    cons
-                                                    array
-                                                    pathname
-                                                    instance
-                                                    hash-table))))
-         (change-test-based-on-item 'eql item))))
-    test)))
+  (or
+   (and (neq item *universal-type*)
+        (neq item *wild-type*)
+        (case test
+          (eql
+           (when (csubtypep item (specifier-type 'eq-comparable-type))
+             'eq))
+          (equal
+           (when (csubtypep item (specifier-type '(not (or
+                                                        cons
+                                                        bit-vector
+                                                        string
+                                                        pathname))))
+             (change-test-based-on-item 'eql item)))
+          (equalp
+           (when (csubtypep item (specifier-type '(not (or number
+                                                        character
+                                                        cons
+                                                        array
+                                                        pathname
+                                                        instance
+                                                        hash-table))))
+             (change-test-based-on-item 'eql item)))))
+   test))
 
 (macrolet ((def (name &optional if/if-not)
              (let ((basic (symbolicate "%" name))
@@ -653,7 +654,7 @@
                         `(,',basic-key-eq item list key)))
                   (deftransform ,test ((item list test) (t t t) * :node node)
                     (let ((test (lvar-fun-is test '(eq eql equal equalp))))
-                      (case (change-test-based-on-item test item)
+                      (case (change-test-based-on-item test (lvar-type item))
                         (eq
                          `(,',basic-eq item list))
                         (eql
@@ -665,7 +666,7 @@
                                                                '(equal equalp))))))
                       (case ,(if (eq name 'adjoin)
                                  'test
-                                 '(change-test-based-on-item test item))
+                                 '(change-test-based-on-item test (lvar-type item)))
                         (eq
                          `(,',basic-key-eq item list key))
                         (eql
@@ -2524,6 +2525,44 @@
   (def %find-position-if when)
   (def %find-position-if-not unless))
 
+(defun sequence-element-type (sequence key)
+  (let ((key-return-type *universal-type*))
+    (when key
+      (multiple-value-bind (type name) (lvar-fun-type key)
+        (cond ((eq name 'identity)
+               (setf key nil))
+              (t
+               (setf key-return-type (if (fun-type-p type)
+                                         (single-value-type (fun-type-returns type))
+                                         *universal-type*))
+               (if (constant-fold-arg-p name)
+                   (setf key name)
+                   (return-from sequence-element-type key-return-type))))))
+    (let ((type (sequence-elements-type sequence key)))
+      (if (or (eq type *universal-type*)
+              (eq type *wild-type*))
+          key-return-type
+          type))))
+
+(deftransform %find-position ((item sequence from-end start end key test))
+  (let* ((test (lvar-fun-is test '(eql equal equalp)))
+         (test-origin test))
+    (when test
+      (setf test (change-test-based-on-item test (lvar-type item)))
+      (unless (eq test 'eq)
+        (let ((elt (sequence-element-type sequence key)))
+          (setf test (change-test-based-on-item test elt))
+          (when (and (eq test 'equalp)
+                     (csubtypep (lvar-type item) (specifier-type 'integer))
+                     (csubtypep elt (specifier-type 'integer)))
+            (setf test (if (or (csubtypep (lvar-type item) (specifier-type 'fixnum))
+                               (csubtypep elt (specifier-type 'fixnum)))
+                           'eq
+                           'eql))))))
+    (if (eq test test-origin)
+        (give-up-ir1-transform)
+        `(%find-position item sequence from-end start end key #',test))))
+
 ;;; %FIND-POSITION for LIST data can be expanded into %FIND-POSITION-IF
 ;;; without loss of efficiency. (I.e., the optimizer should be able
 ;;; to straighten everything out.)
@@ -2836,24 +2875,6 @@
                             `(lambda (item sequence &rest rest)
                                (declare (ignore sequence rest))
                                (cond ,@(if reversedp (nreverse clauses) clauses))))))))
-                  ;; For both FIND and POSITION, try to optimize EQL into EQ.
-                  (when (and (eq effective-test 'eql)
-                             const-seq
-                             (or (vectorp const-seq) (proper-list-p const-seq))
-                             (let ((key (if key
-                                            (let ((name (lvar-fun-name* key)))
-                                              (and (constant-fold-arg-p name)
-                                                   name))
-                                            #'identity)))
-                               (and key
-                                    (every (lambda (x)
-                                             (block nil
-                                               (sb-xc:typep (handler-case (funcall key x)
-                                                              (error ()
-                                                                (return)))
-                                                            'eq-comparable-type)))
-                                           const-seq))))
-                    (setq test-form '#'eq))
                   `(nth-value ,',values-index
                               (%find-position item sequence
                                               from-end start
