@@ -615,7 +615,9 @@
              (let ((basic (symbolicate "%" name))
                    (basic-eq (symbolicate "%" name "-EQ"))
                    (basic-key (symbolicate "%" name "-KEY"))
-                   (basic-key-eq (symbolicate "%" name "-KEY-EQ")))
+                   (basic-key-eq (symbolicate "%" name "-KEY-EQ"))
+                   (test (symbolicate "%" name "-TEST"))
+                   (key-test (symbolicate "%" name "-KEY-TEST")))
                `(progn
                   (deftransform ,name ((item list &key key test test-not) * * :node node)
                     (transform-list-item-seek ',name item list key test test-not node))
@@ -623,13 +625,31 @@
                     `(,',basic-eq item list))
                   (deftransform ,basic-key ((item list) (eq-comparable-type t))
                     `(,',basic-key-eq item list))
+                  (deftransform ,test ((item list test) (t t t))
+                    (let ((test (lvar-fun-is test '(eq eql))))
+                      (case test
+                        (eq
+                         `(,',basic-eq item list))
+                        (eql
+                         `(,',basic item list))
+                        (t
+                         (give-up-ir1-transform)))))
+                  (deftransform ,key-test ((item list key test) (t t t))
+                    (let ((test (lvar-fun-is test '(eq eql))))
+                      (case test
+                        (eq
+                         `(,',basic-key-eq item list))
+                        (eql
+                         `(,',basic-key item list))
+                        (t
+                         (give-up-ir1-transform)))))
                   ,@(when if/if-not
-                          (let ((if-name (symbolicate name "-IF"))
-                                (if-not-name (symbolicate name "-IF-NOT")))
-                            `((deftransform ,if-name ((pred list &key key) * * :node node)
-                                (transform-list-pred-seek ',if-name pred list key node))
-                              (deftransform ,if-not-name ((pred list &key key) * * :node node)
-                                (transform-list-pred-seek ',if-not-name pred list key node)))))))))
+                      (let ((if-name (symbolicate name "-IF"))
+                            (if-not-name (symbolicate name "-IF-NOT")))
+                        `((deftransform ,if-name ((pred list &key key) * * :node node)
+                            (transform-list-pred-seek ',if-name pred list key node))
+                          (deftransform ,if-not-name ((pred list &key key) * * :node node)
+                            (transform-list-pred-seek ',if-not-name pred list key node)))))))))
   (def adjoin)
   (def assoc  t)
   (def member t)
