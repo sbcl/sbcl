@@ -286,11 +286,7 @@ void
 os_install_interrupt_handlers(void)
 {
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
-    ll_install_handler(SIG_MEMORY_FAULT,
-#if defined(LISP_FEATURE_FREEBSD) && !defined(__GLIBC__)
-                                                 (__siginfohandler_t *)
-#endif
-                                                 memory_fault_handler);
+    ll_install_handler(SIG_MEMORY_FAULT, memory_fault_handler);
 
 #ifdef LISP_FEATURE_DARWIN
     /* Unmapped pages get this and not SIGBUS. */
