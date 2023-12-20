@@ -1668,11 +1668,6 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         if (layout) {
             CHECK(layout, object);
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
-            if (widetag_of(object) == FUNCALLABLE_INSTANCE_WIDETAG) {
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                gc_assert(bitmap.bits[0] == (sword_t)-4);
-#endif
-            }
             if (lockfree_list_node_layout_p(LAYOUT(layout))) {
                 struct list_node* node = (void*)object;
                 lispobj next = node->_node_next;

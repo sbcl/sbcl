@@ -41,7 +41,7 @@
 (define-load-time-global *sgf-wrapper*
   (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function
-                      sb-kernel::standard-gf-primitive-obj-layout-bitmap))
+                      sb-kernel::funinstance-layout-bitmap))
 
 
 (defun allocate-standard-instance (wrapper)
@@ -185,12 +185,12 @@
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
               (!early-collect-inheritance name)
             (let* ((class (find-class name))
-                   ;; All funcallable objects get the bitmap of standard-GF.
+                   ;; All funcallable instances have the same bitmap
                    ;; This is checked in verify_range() of gencgc.
                    (bitmap (if (memq name '(standard-generic-function
                                             funcallable-standard-object
                                             generic-function))
-                               sb-kernel::standard-gf-primitive-obj-layout-bitmap
+                               sb-kernel::funinstance-layout-bitmap
                                +layout-all-tagged+))
                    (wrapper (cond ((eq class slot-class)
                                    slot-class-wrapper)

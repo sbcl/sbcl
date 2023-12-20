@@ -388,24 +388,6 @@
   (aver (not (consp (layout-%info layout))))
   (setf (layout-%info layout) newval))
 
-;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
-(defconstant standard-gf-primitive-obj-layout-bitmap
-  ;; layout has no bitmap bit. The other slots all look tagged even though
-  ;; it's an accident that the raw instruction words resemble fixnums.
-  ;; I should probably find a more principled way to express this,
-  ;; but the old - technically correct - way based on a bitmap really made
-  ;; the logic look like crap. But now that the variable-length part of a
-  ;; funcallable-instance follows its embedded trampoline, it would be simple
-  ;; to alter the GC to skip a fixed number of slots.
-  ;; I think that is preferable to using a bitmap.
-  #+compact-instance-header -1
-  ;; the layout is considered untagged so that we don't doubly process it
-  ;; if walking tagged slots. The assumption is that layout is always
-  ;; handled separately, so therefore we don't want to process it again
-  ;; in a bitmap-based scan. And the entry point is considered untagged
-  ;; because it points to an assembler routine, thus ignorable.
-  #-compact-instance-header -4)
-
 #-sb-xc-host
 (progn
 (declaim (inline bitmap-start bitmap-nwords bitmap-all-taggedp))

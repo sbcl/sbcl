@@ -1,3 +1,14 @@
+
+(with-test (:name :funinstance-layout-bitmaps-all-same)
+  (let* ((list (sb-vm:list-allocated-objects :all :type sb-vm:instance-widetag
+                                                  :test #'sb-kernel::layout-p))
+         (fun-layouts
+          (remove-if-not (lambda (x) (find (sb-kernel:find-layout 'function)
+                                           (sb-kernel:layout-inherits x)))
+                         list))
+         (bitmaps (mapcar 'sb-kernel::%layout-bitmap fun-layouts)))
+    (assert (= (length (remove-duplicates bitmaps)) 1))))
+
 (with-test (:name :stream-layout-bits)
   (loop for wrapper being each hash-value
         of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't))

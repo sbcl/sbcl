@@ -948,14 +948,9 @@ scav_funinstance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
     struct funcallable_instance* fin = (void*)where;
-#ifdef LISP_FEATURE_EXECUTABLE_FUNINSTANCES
     lispobj* firstword = &fin->function;
-#else
-    lispobj* firstword = &fin->layout;
-#endif
-    // This will potentially see the layout "again" if it appears as an
-    // ordinary descriptor slot. Thankfully it's not a problem for gencgc
-    // to process a slot twice.
+    // This will visit the layout again if it appears as an ordinary descriptor slot.
+    // It's not a problem for gencgc to process a slot twice.
     lispobj* lastword = where + (nslots+1); // exclusive upper bound
     scavenge(firstword, lastword - firstword);
     return 1 + (nslots | 1);

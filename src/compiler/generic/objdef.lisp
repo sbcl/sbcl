@@ -284,12 +284,15 @@ during backtrace.
                              #-(or x86 x86-64 arm64) %closure-fun)
   (info :rest-p t))
 
-#+executable-funinstances
 (define-primitive-object (funcallable-instance
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
-  (trampoline)
+  #+executable-funinstances (trampoline)
+  ;; FIXME: this :INIT seems completely silly.  I'm quite certain we can look up the
+  ;; assembler routine and assign it in a way totally consistent across the backends
+  ;; so that the special case in EMIT-INITS and the vops can go away.
+  #-executable-funinstances (trampoline :init :funcallable-instance-tramp)
   ;; self-contained trampoline instructions go in the words following
   ;; the trampoline address. Currently the use of 2 words is based on
   ;; the requirement for x86-64 but it is relatively easy to change.
@@ -298,24 +301,13 @@ during backtrace.
   ;; were the LAYOUT to intrude between the instructions and the FUNCTION,
   ;; then the instruction bytes would depend on whether #+compact-instance-header
   ;; is enabled, which is an extra and unnecessary complication.
-  (instword1)
-  (instword2)
+  #+executable-funinstances (instword1)
+  #+executable-funinstances (instword2)
   (function :type function
             :ref-known (flushable) :ref-trans %funcallable-instance-fun
             :set-known () :set-trans (setf %funcallable-instance-fun))
   #-compact-instance-header
   (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
-  (info :rest-p t))
-#-executable-funinstances
-(define-primitive-object (funcallable-instance
-                          :lowtag fun-pointer-lowtag
-                          :widetag funcallable-instance-widetag
-                          :alloc-trans %make-funcallable-instance)
-  (trampoline :init :funcallable-instance-tramp)
-  (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
-  (function :type function
-            :ref-known (flushable) :ref-trans %funcallable-instance-fun
-            :set-known () :set-trans (setf %funcallable-instance-fun))
   (info :rest-p t))
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag

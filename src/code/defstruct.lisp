@@ -1640,16 +1640,21 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;       word3: (u) machine instructions
 ;;;       word4: (t) implementation-fun
 ;;;       word5: (t) tagged slots ...
-;;;   Non-executable:                    #b...1100        -4
+;;;   Non-executable:                    #b...1010        -6
 ;;;       word0:     header
 ;;;       word1: (*) entry address
-;;;       word2: (u) layout
 ;;;       word3: (t) implementation-fun
+;;;       word2: (u) layout
 ;;;       word4: (t) tagged slots ...
 ;;; (*) entry address can be treated as either tagged or raw.
 ;;;     For some architectures it has a lowtag, but points to
 ;;;     read-only space. For others it is a fixnum.
 ;;;     In either case the GC need not observe the value.
+(defconstant funinstance-layout-bitmap
+  #-executable-funinstances                                     -6
+  #+(and executable-funinstances (not compact-instance-header)) -24
+  #+(and executable-funinstances compact-instance-header)       -8)
+
 ;;;
 ;;; Ordinary instance with only tagged slots:
 ;;;   Non-compact header:                #b...1110        -2
@@ -1683,10 +1688,8 @@ or they must be declared locally notinline at each call site.~@:>"
   #+sb-xc-host
   (when (eq (dd-name dd) 'layout)
     (setf rest :untagged))
-  #-compact-instance-header
   (when (eq (car (dd-alternate-metaclass dd)) 'function)
-    ;; There is only one possible bitmap, which excludes LAYOUT from tagged slots
-    (return-from calculate-dd-bitmap standard-gf-primitive-obj-layout-bitmap))
+    (return-from calculate-dd-bitmap funinstance-layout-bitmap))
   ;; Compute two masks with a 1 bit for each dsd-index which contains a descriptor.
   ;; The "mininal" bitmap contains a 1 for each slot which *must* be scanned in GC,
   ;; and the "maximal" bitmap contains a 1 for each which *may* be scanned.

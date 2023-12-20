@@ -248,9 +248,8 @@
   ;; to superclasses, so maybe it's possible.
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
-      (%raw-instance-set/signed-word
-       layout (sb-kernel::type-dd-length layout)
-       sb-kernel::standard-gf-primitive-obj-layout-bitmap))
+      (%raw-instance-set/signed-word layout (sb-kernel::type-dd-length layout)
+                                     sb-kernel::funinstance-layout-bitmap))
     (setq flags (logior (logand (logior +sequence-layout-flag+
                                         +stream-layout-flag+
                                         +simple-stream-layout-flag+
