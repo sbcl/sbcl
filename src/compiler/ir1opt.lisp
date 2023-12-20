@@ -1906,8 +1906,8 @@
                          (and (ref-p first)
                               (eq (ref-leaf first) var))))
             (return-from %analyze-set-uses nil))
-          (let ((step-type (lvar-type (second args)))
-                (set-type (lvar-type (set-value set))))
+          (let ((step-type (weaken-numeric-union-type (lvar-type (second args))))
+                (set-type (weaken-numeric-union-type (lvar-type (set-value set)))))
             ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
             ;; type matching INITIAL-TYPE.
             (unless (and (numeric-type-p step-type)
