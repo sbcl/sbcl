@@ -423,8 +423,8 @@
     (loop with i = -1
           for ref = (vop-args vop) then (tn-ref-across ref)
           do
-          (loop for type = (pop types)
-                do (incf i)
+          (loop do (pop types)
+                   (incf i)
                 while (typep (car types) '(cons (eql :constant))))
           when (eq ref tn-ref) return i)))
 

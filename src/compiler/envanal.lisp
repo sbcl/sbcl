@@ -395,7 +395,7 @@
 (defun find-lvar-dynamic-extents (component)
   (declare (type component component))
   (do-blocks (block component)
-    (do-nodes (node lvar block)
+    (do-nodes (node nil block)
       (when (and (combination-p node)
                  (memq (basic-combination-kind node)
                        '(:full :unknown-keys :known)))

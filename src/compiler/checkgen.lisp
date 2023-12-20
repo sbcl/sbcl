@@ -116,22 +116,14 @@
        (2 (weaken-values-type type))
        (3 type)))))
 
-;;; LVAR is an lvar we are doing a type check on and TYPES is a list
-;;; of types that we are checking its values against. If we have
-;;; proven that LVAR generates a fixed number of values, then for each
-;;; value, we check whether it is cheaper to then difference between
-;;; the proven type and the corresponding type in TYPES.
-(defun lvar-types-to-check (lvar types original-types n-required)
-  (declare (type lvar lvar) (list types original-types))
-  (let ((ptypes (values-type-out (lvar-derived-type lvar) (length types))))
-    (loop for p in ptypes
-          and c in types
-          and a in original-types
-          and i from 0
-          collect (list (if (>= i n-required)
-                            (type-union c (specifier-type 'null))
-                            c)
-                        a))))
+(defun lvar-types-to-check (types original-types n-required)
+  (loop for type in types
+        for original in original-types
+        for i from 0
+        collect (list (if (>= i n-required)
+                          (type-union original (specifier-type 'null))
+                          original)
+                      type)))
 
 ;;; Determine if CAST can be checked.
 ;;; We may check only fixed number of values; in any case the number
@@ -158,7 +150,6 @@
   (let* ((ctype (coerce-to-values (cast-type-to-check cast)))
          (atype (coerce-to-values (cast-asserted-type cast)))
          (dtype (node-derived-type cast))
-         (value (cast-value cast))
          (lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar)))
          (n-consumed (cond ((not lvar)
@@ -177,29 +168,26 @@
                 (not (values-type-rest dtype)))
            ;; we [almost] know how many values are produced
            (values :simple
-                   (lvar-types-to-check value
-                                        (values-type-out ctype n-required)
+                   (lvar-types-to-check (values-type-out ctype n-required)
                                         (values-type-out atype n-required)
                                         n-required)))
           ((lvar-single-value-p lvar)
            ;; exactly one value is consumed
            (principal-lvar-single-valuify lvar)
-           (values :simple (lvar-types-to-check value
-                                               (list (single-value-type ctype))
-                                               (list (single-value-type atype))
-                                               n-required)))
+           (values :simple (lvar-types-to-check (list (single-value-type ctype))
+                                                (list (single-value-type atype))
+                                                n-required)))
           ((and (mv-combination-p dest)
                 (eq (mv-combination-kind dest) :local)
                 (singleton-p (mv-combination-args dest)))
            ;; we know the number of consumed values
-           (values :simple (lvar-types-to-check value
-                                               (adjust-list (values-type-types ctype)
-                                                            n-consumed
-                                                            *universal-type*)
-                                               (adjust-list (values-type-types atype)
-                                                            n-consumed
-                                                            *universal-type*)
-                                               n-required)))
+           (values :simple (lvar-types-to-check (adjust-list (values-type-types ctype)
+                                                             n-consumed
+                                                             *universal-type*)
+                                                (adjust-list (values-type-types atype)
+                                                             n-consumed
+                                                             *universal-type*)
+                                                n-required)))
           (t
            (values :too-hairy nil)))))
 
