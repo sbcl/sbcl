@@ -1917,7 +1917,9 @@
                              ;; are of different types, and the step
                              ;; is less contagious.
                              (let ((contagion-type (numeric-contagion initial-type
-                                                                      step-type)))
+                                                                      step-type
+                                                                      ;; Adding integers will produce integers
+                                                                      :rational nil)))
                                (and (numeric-type-p contagion-type)
                                     (numtype-aspects-eq initial-type contagion-type)))))
               (return-from %analyze-set-uses nil))
@@ -1962,7 +1964,9 @@
                             (type-union union step-type)
                             step-type))))))
     (type-union initial-type
-                (numeric-contagion initial-type union))))
+                (numeric-contagion initial-type union
+                                   ;; Adding integers will produce integers
+                                   :rational nil))))
 
 (defun maybe-infer-iteration-var-type (var initial-type)
   (binding* ((sets (lambda-var-sets var) :exit-if-null)

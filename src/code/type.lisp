@@ -3424,7 +3424,21 @@ used for a COMPLEX component.~:@>"
         ((eq type2 (specifier-type 'ratio))
          (numeric-contagion type1 (specifier-type 'rational)))
         (t
-         (specifier-type 'number))))
+         (flet ((try-union (a b)
+                  (let (union)
+                    (loop for type in (union-type-types a)
+                          for contagion = (numeric-contagion type b :rational rational :unsigned unsigned)
+                          do (setf union (if union
+                                             (type-union union contagion)
+                                             contagion))
+                          until (eq union (specifier-type 'number)))
+                    union)))
+           (cond ((union-type-p type1)
+                  (try-union type1 type2))
+                 ((union-type-p type2)
+                  (try-union type2 type1))
+                 (t
+                  (specifier-type 'number)))))))
 
 ;;;; array types
 
