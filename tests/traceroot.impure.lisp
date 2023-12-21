@@ -16,7 +16,7 @@
 ;;;; It's just that sometimes we get :PINNED as a root instead of
 ;;;; the expected reference to the one and only thread.
 ;;;; And also sb-safepoint gets a crash in C.
-#-(and (or arm64 ppc64 x86-64) sb-thread (not sb-safepoint))
+#-(and (or arm64 ppc64 x86-64) sb-thread (not sb-safepoint) (not gc-stress))
 (invoke-restart 'run-tests::skip-file)
 
 (setq sb-ext:*evaluator-mode* :compile)

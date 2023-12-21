@@ -2,7 +2,7 @@
 
 (with-test (:name (:join-thread :timeout)
             :broken-on :sb-safepoint
-            :skipped-on (not :sb-thread))
+            :skipped-on (or (not :sb-thread) :gc-stress))
   (macrolet ((delta-t () '(/ (- (get-internal-real-time) begin)
                              internal-time-units-per-second)))
     (let ((thr (sb-thread:make-thread (lambda () (sleep 10)) :name "thr1"))
