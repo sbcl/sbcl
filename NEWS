@@ -1,5 +1,30 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.3.11:
+  * minor incompatible change: *COMPILE-VERBOSE* and *LOAD-VERBOSE* are bound
+    to NIL when the system is started with the --script command-line argument.
+    (reported by Hraban Luyat, thanks to Nicolas Martyanoff)
+  * minor incompatible change: when looking for its core file, the system
+    checks the validity of whatever is pointed to by /proc/self/exe, and
+    assesses argv[0] if /proc/self/exe is invalid.  (thanks to Philipp Marek)
+  * minor incompatible change: the system no longer provides type names on the
+    standard (CL) symbols ARRAY-RANK, ARRAY-TOTAL-SIZE, PATHNAME-HOST,
+    PATHNAME-TYPE, PATHNAME-DIRECTORY, FLOAT-RADIX or FLOAT-DIGITS.
+    (lp#2045559)
+  * platform support
+    ** the mark-region parallel garbage collector can be enabled on arm64.
+       (Thanks to Hayley Patton)
+    ** fix build on modern FreeBSDs.  (lp#2046996, thanks to David J. Flander)
+  * bug fix: restore compiler type inference correctness on calls to REDUCE
+    with :INITIAL-VALUE but no :FROM-END.  (lp#2044856, reported by Patrick
+    Poitras)
+  * bug fix: compiler error when declaring SB-EXT:MUFFLE-CONDITIONS on an
+    unknown type.  (lp#2045442)
+  * bug fix: the disassembler provided non-pretty output for registers in some
+    cases.  (lp#2046004, reported by Fedorov Alexander)
+  * bug fix: the system is slightly less likely to exhaust the stack again
+    when reporting a control stack exhaustion error.
+
 changes in sbcl-2.3.11 relative to sbcl-2.3.10:
   * minor incompatible change: streams with an external-format specified with
     :REPLACEMENT will use their replacement data once per stream unit that
