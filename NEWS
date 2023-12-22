@@ -24,6 +24,14 @@ changes relative to sbcl-2.3.11:
     cases.  (lp#2046004, reported by Fedorov Alexander)
   * bug fix: the system is slightly less likely to exhaust the stack again
     when reporting a control stack exhaustion error.
+  * optimization: GC write barriers are eliminated in more cases.
+  * optimization: improved type derivation of iteration variables with mixed
+    types.
+  * optimization: remove unused initial values from LET bindings, improving
+    register type selection.
+  * optimization: lower EQUALP/EQUAL/EQL to EQL/EQ in FIND/MEMBER based on the
+    input types.
+  * optimization: better type derivation for DPB, LOGIOR.
 
 changes in sbcl-2.3.11 relative to sbcl-2.3.10:
   * minor incompatible change: streams with an external-format specified with
