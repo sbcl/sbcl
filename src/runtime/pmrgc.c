@@ -2057,7 +2057,7 @@ void gc_gen_report_to_file(int filedes, FILE *file) {
   FORMAT("  %4s %6s %6s %6s %6s %6s %6s\n",
          "Gen#", "Raw", "Boxed", "Mixed", "Cons", "Code", "Total");
   OUTPUT("Small objects (in MiB):\n");
-  for (generation_index_t g = 0; g <= HIGHEST_NORMAL_GENERATION; g++)
+  for (generation_index_t g = 0; g <= PSEUDO_STATIC_GENERATION; g++)
     if (small_generation_total[g]) {
       uword_t *gen = small_generation_type[g];
       FORMAT("  %4d %6d %6d %6d %6d %6d %6d\n",
