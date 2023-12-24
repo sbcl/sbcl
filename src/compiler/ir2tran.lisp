@@ -2338,9 +2338,7 @@
       (let ((target (first succ)))
         (cond ((eq target (component-tail (block-component block)))
                (cond ((and (basic-combination-p last)
-                           (or (memq (basic-combination-kind last) '(:full :unknown-keys))
-                               (and (eq (basic-combination-kind last) :known)
-                                    (eq (basic-combination-info last) :full))))
+                           (memq (basic-combination-kind last) '(:full :known :unknown-keys)))
                       (let* ((fun (basic-combination-fun last))
                              (use (lvar-uses fun))
                              (name (and (ref-p use)
@@ -2352,13 +2350,15 @@
                                     (policy last (zerop safety))
                                     (and (fun-type-p ftype)
                                          (eq *empty-type* (fun-type-returns ftype))))
-                          (vop nil-fun-returned-error last 2block
-                               (if name
-                                   (emit-constant name)
-                                   (multiple-value-bind (tn named)
-                                       (fun-lvar-tn last 2block fun)
-                                     (aver (not named))
-                                     tn))))))
+                          (if (eq (basic-combination-info last) :full)
+                              (vop nil-fun-returned-error last 2block
+                                   (if name
+                                       (emit-constant name)
+                                       (multiple-value-bind (tn named)
+                                           (fun-lvar-tn last 2block fun)
+                                         (aver (not named))
+                                         tn)))
+                              (vop sb-impl::unreachable last 2block)))))
                      ;; Something was not properly deleted
                      ((not (or (return-p last)
                                (exit-p last)
