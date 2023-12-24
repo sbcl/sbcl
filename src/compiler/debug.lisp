@@ -1459,7 +1459,7 @@ is replaced with replacement."
                      ((ctype-p x)
                       (type-specifier x))
                      (t x))))
-        (format t "~a~a ~a ~a~%" kind*
+        (format t "   ~a~a ~a ~a~%" kind*
                 (if (constraint-not-p constraint)
                     " NOT"
                     "")
@@ -1476,10 +1476,10 @@ is replaced with replacement."
                     (print-nodes block)
                     (let ((last (block-last block)))
                       (cond ((if-p last)
-                             (format t "CONSEQ~%")
+                             (format t "  CONSEQ~%")
                              (do-conset-elements (con (if-consequent-constraints last))
                                (print-constraint con kind))
-                             (format t "ALT~%")
+                             (format t "  ALT~%")
                              (do-conset-elements (con (if-alternative-constraints last))
                                (print-constraint con kind)))
                             (t

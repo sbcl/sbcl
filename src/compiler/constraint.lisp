@@ -1411,7 +1411,8 @@
                     (type-union in-var-type
                                 (type-from-constraints var out *universal-type*))))))
 
-        (unless (eq in-var-type *universal-type*)
+        (unless (or (eq in-var-type *universal-type*)
+                    (contains-hairy-type-p in-var-type))
           ;; Remove the existing constraints to avoid joining them again later.
           (do-propagatable-constraints (con (in var))
             (when (eq (constraint-kind con) 'typep)

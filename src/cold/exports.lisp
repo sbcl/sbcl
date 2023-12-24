@@ -1870,7 +1870,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%CONCATENATE-TO-STRING"
            "%CONCATENATE-TO-SIMPLE-VECTOR"
            "%CONCATENATE-TO-LIST" "%CONCATENATE-TO-VECTOR"
-           "CONTAINS-UNKNOWN-TYPE-P"
+           "CONTAINS-HAIRY-TYPE-P" "CONTAINS-UNKNOWN-TYPE-P"
            "%COS" "%COS-QUICK"
            "%COSH" "%DATA-VECTOR-AND-INDEX" "%DEPOSIT-FIELD"
            "%DOUBLE-FLOAT" "%DPB" "%EQL"

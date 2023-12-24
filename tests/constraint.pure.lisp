@@ -888,3 +888,13 @@
      (when (integerp (+ x 1))
        x))
    (or integer null)))
+
+(with-test (:name :ignore-hairy-types)
+  (checked-compile
+   '(lambda (a)
+     (declare (optimize (debug 2)))
+     (let ((v (the (satisfies eval) a)))
+       (dotimes (i 3)
+         (print (/= a 1))
+         (the real a))
+       v))))
