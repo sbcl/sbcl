@@ -898,3 +898,10 @@
          (print (/= a 1))
          (the real a))
        v))))
+
+(with-test (:name :set-constraint)
+  (assert-type
+   (lambda (x)
+     (when (> (decf x 10) 10)
+       x))
+   (or (real (10)) null)))

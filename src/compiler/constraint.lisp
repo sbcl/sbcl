@@ -589,7 +589,14 @@
                   (conset-lvar-lambda-var-eql-p constraints lvar lambda-var)
                   lambda-var)))
           ((cast-p use)
-           (ok-lvar-lambda-var (cast-value use) constraints)))))
+           (ok-lvar-lambda-var (cast-value use) constraints))
+          ((set-p use)
+           (let ((leaf (set-var use)))
+             (when (and (lambda-var-p leaf)
+                        (lambda-var-constraints leaf))
+               (and leaf
+                    (conset-lvar-lambda-var-eql-p constraints lvar leaf)
+                    leaf)))))))
 ;;;; Searching constraints
 
 ;;; Add the indicated test constraint to TARGET.
@@ -1262,7 +1269,9 @@
              (conset-add-constraint gen 'typep var type nil)))
          (unless (policy node (> compilation-speed speed))
            (maybe-add-eql-var-var-constraint var (set-value node) gen))
-         (add-eq-constraint var (set-value node) gen)))
+         (add-eq-constraint var (set-value node) gen)
+         (when (node-lvar node)
+           (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))))
       (combination
        (when (eq (combination-kind node) :known)
          (unless (and preprocess-refs-p
