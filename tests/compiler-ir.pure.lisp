@@ -415,3 +415,12 @@
                          (declare ((or array (signed-byte 8)) x))
                          (typep x 'integer))))
       0)))
+
+(with-test (:name :let-no-typecheck)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (x)
+                         (let ((m (the sequence x)))
+                           (values (length m)
+                                   m))))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
