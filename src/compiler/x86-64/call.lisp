@@ -242,7 +242,8 @@
 (defun default-unknown-values (vop values nvals node rbx move-temp)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals))
-  (let ((type (sb-c::basic-combination-derived-type node)))
+  (let* ((type (sb-c::basic-combination-derived-type node))
+         (min-values (values-type-min-value-count type)))
     (cond
       ((<= nvals 1)
        (note-this-location vop :single-value-return)
@@ -295,7 +296,8 @@
             (note-this-location vop :unknown-return)
             ;; If it returned exactly one value the registers and the
             ;; stack slots need to be filled with NIL.
-            (cond (used-stack-slots-p
+            (cond ((> min-values 1))
+                  (used-stack-slots-p
                    (inst jmp :nc default-stack-slots))
                   (t
                    (inst jmp :c regs-defaulted)
@@ -310,18 +312,25 @@
                 ((null val))
               (let ((tn (tn-ref-tn val)))
                 (unless (eq (tn-kind tn) :unused)
-                  (let ((default-lab (gen-label)))
-                    (defaults (cons default-lab tn))
-                    ;; Note that the max number of values received
-                    ;; is assumed to fit in a :dword register.
-                    (inst cmp :dword rcx-tn (fixnumize i))
-                    (inst jmp :be default-lab)
-                    (sc-case tn
-                      (control-stack
-                       (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
-                       (inst mov tn move-temp))
-                      (t
-                       (loadw tn rbx (frame-word-offset (+ sp->fp-offset i)))))))))
+                  (if (< i min-values)
+                      (sc-case tn
+                        (control-stack
+                         (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
+                         (inst mov tn move-temp))
+                        (t
+                         (loadw tn rbx (frame-word-offset (+ sp->fp-offset i)))))
+                      (let ((default-lab (gen-label)))
+                        (defaults (cons default-lab tn))
+                        ;; Note that the max number of values received
+                        ;; is assumed to fit in a :dword register.
+                        (inst cmp :dword rcx-tn (fixnumize i))
+                        (inst jmp :be default-lab)
+                        (sc-case tn
+                          (control-stack
+                           (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
+                           (inst mov tn move-temp))
+                          (t
+                           (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))))
             DEFAULTING-DONE
             (move rsp-tn rbx)
             (let ((defaults (defaults)))
