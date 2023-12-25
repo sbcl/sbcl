@@ -2660,6 +2660,13 @@
       `(code-char (+ code #.(char-code #\0)))
       (give-up-ir1-transform)))
 
+(defoptimizer (digit-char-p derive-type) ((code &optional radix))
+  (if radix
+      (let ((max (type-approximate-interval (lvar-type radix))))
+        (when (interval-high max)
+          (specifier-type `(or null (mod ,(interval-high max))))))
+      (specifier-type '(or null (mod 10)))))
+
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
 
