@@ -1885,7 +1885,7 @@
        (eq (combination-kind node) :known)
        (fun-info-p (combination-fun-info node))
        (not (node-to-be-deleted-p node))
-       (let ((source-name (combination-fun-source-name node)))
+       (let ((source-name (uncross (combination-fun-source-name node))))
          (when (memq source-name '(- +))
            source-name))))
 

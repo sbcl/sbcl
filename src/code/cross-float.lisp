@@ -417,6 +417,23 @@
           (when (cl:> arg-contagion result-contagion)
             (setq result-fmt arg-fmt result-contagion arg-contagion)))))))
 
+(defun pick-float-result-format (&rest args)
+  (flet ((target-num-fmt (num)
+           (cond ((rationalp num) 'single-float)
+                 ((floatp num) (flonum-format num))
+                 (t (error "What? ~S" num)))))
+    (let* ((result-fmt 'single-float)
+           (result-contagion 0))
+      (dolist (arg args result-fmt)
+        (let* ((arg-fmt (target-num-fmt arg))
+               ;; This is inadequate for complex numbers,
+               ;; but we don't need them.
+               (arg-contagion
+                (position arg-fmt
+                          '(short-float single-float double-float long-float))))
+          (when (cl:> arg-contagion result-contagion)
+            (setq result-fmt arg-fmt result-contagion arg-contagion)))))))
+
 (defmacro validate-args (&rest args)
   `(when (or ,@(mapcar (lambda (arg) `(typep ,arg '(or cl:float cl:complex))) args))
      (error "Unexpectedly got host float/complex args")))
@@ -563,17 +580,25 @@
                       (,(intern (string name) "CL") number divisor)
                       (,float-fun number divisor)))
                 (defun ,float-fun (number divisor)
-                  (with-memoized-math-op (,name (list number divisor))
-                    (multiple-value-bind (q r)
-                        (,(intern (string name) "CL")
-                         (realnumify number)
-                         (realnumify divisor))
-                      (values q
-                              (make-flonum r (if (or (eq (flonum-format number) 'double-float)
-                                                     (and (floatp divisor)
-                                                          (eq (flonum-format divisor) 'double-float)))
-                                                 'double-float
-                                                 'single-float)))))))))
+                  (let ((type (if (or (eq (flonum-format number) 'double-float)
+                                      (and (floatp divisor)
+                                           (eq (flonum-format divisor) 'double-float)))
+                                  'double-float
+                                  'single-float)))
+                    (if (and (floatp number)
+                             (eq (flonum-%value number) :minus-zero))
+                        (values 0
+                                (make-flonum (if  (< divisor 0)
+                                                  0
+                                                  :minus-zero)
+                                             type))
+                        (with-memoized-math-op (,name (list number divisor))
+                          (multiple-value-bind (q r)
+                              (,(intern (string name) "CL")
+                               (realnumify number)
+                               (realnumify divisor))
+                            (values q
+                                    (make-flonum r type))))))))))
   (define floor xfloat-floor)
   (define ceiling xfloat-ceiling)
   (define truncate xfloat-truncate)
@@ -758,6 +783,8 @@
              `(if (every #'rationalp args)
                   (apply #',f args)
                   (with-memoized-math-op (,f args) ,irrational)))
+           (dispatch-float (f irrational)
+             `(with-memoized-math-op (,f args) ,irrational))
            (flonums-eql-p ()
              `(let ((x (car args)) (y (cadr args)))
                 (and (floatp x) (floatp y) (eql (flonum-%bits x) (flonum-%bits y)))))
@@ -782,10 +809,16 @@
 
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
-  (intercept (max min + acos acosh asin asinh atan atanh conjugate cos cosh phase sin sinh tan tanh) (&rest args)
+  (intercept (max min +) (&rest args)
     (dispatch :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-result-format args))))
+
+  (intercept (acos acosh asin asinh atan atanh conjugate cos cosh phase sin sinh tan tanh) (&rest args)
+    (dispatch-float :me
+     (make-flonum (apply #':me (realnumify* args))
+                  (apply #'pick-float-result-format args))))
+
   (intercept (fceiling ffloor fround ftruncate) (&rest args)
              (dispatch :me
                        (multiple-value-bind (a b) (apply #':me (realnumify* args))
@@ -887,21 +920,7 @@
 
   (intercept (<=) (&rest args  &aux (nargs (length args)))
     (dispatch :me
-      (cond ((and (eql nargs 3) (every #'floatp args))
-             (destructuring-bind (a b c) args
-               (if (and (eq (flonum-format a) (flonum-format c))
-                        (or (eq (flonum-format b) (flonum-format a))
-                            (eq (flonum-format b) 'single-float)))
-                   (cond ((and (eql a most-negative-single-float)
-                               (eql c most-positive-single-float))
-                          (not (float-infinity-p b)))
-                         ((and (eql a most-negative-double-float)
-                               (eql c most-positive-double-float))
-                          (not (float-infinity-p b)))
-                         (t
-                          (error "Unhandled")))
-                   (error "Unhandled"))))
-            ((two-zeros-p) t) ; signed zeros are equal
+      (cond ((two-zeros-p) t) ; signed zeros are equal
             ((same-sign-infinities-p) t) ; infinities are =
             ((and (eql nargs 2)
                   (infinity-p 0 :+infinity))
@@ -923,8 +942,12 @@
             ((eql nargs 2)
              (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
                (:me a b)))
+            ((eql nargs 1)
+             t)
             (t
-             (apply #':me (realnumify* args))))))
+             (loop for (a . rest) on args
+                   always (or (not rest)
+                              (sb-xc:<= a (car rest))))))))
 
 ) ; end MACROLET
 

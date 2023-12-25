@@ -776,7 +776,7 @@
 (defun safe-expt (x y)
   (when (and (numberp x) (numberp y))
     (handler-case
-        (when (< (abs y) 10000)
+        (when (sb-xc:< (abs y) 10000)
           (expt x y))
       ;; Currently we can hide unanticipated errors (such as failure to use SB-XC: math
       ;; when cross-compiling) as well as the anticipated potential problem of overflow.

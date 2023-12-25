@@ -2612,29 +2612,39 @@ expansion happened."
 ;;; exclusive bounds.
 (defun coerce-numeric-bound (bound type)
   (flet ((c (thing)
-           #+sb-xc-host (declare (ignore thing))
            (case type
              (rational
-              #+sb-xc-host (return-from coerce-numeric-bound)
-              #-sb-xc-host (if (and (floatp thing) (float-infinity-p thing))
-                               (return-from coerce-numeric-bound nil)
-                               (rational thing)))
+              (cond ((and (floatp thing) (float-infinity-p thing))
+                     (return-from coerce-numeric-bound nil))
+                    ((or (eql thing $-0d0)
+                         (eql thing $-0f0))
+                     0)
+                    (t
+                     (rational thing))))
              ((float single-float)
-              (cond #-sb-xc-host
-                    ((<= most-negative-single-float thing most-positive-single-float)
+              (cond ((or (eql thing $-0d0)
+                         (eql thing $-0f0))
+                     $0f0)
+                    ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
                      (coerce thing 'single-float))
                     (t
                      (return-from coerce-numeric-bound nil))))
              (double-float
-              (cond #-sb-xc-host
-                    ((<= most-negative-double-float thing most-positive-double-float)
+              (cond ((or (eql thing $-0d0)
+                         (eql thing $-0f0))
+                     $0d0)
+                    ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
                      (coerce thing 'double-float))
                     (t
                      (return-from coerce-numeric-bound nil)))))))
     (when bound
-      (if (consp bound)
-          (list (c (car bound)))
-          (c bound)))))
+      (handler-case
+          (if (consp bound)
+              (list (c (car bound)))
+              (c bound))
+        #+sb-xc-host
+        (error ()
+          (return-from coerce-numeric-bound nil))))))
 
 (defun %make-union-numeric-type (class format complexp low high)
   (declare (type (member integer rational float nil) class))
@@ -2726,8 +2736,8 @@ expansion happened."
                (t x))))
       (declare (inline normalize-zero))
      (new-ctype numeric-type 0 (get-numtype-aspects complexp class format)
-                (normalize-zero low)
-                (normalize-zero high)))))
+                low
+                high))))
 
 (defun modified-numeric-type (base
                               &key
