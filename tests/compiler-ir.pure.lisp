@@ -423,4 +423,13 @@
                          (let ((m (the sequence x)))
                            (values (length m)
                                    m))))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+                     :key (lambda (x) (combination-fun-source-name x nil)))))
+  (assert (eql (count 'sb-c::%type-check-error/c
+                      (ir-calls
+                       `(lambda (x l)
+                          (let ((m (the sequence x))
+                                (l (the integer l)))
+                            (values (length m)
+                                    l))))
+                      :key (lambda (x) (combination-fun-source-name x nil)))
+               1)))

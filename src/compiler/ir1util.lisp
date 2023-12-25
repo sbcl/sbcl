@@ -334,8 +334,17 @@
                     (ref
                      (go :next))
                     (cast
-                     (when (and (memq (cast-type-check node) '(:external nil))
-                                (eq dest (node-dest node)))
+                     (when (or (and (memq (cast-type-check node) '(:external nil))
+                                    (eq dest (node-dest node)))
+                               ;; If they types do not match then this
+                               ;; cast is not related to the LVAR and
+                               ;; wouldn't be affected if it's
+                               ;; executed out of order.
+                               (multiple-value-bind (res true)
+                                   (values-subtypep (node-derived-type node)
+                                                    (lvar-derived-type lvar))
+                                 (and (not res)
+                                      true)))
                        (go :next)))
                     (enclose
                      (go :next)))))
