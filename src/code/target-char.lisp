@@ -713,21 +713,23 @@ Case is ignored." t))
 (defun digit-char-p (char &optional (radix 10.))
   "If char is a digit in the specified radix, returns the fixnum for which
 that digit stands, else returns NIL."
-  (if (<= (char-code char) 127)
-      (let ((weight (- (char-code char) 48)))
-        (cond ((minusp weight) nil)
-              ((<= radix 10.)
-               ;; Special-case ASCII digits in decimal and smaller radices.
-               (if (< weight radix) weight nil))
-              ;; Digits 0 - 9 are used as is, since radix is larger.
-              ((< weight 10) weight)
-              ;; Check for upper case A - Z.
-              ((and (>= (decf weight 7) 10) (< weight radix)) weight)
-              ;; Also check lower case a - z.
-              ((and (>= (decf weight 32) 10) (< weight radix)) weight)))
-      (let ((number (ucd-decimal-digit char)))
-        (when (and number (< (truly-the fixnum number) radix))
-          number))))
+  (let ((code (char-code char)))
+    (if (<= code 1632) ;; (loop for code from 127 when (digit-char-p (code-char code)) return code)
+        (let ((weight (- code 48)))
+          (cond ((minusp weight) nil)
+                ((<= radix 10.)
+                 ;; Special-case ASCII digits in decimal and smaller radices.
+                 (if (< weight radix) weight nil))
+                ;; Digits 0 - 9 are used as is, since radix is larger.
+                ((< weight 10) weight)
+                (t
+                 (let ((weight (logior #x20 code))) ;; downcase ASCII characters.
+                   (when (and (>= (decf weight (- (char-code #\a) 10)) 10)
+                              (< weight radix))
+                     weight) ))))
+        (let ((number (ucd-decimal-digit char)))
+          (when (and number (< number radix))
+            number)))))
 
 (defun digit-char (weight &optional (radix 10))
   "All arguments must be integers. Returns a character object that represents
