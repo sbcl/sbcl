@@ -2653,6 +2653,13 @@
   (splice-fun-args char 'code-char 1)
   'char)
 
+(deftransform digit-char ((code &optional radix) ((integer 0 9) t))
+  (if (or (not radix)
+          (interval-< (type-approximate-interval (lvar-type code))
+                      (type-approximate-interval (lvar-type radix))))
+      `(code-char (+ code #.(char-code #\0)))
+      (give-up-ir1-transform)))
+
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
 
