@@ -234,12 +234,12 @@ maintained."
                        &body body)
   ;; If the &REST arg never needs to be reified, this is slightly quicker
   ;; than using a DX list.
-  (let ((index (gensym "INDEX")))
+  (let ((index (or index-var (gensym "INDEX"))))
     `(let ((,index ,start))
+       (declare (index ,index))
        (loop
         (cond ((< (truly-the index ,index) (length ,rest-var))
-               (let ((,var (fast-&rest-nth ,index ,rest-var))
-                     ,@(if index-var `((,index-var ,index))))
+               (let ((,var (fast-&rest-nth ,index ,rest-var)))
                  ,@body)
                (incf ,index))
               (t

@@ -315,7 +315,7 @@
 ;;;
 ;;; Uninteresting nodes are nodes in the same block which are either
 ;;; REFs, ENCLOSEs, or external CASTs to the same destination.
-(defun almost-immediately-used-p (lvar node)
+(defun almost-immediately-used-p (lvar node &key flushable)
   (declare (type lvar lvar)
            (type node node))
   (unless (bind-p node)
@@ -336,7 +336,9 @@
                     (cast
                      (when (or (and (memq (cast-type-check node) '(:external nil))
                                     (eq dest (node-dest node)))
-                               ;; If they types do not match then this
+                               (and flushable
+                                    (not (contains-hairy-type-p (cast-type-to-check node))))
+                               ;; If the types do not match then this
                                ;; cast is not related to the LVAR and
                                ;; wouldn't be affected if it's
                                ;; executed out of order.
@@ -345,6 +347,10 @@
                                                     (lvar-derived-type lvar))
                                  (and (not res)
                                       true)))
+                       (go :next)))
+                    (combination
+                     (when (and flushable
+                                (flushable-combination-p node))
                        (go :next)))
                     (enclose
                      (go :next)))))

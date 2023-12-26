@@ -232,37 +232,59 @@
   (deftransform nconc ((&rest args))
     (remove-nil 'nconc args)))
 
-(flet ((remove-nil (fun args &rest prefix)
-         (let ((remove
-                 (loop for arg in args
-                       when (or (eq (lvar-type arg) (specifier-type 'null))
-                                (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
-                       collect arg)))
-           (if remove
-               (let ((vars (make-gensym-list (length args))))
-                 `(lambda ,(append prefix vars)
-                    (declare (ignorable ,@vars))
-                    (,fun ,@prefix ,@(loop for var in vars
-                                           for arg in args
-                                           unless (memq arg remove)
-                                           collect var))))
+(flet ((transform (fun args subseq &rest prefix)
+         (let* (new
+                subseqp
+                vars
+                (args (loop for arg in args
+                            if (and subseq
+                                    (lvar-matches arg :fun-names '(vector-subseq* subseq))
+                                    ;; Nothing should be modifying the original sequence
+                                    (almost-immediately-used-p arg (lvar-use arg)
+                                                               :flushable t))
+                            append (let ((call (lvar-uses arg)))
+                                     (setf new t
+                                           subseqp t)
+                                     (destructuring-bind (sequence start &optional end) (combination-args call)
+                                       (setf (combination-args call) (if end
+                                                                         (list start end sequence)
+                                                                         (list start sequence)))
+                                       (splice-fun-args arg :any (if end 3 2))
+                                       (list (car (push (gensym) vars))
+                                             (when end
+                                               (car (push (gensym) vars)))
+                                             (car (push (gensym) vars)))))
+                            else if (or (eq (lvar-type arg) (specifier-type 'null))
+                                        (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
+                            do (setf new t)
+                               (push (gensym) vars)
+                            else
+                            collect (car (push (gensym) vars)))))
+
+           (if new
+               `(lambda ,(append prefix (reverse vars))
+                  (declare (ignorable ,@vars))
+                  (,(if subseqp
+                        subseq
+                        fun)
+                   ,@prefix ,@args))
                (give-up-ir1-transform)))))
   (deftransform %concatenate-to-list ((&rest args))
-    (remove-nil '%concatenate-to-list args))
+    (transform '%concatenate-to-list args '%concatenate-to-list-subseq))
 
   (deftransform %concatenate-to-string ((&rest args))
-    (remove-nil '%concatenate-to-string args))
+    (transform '%concatenate-to-string args '%concatenate-to-string-subseq))
 
   (deftransform %concatenate-to-base-string ((&rest args))
-    (remove-nil '%concatenate-to-base-string args))
+    (transform '%concatenate-to-base-string args '%concatenate-to-base-string-subseq))
 
   (deftransform %concatenate-to-vector ((widetag &rest args))
-    (remove-nil '%concatenate-to-vector args 'widetag))
+    (transform '%concatenate-to-vector args '%concatenate-to-vector-subseq 'widetag))
 
   (deftransform %concatenate-to-simple-vector ((&rest args))
-    (remove-nil '%concatenate-to-simple-vector args))
+    (transform '%concatenate-to-simple-vector args '%concatenate-to-simple-vector-subseq))
   (deftransform concatenate ((type &rest args))
-    (remove-nil 'concatenate args 'type)))
+    (transform 'concatenate args nil 'type)))
 
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)

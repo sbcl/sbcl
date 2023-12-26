@@ -1036,6 +1036,63 @@ many elements are copied."
                    (tagbody
                       ,@forms))))))))))
 
+(defmacro do-vector-subseq ((elt vector start end) &body body)
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    (with-unique-names (index vec start-s end-s ref)
+      `(with-array-data ((,vec ,vector)
+                         (,start-s ,start)
+                         (,end-s ,end)
+                         :check-fill-pointer t)
+         (let ((,ref (sb-vm::%find-data-vector-reffer ,vec)))
+           (declare (function ,ref))
+           (do ((,index ,start-s (1+ ,index)))
+               ((>= ,index ,end-s)
+                (let ((,elt nil))
+                  ,@(sb-impl::filter-dolist-declarations decls)
+                  ,elt))
+             (let ((,elt (funcall ,ref ,vec ,index)))
+               ,@decls
+               (tagbody ,@forms))))))))
+
+(defmacro do-subsequence ((element sequence start end) &body body)
+  "Executes BODY with ELEMENT subsequently bound to each element of
+  SEQUENCE, then returns RETURN."
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    (once-only ((sequence sequence)
+                (start start)
+                (end end))
+      (with-unique-names (state limit from-end step endp elt subsequence)
+        `(block nil
+           (seq-dispatch ,sequence
+             (let ((,subsequence ,sequence))
+               (loop for i below ,start
+                     do
+                     (unless ,subsequence
+                       (sequence-bounding-indices-bad-error ,sequence ,start ,end))
+                     (pop ,subsequence))
+               (if ,end
+                   (loop for i from ,start below ,end
+                         do
+                         (unless ,subsequence
+                           (sequence-bounding-indices-bad-error ,sequence ,start ,end))
+                         (let ((,element (pop ,subsequence)))
+                           (progn ,@body)))
+                   (loop for ,element in ,subsequence
+                         do (progn ,@body))))
+             (do-vector-subseq (,element ,sequence ,start ,end) ,@body)
+             (multiple-value-bind (,state ,limit ,from-end ,step ,endp ,elt)
+                 (sb-sequence:make-sequence-iterator ,sequence :start ,start :end ,end)
+               (declare (function ,step ,endp ,elt))
+               (do ((,state ,state (funcall ,step ,sequence ,state ,from-end)))
+                   ((funcall ,endp ,sequence ,state ,limit ,from-end)
+                    (let ((,element nil))
+                      ,@(filter-dolist-declarations decls)
+                      (declare (ignorable ,element))))
+                 (let ((,element (funcall ,elt ,sequence ,state)))
+                   ,@decls
+                   (tagbody
+                      ,@forms))))))))))
+
 
 ;;;; CONCATENATE
 
@@ -1114,23 +1171,57 @@ many elements are copied."
 ;;; Efficient out-of-line concatenate for strings. Compiler transforms
 ;;; CONCATENATE 'STRING &co into these.
 (macrolet ((def (name element-type &rest dispatch)
-             `(defun ,name (&rest sequences)
-                (declare (explicit-check)
-                         (optimize (sb-c:insert-array-bounds-checks 0)))
-                (let ((length 0))
-                  (declare (index length))
-                  (do-rest-arg ((seq) sequences)
-                    (incf length (length seq)))
-                  (let ((result (make-array length :element-type ',element-type))
-                        (start 0))
-                    (declare (index start))
+             `(progn
+                (defun ,name (&rest sequences)
+                  (declare (explicit-check)
+                           (optimize (sb-c:insert-array-bounds-checks 0)))
+                  (let ((length 0))
+                    (declare (index length))
                     (do-rest-arg ((seq) sequences)
-                      (string-dispatch (,@dispatch t)
-                                       seq
-                        (let ((length (length seq)))
-                          (replace result seq :start1 start)
-                          (incf start length))))
-                    result)))))
+                      (incf length (length seq)))
+                    (let ((result (make-array length :element-type ',element-type))
+                          (start 0))
+                      (declare (index start))
+                      (do-rest-arg ((seq) sequences)
+                        (string-dispatch (,@dispatch t)
+                                         seq
+                          (let ((length (length seq)))
+                            (replace result seq :start1 start)
+                            (incf start length))))
+                      result)))
+                (defun ,(symbolicate name "-SUBSEQ") (&rest sequences)
+                  (declare (explicit-check)
+                           (optimize (sb-c:insert-array-bounds-checks 0)))
+                  (let ((length 0))
+                    (declare (index length))
+                    (do-rest-arg ((arg index) sequences)
+                      (cond ((fixnump arg)
+                             (let* ((end (truly-the (or null index) (fast-&rest-nth (incf index) sequences)))
+                                    (seq (the sequence (fast-&rest-nth (incf index) sequences)))
+                                    (end (or end (length seq))))
+                               (if (> arg end)
+                                   (sequence-bounding-indices-bad-error seq arg end))
+                               (incf length (- end (truly-the index arg)))))
+                            (t
+                             (incf length (length arg)))))
+                    (let ((result (make-array length :element-type ',element-type))
+                          (start 0))
+                      (declare (index start))
+                      (do-rest-arg ((arg index) sequences)
+                        (multiple-value-bind (seq start2 end2 length)
+                            (cond ((fixnump arg)
+                                   (let ((end (truly-the (or null index)
+                                                         (fast-&rest-nth (incf index) sequences)))
+                                         (seq (truly-the sequence (fast-&rest-nth (incf index) sequences))))
+                                     (values seq arg end (- (or end (length seq))
+                                                            (truly-the index arg)))))
+                                  (t
+                                   (values arg 0 nil (length arg))))
+                          (string-dispatch (,@dispatch t)
+                                           seq
+                            (replace result seq :start1 start :start2 start2 :end2 end2)
+                            (incf start length))))
+                      result))))))
   #+sb-unicode
   (def %concatenate-to-string character
     (simple-array character (*)) (simple-array base-char (*)))
@@ -1163,6 +1254,57 @@ many elements are copied."
         (sb-sequence:dosequence (e seq)
           (funcall setter result index e)
           (incf index)))
+      result)))
+
+(defun %concatenate-to-list-subseq (&rest sequences)
+  (declare (explicit-check))
+  (let* ((result (list nil))
+         (splice result))
+    (do-rest-arg ((arg index) sequences)
+      (multiple-value-bind (seq start2 end2)
+          (cond ((fixnump arg)
+                 (let ((end (truly-the (or null index)
+                                       (fast-&rest-nth (incf index) sequences)))
+                       (seq (truly-the sequence (fast-&rest-nth (incf index) sequences))))
+                   (values seq arg end)))
+                (t
+                 (values arg 0 nil)))
+        (do-subsequence (e seq start2 end2)
+          (setf splice (cdr (rplacd splice (list e)))))))
+    (cdr result)))
+
+(defun %concatenate-to-vector-subseq (widetag &rest sequences)
+  (declare (explicit-check))
+  (let ((length 0))
+    (declare (index length))
+    (do-rest-arg ((arg index) sequences)
+      (cond ((fixnump arg)
+             (let* ((end (truly-the (or null index) (fast-&rest-nth (incf index) sequences)))
+                    (seq (the sequence (fast-&rest-nth (incf index) sequences)))
+                    (end (or end (length seq))))
+               (if (> arg end)
+                   (sequence-bounding-indices-bad-error seq arg end))
+               (incf length (- end (truly-the index arg)))))
+            (t
+             (incf length (length arg)))))
+    (let* ((n-bits-shift (aref sb-vm::%%simple-array-n-bits-shifts%% widetag))
+           (result (sb-vm::allocate-vector-with-widetag
+                    #+ubsan nil widetag length n-bits-shift))
+           (setter (the function (svref %%data-vector-setters%% widetag)))
+           (index 0))
+      (declare (index index))
+      (do-rest-arg ((arg rest-index) sequences)
+        (multiple-value-bind (seq start2 end2)
+            (cond ((fixnump arg)
+                   (let ((end (truly-the (or null index)
+                                         (fast-&rest-nth (incf rest-index) sequences)))
+                         (seq (truly-the sequence (fast-&rest-nth (incf rest-index) sequences))))
+                     (values seq arg end)))
+                  (t
+                   (values arg 0 nil)))
+          (do-subsequence (e seq start2 end2)
+            (funcall setter result index e)
+            (incf index))))
       result)))
 
 ;;;; MAP
