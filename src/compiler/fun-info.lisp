@@ -178,7 +178,8 @@
   (call-type-deriver nil :type (or function null))
   annotation
   ;; For functions with unboxed args/returns
-  (folder nil :type (or function null)))
+  (folder nil :type (or function null))
+  (externally-checkable-type nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

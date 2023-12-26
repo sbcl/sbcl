@@ -273,14 +273,20 @@
     (when (combination-p dest)
       ;; TODO: MV-COMBINATION
       (when (call-full-like-p dest)
-        (map-combination-args-and-types
-         (lambda (arg type &rest args)
-           (declare (ignore args))
-           (when (eq arg lvar)
-             (return-from lvar-externally-checkable-type
-               (coerce-to-values type))))
-         dest
-         nil nil t t)))
+        (let ((info (and (eq (basic-combination-kind dest) :known)
+                         (basic-combination-fun-info dest))))
+          (if (and info
+                   (fun-info-externally-checkable-type info))
+              (return-from lvar-externally-checkable-type
+                (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
+              (map-combination-args-and-types
+               (lambda (arg type &rest args)
+                 (declare (ignore args))
+                 (when (eq arg lvar)
+                   (return-from lvar-externally-checkable-type
+                     (coerce-to-values type))))
+               dest
+               nil nil t t)))))
     *wild-type*))
 
 ;;;; interface routines used by optimizers

@@ -240,20 +240,18 @@
                             if (and subseq
                                     (lvar-matches arg :fun-names '(vector-subseq* subseq))
                                     ;; Nothing should be modifying the original sequence
-                                    (almost-immediately-used-p arg (lvar-use arg)
-                                                               :flushable t))
+                                    (almost-immediately-used-p arg (lvar-use arg) :flushable t))
                             append (let ((call (lvar-uses arg)))
                                      (setf new t
                                            subseqp t)
                                      (destructuring-bind (sequence start &optional end) (combination-args call)
-                                       (setf (combination-args call) (if end
-                                                                         (list start end sequence)
-                                                                         (list start sequence)))
+                                       (declare (ignorable sequence start))
                                        (splice-fun-args arg :any (if end 3 2))
-                                       (list (car (push (gensym) vars))
+                                       (list ''sb-impl::%subseq
+                                             (car (push (gensym) vars))
+                                             (car (push (gensym) vars))
                                              (when end
-                                               (car (push (gensym) vars)))
-                                             (car (push (gensym) vars)))))
+                                               (car (push (gensym) vars))))))
                             else if (or (eq (lvar-type arg) (specifier-type 'null))
                                         (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
                             do (setf new t)
@@ -285,6 +283,31 @@
     (transform '%concatenate-to-simple-vector args '%concatenate-to-simple-vector-subseq))
   (deftransform concatenate ((type &rest args))
     (transform 'concatenate args nil 'type)))
+
+(defun concatenate-subseq-type (lvar args)
+  (flet ((check (arg type)
+           (when (eq arg lvar)
+             (return-from concatenate-subseq-type type))))
+    (loop while args
+          do (let ((arg (pop args)))
+               (cond ((and (constant-lvar-p arg)
+                           (eq (lvar-value arg) 'sb-impl::%subseq))
+                      (check (pop args) (specifier-type 'sequence))
+                      (check (pop args) (specifier-type 'index))
+                      (check (pop args) (specifier-type '(or null index))))
+                     (t
+                      (check arg (specifier-type 'sequence))))))))
+
+(defoptimizer (%concatenate-to-string-subseq externally-checkable-type) ((&rest args) node lvar)
+  (concatenate-subseq-type lvar args))
+(defoptimizer (%concatenate-to-base-string-subseq externally-checkable-type) ((&rest args) node lvar)
+  (concatenate-subseq-type lvar args))
+(defoptimizer (%concatenate-to-list-subseq externally-checkable-type) ((&rest args) node lvar)
+  (concatenate-subseq-type lvar args))
+(defoptimizer (%concatenate-to-simple-vector-subseq externally-checkable-type) ((&rest args) node lvar)
+  (concatenate-subseq-type lvar args))
+(defoptimizer (%concatenate-to-vector-subseq externally-checkable-type) ((type &rest args) node lvar)
+  (concatenate-subseq-type lvar args))
 
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)

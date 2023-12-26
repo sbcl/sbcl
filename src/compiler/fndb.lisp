@@ -586,14 +586,26 @@
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown %concatenate-to-string (&rest sequence) simple-string
-  (flushable no-verify-arg-count))
+  (flushable))
 (defknown %concatenate-to-base-string (&rest sequence) simple-base-string
-  (flushable no-verify-arg-count))
+  (flushable))
 (defknown %concatenate-to-list (&rest sequence) list
-    (flushable no-verify-arg-count))
+    (flushable))
 (defknown %concatenate-to-simple-vector (&rest sequence) simple-vector
-  (flushable no-verify-arg-count))
+  (flushable))
 (defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest sequence)
+    vector
+  (flushable no-verify-arg-count))
+
+(defknown %concatenate-to-string-subseq (&rest t) simple-string
+  (flushable))
+(defknown %concatenate-to-base-string-subseq (&rest t) simple-base-string
+  (flushable))
+(defknown %concatenate-to-list-subseq (&rest t) list
+    (flushable))
+(defknown %concatenate-to-simple-vector-subseq (&rest t) simple-vector
+  (flushable))
+(defknown %concatenate-to-vector-subseq ((unsigned-byte #.sb-vm:n-widetag-bits) &rest t)
     vector
   (flushable no-verify-arg-count))
 
