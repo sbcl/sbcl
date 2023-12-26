@@ -353,6 +353,8 @@ static void brief_struct(lispobj obj)
 #include "genesis/defstruct-description.h"
 static bool tagged_slot_p(struct layout *layout, int slot_index)
 {
+    // Since we're doing this scan, we could return the name
+    // and exact raw type.
     if (instancep(layout->_info)) {
         struct defstruct_description* dd = (void*)(layout->_info-INSTANCE_POINTER_LOWTAG);
         lispobj slots = dd->slots;
@@ -363,7 +365,15 @@ static bool tagged_slot_p(struct layout *layout, int slot_index)
                 return (fixnum_value(dsd->bits) & DSD_RAW_TYPE_MASK) == 0;
         }
     }
-    return 0;
+    /* Revision 2b783b49 said to prefer LAYOUT-INFO vs BITMAP because the bitmap
+     * can indicate a 0 bit ("raw") for any slot that _may_ be ignored by GC, such as
+     * slots constrained to FIXNUM. Unfortunately that misses that CONDITION instances
+     * have trailing variable-length tagged data. In practice an instance may have raw
+     * words only if it has a DD, which most CONDITION subtypes do not. Therefore this
+     * could almost always return 1. But layout-of-layout is an important use of trailing
+     * raw slots. Attempting to print random words as tagged could be disastrous.
+     * Therefore, test the bitmap if the above loop failed to find slot_index. */
+    return bitmap_logbitp(slot_index, get_layout_bitmap(layout));
 }
 
 static void print_struct(lispobj obj)
