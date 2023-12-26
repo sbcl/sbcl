@@ -1103,9 +1103,33 @@
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
                   (let ((content-length (length initial-contents)))
-                   (unless (= content-length ,(or c-length 'length))
-                     (sb-vm::initial-contents-error content-length  ,(or c-length 'length))))
-                  ,(wrap `(replace ,data-alloc-form initial-contents)))))))))
+                    (unless (= content-length ,(or c-length 'length))
+                      (sb-vm::initial-contents-error content-length  ,(or c-length 'length))))
+                  ,(wrap
+                    (if (and (lvar-matches initial-contents :fun-names '(reverse sb-impl::list-reverse
+                                                                         sb-impl::vector-reverse))
+                             ;; Nothing should be modifying the original sequence
+                             (almost-immediately-used-p initial-contents (lvar-use initial-contents)
+                                                        :flushable t))
+                        (let* ((reverse (lvar-use initial-contents))
+                               (initial-contents-type (lvar-type (car (combination-args reverse)))))
+                          (splice-fun-args initial-contents :any 1)
+                          (cond ((csubtypep initial-contents-type (specifier-type 'list))
+                                 `(let ((data ,data-alloc-form))
+                                    (loop for i from (1- ,(or c-length 'length)) downto 0
+                                          for elt in initial-contents
+                                          do (setf (aref data i) elt))
+                                    data))
+                                ((csubtypep initial-contents-type (specifier-type 'simple-vector))
+                                 `(let ((data ,data-alloc-form))
+                                    (loop for i from (1- ,(or c-length 'length)) downto 0
+                                          for j from 0
+                                          do (setf (aref data i) (aref initial-contents j)))
+                                    data))
+                                (t
+                                 `(nreverse (replace ,data-alloc-form initial-contents)))))
+
+                        `(replace ,data-alloc-form initial-contents))))))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
 ;;; specific must come first, otherwise suboptimal transforms will result for
