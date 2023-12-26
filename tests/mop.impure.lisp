@@ -148,7 +148,8 @@
 (defmethod validate-superclass ((c1 automethod-class) (c2 standard-class))
   t)
 (defmethod finalize-inheritance :after ((x automethod-class))
-  (format t "~&~S ~S~%" x (find-class (class-name x))))
+  ;; not sure what this output demonstrated
+  (format (make-broadcast-stream) "~&~S ~S~%" x (find-class (class-name x))))
 (defclass automethod-object () ()
   (:metaclass automethod-class))
 (defvar *automethod-object* (make-instance 'automethod-object))
@@ -646,6 +647,8 @@
       (setf (slot-value slotd 'function) (fdefinition *func-slot*)))
     slotd))
 
+;; I hope this declamation doesn't change the nature of the test
+(declaim (ftype function foofoo))
 (with-test (:name :class-redefinition-changes-custom-slot-type)
   (eval `(defclass func-slot-object ()
            ((foo :initarg :foo :reader foofoo))
@@ -711,8 +714,9 @@
                   #'definitely-a-funcallable-instance)
                  type-error))
 
+(let ((*error-output* (make-broadcast-stream)))
+  (eval '(defstruct nil-slot-name nil)))
 (with-test (:name (defstruct :nil-slot-name :bug-633911))
-  (defstruct nil-slot-name nil)
   (let ((fun (compile nil '(lambda (x) (slot-value x 'nil)))))
     (assert (= 3 (funcall fun (make-nil-slot-name :nil 3))))))
 
