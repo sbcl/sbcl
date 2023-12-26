@@ -77,6 +77,7 @@
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil)
         (dx-p (node-stack-allocate-p node)))
+    (declare (ignorable funcallable-instance-tramp-tn))
     (flet ((zero-init-p (x)
              ;; dynamic-space is already zeroed
              (and (not dx-p)
@@ -137,6 +138,7 @@
                                     tn))))
                        (:null
                         (emit-constant nil))
+                       #-executable-funinstances
                        (:funcallable-instance-tramp
                         (or funcallable-instance-tramp-tn
                             (setf funcallable-instance-tramp-tn

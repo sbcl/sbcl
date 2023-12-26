@@ -699,8 +699,7 @@
                              operand inst))))
                ((or (eq inst lea-inst)
                     (and (eq inst mov-inst) (eql opcode #x8B)))
-                ;; Computing the address of UNDEFINED-FDEFN and
-                ;; FUNCALLABLE-INSTANCE-TRAMP is done with LEA.
+                ;; Computing the address of UNDEFINED-FDEFN is done with LEA.
                 ;; Load from the alien linkage table can be done with MOV Rnn,[RIP-k].
                 (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
                   (when (= (logand modrm #b11000111) #b00000101) ; RIP-relative mode

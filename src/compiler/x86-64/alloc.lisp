@@ -1008,15 +1008,6 @@
 
 ;;;; automatic allocators for primitive objects
 
-(define-vop (make-funcallable-instance-tramp)
-  (:args)
-  (:results (result :scs (any-reg)))
-  (:vop-var vop)
-  (:generator 1
-    ;; gets "... is not the name of a defined VOP." if not defined at all
-    #+compact-instance-header (bug "Shouldn't get here")
-    (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
-
 (flet
   ((alloc (vop name words type lowtag stack-allocate-p result
                     &optional alloc-temp node

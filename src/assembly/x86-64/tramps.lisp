@@ -228,13 +228,6 @@
   (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
-#-compact-instance-header
-(define-assembly-routine
-    (funcallable-instance-tramp (:return-style :none))
-    ()
-  (loadw rax-tn rax-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
-
 (define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
   (with-registers-preserved (lisp)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
