@@ -1568,7 +1568,17 @@
                     (scanptr vaddr obj (1+ i))))))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
-                (cond ((logtest (get-header-data obj) vector-addr-hashing-flag)
+                ;; FIXME: VECTOR-ADDR-HASHING-FLAG must be left-shifted by ARRAY-FLAGS-DATA-POSITION
+                ;; for this LOGTEST to be correct.  I think it broke when array-rank was placed adjacent
+                ;; to the widetag and the flags bits moved over. The fact that it seems to be useless
+                ;; suggests that I need to come up with a way to assert that it does anything, which
+                ;; is all but impossible. We'd need a correctly-hashed table containing a key in which
+                ;; nothing moves in the final S-L-A-D, but does have a function move during elfination.
+                ;; I'm leaving this line broken for now because frankly I think it might be safer to
+                ;; assert that IF the table is address-sensitive THEN it has the rehash flag already set
+                ;; in the k/v vector. That's not quite true either, because it only needs to rehash if
+                ;; any key was actually hashed by address.
+                (cond ((logtest (get-header-data obj) vector-addr-hashing-flag) ; BUG
                        (do ((i 2 (+ i 2)) (needs-rehash))
                            ;; Refer to the figure at the top of src/code/hash-table.lisp.
                            ;; LEN is an odd number.
