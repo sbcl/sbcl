@@ -720,12 +720,24 @@
           (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.
-(defun numeric-type->interval (x)
+(defun numeric-type->interval (x &optional integer)
   (declare (type numeric-type x))
-  (make-interval :low (numeric-type-low x)
-                 :high (numeric-type-high x)))
+  (let ((low (numeric-type-low x))
+        (high (numeric-type-high x)))
+    (make-interval :low (cond ((not integer)
+                               low)
+                              ((consp low)
+                               (1+ (floor (car low))))
+                              (low
+                               (ceiling low)))
+                   :high (cond ((not integer)
+                                high)
+                               ((consp high)
+                                (1- (ceiling (car high))))
+                               (high
+                                (floor high))))))
 
-(defun type-approximate-interval (type)
+(defun type-approximate-interval (type &optional integer)
   (declare (type ctype type))
   (let ((types (prepare-arg-for-derive-type type))
         (result nil)
@@ -741,7 +753,7 @@
                      type))))
         (unless (numeric-type-p type)
           (return-from type-approximate-interval (values nil nil)))
-        (let ((interval (numeric-type->interval type)))
+        (let ((interval (numeric-type->interval type integer)))
           (when (eq (numeric-type-complexp type) :complex)
             (setf complex t))
           (setq result

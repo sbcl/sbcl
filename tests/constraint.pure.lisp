@@ -507,19 +507,7 @@
               s)))))
     '(values array &optional))))
 
-(with-test (:name :+integer-argument-constarint)
-  (assert
-   (type-specifiers-equal
-    (caddr
-     (sb-kernel:%simple-fun-type
-      (checked-compile
-       `(lambda (a x y)
-          (declare (fixnum x))
-          (aref a (+ x y))
-          y))))
-    '(values integer &optional))))
-
-(with-test (:name :+integer-argument-constarint.var)
+(with-test (:name :+integer-argument-constraint.var)
   (assert
    (type-specifiers-equal
     (caddr
@@ -530,9 +518,11 @@
           (let ((m (+ x y)))
             (aref a (+ m (aref a m)))
             y)))))
-    '(values integer &optional))))
+    `(values (integer ,(1+ most-negative-fixnum) 
+                      ,(+ most-positive-fixnum array-dimension-limit))
+             &optional))))
 
-(with-test (:name :+integer-argument-constarint.typep)
+(with-test (:name :+integer-argument-constraint.typep)
   (assert
    (type-specifiers-equal
     (caddr
@@ -887,7 +877,19 @@
    (lambda (x)
      (when (integerp (+ x 1))
        x))
-   (or integer null)))
+   (or integer null))
+  (assert-type
+   (lambda (x)
+     (when (typep (+ x 3) '(integer 0 20))
+       x))
+   (or (integer -3 17) null))
+  (assert-type
+   (lambda (x m)
+     (declare ((real 2 4) m)
+              (fixnum x))
+     (when (typep (+ m x) '(integer 2 4))
+       x))
+   (or (integer -2 2) null)))
 
 (with-test (:name :ignore-hairy-types)
   (checked-compile
