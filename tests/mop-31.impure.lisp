@@ -26,9 +26,11 @@
   T)
 
 (defmethod sb-mop:direct-slot-definition-class ((class metaclass) &rest initargs)
+  (declare (ignore initargs))
   (find-class 'sb-mop:standard-direct-slot-definition))
 
 (defmethod sb-mop:effective-slot-definition-class ((class metaclass) &rest initargs)
+  (declare (ignore initargs))
   (find-class 'sb-mop:standard-effective-slot-definition))
 
 (defmethod sb-mop:slot-value-using-class ((class metaclass) object slot)

@@ -54,7 +54,7 @@
   (declare (ignore args))
   :no-applicable-method)
 (defmethod sb-pcl:no-primary-method ((zut-n-a-m (eql #'zut-n-a-m)) &rest args)
-  (declare (ignore-args))
+  (declare (ignore args))
   :no-primary-method)
 (with-test (:name no-applicable-method)
   (assert (eq :no-applicable-method (zut-n-a-m 1 2 3))))
@@ -1358,7 +1358,9 @@
 
 ;;; verify that we can still detect no primary methods and invalid qualifiers
 
-(defmethod gf-with-keys-and-no-primary-method :around ((x integer) &key b) (1+ x))
+(defmethod gf-with-keys-and-no-primary-method :around ((x integer) &key b)
+  (declare (ignore b))
+  (1+ x))
 
 (with-test (:name (:check-keyword-args :no-primary-method :no-keywords :error))
   (assert-error (gf-with-keys-and-no-primary-method 3) sb-pcl::no-primary-method-error))
@@ -1370,7 +1372,10 @@
 
 (defgeneric gf-with-keys-and-invalid-qualifier (x &key)
   (:method-combination progn))
-(defmethod gf-with-keys-and-invalid-qualifier progn ((x integer) &key b) (print (1+ x)))
+(defmethod gf-with-keys-and-invalid-qualifier progn ((x integer) &key b)
+  (declare (ignore b))
+  (print (1+ x)))
+;; I'm guessing this is PROGN but spelled wrong purposely, right?
 (defmethod gf-with-keys-and-invalid-qualifier prong ((x fixnum) &key c) (print c))
 
 (with-test (:name (:check-keyword-args :invalid-qualifier :no-keywords :error))
