@@ -738,8 +738,7 @@
 
 (defmethod decode-record-definition ((_ (eql 'associative-record)) expr)
   (destructuring-bind (name binary-operation identity-element &rest rest) expr
-    `(let* ((.binary-operation. (find-function-record ',binary-operation))
-            (.value-record. (function-record-result-record .binary-operation.)))
+    `(let* ((.binary-operation. (find-function-record ',binary-operation)))
        (make-instance 'associative-record
          :name ',name
          :binary-operation .binary-operation.
