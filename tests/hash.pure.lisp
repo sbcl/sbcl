@@ -500,7 +500,7 @@
     (loop repeat (the fixnum n-iter)
           do
        (let* ((n (random limit random-state))
-              (lisp-hash (sb-impl:murmur-fmix-word-for-unit-test n))
+              (lisp-hash (sb-impl::murmur3-fmix-word n))
               (c-hash (c-murmur-fmix n)))
          (assert (= lisp-hash c-hash))))))
 (compile 'murmur-compare)

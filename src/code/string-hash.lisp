@@ -151,6 +151,7 @@
 ;;; These are Lisp implementations of
 ;;; https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 ;;; Please excuse the C-like syle.
+;;; (To avoid consing, you might want the wrappers that mask to fixnum.)
 #-64-bit
 (progn
 (declaim (inline murmur3-fmix32))
@@ -174,12 +175,6 @@
   (setq k (logand (* k #xc4ceb9fe1a85ec53) most-positive-word))
   (logxor k (ash k -33)))
 (defmacro murmur3-fmix-word (x) `(murmur3-fmix64 ,x)))
-
-;;; You probably don't want to use this function because it (almost surely)
-;;; has to cons the result. Better to use the /FIXNUM functions below.
-(defun murmur-fmix-word-for-unit-test (x)
-  (murmur3-fmix-word (the sb-vm:word x)))
-(export 'murmur-fmix-word-for-unit-test) ; protect from tree-shaker
 
 ;;; This hash function on sb-vm:word returns a fixnum, does not cons,
 ;;; and has better avalanche behavior then SXHASH - changing any one input bit
