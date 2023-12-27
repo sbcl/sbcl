@@ -64,7 +64,7 @@
                ;; except in forcing discontiguous addresses for testing.
                ;; And of course, don't use them if unsupported.
                ((:fixedobj-space-start fixedobj-space-start*))
-               ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
+               ((:fixedobj-space-size  fixedobj-space-size*) (* 48 1024 1024))
                ((:text-space-start text-space-start*))
                ((:text-space-size  text-space-size*) (* 160 1024 1024))
                (small-space-size #x100000)
