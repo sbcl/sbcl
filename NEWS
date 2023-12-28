@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.3.11:
+changes in sbcl-2.4.0 relative to sbcl-2.3.11:
   * minor incompatible change: *COMPILE-VERBOSE* and *LOAD-VERBOSE* are bound
     to NIL when the system is started with the --script command-line argument.
     (reported by Hraban Luyat, thanks to Nicolas Martyanoff)
