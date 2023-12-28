@@ -877,6 +877,19 @@ many elements are copied."
       ((endp list) new-list)
     (push (pop list) new-list)))
 
+(defun list-reverse-into-vector (list)
+  (declare (explicit-check))
+  (let* ((length (length (the list list)))
+         (vector (make-array length))
+         (list list))
+    (loop for x = (pop list)
+          do
+          (locally (declare (optimize (safety 0)))
+            (setf (aref vector (decf length)) x))
+          ;; LENGTH already checked for a proper list.
+          until (atom list))
+    vector))
+
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
   (do ((length (length to))
