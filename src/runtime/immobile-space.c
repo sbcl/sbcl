@@ -59,7 +59,6 @@
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
 #include "immobile-space.h"
-#include "lispstring.h"
 #include "pseudo-atomic.h"
 #include "search.h"
 #include "align.h"

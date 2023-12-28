@@ -3414,9 +3414,10 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
 
 (defun write-vector-sap-helpers ()
   (format t "static inline char* vector_sap(lispobj v) { return (char*)VECTOR(v)->data; }
-static inline int simple_base_string_p(lispobj x) {
-    // caller MUST ensure that 'x' is an OTHER pointer
-    return widetag_of(native_pointer(x)) == SIMPLE_BASE_STRING_WIDETAG;
+static inline unsigned int schar(struct vector* string, int index) {
+    return (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG) ?
+      ((char*)string->data)[index] :
+      ((unsigned int*)string->data)[index];
 }~%"))
 
 (defun write-sap-initializer ()

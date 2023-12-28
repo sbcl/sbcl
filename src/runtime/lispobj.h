@@ -88,6 +88,19 @@ make_lispobj(void *o, int low_tag)
     return (lispobj)o | low_tag;
 }
 
+static inline int simple_base_string_p(lispobj x) {
+    // caller should ensure that 'x' is a headered object
+    return widetag_of(native_pointer(x)) == SIMPLE_BASE_STRING_WIDETAG;
+}
+static inline int string_widetag_p(int widetag)
+{
+    return
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+        widetag == SIMPLE_CHARACTER_STRING_WIDETAG ||
+#endif
+        widetag == SIMPLE_BASE_STRING_WIDETAG;
+}
+
 #define make_fixnum(n) ((uword_t)(n) << N_FIXNUM_TAG_BITS)
 
 static inline sword_t

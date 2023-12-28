@@ -36,7 +36,6 @@
 #include "gc.h"
 #include "code.h"
 #include "var-io.h"
-#include "lispstring.h"
 #include "search.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
