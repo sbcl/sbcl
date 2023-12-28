@@ -1057,7 +1057,7 @@ between the ~A definition and the ~A definition"
          (complex
           :translation complex
           :inherits (number)
-          :codes (,sb-vm:complex-widetag)
+          :codes (,sb-vm:complex-rational-widetag)
           :prototype-form ,(complex 0 1))
          (complex-single-float
           :translation (complex single-float)

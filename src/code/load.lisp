@@ -936,7 +936,7 @@
   #-sb-xc-host (%make-ratio num den))
 
 (define-fop 71 (fop-complex (realpart imagpart))
-  #+sb-xc-host (number-pair-to-core realpart imagpart sb-vm:complex-widetag)
+  #+sb-xc-host (number-pair-to-core realpart imagpart sb-vm:complex-rational-widetag)
   #-sb-xc-host (%make-complex realpart imagpart))
 
 (macrolet ((fast-read-single-float ()

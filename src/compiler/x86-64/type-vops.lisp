@@ -555,7 +555,7 @@
                   out))))
   (define bignump (bignum-widetag))
   (define ratiop (ratio-widetag))
-  (define complex-rational-p (complex-widetag))
+  (define complex-rational-p (complex-rational-widetag))
   (define complex-single-float-p (complex-single-float-widetag))
   (define complex-double-float-p (complex-double-float-widetag))
   (define double-float-p (double-float-widetag))

@@ -818,7 +818,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // Skip irrelevant objects.
             if ((widetag == WEAK_POINTER_WIDETAG) || /* do not follow! */
                 // These numeric types contain pointers, but are uninteresting.
-                (widetag == COMPLEX_WIDETAG) ||
+                (widetag == COMPLEX_RATIONAL_WIDETAG) ||
                 (widetag == RATIO_WIDETAG))
                 continue;
         }

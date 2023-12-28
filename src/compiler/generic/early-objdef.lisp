@@ -196,7 +196,7 @@
   ratio-widetag                                   ;  0E   15       |
   single-float-widetag                            ;  12   19       |
   double-float-widetag                            ;  16   1D       | EQL-hash picks off this
-  complex-widetag                                 ;  1A   21       | range of widetags.
+  complex-rational-widetag                        ;  1A   21       | range of widetags.
   complex-single-float-widetag                    ;  1E   25       |
   complex-double-float-widetag                    ;  22   29       |
   ;; -- end of numeric widetags --                                 |
@@ -305,7 +305,7 @@
     (ratio-widetag "ratio")
     (single-float-widetag "sfloat")
     (double-float-widetag "dfloat")
-    (complex-widetag "cplxnum")
+    (complex-rational-widetag "cplxnum")
     (complex-single-float-widetag "cplx-sfloat")
     (complex-double-float-widetag "cplx-dfloat")
     (symbol-widetag "symbol")

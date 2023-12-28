@@ -1024,7 +1024,7 @@ core and return a descriptor to it."
 
 (defun complexnum-to-core (num &aux (r (realpart num)) (i (imagpart num)))
   (if (rationalp r)
-      (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-widetag)
+      (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-rational-widetag)
       (ecase (sb-impl::flonum-format r)
        (single-float
         (let* ((des (allocate-otherptr *dynamic* sb-vm:complex-single-float-size

@@ -73,10 +73,10 @@
 (define-type-vop ratiop (ratio-widetag))
 
 (define-type-vop complexp
-  (complex-widetag complex-single-float-widetag complex-double-float-widetag
+  (complex-rational-widetag complex-single-float-widetag complex-double-float-widetag
                    #+long-float complex-long-float-widetag))
 
-(define-type-vop complex-rational-p (complex-widetag))
+(define-type-vop complex-rational-p (complex-rational-widetag))
 
 (define-type-vop complex-float-p
   (complex-single-float-widetag complex-double-float-widetag
@@ -163,7 +163,7 @@
    single-float-widetag
    double-float-widetag
    #+long-float long-float-widetag
-   complex-widetag
+   complex-rational-widetag
    complex-single-float-widetag
    complex-double-float-widetag
    #+long-float complex-long-float-widetag

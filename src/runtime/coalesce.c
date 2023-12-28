@@ -42,7 +42,7 @@ static bool coalescible_number_p(lispobj* where)
     int widetag = widetag_of(where);
     return widetag == BIGNUM_WIDETAG
         // Ratios and complex integers containing pointers to bignums don't work.
-        || ((widetag == RATIO_WIDETAG || widetag == COMPLEX_WIDETAG)
+        || ((widetag == RATIO_WIDETAG || widetag == COMPLEX_RATIONAL_WIDETAG)
             && fixnump(where[1]) && fixnump(where[2]))
 #ifndef LISP_FEATURE_64_BIT
         || widetag == SINGLE_FLOAT_WIDETAG

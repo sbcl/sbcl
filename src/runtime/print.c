@@ -539,7 +539,7 @@ static void print_fun_or_otherptr(lispobj obj)
         print_slots(ratio_slots, count, ptr);
         break;
 
-    case COMPLEX_WIDETAG:
+    case COMPLEX_RATIONAL_WIDETAG:
         print_slots(complex_slots, count, ptr);
         break;
 

@@ -77,9 +77,11 @@
   #+sparc (filler)
   (value :c-type "long double" :length #+x86 3 #+sparc 4))
 
+;;; FIXME: the primitive-type should probably be named COMPLEX-RATIONAL
+;;; but that was more invasive than renaming just the widetag
 (define-primitive-object (complex :type complex
                                   :lowtag other-pointer-lowtag
-                                  :widetag complex-widetag
+                                  :widetag complex-rational-widetag
                                   :alloc-trans %make-complex)
   (real :type real
         :ref-known (flushable movable)

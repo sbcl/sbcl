@@ -103,7 +103,7 @@ static int readonly_unboxed_obj_p(lispobj* obj)
     case SIMD_PACK_256_WIDETAG:
 #endif
         return 1;
-    case RATIO_WIDETAG: case COMPLEX_WIDETAG:
+    case RATIO_WIDETAG: case COMPLEX_RATIONAL_WIDETAG:
         return fixnump(obj[1]) && fixnump(obj[2]);
     }
     if ((widetag > SIMPLE_VECTOR_WIDETAG && widetag < COMPLEX_BASE_STRING_WIDETAG)) {

@@ -302,7 +302,7 @@
                ((type= type (specifier-type '(complex double-float)))
                 sb-vm:complex-double-float-widetag)
                ((type= type (specifier-type '(complex rational)))
-                sb-vm:complex-widetag)))
+                sb-vm:complex-rational-widetag)))
         #+sb-simd-pack
         ((simd-pack-type-p type)
          (cond ((type= type (specifier-type 'simd-pack))

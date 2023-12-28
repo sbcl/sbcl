@@ -538,7 +538,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         case VALUE_CELL_WIDETAG:
         case WEAK_POINTER_WIDETAG:
         case RATIO_WIDETAG:
-        case COMPLEX_WIDETAG:
+        case COMPLEX_RATIONAL_WIDETAG:
             break;
 
         // Other

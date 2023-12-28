@@ -45,7 +45,7 @@
     (ratio "boxed" "ratio_or_complex" "boxed")
     (single-float ,(or #+64-bit "immediate" "unboxed"))
     (double-float "unboxed")
-    (complex "boxed" "ratio_or_complex" "boxed")
+    (complex-rational "boxed" "ratio_or_complex" "boxed")
     (complex-single-float "unboxed")
     (complex-double-float "unboxed")
 

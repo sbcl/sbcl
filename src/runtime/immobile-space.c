@@ -1633,7 +1633,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         case VALUE_CELL_WIDETAG:
         case WEAK_POINTER_WIDETAG:
         case RATIO_WIDETAG:
-        case COMPLEX_WIDETAG:
+        case COMPLEX_RATIONAL_WIDETAG:
           // Use the sizing functions for generality.
           // Symbols can contain strange header bytes,
           // and vectors might have a padding word, etc.

@@ -419,10 +419,10 @@
   (assert (eql other-pointer-lowtag #b1111))
   ;; This is also assumed in src/runtime/x86-64-assem.S
   (assert (eql (min bignum-widetag ratio-widetag single-float-widetag double-float-widetag
-                    complex-widetag complex-single-float-widetag complex-double-float-widetag)
+                    complex-rational-widetag complex-single-float-widetag complex-double-float-widetag)
                bignum-widetag))
   (assert (eql (max bignum-widetag ratio-widetag single-float-widetag double-float-widetag
-                    complex-widetag complex-single-float-widetag complex-double-float-widetag)
+                    complex-rational-widetag complex-single-float-widetag complex-double-float-widetag)
                complex-double-float-widetag)))
 
 ;;; Most uses of EQL are transformed into a non-generic form, but when we need

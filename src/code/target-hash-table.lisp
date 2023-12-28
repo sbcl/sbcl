@@ -89,7 +89,7 @@
                ;; no overhead to extending the widetag range by 1 widetag.
                '#.(list sb-vm:bignum-widetag sb-vm:ratio-widetag sb-vm:double-float-widetag
                         sb-vm:single-float-widetag
-                        sb-vm:complex-widetag sb-vm:complex-single-float-widetag
+                        sb-vm:complex-rational-widetag sb-vm:complex-single-float-widetag
                         sb-vm:complex-double-float-widetag
                         sb-vm:symbol-widetag))
               ;; NON-NULL-SYMBOL-P skips a test for NIL which is sensible, and we're
@@ -123,7 +123,7 @@
                 ,sb-vm:bignum-widetag
                 ,sb-vm:ratio-widetag
                 ,sb-vm:double-float-widetag
-                ,sb-vm:complex-widetag
+                ,sb-vm:complex-rational-widetag
                 ,sb-vm:complex-single-float-widetag
                 ,sb-vm:complex-double-float-widetag
                 ,sb-vm:simple-bit-vector-widetag

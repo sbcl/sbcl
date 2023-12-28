@@ -411,7 +411,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case SAP_WIDETAG:
           return ptrans_unboxed(thing, header);
       case RATIO_WIDETAG:
-      case COMPLEX_WIDETAG:
+      case COMPLEX_RATIONAL_WIDETAG:
       case SIMPLE_ARRAY_WIDETAG:
       case COMPLEX_BASE_STRING_WIDETAG:
 #ifdef COMPLEX_CHARACTER_STRING_WIDETAG
