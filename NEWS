@@ -14,7 +14,7 @@ changes in sbcl-2.4.0 relative to sbcl-2.3.11:
   * platform support
     ** the mark-region parallel garbage collector can be enabled on arm64.
        (Thanks to Hayley Patton)
-    ** fix build on modern FreeBSDs.  (lp#2046996, thanks to David J. Flander)
+    ** fix build on modern FreeBSDs.  (lp#2046966, thanks to David J. Flander)
   * bug fix: restore compiler type inference correctness on calls to REDUCE
     with :INITIAL-VALUE but no :FROM-END.  (lp#2044856, reported by Patrick
     Poitras)
