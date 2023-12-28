@@ -28,7 +28,6 @@
 #include "os.h"
 #include "core.h"
 #include "globals.h"
-#include "save.h"
 #include "dynbind.h"
 #include "lispregs.h"
 #include "validate.h"
@@ -44,6 +43,7 @@
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # include <zstd.h>
 #endif
+#define COMPRESSION_LEVEL_NONE INT_MIN
 
 #define GENERAL_WRITE_FAILURE_MSG "error writing to core file"
 

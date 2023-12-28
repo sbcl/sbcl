@@ -56,7 +56,6 @@
 #include "gc.h"
 #include "validate.h"
 #include "core.h"
-#include "save.h"
 #include "lispregs.h"
 #include "thread.h"
 
