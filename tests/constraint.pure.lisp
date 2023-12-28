@@ -518,7 +518,7 @@
           (let ((m (+ x y)))
             (aref a (+ m (aref a m)))
             y)))))
-    `(values (integer ,(1+ most-negative-fixnum) 
+    `(values (integer ,(1+ most-negative-fixnum)
                       ,(+ most-positive-fixnum array-dimension-limit))
              &optional))))
 
@@ -890,6 +890,48 @@
      (when (typep (+ m x) '(integer 2 4))
        x))
    (or (integer -2 2) null)))
+
+(with-test (:name :-back)
+  (assert-type
+   (lambda (x)
+     (when (typep (- x 4) '(integer 0 10))
+       x))
+   (or (integer 4 14) null))
+  (assert-type
+   (lambda (x)
+     (when (typep (- 3 x) '(integer 0 10))
+       x))
+   (or (integer -7 3) null))
+  (assert-type
+   (lambda (x)
+     (when (> (- 3 x) 10)
+       x))
+   (or real null)))
+
+(with-test (:name :*back)
+  (assert-type
+   (lambda (x)
+     (when (typep (* x 4) '(integer 0 10))
+       x))
+   (or (rational 0 5/2) null))
+  (assert-type
+   (lambda (x m)
+     (declare ((real 0 3) m))
+     (when (typep (* x m) '(integer 0 10))
+       x))
+   (or number null))
+  (assert-type
+   (lambda (x)
+     (when (> (* x 3) 10)
+       x))
+   (or real null))
+  (assert-type
+   (lambda (x m)
+     (declare (real x)
+              (integer m))
+     (when (typep (* x m) 'integer)
+       x))
+   (or rational null)))
 
 (with-test (:name :ignore-hairy-types)
   (checked-compile
