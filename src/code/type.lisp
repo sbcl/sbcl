@@ -2736,8 +2736,8 @@ expansion happened."
                (t x))))
       (declare (inline normalize-zero))
      (new-ctype numeric-type 0 (get-numtype-aspects complexp class format)
-                low
-                high))))
+                (normalize-zero low)
+                (normalize-zero high)))))
 
 (defun modified-numeric-type (base
                               &key
