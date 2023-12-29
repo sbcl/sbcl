@@ -3416,7 +3416,7 @@ static inline struct weak_pointer *get_weak_pointer_next(struct weak_pointer *wp
   (format t "static inline char* vector_sap(lispobj v) { return (char*)VECTOR(v)->data; }
 static inline unsigned int schar(struct vector* string, int index) {
     return (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG) ?
-      ((char*)string->data)[index] :
+      ((unsigned char*)string->data)[index] :
       ((unsigned int*)string->data)[index];
 }~%"))
 
