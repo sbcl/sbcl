@@ -1034,7 +1034,7 @@
     ;; if ~S is used here. The intent is to use only SBCL as host to compute
     ;; the table, since we assume that everybody's math routines suck.
     ;; But anyway, this does seem to work in most other lisps.
-    (let ((*proxy-sfloat-ctor* "S")  (*proxy-dfloat-ctor* "D"))
+    (let ((*print-pretty* nil) (*proxy-sfloat-ctor* "S")  (*proxy-dfloat-ctor* "D"))
       (dolist (pair (sort (%hash-table-alist table) #'lessp :key #'car))
         (destructuring-bind ((fun . args) . result) pair
           (format stream "(~A ~A~{ ~A~})~%"
