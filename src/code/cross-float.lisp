@@ -27,14 +27,23 @@
 (defun double-float-high-bits (x)
   (ash (double-float-bits x) -32))
 
-(flet ((output-part (x stream)
+;;; This choice exists because cold-init reads from "output/sxhash-calls.lisp-expr"
+;;; using the ordinary definition of "#." which has to call the function at the car
+;;; of a list; but warm.lisp uses a purpose-made #. reader that handles only 2
+;;; symbols, reducing the size of float-math.lisp-expr by abbreviating the float
+;;; constructors to single-character symbols.
+(defvar *proxy-sfloat-ctor* "MAKE-SINGLE-FLOAT")
+(defvar *proxy-dfloat-ctor* "MAKE-DOUBLE-FLOAT")
+(labels
+      ((stringify (bits) (if (= bits 0) 0 (format nil "#x~x" bits)))
+       (output-part (x stream)
          (typecase x
            (single-float
-            (format stream "(MAKE-SINGLE-FLOAT #x~x)" (flonum-%bits x)))
+            (format stream "(~A ~A)" *proxy-sfloat-ctor* (stringify (flonum-%bits x))))
            (double-float
-            (format stream "(MAKE-DOUBLE-FLOAT #x~x #x~x)"
-                    (double-float-high-bits x)
-                    (double-float-low-bits x)))
+            (format stream "(~A ~A ~A)" *proxy-dfloat-ctor*
+                    (stringify (double-float-high-bits x))
+                    (stringify (double-float-low-bits x))))
            (rational
             (prin1 x stream)))))
   (defmethod print-object ((self float) stream)
@@ -274,19 +283,22 @@
           ;; Ensure that we're reading the correct variant of the file
           ;; in case there is more than one set of floating-point formats.
           (assert (eq (read stream) :default))
-          (let ((*package* (find-package "SB-KERNEL")))
-            (dolist (expr (read stream))
+          (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL"))))
+            (loop for (alias . actual) in '(("MAKE-SINGLE-FLOAT" . sb-kernel:make-single-float)
+                                            ("MAKE-DOUBLE-FLOAT" . sb-kernel:make-double-float)
+                                            ("S" . sb-kernel:make-single-float)
+                                            ("D" . sb-kernel:make-double-float))
+                  do (setf (fdefinition (intern alias pkg)) (fdefinition actual)))
+            (dolist (expr (let ((*package* pkg)) (read stream)))
               (destructuring-bind (fun args . values) expr
-                ;; some symbols, such as SQRT, read as XC-STRICT-CL:SQRT
-                ;; from the SB-KERNEL package, but the cache key should
-                ;; always use the symbol in the CL package.
-                (float-ops-cache-insert (cons (intern (string fun) "CL") args)
+                (float-ops-cache-insert (cons fun args)
                                         (if (and (symbolp (first values))
                                                  (string= (symbol-name (first values))
                                                           "&VALUES"))
                                             (rest values)
                                             values)
-                                        table))))
+                                        table)))
+            (delete-package pkg))
           (setf (cdr cache) (hash-table-count table))
           (when cl:*compile-verbose*
             (format t "~&; Float-ops cache prefill: ~D entries~%" (cdr cache))))))
@@ -984,6 +996,12 @@
                    ((single-float-p x) 2)
                    ((double-float-p x) 3)
                    (t (error "Unclassifiable arg ~S" x))))
+           (spelling-of (expr)
+             ;; MUST not write package prefixes !
+             ;; e.g. avoid writing a line like (COERCE (-33619991 SB-XC:DOUBLE-FLOAT) ...)
+             (let ((hex (write-to-string expr :pretty nil :base 16 :radix t :escape nil))
+                   (dec (write-to-string expr :pretty nil :base 10 :escape nil)))
+               (if (<= (length hex) (length dec)) hex dec)))
            (lessp (expr-a expr-b)
              (let ((f (string (car expr-a)))
                    (g (string (car expr-b))))
@@ -1016,11 +1034,14 @@
     ;; if ~S is used here. The intent is to use only SBCL as host to compute
     ;; the table, since we assume that everybody's math routines suck.
     ;; But anyway, this does seem to work in most other lisps.
-    (let ((*print-pretty* nil) (*print-base* 16) (*print-radix* t))
+    (let ((*proxy-sfloat-ctor* "S")  (*proxy-dfloat-ctor* "D"))
       (dolist (pair (sort (%hash-table-alist table) #'lessp :key #'car))
         (destructuring-bind ((fun . args) . result) pair
           (format stream "(~A ~A~{ ~A~})~%"
-                  fun args
+                  fun
+                  ;; Why do ABS and RATIONAL write the unary arg as an atom
+                  ;; but SQRT writes it as a singleton list?
+                  (if (listp args) (mapcar #'spelling-of args) (spelling-of args))
                   ;; Can't use ENSURE-LIST. We need NIL -> (NIL)
                   (if (consp result) result (list result)))))))
   (format stream ")~%"))
