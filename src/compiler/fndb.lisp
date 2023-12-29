@@ -1011,6 +1011,8 @@
   :call-type-deriver #'append-call-type-deriver)
 
 (defknown copy-list (proper-or-dotted-list) list (flushable))
+(defknown sb-impl::copy-list-to (proper-or-dotted-list cons) cons
+  (flushable no-verify-arg-count))
 (defknown copy-alist (proper-list) list (flushable))
 (defknown copy-tree (t) t (flushable recursive))
 (defknown revappend (proper-list t) t (flushable))

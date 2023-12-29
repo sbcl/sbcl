@@ -121,8 +121,10 @@
                  (setq ncdrs (- (length (cdr form)) 2))))))
       (let ((answer
               (cond ((null ncdrs)
-                     `(when (setf (cdr ,tail-var) ,tail-form)
-                        (setq ,tail-var (last (cdr ,tail-var)))))
+                     (if (typep tail-form '(cons (eql copy-list)))
+                         `(setf ,tail-var (sb-impl::copy-list-to ,(second tail-form)  ,tail-var))
+                         `(when (setf (cdr ,tail-var) ,tail-form)
+                            (setq ,tail-var (last (cdr ,tail-var))))))
                     ((< ncdrs 0) (return-from loop-collect-rplacd nil))
                     ((= ncdrs 0)
                      ;; @@@@ Here we have a choice of two idioms:

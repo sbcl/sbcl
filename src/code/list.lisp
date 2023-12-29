@@ -438,6 +438,16 @@
   "Return a new list which is EQUAL to LIST. LIST may be improper."
   (copy-list-macro list))
 
+(defun copy-list-to (list tail)
+  (declare (explicit-check))
+  (the list (cdr (truly-the cons tail)))
+  (do ((orig list (cdr orig))
+       (splice tail
+               (let ((cell (list (car orig))))
+                 (rplacd (truly-the cons splice) cell)
+                 cell)))
+      ((atom orig) (rplacd (truly-the cons splice) orig))))
+
 (defun ensure-heap-list (list)
   (declare (sb-c::tlab :system))
   ;; If some cons is not on the heap then copy the whole list
