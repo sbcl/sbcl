@@ -941,7 +941,20 @@
        (dotimes (i 3)
          (print (/= a 1))
          (the real a))
-       v))))
+       v)))
+  (checked-compile
+   '(lambda (d)
+     (values
+      (let ((v9 d)
+            (v1 (the (satisfies eval) (setf d 1))))
+        (if (= v1 v9) 0 1))
+      (loop sum (if (> (if (<= 220 d)
+                           (if (and (< 220 d)
+                                    (>= 1024 d))
+
+                               7)
+                           220) 0)
+                    1 2))))))
 
 (with-test (:name :set-constraint)
   (assert-type

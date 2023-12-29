@@ -400,6 +400,11 @@
         (when (lambda-var-p y)
           (register-constraint y new x))
         new)))
+
+(declaim (inline type-for-constraints-p))
+(defun type-for-constraints-p (type)
+  (not (or (eq type *universal-type*)
+           (contains-hairy-type-p type))))
 
 ;;; Actual conset interface
 ;;;
@@ -1227,7 +1232,7 @@
                  and val in (combination-args call)
                  when (and val (lambda-var-constraints var))
                  do (let ((type (lvar-type val)))
-                      (unless (eq type *universal-type*)
+                      (when (type-for-constraints-p type)
                         (conset-add-constraint gen 'typep var type nil)))
                     (maybe-add-eql-var-var-constraint var val gen)
                     (add-var-result-constraints var val gen)))))
@@ -1240,9 +1245,9 @@
        (let* ((lvar (cast-value node))
               (var (ok-lvar-lambda-var lvar gen))
               (atype (single-value-type (cast-derived-type node))))
-         (cond ((eq atype *universal-type*))
-               (var
-                (conset-add-constraint-to-eql gen 'typep var atype nil)))
+         (when (and var
+                    (type-for-constraints-p atype))
+           (conset-add-constraint-to-eql gen 'typep var atype nil))
          (constraint-propagate-back lvar 'typep atype gen gen nil)
          (when (and (bound-cast-p node)
                     (bound-cast-check node)
@@ -1259,13 +1264,13 @@
          (when (policy node (or (and (= speed 3) (> speed compilation-speed))
                                 (> debug 1)))
            (let ((type (lambda-var-type var)))
-             (unless (eq *universal-type* type)
+             (when (type-for-constraints-p type)
                (do-eql-vars (other (var gen))
                  (unless (eql other var)
                    (conset-add-constraint gen 'typep other type nil))))))
          (conset-clear-lambda-var gen var)
          (let ((type (single-value-type (node-derived-type node))))
-           (unless (eq type *universal-type*)
+           (when (type-for-constraints-p type)
              (conset-add-constraint gen 'typep var type nil)))
          (unless (policy node (> compilation-speed speed))
            (maybe-add-eql-var-var-constraint var (set-value node) gen))
@@ -1420,8 +1425,7 @@
                     (type-union in-var-type
                                 (type-from-constraints var out *universal-type*))))))
 
-        (unless (or (eq in-var-type *universal-type*)
-                    (contains-hairy-type-p in-var-type))
+        (when (type-for-constraints-p in-var-type)
           ;; Remove the existing constraints to avoid joining them again later.
           (do-propagatable-constraints (con (in var))
             (when (eq (constraint-kind con) 'typep)
