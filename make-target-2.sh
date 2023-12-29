@@ -72,3 +72,17 @@ echo //doing warm init - load and dump phase
 (let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF
+
+./src/runtime/sbcl --noinform --core output/sbcl.core \
+  --no-sysinit --no-userinit --noprint <<EOF
+  (ignore-errors (delete-file "output/reorg.core"))
+  ;; * Lisp won't read compressed cores, and crashes on arm64
+  #+(and mark-region-gc x86-64 (not sb-core-compression))
+  (progn
+   (load "tools-for-build/editcore")
+   (funcall (intern "REORGANIZE-CORE" "SB-EDITCORE") "output/sbcl.core" "output/reorg.core"))
+EOF
+if [ -r output/reorg.core ]
+then
+    mv output/reorg.core output/sbcl.core
+fi

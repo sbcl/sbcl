@@ -21,7 +21,7 @@
   (:use "CL" "SB-ALIEN" "SB-COREFILE" "SB-INT" "SB-EXT"
         "SB-KERNEL" "SB-SYS" "SB-VM")
   (:export #:move-dynamic-code-to-text-space #:redirect-text-space-calls
-           #:split-core #:copy-to-elf-obj)
+           #:split-core #:copy-to-elf-obj #:reorganize-core)
   (:import-from "SB-ALIEN-INTERNALS"
                 #:alien-type-bits #:parse-alien-type
                 #:alien-value-sap #:alien-value-type)
@@ -694,7 +694,7 @@
 
 (defstruct page
   words-used
-  single-obj-p
+  (single-obj-p 0 :type bit)
   type
   scan-start
   bitmap)
@@ -731,15 +731,11 @@
                       (page-scan-start p)))))))
     table))
 
-(defun decode-page-type (type)
-  (ecase type
-    (0 :free)
-    (1 :unboxed)
-    (2 :boxed)
-    (3 :mixed)
-    (4 :small-mixed)
-    (5 :cons)
-    (7 :code)))
+(defglobal page-type-symbols
+    #(:free :unboxed :boxed :mixed :small-mixed :cons nil :code))
+(defun encode-page-type (keyword)
+  (the (not null) (position (the keyword keyword) page-type-symbols)))
+(defun decode-page-type (type) (svref page-type-symbols type))
 
 (defun calc-page-index (vaddr space)
   (let ((vaddr (if (system-area-pointer-p vaddr) (sap-int vaddr) vaddr)))
@@ -872,6 +868,26 @@
   ;;(format t "~&Target-features=~S~%" result)
   result)
 
+(defun transport-code (from-vaddr from-paddr to-vaddr to-paddr size)
+  (%byte-blt from-paddr 0 to-paddr 0 size)
+  (let* ((new-physobj (%make-lisp-obj (logior (sap-int to-paddr) other-pointer-lowtag)))
+         (header-bytes (ash (code-header-words new-physobj) word-shift))
+         (new-insts (code-instructions new-physobj)))
+    ;; fix the jump table words which, if present, start at NEW-INSTS
+    (let ((wordcount (code-jump-table-words new-physobj))
+          (disp (sap- to-vaddr from-vaddr)))
+      (loop for i from 1 below wordcount
+            do (let ((w (sap-ref-word new-insts (ash i word-shift))))
+                 (unless (zerop w)
+                   (setf (sap-ref-word new-insts (ash i word-shift)) (+ w disp))))))
+    ;; fix the simple-fun pointers
+    (dotimes (i (code-n-entries new-physobj))
+      (let ((fun-offs (%code-fun-offset new-physobj i)))
+        ;; Assign the address that each simple-fun will have assuming
+        ;; the object will reside at its new logical address.
+        (setf (sap-ref-sap new-insts (+ fun-offs n-word-bytes))
+              (sap+ to-vaddr (+ header-bytes fun-offs (* 2 n-word-bytes))))))))
+
 (defun transport-dynamic-space-code (codeblobs spacemap new-space free-ptr)
   (do ((list codeblobs (cdr list))
        (offsets-vector-data (sap+ new-space (* 2 n-word-bytes)))
@@ -885,26 +901,7 @@
             (to-vaddr (+ +code-space-nominal-address+ free-ptr))
             (to-paddr (sap+ new-space free-ptr)))
         (setf (sap-ref-32 offsets-vector-data (ash object-index 2)) free-ptr)
-        ;; copy to code space
-        (%byte-blt from-paddr 0 new-space free-ptr size)
-        (let* ((new-physobj
-                (%make-lisp-obj (logior (sap-int to-paddr) other-pointer-lowtag)))
-               (header-bytes (ash (code-header-words new-physobj) word-shift))
-               (new-insts (code-instructions new-physobj)))
-          ;; fix the jump table words which, if present, start at NEW-INSTS
-          (let ((wordcount (code-jump-table-words new-physobj))
-                (disp (- to-vaddr (sap-int from-vaddr))))
-            (loop for i from 1 below wordcount
-                  do (let ((w (sap-ref-word new-insts (ash i word-shift))))
-                       (unless (zerop w)
-                         (setf (sap-ref-word new-insts (ash i word-shift)) (+ w disp))))))
-          ;; fix the simple-fun pointers
-          (dotimes (i (code-n-entries new-physobj))
-            (let ((fun-offs (%code-fun-offset new-physobj i)))
-              ;; Assign the address that each simple-fun will have assuming
-              ;; the object will reside at its new logical address.
-              (setf (sap-ref-word new-insts (+ fun-offs n-word-bytes))
-                    (+ to-vaddr header-bytes fun-offs (* 2 n-word-bytes))))))
+        (transport-code from-vaddr from-paddr (int-sap to-vaddr) to-paddr size)
         (incf free-ptr size)))))
 
 (defun remap-to-quasi-static-code (val spacemap fwdmap)
@@ -1070,7 +1067,7 @@
         (#.runtime-options-magic) ; ignore
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
-    (values total-npages space-list card-mask-nbits core-dir-start initfun)))
+    (values total-npages (reverse space-list) card-mask-nbits core-dir-start initfun)))
 
 (defconstant +lispwords-per-corefile-page+ (/ sb-c:+backend-page-bytes+ n-word-bytes))
 
@@ -1167,6 +1164,10 @@
                                           (sap-int paddr))))))))
                      static-core-space-id spacemap))
 
+(defconstant simple-array-uword-widetag
+  #+64-bit simple-array-unsigned-byte-64-widetag
+  #-64-bit simple-array-unsigned-byte-32-widetag)
+
 (defun move-dynamic-code-to-text-space (input-pathname output-pathname)
   ;; Remove old files
   (ignore-errors (delete-file output-pathname))
@@ -1246,7 +1247,7 @@
               (setf (sap-ref-word new-space 0) simple-array-unsigned-byte-32-widetag
                     (sap-ref-word new-space n-word-bytes) (fixnumize n-objects))
               ;; write header of "vector 2"
-              (setf (sap-ref-word new-space offsets-vector-size) simple-array-unsigned-byte-64-widetag
+              (setf (sap-ref-word new-space offsets-vector-size) simple-array-uword-widetag
                     (sap-ref-word new-space (+ offsets-vector-size n-word-bytes))
                     (fixnumize c-linkage-reserved-words))
               ;; Transport code contiguously into new space
@@ -1276,7 +1277,7 @@
               ;; don't zerofill asm code in static space
               (zerofill-old-code spacemap (cdr codeblobs) page-ranges)
               ;; Update the core header to contain newspace
-              (let ((spaces (nreconc
+              (let ((spaces (nconc
                              (mapcar (lambda (space)
                                        (list 0 (space-id space)
                                              (int-sap (translate-ptr (space-addr space) spacemap))
@@ -1409,3 +1410,514 @@
                           (align-up (* (space-nwords space) n-word-bytes)
                                     +backend-page-bytes+)))))
 
+;;;; Offline mark-region compactor
+(declaim (inline load-bits-wordindexed))
+(defun load-bits-wordindexed (sap index)
+  (declare (type (signed-byte 32) index))
+  (sap-ref-word sap (ash index word-shift)))
+(defun load-wordindexed (sap index)
+  (let ((word (load-bits-wordindexed sap index)))
+    (if (not (is-lisp-pointer word))
+        (%make-lisp-obj word) ; fixnum, character, single-float, unbound-marker
+        (make-descriptor word))))
+
+(defun physical-sap (taggedptr spacemap)
+  (let ((bits (if (descriptor-p taggedptr) (descriptor-bits taggedptr) taggedptr)))
+    (int-sap (translate-ptr (logandc2 bits lowtag-mask) spacemap))))
+
+(defun size-of (sap)
+  (with-alien ((primitive-object-size (function unsigned system-area-pointer) :extern))
+    (alien-funcall primitive-object-size sap)))
+
+(macrolet ((layout-index ()
+             `(ash (ecase widetag
+                     (#.funcallable-instance-widetag 5) ; KLUDGE
+                     (#.instance-widetag 1))
+                   word-shift)))
+(defun set-layout (instance-sap widetag layout-bits)
+  (setf (sap-ref-word instance-sap (layout-index)) layout-bits))
+(defun get-layout (instance-sap widetag)
+  (sap-ref-word instance-sap (layout-index))))
+
+;;; Return T if WIDETAG is for a pointerless object.
+(defun leafp (widetag)
+  (declare ((integer 0 255) widetag))
+  (macrolet ((compute-leaves (&aux (result 0))
+               (loop for w in ; these are the nonleaves
+                     `(,closure-widetag ,code-header-widetag ,symbol-widetag ,value-cell-widetag
+                       ,instance-widetag ,funcallable-instance-widetag ,weak-pointer-widetag
+                       ,fdefn-widetag ,ratio-widetag ,complex-rational-widetag
+                       ,simple-vector-widetag ,simple-array-widetag ,complex-array-widetag
+                       ,complex-base-string-widetag #+sb-unicode ,complex-character-string-widetag
+                       ,complex-vector-widetag ,complex-bit-vector-widetag)
+                     do (setf result (logior result (ash 1 (ash w -2)))))
+               (lognot result)))
+    (logbitp (ash widetag -2) (compute-leaves))))
+
+(defun instance-slot-count (sap widetag)
+  (let ((header (sap-ref-word sap 0)))
+    (ecase widetag
+      (#.funcallable-instance-widetag
+       (ldb (byte 8 n-widetag-bits) header))
+      (#.instance-widetag
+       ;; See instance_length() in src/runtime/instance.inc
+       (+ (logand (ash header (- instance-length-shift)) instance-length-mask)
+          (logand (ash header -10) (ash header -9) 1))))))
+
+(defun target-listp (taggedptr)
+  (= (logand taggedptr lowtag-mask) list-pointer-lowtag))
+
+(defun target-widetag-of (descriptor spacemap)
+  (if (target-listp (descriptor-bits descriptor))
+      list-pointer-lowtag
+      (logand (sap-ref-word (physical-sap descriptor spacemap) 0) widetag-mask)))
+
+;;; Target objects will be represented by a DESCRIPTOR, making this safe even for
+;;; precise GC. i.e. we never load into a register the bits of a target pointer that
+;;; could be mistaken for something in the host's dynamic-space.
+;;; DESCRIPTOR-BITS has a lowtag so that we can easily discriminate the 4 pointer types.
+(macrolet ((scan-slot (index &optional value)
+             (if value
+                 `(funcall function sap ,index ,value widetag)
+                 `(let ((.i. ,index))
+                    (funcall function sap .i. (load-wordindexed sap .i.) widetag))))
+           (asm-call-p (x name)
+             `(eq ,x (load-time-value (sb-fasl:get-asm-routine ,name) t)))
+           (fun-entry->descriptor (addr)
+             `(make-descriptor (+ ,addr (* -2 n-word-bytes) fun-pointer-lowtag))))
+
+(defun trace-symbol (function sap &aux (widetag symbol-widetag))
+  (scan-slot symbol-value-slot)
+  (scan-slot symbol-fdefn-slot)
+  (scan-slot symbol-info-slot)
+  (scan-slot symbol-name-slot ; decode the packed NAME word
+   (make-descriptor (ldb (byte 48 0) (load-bits-wordindexed sap symbol-name-slot)))))
+
+;;; This is a less general variant of do-referenced-object, but more efficient.
+;;; I think it's the most concisely an object slot visitor can be expressed.
+(defun trace-obj (function descriptor spacemap
+                  &optional (layout-translator
+                             (lambda (ptr) (translate-ptr ptr spacemap)))
+                  &aux (widetag (target-widetag-of descriptor spacemap))
+                       (sap (physical-sap descriptor spacemap)))
+  (declare (function function layout-translator))
+  (multiple-value-bind (first last)
+      (cond ((= widetag list-pointer-lowtag) (values 0 cons-size))
+            ((member widetag `(,instance-widetag ,funcallable-instance-widetag))
+             ;; These two primitive types have a bitmap
+             (let* ((ld (get-layout sap widetag)) ; layout descriptor
+                    (layout
+                     (truly-the layout
+                      (%make-lisp-obj (funcall layout-translator ld)))))
+               (scan-slot 0 (make-descriptor ld))
+               (do-layout-bitmap (i taggedp layout (instance-slot-count sap widetag))
+                 (when taggedp (scan-slot (1+ i))))
+               (return-from trace-obj)))
+            ((leafp widetag) (return-from trace-obj))
+            ((= widetag symbol-widetag)
+             (return-from trace-obj (trace-symbol function sap)))
+            ((= widetag code-header-widetag)
+             (values 2 ; code_header_words() can't be called from Lisp, so emulate it
+                     (ash (ldb (byte 32 0) (load-bits-wordindexed sap code-boxed-size-slot))
+                          (- word-shift))))
+            (t
+             (let ((first 1) (last (ash (size-of sap) (- word-shift))))
+               (case widetag
+                 (#.fdefn-widetag ; wordindex 3 is an untagged simple-fun entry address
+                  (let ((bits (load-bits-wordindexed sap fdefn-raw-addr-slot)))
+                    (unless (or (eq bits 0)
+                                (asm-call-p bits 'sb-vm::undefined-tramp)
+                                (asm-call-p bits 'sb-vm::closure-tramp))
+                      (scan-slot fdefn-raw-addr-slot (fun-entry->descriptor bits))))
+                  (setq last 3))
+                 (#.closure-widetag ; wordindex 1 is an untagged simple-fun entry address
+                  (let ((bits (load-bits-wordindexed sap closure-fun-slot)))
+                    (scan-slot closure-fun-slot (fun-entry->descriptor bits)))
+                  (setq first 2)))
+               (values first last))))
+    (loop for i from first below last do (scan-slot i))))
+) ; end MACROLET
+
+(defun compute-nil-symbol-sap (spacemap)
+  (let ((space (get-space static-core-space-id spacemap)))
+    ;; TODO: The core should store its address of NIL in the initial function entry
+    ;; so this kludge can be removed.
+    (int-sap (translate-ptr (logior (space-addr space) #x108) spacemap))))
+
+(defun is-code (taggedptr spacemap)
+  (and (= (logand taggedptr lowtag-mask) other-pointer-lowtag)
+       (= (logand (sap-ref-word (physical-sap taggedptr spacemap) 0) widetag-mask)
+          code-header-widetag)))
+
+(defun is-simple-fun (descriptor spacemap)
+  (and (= (logand (descriptor-bits descriptor) lowtag-mask) fun-pointer-lowtag)
+       (= (logand (sap-ref-word (physical-sap descriptor spacemap) 0) widetag-mask)
+          simple-fun-widetag)))
+
+(defun fun-ptr-to-code-ptr (descriptor spacemap)
+  (let ((backptr (ldb (byte 24 n-widetag-bits)
+                      (sap-ref-word (physical-sap descriptor spacemap) 0))))
+    (+ (- (descriptor-bits descriptor) (ash backptr word-shift))
+       (- other-pointer-lowtag fun-pointer-lowtag))))
+
+(defun maybe-fun-ptr-to-code-ptr (descriptor spacemap)
+  (if (is-simple-fun descriptor spacemap)
+      (make-descriptor (fun-ptr-to-code-ptr descriptor spacemap))
+      descriptor))
+
+(defun widetag-name (i)
+  (if (> i 1) (deref (extern-alien "widetag_names" (array c-string 64)) i) "cons"))
+
+(defun summarize-object-counts (spacemap seen)
+  (let ((widetags (make-array 64 :initial-element 0)))
+    (maphash (lambda (taggedptr v)
+               (declare (ignore v))
+               (assert (integerp taggedptr))
+               ;; FIXME: should use GET-SPACE to find the vaddr
+               (when (>= taggedptr dynamic-space-start)
+                 (let* ((descriptor (make-descriptor taggedptr))
+                        (widetag
+                         (if (target-listp taggedptr)
+                             list-pointer-lowtag
+                             (logand (sap-ref-word (physical-sap descriptor spacemap) 0)
+                                     widetag-mask))))
+                   (incf (aref widetags (ash widetag -2))))))
+             seen)
+    (let ((tot 0))
+      (dotimes (i 64)
+        (let ((ct (aref widetags i)))
+          (when (plusp ct)
+            (incf tot ct)
+            (format t "~8d ~a~%" ct (widetag-name i)))))
+      (format t "~8d TOTAL~%" tot))))
+
+(defun make-visited-table () (make-hash-table))
+(defun visited (hashset obj) (setf (gethash (descriptor-bits obj) hashset) t))
+(defun unvisited (hashset obj) (remhash (descriptor-bits obj) hashset))
+(defun was-visitedp (hashset obj) (gethash (descriptor-bits obj) hashset))
+
+(defun call-with-each-static-object (function spacemap)
+  (Declare (function function))
+  (let* ((space (get-space static-core-space-id spacemap))
+         (physaddr (space-physaddr space spacemap))
+         (limit (sap+ physaddr (ash (space-nwords space) word-shift))))
+    (do ((object (sap+ (compute-nil-symbol-sap spacemap) (ash 7 word-shift)) ; KLUDGE
+                 (sap+ object (size-of object))))
+        ((sap>= object limit))
+      ;; There are no static cons cells
+      (let ((lowtag (logand (deref (extern-alien "widetag_lowtag" (array char 256))
+                                   (sap-ref-8 object 0))
+                            lowtag-mask)))
+        (funcall function (make-descriptor (+ (space-addr space) (sap- object physaddr)
+                                              lowtag)))))))
+
+;;; Gather all the objects in the order we want to reallocate them in.
+;;; This relies on MAPHASH in SBCL iterating in insertion order.
+(defun visit-everything (spacemap initfun
+                         &optional print
+                         &aux (seen (make-visited-table))
+                              (defer-debug-info
+                                  (make-array 10000 :fill-pointer 0 :adjustable t))
+                              stack)
+  (visited seen (make-descriptor nil-value))
+  (labels ((root (descriptor)
+             (visited seen descriptor)
+             (trace-obj #'visit descriptor spacemap))
+           (visit (sap slot value widetag)
+             (declare (ignorable sap slot widetag))
+             (when print (format t "~&  slot ~d = ~a" slot value))
+             (when (and (= widetag code-header-widetag) (< slot 4) defer-debug-info)
+               (unless (and (plusp (fill-pointer defer-debug-info))
+                            (sap= (aref defer-debug-info (1- (fill-pointer defer-debug-info)))
+                                  sap))
+                 (vector-push-extend sap defer-debug-info))
+               (return-from visit))
+             (when (descriptor-p value)
+               (let ((value (maybe-fun-ptr-to-code-ptr value spacemap)))
+                 (unless (was-visitedp seen value)
+                   (when print (format t " (pushed)"))
+                   (visited seen value)
+                   (push value stack)))))
+           (transitive-closure ()
+             (loop while stack
+                   do (let ((descriptor (pop stack)))
+                        (when print (format t "~&Popped ~x~%" descriptor))
+                        (trace-obj #'visit descriptor spacemap)))))
+    (root (make-descriptor initfun))
+    (trace-symbol #'visit (compute-nil-symbol-sap spacemap))
+    (call-with-each-static-object #'root spacemap)
+    (transitive-closure)
+    (dovector (sap (prog1 defer-debug-info (setq defer-debug-info nil)))
+      (visit sap 2 (load-wordindexed sap 2) 0)
+      (visit sap 3 (load-wordindexed sap 3) 0))
+    (transitive-closure))
+  seen)
+
+(defstruct (newspace (:include core-space))
+  ;; alist of page type to list of pages with any space
+  (available-ranges (mapcar 'list '(:cons :boxed :unboxed :mixed :code))))
+
+(defun unboxed-like-simple-vector (sap)
+  (declare (ignore sap))
+  ;; TODO: return T if the vector has the 'shareable' header bit (is effectively
+  ;; a constant) and contains no pointers.
+  nil)
+
+(defun vector-alloc-mixed-p (sap)
+  (logtest (logior (ash (logior vector-weak-flag vector-hashing-flag) array-flags-position)
+                   sb-vm::+vector-alloc-mixed-region-bit+)
+           (sap-ref-word sap 0)))
+
+(defun instance-strictly-boxed-p (sap spacemap)
+  (let ((layout (translate-ptr (get-layout sap instance-widetag) spacemap)))
+    (logtest (layout-flags (truly-the layout (%make-lisp-obj layout)))
+             +strictly-boxed-flag+)))
+
+(defun pick-page-type (descriptor sap largep spacemap)
+  (when (target-listp (descriptor-bits descriptor))
+    (return-from pick-page-type :cons))
+  (let ((widetag (target-widetag-of descriptor spacemap)))
+    (if largep
+        ;; Choose from among {boxed, mixed, code}
+        (cond ((= widetag code-header-widetag) :code)
+              ((or (/= widetag simple-vector-widetag) (vector-alloc-mixed-p sap))
+               :mixed)
+              (t
+               :boxed))
+        ;; Choose from among {raw, boxed, mixed, code}
+        (cond ((member widetag `(,code-header-widetag ,funcallable-instance-widetag))
+               :code)
+              ((or (leafp widetag)
+                   (and (member widetag `(,ratio-widetag ,complex-rational-widetag))
+                        (fixnump (load-wordindexed sap 1))
+                        (fixnump (load-wordindexed sap 2)))
+                   (unboxed-like-simple-vector sap))
+               :unboxed)
+              ((or (member widetag `(,symbol-widetag ,weak-pointer-widetag))
+                   (and (= widetag instance-widetag)
+                        (not (instance-strictly-boxed-p sap spacemap)))
+                   (and (= widetag simple-vector-widetag)
+                        (vector-alloc-mixed-p sap)))
+               :mixed)
+              (t
+               :boxed)))))
+
+(defun find-sufficient-gap (gaps size)
+  (dolist (gap gaps)
+    (when (>= (cdr gap) size)
+      (return gap))))
+
+(defun space-next-free-page (space)
+  (let ((words-per-page (/ gencgc-page-bytes n-word-bytes)))
+    (ceiling (space-nwords space) words-per-page)))
+
+(defconstant-eqx instance-len-byte
+    (byte (integer-length instance-length-mask) instance-length-shift)
+  #'equal)
+(defun reallocate (descriptor old-spacemap new-spacemap)
+  (let* ((sap (physical-sap descriptor old-spacemap))
+         (old-size (size-of sap))
+         (size old-size)
+         (largep (>= size large-object-size))
+         (page-type (pick-page-type descriptor sap largep old-spacemap))
+         (newspace (get-space dynamic-core-space-id new-spacemap))
+         (new-nslots) ; only set if it's a resized instance
+         (new-vaddr))
+    (when (and (= (logand (descriptor-bits descriptor) lowtag-mask)
+                  instance-pointer-lowtag)
+               (= (ldb (byte 2 8) (sap-ref-word sap 0)) 1)) ; hashed not moved
+      (setf new-nslots (1+ (ldb instance-len-byte (sap-ref-word sap 0)))
+            ;; size change can't affect largep
+            size (ash (1+ (logior new-nslots 1)) word-shift)))
+    (flet ((claim-page (scan-start words-used)
+             (let ((index (space-next-free-page newspace)))
+               ;(format t "next-free-page=~s~%" index)
+               ;; should be free
+               (aver (not (aref (space-page-table newspace) index)))
+               ;; previous should be used or nonexistent
+               (aver (or (= index 0) (aref (space-page-table newspace) (1- index))))
+               (incf (space-nwords newspace) (/ gencgc-page-bytes n-word-bytes))
+               (setf (aref (space-page-table newspace) index)
+                     (make-page :words-used words-used
+                                :single-obj-p (if largep 1 0)
+                                :type page-type
+                                :scan-start scan-start
+                                :bitmap (make-array *bitmap-bits-per-page*
+                                                    :element-type 'bit))))))
+      (if largep
+          (let* ((npages (ceiling size gencgc-page-bytes))
+                 (page (space-next-free-page newspace))
+                 (bytes-to-go size)
+                 (scan-start 0))
+            (setq new-vaddr (+ dynamic-space-start (* page gencgc-page-bytes)))
+            (dotimes (i npages)
+              (let ((bytes-this-page (min gencgc-page-bytes bytes-to-go)))
+                (claim-page scan-start (ash bytes-this-page (- word-shift)))
+                (incf scan-start gencgc-page-bytes)
+                (decf bytes-to-go bytes-this-page)))
+            (setf (bit (page-bitmap (aref (newspace-page-table newspace) page)) 0) 1))
+          (let* ((list (assoc page-type (newspace-available-ranges newspace)))
+                 (nwords (ash size (- word-shift)))
+                 (gap (find-sufficient-gap (cdr list) size)))
+            (if gap
+                (let* ((page (floor (- (setq new-vaddr (car gap)) dynamic-space-start)
+                                    gencgc-page-bytes))
+                       (pte (aref (newspace-page-table newspace) page))
+                       (page-base (+ dynamic-space-start (* page gencgc-page-bytes)))
+                       (object-index (ash (- new-vaddr page-base) (- n-lowtag-bits))))
+                  (incf (page-words-used pte) nwords)
+                  (setf (sbit (page-bitmap pte) object-index) 1)
+                  (if (plusp (decf (cdr gap) size))
+                      (incf (car gap) size) ; the gap is moved upward by SIZE
+                      (setf (cdr list) (delq1 gap (cdr list)))))
+                ;; claim a page, use initial portion of it, append rest onto gaps
+                (let ((page (space-next-free-page newspace)))
+                  (setq new-vaddr (+ dynamic-space-start (* page gencgc-page-bytes)))
+                  (setf (bit (page-bitmap (claim-page 0 nwords)) 0) 1)
+                  (let ((gap (cons (+ new-vaddr size) (- gencgc-page-bytes size))))
+                    (nconc list (list gap))))))))
+    (let ((new-sap (physical-sap new-vaddr new-spacemap))
+          (old-sap (physical-sap descriptor old-spacemap))
+          (widetag (target-widetag-of descriptor old-spacemap)))
+      (%byte-blt old-sap 0 new-sap 0 old-size)
+      (case widetag
+        (#.instance-widetag
+         (when new-nslots
+           (setf (sap-ref-word new-sap 0)
+                 (logior (sap-ref-word new-sap 0) (ash 1 hash-slot-present-flag)))
+           (let* ((prehash (sb-impl::murmur3-fmix-word (descriptor-bits descriptor)))
+                  (hash (ash (logand (ash prehash (1+ n-fixnum-tag-bits)) most-positive-word)
+                             -1)))
+             (setf (sap-ref-word new-sap (ash new-nslots word-shift)) hash))))
+        (#.code-header-widetag ; redundantly performs a memmove first, but that's fine
+         (transport-code (int-sap (logandc2 (descriptor-bits descriptor) lowtag-mask)) old-sap
+                         (int-sap new-vaddr) new-sap size))
+        (#.funcallable-instance-widetag
+         (setf (sap-ref-sap new-sap (ash 1 word-shift)) ; set the entry point
+               (sap+ (int-sap new-vaddr) (ash 2 word-shift))))))
+    new-vaddr))
+
+(defun fixup-compacted (old-spacemap new-spacemap seen &optional print)
+  (flet ((visit (sap slot value widetag)
+           (unless (descriptor-p value) (return-from visit))
+           (let ((newspace-ptr
+                  (cond ((is-simple-fun value old-spacemap)
+                         (let* ((old-code (fun-ptr-to-code-ptr value old-spacemap))
+                                (new-code (gethash old-code seen)))
+                           (+ new-code (- (descriptor-bits value) old-code))))
+                        ((gethash (descriptor-bits value) seen)))))
+             (unless newspace-ptr (return-from visit))
+             ;; handle special cases of index + widetag
+             (case (logand most-positive-word (logior (ash slot 8) widetag))
+               ((#.instance-widetag #.funcallable-instance-widetag)
+                (set-layout sap widetag newspace-ptr))
+               ((#.(logior (ash fdefn-raw-addr-slot 8) fdefn-widetag)
+                 #.(logior (ash closure-fun-slot 8) closure-widetag))
+                (setf (sap-ref-word sap (ash slot word-shift))
+                      (+ newspace-ptr (- (ash simple-fun-insts-offset word-shift)
+                                         fun-pointer-lowtag))))
+               ((#.(logior (ash symbol-name-slot 8) symbol-widetag))
+                ;; symbol names are in readonly space now
+                (bug "symbol name change"))
+               (t
+                (setf (sap-ref-word sap (ash slot word-shift)) newspace-ptr)))
+             #+nil
+             (format t "~& - ~x[~x] + ~d ~x -> ~X" (sap-int sap) widetag index value
+                     (sap-ref-word sap (ash slot word-shift)))
+             ))
+         ;; Use _oldspace_ layouts when scanning bitmaps.
+         (layout-vaddr->paddr (ptr)
+           (translate-ptr ptr old-spacemap)))
+    (when print (format t "~&Fixing static space~%"))
+    (trace-symbol #'visit (compute-nil-symbol-sap old-spacemap))
+    (call-with-each-static-object
+       (lambda (descriptor) (trace-obj #'visit descriptor old-spacemap))
+       old-spacemap)
+    (when print (format t "~&Fixing dynamic space~%"))
+    (dohash ((old-taggedptr new-taggedptr) seen)
+      (declare (ignorable old-taggedptr))
+      #+nil
+      (format t "~&Fixing @ old-vaddr=~x new-vaddr=~x new-paddr=~x~%"
+              old-taggedptr new-taggedptr (sap-int (physical-sap new-taggedptr new-spacemap)))
+      (trace-obj #'visit (make-descriptor new-taggedptr) new-spacemap
+                 #'layout-vaddr->paddr)
+      ;; mark every address-sensitive hash-table as needing rehash
+      (let* ((sap (physical-sap new-taggedptr new-spacemap))
+             (header (sap-ref-word sap 0)))
+        (when (and (= (logand header widetag-mask) simple-vector-widetag)
+                   (logtest header (ash vector-addr-hashing-flag array-flags-position)))
+          (setf (sap-ref-word sap (ash 3 word-shift)) (fixnumize 1)))))))
+
+(defun reorganize-core (input-pathname output-pathname &optional print)
+  (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
+    (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
+               (core-offset (read-core-header input core-header t))
+               ((npages space-list card-mask-nbits core-dir-start initfun)
+                (parse-core-header input core-header)))
+      (declare (ignorable card-mask-nbits core-dir-start))
+      (with-mapped-core (sap core-offset npages input)
+        ;; FIXME: WITH-MAPPED-CORE should bind spacemap
+        (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
+               (seen (visit-everything spacemap initfun print))
+               (oldspace (get-space dynamic-core-space-id spacemap)))
+          ;;(summarize-object-counts spacemap seen)
+          (let* ((oldspace-size (ash (space-nwords oldspace) word-shift))
+                 (newspace-mem (sb-sys:allocate-system-memory oldspace-size))
+                 (newspace (make-newspace
+                            :id dynamic-core-space-id
+                            :addr dynamic-space-start
+                            :page-table (make-array (length (space-page-table oldspace))
+                                                    :initial-element nil)
+                            :data-page 0
+                            :nwords 0))
+                 (new-spacemap (list newspace-mem newspace)))
+            (alien-funcall (extern-alien "memset" (function void system-area-pointer int unsigned))
+                           newspace-mem 0 oldspace-size)
+            ;; pass 1: assign new address per object, also copy the object over.
+            ;; But actually do two sub-passes, one to copy everything except code,
+            ;; one for code, so that all code is at the end of the space.
+            ;; FIXME: linearize lists (of conses and lockfree) just like gencgc does.
+            (dotimes (sub-pass 2)
+              (dohash ((taggedptr dummy) seen)
+                (declare (ignore dummy))
+                (when (<= (space-addr oldspace) taggedptr (space-end oldspace))
+                  (when (eq (is-code taggedptr spacemap) (eql sub-pass 1))
+                    (let* ((new-addr (reallocate (make-descriptor taggedptr)
+                                                 spacemap new-spacemap))
+                           (new-taggedptr (logior new-addr (logand taggedptr lowtag-mask))))
+                      #+nil (format t "~x -> ~x~%" taggedptr new-taggedptr)
+                      (setf (gethash taggedptr seen) new-taggedptr)))))
+              ;; Prevent sharing of funinstance pages with code from next pass
+              (let ((avail (assoc :code (newspace-available-ranges (second new-spacemap)))))
+                (setf (cdr avail) nil)))
+            ;; pass 2: visit every object again, fixing pointers
+            ;; Start by removing objects from SEEN that were not forwarded
+            (maphash (lambda (key value) (if (eq value t) (remhash key seen))) seen)
+            (fixup-compacted spacemap new-spacemap seen)
+            (setf initfun (gethash initfun seen))
+            (flet ((n (spaces)
+                     (space-next-free-page (get-space dynamic-core-space-id spaces))))
+              (format t "Compactor: n-pages was ~D, is ~D~%" (n spacemap) (n new-spacemap)))
+            ;; Shrink the page table and encode the page types as required
+            (setf (space-page-table newspace)
+                  (subseq (space-page-table newspace) 0 (space-next-free-page newspace)))
+            (dovector (pte (space-page-table newspace))
+              (setf (page-type pte) (encode-page-type (page-type pte))))
+            ;; Switch dynamic space in spacemap to that of compacted space
+            (let* ((cell (member dynamic-core-space-id (cdr spacemap) :key #'space-id))
+                   (oldspace (car cell))
+                   (oldspace-mem (space-physaddr oldspace spacemap))
+                   (nbytes (ash (space-nwords newspace) word-shift)))
+              (%byte-blt newspace-mem 0 oldspace-mem 0 nbytes)
+              ;; don't clobber the physical address translation of oldspace
+              (setf (space-data-page newspace) (space-data-page oldspace))
+              (rplaca cell newspace)))
+          (with-open-file (output output-pathname :direction :output
+                                  :element-type '(unsigned-byte 8) :if-exists :supersede)
+            (rewrite-core
+             (mapcar (lambda (space)
+                       (list 0 (space-id space) (space-physaddr space spacemap)
+                             (space-addr space) (space-nwords space)))
+                     (cdr spacemap))
+             spacemap card-mask-nbits initfun
+             core-header core-dir-start output)))))))

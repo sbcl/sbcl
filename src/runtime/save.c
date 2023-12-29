@@ -576,7 +576,6 @@ static void prepare_dynamic_space_for_final_gc(struct thread* thread)
     page_index_t i;
 
     prepare_immobile_space_for_final_gc();
-    /* TODO: external full compactor thingy for MR */
     for (i = 0; i < next_free_page; i++) {
 #ifndef LISP_FEATURE_MARK_REGION_GC
         // Compaction requires that we permit large objects to be copied henceforth.
