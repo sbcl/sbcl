@@ -157,6 +157,7 @@
 ;;; represented by a call to VALUES.
 (defknown values (&rest t) * (movable flushable))
 (defknown values-list (list) * (movable foldable unsafely-flushable))
+(defknown reverse-values-list (list index) * (movable foldable unsafely-flushable))
 
 ;;;; from the "Macros" chapter:
 
@@ -1934,7 +1935,7 @@
 (defknown %dynamic-extent-start () t)
 (defknown %special-bind (t t) t)
 (defknown %special-unbind (&rest symbol) t)
-(defknown %listify-rest-args (t index) list (flushable))
+(defknown %listify-rest-args (t index) list (flushable always-translatable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t (flushable))
 (defknown %more-kw-arg (t fixnum) (values t t))

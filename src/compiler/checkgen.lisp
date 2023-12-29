@@ -213,62 +213,71 @@
   (declare (type cast cast))
   (let ((lvar (node-lvar cast)))
     (multiple-value-bind (lvar dest) (and lvar (immediately-used-let-dest lvar cast))
-      (and (combination-p dest)
-           (or (not (combination-fun-info dest))
-               ;; fixed-args functions do not check their arguments.
-               (not (ir1-attributep (fun-info-attributes (combination-fun-info dest))
-                                    fixed-args
-                                    always-translatable)))
-           ;; The theory is that the type assertion is from a declaration on the
-           ;; callee, so the callee should be able to do the check. We want to
-           ;; let the callee do the check, because it is possible that by the
-           ;; time of call that declaration will be changed and we do not want
-           ;; to make people recompile all calls to a function when they were
-           ;; originally compiled with a bad declaration.
-           ;;
-           ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
-           ;; that occur before nodes that can cause observable side effects --
-           ;; most commonly other non-external casts: so the order in which
-           ;; possible type errors are signalled matches with the evaluation
-           ;; order.
-           ;;
-           ;; FIXME: We should let more cases be handled by the callee then we
-           ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
-           ;; This is not fixable quite here, though, because flow-analysis has
-           ;; deleted the LVAR of the cast by the time we get here, so there is
-           ;; no destination. Perhaps we should mark cases inserted by
-           ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
-           ;; deemed unreachable?
-           (cond ((and (lvar-fun-is (combination-fun dest)
-                                    '(hairy-data-vector-set/check-bounds
-                                      hairy-data-vector-ref/check-bounds
-                                      hairy-data-vector-ref
-                                      hairy-data-vector-set))
-                       (eq (car (combination-args dest)) lvar)
-                       (type= (specifier-type 'vector)
-                              (single-value-type (cast-type-to-check cast))))
-                  (change-full-call dest
-                                    (getf '(hairy-data-vector-set/check-bounds vector-hairy-data-vector-set/check-bounds
-                                            hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
-                                            hairy-data-vector-ref vector-hairy-data-vector-ref
-                                            hairy-data-vector-set vector-hairy-data-vector-set)
-                                          (lvar-fun-name (combination-fun dest) t))))
-                 #+(or arm64 x86-64)
-                 ((lvar-fun-is (combination-fun dest) '(values-list)))
-                 ;; Not great
-                 ((lvar-fun-is (combination-fun dest) '(%%primitive))
-                  (destructuring-bind (vop &rest args) (combination-args dest)
-                    (and (constant-lvar-p vop)
-                         (let ((name (vop-info-name (lvar-value vop))))
-                           (or (and (memq name '(sb-vm::overflow+t
-                                                 sb-vm::overflow-t
-                                                 sb-vm::overflow*t))
-                                    (eq lvar (car args)))
-                               (and (memq name '(sb-vm::overflow-t-y))
-                                    (eq lvar (cadr args))))))))
-                 (t
-                  (values-subtypep (lvar-externally-checkable-type lvar)
-                                   (cast-type-to-check cast))))))))
+      (cond ((and (combination-p dest)
+                  (or (not (combination-fun-info dest))
+                      ;; fixed-args functions do not check their arguments.
+                      (not (ir1-attributep (fun-info-attributes (combination-fun-info dest))
+                                           fixed-args
+                                           always-translatable)))
+                  ;; The theory is that the type assertion is from a declaration on the
+                  ;; callee, so the callee should be able to do the check. We want to
+                  ;; let the callee do the check, because it is possible that by the
+                  ;; time of call that declaration will be changed and we do not want
+                  ;; to make people recompile all calls to a function when they were
+                  ;; originally compiled with a bad declaration.
+                  ;;
+                  ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
+                  ;; that occur before nodes that can cause observable side effects --
+                  ;; most commonly other non-external casts: so the order in which
+                  ;; possible type errors are signalled matches with the evaluation
+                  ;; order.
+                  ;;
+                  ;; FIXME: We should let more cases be handled by the callee then we
+                  ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
+                  ;; This is not fixable quite here, though, because flow-analysis has
+                  ;; deleted the LVAR of the cast by the time we get here, so there is
+                  ;; no destination. Perhaps we should mark cases inserted by
+                  ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
+                  ;; deemed unreachable?
+                  (cond ((and (lvar-fun-is (combination-fun dest)
+                                           '(hairy-data-vector-set/check-bounds
+                                             hairy-data-vector-ref/check-bounds
+                                             hairy-data-vector-ref
+                                             hairy-data-vector-set))
+                              (eq (car (combination-args dest)) lvar)
+                              (type= (specifier-type 'vector)
+                                     (single-value-type (cast-type-to-check cast))))
+                         (change-full-call dest
+                                           (getf '(hairy-data-vector-set/check-bounds vector-hairy-data-vector-set/check-bounds
+                                                   hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
+                                                   hairy-data-vector-ref vector-hairy-data-vector-ref
+                                                   hairy-data-vector-set vector-hairy-data-vector-set)
+                                                 (lvar-fun-name (combination-fun dest) t))))
+                        #+(or arm64 x86-64)
+                        ((lvar-fun-is (combination-fun dest) '(values-list)))
+                        ;; Not great
+                        ((lvar-fun-is (combination-fun dest) '(%%primitive))
+                         (destructuring-bind (vop &rest args) (combination-args dest)
+                           (and (constant-lvar-p vop)
+                                (let ((name (vop-info-name (lvar-value vop))))
+                                  (or (and (memq name '(sb-vm::overflow+t
+                                                        sb-vm::overflow-t
+                                                        sb-vm::overflow*t))
+                                           (eq lvar (car args)))
+                                      (and (memq name '(sb-vm::overflow-t-y))
+                                           (eq lvar (cadr args))))))))
+                        (t
+                         (values-subtypep (lvar-externally-checkable-type lvar)
+                                          (cast-type-to-check cast))))))
+            ((and (cast-p dest)
+                  (cast-type-check dest)
+                  (if (values-type-p (cast-type-to-check dest))
+                      (values-subtypep (cast-type-to-check dest)
+                                       (lvar-derived-type lvar))
+                      (csubtypep (cast-type-to-check dest)
+                                 (lvar-type lvar))))
+             t)
+            ))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be
