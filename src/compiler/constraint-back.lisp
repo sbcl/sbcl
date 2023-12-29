@@ -32,9 +32,12 @@
                     (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
                 (flet ((int (c-interval x y)
                          (let* ((y-interval (type-approximate-interval (lvar-type y) t))
-                                (int (interval-sub c-interval y-interval)))
-                           (add x (specifier-type `(integer ,(or (interval-low int) '*)
-                                                            ,(or (interval-high int) '*)))))))
+                                (int (and c-interval y-interval
+                                          (interval-sub c-interval y-interval))))
+                           (add x (specifier-type (if int
+                                                      `(integer ,(or (interval-low int) '*)
+                                                                ,(or (interval-high int) '*))
+                                                      'integer))))))
                  (cond ((or y-integerp x-integerp)
                         (let ((interval (type-approximate-interval constraint t)))
                           (int interval y x)
@@ -67,13 +70,21 @@
                 (cond ((or y-integerp x-integerp)
                        (let ((c-interval (type-approximate-interval constraint t)))
                          (let* ((y-interval (type-approximate-interval (lvar-type y) t))
-                                (int (interval-add c-interval y-interval)))
-                           (add x (specifier-type `(integer ,(or (interval-low int) '*)
-                                                            ,(or (interval-high int) '*)))))
+                                (int (and c-interval
+                                          y-interval
+                                          (interval-add c-interval y-interval))))
+                           (add x (specifier-type (if int
+                                                      `(integer ,(or (interval-low int) '*)
+                                                                ,(or (interval-high int) '*))
+                                                      'integer))))
                          (let* ((x-interval (type-approximate-interval (lvar-type x) t))
-                                (int (interval-sub x-interval c-interval)))
-                           (add y (specifier-type `(integer ,(or (interval-low int) '*)
-                                                            ,(or (interval-high int) '*)))))))
+                                (int (and c-interval
+                                          x-interval
+                                          (interval-sub x-interval c-interval))))
+                           (add y (specifier-type (if int
+                                                      `(integer ,(or (interval-low int) '*)
+                                                                ,(or (interval-high int) '*))
+                                                      'integer))))))
                       ((or (csubtypep (lvar-type x) (specifier-type 'real))
                            (csubtypep (lvar-type y) (specifier-type 'real)))
                        (add x (specifier-type 'rational))
@@ -110,9 +121,13 @@
                        (y-rationalp (csubtypep (lvar-type y) rational-type)))
                   (flet ((int (c-interval x y)
                            (let* ((y-interval (type-approximate-interval (lvar-type y) t))
-                                  (int (interval-div c-interval y-interval)))
-                             (add x (specifier-type `(rational ,(or (interval-low int) '*)
-                                                               ,(or (interval-high int) '*)))))))
+                                  (int (and c-interval
+                                            y-interval
+                                            (interval-div c-interval y-interval))))
+                             (add x (specifier-type (if int
+                                                        `(rational ,(or (interval-low int) '*)
+                                                                   ,(or (interval-high int) '*))
+                                                        'rational))))))
                     (cond ((or y-rationalp x-rationalp)
                            (let ((interval (type-approximate-interval constraint t)))
                              (int interval y x)
