@@ -104,6 +104,8 @@ jobs:
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/cmucl.tar.bz2
         tar xf cmucl.tar.bz2
         echo '(setf ext:*gc-verbose* nil)' > ~/.cmucl-init.lisp
+        echo '(setf *batch-mode* t)' >> ~/.cmucl-init.lisp
+        echo '(setf *debugger-hook* (lambda (c fun) (princ c) (debug:backtrace) (quit nil 1)))' >> ~/.cmucl-init.lisp
         sudo apt-get -qq update | true
         sudo apt-get -qq install git-restore-mtime
       working-directory: /tmp/
@@ -112,7 +114,7 @@ jobs:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: |
         git restore-mtime
-        ./make.sh --xc-host='/tmp/cmucl/bin/lisp -batch'
+        ./make.sh --xc-host='/tmp/cmucl/bin/lisp -dynamic-space-size 1024'
     - name: archive cmucl-xc fasls
       run: tar --transform 's,^,cmucl-host/,' -cf cmucl-host-fasls.tgz obj/from-xc/
     - name: upload cmucl-xc archive
