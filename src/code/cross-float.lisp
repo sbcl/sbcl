@@ -30,7 +30,7 @@
 ;;; This choice exists because cold-init reads from "output/sxhash-calls.lisp-expr"
 ;;; using the ordinary definition of "#." which has to call the function at the car
 ;;; of a list; but warm.lisp uses a purpose-made #. reader that handles only 2
-;;; symbols, reducing the size of float-math.lisp-expr by abbreviating the float
+;;; symbols, reducing the size of xfloat-math.lisp-expr by abbreviating the float
 ;;; constructors to single-character symbols.
 (defvar *proxy-sfloat-ctor* "MAKE-SINGLE-FLOAT")
 (defvar *proxy-dfloat-ctor* "MAKE-DOUBLE-FLOAT")
@@ -278,7 +278,7 @@
     (return-from get-float-ops-cache cache))
   (let ((table (car cache)))
     (when (zerop (hash-table-count table))
-      (with-open-file (stream "float-math.lisp-expr" :if-does-not-exist nil)
+      (with-open-file (stream "xfloat-math.lisp-expr" :if-does-not-exist nil)
         (when stream
           ;; Ensure that we're reading the correct variant of the file
           ;; in case there is more than one set of floating-point formats.

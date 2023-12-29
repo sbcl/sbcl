@@ -888,7 +888,7 @@
      (when nil ; *compile-verbose*
        (funcall (intern "SHOW-INTERNED-NUMBERS" "SB-IMPL") *standard-output*))
      (when (> (hash-table-count table) (cdr memo))
-       (let ((filename "float-math.lisp-expr"))
+       (let ((filename "xfloat-math.lisp-expr"))
          (with-open-file (stream filename :direction :output
                                           :if-exists :supersede)
            (funcall (intern "DUMP-MATH-MEMOIZATION-TABLE" "SB-IMPL")

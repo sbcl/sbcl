@@ -81,7 +81,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
 ;;; Verify that compile-time floating-point math matches load-time.
 (defvar *compile-files-p*)
 (when (or (not (boundp '*compile-files-p*)) *compile-files-p*)
-  (with-open-file (stream "float-math.lisp-expr" :if-does-not-exist nil)
+  (with-open-file (stream "xfloat-math.lisp-expr" :if-does-not-exist nil)
     (when stream
       (format t "; Checking ~S~%" (pathname stream))
       ;; Ensure that we're reading the correct variant of the file
