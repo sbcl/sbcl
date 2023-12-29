@@ -550,6 +550,9 @@
            (etypecase obj ; croak on anything but these
             (symbol (sb-impl::symbol-name-hash obj))
             (sb-xc:fixnum #.(sxhash-fixnum-xform 'obj))
+            ;; calc-member-type-hash seems to want to invoke sb-xc:sxhash on
+            ;; signed zeros. I'm not sure if the answer has to match SBCL's
+            ;; answer, but this makes it so it does.
             (single-float #.(sxhash-single-float-xform 'obj))
             (double-float #.(sxhash-double-float-xform 'obj)))))
       ;; Symbol hashes are verified by CHECK-HASH-SLOT in !PACKAGE-COLD-INIT

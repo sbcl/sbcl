@@ -673,7 +673,7 @@
          ;; Inherited slots are mixed in by calling the supertype's hash function.
          (hashed-slots
           (mapcan (lambda (slot &aux (type (getf (cddr slot) :type))
-                                     (hasher (getf (cddr slot) :hasher 'clipped-sxhash))
+                                     (hasher (getf (cddr slot) :hasher 'fallback-sxhash))
                                      (comparator (getf (cddr slot) :test)))
                     (cond ((or comparator (null hasher))) ; ok
                           ((eq type 'ctype)
@@ -745,24 +745,40 @@
                              (array-type '(type-flags element-type)))
                           ,@(cdr private-ctor-args))))))))
 
-;;; The "clipped hash" is just some stable hash that may rely on the host's SXHASH
-;;; but always ensuring that the result is an unsigned fixnum for the target,
-;;; so that we can call our MIX on the value. It's needlessly tedious to fully
-;;; replicate our SXHASH on BIGNUM and RATIO which can appear in numeric bounds.
+;;; The fallback hashing function might rely on the host's SXHASH but always produces
+;;; SB-XC:FIXNUM so that we can call our MIX on the value.
+;;; It turns out that we actually have to either reimplement numeric hashing almost entirely
+;;; because some hosts produce sufficiently bad hashes that they blow up our robinhood hashset
+;;; algorithm. But unlike SB-XC:SXHASH, this function does not have to match our output.
+;;; In fact, the matching that we attempt to do on floats may be pointless.
 #+sb-xc-host
-(defun clipped-sxhash (x)
+(defun fallback-sxhash (x)
   (typecase x
-    (rational ; numeric-type high,low bound; array dimensions, etc
-     ;; All integers can fall through to the host because it would be silly to restrict
-     ;; this case to exactly (OR (AND INTEGER (NOT SB-XC:FIXNUM)) RATIO).
-     (logand (cl:sxhash x) sb-xc:most-positive-fixnum))
+    (integer
+     ;; Allthough FALLBACK-SXHASH is not required to match SBCL's SXHASH
+     ;; on a given input, it will for fixnums. Also the nested hashing calls for
+     ;; RATIO and BIGNUM may end up using SB-XC:SXHASH on fixnums, but again
+     ;; the final result need not match ours for RATIO and BIGNUM.
+     (if (typep x 'sb-xc:fixnum)
+         (sb-xc:sxhash x)
+         ;; mix target-fixnum-sized chunks
+         (let ((nbits (1+ (integer-length x))) (h #xbbbb) (pos 0))
+           (dotimes (i (ceiling nbits sb-vm:n-positive-fixnum-bits) h)
+             (let ((chunk (ldb (byte sb-vm:n-positive-fixnum-bits pos) x)))
+               (setf h (mix (fallback-sxhash chunk) h)))
+             (incf pos sb-vm:n-positive-fixnum-bits)))))
+    (ratio
+     (mix (fallback-sxhash (numerator x)) (fallback-sxhash (denominator x))))
+    (single-float (fallback-sxhash (single-float-bits x)))
+    (double-float (mix (fallback-sxhash (double-float-low-bits x))
+                       (fallback-sxhash (double-float-high-bits x))))
     (cons
      (if (eq (car x) 'satisfies)
          (sb-xc:sxhash (cadr x)) ; it's good enough
          (error "please no: ~S" x)))
     (t
      (sb-xc:sxhash x)))) ; FLOAT representation as struct, or SYMBOL
-#-sb-xc-host (defmacro clipped-sxhash (x) `(sxhash ,x))
+#-sb-xc-host (defmacro fallback-sxhash (x) `(sxhash ,x))
 
 (defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
 ;;; The final mix ensures that all bits affect the masked hash.
@@ -1079,16 +1095,13 @@
 
 (macrolet ((numbound-hash (b)
              ;; It doesn't matter what the hash of a number is, as long as it's stable.
-             ;; Use the host's SXHASH for convenience.
-             ;; We aren't obliged to fully emulate own behavior on numbers,
-             ;; but we can't trust the host to do the right thing on our proxy floats.
              `(let ((x ,b))
                 (block nil
                   (multiple-value-bind (h v)
                       (if (listp x)
                           (if x (values #x55AA55 (car x)) (return 0))
                           (values 0 x))
-                    (logxor h (#+sb-xc-host clipped-sxhash
+                    (logxor h (#+sb-xc-host fallback-sxhash
                                #-sb-xc-host sb-impl::number-sxhash v))))))
            (numbound-eql (a b)
              ;; Determine whether the 'low' and 'high' slots of two NUMERIC-TYPE instances
