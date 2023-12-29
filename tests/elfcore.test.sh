@@ -97,7 +97,7 @@ EOF
 m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lzstd") #+x86 (princ " -m32"))' --quit`
 
 (cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; make libsbcl.a)
-run_sbcl --script ../tools-for-build/editcore.lisp split \
+run_sbcl --script ../tools-for-build/elftool.lisp split \
   ${tmpcore} $TEST_DIRECTORY/elfcore-test.s
 # I guess we're going to have to hardwire the system libraries
 # until I can figure out how to get a Makefile to work, which is fine

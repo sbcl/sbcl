@@ -32,7 +32,7 @@ set -e # exit on error
 create_test_subdirectory
 temp=$TEST_DIRECTORY/$TEST_FILESTEM
 
-run_sbcl --load ../tools-for-build/editcore \
+run_sbcl --load ../tools-for-build/elftool \
   --eval '(sb-editcore:move-dynamic-code-to-text-space "../output/sbcl.core" "'${temp}'-patched.core")' \
   --eval '(sb-editcore:redirect-text-space-calls "'${temp}'-patched.core")' \
   --eval '(sb-editcore:split-core "'${temp}'-patched.core" "'${temp}'-src.s")' --quit

@@ -140,12 +140,12 @@ libsbcl.so: $(PIC_OBJS)
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
-SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
+SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/elftool.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
-	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
+	../../run-sbcl.sh --script ../../tools-for-build/elftool.lisp split \
 	--dynamic-space-size 256 ../../output/sbcl.core shrinkwrap-sbcl.s
 pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
-	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \
+	../../run-sbcl.sh --script ../../tools-for-build/elftool.lisp split --pie \
 		../../output/sbcl.core pie-shrinkwrap-sbcl.s
 # "Commas ... cannot appear in the text of an argument as written"
 # There can not be any space after the comma on the next line,
