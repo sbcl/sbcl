@@ -177,7 +177,7 @@
       (typecase node
         (ref (ref node list))
         (cast
-         (and (csubtypep (cast-asserted-type node) (specifier-type 'list))
+         (and (eq (cast-asserted-type node) (specifier-type 'list))
               (immediately-used-p list node)
               (do-uses (node (cast-value node))
                 (when (ref-p node)
