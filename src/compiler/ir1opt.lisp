@@ -2689,10 +2689,21 @@
           (setf (combination-args node) args)
           t)))))
 
-(deftransform values-list ((list) * * :node node :policy (< safety 3))
-  (if (lvar-single-value-p (node-lvar node))
-      `(car list)
-      (give-up-ir1-transform)))
+(deftransform values-list ((list) * * :node node)
+  (cond ((and (policy node (< safety 3))
+              (lvar-single-value-p (node-lvar node)))
+         `(car list))
+        ((and (vop-existsp :named reverse-values-list)
+              (lvar-matches (principal-lvar list) :fun-names '(reverse sb-impl::list-reverse))
+              (almost-immediately-used-p list (lvar-use list) :flushable t))
+         (let ((cast (lvar-use list)))
+           (when (and (cast-p cast)
+                      (eq (cast-asserted-type cast) (specifier-type 'list)))
+             (delete-cast cast))
+          (splice-fun-args (principal-lvar list) :any 1))
+         `(reverse-values-list list (length (the list list))))
+        (t
+         (give-up-ir1-transform))))
 
 ;;; PCL uses apply %listify-rest-args, probably could be changed to
 ;;; use m-v-call directly, but figuring the PCL indirections is harder

@@ -1809,6 +1809,20 @@
                        (eq (ir2-lvar-kind 2lvar) :fixed)))
              (ir2-convert-full-call node block)))))
 
+(defoptimizer (reverse-values-list ir2-convert) ((list length) node block)
+  (let* ((lvar (node-lvar node))
+         (2lvar (and lvar (lvar-info lvar))))
+    (cond ((and 2lvar
+                (eq (ir2-lvar-kind 2lvar) :unknown))
+           (let ((locs (ir2-lvar-locs 2lvar)))
+             (vop* reverse-values-list node block
+                   ((lvar-tn node block list)
+                    (lvar-tn node block length) nil)
+                   ((reference-tn-list locs t)))))
+          (t (aver (or (not 2lvar) ; i.e. we want to check the argument
+                       (eq (ir2-lvar-kind 2lvar) :fixed)))
+             (ir2-convert-full-call node block)))))
+
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
   ;; Slime is still using that argument
   (aver (and (constant-lvar-p start)

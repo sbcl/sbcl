@@ -2844,13 +2844,16 @@ is :ANY, the function name is not checked."
 ;;; Return true if LVAR's only use is a call to one of the named functions
 ;;; (or any function if none are specified) with the specified number of
 ;;; of arguments (or any number if number is not specified)
-(defun lvar-matches (lvar &key fun-names arg-count)
+(defun lvar-matches (lvar &key fun-names arg-count (notinline t))
   (let ((use (lvar-uses lvar)))
     (and (combination-p use)
          (or (not fun-names)
              (multiple-value-bind (name ok)
                  (combination-fun-source-name use nil)
-               (and ok (member name fun-names :test #'eq))))
+               (and ok
+                    (not (and notinline
+                              (fun-lexically-notinline-p name (node-lexenv use))))
+                    (member name fun-names :test #'eq))))
          (or (not arg-count)
              (= arg-count (length (combination-args use)))))))
 

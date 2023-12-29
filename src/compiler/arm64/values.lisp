@@ -146,6 +146,46 @@
       (inst sub count csp-tn start)
       (inst asr count count (- word-shift n-fixnum-tag-bits)))))
 
+(define-vop (sb-c::reverse-values-list)
+  (:args (arg :scs (descriptor-reg) :target list)
+         (length :scs (any-reg) :target count))
+  (:arg-refs arg-ref)
+  (:policy :fast-safe)
+  (:results (start :scs (any-reg) :from (:argument 0))
+            (count :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg) :from (:argument 0)) list)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:scs (non-descriptor-reg)) end)
+  (:vop-var vop)
+  (:node-var node)
+  (:save-p :compute-only)
+  (:generator 0
+    (move list arg)
+
+    (unless (eq (tn-kind start) :unused)
+      (move start csp-tn))
+    (unless (eq (tn-kind count) :unused)
+      (move count length))
+
+    (inst add csp-tn csp-tn (lsl length (- word-shift n-fixnum-tag-bits)))
+    (inst sub end csp-tn n-word-bytes)
+    (when (and (policy node (> safety 0))
+               (not (csubtypep (tn-ref-type arg-ref) (specifier-type 'list))))
+      (inst b type-check))
+    LOOP
+    (inst cmp list null-tn)
+    (loadw temp list cons-car-slot list-pointer-lowtag)
+    (inst b :eq DONE)
+    (loadw list list cons-cdr-slot list-pointer-lowtag)
+    (inst str temp (@ end (- n-word-bytes) :post-index))
+    TYPE-CHECK
+    (cond ((policy node (> safety 0))
+           (test-type list ndescr LOOP nil (list-pointer-lowtag))
+           (error-call vop 'bogus-arg-to-values-list-error list))
+          (t
+           (inst b LOOP)))
+    DONE))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.

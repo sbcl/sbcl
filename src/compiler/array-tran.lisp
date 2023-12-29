@@ -1081,7 +1081,8 @@
                                 ;; FIXME: probably don't need all 4 of these now?
                                 :fun-names '(list vector
                                              sb-impl::|List| sb-impl::|Vector|)
-                                :arg-count c-length))
+                                :arg-count c-length
+                                :notinline nil))
              (let ((parameters (eliminate-keywords))
                    (elt-vars (make-gensym-list c-length))
                    (lambda-list '(length)))
@@ -1287,9 +1288,9 @@
     ;; or (LIST* n nil). Don't care if FUN-LEXICALLY-NOTINLINE-P on those because
     ;; you can't portably observe whether they're called (tracing them isn't allowed).
     ;; XXX: minor OAOO problem, see similar logic in (VALUES-LIST OPTIMIZER).
-    (awhen (cond ((and (lvar-matches dims :fun-names '(list) :arg-count 1))
+    (awhen (cond ((and (lvar-matches dims :fun-names '(list) :arg-count 1 :notinline nil))
                   (car (splice-fun-args dims :any 1)))
-                 ((and (lvar-matches dims :fun-names '(list*) :arg-count 2)
+                 ((and (lvar-matches dims :fun-names '(list*) :arg-count 2 :notinline nil)
                        (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
                   (let* ((args (splice-fun-args dims :any 2)) ; the args to LIST*
                          (dummy (cadr args)))
