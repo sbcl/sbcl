@@ -125,6 +125,12 @@
                  ref)))
     (recurse lvar nil)))
 
+(defun lvar-lambda-var (lvar)
+  (let ((ref (principal-lvar-ref lvar)))
+    (and (ref-p ref)
+         (lambda-var-p (ref-leaf ref))
+         (ref-leaf ref))))
+
 ;;; Look through casts and variables
 (defun map-all-uses (function lvar)
   (declare (dynamic-extent function))

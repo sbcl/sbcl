@@ -153,6 +153,36 @@
       (once-only ((list `(the list ,list))) `(copy-list-macro ,list))
       (values nil t))) ; give up
 
+;;; Optimize
+;;; (loop append (cond (x
+;;;                     nil)
+;;;                    (t
+;;;                     list)))
+;;; by skipping copy-list-to from the NIL path.
+(defoptimizer (sb-impl::copy-list-to optimizer) ((list tail) copy-list)
+  (flet ((ref (ref lvar)
+           (when (and (constant-p (ref-leaf ref))
+                      (null (constant-value (ref-leaf ref)))
+                      (almost-immediately-used-p lvar ref))
+             (let ((set (node-dest copy-list)))
+               (when (and (set-p set)
+                          (eq (set-var set) (lvar-lambda-var tail))
+                          (immediately-used-p (node-lvar copy-list) copy-list))
+                 (node-ends-block set)
+                 (node-ends-block ref)
+                 (unlink-blocks (node-block ref) (car (block-succ (node-block ref))))
+                 (delete-lvar-use ref)
+                 (link-blocks (node-block ref) (car (block-succ (node-block set)))))))))
+    (do-uses (node list)
+      (typecase node
+        (ref (ref node list))
+        (cast
+         (and (csubtypep (cast-asserted-type node) (specifier-type 'list))
+              (immediately-used-p list node)
+              (do-uses (node (cast-value node))
+                (when (ref-p node)
+                  (ref node (node-lvar node))))))))))
+
 (define-source-transform append (&rest lists)
   (case (length lists)
     (0 nil)
