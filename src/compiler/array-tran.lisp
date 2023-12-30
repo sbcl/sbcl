@@ -1291,7 +1291,7 @@
     (awhen (cond ((and (lvar-matches dims :fun-names '(list) :arg-count 1 :notinline nil))
                   (car (splice-fun-args dims :any 1)))
                  ((and (lvar-matches dims :fun-names '(list*) :arg-count 2 :notinline nil)
-                       (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
+                       (lvar-value-is (second (combination-args (lvar-uses dims))) nil))
                   (let* ((args (splice-fun-args dims :any 2)) ; the args to LIST*
                          (dummy (cadr args)))
                     (flush-dest dummy)
@@ -1325,7 +1325,7 @@
                                           initial-element initial-contents call
                                           :adjustable adjustable
                                           :fill-pointer fill-pointer))
-            ((and fill-pointer (not (lvar-value-is-nil fill-pointer)))
+            ((and fill-pointer (not (lvar-value-is fill-pointer nil)))
              (give-up-ir1-transform))
             (t
              (let* ((total-size (reduce #'* dims))

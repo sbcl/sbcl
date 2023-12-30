@@ -5164,10 +5164,26 @@
                           (and fixnum (not (eql 0)))))
   `(sb-kernel::fixnum-gcd x y))
 
-(deftransforms (gcd sb-kernel::fixnum-gcd lcm) ((x y))
-  (if (same-leaf-ref-p x y)
-      '(abs x)
-      (give-up-ir1-transform)))
+(deftransforms (gcd sb-kernel::fixnum-gcd) ((x y))
+  (cond ((or (same-leaf-ref-p x y)
+             (lvar-value-is y 0))
+         '(abs x))
+        ((lvar-value-is x 0)
+         '(abs y))
+        (t
+         (give-up-ir1-transform))))
+
+(deftransform lcm ((x y))
+  (cond ((or (same-leaf-ref-p x y)
+             (csubtypep (lvar-type y) (specifier-type '(or (eql -1) (eql 1)))))
+         '(abs x))
+        ((csubtypep (lvar-type x) (specifier-type '(or (eql -1) (eql 1))))
+         '(abs y))
+        ((or (lvar-value-is x 0)
+             (lvar-value-is y 0))
+         0)
+        (t
+         (give-up-ir1-transform))))
 
 (defun derive-gcd (args)
   (let ((min)
@@ -5677,7 +5693,7 @@
           (lambda (node) (check-format-args node fun arg-n nil)))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
-  (when (lvar-value-is-nil dest)
+  (when (lvar-value-is dest nil)
     (specifier-type 'simple-string)))
 
 ;;; We disable this transform in the cross-compiler to save memory in
@@ -6272,7 +6288,7 @@
     (when (fun-type-p type)
       (let ((null-p (not (and (constant-lvar-p waitp)
                               (lvar-value waitp)
-                              (lvar-value-is-nil timeout)))))
+                              (lvar-value-is timeout nil)))))
         (if null-p
             (values-type-union (fun-type-returns type)
                                (values-specifier-type '(values null &optional)))

@@ -26,7 +26,7 @@ task:
   arm_container:
     image: gcc:latest
     cpu: 1
-    memory: 1G
+    memory: 2G
   install_script:
     - apt-get -qq update
     - apt-get -qq -y install sbcl strace

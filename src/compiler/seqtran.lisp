@@ -2059,7 +2059,7 @@
   (declare (ignore start end from-end))
   (let ((type *universal-type*)
         (key-identity-p (or (not key)
-                            (lvar-value-is-nil key)
+                            (lvar-value-is key nil)
                             (lvar-fun-is key '(identity)))))
     (flet ((fun-accepts-type (fun-lvar argument)
              (when fun-lvar
@@ -2073,7 +2073,7 @@
                  key-identity-p
                  (or (not test)
                      (lvar-fun-is test '(eq eql char= char-equal))
-                     (lvar-value-is-nil test)))
+                     (lvar-value-is test nil)))
         ;; Maybe FIND returns ITEM itself (or an EQL number).
         (setf type (lvar-type item)))
       ;; Should return something the functions can accept
@@ -2468,7 +2468,7 @@
          (not (and (lvar-single-value-p (node-lvar node))
                    (constant-lvar-p start)
                    (eql (lvar-value start) 0)
-                   (lvar-value-is-nil end)))))
+                   (lvar-value-is end nil)))))
     `(let ((find nil)
            (position nil))
        (flet ((bounds-error ()

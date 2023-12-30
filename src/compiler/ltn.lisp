@@ -175,7 +175,7 @@
                 (eq (basic-combination-fun dest) dest-lvar)
                 ;; Everything else can't handle NIL, just don't
                 ;; bother optimizing it.
-                (not (lvar-value-is-nil fun)))
+                (not (lvar-value-is fun nil)))
            (setf (basic-combination-fun dest) fun
                  (basic-combination-args node) '()
                  (lvar-dest fun) dest
