@@ -4342,12 +4342,22 @@
 
 (with-test (:name :consecutive-cast)
   (checked-compile-and-assert
-    ()
-    `(lambda (f)
-       (the fixnum (the integer (funcall f))))
-    ((#'+) 0))
+   ()
+   `(lambda (f)
+      (the fixnum (the integer (funcall f))))
+   ((#'+) 0))
   (checked-compile-and-assert
    ()
    `(lambda (a)
       (abs (catch 'c (the (satisfies eval) a))))
-   ((-1) 1)))
+   ((-1) 1))
+  (checked-compile-and-assert
+   ()
+   `(lambda (f x)
+      (the fixnum
+           (if f
+               (funcall f)
+               (the real x))))
+   ((#'* 0) 1)
+   ((nil 2) 2)))
+
