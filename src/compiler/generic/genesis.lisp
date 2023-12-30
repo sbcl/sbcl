@@ -262,10 +262,10 @@
 (defvar *read-only*)
 (defvar core-file-name)
 
+(defvar *immobile-fixedobj*) ; always defined, we can test BOUNDP on it
 #+immobile-space
 (progn
   (defvar *asm-routine-vector*)
-  (defvar *immobile-fixedobj*)
   (defvar *immobile-text*)
   (defvar *immobile-space-map* nil))
 
@@ -833,6 +833,9 @@
 
 #+compact-instance-header
 (progn
+  (defun set-simple-fun-layout (fn)
+    (let ((bits (ash (cold-layout-descriptor-bits 'function) 32)))
+      (write-wordindexed/raw fn 0 (logior (read-bits-wordindexed fn 0) bits))))
   ;; This is called to backpatch layout-of-layout into the primordial layouts.
   (defun set-instance-layout (thing layout)
     ;; High half of the header points to the layout
@@ -842,6 +845,7 @@
     (make-random-descriptor (ash (read-bits-wordindexed thing 0) -32))))
 #-compact-instance-header
 (progn
+  (defun set-simple-fun-layout (fn) (declare (ignore fn)))
   (defun set-instance-layout (thing layout)
     ;; Word following the header is the layout
     (write-wordindexed thing sb-vm:instance-slots-offset layout))
@@ -1286,8 +1290,8 @@ core and return a descriptor to it."
                      :inherits (cddr flags+depthoid+inherits))))))))
 
 (defvar *vacuous-slot-table*)
-(defvar *cold-layout-gspace* (or #+compact-instance-header '*immobile-fixedobj*
-                                 '*dynamic*))
+(defun cold-layout-gspace ()
+  (if (boundp '*immobile-fixedobj*) *immobile-fixedobj* *dynamic*))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1304,7 +1308,7 @@ core and return a descriptor to it."
                                   (or (awhen (gethash 'layout *cold-layouts*)
                                         (cold-layout-descriptor it))
                                       (make-fixnum-descriptor 0))
-                                  (symbol-value *cold-layout-gspace*)))
+                                  (cold-layout-gspace)))
          (this-id (sb-kernel::choose-layout-id name (logtest flags +condition-layout-flag+)))
          (hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))))
 
@@ -1838,8 +1842,8 @@ core and return a descriptor to it."
         (if core-file-name
             (write-slots (allocate-struct-of-type 'sb-lockless::list-node *static*)
                          :%node-next nil)
-            (let ((words (+ 1 #-compact-instance-header 1)))
-              (allocate-struct words (make-fixnum-descriptor 0) *static*))))
+            (allocate-struct (1+ sb-vm:instance-data-start)
+                             (make-fixnum-descriptor 0) *static*)))
 
   ;; Assign TLS indices of C interface symbols
   #+sb-thread
@@ -1855,13 +1859,12 @@ core and return a descriptor to it."
   (let ((t-symbol (cold-intern t :gspace *static*)))
     (cold-set t-symbol t-symbol))
 
-  ;; Establish the value of SB-VM:FUNCTION-LAYOUT
+  ;; Establish the value of SB-VM:FUNCTION-LAYOUT and **PRIMITIVE-OBJECT-LAYOUTS**
   #+compact-instance-header
+  (progn
   (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
                          sb-vm:symbol-value-slot
                          (ash (cold-layout-descriptor-bits 'function) 32))
-
-  #+compact-instance-header
   (cold-set '**primitive-object-layouts**
             (let ((filler
                    (make-random-descriptor
@@ -1878,7 +1881,7 @@ core and return a descriptor to it."
                                  ;; subtract 2 object headers + 256 words
                                  (+ 4 256)))
               (emplace-vector vector sb-vm:simple-vector-widetag 256)
-              vector))
+              vector)))
 
   ;; Immobile code on x86-64 prefers all FDEFNs adjacent so that code
   ;; can be located anywhere in the addressable memory allowed by the
@@ -2801,9 +2804,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (declare (type index header-index stack-index))
       (dotimes (fun-index (code-n-entries des))
         (let ((fn (%code-entry-point des fun-index)))
-          #+compact-instance-header
-          (write-wordindexed/raw fn 0 (logior (ash (cold-layout-descriptor-bits 'function) 32)
-                                              (read-bits-wordindexed fn 0)))
+          (set-simple-fun-layout fn)
           #+(or x86 x86-64 arm64) ; store a machine-native pointer to the function entry
           ;; note that the bit pattern looks like fixnum due to alignment
           (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
@@ -3536,9 +3537,9 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
        (output (dd structure-tag)
          (format t "struct ~A {~%" structure-tag)
          (format t "    lispobj header; // = word_0_~%")
-         ;; "self layout" slots are named '_layout' instead of 'layout' so that
-         ;; classoid's expressly declared layout isn't renamed as a special-case.
-         #-compact-instance-header (format t "    lispobj _layout;~%")
+         ;; If the user's data starts at slot index 1, then index 0 is the layout.
+         (when (= sb-vm:instance-data-start 1)
+           (format t "    lispobj _layout;~%")) ; Avoid name clash with CLASSOID-LAYOUT
          ;; Output exactly the number of Lisp words consumed by the structure,
          ;; no more, no less. C code can always compute the padded length from
          ;; the precise length, but the other way doesn't work.
@@ -3628,7 +3629,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
           "FUNCTION"
           "FIXEDOBJ"
           (- (cold-layout-descriptor-bits 'function)
-             (gspace-byte-address (symbol-value *cold-layout-gspace*))))
+             (gspace-byte-address (cold-layout-gspace))))
   ;; For immobile code on x86-64, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
   #+(and x86-64 immobile-code)
