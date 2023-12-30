@@ -4226,8 +4226,8 @@
 
 ;;;; character operations
 
-(deftransform two-arg-char-equal ((a b) (base-char base-char) *
-                                  :policy (> speed space))
+(deftransform char-equal ((a b) (base-char base-char) *
+                          :policy (> speed space))
   "open code"
   '(let* ((ac (char-code a))
           (bc (char-code b))
@@ -4251,8 +4251,8 @@
                (,op ,a ,reverse)))
         `(,op ,a ,char))))
 
-(deftransform two-arg-char-equal ((a b) (t (constant-arg character)) *
-                                  :node node)
+(deftransform char-equal ((a b) (t (constant-arg character)) *
+                          :node node)
   (transform-constant-char-equal 'a b))
 
 (deftransform char-upcase ((x) (base-char))
@@ -4309,7 +4309,7 @@
       (t (give-up-ir1-transform)))))
 
 ;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
-(deftransform two-arg-char-equal ((x y) * *)
+(deftransform char-equal ((x y) * *)
   (cond
     ((same-leaf-ref-p x y) t)
     (t (give-up-ir1-transform))))
@@ -4832,22 +4832,19 @@
 ;;;; point to avoid pessimization.
 
 ;;; This function is used for source transformation of N-arg
-;;; comparison functions other than inequality. We deal both with
-;;; converting to two-arg calls and inverting the sense of the test,
-;;; if necessary. If the call has two args, then we pass or return a
-;;; negated test as appropriate. If it is a degenerate one-arg call,
-;;; then we transform to code that returns true. Otherwise, we bind
-;;; all the arguments and expand into a bunch of IFs.
-(defun multi-compare (predicate args not-p type &optional force-two-arg-p)
+;;; comparison functions other than inequality.  If the call has two
+;;; args, then we pass or return a negated test as appropriate. If it
+;;; is a degenerate one-arg call, then we transform to code that
+;;; returns true. Otherwise, we bind all the arguments and expand into
+;;; a bunch of IFs.
+(defun multi-compare (predicate args not-p type)
   (let ((nargs (length args)))
     (cond ((< nargs 1) (values nil t))
           ((= nargs 1) `(progn (the ,type ,@args) t))
           ((= nargs 2)
            (if not-p
                `(if (,predicate ,(first args) ,(second args)) nil t)
-               (if force-two-arg-p
-                   `(,predicate ,(first args) ,(second args))
-                   (values nil t))))
+               (values nil t)))
           (t
            (do* ((i (1- nargs) (1- i))
                  (last nil current)
@@ -4888,15 +4885,15 @@
                                                             'character))
 
 (define-source-transform char-equal (&rest args)
-  (multi-compare 'two-arg-char-equal args nil 'character t))
+  (multi-compare 'char-equal args nil 'character))
 (define-source-transform char-lessp (&rest args)
-  (multi-compare 'two-arg-char-lessp args nil 'character t))
+  (multi-compare 'char-lessp args nil 'character))
 (define-source-transform char-greaterp (&rest args)
-  (multi-compare 'two-arg-char-greaterp args nil 'character t))
+  (multi-compare 'char-greaterp args nil 'character))
 (define-source-transform char-not-greaterp (&rest args)
-  (multi-compare 'two-arg-char-greaterp args t 'character t))
+  (multi-compare 'char-greaterp args t 'character))
 (define-source-transform char-not-lessp (&rest args)
-  (multi-compare 'two-arg-char-lessp args t 'character t))
+  (multi-compare 'char-lessp args t 'character))
 
 ;;; This function does source transformation of N-arg inequality
 ;;; functions such as /=. This is similar to MULTI-COMPARE in the <3
