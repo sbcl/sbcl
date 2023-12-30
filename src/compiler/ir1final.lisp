@@ -139,7 +139,6 @@
                          (values-type-intersection dtype atype)))))
               ((and (cast-p node)
                     (eq (cast-type-check node) :external))
-               (aver (basic-combination-p dest))
                (delete-filter node lvar (cast-value node))))))))
 
 (defglobal *two-arg-functions*
