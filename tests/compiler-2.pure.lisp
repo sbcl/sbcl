@@ -4339,3 +4339,15 @@
        (declare ((simple-array double-float (*)) v))
        (loop for e across v count (> e 0)))
     (((make-array 9 :element-type 'double-float :initial-element 1d0)) 9)))
+
+(with-test (:name :consecutive-cast)
+  (checked-compile-and-assert
+    ()
+    `(lambda (f)
+       (the fixnum (the integer (funcall f))))
+    ((#'+) 0))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (abs (catch 'c (the (satisfies eval) a))))
+   ((-1) 1)))

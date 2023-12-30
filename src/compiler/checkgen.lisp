@@ -271,13 +271,15 @@
                                           (cast-type-to-check cast))))))
             ((and (cast-p dest)
                   (cast-type-check dest)
-                  (if (values-type-p (cast-type-to-check dest))
-                      (values-subtypep (cast-type-to-check dest)
-                                       (lvar-derived-type lvar))
-                      (csubtypep (cast-type-to-check dest)
-                                 (lvar-type lvar))))
-             t)
-            ))))
+                  (cond ((and (values-type-p (cast-asserted-type dest))
+                              (values-type-p (cast-asserted-type cast)))
+                         (values-subtypep (cast-asserted-type dest)
+                                          (cast-asserted-type cast)))
+                        ((not (or (values-type-p (cast-asserted-type dest))
+                                  (values-type-p (cast-asserted-type cast))))
+                         (csubtypep (cast-asserted-type dest)
+                                    (cast-asserted-type cast)))))
+             t)))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be
@@ -502,47 +504,47 @@
         (when (and (block-type-check block)
                    (not (block-delete-p block)))
           ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
-          (do-nodes-backwards (node nil block)
-            (when (and (cast-p node)
-                       (cast-type-check node))
-              (cast-check-uses node)
-              (cond ((cast-externally-checkable-p node)
-                     (setf (cast-%type-check node) :external))
+          (do-nodes-backwards (cast nil block)
+            (when (and (cast-p cast)
+                       (cast-type-check cast))
+              (cast-check-uses cast)
+              (cond ((cast-externally-checkable-p cast)
+                     (setf (cast-%type-check cast) :external))
                     (t
                      ;; it is possible that NODE was marked :EXTERNAL by
                      ;; the previous pass
-                     (setf (cast-%type-check node) t)
-                     (casts node)))))
-          (setf (block-type-check block) nil)))
-      (dolist (cast (casts))
-        (unless (bound-cast-p cast)
-          (multiple-value-bind (check types) (cast-check-types cast)
-            (ecase check
-              (:simple
-               (convert-type-check cast types)
-               (setf generated t))
-              (:too-hairy
-               (when (policy cast (>= safety inhibit-warnings))
-                 (let* ((*compiler-error-context* cast)
-                       (type (cast-asserted-type cast))
-                       (value-type (coerce-to-values type)))
-                   (compiler-notify
-                    "Type assertion too complex to check:~@
+                     (setf (cast-%type-check cast) t)
+                     (unless (bound-cast-p cast)
+                       (multiple-value-bind (check types) (cast-check-types cast)
+                         (ecase check
+                           (:simple
+                            (casts (cons cast types))
+                            (setf generated t))
+                           (:too-hairy
+                            (when (policy cast (>= safety inhibit-warnings))
+                              (let* ((*compiler-error-context* cast)
+                                     (type (cast-asserted-type cast))
+                                     (value-type (coerce-to-values type)))
+                                (compiler-notify
+                                 "Type assertion too complex to check:~@
                     ~/sb-impl:print-type/.~a"
-                    type
-                    (cond ((values-type-rest value-type)
-                           (format nil
-                                   "~%It allows an unknown number of values, consider using~@
+                                 type
+                                 (cond ((values-type-rest value-type)
+                                        (format nil
+                                                "~%It allows an unknown number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                   (make-values-type (values-type-required value-type)
-                                                     (values-type-optional value-type))))
-                          ((values-type-optional value-type)
-                           (format nil
-                                   "~%It allows a variable number of values, consider using~@
+                                                (make-values-type (values-type-required value-type)
+                                                                  (values-type-optional value-type))))
+                                       ((values-type-optional value-type)
+                                        (format nil
+                                                "~%It allows a variable number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                   (make-values-type (append (values-type-required value-type)
-                                                             (values-type-optional value-type)))))
-                          ("")))))
-               (setf (cast-type-to-check cast) *wild-type*)
-               (setf (cast-%type-check cast) nil)))))))
+                                                (make-values-type (append (values-type-required value-type)
+                                                                          (values-type-optional value-type)))))
+                                       ("")))))
+                            (setf (cast-type-to-check cast) *wild-type*)
+                            (setf (cast-%type-check cast) nil)))))))))
+          (setf (block-type-check block) nil)))
+      (loop for (cast . types) in (casts)
+            do (convert-type-check cast types)))
     generated))
