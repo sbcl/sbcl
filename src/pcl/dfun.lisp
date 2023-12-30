@@ -202,11 +202,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                 (slot-definition-location slot)))))
     (setf *standard-slot-locations* new)))
 
-(defun maybe-update-standard-slot-locations (class)
-  (when (and (eq **boot-state** 'complete)
-             (memq (class-name class) +standard-classes+))
-    (compute-standard-slot-locations)))
-
 (defun standard-slot-value (object slot-name class)
   (declare (notinline standard-instance-access
                       funcallable-standard-instance-access))

@@ -1111,9 +1111,7 @@
             (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
       (style-warn-about-duplicate-slots class)
-      (setf (slot-value class 'finalized-p) t)
-      (unless (eq owrapper nwrapper)
-        (maybe-update-standard-slot-locations class)))))
+      (setf (slot-value class 'finalized-p) t))))
 
 (defun update-gf-dfun (class gf)
   (let ((*new-class* class)
