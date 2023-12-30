@@ -62,7 +62,7 @@
                  (digit-char -1)
                  (digit-char 4 1)
                  (digit-char 4 37)
-                 (sb-int:two-arg-char-equal 10 10)))
+                 (char-equal 10 10)))
    (assert-error (apply (car form) (mapcar 'eval (cdr form))) type-error)))
 
 ;; All of the inequality predicates when called out-of-line

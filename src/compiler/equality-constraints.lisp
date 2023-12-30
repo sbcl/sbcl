@@ -114,7 +114,7 @@
 
 (defun inherit-equality-p (new from not-p)
   (case new
-    ((char= two-arg-char-equal . #.+eq-ops+)
+    ((char= char-equal . #.+eq-ops+)
      (unless not-p
        from))
     (<
@@ -238,7 +238,7 @@
                                  consequent-constraints
                                  alternative-constraints)
   (case operator
-    ((char= two-arg-char-equal > <  <= >=
+    ((char= char-equal > <  <= >=
             . #.+eq-ops+)
      (when (= (length args) 2)
        (add-equality-constraint operator (first args) (second args)
@@ -333,7 +333,7 @@
                                   ((> <)
                                    (unless not-p
                                      (return nil)))
-                                  ((= <= >= two-arg-char-equal)
+                                  ((= <= >= char-equal)
                                    (when not-p
                                      (return nil))))))
     :give-up))
@@ -348,7 +348,7 @@
                                   ((> <)
                                    (unless not-p
                                      (return nil)))
-                                  ((= <= >= two-arg-char-equal)
+                                  ((= <= >= char-equal)
                                    (when not-p
                                      (return nil))))))
     :give-up))
@@ -391,17 +391,17 @@
                                 (case op
                                   ((char= eq eql)
                                    (return (not not-p)))
-                                  (two-arg-char-equal
+                                  (char-equal
                                    (when not-p
                                      (return nil))))))
     :give-up))
 
-(defoptimizer (two-arg-char-equal equality-constraint) ((x y)  node gen)
+(defoptimizer (char-equal equality-constraint) ((x y)  node gen)
   (block nil
     (map-equality-constraints x y gen
                               (lambda (op not-p)
                                 (case op
-                                  (two-arg-char-equal
+                                  (char-equal
                                    (return (not not-p)))
                                   ((char= eq eql)
                                    (unless not-p

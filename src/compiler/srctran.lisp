@@ -4585,7 +4585,7 @@
                         ((both-csubtypep 'pathname)
                          '(pathname= x y))
                         ((both-csubtypep 'character)
-                         '(two-arg-char-equal x y))
+                         '(char-equal x y))
                         ((both-csubtypep 'number)
                          '(= x y))
                         ((both-csubtypep 'hash-table)
