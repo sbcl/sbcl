@@ -4359,5 +4359,17 @@
                (funcall f)
                (the real x))))
    ((#'* 0) 1)
-   ((nil 2) 2)))
+   ((nil 2) 2))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (x)
+      (the vector (the array x)))
+   ((1) (condition 'type-error)))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (x)
+      (let ((m (the array x)))
+        (values (the vector m)
+                m)))
+   ((1) (condition 'type-error))))
 

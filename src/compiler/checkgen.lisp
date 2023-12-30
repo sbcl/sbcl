@@ -162,7 +162,9 @@
                                  (singleton-p (mv-combination-args dest)))
                             (let ((fun-ref (lvar-use (mv-combination-fun dest))))
                               (length (lambda-vars (ref-leaf fun-ref)))))))
-         (n-required (length (values-type-required dtype))))
+         (n-required (if (eq dtype *wild-type*)
+                         (return-from cast-check-types (values :too-hairy nil))
+                         (length (values-type-required dtype)))))
     (aver (not (eq ctype *wild-type*)))
     (cond ((and (null (values-type-optional dtype))
                 (not (values-type-rest dtype)))
@@ -204,7 +206,7 @@
             (loop for ref in refs
                   for lvar = (node-lvar ref)
                   when (and (almost-immediately-used-p lvar (lambda-bind fun)))
-                  do (return (values lvar (lvar-dest lvar)))))
+                  do (return (values lvar (lvar-dest lvar) ref))))
           (values lvar dest)))))
 
 ;;; Return T is the cast appears to be from the declaration of the callee,
@@ -212,7 +214,7 @@
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
   (let ((lvar (node-lvar cast)))
-    (multiple-value-bind (lvar dest) (and lvar (immediately-used-let-dest lvar cast))
+    (multiple-value-bind (lvar dest ref) (and lvar (immediately-used-let-dest lvar cast))
       (cond ((and (combination-p dest)
                   (or (not (combination-fun-info dest))
                       ;; fixed-args functions do not check their arguments.
@@ -279,6 +281,11 @@
                                   (values-type-p (cast-asserted-type cast))))
                          (csubtypep (cast-asserted-type dest)
                                     (cast-asserted-type cast)))))
+             (let ((type (lvar-derived-type (cast-value cast))))
+               (derive-node-type cast type :from-scratch t)
+               (when ref
+                 (setf (lambda-var-type (ref-leaf ref)) (single-value-type type))
+                 (derive-node-type ref type :from-scratch t)))
              dest)))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
