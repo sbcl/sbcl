@@ -383,13 +383,10 @@
   (= (logand lowtag 3) sb-vm:other-immediate-0-lowtag))
 
 (defstruct (descriptor
-            (:constructor make-descriptor (bits &optional gspace byte-offset))
+            (:constructor make-descriptor (bits &optional %gspace))
             (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
-  (gspace nil :type (or gspace null))
-  ;; the offset in bytes (discounting the lowtag) from the start of GSPACE,
-  ;; or NIL if not set yet
-  (byte-offset nil :type (or sb-vm:word null))
+  (%gspace nil :type (or gspace null))
   (bits 0 :read-only t :type (unsigned-byte #.sb-vm:n-machine-word-bits)))
 
 (declaim (inline descriptor=))
@@ -405,8 +402,12 @@
 (defun descriptor-widetag (des)
   (logand (read-bits-wordindexed des 0) sb-vm:widetag-mask))
 
+(declaim (inline descriptor-base-address))
 (defun descriptor-base-address (des)
   (logandc2 (descriptor-bits des) sb-vm:lowtag-mask))
+(defun descriptor-byte-offset (des)
+  (- (descriptor-base-address des) (gspace-byte-address (descriptor-gspace des))))
+
 (defmethod print-object ((des descriptor) stream)
   (print-unreadable-object (des stream :type t)
     (let ((lowtag (descriptor-lowtag des))
@@ -434,7 +435,7 @@
   (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
                             sb-vm:word-shift))
          (ptr (+ (gspace-byte-address gspace) relative-ptr))
-         (des (make-descriptor (logior ptr lowtag) gspace relative-ptr)))
+         (des (make-descriptor (logior ptr lowtag) gspace)))
     (awhen (gspace-objects gspace) (vector-push-extend des it))
     des))
 
@@ -627,15 +628,13 @@
 
 ;;; common idioms
 (defun descriptor-mem (des)
-  (gspace-data (descriptor-intuit-gspace des)))
+  (gspace-data (descriptor-gspace des)))
 
-;;; If DESCRIPTOR-GSPACE is already set, just return that. Otherwise,
-;;; figure out a GSPACE which corresponds to DES, set it into
-;;; (DESCRIPTOR-GSPACE DES), set a consistent value into
-;;; (DESCRIPTOR-BYTE-OFFSET DES), and return the GSPACE.
-(declaim (ftype (function (descriptor) gspace) descriptor-intuit-gspace))
-(defun descriptor-intuit-gspace (des)
-  (or (descriptor-gspace des)
+;;; If DESCRIPTOR-%GSPACE is already set, just return that. Otherwise,
+;;; figure out a GSPACE which corresponds to DES, and memoize and return it.
+(declaim (ftype (function (descriptor) gspace) descriptor-gspace))
+(defun descriptor-gspace (des)
+  (or (descriptor-%gspace des)
 
       ;; gspace wasn't set, now we have to search for it.
       (let* ((lowtag (descriptor-lowtag des))
@@ -658,14 +657,10 @@
                     (and (eq gspace *read-only*) ; KLUDGE
                          (<= sb-vm:read-only-space-start abs-addr
                              sb-vm:read-only-space-end)))
-            ;; Update the descriptor with the correct gspace and the
-            ;; offset within the gspace and return the gspace.
-            (setf (descriptor-byte-offset des)
-                  (- abs-addr (gspace-byte-address gspace)))
-            (return (setf (descriptor-gspace des) gspace)))))))
+            (return (setf (descriptor-%gspace des) gspace)))))))
 
 (defun descriptor-gspace-name (des)
-  (gspace-name (descriptor-intuit-gspace des)))
+  (gspace-name (descriptor-gspace des)))
 
 (defun %fixnum-descriptor-if-possible (num)
   (and (typep num `(signed-byte ,sb-vm:n-fixnum-bits))
@@ -752,8 +747,7 @@
 (defun write-header-word (des header-word)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
   (let* ((gen (or #+immobile-space
-                  (let ((gspace (descriptor-intuit-gspace des)))
-                    (aver gspace)
+                  (let ((gspace (descriptor-gspace des)))
                     (when (or (eq gspace *immobile-fixedobj*)
                               (eq gspace *immobile-text*))
                       sb-vm:+pseudo-static-generation+))
