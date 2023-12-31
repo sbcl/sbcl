@@ -205,16 +205,16 @@
                  (refs (leaf-refs var)))
             (loop for ref in refs
                   for lvar = (node-lvar ref)
-                  when (and (almost-immediately-used-p lvar (lambda-bind fun)))
-                  do (return (values lvar (lvar-dest lvar) ref))))
-          (values lvar dest)))))
+                  when (and lvar (almost-immediately-used-p lvar (lambda-bind fun)))
+                  do (return (values (lvar-dest lvar) lvar))))
+          (values dest lvar)))))
 
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
   (let ((lvar (node-lvar cast)))
-    (multiple-value-bind (lvar dest ref) (and lvar (immediately-used-let-dest lvar cast))
+    (multiple-value-bind (dest lvar) (and lvar (immediately-used-let-dest lvar cast))
       (cond ((and (combination-p dest)
                   (or (not (combination-fun-info dest))
                       ;; fixed-args functions do not check their arguments.
@@ -273,6 +273,7 @@
                                           (cast-type-to-check cast))))))
             ((and (cast-p dest)
                   (cast-type-check dest)
+                  (atom (lvar-uses (node-lvar cast)))
                   (cond ((and (values-type-p (cast-asserted-type dest))
                               (values-type-p (cast-asserted-type cast)))
                          (values-subtypep (cast-asserted-type dest)
@@ -281,12 +282,10 @@
                                   (values-type-p (cast-asserted-type cast))))
                          (csubtypep (cast-asserted-type dest)
                                     (cast-asserted-type cast)))))
-             (let ((type (lvar-derived-type (cast-value cast))))
-               (derive-node-type cast type :from-scratch t)
-               (when ref
-                 (setf (lambda-var-type (ref-leaf ref)) (single-value-type type))
-                 (derive-node-type ref type :from-scratch t)))
-             dest)))))
+             (setf (cast-asserted-type cast) (cast-asserted-type dest)
+                   (cast-type-to-check cast) (cast-type-to-check dest)
+                   (cast-%type-check dest) nil)
+             nil)))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be
@@ -505,8 +504,7 @@
 ;;; which may lead to inappropriate template choices due to the
 ;;; modification of argument types.
 (defun generate-type-checks (component)
-  (let (generated
-        checkable-casts)
+  (let (generated)
     (collect ((casts))
       (do-blocks (block component)
         (when (and (block-type-check block)
@@ -518,8 +516,6 @@
               (cast-check-uses node)
               (let ((external (cast-externally-checkable-p node)))
                 (cond (external
-                       (when (cast-p external)
-                         (push node (getf checkable-casts external)))
                        (setf (cast-%type-check node) :external))
                       (t
                        ;; it is possible that NODE was marked :EXTERNAL by
@@ -527,44 +523,39 @@
                        (setf (cast-%type-check node) t)
                        (casts node))))))
           (setf (block-type-check block) nil)))
-      (loop with casts = (casts)
-            while casts
-            do
-            (let ((cast (pop casts)))
-              (unless (bound-cast-p cast)
-                (multiple-value-bind (check types) (cast-check-types cast)
-                  (ecase check
-                    (:simple
-                     (convert-type-check cast types)
-                     (setf generated t))
-                    (:too-hairy
-                     (when (policy cast (>= safety inhibit-warnings))
-                       (let* ((*compiler-error-context* cast)
-                              (type (cast-asserted-type cast))
-                              (value-type (coerce-to-values type)))
-                         (compiler-notify
-                          "Type assertion too complex to check:~@
+      (dolist (cast (casts))
+        (unless (or (bound-cast-p cast)
+                    ;; Disabled by cast-externally-checkable-p of a different cast.
+                    (not (cast-type-check cast)))
+          (multiple-value-bind (check types) (cast-check-types cast)
+            (ecase check
+              (:simple
+               (convert-type-check cast types)
+               (setf generated t))
+              (:too-hairy
+               (when (policy cast (>= safety inhibit-warnings))
+                 (let* ((*compiler-error-context* cast)
+                        (type (cast-asserted-type cast))
+                        (value-type (coerce-to-values type)))
+                   (compiler-notify
+                    "Type assertion too complex to check:~@
                     ~/sb-impl:print-type/.~a"
-                          type
-                          (cond ((values-type-rest value-type)
-                                 (format nil
-                                         "~%It allows an unknown number of values, consider using~@
+                    type
+                    (cond ((values-type-rest value-type)
+                           (format nil
+                                   "~%It allows an unknown number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                         (make-values-type (values-type-required value-type)
-                                                           (values-type-optional value-type))))
-                                ((values-type-optional value-type)
-                                 (format nil
-                                         "~%It allows a variable number of values, consider using~@
+                                   (make-values-type (values-type-required value-type)
+                                                     (values-type-optional value-type))))
+                          ((values-type-optional value-type)
+                           (format nil
+                                   "~%It allows a variable number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                         (make-values-type (append (values-type-required value-type)
-                                                                   (values-type-optional value-type)))))
-                                ("")))))
+                                   (make-values-type (append (values-type-required value-type)
+                                                             (values-type-optional value-type)))))
+                          ("")))))
 
-                     (setf (cast-type-to-check cast) *wild-type*)
-                     (setf (cast-%type-check cast) nil)
-                     ;; Emit casts that thought this one would do their job
-                     (let ((dependent (getf checkable-casts cast)))
-                       (loop for cast in dependent
-                             do (push cast casts))))))))))
+               (setf (cast-type-to-check cast) *wild-type*)
+               (setf (cast-%type-check cast) nil)))))))
     generated))
 

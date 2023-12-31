@@ -4371,5 +4371,16 @@
       (let ((m (the array x)))
         (values (the vector m)
                 m)))
-   ((1) (condition 'type-error))))
+   ((1) (condition 'type-error)))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (c d m)
+      (declare (type fixnum c d m))
+      (the (and unsigned-byte fixnum)
+           (values
+            (let ((v (logxor c -7322529 d 9223372036854775805)))
+              (if (> v 0)
+                  (the unsigned-byte m)
+                  (logior 80827861226 v))))))
+   ((-3462512952 -77 0) (condition 'type-error))))
 
