@@ -1252,19 +1252,20 @@
                     (fixnumize c-linkage-reserved-words))
               ;; Transport code contiguously into new space
               (transport-dynamic-space-code codeblobs spacemap new-space reserved-amount)
-              ;; Walk static space and dynamic-space changing any pointers that
+              ;; Walk spaces except for newspace, changing any pointers that
               ;; should point to new space.
-              (dolist (space-id `(,dynamic-core-space-id ,static-core-space-id))
-                (let* ((space (get-space space-id spacemap))
-                       (vaddr (space-addr space))
-                       (paddr (space-physaddr space spacemap))
-                       (diff (+ (- (sap-int paddr)) vaddr)))
+              (dolist (space-id `(,dynamic-core-space-id ,static-core-space-id
+                                  ,permgen-core-space-id))
+                (binding* ((space (get-space space-id spacemap) :exit-if-null)
+                           (vaddr (space-addr space))
+                           (paddr (space-physaddr space spacemap))
+                           (diff (+ (- (sap-int paddr)) vaddr)))
                   (format nil "~&Fixing ~A~%" space)
                   (walk-target-space
-                    (lambda (object widetag size)
-                      (declare (ignore widetag size))
-                      (unless (and (code-component-p object) (= space-id dynamic-core-space-id))
-                        (update-quasi-static-code-ptrs object spacemap fwdmap diff)))
+                   (lambda (object widetag size)
+                     (declare (ignore widetag size))
+                     (unless (and (code-component-p object) (= space-id dynamic-core-space-id))
+                       (update-quasi-static-code-ptrs object spacemap fwdmap diff)))
                    space-id spacemap)))
               ;; Walk new space and fix pointers into itself
               (format nil "~&Fixing newspace~%")
@@ -1429,15 +1430,18 @@
   (with-alien ((primitive-object-size (function unsigned system-area-pointer) :extern))
     (alien-funcall primitive-object-size sap)))
 
-(macrolet ((layout-index ()
-             `(ash (ecase widetag
-                     (#.funcallable-instance-widetag 5) ; KLUDGE
-                     (#.instance-widetag 1))
-                   word-shift)))
+(defmacro get-layout (sap widetag)
+  (declare (ignorable widetag))
+  ;; FIXME: should depend on target feature, not host feature
+  #.(if (member :compact-instance-header sb-impl:+internal-features+)
+        '`(sap-ref-32 ,sap 4)
+        '`(sap-ref-word ,sap (ash (ecase ,widetag
+                                    (,funcallable-instance-widetag 5) ; KLUDGE
+                                    (,instance-widetag 1))
+                                  word-shift))))
 (defun set-layout (instance-sap widetag layout-bits)
-  (setf (sap-ref-word instance-sap (layout-index)) layout-bits))
-(defun get-layout (instance-sap widetag)
-  (sap-ref-word instance-sap (layout-index))))
+  (declare (ignorable widetag))
+  (setf (get-layout instance-sap widetag) layout-bits))
 
 ;;; Return T if WIDETAG is for a pointerless object.
 (defun leafp (widetag)
@@ -1597,19 +1601,22 @@
 (defun was-visitedp (hashset obj) (gethash (descriptor-bits obj) hashset))
 
 (defun call-with-each-static-object (function spacemap)
-  (Declare (function function))
-  (let* ((space (get-space static-core-space-id spacemap))
-         (physaddr (space-physaddr space spacemap))
-         (limit (sap+ physaddr (ash (space-nwords space) word-shift))))
-    (do ((object (sap+ (compute-nil-symbol-sap spacemap) (ash 7 word-shift)) ; KLUDGE
-                 (sap+ object (size-of object))))
-        ((sap>= object limit))
-      ;; There are no static cons cells
-      (let ((lowtag (logand (deref (extern-alien "widetag_lowtag" (array char 256))
-                                   (sap-ref-8 object 0))
-                            lowtag-mask)))
-        (funcall function (make-descriptor (+ (space-addr space) (sap- object physaddr)
-                                              lowtag)))))))
+  (declare (function function))
+  (dolist (id `(,static-core-space-id ,permgen-core-space-id))
+    (binding* ((space (get-space id spacemap) :exit-if-null)
+               (physaddr (space-physaddr space spacemap))
+               (limit (sap+ physaddr (ash (space-nwords space) word-shift))))
+      (do ((object (if (= id static-core-space-id)
+                       (sap+ (compute-nil-symbol-sap spacemap) (ash 7 word-shift)) ; KLUDGE
+                       (sap+ physaddr (ash (+ 256 2) word-shift))) ; KLUDGE
+                   (sap+ object (size-of object))))
+          ((sap>= object limit))
+        ;; There are no static cons cells
+        (let ((lowtag (logand (deref (extern-alien "widetag_lowtag" (array char 256))
+                                     (sap-ref-8 object 0))
+                              lowtag-mask)))
+          (funcall function (make-descriptor (+ (space-addr space) (sap- object physaddr)
+                                                lowtag))))))))
 
 ;;; Gather all the objects in the order we want to reallocate them in.
 ;;; This relies on MAPHASH in SBCL iterating in insertion order.

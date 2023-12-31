@@ -258,6 +258,7 @@
 ;;; copying GC is in use), then only the active dynamic space gets
 ;;; dumped to core.
 (defvar *dynamic*)
+(defvar *permgen*)
 (defvar *static*)
 (defvar *read-only*)
 (defvar core-file-name)
@@ -637,6 +638,7 @@
           (error "don't even know how to look for a GSPACE for ~S" des))
 
         (dolist (gspace (list *dynamic* *static* *read-only*
+                              #+permgen *permgen*
                               #+immobile-space *immobile-fixedobj*
                               #+immobile-space *immobile-text*)
                  (error "couldn't find a GSPACE for ~S" des))
@@ -1280,7 +1282,9 @@ core and return a descriptor to it."
 
 (defvar *vacuous-slot-table*)
 (defun cold-layout-gspace ()
-  (if (boundp '*immobile-fixedobj*) *immobile-fixedobj* *dynamic*))
+  (cond ((boundp '*permgen*) *permgen*)
+        ((boundp '*immobile-fixedobj*) *immobile-fixedobj*)
+        (t *dynamic*)))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1855,6 +1859,12 @@ core and return a descriptor to it."
                          sb-vm:symbol-value-slot
                          (ash (cold-layout-descriptor-bits 'function) 32))
   (cold-set '**primitive-object-layouts**
+            #+permgen
+            (emplace-vector (make-random-descriptor
+                             (logior (gspace-byte-address *permgen*)
+                                     sb-vm:other-pointer-lowtag))
+                            sb-vm:simple-vector-widetag 256)
+            #+immobile-space
             (let ((filler
                    (make-random-descriptor
                     (logior (gspace-byte-address *immobile-fixedobj*)
@@ -1869,8 +1879,7 @@ core and return a descriptor to it."
                               (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
                                  ;; subtract 2 object headers + 256 words
                                  (+ 4 256)))
-              (emplace-vector vector sb-vm:simple-vector-widetag 256)
-              vector)))
+              (emplace-vector vector sb-vm:simple-vector-widetag 256))))
 
   ;; Immobile code on x86-64 prefers all FDEFNs adjacent so that code
   ;; can be located anywhere in the addressable memory allowed by the
@@ -3612,7 +3621,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
   #+compact-instance-header
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(~A_SPACE_START+0x~x)~%~}"
           "FUNCTION"
-          "FIXEDOBJ"
+          #+permgen "PERMGEN" #-permgen "FIXEDOBJ"
           (- (cold-layout-descriptor-bits 'function)
              (gspace-byte-address (cold-layout-gspace))))
   ;; For immobile code on x86-64, define a constant for the address of the vector of
@@ -3956,6 +3965,7 @@ III. initially undefined function references (alphabetically):
       ;; Write the Directory entry header.
       (write-words core-file directory-core-entry-type-code)
       (let ((spaces `(,*static*
+                      #+permgen ,*permgen*
                       #+immobile-space ,@`(,*immobile-fixedobj* ,*immobile-text*)
                       ,*dynamic* ,*read-only*)))
         ;; length = (5 words/space) * N spaces + 2 for header.
@@ -4061,6 +4071,10 @@ III. initially undefined function references (alphabetically):
            (*immobile-text*
             (make-gspace :immobile-text immobile-text-core-space-id sb-vm:text-space-start
                          :objects (make-array 20000 :fill-pointer 0 :adjustable t)))
+           #+permgen
+           (*permgen*
+            (make-gspace :permgen permgen-core-space-id sb-vm:permgen-space-start
+                         :free-word-index (+ sb-vm:vector-data-offset 256)))
            (*dynamic*
             (make-gspace :dynamic dynamic-core-space-id sb-vm:dynamic-space-start
                          :page-table (make-array 100 :adjustable t :initial-element nil)))

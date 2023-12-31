@@ -584,6 +584,9 @@ static void relocate_heap(struct heap_adjust* adj)
 #endif
     relocate_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, adj);
     relocate_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
+#ifdef LISP_FEATURE_PERMGEN_SPACE
+    relocate_space(PERMGEN_SPACE_START, permgen_space_free_pointer, adj);
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
 #endif
@@ -803,6 +806,7 @@ process_directory(int count, struct ndir_entry *entry,
                 READ_ONLY_SPACE_START = READ_ONLY_SPACE_END = addr;
             }
         }
+        if (id == PERMGEN_CORE_SPACE_ID) PERMGEN_SPACE_START = addr;
         if (len != 0) {
             spaces[id].len = len;
             size_t request = spaces[id].desired_size;
@@ -1323,6 +1327,10 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     struct coreparse_space defined_spaces[] = {
         {READ_ONLY_CORE_SPACE_ID, 0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
         {STATIC_CORE_SPACE_ID, 0, 0, STATIC_SPACE_START, &static_space_free_pointer},
+#ifdef LISP_FEATURE_PERMGEN
+        {PERMGEN_CORE_SPACE_ID, PERMGEN_SPACE_SIZE, 0,
+         PERMGEN_SPACE_START, &permgen_space_free_pointer},
+#endif
 #ifdef LISP_FEATURE_DARWIN_JIT
         {STATIC_CODE_CORE_SPACE_ID, 0, 0, STATIC_CODE_SPACE_START, &static_code_space_free_pointer},
 #endif

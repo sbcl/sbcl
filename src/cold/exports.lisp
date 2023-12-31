@@ -631,6 +631,8 @@ structure representations")
            #+win32 "CONTEXT-RESTORE-TRAP"
            "ZERO-SC-NUMBER")
   (:export "TEXT-SPACE-START" "*TEXT-SPACE-FREE-POINTER*")
+  #+permgen
+  (:export "*PERMGEN-SPACE-FREE-POINTER*" "PERMGEN-SPACE-START" "PERMGEN-SPACE-SIZE")
   #+immobile-space
   (:export
    "IMMOBILE-CARD-BYTES"

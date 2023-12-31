@@ -16,6 +16,7 @@
            #:dynamic-core-space-id
            #:immobile-fixedobj-core-space-id
            #:immobile-text-core-space-id
+           #:permgen-core-space-id
            #:alien-linkage-table-core-space-id
            #:thread-struct-core-space-id
            #:deflated-core-space-id-flag))
@@ -53,6 +54,7 @@
 (defconstant read-only-core-space-id 3)
 (defconstant immobile-fixedobj-core-space-id 4)
 (defconstant immobile-text-core-space-id 5)
+(defconstant permgen-core-space-id 6)
 (defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)
 ;;; These space-IDs are not present in a core file, but

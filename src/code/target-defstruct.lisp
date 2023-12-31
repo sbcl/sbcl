@@ -13,6 +13,23 @@
 
 ;;;; structure frobbing primitives
 
+#+permgen
+(defun allocate-permgen-layout (nwords)
+  (flet ((thunk ()
+           (let ((freeptr sb-vm:*permgen-space-free-pointer*))
+             (setf sb-vm:*permgen-space-free-pointer*
+                   ;; round-to-odd, add the header word
+                   (sap+ freeptr (ash (1+ (logior nwords 1)) sb-vm:word-shift)))
+             (aver (<= (sap-int sb-vm:*permgen-space-free-pointer*)
+                       (+ sb-vm:permgen-space-start sb-vm:permgen-space-size)))
+             (setf (sap-ref-word freeptr 0)
+                   (logior (ash nwords sb-vm:instance-length-shift)
+                           sb-vm:instance-widetag))
+             (%make-lisp-obj (sap-int (sap+ freeptr sb-vm:instance-pointer-lowtag))))))
+    (if (sb-thread::mutex-p sb-vm::*allocator-mutex*)
+        (with-system-mutex (sb-vm::*allocator-mutex* :without-gcing t) (thunk))
+        (thunk))))
+
 ;;; For lack of any better to place to write up some detail surrounding
 ;;; layout creation for structure types, I'm putting here.
 ;;; When you issue a DEFSTRUCT at the REPL, there are *three* instances
@@ -44,10 +61,13 @@
          (layout
           (truly-the layout
                      #+compact-instance-header
-                     (sb-vm::alloc-immobile-fixedobj
-                      (1+ nwords)
-                      (logior (ash nwords sb-vm:instance-length-shift)
-                              sb-vm:instance-widetag))
+                     (progn
+                       #+permgen (allocate-permgen-layout nwords)
+                       #+immobile-space
+                       (sb-vm::alloc-immobile-fixedobj
+                        (1+ nwords)
+                        (logior (ash nwords sb-vm:instance-length-shift)
+                                sb-vm:instance-widetag)))
                      #-compact-instance-header
                      (%make-instance/mixed nwords))))
     (%set-instance-layout layout #.(find-layout 'layout))

@@ -499,6 +499,8 @@ during backtrace.
            msan-xor-constant
            ;; The following slot's existence must NOT be conditional on #+msan
            msan-param-tls) ; = &__msan_param_tls
+       #+permgen
+       ,@'(function-layout)
        #+immobile-space
        ,@'(function-layout
            text-space-addr

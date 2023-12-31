@@ -307,6 +307,14 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  static_space_free_pointer,
                  core_start_pos,
                  core_compression_level), ++count;
+#ifdef LISP_FEATURE_PERMGEN
+    output_space(file,
+                 PERMGEN_CORE_SPACE_ID,
+                 (lispobj *)PERMGEN_SPACE_START,
+                 permgen_space_free_pointer,
+                 core_start_pos,
+                 core_compression_level), ++count;
+#endif
 #ifdef LISP_FEATURE_DARWIN_JIT
     output_space(file,
                  STATIC_CODE_CORE_SPACE_ID,

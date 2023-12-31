@@ -161,6 +161,7 @@ static void walk_all_gc_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
 {
     walk_range((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, fun, arg);
     walk_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, fun, arg);
+    walk_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, fun, arg);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     walk_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, fun, arg);
 #endif

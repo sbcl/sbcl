@@ -92,6 +92,7 @@
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+))
                            (static ,small-space-size)
+                           (permgen 8388608) ; 8MiB
                            #+darwin-jit
                            (static-code ,small-space-size))
                          #+immobile-space
@@ -103,7 +104,7 @@
            (loop for (space size var-name) in spaces
                  appending
                  (let* ((relocatable
-                          (member space '(fixedobj text
+                          (member space '(fixedobj text permgen
                                           #+relocatable-static-space safepoint
                                           #+relocatable-static-space static
                                           #+immobile-space alien-linkage-table

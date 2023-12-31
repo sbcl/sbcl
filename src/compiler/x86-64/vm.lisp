@@ -518,7 +518,7 @@
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-symbol)))
-          #+immobile-space
+          #+(or immobile-space permgen)
           (layout
            (make-fixup val :layout))
           (character (if tag

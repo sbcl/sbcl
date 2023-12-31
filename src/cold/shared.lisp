@@ -307,6 +307,8 @@
           (pushnew :sb-futex sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread :x86-64))
           (pushnew :system-tlabs sb-xc:*features*))
+        (when (target-featurep '(:and :mark-region-gc :permgen :x86-64))
+          (pushnew :compact-instance-header sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (when (target-featurep :x86-64)
             (pushnew :compact-instance-header sb-xc:*features*))
@@ -386,7 +388,7 @@
           ;; It sorta kinda works to have both, but there should be no need,
           ;; and it's not really supported.
           "At most one interpreter can be selected")
-         ("(and compact-instance-header (not immobile-space))"
+         ("(and compact-instance-header (not (or permgen immobile-space)))"
           ":COMPACT-INSTANCE-HEADER requires :IMMOBILE-SPACE feature")
          ("(and immobile-code (not immobile-space))"
           ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")

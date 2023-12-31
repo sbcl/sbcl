@@ -19,6 +19,12 @@
                         sb-vm:*read-only-space-free-pointer*)
     system-area-pointer)
 
+#+permgen
+(progn
+(define-alien-variable ("PERMGEN_SPACE_START" sb-vm:permgen-space-start) sb-kernel::os-vm-size-t)
+(define-alien-variable ("permgen_space_free_pointer" sb-vm:*permgen-space-free-pointer*)
+    system-area-pointer))
+
 #+relocatable-static-space
 (define-alien-variable ("STATIC_SPACE_START" sb-vm:static-space-start) sb-kernel::os-vm-size-t)
 ;;; STATIC-SPACE-START is a constant from genesis

@@ -931,6 +931,8 @@ static void trace_static_roots() {
   trace_other_object((lispobj*)NIL_SYMBOL_SLOTS_START);
   mr_trace_bump_range((lispobj*)STATIC_SPACE_OBJECTS_START,
                       static_space_free_pointer);
+  mr_trace_bump_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
+
   // TODO: use an explicit remembered set of modified objects in this range
   if (TEXT_SPACE_START) mr_trace_bump_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
 #ifdef LISP_FEATURE_SYSTEM_TLABS
