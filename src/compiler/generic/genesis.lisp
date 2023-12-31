@@ -1890,10 +1890,6 @@ core and return a descriptor to it."
   (setf *asm-routine-vector* (word-vector (make-list 256 :initial-element 0)
                                           *static*)))
 
-  #-(and x86-64 immobile-code)
-  (dolist (sym sb-vm::+c-callable-fdefns+)
-    (ensure-cold-fdefn sym *static*))
-
   ;; With immobile-code on x86-64, static-fdefns as a concept are
   ;; useful - the implication is that the function's definition will
   ;; not change.  But the fdefn per se is not useful - callers refer
