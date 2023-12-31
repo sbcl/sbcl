@@ -176,18 +176,16 @@
      (%instance-set .instance. .index. .newval.)
      .newval.))
 
-;;; *** These transforms should be the only code, aside from the C runtime
-;;;     with knowledge of the layout index.
 #+compact-instance-header
 (define-source-transform function-with-layout-p (x) `(functionp ,x))
 #-compact-instance-header
 (progn
+  (define-source-transform function-with-layout-p (x) `(funcallable-instance-p ,x))
+  ;; Nothing but these transforms should assume that slot 0 holds a layout
   (define-source-transform %instance-layout (x)
     `(truly-the layout (%instance-ref ,x 0)))
   (define-source-transform %set-instance-layout (instance layout)
-    `(%instance-set ,instance 0 (the layout ,layout)))
-  (define-source-transform function-with-layout-p (x)
-    `(funcallable-instance-p ,x)))
+    `(%instance-set ,instance 0 (the layout ,layout))))
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 

@@ -53,8 +53,8 @@
 ;; on the stack, so it needs an inlineable constructor.
 (declaim (inline make-basic-env))
 ;; This is 6 words including the header. It could be shrunk to 4 words
-;; with the compact-instance patch because the 'symbols' slot is strictly
-;; a lexical (static) aspect that can be moved into the 'decl-scope' object.
+;; with #+compact-instance-header because the 'symbols' slot is strictly
+;; a lexical aspect that could be moved into the 'decl-scope' object.
 (defstruct (basic-env ; 6 words incl. header word.
              (:conc-name env-)
              (:include sb-c::abstract-lexenv)

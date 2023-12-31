@@ -118,11 +118,9 @@ static inline struct bitmap get_layout_bitmap(struct layout* layout)
     return bitmap;
 }
 
-/* Return true if the INDEXth bit is set in BITMAP.
- * Index 0 corresponds to the word just after the instance header.
- * So index 0 may be the layout pointer if #-compact-instance-header,
- * or a user data slot if #+compact-instance-header
- */
+/* Return true if the INDEXth bit is set in BITMAP. Index 0 corresponds to the word
+ * immediately following the instance header word, which is the instance's layout
+ * if #-compact-instance-header */
 static inline int bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 {
     unsigned int word_index = index / N_WORD_BITS;
