@@ -328,18 +328,7 @@
     (unless (zerop (rem byte-address target-space-alignment))
       (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
              byte-address target-space-alignment)))
-  (apply #'%make-gspace :name name
-                :identifier identifier
-                ;; Track page usage
-                :page-table (if (= identifier dynamic-core-space-id)
-                                (make-array 100 :adjustable t :initial-element nil))
-                :byte-address byte-address
-                :free-word-index (cond #+immobile-space
-                                       ((= identifier immobile-fixedobj-core-space-id)
-                                        (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
-                                       (t
-                                        0))
-                rest))
+  (apply #'%make-gspace :name name :identifier identifier :byte-address byte-address rest))
 
 (defstruct (model-sap (:constructor make-model-sap (address gspace)))
   (address 0 :type sb-vm:word)
@@ -4065,17 +4054,20 @@ III. initially undefined function references (alphabetically):
                                      static-core-space-id
                                      sb-vm:static-space-start))
            #+immobile-space
-           (*immobile-fixedobj* (make-gspace :immobile-fixedobj
-                                             immobile-fixedobj-core-space-id
-                                             sb-vm:fixedobj-space-start))
+           (*immobile-fixedobj*
+            ;; Primordial layouts (from INITIALIZE-LAYOUTS) are made before anything else,
+            ;; but they don't allocate starting from word index 0, because page 0 is reserved
+            ;; for the **PRIMITIVE-OBJECT-LAYOUTS** vector.
+            (make-gspace :immobile-fixedobj immobile-fixedobj-core-space-id
+                         sb-vm:fixedobj-space-start
+                         :free-word-index (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
            #+immobile-space
-           (*immobile-text* (make-gspace :immobile-text
-                                         immobile-text-core-space-id
-                                         sb-vm:text-space-start
-                                         :objects (make-array 20000 :fill-pointer 0 :adjustable t)))
-           (*dynamic*   (make-gspace :dynamic
-                                     dynamic-core-space-id
-                                     sb-vm:dynamic-space-start))
+           (*immobile-text*
+            (make-gspace :immobile-text immobile-text-core-space-id sb-vm:text-space-start
+                         :objects (make-array 20000 :fill-pointer 0 :adjustable t)))
+           (*dynamic*
+            (make-gspace :dynamic dynamic-core-space-id sb-vm:dynamic-space-start
+                         :page-table (make-array 100 :adjustable t :initial-element nil)))
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)
