@@ -43,6 +43,10 @@ static void USING_LAYOUT(lispobj layout, lispobj* where, int nslots)
     // Apart from the allowance for untagged pointers in lockfree list nodes,
     // this contains almost none of the special cases that gencgc does.
     if (!layout) return;
+    // FIXME: this can't work as intended if #+compact-instance-header is enabled
+    // because the source field is not a full word. You'll crash or not depending
+    // on whether you need to write back the pointer.
+    // (It gets a compile-time "incompatible pointer type" warning, so that's good)
     ACTION(layout, &layout_of(where), SOURCE_NORMAL);
     if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
         struct list_node* node = (void*)where;

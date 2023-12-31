@@ -37,7 +37,9 @@
 #define PREFETCH_DISTANCE 32
 
 //#define LOG_COLLECTIONS
-#define COMPACT
+#ifndef ENABLE_COMPACTION
+#define ENABLE_COMPACTION 1
+#endif
 
 /* The idea of the mark-region collector is to avoid copying where
  * possible, and instead reclaim as much memory in-place as possible.
@@ -462,7 +464,7 @@ static void mark(lispobj object, lispobj *where, enum source source_type) {
       lispobj *base = (lispobj*)fun_code_header((struct simple_fun*)np);
       object = make_lispobj(base, OTHER_POINTER_LOWTAG);
     }
-#ifdef COMPACT
+#if ENABLE_COMPACTION
     if (where)
       log_slot(object, where, source_object, source_type);
 #endif
@@ -522,7 +524,7 @@ static void trace_object(lispobj object) {
           next = make_lispobj(base, OTHER_POINTER_LOWTAG);
           np = base;
         }
-#ifdef COMPACT
+#if ENABLE_COMPACTION
         /* Inlined logic from mark() */
         log_slot(c->cdr, &c->cdr, native_pointer(object), SOURCE_NORMAL);
 #endif
@@ -1006,7 +1008,7 @@ static void watch_deferred(lispobj *where, uword_t start, uword_t end) {
   generation_index_t gen = dirty_generation_source;
   for (uword_t i = start; i < end; i++) {
     if (is_lisp_pointer(where[i])) {
-#ifdef COMPACT
+#if ENABLE_COMPACTION
       log_slot(where[i], where + i, where, SOURCE_NORMAL);
 #endif
       if (gc_gen_of(where[i], 0) < gen) {
@@ -1185,7 +1187,7 @@ void mr_pre_gc(generation_index_t generation) {
 #endif
   generation_to_collect = generation;
   reset_statistics();
-#ifdef COMPACT
+#if ENABLE_COMPACTION
   if (generation != PSEUDO_STATIC_GENERATION)
     METER(consider, consider_compaction(generation_to_collect));
 #endif
@@ -1199,7 +1201,7 @@ void mr_collect_garbage(bool raise) {
   trace_static_roots();
   METER(trace, trace_everything());
   METER(sweep, sweep());
-#ifdef COMPACT
+#if ENABLE_COMPACTION
   if (compacting) {
     meters.compacts++;
     /* This isn't a lot of work to wake up every thread for. Perhaps
