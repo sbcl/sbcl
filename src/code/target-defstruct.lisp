@@ -166,7 +166,7 @@
                         layout (+ (get-dsd-index layout id-word0) index))
              ;; use SAP-ref, for lack of half-sized slots
              #+64-bit `(signed-sap-ref-32 (id-bits-sap) (ash index 2))))
-(defun layout-id (layout)
+(defun layout-id (layout &optional (assign t))
   ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
   ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
   ;; There are a few non-structure types at positive depthoid; those do not store
@@ -180,8 +180,9 @@
          (id (with-pinned-objects (layout)
                (access-it))))
     (truly-the
-     layout-id
-     (cond ((zerop id)
+     (or null layout-id)
+     (cond ((not (zerop id)) id)
+           (assign
             (aver (logior +structure-layout-flag+ (layout-flags layout)))
             (with-system-mutex (*layout-id-mutex*)
               (let ((id (truly-the layout-id (access-it)))) ; double-check
@@ -190,8 +191,7 @@
                       (setf (access-it)
                             ;; doesn't really need ATOMIC- any moren
                             (atomic-incf (car *layout-id-generator*))))
-                    id))))
-           (t id)))))
+                    id))))))))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
   (setf (layout-inherits layout) inherits)
