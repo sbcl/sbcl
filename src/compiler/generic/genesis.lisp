@@ -408,11 +408,11 @@
                (values "for other immediate: #X~X, type #b~8,'0B"
                        (ash bits (- sb-vm:n-widetag-bits))
                        (logand bits sb-vm:widetag-mask)))
-              ((descriptor-gspace des)
+              ((descriptor-%gspace des)
                (values "for pointer: #X~X, lowtag #b~v,'0B, ~A"
                        (descriptor-base-address des)
                        sb-vm:n-lowtag-bits lowtag
-                       (gspace-name (descriptor-gspace des))))
+                       (gspace-name (descriptor-%gspace des))))
               (t
                (values "bits: #X~X" bits)))))))
 
