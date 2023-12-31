@@ -76,7 +76,9 @@
     (and static-fun-index
          (+ (* (length +static-symbols+) (pad-data-block symbol-size))
             (pad-data-block (1- symbol-size))
-            (* 4 n-word-bytes) ; sizeof SB-LOCKLESS:+TAIL+
+            ;; sizeof SB-LOCKLESS:+TAIL+ is calculated as 1 user data slot,
+            ;; round-to-odd, add the header word.
+            (* (1+ (logior (1+ sb-vm:instance-data-start) 1)) n-word-bytes)
             (- list-pointer-lowtag)
             (* static-fun-index (pad-data-block fdefn-size))
             other-pointer-lowtag))))
