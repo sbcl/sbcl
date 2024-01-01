@@ -1149,7 +1149,7 @@
   (declare (type ctype type1 type2))
   (macrolet ((quick-fail-simple-=-mask ()
                ;; The set of type-classes for which not EQ implies not TYPE=.
-               (loop for class in '(character-set classoid member named
+               (loop for class in '(character-set classoid member named number
                                     #+sb-simd-pack simd-pack
                                     #+sb-simd-pack-256 simd-pack-256)
                      sum (ash 1 (type-class-name->id class))))
@@ -1168,9 +1168,6 @@
                      (memoize (invoke-type-method :none :complex-= type1 type2))))
                 ((logbitp id1 (quick-fail-simple-=-mask))
                  (values nil t))
-                ((= id1 #.(type-class-name->id 'number)) ; do not cache
-                 ;; At most 2 EQL tests, which are as fast as memoization, if not faster.
-                 (number-simple-=-type-method type1 type2))
                 (t ; use the SIMPLE-= method
                  ;; A cached answer for swapped args is the same, so always put the smaller
                  ;; hash first, and we might win with a previous answer.
@@ -2499,23 +2496,6 @@ expansion happened."
 
 (define-type-class number :enumerable #'numeric-type-enumerable :might-contain-other-types nil)
 
-(define-type-method (number :simple-=) (type1 type2)
-  ;; If NUMERIC-TYPE-CLASS is FLOAT, then we have to compare the bounds using EQUALP
-  ;; which equates signed zeros of the same precision.
-  ;; In particular all the following are different, but TYPE= to each other:
-  ;;  (specifier-type '(single-float -0s0 -0s0))
-  ;;  (specifier-type '(single-float -0s0 +0s0))
-  ;;  (specifier-type '(single-float +0s0 -0s0))
-  ;;  (specifier-type '(single-float +0s0 +0s0))
-  ;; If not a FLOAT class, then thanks to hash-consing, two instances can be TYPE=
-  ;; only if EQ. Therefore, since this method was invoked, the arguments are not TYPE=
-  ;; if the class is other than FLOAT.
-  (values (and (eq (numeric-type-class type1) 'float)
-               (numtype-aspects-eq type1 type2)
-               (equalp (numeric-type-low type1) (numeric-type-low type2))
-               (equalp (numeric-type-high type1) (numeric-type-high type2)))
-          t))
-
 (declaim (inline bounds-unbounded-p))
 (defun bounds-unbounded-p (low high)
   (and (null low) (eq high low)))
@@ -2730,9 +2710,11 @@ expansion happened."
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
     (flet ((normalize-zero (x)
-             (case x
-               ($-0d0 $0d0)
-               ($-0f0 $0f0)
+             (cond
+               ((eql x $-0d0) $0d0)
+               ((eql x $-0f0) $0f0)
+               ((equal x '($-0d0)) '($0d0))
+               ((equal x '($-0f0)) '($0f0))
                (t x))))
       (declare (inline normalize-zero))
      (new-ctype numeric-type 0 (get-numtype-aspects complexp class format)
