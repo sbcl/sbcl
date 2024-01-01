@@ -276,32 +276,42 @@
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
   (when (atom cache)
     (return-from get-float-ops-cache cache))
-  (let ((table (car cache)))
+  (let ((table (car cache))
+        (pathname))
     (when (zerop (hash-table-count table))
-      (with-open-file (stream "xfloat-math.lisp-expr" :if-does-not-exist nil)
+      (with-open-file (stream (setq pathname (sb-cold::math-journal-pathname :input))
+                              :if-does-not-exist nil)
         (when stream
           ;; Ensure that we're reading the correct variant of the file
           ;; in case there is more than one set of floating-point formats.
           (assert (eq (read stream) :default))
-          (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL"))))
+          (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL")))
+                (line 0))
             (loop for (alias . actual) in '(("MAKE-SINGLE-FLOAT" . sb-kernel:make-single-float)
                                             ("MAKE-DOUBLE-FLOAT" . sb-kernel:make-double-float)
                                             ("S" . sb-kernel:make-single-float)
                                             ("D" . sb-kernel:make-double-float))
                   do (setf (fdefinition (intern alias pkg)) (fdefinition actual)))
             (dolist (expr (let ((*package* pkg)) (read stream)))
+              (incf line)
               (destructuring-bind (fun args . values) expr
-                (float-ops-cache-insert (cons fun args)
+                (let ((old-count (hash-table-count table)))
+                  (float-ops-cache-insert (cons fun args)
                                         (if (and (symbolp (first values))
                                                  (string= (symbol-name (first values))
                                                           "&VALUES"))
                                             (rest values)
                                             values)
-                                        table)))
+                                        table)
+                  (unless (= (hash-table-count table) (1+ old-count))
+                    (let ((*print-pretty* nil))
+                      (error "~&Line ~D of float cache: PUTHASH ~S did not insert a new key"
+                             line (cons fun args)))))))
             (delete-package pkg))
           (setf (cdr cache) (hash-table-count table))
           (when cl:*compile-verbose*
-            (format t "~&; Float-ops cache prefill: ~D entries~%" (cdr cache))))))
+            (format t "~&; Math journal: prefilled ~D entries from ~S~%"
+                    (cdr cache) pathname)))))
     table))
 
 (defun record-math-op (key &rest values)
@@ -310,12 +320,38 @@
          (fun (car key))
          (args (cdr key))
          ;; args list is potentially on stack, so copy it
-         (key (cons fun (if (listp args) (copy-list args) args))))
-    (float-ops-cache-insert key values table))
+         (key (cons fun (if (listp args) (copy-list args) args)))
+         (old-count (hash-table-count table)))
+    (float-ops-cache-insert key values table)
+    (unless (= (hash-table-count table) (1+ old-count))
+      (bug "Non-canonical math journal entry ~S" key)))
   (apply #'values values))
 
+;;; Disallow non-canonical symbols in the float math cache,
+;;; or it gets very confusing as to whether the cache is dirty.
+(defun canonical-math-op-args (expr)
+  ;; Try to avoid consing a new list unless we have to.
+  (labels ((check (expr)
+             (cond ((consp expr) (and (check (car expr)) (check (cdr expr))))
+                   ((symbolp expr) (eq (cl:symbol-package expr) *cl-package*))
+                   (t)))
+           (recons (expr)
+             (cond ((consp expr) (cons (recons (car expr)) (recons (cdr expr))))
+                   ((symbolp expr) (intern (string expr) *cl-package*))
+                   (t expr))))
+    (if (check expr) expr (recons expr))))
+
 (defmacro with-memoized-math-op ((name key-expr) calculation)
-  `(dx-let ((cache-key (cons ',(intern (string name) "CL") ,key-expr)))
+  (assert (symbolp name))
+  ;; In theory I could make this so that only a cache miss has to call SANIFY-MATH-OP-ARGS
+  ;; so that in the frequently-occuring cases we do not have to make an extra pass over
+  ;; the expression to determine whether was is canonical. But since only COERCE can have
+  ;; a problem of non-canononical symbols, it's easiest to just always canonicalize
+  ;; for COERCE, and nothing else.
+  `(dx-let ((cache-key
+             ,(if (string= name 'coerce)
+                  `(cons ',(intern (string name) "CL") (canonical-math-op-args ,key-expr))
+                  `(cons ',(intern (string name) "CL") ,key-expr))))
      (multiple-value-bind (answer foundp) (gethash cache-key (get-float-ops-cache))
        (if foundp
            (if (and (listp answer)

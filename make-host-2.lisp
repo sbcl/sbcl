@@ -17,6 +17,13 @@
 ;; Avoid natively compiling new code under ecl
 #+ecl (ext:install-bytecodes-compiler)
 
+(defun copy-file-from-file (new old)
+  (with-open-file (output new :direction :output :if-exists :supersede
+                          :if-does-not-exist :create)
+    (with-open-file (input old)
+      (loop (let ((line (read-line input nil)))
+              (if line (write-line line output) (return new)))))))
+
 ;;; Run the cross-compiler to produce cold fasl files.
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 (setq sb-c::*static-vop-usage-counts* (make-hash-table))
@@ -38,6 +45,10 @@
                      (setq warnp 'warning))))
     (sb-xc:with-compilation-unit ()
       (load "src/cold/compile-cold-sbcl.lisp")
+      (let ((cache (math-journal-pathname :output)))
+        (when (probe-file cache)
+          (copy-file-from-file "xfloat-math.lisp-expr" cache)
+          (format t "~&Math journal: replaced from ~S~%" cache)))
       ;; Enforce absence of unexpected forward-references to warm loaded code.
       ;; Looking into a hidden detail of this compiler seems fair game.
       (when sb-c::*undefined-warnings*

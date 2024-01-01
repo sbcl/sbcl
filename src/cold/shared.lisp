@@ -878,6 +878,25 @@
 (compile 'install-read-interceptor)
 
 (defvar *math-ops-memoization* (make-hash-table :test 'equal))
+(defun math-journal-pathname (direction)
+  ;; Initialy we read from the file in the source tree, but writeback occurs
+  ;; to a new local file. Then if re-reading we read the local copy of the cache.
+  ;; This should allow multiple builds to happen (via make-all-targets.sh) in a
+  ;; single source tree. If exactly one target is built, we can mv the local file
+  ;; on top of the source file. For more than one, we could either merge them
+  ;; or just ignore any modifications.
+  (let* ((base "xfloat-math.lisp-expr")
+         (local (concatenate 'string sb-cold::*host-obj-prefix* base)))
+    (pathname
+     (ecase direction
+       (:input (if (probe-file local) local base))
+       (:output local)))))
+
+(defun count-lines-of (pathname &aux (n 0))
+  (with-open-file (f pathname)
+    (loop (let ((line (read-line f nil)))
+            (if line (incf n) (return n))))))
+
 (defmacro with-math-journal (&body body)
   `(let* ((table *math-ops-memoization*)
           (memo (cons table (hash-table-count table))))
@@ -890,12 +909,15 @@
      (when nil ; *compile-verbose*
        (funcall (intern "SHOW-INTERNED-NUMBERS" "SB-IMPL") *standard-output*))
      (when (> (hash-table-count table) (cdr memo))
-       (let ((filename "xfloat-math.lisp-expr"))
+       (let ((filename (math-journal-pathname :output)))
          (with-open-file (stream filename :direction :output
                                           :if-exists :supersede)
            (funcall (intern "DUMP-MATH-MEMOIZATION-TABLE" "SB-IMPL")
                     table stream))
-         (format t "~&; wrote ~a - ~d entries"
+         ;; Enforce absence of spurious newlines from pretty-printing or whatever
+         ;; If this assertion is wrong on other lisps we can just remove it
+         (assert (= (count-lines-of filename) (+ (hash-table-count table) 5)))
+         (format t "~&; Math journal: wrote ~S (~d entries)"
                  filename (hash-table-count table))))))
 
 ;;;; Please avoid writing "consecutive" (un-nested) reader conditionals
