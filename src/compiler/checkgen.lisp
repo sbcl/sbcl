@@ -274,6 +274,7 @@
             ((and (cast-p dest)
                   (cast-type-check dest)
                   (atom (lvar-uses (node-lvar cast)))
+                  (atom (lvar-uses (cast-value dest)))
                   (cond ((and (values-type-p (cast-asserted-type dest))
                               (values-type-p (cast-asserted-type cast)))
                          (values-subtypep (cast-asserted-type dest)

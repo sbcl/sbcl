@@ -4382,4 +4382,16 @@
               (if (> v 0)
                   (the unsigned-byte m)
                   (logior 80827861226 v))))))
-   ((-3462512952 -77 0) (condition 'type-error))))
+   ((-3462512952 -77 0) (condition 'type-error)))
+  (checked-compile-and-assert
+    (:optimize :safe)
+    `(lambda (x m)
+       (the fixnum
+            (if x
+                (let ((j (the integer m)))
+                  j)
+                m)))
+    ((nil 'a) (condition 'type-error))
+    ((t 1d0) (condition 'type-error))
+    ((nil 1) 1)
+    ((t 2) 2)))
