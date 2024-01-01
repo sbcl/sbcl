@@ -59,7 +59,7 @@
 
   (defconstant alien-linkage-table-entry-size 4)
   (defconstant alien-linkage-table-growth-direction :down)
-  (setq *linkage-space-predefined-entries* '(("call_into_c" nil)))
+  (setq *alien-linkage-table-predefined-entries* '(("call_into_c" nil)))
 
   ;; C stack grows downward from 0x80000000
   )

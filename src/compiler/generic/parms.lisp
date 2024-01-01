@@ -374,7 +374,7 @@
   (defconstant +pseudo-static-generation+ 6))
 
 (defparameter *runtime-asm-routines* nil)
-(defparameter *linkage-space-predefined-entries* nil)
+(defparameter *alien-linkage-table-predefined-entries* nil)
 
 ;;; Floating-point related constants, both format descriptions and FPU
 ;;; control register descriptions.  These don't exactly match up with

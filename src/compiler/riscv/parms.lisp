@@ -62,8 +62,8 @@
 
 (defconstant alien-linkage-table-entry-size #-64-bit 8 #+64-bit 24)
 (defconstant alien-linkage-table-growth-direction :down)
-(setq *linkage-space-predefined-entries* '(("alloc" nil)
-                                           ("alloc_list" nil)))
+(setq *alien-linkage-table-predefined-entries* '(("alloc" nil)
+                                                 ("alloc_list" nil)))
 
 
 ;;;; other miscellaneous constants

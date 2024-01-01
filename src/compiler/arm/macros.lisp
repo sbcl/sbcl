@@ -211,7 +211,7 @@
   (inst word (logior #xe92d0000 ; PUSH {rN, lr}
                      (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
                      (ash 1 (tn-offset lr-tn))))
-  ;; select the C function index as per *LINKAGE-SPACE-PREDEFINED-ENTRIES*
+  ;; select the C function index as per *ALIEN-LINKAGE-TABLE-PREDEFINED-ENTRIES*
   (let ((index (if (eq type 'list) 1 0)))
     (inst ldr alloc-tn (@ null-tn (- (alien-linkage-table-entry-address index)
                                      nil-value))))

@@ -76,10 +76,10 @@
 (defconstant alien-linkage-table-growth-direction :down)
 (defconstant alien-linkage-table-entry-size 16)
 ;;; Link these as data entries so that we store only the address of the
-;;; handwritten assembly code in the linkage able, and not a trampoline
+;;; handwritten assembly code in the alien linkage table, and not a trampoline
 ;;; to the trampoline. The ALLOCATION macro just wants an address.
-(setq *linkage-space-predefined-entries* '(("alloc_tramp" t)
-                                           ("list_alloc_tramp" t)))
+(setq *alien-linkage-table-predefined-entries* '(("alloc_tramp" t)
+                                                 ("list_alloc_tramp" t)))
 
 
 ;;;; other miscellaneous constants

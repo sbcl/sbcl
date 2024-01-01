@@ -4026,7 +4026,7 @@ III. initially undefined function references (alphabetically):
   (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
     ;; Prefill some linkage table entries perhaps
-    (loop for (name datap) in sb-vm::*linkage-space-predefined-entries*
+    (loop for (name datap) in sb-vm::*alien-linkage-table-predefined-entries*
           do (alien-linkage-table-note-symbol name datap))
 
     ;; Now that we've successfully read our only input file (by
