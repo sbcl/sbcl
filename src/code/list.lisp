@@ -420,16 +420,14 @@
        (cdr result)))))
 
 (defun append2 (x y)
-  (declare (optimize (sb-c:verify-arg-count 0)))
   (if (null x)
       y
-      (let ((result (list (car x))))
-        (do ((more (cdr x) (cdr more))
-             (tail result (cdr tail)))
+      (let* ((result (cons (car x) y))
+             (tail result))
+        (do ((more (cdr x) (cdr more)))
             ((null more)
-             (rplacd (truly-the cons tail) y)
              result)
-                    (rplacd (truly-the cons tail) (list (car more)))))))
+          (rplacd (truly-the cons tail) (setf tail (cons (car more) y)))))))
 
 
 ;;;; list copying functions
