@@ -4394,4 +4394,11 @@
     ((nil 'a) (condition 'type-error))
     ((t 1d0) (condition 'type-error))
     ((nil 1) 1)
-    ((t 2) 2)))
+    ((t 2) 2))
+  (checked-compile-and-assert
+    (:optimize :safe)
+   `(lambda (f x)
+     (the (values fixnum &optional) (the (values integer &rest t) (funcall f x))))
+    ((#'identity .0) (condition 'type-error))
+    ((#'identity 1) 1)
+    ((#'identity (expt 2 1000)) (condition 'type-error))))
