@@ -339,7 +339,13 @@ Please check that all strings which were not recognizable to the compiler
 
 
   (do-all-symbols (symbol)
-    (sb-kernel:logior-header-bits symbol sb-vm::+symbol-initial-core+)
+    ;; Don't futz with the header of static symbols.
+    ;; Technically LOGIOR-HEADER-BITS can only be used on an OTHER-POINTER-LOWTAG
+    ;; objects, so modifying NIL should not ever work, but it's especially wrong
+    ;; on ppc64 where OTHER- and LIST- pointer lowtags are 10 bytes apart instead
+    ;; of 8, so this was making a random alteration to the header.
+    (unless (eq (heap-allocated-p symbol) :static)
+      (sb-kernel:logior-header-bits symbol sb-vm::+symbol-initial-core+))
 
     ;; A symbol whose INFO slot underwent any kind of manipulation
     ;; such that it now has neither properties nor globaldb info,
