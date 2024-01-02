@@ -454,7 +454,7 @@
                 (let ((rank (- nwords array-dimensions-offset)))
                   (ash (encode-array-rank rank) array-rank-position))
                 (case widetag
-                  (#.fdefn-widetag 0)
+                  ((#.symbol-widetag #.fdefn-widetag) 0)
                   (t (ash (1- nwords) (length-field-shift widetag)))))
             widetag)))
 

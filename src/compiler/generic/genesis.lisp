@@ -783,9 +783,7 @@
    initialized with the payload size as (1- LENGTH), and WIDETAG."
   (let ((des (allocate-cold-descriptor gspace (ash length sb-vm:word-shift)
                                        sb-vm:other-pointer-lowtag)))
-    ;; FDEFNs don't store a length, freeing up a header byte for other use
-    (write-header-data+tag des (if (= widetag sb-vm:fdefn-widetag) 0 (1- length))
-                           widetag)
+    (write-header-word des (sb-vm::compute-object-header length widetag))
     des))
 (defvar *simple-vector-0-descriptor*)
 (defun allocate-vector (widetag length words &optional (gspace *dynamic*))
