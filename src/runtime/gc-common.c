@@ -2999,6 +2999,7 @@ void recompute_gen_bytes_allocated() {
 #endif
 
 #ifdef LISP_FEATURE_DARWIN_JIT
+_Atomic(char) *page_execp;
 #include "sys_mmap.inc"
 #include <errno.h>
 /* darwin-jit has another reason to remap besides just zeroing, namely,

@@ -151,7 +151,7 @@ extern void prepare_pages(bool commit, page_index_t start, page_index_t end,
  * squeeze a bit into the 'type' field of the page table, but it's clearer to
  * have this externally so that page type 0 remains as "free" */
 #ifdef LISP_FEATURE_DARWIN_JIT
-_Atomic(char) *page_execp;
+extern _Atomic(char) *page_execp;
 static inline void set_page_executable(page_index_t i, bool val) { page_execp[i] = val; }
 #endif
 
