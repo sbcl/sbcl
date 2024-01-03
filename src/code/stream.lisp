@@ -2309,22 +2309,17 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   for STREAM is reached before copying all elements of the subsequence,
   then the extra elements near the end of sequence are not updated, and
   the index of the next element is returned."
-  (declare (type sequence seq)
-           (type stream stream)
-           (type index start)
-           (type sequence-end end)
-           (values index))
+  (declare (explicit-check))
   (stream-api-dispatch (stream)
     :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-read-sequence seq stream start end)
-    :gray (stream-read-sequence stream seq start end)))
+    :gray (stream-read-sequence stream (the sequence seq) (the index start) (the sequence-end end))))
 
 (declaim (maybe-inline read-sequence/read-function))
 (defun read-sequence/read-function (seq stream start %end
                                     stream-element-mode
                                     character-read-function binary-read-function)
-  (declare (type sequence seq)
-           (type stream stream)
+  (declare (type stream stream)
            (type index start)
            (type sequence-end %end)
            (type stream-element-mode stream-element-mode)
@@ -2396,15 +2391,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (read-generic-sequence (compute-read-function nil)))))))
 
 (defun ansi-stream-read-sequence (seq stream start %end)
-  (declare (type sequence seq)
-           (type ansi-stream stream)
+  (declare (type ansi-stream stream)
            (type index start)
            (type sequence-end %end)
+           (inline read-sequence/read-function)
            (values index &optional))
-  (locally (declare (inline read-sequence/read-function))
-    (read-sequence/read-function
-     seq stream start %end (stream-element-mode stream)
-     #'ansi-stream-read-char #'ansi-stream-read-byte)))
+  (read-sequence/read-function
+   seq stream start %end (stream-element-mode stream)
+   #'ansi-stream-read-char #'ansi-stream-read-byte))
 
 (defun ansi-stream-read-string-from-frc-buffer (seq stream start %end)
   (declare (type simple-string seq)
@@ -2453,6 +2447,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 (defun write-sequence (seq stream &key (start 0) (end nil))
   "Write the elements of SEQ bounded by START and END to STREAM."
+  (declare (explicit-check seq))
   (let* ((length (length seq))
          (end (or end length)))
     (unless (<= start end length)
@@ -2478,8 +2473,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                       stream-element-mode
                                       character-write-function
                                       binary-write-function)
-  (declare (type sequence seq)
-           (type stream stream)
+  (declare (type stream stream)
            (type index start)
            (type sequence-end %end)
            (type stream-element-mode stream-element-mode)
@@ -2544,14 +2538,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 ;;; This takes any kind of stream, not just ansi streams, because of recursion.
 ;;; It's basically just the non-keyword-accepting entry for WRITE-SEQUENCE.
 (defun write-seq-impl (seq stream start %end)
-  (declare (type sequence seq)
-           (type stream stream)
+  (declare (type stream stream)
            (type index start)
            (type sequence-end %end)
            (inline write-sequence/write-function))
   (stream-api-dispatch (stream)
-    :simple (s-%write-sequence stream seq start (or %end (length seq)))
-    :gray (stream-write-sequence stream seq start %end)
+    :simple (s-%write-sequence stream (the sequence seq) start (or %end (length seq)))
+    :gray (stream-write-sequence stream (the sequence seq) start %end)
     :native
     (typecase stream
     ;; Don't merely extract one layer of composite stream, because a synonym stream
