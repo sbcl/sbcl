@@ -304,43 +304,38 @@
                    (loop for null = nil-value then (car used-registers)
                          for reg in used-registers
                          do (inst mov :dword reg null))
-                   (move rbx rsp-tn)
-                   (inst jmp defaulting-done)))
+                   (inst jmp done)))
             REGS-DEFAULTED
             (do ((i register-arg-count (1+ i))
                  (val values (tn-ref-across val)))
                 ((null val))
               (let ((tn (tn-ref-tn val)))
                 (unless (eq (tn-kind tn) :unused)
-                  (if (< i min-values)
-                      (sc-case tn
-                        (control-stack
-                         (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
-                         (inst mov tn move-temp))
-                        (t
-                         (loadw tn rbx (frame-word-offset (+ sp->fp-offset i)))))
-                      (let ((default-lab (gen-label)))
-                        (defaults (cons default-lab tn))
-                        ;; Note that the max number of values received
-                        ;; is assumed to fit in a :dword register.
-                        (inst cmp :dword rcx-tn (fixnumize i))
-                        (inst jmp :be default-lab)
-                        (sc-case tn
-                          (control-stack
-                           (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
-                           (inst mov tn move-temp))
-                          (t
-                           (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))))
+                  (when (>= i min-values)
+                    (let ((default-lab (gen-label)))
+                      (defaults (cons default-lab tn))
+                      ;; Note that the max number of values received
+                      ;; is assumed to fit in a :dword register.
+                      (inst cmp :dword rcx-tn (fixnumize i))
+                      (inst jmp :be default-lab)))
+                  (sc-case tn
+                    (control-stack
+                     (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
+                     (inst mov tn move-temp))
+                    (t
+                     (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))
             DEFAULTING-DONE
             (move rsp-tn rbx)
+            DONE
             (let ((defaults (defaults)))
               (when defaults
                 (assemble (:elsewhere)
-                  (emit-label default-stack-slots)
-                  (loop for null = nil-value then (car used-registers)
-                        for reg in used-registers
-                        do (inst mov :dword reg null))
-                  (move rbx rsp-tn)
+                  (when (<= min-values 1)
+                    (emit-label default-stack-slots)
+                    (loop for null = nil-value then (car used-registers)
+                          for reg in used-registers
+                          do (inst mov :dword reg null))
+                    (move rbx rsp-tn))
                   (dolist (default defaults)
                     (emit-label (car default))
                     (inst mov (cdr default) nil-value))

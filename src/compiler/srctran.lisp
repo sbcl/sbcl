@@ -3350,7 +3350,7 @@
     `(* integer ,(ash 1 shift))))
 
 (defun cast-or-check-bound-type (lvar &optional fixnum)
-  (let ((dest (lvar-dest lvar)))
+  (let ((dest (let-lvar-dest lvar)))
     (cond ((cast-p dest)
            (and (cast-type-check dest)
                 (single-value-type (cast-type-to-check dest))))

@@ -342,6 +342,11 @@
                              'cerror)
                             (t
                              (sb-di:error-context))))
+             (object (cond ((eq context 'sb-c::truncate-to-integer)
+                            (setf context nil)
+                            (truncate object))
+                           (t
+                            object)))
              (condition
                (make-condition (if (and (%instancep object)
                                         (layout-invalid (%instance-layout object)))

@@ -1664,17 +1664,32 @@
              ,(value-within-numeric-type rem-type))))
 
 (macrolet ((def (type)
-             `(deftransform unary-truncate ((number) (,type))
-                '(if (typep number
-                      '(,type
-                        ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
-                        ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                  (let ((truncated (truly-the fixnum (,(symbolicate '%unary-truncate/ type) number))))
-                    (declare (flushable ,(symbolicate "%" type)))
-                    (values truncated
-                            (- number
-                               (coerce truncated ',type))))
-                  (,(symbolicate 'unary-truncate- type '-to-bignum) number)))))
+             `(deftransform unary-truncate ((number) (,type) * :node node)
+                (let ((cast (cast-or-check-bound-type (node-lvar node))))
+                  (if (and cast
+                           (csubtypep cast (specifier-type 'sb-vm:signed-word)))
+                      (let ((int (type-approximate-interval cast)))
+                        (multiple-value-bind (low high) (,(package-symbolicate :sb-kernel type '-integer-bounds)
+                                                         (interval-low int)
+                                                         (interval-high int))
+                          `(if (typep number
+                                      '(,',type ,low ,high))
+                               (let ((truncated (truly-the ,(type-specifier cast) (,',(symbolicate '%unary-truncate/ type) number))))
+                                 (declare (flushable ,',(symbolicate "%" type)))
+                                 (values truncated
+                                         (- number
+                                            (coerce truncated ',',type))))
+                               ,(internal-type-error-call 'number (type-specifier cast) 'truncate-to-integer))))
+                      '(if (typep number
+                            '(,type
+                              ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                              ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                        (let ((truncated (truly-the fixnum (,(symbolicate '%unary-truncate/ type) number))))
+                          (declare (flushable ,(symbolicate "%" type)))
+                          (values truncated
+                                  (- number
+                                     (coerce truncated ',type))))
+                        (,(symbolicate 'unary-truncate- type '-to-bignum) number)))))))
   (def single-float)
   (def double-float))
 
