@@ -381,3 +381,14 @@
      (loop for i below n
            sum (coerce n 'single-float)))
    (or (integer 0 0) single-float)))
+
+(with-test (:name :overflow-transform-order)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a m)
+         (declare (fixnum a))
+         (let ((j (* 44 a)))
+           (when m
+             (the fixnum j))))
+    ((most-positive-fixnum nil) nil)
+    ((most-positive-fixnum t) (condition 'type-error))))

@@ -1665,7 +1665,7 @@
 
 (macrolet ((def (type)
              `(deftransform unary-truncate ((number) (,type) * :node node)
-                (let ((cast (cast-or-check-bound-type (node-lvar node))))
+                (let ((cast (cast-or-check-bound-type node)))
                   (if (and cast
                            (csubtypep cast (specifier-type 'sb-vm:signed-word)))
                       (let ((int (type-approximate-interval cast)))

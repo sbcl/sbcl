@@ -193,22 +193,6 @@
           (t
            (values :too-hairy nil)))))
 
-(defun immediately-used-let-dest (lvar cast)
-  (let ((dest (lvar-dest lvar)))
-    (when (almost-immediately-used-p lvar cast)
-      (if (and (combination-p dest)
-               (eq (combination-kind dest) :local))
-          (let* ((fun (combination-lambda dest))
-                 (n (position-or-lose lvar
-                                      (combination-args dest)))
-                 (var (nth n (lambda-vars fun)))
-                 (refs (leaf-refs var)))
-            (loop for ref in refs
-                  for lvar = (node-lvar ref)
-                  when (and lvar (almost-immediately-used-p lvar (lambda-bind fun)))
-                  do (return (values (lvar-dest lvar) lvar))))
-          (values dest lvar)))))
-
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
