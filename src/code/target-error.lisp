@@ -1990,6 +1990,21 @@ the usual naming convention (names like *FOO*) for special variables"
   ()
   (:default-initargs :kind 'ftype :description "known function"))
 
+(define-condition ftype-proclamation-derived-mismatch-warning (ftype-proclamation-mismatch-warning)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+             "~@<The new ~A proclamation for~@[ ~A~] ~
+               ~/sb-ext:print-symbol-with-prefix/~
+               ~@:_~2@T~/sb-impl:print-type-specifier/~@:_~
+               does not match the derived return type~
+               ~@:_~2@T~/sb-impl:print-type-specifier/~@:>"
+             (proclamation-mismatch-kind condition)
+             (proclamation-mismatch-description condition)
+             (proclamation-mismatch-name condition)
+             (proclamation-mismatch-new condition)
+             (proclamation-mismatch-old condition)))))
 
 ;;;; deprecation conditions
 

@@ -359,23 +359,42 @@
     (error "Not a function type: ~/sb-impl:print-type/" type-oid))
   (with-single-package-locked-error
       (:symbol name "globally declaring the FTYPE of ~A")
-    (when (eq (info :function :where-from name) :declared)
-      (let ((old-type (global-ftype name))
-            (type (if (ctype-p type-oid)
-                      type-oid
-                      (specifier-type type-specifier))))
-        (cond
-          ((not (type/= type old-type))) ; not changed
-          ((not (info :function :info name)) ; not a known function
-           (ftype-proclamation-mismatch-warn
-            name (type-specifier old-type) type-specifier))
-          ((csubtypep type old-type)) ; tighten known function type
-          (t
-           (cerror "Continue"
-                   'ftype-proclamation-mismatch-error
-                   :name name
-                   :old (type-specifier old-type)
-                   :new type-specifier)))))
+    (let ((from (info :function :where-from name)))
+     (case from
+       (:declared
+        (let ((old-type (global-ftype name))
+              (type (if (ctype-p type-oid)
+                        type-oid
+                        (specifier-type type-specifier))))
+          (cond
+            ((not (type/= type old-type)))    ; not changed
+            ((not (info :function :info name)) ; not a known function
+             (ftype-proclamation-mismatch-warn
+              name (type-specifier old-type) type-specifier))
+            ((csubtypep type old-type)) ; tighten known function type
+            (t
+             (cerror "Continue"
+                     'ftype-proclamation-mismatch-error
+                     :name name
+                     :old (type-specifier old-type)
+                     :new type-specifier)))))
+       (:defined
+        (let* ((old-type (global-ftype name))
+               (type (if (ctype-p type-oid)
+                         type-oid
+                         (specifier-type type-specifier)))
+               (old-return-type (if (fun-type-p old-type)
+                                    (fun-type-returns old-type)
+                                    *wild-type*))
+               (return-type (if (fun-type-p type)
+                                (fun-type-returns type)
+                                *wild-type*)))
+          (cond
+            ((values-subtypep old-return-type return-type))
+            (t
+             (style-warn 'sb-kernel::ftype-proclamation-derived-mismatch-warning
+                         :name name :old (type-specifier old-type)
+                         :new type-specifier)))))))
     ;; Now references to this function shouldn't be warned about as
     ;; undefined, since even if we haven't seen a definition yet, we
     ;; know one is planned.
