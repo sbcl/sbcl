@@ -277,8 +277,15 @@
 
   ;; We run through queued-up type and ftype proclaims that were made
   ;; before the type system was initialized, and (since it is now
-  ;; initalized) reproclaim them..
-  (mapcar #'proclaim sb-c::*queued-proclaims*)
+  ;; initalized) reproclaim them.
+  (loop for claim in sb-c::*queued-proclaims*
+        do
+        (when (eq (car claim) 'ftype)
+          ;; Avoid warnings about mismatched types.
+          (loop for name in (cddr claim)
+                do (setf (info :function :where-from name) :assumed)))
+        (proclaim claim))
+
   (makunbound 'sb-c::*queued-proclaims*)
 
   (show-and-call os-cold-init-or-reinit)
