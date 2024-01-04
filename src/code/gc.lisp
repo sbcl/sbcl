@@ -332,8 +332,11 @@ Note: currently changes to this value are lost when saving core."
 
 (defun (setf bytes-consed-between-gcs) (val)
   (declare (type (and fixnum unsigned-byte) val))
-  (setf (extern-alien "bytes_consed_between_gcs" os-vm-size-t)
-        val))
+  #+(or gencgc mark-region-gc)
+  (let ((current (extern-alien "bytes_consed_between_gcs" os-vm-size-t)))
+    (when (< val current)
+      (decf (extern-alien "auto_gc_trigger" os-vm-size-t) (- current val))))
+  (setf (extern-alien "bytes_consed_between_gcs" os-vm-size-t) val))
 
 (declaim (inline maybe-handle-pending-gc))
 (defun maybe-handle-pending-gc ()
