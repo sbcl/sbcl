@@ -379,22 +379,23 @@
                      :old (type-specifier old-type)
                      :new type-specifier)))))
        (:defined
-        (let* ((old-type (global-ftype name))
-               (type (if (ctype-p type-oid)
-                         type-oid
-                         (specifier-type type-specifier)))
-               (old-return-type (if (fun-type-p old-type)
-                                    (fun-type-returns old-type)
-                                    *wild-type*))
-               (return-type (if (fun-type-p type)
-                                (fun-type-returns type)
-                                *wild-type*)))
-          (cond
-            ((values-subtypep old-return-type return-type))
-            (t
-             (style-warn 'sb-kernel::ftype-proclamation-derived-mismatch-warning
-                         :name name :old (type-specifier old-type)
-                         :new type-specifier)))))))
+        (when (and #+sb-xc-host (not (sb-cold::make-host-2-parallelism)))
+          (let* ((old-type (global-ftype name))
+                 (type (if (ctype-p type-oid)
+                           type-oid
+                           (specifier-type type-specifier)))
+                 (old-return-type (if (fun-type-p old-type)
+                                      (fun-type-returns old-type)
+                                      *wild-type*))
+                 (return-type (if (fun-type-p type)
+                                  (fun-type-returns type)
+                                  *wild-type*)))
+            (cond
+              ((values-subtypep old-return-type return-type))
+              (t
+               (style-warn 'sb-kernel::ftype-proclamation-derived-mismatch-warning
+                           :name name :old (type-specifier old-type)
+                           :new type-specifier))))))))
     ;; Now references to this function shouldn't be warned about as
     ;; undefined, since even if we haven't seen a definition yet, we
     ;; know one is planned.
