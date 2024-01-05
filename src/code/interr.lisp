@@ -174,32 +174,37 @@
 
 (deferr invalid-arg-count-error (nargs)
   (let* ((frame (find-interrupted-frame))
-         (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))))
-    (when (typep name '(cons (eql sb-pcl::fast-method)))
-      (decf nargs 2)))
-  (restart-case
-      (%program-error "invalid number of arguments: ~S" nargs)
-    #+(or x86-64 arm64)
-    (replace-function (value)
-      :report (lambda (stream)
-                (format stream "Call a different function with the same arguments"))
-      :interactive read-evaluated-form
-      (sb-vm::context-call-function *current-internal-error-context*
-                                    (fdefinition value)))
-    #+(or x86-64 arm64)
-    (call-form (form)
-      :report (lambda (stream)
-                (format stream "Call a different form"))
-      :interactive read-evaluated-form
-      (sb-vm::context-call-function *current-internal-error-context*
-                                    (lambda ()
-                                      ;; Don't invoke the compiler in
-                                      ;; case it's dealing with an
-                                      ;; error within the compiler
-                                      (let (#+(or sb-eval sb-fasteval)
-                                            (*evaluator-mode* :interpret))
-                                        (eval form)))
-                                    0))))
+         (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
+         (context (sb-di:error-context)))
+    (cond (context
+           (%program-error "Function~@[ ~s~] declared to return ~s returned ~a value~:p"
+                           (car context) (cdr context) nargs))
+          (t
+           (when (typep name '(cons (eql sb-pcl::fast-method)))
+             (decf nargs 2))
+           (restart-case
+               (%program-error "invalid number of arguments: ~S" nargs)
+             #+(or x86-64 arm64)
+             (replace-function (value)
+               :report (lambda (stream)
+                         (format stream "Call a different function with the same arguments"))
+               :interactive read-evaluated-form
+               (sb-vm::context-call-function *current-internal-error-context*
+                                             (fdefinition value)))
+             #+(or x86-64 arm64)
+             (call-form (form)
+               :report (lambda (stream)
+                         (format stream "Call a different form"))
+               :interactive read-evaluated-form
+               (sb-vm::context-call-function *current-internal-error-context*
+                                             (lambda ()
+                                               ;; Don't invoke the compiler in
+                                               ;; case it's dealing with an
+                                               ;; error within the compiler
+                                               (let (#+(or sb-eval sb-fasteval)
+                                                     (*evaluator-mode* :interpret))
+                                                 (eval form)))
+                                             0)))))))
 
 (deferr local-invalid-arg-count-error (nargs name)
   (%program-error "~S called with invalid number of arguments: ~S"
