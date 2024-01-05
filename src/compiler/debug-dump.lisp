@@ -185,6 +185,13 @@
            (the fixnum (logior (ash offset registers-size)
                                (tn-offset tn)))
            offset)))
+    (cons (let ((last (cdr (last x))))
+            (if (restart-location-p last)
+                (let ((new (copy-list x)))
+                  (setf (cdr (last new))
+                        (encode-restart-location location last))
+                  new)
+                x)))
     (t
      x)))
 

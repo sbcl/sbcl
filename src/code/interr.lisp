@@ -177,8 +177,16 @@
          (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
          (context (sb-di:error-context)))
     (cond (context
-           (%program-error "Function~@[ ~s~] declared to return ~s returned ~a value~:p"
-                           (car context) (cdr context) nargs))
+           (destructuring-bind (name type . restart) context
+               (restart-case
+                   (error 'simple-program-error
+                          :format-control "Function~@[ ~s~] declared to return ~s returned ~a value~:p"
+                          :format-arguments (list name type nargs))
+                 (continue ()
+                   :report (lambda (stream)
+                             (format stream "Ignore extra values / use NIL for missing values."))
+                   (sb-vm::incf-context-pc *current-internal-error-context*
+                                           restart)))))
           (t
            (when (typep name '(cons (eql sb-pcl::fast-method)))
              (decf nargs 2))
