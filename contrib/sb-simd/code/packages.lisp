@@ -1993,3 +1993,9 @@
      #:f64.4-fmsub
      #:f64.4-fmaddsub
      #:f64.4-fmsubadd)))
+
+(dolist (p '("SB-SIMD" "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
+             "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
+             "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
+             "SB-SIMD-SSSE3" "SB-SIMD-X86-64"))
+  (setf (sb-int:system-package-p (find-package p)) t))
