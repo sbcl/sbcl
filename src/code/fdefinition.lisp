@@ -22,7 +22,8 @@
   #+(and x86-64 immobile-space)
   (let ((fdefn (truly-the (values fdefn &optional)
                           (sb-vm::alloc-immobile-fdefn))))
-    (sb-vm::%set-fdefn-name fdefn name)
+    (%primitive sb-vm::set-slot fdefn name 'make-fdefn
+                sb-vm:fdefn-name-slot sb-vm:other-pointer-lowtag)
     (fdefn-makunbound fdefn)
     fdefn))
 

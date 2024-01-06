@@ -221,8 +221,7 @@ during backtrace.
 (define-primitive-object (fdefn :type fdefn
                                 :lowtag other-pointer-lowtag
                                 :widetag fdefn-widetag)
-  (name :ref-trans fdefn-name
-        :set-trans %set-fdefn-name :set-known ())
+  (name :ref-trans fdefn-name)
   (fun :type (or function null) :ref-trans fdefn-fun)
   ;; raw-addr is used differently by the various backends:
   ;; - Sparc, ARM, and RISC-V store the same object as 'fun'
