@@ -95,16 +95,6 @@ distinct from the global value. Can also be SETF."
         sxhash
         (logior sxhash #x55AA)))) ; arbitrary
 
-;; Return SYMBOL's hash, a strictly positive fixnum, computing it if not stored.
-;; The inlined code for (SXHASH symbol) only calls ENSURE-SYMBOL-HASH if
-;; needed, however this is ok to call even if the hash is already nonzero.
-(defun ensure-symbol-hash (symbol)
-  (let ((hash (symbol-hash symbol)))
-    (if (zerop hash)
-        (let ((name (symbol-name symbol)))
-          (%set-symbol-hash symbol (compute-symbol-hash name (length name))))
-      hash)))
-
 ;;; Return the function binding of SYMBOL or NIL if not fboundp.
 ;;; Don't strip encapsulations.
 (declaim (inline %symbol-function))
@@ -420,6 +410,7 @@ distinct from the global value. Can also be SETF."
                        (char= (char name (1- (length name))) #\*)))
               (sb-vm::make-immobile-symbol name)
               (sb-vm::%%make-symbol name)))))
+    (%set-symbol-hash symbol (compute-symbol-hash name (length name)))
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.
     #-compact-symbol (%set-symbol-package symbol nil)
@@ -529,23 +520,24 @@ distinct from the global value. Can also be SETF."
           ((memq (car plist) indicator-list)
            (return (values (car plist) (cadr plist) plist))))))
 
-(defun copy-symbol (symbol &optional (copy-props nil) &aux new-symbol)
+(defun copy-symbol (symbol &optional (copy-props nil))
   "Make and return a new uninterned symbol with the same print name
   as SYMBOL. If COPY-PROPS is false, the new symbol is neither bound
   nor fbound and has no properties, else it has a copy of SYMBOL's
   function, value and property list."
   (declare (type symbol symbol))
   (declare (sb-c::tlab :system)) ; heap-cons the property list if copying it
-  (setq new-symbol (make-symbol (symbol-name symbol)))
-  (when copy-props
-    (%set-symbol-value new-symbol
-                       (%primitive sb-c:fast-symbol-value symbol))
-    (locally (declare (optimize speed)) ; will inline COPY-LIST
-      (setf (symbol-plist new-symbol)
-            (copy-list (symbol-plist symbol))))
-    (when (fboundp symbol)
-      (setf (symbol-function new-symbol) (symbol-function symbol))))
-  new-symbol)
+  (let ((new-symbol (make-symbol (symbol-name symbol))))
+    (when copy-props
+      ;; Should this really copy a thread-local value ?
+      ;; I would think it more correct to copy only a global value.
+      (%set-symbol-value new-symbol (%primitive sb-c:fast-symbol-value symbol))
+      (locally (declare (optimize speed)) ; will inline COPY-LIST
+        (setf (symbol-plist new-symbol)
+              (copy-list (symbol-plist symbol))))
+      (when (fboundp symbol)
+        (setf (symbol-function new-symbol) (symbol-function symbol))))
+    new-symbol))
 
 (defun keywordp (object)
   "Return true if Object is a symbol in the \"KEYWORD\" package."

@@ -722,8 +722,6 @@
   (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (let* ((vector (layout-slot-table wrapper))
          (modulus (truly-the index (svref vector 0)))
-         ;; Can elide the 'else' branch of (OR symbol-hash ensure-symbol-hash)
-         ;; because every symbol in the slot-table already got a nonzero hash.
          (index (rem (symbol-hash slot-name) modulus))
          (probe (svref vector (1+ index))))
     (declare (simple-vector vector) (index index))
@@ -751,7 +749,7 @@
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c:insert-array-bounds-checks 0)))
-             (let ((index (rem (ensure-symbol-hash name) n)))
+             (let ((index (rem (symbol-hash name) n)))
                (setf (svref vector index)
                      (acons name
                             (cons (when (or bootstrap

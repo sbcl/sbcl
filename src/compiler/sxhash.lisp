@@ -131,35 +131,8 @@
 
 (deftransform sxhash ((x) (double-float)) '#.(sb-impl::sxhash-double-float-xform 'x))
 
-(deftransform sxhash ((x) (symbol))
-  ;; All interned symbols have a precomputed hash.
-  ;; The types for which interned-ness can be conveyed via type constraints
-  ;; are KEYWORD and MEMBER. Despite the existence of UNINTERN, the optimization
-  ;; here is admissible. If the user uninterns a symbol, the hash is still there.
-  ;; TBH I think we should just precompute the hash of all symbols.
-  (cond ((or (csubtypep (lvar-type x) (specifier-type 'keyword))
-             (and (member-type-p (lvar-type x))
-                  (progn
-                    ;; can't be a subtype of SYMBOL with fp-zeroes in it
-                    (aver (null (sb-kernel::member-type-fp-zeroes (lvar-type x))))
-                    (xset-every #'cl:symbol-package
-                                (sb-kernel::member-type-xset (lvar-type x))))))
-         `(symbol-hash x)) ; Never need to lazily compute and memoize
-        ((vop-existsp :translate ensure-symbol-hash)
-         ;; A vop might emit slightly better code than the expression below
-         `(ensure-symbol-hash x))
-        (t
-         ;; Cache the value of the symbol's sxhash in the symbol-hash
-         ;; slot.
-         '(let ((result (symbol-hash x)))
-            ;; 0 marks uninitialized slot. We can't use negative
-            ;; values for the uninitialized slots since NIL might be
-            ;; located so high in memory on some platforms that its
-            ;; SYMBOL-HASH (which contains NIL itself) is a negative
-            ;; fixnum.
-            (if (= 0 result)
-                (ensure-symbol-hash x)
-                result)))))
+;; All symbols have a precomputed hash.
+(deftransform sxhash ((x) (symbol)) `(symbol-hash x))
 
 (deftransform symbol-hash* ((object predicate) (symbol null) * :important nil)
   `(symbol-hash* object 'symbolp)) ; annotate that object satisfies SYMBOLP

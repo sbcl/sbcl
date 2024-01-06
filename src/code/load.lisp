@@ -849,17 +849,7 @@
            (multiple-value-bind (name length elt-type)
                (read-symbol-name length+flag fasl-input)
              (push-fop-table (%intern name length package elt-type t inherited)
-                             fasl-input)))
-         (ensure-hashed (symbol)
-           ;; ENSURE-SYMBOL-HASH when vop-translated is flushable since it is
-           ;; conceptually just a slot reader, however its actual effect is to fill in
-           ;; the hash if absent, so it's not quite flushable when called expressly
-           ;; to fill in the slot. In this case we need a full call to ENSURE-SYMBOL-HASH
-           ;; to ensure the side-effect happens.
-           ;; Careful if changing this again. There'a regression test thank goodness.
-           (declare (notinline ensure-symbol-hash))
-           (ensure-symbol-hash symbol)
-           symbol))
+                             fasl-input))))
 
   (define-fop 77 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *cl-package* t (fasl-input)))
@@ -872,12 +862,11 @@
 
   (define-fop 80 :not-host (fop-uninterned-symbol-save ((:operands length+flag)))
     (multiple-value-bind (name len) (read-symbol-name length+flag (fasl-input))
-      (push-fop-table (ensure-hashed (make-symbol (subseq name 0 len)))
+      (push-fop-table (make-symbol (subseq name 0 len))
                       (fasl-input))))
 
   (define-fop 81 :not-host (fop-copy-symbol-save ((:operands table-index)))
-    (push-fop-table (ensure-hashed
-                     (copy-symbol (ref-fop-table (fasl-input) table-index)))
+    (push-fop-table (copy-symbol (ref-fop-table (fasl-input) table-index))
                     (fasl-input))))
 
 (define-fop 82 (fop-package (pkg-designator))

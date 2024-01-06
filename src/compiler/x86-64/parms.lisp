@@ -160,7 +160,7 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-    `#(ensure-symbol-hash sb-impl::install-hash-table-lock update-object-layout
+    `#(sb-impl::install-hash-table-lock update-object-layout
        ,@common-static-fdefns)
   #'equalp)
 

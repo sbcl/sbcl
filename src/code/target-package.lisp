@@ -1099,7 +1099,7 @@ Experimental: interface subject to change."
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
          (len (length vec))
-         (name-hash (truly-the fixnum (ensure-symbol-hash symbol)))
+         (name-hash (symbol-hash symbol))
          (h1 (symbol-table-hash 1 name-hash len))
          (h2 (symbol-table-hash 2 name-hash len)))
     (declare (fixnum name-hash))

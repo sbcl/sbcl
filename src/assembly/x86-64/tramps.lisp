@@ -228,12 +228,6 @@
   (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
-(define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
-  (with-registers-preserved (lisp)
-    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-    (call-static-fun 'ensure-symbol-hash 1)
-    (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
-
 #+debug-gc-barriers
 (define-assembly-routine (check-barrier (:return-style :none)) ()
   (inst push rax-tn)

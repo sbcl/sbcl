@@ -106,23 +106,16 @@
     (instance) hash-code (flushable))
 ;;; SXHASH values on numbers and strings are predictable, therefore the next batch
 ;;; of functions are flushable. Perhaps not entirely obviously, symbol hashes are
-;;; predictable because we hash by name. And while ENSURE-SYMBOL-HASH is not
-;;; - strictly speaking - a side-effectless operation, it has no effect as far as
-;;; user-written code is concerned. i.e. nothing portably expressed can discern
-;;; whether memoization of the hash occurred. (I feel like we would have a cleaner
-;;; implementation if we just eagerly compute the hash anyway. Practically all
-;;; symbols eventually get hashed)
+;;; predictable because we hash by name.
 (defknown sb-impl::number-sxhash (number) hash-code (foldable flushable))
 (defknown %sxhash-string (string) hash-code (foldable flushable))
 (defknown %sxhash-simple-string (simple-string) hash-code (foldable flushable))
 
 (defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
-(defknown sb-impl::compute-symbol-hash (simple-string index) hash-code
-  (foldable flushable))
+(defknown sb-impl::compute-symbol-hash (simple-string index) hash-code ())
 
-(defknown (symbol-hash ensure-symbol-hash) (symbol) hash-code
-  (flushable movable))
+(defknown (symbol-hash) (symbol) hash-code (flushable movable))
 ;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
 ;;; object, not only symbols. The result is meaningful only if the object
 ;;; is a symbol. The second argument indicates a predicate that the first
