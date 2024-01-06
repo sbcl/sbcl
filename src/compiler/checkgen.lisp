@@ -252,6 +252,11 @@
                                            (eq lvar (car args)))
                                       (and (memq name '(sb-vm::overflow-t-y))
                                            (eq lvar (cadr args))))))))
+                        ((and (policy dest (= debug 3))
+                              (let ((leaf (nth-value 2 (lvar-fun-type (combination-fun dest)))))
+                                (and leaf
+                                     (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
+                         nil)
                         (t
                          (values-subtypep (lvar-externally-checkable-type lvar)
                                           (cast-type-to-check cast))))))
