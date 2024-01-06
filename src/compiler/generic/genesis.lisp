@@ -3809,7 +3809,8 @@ III. initially undefined function references (alphabetically):
     (mapc (lambda (cell &aux (host-obj (car cell)) (addr (descriptor-bits (cdr cell))))
             (when (ctype-p host-obj)
               (format t "~X: [~vx] ~A = ~S~%"
-                      addr (* 2 sb-vm:n-word-bytes) (read-slot (cdr cell) :%bits)
+                      addr (* 2 sb-vm:n-word-bytes)
+                      (descriptor-fixnum (read-slot (cdr cell) :%bits))
                       (type-of host-obj) (type-specifier host-obj))))
           sorted)
     (format t "Lists:~%")
