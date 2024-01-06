@@ -882,12 +882,10 @@ many elements are copied."
   (let* ((length (length (the list list)))
          (vector (make-array length))
          (list list))
-    (loop for x = (pop list)
+    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+    (loop for i from (1- length) downto 0
           do
-          (locally (declare (optimize (safety 0)))
-            (setf (aref vector (decf length)) x))
-          ;; LENGTH already checked for a proper list.
-          until (atom list))
+          (setf (aref vector i) (pop list)))
     vector))
 
 (defun reverse-word-specialized-vector (from to end)
