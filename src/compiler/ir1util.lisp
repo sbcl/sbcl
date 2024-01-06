@@ -198,6 +198,20 @@
             (let-lvar-dest (node-lvar (car refs)))))
         dest)))
 
+(defun lvar-dest-var (lvar)
+  (let ((dest (lvar-dest lvar)))
+    (cond ((combination-p dest)
+           (if (eq (basic-combination-kind dest) :local)
+               (let* ((fun (combination-lambda dest))
+                      (n (position-or-lose lvar
+                                           (combination-args dest)))
+                      (var (nth n (lambda-vars fun))))
+                 var)
+               (and (lvar-fun-is (combination-fun dest) '(sb-vm::splat))
+                    (lvar-dest-var (node-lvar dest)))))
+          ((cast-p dest)
+           (lvar-dest-var (node-lvar dest))))))
+
 (defun immediately-used-let-dest (lvar node &optional flushable)
   (let ((dest (lvar-dest lvar)))
     (when (almost-immediately-used-p lvar node :flushable flushable)

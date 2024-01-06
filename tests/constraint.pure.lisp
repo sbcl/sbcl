@@ -834,6 +834,33 @@
                      nil))
              0)))
 
+(with-test (:name :bounds-check-make-array)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (length)
+                        (declare (integer length))
+                        (let ((array (make-array length)))
+                          (loop for i below length
+                                do (setf (aref array i) i))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (length)
+                        (let ((array (make-array length)))
+                          (loop for i below length
+                                do (setf (aref array i) i))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (type length)
+                        (let ((array (make-sequence type length)))
+                          (loop for i below length
+                                do (setf (aref array i) i))))
+                     nil))
+             0)))
+
 (with-test (:name :reoptimize)
   (assert-type
    (lambda ()

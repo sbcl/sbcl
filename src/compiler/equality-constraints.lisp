@@ -143,96 +143,108 @@
            ((> >= . #.+eq-ops+) '>=))))))
 
 (defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints)
-  (let* ((constant-x (and (lvar-p first)
-                          (constant-lvar-p first)))
-         (constant-y (and (lvar-p second)
-                          (constant-lvar-p second)))
-         (x (cond (constant-x
-                   (nth-value 1 (lvar-value first)))
-                  ((lambda-var/vector-length-p first)
-                   first)
-                  ((ok-lvar-lambda-var/vector-length first constraints))
-                  (t
-                   first)))
-         (y (cond (constant-y
-                   (nth-value 1 (lvar-value second)))
-                  ((lambda-var/vector-length-p second)
-                   second)
-                  ((ok-lvar-lambda-var/vector-length second constraints))
-                  (t
-                   second)))
-         (x-type (etypecase first
-                   (lvar (lvar-type first))
-                   (lambda-var (lambda-var-type first))
-                   (vector-length-constraint (specifier-type 'index))))
-         (y-type (etypecase second
-                   (lvar (lvar-type second))
-                   (lambda-var (lambda-var-type second))
-                   (vector-length-constraint (specifier-type 'index)))))
-    (when (lvar-p first)
-      (constraint-propagate-back first operator second
-                                 constraints
-                                 consequent-constraints
-                                 alternative-constraints))
-    (unless (lambda-var/vector-length-p x)
-      (unless (lambda-var/vector-length-p y)
-        (return-from add-equality-constraint))
-      (rotatef first second)
-      (rotatef x y)
-      (rotatef x-type y-type)
-      (rotatef constant-x constant-y)
-      (setf operator (invert-operator operator)))
-    (flet ((replace-var (var with)
-             (cond ((eq var with)
-                    var)
-                   ((vector-length-constraint-p var)
-                    (make-vector-length-constraint with))
-                   (t
-                    with)))
-           (add (x y &optional (operator operator) (alternative-constraints alternative-constraints))
-             (unless (lambda-var/vector-length-p x)
-               (unless (lambda-var/vector-length-p y)
-                 (return-from add))
-               (rotatef x y)
-               (setf operator (invert-operator operator)))
-             (conset-add-equality-constraint consequent-constraints operator x y nil)
-             (when alternative-constraints
-               (conset-add-equality-constraint alternative-constraints operator x y t))))
-      (do-eql-vars (eql-x ((constraint-var x) constraints))
-        (let ((x (replace-var x eql-x)))
-          (add x y)
-          (when (and (vector-length-constraint-p x)
-                     (not constant-y)
-                     (neq y-type *universal-type*))
-            (add x y-type))))
-      (if (lambda-var/vector-length-p y)
-          (do-eql-vars (eql-y ((constraint-var y) constraints))
-            (let ((y (replace-var y eql-y)))
-              (add x y)
-              (when (and (vector-length-constraint-p y)
-                         (not constant-x)
-                         (neq x-type *universal-type*))
-                (add x-type y))))
-          (add x y))
-      (flet ((inherit (x y x-type operator)
-               (when (lambda-var/vector-length-p y)
-                 (do-equality-constraints (in-y in-op in-not-p) y constraints
-                   (unless (eq in-y y)
-                     (let ((inherit (inherit-equality-p operator in-op in-not-p)))
-                       (when inherit
-                         (add x in-y inherit nil)
-                         (when (and (vector-length-constraint-p in-y)
-                                    (not (constant-p x)))
-                           (add x-type in-y inherit nil)))))))))
-        (inherit x y x-type operator)
-        (inherit y x y-type (invert-operator operator))
-        (when (lvar-p y)
-          (loop for (in-op in-lvar) in (lvar-result-constraints y)
-                do
-                (let ((inherit (inherit-equality-p operator in-op nil)))
-                  (when inherit
-                    (add-equality-constraint inherit x in-lvar
-                                             constraints consequent-constraints nil)))))))))
+  (case operator
+    (vector-length
+     (let ((var (if (lambda-var-p first)
+                    first
+                    (lvar-dest-var first))))
+       (when (and var
+                  (lambda-var-constraints var))
+         (add-equality-constraint 'eq (make-vector-length-constraint var) second
+                                  constraints consequent-constraints alternative-constraints))))
+    (t
+     (let* ((constant-x (and (lvar-p first)
+                             (constant-lvar-p first)))
+            (constant-y (and (lvar-p second)
+                             (constant-lvar-p second)))
+            (x (cond (constant-x
+                      (nth-value 1 (lvar-value first)))
+                     ((lambda-var/vector-length-p first)
+                      first)
+                     ((ok-lvar-lambda-var/vector-length first constraints))
+                     (t
+                      first)))
+            (y (cond (constant-y
+                      (nth-value 1 (lvar-value second)))
+                     ((lambda-var/vector-length-p second)
+                      second)
+                     ((ok-lvar-lambda-var/vector-length second constraints))
+                     (t
+                      second)))
+            (x-type (etypecase first
+                      (lvar (lvar-type first))
+                      (lambda-var (lambda-var-type first))
+                      (vector-length-constraint (specifier-type 'index))))
+            (y-type (etypecase second
+                      (lvar (lvar-type second))
+                      (lambda-var (lambda-var-type second))
+                      (vector-length-constraint (specifier-type 'index)))))
+       (when (lvar-p first)
+         (constraint-propagate-back first operator second
+                                    constraints
+                                    consequent-constraints
+                                    alternative-constraints))
+       (unless (lambda-var/vector-length-p x)
+         (unless (lambda-var/vector-length-p y)
+           (return-from add-equality-constraint))
+         (rotatef first second)
+         (rotatef x y)
+         (rotatef x-type y-type)
+         (rotatef constant-x constant-y)
+         (setf operator (invert-operator operator)))
+       (flet ((replace-var (var with)
+                (cond ((eq var with)
+                       var)
+                      ((vector-length-constraint-p var)
+                       (make-vector-length-constraint with))
+                      (t
+                       with)))
+              (add (x y &optional (operator operator) (alternative-constraints alternative-constraints))
+                (unless (lambda-var/vector-length-p x)
+                  (unless (lambda-var/vector-length-p y)
+                    (return-from add))
+                  (rotatef x y)
+                  (setf operator (invert-operator operator)))
+                (conset-add-equality-constraint consequent-constraints operator x y nil)
+                (when alternative-constraints
+                  (conset-add-equality-constraint alternative-constraints operator x y t))))
+         (do-eql-vars (eql-x ((constraint-var x) constraints))
+           (let ((x (replace-var x eql-x)))
+             (add x y)
+             (when (and (vector-length-constraint-p x)
+                        (not constant-y)
+                        (neq y-type *universal-type*))
+               (add x y-type))))
+         (if (lambda-var/vector-length-p y)
+             (do-eql-vars (eql-y ((constraint-var y) constraints))
+               (let ((y (replace-var y eql-y)))
+                 (add x y)
+                 (when (and (vector-length-constraint-p y)
+                            (not constant-x)
+                            (neq x-type *universal-type*))
+                   (add x-type y))))
+             (add x y))
+         (flet ((inherit (x y x-type operator)
+                  (when (lambda-var/vector-length-p y)
+                    (do-equality-constraints (in-y in-op in-not-p) y constraints
+                      (unless (eq in-y y)
+                        (let ((inherit (inherit-equality-p operator in-op in-not-p)))
+                          (when inherit
+                            (add x in-y inherit nil)
+                            (when (and (vector-length-constraint-p in-y)
+                                       (not (constant-p x)))
+                              (add x-type in-y inherit nil)))))))))
+           (inherit x y x-type operator)
+           (inherit y x y-type (invert-operator operator))
+           (when (lvar-p y)
+             (loop for (in-op in-lvar) in (lvar-result-constraints y)
+                   do
+                   (case in-op
+                     (t
+                      (let ((inherit (inherit-equality-p operator in-op nil)))
+                        (when inherit
+                          (add-equality-constraint inherit x in-lvar
+                                                   constraints consequent-constraints nil)))))))))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
@@ -676,3 +688,12 @@
 
 (defoptimizer (/ constraint-propagate-result) ((x y) node)
   (div-constraints x y))
+
+(defoptimizer (allocate-vector constraint-propagate-result) ((#+ubsan poisoned type length words) node)
+  (list (list 'vector-length length)))
+
+(defoptimizer (%make-array constraint-propagate-result) ((length &rest args) node)
+  (list (list 'vector-length length)))
+
+(defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
+  (list (list 'vector-length length)))
