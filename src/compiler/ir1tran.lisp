@@ -214,6 +214,17 @@
          (compiler-warn "~(~a~) ~s where a function is expected" kind name)))
       (let ((ftype (global-ftype name))
             (notinline (fun-lexically-notinline-p name)))
+        #-sb-xc-host
+        (when (and (eq where :declared)
+                   (policy *lexenv* (and (>= safety 1)
+                                         (= debug 3)))
+                   (not (or
+                         (info :function :info name)
+                         (let ((name (if (consp name)
+                                         (second name)
+                                         name)))
+                           (system-package-p (symbol-package name))))))
+          (setf where :declared-verify))
         (make-global-var
          :kind :global-function
          :%source-name name

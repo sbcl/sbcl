@@ -1381,7 +1381,7 @@
 (defun validate-call-type (call type fun &optional ir1-converting-not-optimizing-p (trusted t))
   (declare (type combination call) (type ctype type))
   (let* ((where (when fun (leaf-where-from fun)))
-         (same-file-p (eq :defined-here where)))
+         (same-file-p (memq where '(:defined-here :declared-verify))))
     (cond ((not (fun-type-p type))
            ;; Using the defined-type too early is a bit of a waste: during
            ;; conversion we cannot use the untrusted ASSERT-CALL-TYPE, etc.
@@ -1401,7 +1401,7 @@
                                                             #'compiler-style-warn)
                                            :unwinnage-fun #'compiler-notify)
                             same-file-p)
-                   (assert-call-type call defined-type nil)
+                   (assert-call-type call defined-type nil where)
                    (maybe-terminate-block call ir1-converting-not-optimizing-p)))))
            (recognize-known-call call ir1-converting-not-optimizing-p))
           (t
@@ -1413,7 +1413,7 @@
                               :unwinnage-fun #'compiler-notify)
              (declare (ignore unwinnage))
              (cond (valid
-                    (assert-call-type call type trusted)
+                    (assert-call-type call type trusted where)
                     (maybe-terminate-block call ir1-converting-not-optimizing-p)
                     (cond ((eq (combination-kind call) :error)
                            (values nil nil))

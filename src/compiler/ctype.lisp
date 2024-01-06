@@ -1007,7 +1007,7 @@ and no value was provided for it." name))))))))))
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
-(defun assert-call-type (call type &optional (trusted t))
+(defun assert-call-type (call type trusted where-from)
   (declare (type combination call) (type fun-type type))
   (let ((policy (lexenv-policy (node-lexenv call)))
         (returns (fun-type-returns type)))
@@ -1023,9 +1023,10 @@ and no value was provided for it." name))))))))))
           ;; less use there, but they can cause the MV call conversion
           ;; to cause astray.
           (when (and lvar
-                     (not (return-p (lvar-dest lvar)))
-                     (not (mv-combination-p (lvar-dest lvar)))
-                     (lvar-has-single-use-p lvar))
+                     (or (eq where-from :declared-verify)
+                         (and (not (return-p (lvar-dest lvar)))
+                              (not (mv-combination-p (lvar-dest lvar)))
+                              (lvar-has-single-use-p lvar))))
             (when (assert-lvar-type lvar returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
     (let* ((name (lvar-fun-name (combination-fun call) t))

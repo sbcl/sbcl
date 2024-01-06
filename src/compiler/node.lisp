@@ -817,11 +817,12 @@
   (defined-type *universal-type* :type ctype)
   ;; where the TYPE information came from (in order, from strongest to weakest):
   ;;  :DECLARED, from a declaration.
+  ;;  :DECLARED-VERIFY
   ;;  :DEFINED-HERE, from examination of the definition in the same file.
   ;;  :DEFINED, from examination of the definition elsewhere.
   ;;  :DEFINED-METHOD, implicit, piecemeal declarations from CLOS.
   ;;  :ASSUMED, from uses of the object.
-  (where-from :assumed :type (member :declared :assumed :defined-here :defined :defined-method))
+  (where-from :assumed :type (member :declared :declared-verify :assumed :defined-here :defined :defined-method))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
   ;; For tracking whether to warn about unused variables:

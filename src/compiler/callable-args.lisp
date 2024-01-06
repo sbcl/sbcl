@@ -188,7 +188,7 @@
                                       lvar-type)
                                      (t
                                       (global-ftype (leaf-%source-name leaf)))))
-                              (:defined-here
+                              ((:defined-here :declared-verify)
                                (cond ((or (and (defined-fun-p leaf)
                                                (eq (defined-fun-inlinep leaf) 'notinline))
                                           (fun-lexically-notinline-p (leaf-%source-name leaf)
@@ -267,7 +267,7 @@
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
   (if (or (not leaf)
-          (and (neq (leaf-where-from leaf) :defined-here)
+          (and (not (memq (leaf-where-from leaf) '(:defined-here :declared-verify)))
                (not (and (functional-p leaf)
                          (or (lambda-p leaf)
                              (member (functional-kind leaf)
