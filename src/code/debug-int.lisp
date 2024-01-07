@@ -3825,11 +3825,8 @@ register."
                   ;; something like GET-FDEFN-FOR-SINGLE-STEP
                   (+ (sap-ref-32 (context-pc context) 1) -2 other-pointer-lowtag))
                  (t
-                  #+ppc64
                   (logior (context-register context callee-register-offset)
-                          other-pointer-lowtag)
-                  #-ppc64
-                  (context-register context callee-register-offset)))))
+                          #+untagged-fdefns other-pointer-lowtag)))))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
@@ -3892,9 +3889,9 @@ register."
           (sb-vm::incf-context-pc context 5))
          (t
           (setf (context-register context callee-register-offset)
-                #+ppc64
+                #+untagged-fdefns
                 (logandc2 (get-lisp-obj-address new-callee) lowtag-mask)
-                #-ppc64
+                #-untagged-fdefns
                 (get-lisp-obj-address new-callee))))))))
 
 ;;; Given a signal context, fetch the step-info that's been stored in
