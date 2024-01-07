@@ -2067,26 +2067,33 @@
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
-(macrolet ((define (name args expr)
-             `(deftransform ,name ,args
-                (let* ((type (lvar-type array))
-                       (element-type (array-type-upgraded-element-type type)))
-                  (when (or (and (eq element-type *wild-type*)
-                                 ;; This type logic corresponds to the special
-                                 ;; case for strings in HAIRY-DATA-VECTOR-REF
-                                 ;; (generic/vm-tran.lisp)
-                                 (not (csubtypep type (specifier-type 'simple-string))))
-                            (not (null (conservative-array-type-complexp type))))
-                    (give-up-ir1-transform
-                     "Upgraded element type of array is not known at compile time."))
-                  ,expr))))
-  (define hairy-data-vector-ref/check-bounds ((array index))
-    `(hairy-data-vector-ref
-      array (check-bound array (array-dimension array 0) index)))
-  (define hairy-data-vector-set/check-bounds ((array index new-value))
-    `(hairy-data-vector-set
-      array
-      (check-bound array (array-dimension array 0) index) new-value)))
+
+(deftransform hairy-data-vector-ref/check-bounds ((array index))
+  (let* ((type (lvar-type array))
+         (element-type (array-type-upgraded-element-type type)))
+    (when (or (and (eq element-type *wild-type*)
+                   ;; This type logic corresponds to the special
+                   ;; case for strings in HAIRY-DATA-VECTOR-REF
+                   ;; (generic/vm-tran.lisp)
+                   (not (csubtypep type (specifier-type 'simple-string))))
+              (not (null (conservative-array-type-complexp type))))
+      (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
+    `(hairy-data-vector-ref array (check-bound array (array-dimension array 0) index))))
+
+(deftransform hairy-data-vector-set/check-bounds ((array index new-value))
+  (let* ((type (lvar-type array))
+         (element-type (array-type-upgraded-element-type type))
+         (simple (null (conservative-array-type-complexp type))))
+    (if (or (and (eq element-type *wild-type*)
+                 (not (csubtypep type (specifier-type 'simple-string))))
+            (not simple))
+        ;; The new value is only suitable for a simple-vector
+        (if (and simple
+                 (csubtypep (lvar-type new-value) (specifier-type '(not (or number character)))))
+            `(hairy-data-vector-set/check-bounds (the simple-vector array) index new-value)
+            (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
+        `(hairy-data-vector-set array (check-bound array (array-dimension array 0) index) new-value))))
+
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the

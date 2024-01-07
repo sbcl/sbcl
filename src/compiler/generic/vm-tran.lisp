@@ -306,20 +306,24 @@
          (element-ctype (array-type-upgraded-element-type type))
          (declared-element-ctype (declared-array-element-type type)))
     (declare (type ctype element-ctype))
-    (when (eq *wild-type* element-ctype)
-      (give-up-ir1-transform
-       "Upgraded element type of array is not known at compile time."))
-    (let ((element-type-specifier (type-specifier element-ctype)))
-      `(multiple-value-bind (array index)
-           (%data-vector-and-index array index)
-         (declare (type (simple-array ,element-type-specifier 1) array)
-                  (type ,element-type-specifier new-value))
-         ,(if (type= element-ctype declared-element-ctype)
-              '(progn (data-vector-set array index new-value)
-                      new-value)
-              `(progn (data-vector-set array index
-                       ,(the-unwild declared-element-ctype 'new-value))
-                      ,(truly-the-unwild declared-element-ctype 'new-value)))))))
+    (cond ((eq *wild-type* element-ctype)
+           ;; The new value is only suitable for a simple-vector
+           (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
+               `(hairy-data-vector-set (the simple-vector array) index new-value)
+               (give-up-ir1-transform
+                "Upgraded element type of array is not known at compile time.")))
+          (t
+           (let ((element-type-specifier (type-specifier element-ctype)))
+             `(multiple-value-bind (array index)
+                  (%data-vector-and-index array index)
+                (declare (type (simple-array ,element-type-specifier 1) array)
+                         (type ,element-type-specifier new-value))
+                ,(if (type= element-ctype declared-element-ctype)
+                     '(progn (data-vector-set array index new-value)
+                       new-value)
+                     `(progn (data-vector-set array index
+                                              ,(the-unwild declared-element-ctype 'new-value))
+                             ,(truly-the-unwild declared-element-ctype 'new-value)))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.

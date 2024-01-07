@@ -786,3 +786,10 @@
                         (aref x 0))
                      nil))
              0)))
+
+(with-test (:name :setf-aref-simple-vector-from-new-value)
+  (assert (not
+           (ctu:ir1-named-calls
+            `(lambda (x)
+               (declare ((simple-array * (*)) x))
+               (setf (aref x 0) 'm))))))
