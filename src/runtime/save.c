@@ -725,6 +725,16 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     struct thread *thread = get_sb_vm_thread();
     gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
+    unwind_binding_stack(thread);
+    // Avoid tenuring of otherwise-dead objects referenced by bindings which
+    // disappear on image restart. This must occcur *after* unwind_binding_stack()
+    // because unwinding moves values from the binding stack into TLS.
+    char *start = (char*)&thread->lisp_thread;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+    // After zeroing, make sure PINNED_OBJECTS is a list again.
+    write_TLS(PINNED_OBJECTS, NIL, thread);
+
     pre_verify_gen_0 = 1;
 #ifdef LISP_FEATURE_MARK_REGION_GC
     /* Do a minor GC to instate allocation bitmap for new objects.
@@ -735,15 +745,6 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     move_rospace_to_dynamic(0);
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc(thread);
-    unwind_binding_stack(thread);
-    // Avoid tenuring of otherwise-dead objects referenced by bindings which
-    // disappear on image restart. This must occcur *after* unwind_binding_stack()
-    // because unwinding moves values from the binding stack into TLS.
-    char *start = (char*)&thread->lisp_thread;
-    char *end = (char*)thread + dynamic_values_bytes;
-    memset(start, 0, end-start);
-    // After zeroing, make sure PINNED_OBJECTS is a list again.
-    write_TLS(PINNED_OBJECTS, NIL, thread);
 
     save_lisp_gc_iteration = 1;
 #ifndef LISP_FEATURE_MARK_REGION_GC
