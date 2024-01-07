@@ -879,13 +879,15 @@ many elements are copied."
 
 (defun list-reverse-into-vector (list)
   (declare (explicit-check))
-  (let* ((length (length (the list list)))
-         (vector (make-array length))
-         (list list))
-    (loop for i from (1- length) downto 0
-          do
-          (setf (aref vector i) (pop list)))
-    vector))
+  (if list
+      (let* ((length (length (the list list)))
+             (vector (make-array length))
+             (list list))
+        (loop for i from (1- length) downto 0
+              do
+              (setf (aref vector i) (pop list)))
+        vector)
+      #()))
 
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
