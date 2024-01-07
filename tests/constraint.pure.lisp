@@ -861,6 +861,42 @@
                      nil))
              0)))
 
+(with-test (:name :bounds-check-down)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (let ((end (1- (length v))))
+                          (decf end)
+                          (when (>= end 0)
+                            (svref v end))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (declare (optimize (debug 2)))
+                        (let ((end (1- (length v))))
+                          (decf end)
+                          (when (>= end 0)
+                            (svref v end))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (loop for i from (1- (length v)) downto 0
+                              collect (svref v i)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (declare (optimize (debug 2)))
+                        (loop for i from (1- (length v)) downto 0
+                              collect (svref v i)))
+                     nil))
+             0)))
+
 (with-test (:name :reoptimize)
   (assert-type
    (lambda ()

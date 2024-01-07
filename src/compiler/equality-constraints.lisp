@@ -200,6 +200,8 @@
                       (t
                        with)))
               (add (x y &optional (operator operator) (alternative-constraints alternative-constraints))
+                (when (eq x y)
+                  (return-from add))
                 (unless (lambda-var/vector-length-p x)
                   (unless (lambda-var/vector-length-p y)
                     (return-from add))
@@ -239,12 +241,10 @@
            (when (lvar-p y)
              (loop for (in-op in-lvar) in (lvar-result-constraints y)
                    do
-                   (case in-op
-                     (t
-                      (let ((inherit (inherit-equality-p operator in-op nil)))
-                        (when inherit
-                          (add-equality-constraint inherit x in-lvar
-                                                   constraints consequent-constraints nil)))))))))))))
+                   (let ((inherit (inherit-equality-p operator in-op nil)))
+                     (when inherit
+                       (add-equality-constraint inherit x in-lvar
+                                                constraints consequent-constraints nil)))))))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
@@ -639,6 +639,26 @@
     (let ((vector-length (vector-length-var-p lvar constraints)))
       (when vector-length
         (conset-add-equality-constraint target 'eq var vector-length nil)))))
+
+;;; Need a separate function because a set clears the constraints of the var
+(defun add-set-constraints (var lvar constraints)
+  (let (gen)
+    (loop for (operator second) in (lvar-result-constraints lvar)
+          for y = (if (lambda-var-p second)
+                      second
+                      (ok-lvar-lambda-var second constraints))
+          when y
+          do
+          (do-eql-vars (eql-y (y constraints))
+            (when (eq eql-y var)
+              (do-equality-constraints (in-y in-op in-not-p) y constraints
+                (unless (eq in-y y)
+                  (let ((inherit (inherit-equality-p operator in-op in-not-p)))
+                    (when inherit
+                      (conset-add-equality-constraint (or gen
+                                                          (setf gen (make-conset)))
+                                                      inherit var in-y nil))))))))
+    gen))
 
 (defoptimizer (- constraint-propagate-result) ((a b) node)
   (and (csubtypep (lvar-type a) (specifier-type 'integer))

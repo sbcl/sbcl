@@ -1268,7 +1268,12 @@
                (do-eql-vars (other (var gen))
                  (unless (eql other var)
                    (conset-add-constraint gen 'typep other type nil))))))
-         (conset-clear-lambda-var gen var)
+
+         (let ((new (add-set-constraints var (set-value node) gen)))
+           (conset-clear-lambda-var gen var)
+           (when new
+             (conset-union gen new)))
+
          (let ((type (single-value-type (node-derived-type node))))
            (when (type-for-constraints-p type)
              (conset-add-constraint gen 'typep var type nil)))

@@ -882,7 +882,6 @@ many elements are copied."
   (let* ((length (length (the list list)))
          (vector (make-array length))
          (list list))
-    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
     (loop for i from (1- length) downto 0
           do
           (setf (aref vector i) (pop list)))
