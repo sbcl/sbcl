@@ -70,6 +70,7 @@
            `(progn
               (define-notinline ,err (x)
                 (error "Cannot reinterpret ~S as ~S." x ',name))
+              (declaim (inline ,name))
               (defun ,name (x)
                 (typecase x
                   ,@(loop for reinterpreter in reinterpreters
