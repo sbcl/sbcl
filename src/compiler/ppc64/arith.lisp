@@ -308,7 +308,7 @@
                       (inst sld result number amount))
                      (immediate
                       (let ((amount (tn-value amount)))
-                        (aver (> amount 0))
+                        (aver (>= amount 0))
                         (inst sldi result number amount))))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
