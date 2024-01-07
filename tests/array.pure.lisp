@@ -777,3 +777,12 @@
       (let ((s (make-string 536870910)))
         (declare (dynamic-extent s))
         (funcall fn s)))))
+
+(with-test (:name :hairy-aref-check-bounds)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare ((vector t) x))
+                        (aref x 0))
+                     nil))
+             0)))

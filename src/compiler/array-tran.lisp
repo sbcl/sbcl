@@ -2035,7 +2035,8 @@
 ;; with sufficient precision, skip directly to DATA-VECTOR-REF.
 (deftransform aref ((array index) (t t) * :node node)
   (let* ((type (lvar-type array))
-         (element-ctype (array-type-upgraded-element-type type)))
+         (element-ctype (array-type-upgraded-element-type type))
+         (declared-element-ctype (declared-array-element-type type)))
     (cond
       ((eq element-ctype *empty-type*)
        `(data-nil-vector-ref array index))
@@ -2043,21 +2044,25 @@
             (null (array-type-complexp type))
             (neq element-ctype *wild-type*)
             (eql (length (array-type-dimensions type)) 1))
-       (let* ((declared-element-ctype (array-type-element-type type))
-              (bare-form
+       (let* ((bare-form
                 `(data-vector-ref array
                                   (check-bound array (array-dimension array 0) index))))
          (if (type= declared-element-ctype element-ctype)
              bare-form
              `(the ,declared-element-ctype ,bare-form))))
       ((policy node (zerop insert-array-bounds-checks))
-       `(hairy-data-vector-ref array index))
-      (t `(hairy-data-vector-ref/check-bounds array index)))))
+       (the-unwild declared-element-ctype `(hairy-data-vector-ref array index)))
+      (t
+       (the-unwild declared-element-ctype `(hairy-data-vector-ref/check-bounds array index))))))
 
 (deftransform (setf aref) ((new-value array index) (t t t) * :node node)
-  (if (policy node (zerop insert-array-bounds-checks))
-      `(hairy-data-vector-set array index new-value)
-      `(hairy-data-vector-set/check-bounds array index new-value)))
+  (let* ((type (lvar-type array))
+         (declared-element-ctype (declared-array-element-type type)))
+    (truly-the-unwild
+     declared-element-ctype
+     (if (policy node (zerop insert-array-bounds-checks))
+         `(hairy-data-vector-set array index ,(the-unwild declared-element-ctype 'new-value))
+         `(hairy-data-vector-set/check-bounds array index ,(the-unwild declared-element-ctype 'new-value))))))
 
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
@@ -2065,34 +2070,23 @@
 (macrolet ((define (name args expr)
              `(deftransform ,name ,args
                 (let* ((type (lvar-type array))
-                       (element-type (array-type-upgraded-element-type type))
-                       (declared-type (declared-array-element-type type)))
-                  ;; If an element type has been declared, we want to
-                  ;; use that information it for type checking (even
-                  ;; if the access can't be optimized due to the array
-                  ;; not being simple).
-                  (when (and (eq element-type *wild-type*)
-                             ;; This type logic corresponds to the special
-                             ;; case for strings in HAIRY-DATA-VECTOR-REF
-                             ;; (generic/vm-tran.lisp)
-                             (not (csubtypep type (specifier-type 'simple-string))))
-                    (when (or (not (array-type-p type))
-                              ;; If it's a simple array, we might be able
-                              ;; to inline the access completely.
-                              (not (null (array-type-complexp type))))
-                      (give-up-ir1-transform
-                       "Upgraded element type of array is not known at compile time.")))
+                       (element-type (array-type-upgraded-element-type type)))
+                  (when (or (and (eq element-type *wild-type*)
+                                 ;; This type logic corresponds to the special
+                                 ;; case for strings in HAIRY-DATA-VECTOR-REF
+                                 ;; (generic/vm-tran.lisp)
+                                 (not (csubtypep type (specifier-type 'simple-string))))
+                            (not (null (conservative-array-type-complexp type))))
+                    (give-up-ir1-transform
+                     "Upgraded element type of array is not known at compile time."))
                   ,expr))))
   (define hairy-data-vector-ref/check-bounds ((array index))
-    (the-unwild declared-type
-          `(hairy-data-vector-ref
-           array (check-bound array (array-dimension array 0) index))))
+    `(hairy-data-vector-ref
+      array (check-bound array (array-dimension array 0) index)))
   (define hairy-data-vector-set/check-bounds ((array index new-value))
-    (truly-the-unwild declared-type
-                `(hairy-data-vector-set
-                 array
-                 (check-bound array (array-dimension array 0) index)
-                 ,(the-unwild declared-type 'new-value)))))
+    `(hairy-data-vector-set
+      array
+      (check-bound array (array-dimension array 0) index) new-value)))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
