@@ -178,11 +178,7 @@
     ;; For some types the definition of EQUAL implies a special hash
     ((or string cons number bit-vector pathname)
      (values (sxhash key) nil))
-    ;; Certain objects have space in them wherein we can memoized a hash.
-    ;; For those objects, use that hash
-    ;; And wow, typecase isn't enough to get use to use the transform
-    ;; for (sxhash symbol) without an explicit THE form.
-    (symbol (values (sxhash (the symbol key)) nil)) ; transformed
+    (symbol (values (symbol-hash key) nil))
     ;; Otherwise use an EQ hash, rather than SXHASH, since the values
     ;; of SXHASH will be extremely badly distributed due to the
     ;; requirements of the spec fitting badly with our implementation
@@ -197,8 +193,7 @@
     ;; HASH-TABLE are caught by the STRUCTURE-OBJECT test.
     ((or array cons number character structure-object)
      (values (psxhash key) nil))
-    ;; As with EQUAL-HASH, use memoized hashes when applicable.
-    (symbol (values (sxhash (the symbol key)) nil)) ; transformed
+    (symbol (values (symbol-hash key) nil))
     ;; INSTANCE at this point means STANDARD-OBJECT and CONDITION,
     ;; since STRUCTURE-OBJECT is recursed into by PSXHASH.
     (instance (values (instance-sxhash key) nil))

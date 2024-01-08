@@ -560,7 +560,7 @@
 #+64-bit
 (progn
 (defun best-slot-map-parameters (names)
-  (let* ((raw-hashes (mapcar (lambda (x) (sxhash (the symbol x))) names))
+  (let* ((raw-hashes (mapcar (lambda (x) (symbol-hash (the symbol x))) names))
          (n-names (length names))
          (n-cells (logior n-names 1)) ; round to odd if not already
          ;; remember the best N-COLLISIONS N-CELLS MASK C
@@ -607,8 +607,8 @@
         ;; to encode the raw-type into the value stored in the index vector.
         (when (eq (dsd-raw-type dsd) t)
           (binding*
-              ((hash (sxhash (dsd-name dsd)))
-                 (masked-hash (logand (ash hash (- shift)) mask))
+              ((hash (symbol-hash (dsd-name dsd)))
+               (masked-hash (logand (ash hash (- shift)) mask))
                (bin (truly-the index
                                (+ (sb-vm::fastrem-32 masked-hash c n-cells)
                                   fast-slot-table-fixed-cells)))

@@ -116,14 +116,13 @@
                                       :if-does-not-exist nil)
                 (when stream
                   (let ((*package* (find-package "SB-KERNEL"))) (read stream))))))
+    (dolist (item list)
+      (destructuring-bind (object hash) item
+        (let ((calc (sxhash object)))
+          (unless (= hash calc)
+            (error "cross-compiler SXHASH failure on ~S: ~X vs ~X" object hash calc)))))
     (when list
-      (dolist (item list)
-        (destructuring-bind (object hash) item
-          (unless (= (sxhash object) hash)
-            (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
-                   object hash (sxhash object)))))
-      (format t "~&cross-compiler SXHASH tests passed: ~D cases~%"
-              (length list)))))
+      (format t "~&cross-compiler SXHASH tests passed: ~D cases~%" (length list)))))
 
 ;;; called when a cold system starts up
 (defun !cold-init ()

@@ -591,7 +591,7 @@
                     (dovector (ch piece res)
                       (setf res (mix (murmur-hash-word/+fixnum (char-code ch)) res)))
                     (sxhash piece))))
-             (symbol (sxhash piece)) ; transformed
+             (symbol (symbol-hash piece))
              (pattern (pattern-hash piece))
              ;; next case is only for MAKE-PATTERN
              ((cons (eql :character-set)) (hash-piece (the string (cdr piece))))

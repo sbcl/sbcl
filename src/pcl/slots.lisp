@@ -93,9 +93,7 @@
                (c (truly-the (unsigned-byte 32) (svref map 2)))
                ;; elide the check for whether hash was precomputed. It has to have been,
                ;; and even if it wasn't we'd just take the slow path, so no harm done.
-               (hash (logand (ash (sb-sys:%primitive sb-vm::symbol-hash
-                                                     (truly-the symbol slot-name))
-                                  (- shift))
+               (hash (logand (ash (symbol-hash (truly-the symbol slot-name)) (- shift))
                              mask))
                (n-cells
                 (truly-the (unsigned-byte 32)

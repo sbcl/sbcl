@@ -275,7 +275,7 @@
 
 (declaim (inline sxhash-symbol-or-class))
 (defun sxhash-symbol-or-class (x)
-  (cond ((symbolp x) (sxhash x))
+  (cond ((symbolp x) (symbol-hash x))
         ((std-instance-p x) (sb-impl::instance-sxhash x))
         ((fsc-instance-p x) (fsc-instance-hash x))
         (t

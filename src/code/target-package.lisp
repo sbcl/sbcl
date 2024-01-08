@@ -475,6 +475,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;;      will degenerate to a list.
 ;;; * 32 bits of name-based hash, essential for package operations
 ;;;      and also useful for compiling CASE expressions.
+(defmacro symbol-name-hash (s) `(sxhash ,s)) ; TODO: mask out PRNG bits from SYMBOL-HASH
 (defmacro symbol-table-hash (selector name-hash ncells
                              &aux (reciprocals 'reciprocals)) ; KLUDGE, unhygienic
   (declare (type (member 1 2) selector)) ; primary or secondary hash function
@@ -534,7 +535,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
                ;; in 'hashset.lisp' is 1-based like in the reference algorithm.
                ;; It could be chalked up to the difference
                ;; between using LENGTH versus POSITION.
-               (let* ((name-hash (sxhash symbol))
+               (let* ((name-hash (symbol-name-hash symbol))
                       (h1 (symbol-table-hash 1 name-hash ncells))
                       (h2 (symbol-table-hash 2 name-hash ncells))
                       (index (rem (+ h1 (* probe-sequence-pos h2)) ncells))
@@ -550,9 +551,9 @@ of :INHERITED :EXTERNAL :INTERNAL."
                             (ins (1+ cell-psp) occupant))))
                        (t
                         (ins (1+ probe-sequence-pos) symbol)))))
-             (calculate-psp (symbol &aux (pos 0))
-               (let ((h (symbol-table-hash 1 (sxhash symbol) ncells))
-                     (h2 (symbol-table-hash 2 (sxhash symbol) ncells)))
+             (calculate-psp (symbol &aux (name-hash (symbol-name-hash symbol)) (pos 0))
+               (let ((h (symbol-table-hash 1 name-hash ncells))
+                     (h2 (symbol-table-hash 2 name-hash ncells)))
                  (loop (if (eq (svref vec h) symbol) (return (values pos h)))
                        (incf pos)
                        (setq h (rem (+ h h2) ncells)))))
@@ -1279,10 +1280,7 @@ Experimental: interface subject to change."
                       (let ((new (symtbl-%cells table)))
                         (if (eq new cells) nil (try new))))))))
     (let ((table (package-external-symbols package))
-          ;; Every symbol that was ever interned has a precomputed hash.
-          ;; SXHASH would transform to ENSURE-SYMBOL-HASH which is costlier
-          ;; by a smidgen.
-          (name-hash (symbol-hash symbol)))
+          (name-hash (symbol-name-hash symbol)))
       (named-let try ((cells (symtbl-%cells table)))
         (let* ((reciprocals (car cells))
                (vec (truly-the simple-vector (cdr cells)))
