@@ -210,12 +210,15 @@
           (let ((header (car remaining))
                 (last (null (cdr remaining))))
             (cond
-             ((atom header)
-              (inst cmp :byte widetag-tn header)
-              (if last
-                  (inst jmp equal target)
-                  (inst jmp :e when-true)))
-             (t
+              ((and (eql header simple-array-widetag)
+                    value-tn-ref
+                    (csubtypep (tn-ref-type value-tn-ref) (specifier-type 'string))))
+              ((atom header)
+               (inst cmp :byte widetag-tn header)
+               (if last
+                   (inst jmp equal target)
+                   (inst jmp :e when-true)))
+              (t
                (let ((start (car header))
                      (end (cdr header)))
                  (cond

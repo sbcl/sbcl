@@ -150,6 +150,9 @@
             (let ((header (car remaining))
                   (last (null (cdr remaining))))
               (cond
+                ((and (eql header simple-array-widetag)
+                      value-tn-ref
+                      (csubtypep (tn-ref-type value-tn-ref) (specifier-type 'string))))
                 ((atom header)
                  (cond
                    ((and (not last) (null (cddr remaining))

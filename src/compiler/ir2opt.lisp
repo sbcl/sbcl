@@ -1106,13 +1106,16 @@
                                              (vop-block vop)
                                              (template-or-lose 'move)
                                              (reference-tn widetag nil)
-                                             (reference-tn (tn-ref-tn (vop-results vop )) t)
+                                             (reference-tn (tn-ref-tn (vop-results vop)) t)
                                              vop)
                         (let ((next (vop-next vop)))
                           (when (and next
                                      (eq (vop-name next) 'branch-if))
                             (setf info (vop-codegen-info next))
                             (delete-vop next))
+                          (when (and (eql (car tags) sb-vm:simple-array-widetag)
+                                     (csubtypep (tn-ref-type (vop-args vop)) (specifier-type 'string)))
+                            (pop tags))
                           (emit-and-insert-vop (vop-node vop)
                                                (vop-block vop)
                                                test-vop
