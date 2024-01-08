@@ -2173,6 +2173,11 @@
     ((array))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
 
+(defoptimizer (%other-pointer-widetag derive-type) ((object))
+  (unless (types-equal-or-intersect (lvar-type object) (specifier-type 'simple-array))
+    (specifier-type `(not (integer ,sb-vm:simple-array-widetag
+                                   (,sb-vm:complex-base-string-widetag))))))
+
 ;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
 ;;; is of the specified type.
 (defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
