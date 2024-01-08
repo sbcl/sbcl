@@ -118,11 +118,6 @@
 (define-type-predicate code-component-p code-component)
 #-(or x86 x86-64 arm64) (define-type-predicate lra-p lra)
 (define-type-predicate fdefn-p fdefn)
-(macrolet
-    ((def ()
-       `(progn ,@(loop for (name spec) in *vector-without-complex-typecode-infos*
-                       collect `(define-type-predicate ,name (vector ,spec))))))
-  (def))
 ;;; Unlike the un-%'ed versions, these are true type predicates,
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)

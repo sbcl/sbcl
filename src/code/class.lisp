@@ -1170,7 +1170,8 @@ between the ~A definition and the ~A definition"
          (vector-nil
           :translation (vector nil)
           :inherits (vector array sequence)
-          :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
+          :prototype-form (make-array 0 :element-type 'nil :fill-pointer t)
+          :predicate vector-nil-p)
          ;; This name is imperfect. It should be SIMPLE-RANK1-ARRAY-NIL
          ;; to clearly convey that the dimensions are '(*) and not '*.
          (simple-array-nil
@@ -1284,6 +1285,7 @@ between the ~A definition and the ~A definition"
                    :codes (,(sb-vm:saetp-typecode x))
                    :direct-superclasses (vector simple-array)
                    :inherits (vector simple-array array sequence)
+                   :predicate ,(symbolicate (sb-vm:saetp-primitive-type-name x) "-P")
                    :prototype-form
                    (logically-readonlyize
                     (make-array 0 :element-type ',(sb-vm:saetp-specifier x))))))))))
@@ -1299,7 +1301,7 @@ between the ~A definition and the ~A definition"
                            'error
                            (or (getf (cdr x) :predicate)
                                (sb-c::backend-type-predicate translation)))))
-                (assert predicate)
+                (assert predicate nil "~a" name)
                 ;; destructuring-bind will see the first :translation
                 ;; keyword; we don't need to delete the other one.
                 (list* name :predicate predicate :translation translation (cdr x))))
