@@ -651,8 +651,8 @@
           do
           (do-eql-vars (eql-y (y constraints))
             (when (eq eql-y var)
-              (do-equality-constraints (in-y in-op in-not-p) y constraints
-                (unless (eq in-y y)
+              (do-equality-constraints (in-y in-op in-not-p) var constraints
+                (unless (eq in-y var)
                   (let ((inherit (inherit-equality-p operator in-op in-not-p)))
                     (when inherit
                       (conset-add-equality-constraint (or gen

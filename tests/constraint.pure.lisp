@@ -1025,3 +1025,20 @@
      (when (> (decf x 10) 10)
        x))
    (or (real (10)) null)))
+
+(with-test (:name :set-constraint-inherit)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (declare (type (integer 1 1625159256) b))
+      ((lambda (v2 v6)
+         (logorc1 (setf c 1448416540835)
+                  (gcd
+                   (if (>= b c)
+                       (if (< b c)
+                           0
+                           -197521449755177454)
+                       0)
+                   (decf v2 (incf v2 (incf v6 (setq v2 (setq b 1044756040))))))))
+       0 0))
+   ((572837281 0) -1448416540836)))
