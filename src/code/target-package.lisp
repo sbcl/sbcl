@@ -1203,7 +1203,7 @@ Experimental: interface subject to change."
 ;;; Find where the symbol named STRING is stored in TABLE.
 ;;; INDEX-VAR is bound to the vector index if found, or -1 if not.
 ;;; LENGTH bounds the string, and NAME-HASH should be precomputed by
-;;; calling COMPUTE-SYMBOL-HASH.
+;;; calling CALC-SYMBOL-NAME-HASH.
 ;;; If the symbol is found, then FORMS are executed; otherwise not.
 (defmacro with-symbol (((symbol-var &optional index-var) table
                         string length name-hash) &body forms)
@@ -1340,7 +1340,7 @@ Experimental: interface subject to change."
 (defun %find-symbol (string length package)
   (declare (simple-string string)
            (type index length))
-  (let ((hash (compute-symbol-hash string length)))
+  (let ((hash (calc-symbol-name-hash string length)))
     (declare (hash-code hash))
     (with-symbol ((symbol) (package-internal-symbols package) string length hash)
       (return-from %find-symbol (values symbol :internal)))
@@ -1485,7 +1485,7 @@ Experimental: interface subject to change."
 (defun find-external-symbol (string package)
   (declare (simple-string string))
   (let* ((length (length string))
-         (hash (compute-symbol-hash string length)))
+         (hash (calc-symbol-name-hash string length)))
     (declare (type index length) (hash-code hash))
     (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from find-external-symbol symbol)))
@@ -2021,7 +2021,7 @@ PACKAGE."
              (when symbol ; skip NIL because of its magic-ness
                (let* ((stored-hash (symbol-hash symbol))
                       (name (symbol-name symbol))
-                      (computed-hash (compute-symbol-hash name (length name))))
+                      (computed-hash (calc-symbol-name-hash name (length name))))
                  (aver (= stored-hash computed-hash)))))))
     (check-hash-slot (car *!initial-symbols*)) ; uninterned symbols
     (dolist (spec specs)

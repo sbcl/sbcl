@@ -647,7 +647,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
   (let* ((string (truly-the simple-string
                             (stringify-string-designator string-designator)))
          (length (length string))
-         (hash (compute-symbol-hash string length))
+         (hash (calc-symbol-name-hash string length))
          (result (list nil)))
     (do-packages (p) ; FIXME: should not acquire package-names lock
       (add-to-bag-if-found (package-internal-symbols p) string length hash result)
@@ -701,7 +701,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                     #+sb-unicode
                     (= widetag sb-vm:simple-character-string-widetag))
                 (when (search string obj :test #'char-equal)
-                  (push (cons (compute-symbol-hash obj (length obj)) obj) candidates)))
+                  (push (cons (calc-symbol-name-hash obj (length obj)) obj) candidates)))
                (t
                 (return-from done))))
        :read-only))

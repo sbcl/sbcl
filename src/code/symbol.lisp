@@ -73,7 +73,7 @@ distinct from the global value. Can also be SETF."
 ;; FIND-SYMBOL by special-casing the finding of CL:NIL with an extra "or"
 ;; in the hash-equality test. i.e. We can't recognize that CL:NIL was the
 ;; object sought (having an exceptional hash) until it has been found.
-(defun compute-symbol-hash (string length)
+(defun calc-symbol-name-hash (string length)
   (declare (simple-string string) (index length))
   (if (and (= length 3)
            (locally
@@ -85,15 +85,10 @@ distinct from the global value. Can also be SETF."
               (and (char= (schar string 0) #\N)
                    (char= (schar string 1) #\I)
                    (char= (schar string 2) #\L)))))
-      (return-from compute-symbol-hash (sxhash nil)))
-  ;; And make a symbol's hash not the same as (sxhash name) in general.
-  (let ((sxhash (logxor (%sxhash-simple-substring string 0 length)
-                        most-positive-fixnum)))
-    ;; The low 32 bits of the word in memory should have at least a 1 bit somewhere.
-    ;; If not, OR in a constant value.
-    (if (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) sxhash)
-        sxhash
-        (logior sxhash #x55AA)))) ; arbitrary
+      (sxhash nil) ; transformed
+      ;; flip the bits so that a symbol hashes differently from its print name
+      (logxor (%sxhash-simple-substring string 0 length)
+              most-positive-fixnum)))
 
 ;;; Return the function binding of SYMBOL or NIL if not fboundp.
 ;;; Don't strip encapsulations.
@@ -410,7 +405,7 @@ distinct from the global value. Can also be SETF."
                        (char= (char name (1- (length name))) #\*)))
               (sb-vm::make-immobile-symbol name)
               (sb-vm::%%make-symbol name)))))
-    (%set-symbol-hash symbol (compute-symbol-hash name (length name)))
+    (%set-symbol-hash symbol (calc-symbol-name-hash name (length name)))
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.
     #-compact-symbol (%set-symbol-package symbol nil)

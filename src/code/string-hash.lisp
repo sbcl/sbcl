@@ -78,16 +78,14 @@
     (declare (notinline trick))
     (trick x)))
 #+sb-xc-host
-(defun symbol-name-hash (x)
-  (cond ((string= x "NIL") ; :NIL must hash the same as NIL
-         ;; out-of-order with defconstant nil-value
-         (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
-        (t
-         ;; (STRING X) could be a non-simple string, it's OK.
-         (let ((hash (logxor (%sxhash-simple-string (string x))
-                             most-positive-fixnum)))
-           (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
-           hash))))
+(defun calc-symbol-name-hash (string length)
+  ;; The reader passes a string buffer and length to avoid consing a new string
+  ;; for each symbol read. That does not occur in cross-compilation.
+  (aver (= length (length string)))
+  (if (string= string "NIL") ; :NIL must hash the same as NIL
+      ;; out-of-order with defconstant nil-value
+      (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits))
+      (logxor (%sxhash-simple-string string) most-positive-fixnum)))
 
 ;;;; mixing hash values
 

@@ -1171,11 +1171,8 @@
        (eq (key-info-type a) (key-info-type b))))
 (defun key-info-hash (x)
   (declare (optimize (safety 0)))
-  (#+sb-xc-host progn
-   #-sb-xc-host murmur-hash-word/fixnum ; scramble some more
-   (mix (#+sb-xc-host sb-impl::symbol-name-hash #-sb-xc-host sxhash (key-info-name x))
-        ;; MIX requires positive fixnums
-        (logand (type-hash-value (key-info-type x)) sb-xc:most-positive-fixnum))))
+  (murmur-hash-word/+fixnum
+   (mix (type-hash-value (key-info-type x)) (sb-xc:sxhash (key-info-name x)))))
 
 (defun hash-key-info-set (set) ; order-insensitive
   (declare (optimize (safety 0)))

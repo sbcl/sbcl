@@ -113,7 +113,7 @@
 
 (defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
-(defknown sb-impl::compute-symbol-hash (simple-string index) hash-code ())
+(defknown sb-impl::calc-symbol-name-hash (simple-string index) hash-code ())
 
 (defknown (symbol-hash) (symbol) hash-code (flushable movable))
 ;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
