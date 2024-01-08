@@ -905,13 +905,14 @@
                        `((if ,header-test
                              (= (%array-dimension ,obj 0) ,@dims)
                              (= (vector-length ,obj) ,@dims))))
-                     nil))))))
+                     nil
+                     (car dims)))))))
 
 ;;; Return forms to test that OBJ has the element-type specified by type
 ;;; specified by TYPE, where STYPE is the type we have checked against (which
 ;;; is the same but for dimensions and element type). If HEADERP is true, OBJ
 ;;; is guaranteed to be an array-header.
-(defun test-array-element-type (obj type stype headerp pred)
+(defun test-array-element-type (obj type stype headerp pred length)
   (declare (type array-type type stype))
   (let ((eltype (array-type-specialized-element-type type)))
     (unless (or (type= eltype (array-type-specialized-element-type stype))
@@ -950,20 +951,39 @@
                                               (return nil))))))))
                           t))
                  (vectorp
-                  (values `((and (%other-pointer-p ,obj)
-                                 (let ((widetag (%other-pointer-widetag ,obj)))
-                                   (if (eq widetag ,typecode)
-                                       t
-                                       (and (= widetag sb-vm:complex-vector-widetag)
-                                            (let ((data ,obj))
-                                              (loop
-                                               (setf data (%array-data data))
-                                               (let ((widetag (%other-pointer-widetag data)))
-                                                 (if (eq widetag ,typecode)
-                                                     (return t)
-                                                     (unless (>= widetag sb-vm:complex-vector-widetag)
-                                                       (return nil)))))))))))
-                          t)))))))))
+                  (if length
+                      (values `((and (%other-pointer-p ,obj)
+                                     (let ((widetag (%other-pointer-widetag ,obj)))
+                                       (if (eq widetag ,typecode)
+                                           (= (vector-length (truly-the (simple-array * (*)) ,obj)) ,length)
+                                           (and (= widetag sb-vm:complex-vector-widetag)
+                                                (= (%array-dimension (truly-the (and (array * (*))
+                                                                                     (not simple-array)) ,obj) 0)
+                                                   ,length)
+                                                (let ((data ,obj))
+                                                  (loop
+                                                   (setf data (%array-data data))
+                                                   (let ((widetag (%other-pointer-widetag data)))
+                                                     (if (eq widetag ,typecode)
+                                                         (return t)
+                                                         (unless (>= widetag sb-vm:complex-vector-widetag)
+                                                           (return nil)))))))))))
+                              t
+                              t)
+                      (values `((and (%other-pointer-p ,obj)
+                                     (let ((widetag (%other-pointer-widetag ,obj)))
+                                       (if (eq widetag ,typecode)
+                                           t
+                                           (and (= widetag sb-vm:complex-vector-widetag)
+                                                (let ((data ,obj))
+                                                  (loop
+                                                   (setf data (%array-data data))
+                                                   (let ((widetag (%other-pointer-widetag data)))
+                                                     (if (eq widetag ,typecode)
+                                                         (return t)
+                                                         (unless (>= widetag sb-vm:complex-vector-widetag)
+                                                           (return nil)))))))))))
+                              t))))))))))
 
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
@@ -1006,14 +1026,15 @@
                           (eq (%other-pointer-widetag ,object) ,complex-tag)
                           ,@(unless (eq (car dims) '*)
                               `((= (%array-dimension ,object 0) ,(car dims)))))
-                    (multiple-value-bind (dim-tests headerp)
+                    (multiple-value-bind (dim-tests headerp length)
                         (test-array-dimensions object type stype
                                                simple-array-header-p)
-                      (multiple-value-bind (type-test no-check-for-array)
-                          (test-array-element-type object type stype headerp pred)
+                      (multiple-value-bind (type-test no-check-for-array length-checked)
+                          (test-array-element-type object type stype headerp pred length)
                         (if no-check-for-array
                             `(and ,@type-test
-                                  ,@dim-tests)
+                                  ,@(unless length-checked
+                                      dim-tests))
                             `(and
                               ,@(cond ((and (eql pred 'vectorp)
                                             complexp)
