@@ -630,7 +630,7 @@
                         (push fr oops)
                         (return))))
     (loop for f = most-negative-double-float then (/ f 2d0)
-          while (< f #-x86 -0d0 #+86 -0.1d0)
+          while (< f #-x86 -0d0 #+x86 -0.1d0)
           do (loop for fr = (- (random (- f)))
                    repeat 10
                    do (unless (eql fr (read-from-string (prin1-to-string fr)))
