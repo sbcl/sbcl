@@ -4284,7 +4284,7 @@
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
 ;;; if there is no intersection between the types of the arguments,
 ;;; then the result is definitely false.
-(deftransforms (eq char=) ((x y) * *)
+(deftransform char= ((x y) * *)
   "Simple equality transform"
   (let ((use (lvar-uses x))
         arg)
@@ -4306,6 +4306,58 @@
             (typep (lvar-value arg) '(unsigned-byte 16)))
        (splice-fun-args x '%instance-ref 2)
        `(lambda (obj i val) (%instance-ref-eq obj i val)))
+      (t (give-up-ir1-transform)))))
+
+(defun transform-eq-on-words (fun x y)
+  (flet ((try-sword (x y x-v y-v)
+           (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
+                          (csubtypep (lvar-type y) (specifier-type 'word))))
+             `(if (typep ,y-v 'sb-vm:signed-word)
+                  (,fun ,x-v (truly-the sb-vm:signed-word ,y-v))
+                  nil)))
+         (try-word (x y x-v y-v)
+           (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
+                          (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
+             `(if (typep ,y-v 'word)
+                  (,fun ,x-v (truly-the word ,y-v))
+                  nil))))
+    (let ((x-swordp (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (y-swordp (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
+      (cond ((and x-swordp (not y-swordp))
+             (try-sword x y 'x 'y))
+            ((and y-swordp (not x-swordp))
+             (try-sword y y 'y 'x))
+            (t
+             (let ((x-wordp (csubtypep (lvar-type x) (specifier-type 'word)))
+                   (y-wordp (csubtypep (lvar-type y) (specifier-type 'word))))
+               (cond ((and x-wordp (not y-wordp))
+                      (try-word x y 'x 'y))
+                     ((and y-wordp (not x-wordp))
+                      (try-word y y 'y 'x)))))))))
+
+(deftransform eq ((x y) * *)
+  "Simple equality transform"
+  (let ((use (lvar-uses x))
+        arg)
+    (declare (ignorable use arg))
+    (cond
+      ((same-leaf-ref-p x y) t)
+      ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
+       nil)
+      ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
+      ;; if possible, but do not defer the memory load unless doing
+      ;; so can have no effect, i.e. Y is a constant or provably not
+      ;; effectful. For now, just handle constant Y.
+      ((and (vop-existsp :translate %instance-ref-eq)
+            (constant-lvar-p y)
+            (combination-p use)
+            (almost-immediately-used-p x use)
+            (eql '%instance-ref (lvar-fun-name (combination-fun use)))
+            (constant-lvar-p (setf arg (second (combination-args use))))
+            (typep (lvar-value arg) '(unsigned-byte 16)))
+       (splice-fun-args x '%instance-ref 2)
+       `(lambda (obj i val) (%instance-ref-eq obj i val)))
+      ((transform-eq-on-words 'eq x y))
       (t (give-up-ir1-transform)))))
 
 ;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
@@ -4343,6 +4395,7 @@
        '(char= x y))
       ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
        '(eq y x))
+      ((transform-eq-on-words 'eql x y))
       (t
        (give-up-ir1-transform)))))
 
