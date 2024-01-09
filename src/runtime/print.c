@@ -497,20 +497,18 @@ lispobj symbol_function(struct symbol* symbol)
 
 static void print_fun_or_otherptr(lispobj obj)
 {
-    lispobj *ptr;
-    unsigned long header;
-    int count, type, index;
+    int index;
     char buffer[16];
 
-    ptr = native_pointer(obj);
+    lispobj *ptr = native_pointer(obj);
     if (ptr == NULL) {
         printf(" (NULL Pointer)");
         return;
     }
 
-    header = *ptr++;
-    count = HeaderValue(header);
-    type = header_widetag(header);
+    int count = object_size(ptr)-1;
+    uword_t header = *ptr++;
+    int type = header_widetag(header);
 
     print_obj("header: ", header);
     if (!other_immediate_lowtag_p(header)) {
@@ -560,7 +558,7 @@ static void print_fun_or_otherptr(lispobj obj)
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
         // print_obj doesn't understand raw words, so make it a fixnum
         int pkgid = symbol_package_id(sym) << N_FIXNUM_TAG_BITS;
-        print_obj("package_id: ", pkgid);
+        print_obj("pkgid: ", pkgid);
 #endif
         break;
 
