@@ -90,13 +90,6 @@
            (return-from ir1-transform-type-predicate nil)))
     (let ((intersect (type-intersection type otype))
           (current-predicate (combination-fun-source-name node)))
-      ;; I guess the theory here is that an intersection type
-      ;; is never a singleton, because if we could see that it was
-      ;; a singleton, it wouldn't be an intersection.
-      (when (and intersect (not (intersection-type-p intersect)))
-        (multiple-value-bind (constantp value) (type-singleton-p intersect)
-          (when constantp
-            (return-from ir1-transform-type-predicate `(eql object ',value)))))
       ;; If the object type is known to be (OR NULL <type>),
       ;; it is almost always cheaper to test for not EQ to NIL.
       ;; There is one exception:
