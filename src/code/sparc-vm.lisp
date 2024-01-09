@@ -68,3 +68,11 @@
          (trap-number (sap-ref-8 pc 3)))
     (declare (type system-area-pointer pc))
     (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
+
+;; the sparc backend isn't important enough to deserve a fastrem-32 vop
+(defun fastrem-32 (dividend c divisor)
+  (declare (word dividend c divisor) (optimize (safety 0)))
+  (multiple-value-bind (hi lo)
+      (sb-bignum:%multiply (logand (* dividend c) most-positive-word) divisor)
+    (declare (ignore lo))
+    hi))

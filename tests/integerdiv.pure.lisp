@@ -8,11 +8,7 @@
      (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params divisor)
        (assert (and (plusp c) (plusp mask))))))
 
-(defvar *have-fastrem* (let ((s (find-symbol "FASTREM-32" "SB-VM")))
-                         (and s (gethash s sb-c::*backend-parsed-vops*))))
-
-(when (or (not *have-fastrem*) (member :interpreter *features*))
-  (invoke-restart 'run-tests::skip-file))
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (defvar *rs* (make-random-state t)) ; get a random random-state
 

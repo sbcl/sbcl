@@ -871,3 +871,19 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst sll result digit count)))
+
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst multu dividend c) ; keep only the low 32 bits
+    (inst mflo temp)
+    (inst multu temp divisor)
+    (inst mfhi remainder)))

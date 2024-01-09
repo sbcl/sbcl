@@ -1234,6 +1234,20 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst slw result digit count)))
+
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mullw temp dividend c)
+    (inst mulhwu remainder temp divisor)))
 
 (in-package "SB-C")
 

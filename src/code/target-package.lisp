@@ -496,14 +496,12 @@ of :INHERITED :EXTERNAL :INTERNAL."
                           (,get-mask (truly-the symtbl-magic ,reciprocals))))
                  (divisor
                   (truly-the (and index (not (eql 0)))
-                             ,(if (eq selector 2) `(- ,ncells 2) ncells))))
-            ,(if (sb-c::vop-existsp :translate sb-vm::fastrem-32)
-                 `(let ((c (,get-c (truly-the symtbl-magic ,reciprocals))))
-                    (if (= c 0)
-                        (truly-the index (rem dividend divisor))
-                        (sb-vm::fastrem-32 dividend c
-                                           (truly-the (unsigned-byte 32) divisor))))
-                 `(truly-the index (rem dividend divisor))))))
+                             ,(if (eq selector 2) `(- ,ncells 2) ncells)))
+                 (c (,get-c (truly-the symtbl-magic ,reciprocals))))
+            (if (= c 0)
+                (truly-the index (rem dividend divisor))
+                (sb-vm::fastrem-32 dividend c
+                                   (truly-the (unsigned-byte 32) divisor))))))
     (if (eq selector 1)
         remainder
         `(truly-the index (1+ ,remainder)))))
