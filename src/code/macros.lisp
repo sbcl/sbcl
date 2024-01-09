@@ -71,7 +71,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   (let (dx-decls)
     (dolist (form decl-forms)
       (dolist (expr (cdr form))
-        (when (eq (car expr) 'dynamic-extent)
+        (when (typep expr '(cons (eql dynamic-extent)))
           (setf dx-decls (union dx-decls (cdr expr))))))
     (unless dx-decls
       (return-from extract-dx-args nil))

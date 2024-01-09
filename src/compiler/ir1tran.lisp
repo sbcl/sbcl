@@ -1665,7 +1665,7 @@ possible.")
         (post-binding-lexenv (if binding-form-p (list nil)))) ; dummy cell
     (flet ((process-it (spec decl)
              (cond ((atom spec)
-                    (compiler-error "malformed declaration specifier ~S in ~S"
+                    (compiler-warn "malformed declaration specifier ~S in ~S"
                                     spec decl))
                    ((and (eq allow-lambda-list t)
                          (typep spec '(cons (eql lambda-list) (cons t null))))
