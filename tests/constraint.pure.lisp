@@ -1042,3 +1042,10 @@
                    (decf v2 (incf v2 (incf v6 (setq v2 (setq b 1044756040))))))))
        0 0))
    ((572837281 0) -1448416540836)))
+
+(with-test (:name :float-eql-bits)
+  (assert-type
+   (lambda (number)
+     (declare (type double-float number))
+     (cond ((eql number 1d0) number)))
+   (or (eql 1.0d0) null)))
