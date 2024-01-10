@@ -1049,3 +1049,12 @@
      (declare (type double-float number))
      (cond ((eql number 1d0) number)))
    (or (eql 1.0d0) null)))
+
+(with-test (:name :constraint-amount)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (loop for i below (- (length v) 2) by 2
+                              sum (svref v (1+ i))))
+                     nil))
+             0)))

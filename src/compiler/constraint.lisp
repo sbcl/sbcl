@@ -92,9 +92,10 @@
 (defstruct (equality-constraint
             (:include constraint)
             (:constructor make-equality-constraint
-                (number operator x y not-p
+                (number operator x y not-p &optional (amount 0)
                  &aux (kind 'equality))))
-  (operator nil :type symbol))
+  (operator nil :type symbol)
+  (amount 0 :type integer))
 
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
@@ -1404,8 +1405,9 @@
 
 ;;; Join the constraints coming from the predecessors of BLOCK on
 ;;; every constrained variable into the constraint set IN.
-(defun join-type-constraints (in block)
+(defun join-type-constraints (in block &optional equality-only)
   (let ((vars '())
+        (equality-vars)
         (predecessors (block-pred block)))
     (dolist (pred predecessors)
       (let ((out (block-out-for-successor pred block)))
@@ -1414,12 +1416,18 @@
             (let ((kind  (constraint-kind con))
                   (y     (constraint-y con))
                   (not-p (constraint-not-p con)))
-              (when (or (member kind '(typep < >))
-                        (and (eq kind 'eql) (or (not not-p)
-                                                (constant-p y)))
-                        (and (eq kind '=) (and (numeric-type-p y)
-                                               (not not-p))))
-                (pushnew (constraint-x con) vars))))
+              (when (and (not equality-only)
+                         (or (member kind '(typep < >))
+                             (and (eq kind 'eql) (or (not not-p)
+                                                     (constant-p y)))
+                             (and (eq kind '=) (and (numeric-type-p y)
+                                                    (not not-p)))))
+                (pushnew (constraint-x con) vars))
+              (when (and (eq kind 'equality)
+                         (/= (equality-constraint-amount con) 0))
+                (pushnew (constraint-x con) equality-vars)
+                (when (lambda-var/vector-length-p y)
+                  (pushnew y equality-vars)))))
           (return))))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
@@ -1439,7 +1447,9 @@
                                                     var
                                                     in-var-type
                                                     nil)
-                         in))))))
+                         in))))
+    (dolist (var equality-vars)
+      (join-equality-constraints var block in))))
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil))
@@ -1451,8 +1461,8 @@
           (if in
               (conset-intersection in out)
               (setq in (copy-conset out))))))
-    (when (and join-types-p (rest (block-pred block)))
-      (join-type-constraints in block))
+    (when (rest (block-pred block))
+      (join-type-constraints in block (not join-types-p)))
     (or in (make-conset))))
 
 (defun update-block-in (block join-types-p)

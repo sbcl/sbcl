@@ -1460,7 +1460,9 @@ is replaced with replacement."
                       (type-specifier x))
                      (t x))))
         (format t "   ~a~a ~a ~a~%" (if (eq kind* 'equality)
-                                        (format nil "~a ~a" kind* (equality-constraint-operator constraint))
+                                        (format nil "~a ~a~@[ ~a~]" kind* (equality-constraint-operator constraint)
+                                                (when (/= (equality-constraint-amount constraint) 0)
+                                                  (equality-constraint-amount constraint)))
                                         kind*)
                 (if (constraint-not-p constraint)
                     " NOT"

@@ -14,22 +14,6 @@
       (vector-length-constraint-var thing)
       thing))
 
-(defun find-equality-constraint (operator x y not-p)
-  (let ((constraints (lambda-var-equality-constraints (constraint-var x))))
-    (flet ((constraints-eq-p (a b)
-             (or (eq a b)
-                 (and (vector-length-constraint-p a)
-                      (vector-length-constraint-p b)
-                      (eq (vector-length-constraint-var a)
-                          (vector-length-constraint-var b))))))
-     (when constraints
-       (loop for con across constraints
-             when (and (eq (equality-constraint-operator con) operator)
-                       (eq (constraint-not-p con) not-p)
-                       (constraints-eq-p (constraint-x con) x)
-                       (constraints-eq-p (constraint-y con) y))
-             return con)))))
-
 (defun invert-operator (operator)
   (case operator
     (< '>)
@@ -38,26 +22,48 @@
     (>= '<=)
     (t operator)))
 
-(defmacro do-equality-constraints ((con op not-p) var constraints &body body)
+(defmacro do-equality-constraints ((con op not-p &optional amount) var constraints &body body)
   (once-only ((var var)
               (constraints constraints))
     `(do-conset-constraints-intersection
          (,con (,constraints (lambda-var-equality-constraints (constraint-var ,var))))
-       (flet ((body (,con ,op ,not-p) ,@body))
+       (flet ((body (,con ,op ,@(and amount (list amount)) ,not-p) ,@body))
          (cond ((vector-constraint-eq-p (constraint-x ,con) ,var)
                 (body (constraint-y ,con)
                       (equality-constraint-operator ,con)
+                      ,@(and amount
+                             `((equality-constraint-amount ,con)))
                       (equality-constraint-not-p ,con)))
                ((vector-constraint-eq-p (constraint-y ,con) ,var)
                 (body (constraint-x ,con)
                       (invert-operator (equality-constraint-operator ,con))
+                      ,@(and amount
+                             `((equality-constraint-amount ,con)))
                       (equality-constraint-not-p ,con))))))))
 
-(defun find-or-create-equality-constraint (operator x y not-p)
-  (or (find-equality-constraint operator x y not-p)
+(defun find-equality-constraint (operator amount x y not-p)
+  (let ((constraints (lambda-var-equality-constraints (constraint-var x))))
+    (flet ((constraints-eq-p (a b)
+             (or (eq a b)
+                 (and (vector-length-constraint-p a)
+                      (vector-length-constraint-p b)
+                      (eq (vector-length-constraint-var a)
+                          (vector-length-constraint-var b))))))
+      (when constraints
+        (loop for con across constraints
+              when (and (eq (equality-constraint-operator con) operator)
+                        (eql (equality-constraint-amount con) amount)
+                        (eq (constraint-not-p con) not-p)
+                        (constraints-eq-p (constraint-x con) x)
+                        (constraints-eq-p (constraint-y con) y))
+              return con)))))
+
+(defun find-or-create-equality-constraint (operator x y not-p &optional (amount 0))
+  (or (find-equality-constraint operator amount x y  not-p)
       (let ((new (make-equality-constraint (length *constraint-universe*)
                                            operator
-                                           x y not-p)))
+                                           x y not-p
+                                           amount)))
         (vector-push-extend new *constraint-universe* (1+ (length *constraint-universe*)))
         (flet ((add (var)
                  (conset-adjoin new (lambda-var-constraints var))
@@ -71,6 +77,10 @@
             (when (lambda-var-p y)
               (add y))))
         new)))
+
+(defun conset-add-equality-constraint (conset operator x y not-p &optional (amount 0))
+  (conset-adjoin (find-or-create-equality-constraint operator x y not-p amount)
+                 conset))
 
 (defun add-eq-constraint (var lvar gen)
   (let ((var2 (ok-lvar-lambda-var lvar gen)))
@@ -91,10 +101,6 @@
     (and array-var
          (make-vector-length-constraint array-var))))
 
-(defun conset-add-equality-constraint (conset operator x y not-p)
-  (conset-adjoin (find-or-create-equality-constraint operator x y not-p)
-                 conset))
-
 (defun vector-constraint-eq-p (con1 con2)
   (or (eq con1 con2)
       (and (vector-length-constraint-p con1)
@@ -112,23 +118,33 @@
 
 (defconstant-eqx +eq-ops+ '(eq eql =) #'equal)
 
-(defun inherit-equality-p (new from not-p)
+(defun inherit-equality-p (new from not-p &optional (min-amount 0) max-amount (from-amount 0))
   (case new
     ((char= char-equal . #.+eq-ops+)
      (unless not-p
-       from))
+       (values from from-amount)))
     (<
      (if not-p
          (case from
-           ((> >=) '<))
+           ((> >=) (values '< (+ from-amount min-amount))))
          (case from
-           ((< <= . #.+eq-ops+) '<))))
+           ((< <= . #.+eq-ops+) (values '< (+ from-amount min-amount)))
+           (>
+            (when max-amount
+             (let ((diff (- from-amount max-amount)))
+               (cond ((> diff 0)
+                      (values '> diff)))))))))
     (>
      (if not-p
          (case from
-           ((< <=) '>))
+           ((< <=) (values '> (+ from-amount min-amount))))
          (case from
-           ((> >= . #.+eq-ops+) '>))))
+           ((> >= . #.+eq-ops+) (values '> (+ from-amount min-amount)))
+           (<
+            (when max-amount
+              (let ((diff (- from-amount max-amount)))
+                (cond ((> diff 0)
+                       (values '< diff)))))))))
     (<=
      (if not-p
          (case from
@@ -142,7 +158,8 @@
          (case from
            ((> >= . #.+eq-ops+) '>=))))))
 
-(defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints)
+(defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints
+                                &optional (min-amount 0) max-amount)
   (case operator
     (vector-length
      (let ((var (if (lambda-var-p first)
@@ -199,7 +216,8 @@
                        (make-vector-length-constraint with))
                       (t
                        with)))
-              (add (x y &optional (operator operator) (alternative-constraints alternative-constraints))
+              (add (x y &key (operator operator) (alternative alternative-constraints)
+                             (amount min-amount))
                 (when (eq x y)
                   (return-from add))
                 (unless (lambda-var/vector-length-p x)
@@ -207,16 +225,16 @@
                     (return-from add))
                   (rotatef x y)
                   (setf operator (invert-operator operator)))
-                (conset-add-equality-constraint consequent-constraints operator x y nil)
-                (when alternative-constraints
-                  (conset-add-equality-constraint alternative-constraints operator x y t))))
+                (conset-add-equality-constraint consequent-constraints operator x y nil amount)
+                (when alternative
+                  (conset-add-equality-constraint alternative operator x y t amount))))
          (do-eql-vars (eql-x ((constraint-var x) constraints))
            (let ((x (replace-var x eql-x)))
              (add x y)
              (when (and (vector-length-constraint-p x)
                         (not constant-y)
                         (neq y-type *universal-type*))
-               (add x y-type))))
+               (add x y-type :amount 0))))
          (if (lambda-var/vector-length-p y)
              (do-eql-vars (eql-y ((constraint-var y) constraints))
                (let ((y (replace-var y eql-y)))
@@ -224,27 +242,33 @@
                  (when (and (vector-length-constraint-p y)
                             (not constant-x)
                             (neq x-type *universal-type*))
-                   (add x-type y))))
+                   (add x-type y :amount 0))))
              (add x y))
          (flet ((inherit (x y x-type operator)
                   (when (lambda-var/vector-length-p y)
-                    (do-equality-constraints (in-y in-op in-not-p) y constraints
+                    (do-equality-constraints (in-y in-op in-not-p in-amount) y constraints
                       (unless (eq in-y y)
-                        (let ((inherit (inherit-equality-p operator in-op in-not-p)))
+                        (multiple-value-bind (inherit inherit-amount)
+                            (inherit-equality-p operator in-op in-not-p min-amount max-amount in-amount)
                           (when inherit
-                            (add x in-y inherit nil)
+                            (add x in-y :operator inherit
+                                        :amount (or inherit-amount 0)
+                                        :alternative nil)
                             (when (and (vector-length-constraint-p in-y)
                                        (not (constant-p x)))
-                              (add x-type in-y inherit nil)))))))))
+                              (add x-type in-y :operator inherit :alternative nil
+                                               :amount 0)))))))))
            (inherit x y x-type operator)
            (inherit y x y-type (invert-operator operator))
            (when (lvar-p y)
-             (loop for (in-op in-lvar) in (lvar-result-constraints y)
+             (loop for (in-op in-lvar in-min-amount) in (lvar-result-constraints y)
                    do
-                   (let ((inherit (inherit-equality-p operator in-op nil)))
-                     (when inherit
-                       (add-equality-constraint inherit x in-lvar
-                                                constraints consequent-constraints nil)))))))))))
+                   (unless (eq in-lvar first)
+                     (multiple-value-bind (inherit inherit-amount)
+                         (inherit-equality-p operator in-op nil min-amount max-amount (or in-min-amount 0))
+                       (when inherit
+                         (add-equality-constraint inherit x in-lvar
+                                                  constraints consequent-constraints nil (or inherit-amount 0)))))))))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
@@ -275,8 +299,34 @@
                                               (if replace-x
                                                   (constraint-y con)
                                                   (replace-var (constraint-y con) var))
-                                              (constraint-not-p con))
+                                              (constraint-not-p con)
+                                              (equality-constraint-amount con))
           target))))))
+
+;;; Ignore AMOUNT
+(defun join-equality-constraints (var block in)
+  (let* ((constraints (make-hash-table :test #'equal))
+         (pred (block-pred block))
+         (i -1))
+    ;; TODO: merge the amounts too
+    (loop for pred in pred
+          do
+          (let ((out (block-out-for-successor pred block)))
+            (when out
+              (incf i)
+              (do-equality-constraints (in-con in-op not-p) var out
+                (let ((existing (gethash (list in-con in-op not-p) constraints -1)))
+                  (when (= existing (1- i))
+                    (setf (gethash (list in-con in-op not-p) constraints) i)))))))
+    (dohash ((key value) constraints)
+      (when (= value i)
+        (destructuring-bind (y op not-p) key
+          (conset-adjoin
+           (find-or-create-equality-constraint op
+                                               var
+                                               y
+                                               not-p)
+           in))))))
 
 (defun try-equality-constraint (call gen)
   (let ((constraint (fun-info-equality-constraint (basic-combination-fun-info call)))
@@ -495,7 +545,6 @@
     :give-up))
 
 (defoptimizer (- equality-constraint) ((x y) node gen)
-  gen
   (when (and (csubtypep (lvar-type x) (specifier-type 'integer))
              (csubtypep (lvar-type y) (specifier-type 'integer)))
     (block nil
@@ -632,9 +681,9 @@
                  r)))))))
 
 (defun add-var-result-constraints (var lvar constraints &optional (target constraints))
-  (loop for (operator second) in (lvar-result-constraints lvar)
+  (loop for (operator second min-amount max-amount) in (lvar-result-constraints lvar)
         do
-        (add-equality-constraint operator var second constraints target nil))
+        (add-equality-constraint operator var second constraints target nil (or min-amount 0) max-amount))
   (when (lambda-var-p var)
     (let ((vector-length (vector-length-var-p lvar constraints)))
       (when vector-length
@@ -643,7 +692,7 @@
 ;;; Need a separate function because a set clears the constraints of the var
 (defun add-set-constraints (var lvar constraints)
   (let (gen)
-    (loop for (operator second) in (lvar-result-constraints lvar)
+    (loop for (operator second min-amount max-amount) in (lvar-result-constraints lvar)
           for y = (if (lambda-var-p second)
                       second
                       (ok-lvar-lambda-var second constraints))
@@ -651,35 +700,37 @@
           do
           (do-eql-vars (eql-y (y constraints))
             (when (eq eql-y var)
-              (do-equality-constraints (in-y in-op in-not-p) var constraints
+              (do-equality-constraints (in-y in-op in-not-p in-amount) var constraints
                 (unless (eq in-y var)
-                  (let ((inherit (inherit-equality-p operator in-op in-not-p)))
+                  (multiple-value-bind (inherit inherit-amount)
+                      (inherit-equality-p operator in-op in-not-p min-amount max-amount (or in-amount 0))
                     (when inherit
                       (conset-add-equality-constraint (or gen
                                                           (setf gen (make-conset)))
-                                                      inherit var in-y nil))))))))
+                                                      inherit var in-y nil
+                                                      (or inherit-amount 0)))))))))
     gen))
 
 (defoptimizer (- constraint-propagate-result) ((a b) node)
   (and (csubtypep (lvar-type a) (specifier-type 'integer))
        (csubtypep (lvar-type b) (specifier-type '(integer 0)))
-       (let ((plusp (csubtypep (lvar-type b) (specifier-type '(integer 1)))))
-         (list (list (if plusp
-                         '<
-                         '<=)
-                     a)))))
+       (let ((interval (type-approximate-interval (lvar-type b))))
+         (let ((low (interval-low interval)))
+           (if (> low 0)
+               (list (list '< a low (interval-high interval)))
+               (list (list '<= a)))))))
 
 (defoptimizer (+ constraint-propagate-result) ((x y) node)
   (let (r)
     (flet ((try (a b)
              (and (csubtypep (lvar-type a) (specifier-type 'integer))
                   (csubtypep (lvar-type b) (specifier-type '(integer 0)))
-                  (let ((plusp (csubtypep (lvar-type b) (specifier-type '(integer 1)))))
-                    (push (list (if plusp
-                                    '>
-                                    '>=)
-                                a)
-                          r)))))
+                  (let ((interval (type-approximate-interval (lvar-type b))))
+                    (let ((low (interval-low interval)))
+                      (push (if (> low 0)
+                                (list '> a low (interval-high interval))
+                                (list '>= a))
+                            r))))))
       (try x y)
       (try y x))
     r))
