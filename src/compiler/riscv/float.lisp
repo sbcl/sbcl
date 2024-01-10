@@ -578,7 +578,7 @@
   (:results (res :scs (double-reg)))
   (:arg-types signed-num)
   (:result-types double-float)
-  (:translate make-double-float)
+  (:translate %make-double-float)
   (:policy :fast-safe)
   (:generator 2
     (inst fmvx-> :double res bits)))
