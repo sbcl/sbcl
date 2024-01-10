@@ -21,3 +21,5 @@ CPPFLAGS += -isystem/usr/local/include
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
+
+SBCL_PAXCTL=elfctl -e +noaslr

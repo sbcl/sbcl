@@ -20,3 +20,5 @@ ifdef LISP_FEATURE_SB_THREAD
 endif
 
 CFLAGS += -fno-omit-frame-pointer 
+
+SBCL_PAXCTL=elfctl -e +noaslr
