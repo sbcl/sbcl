@@ -600,33 +600,29 @@
             (aref map 2) c)
       (fill map nil :start (+ fast-slot-table-fixed-cells n-cells))
       (dolist (dsd (dd-slots dd) map)
-        ;; minor kludge: skip raw slots for now, and let structure-slot-value
-        ;; fall back to the fully general SLOT-VALUE. A better solution would be
-        ;; to encode the raw-type into the value stored in the index vector.
-        (when (eq (dsd-raw-type dsd) t)
           (binding*
-              ((hash (symbol-hash (dsd-name dsd)))
-               (masked-hash (logand (ash hash (- shift)) mask))
-               (bin (truly-the index
-                               (+ (sb-vm::fastrem-32 masked-hash c n-cells)
-                                  fast-slot-table-fixed-cells)))
-               (dsd-index (dsd-index dsd))
-               (name (dsd-name dsd))
-               ((key value)
-                (cond ((eql (svref map bin) 0) ; empty, just store the name and dsd-index
-                       (values name dsd-index))
-                      ;; A bin with a collision is upgraded to a vector of the two entries
-                      ((symbolp (svref map bin))
-                       (values (vector (svref map bin) name)
-                               (vector (svref map (+ bin n-cells)) dsd-index)))
-                      ;; Multiple collisions
-                      (t
-                       (values (concatenate 'vector (svref map bin) (vector name))
-                               (concatenate 'vector
-                                            (svref map (+ bin n-cells))
-                                            (vector dsd-index)))))))
-              (setf (svref map bin) key
-                    (svref map (+ bin n-cells)) value)))))))
+           ((hash (symbol-hash (dsd-name dsd)))
+            (masked-hash (logand (ash hash (- shift)) mask))
+            (bin (truly-the index
+                            (+ (sb-vm::fastrem-32 masked-hash c n-cells)
+                               fast-slot-table-fixed-cells)))
+            (dsd-bits (dsd-bits dsd))
+            (name (dsd-name dsd))
+            ((key value)
+             (cond ((eql (svref map bin) 0) ; empty, just store the name and dsd-index
+                    (values name dsd-bits))
+                   ;; A bin with a collision is upgraded to a vector of the two entries
+                   ((symbolp (svref map bin))
+                    (values (vector (svref map bin) name)
+                            (vector (svref map (+ bin n-cells)) dsd-bits)))
+                   ;; Multiple collisions
+                   (t
+                    (values (concatenate 'vector (svref map bin) (list name))
+                            (concatenate 'vector
+                                         (svref map (+ bin n-cells))
+                                         (list dsd-bits)))))))
+           (setf (svref map bin) key
+                 (svref map (+ bin n-cells)) value))))))
 
 
 (/show0 "target-defstruct.lisp end of file")

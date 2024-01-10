@@ -85,7 +85,7 @@
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
 (macrolet
-    ((fast-get-dsd-index-by-name ()
+    ((fast-get-dsd-bits-by-name ()
        ;; This macro is unhygienic, freely referencing MAP and SLOT-NAME
        ;; from STRUCTURE-SLOT-VALUE or SLOT-VALUE.
        `(let* ((shift (truly-the (integer 0 31) (svref map 0)))
@@ -104,10 +104,8 @@
           (cond ((eq entry slot-name)
                  (svref map (+ bin n-cells))) ; skip over the fixed portion
                 ((eql entry 0) nil)
-                ;; If a symbol is omitted from the map because it names a raw slot,
-                ;; this cell might have a _different_ symbol in it, not a vector.
-                ((simple-vector-p (truly-the (or simple-vector symbol) entry))
-                 (let ((v entry))
+                (t
+                 (let ((v (truly-the simple-vector entry)))
                    ;; try to find slot-name in the collision vector
                    (dotimes (i (length v))
                      (when (eq (svref v i) slot-name)
@@ -122,12 +120,19 @@
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((layout (%instance-layout (truly-the structure-object instance)))
          (map (the simple-vector (sb-kernel::layout-struct-slot-map layout)))
-         (dsd-index (fast-get-dsd-index-by-name)))
-    ;; TODO: encode dsd-raw-type into the index, and handle all raw types here
-    (if dsd-index
-        ;; We don't transform SLOT-VALUE to STRUCTURE-SLOT-VALUE in safety 3,
-        ;; So this need not check for unbound-marker.
-        (%instance-ref instance (truly-the index dsd-index))
+         (bits (fast-get-dsd-bits-by-name)))
+    (if bits
+        (let ((raw-type (logand (truly-the fixnum bits) sb-vm:dsd-raw-type-mask))
+              (index (truly-the index (ash bits (- sb-vm:dsd-index-shift)))))
+          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+          ;; We don't transform SLOT-VALUE to STRUCTURE-SLOT-VALUE in safety 3,
+          ;; so this need not check for unbound-marker.
+          (if (/= raw-type 0)
+              (funcall (sb-kernel::raw-slot-data-accessor-fun
+                        (svref (load-time-value sb-kernel::*raw-slot-data* t)
+                               (truly-the index (1- raw-type))))
+                       instance index)
+              (%instance-ref instance index)))
         ;; not found, take the slow path
         (locally (declare (notinline slot-value))
           (slot-value instance slot-name)))))
