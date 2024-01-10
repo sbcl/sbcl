@@ -557,8 +557,6 @@
 ;;; If "flexible" defstructs (multiple inheritance, standard-object ancestors) are ever
 ;;; brought to life, these might be inadmissible. Probably we would not store the
 ;;; fast map in such situations.
-#+64-bit
-(progn
 (defun best-slot-map-parameters (names)
   (let* ((raw-hashes (mapcar (lambda (x) (symbol-hash (the symbol x))) names))
          (n-names (length names))
@@ -629,7 +627,6 @@
                                             (vector dsd-index)))))))
               (setf (svref map bin) key
                     (svref map (+ bin n-cells)) value)))))))
-) ; end PROGN
 
 
 (/show0 "target-defstruct.lisp end of file")

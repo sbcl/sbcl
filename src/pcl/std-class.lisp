@@ -854,7 +854,6 @@
              (layout (classoid-layout lclass)))
         (setf (classoid-pcl-class lclass) class)
         (setf (slot-value class 'wrapper) layout)
-        #+64-bit
         (setf (sb-kernel::layout-struct-slot-map layout)
               (sb-kernel::make-struct-slot-map (layout-dd layout)))
         (setf (layout-slot-table layout) (make-slot-table class slots))))

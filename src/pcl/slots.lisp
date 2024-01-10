@@ -91,8 +91,6 @@
        `(let* ((shift (truly-the (integer 0 31) (svref map 0)))
                (mask (truly-the (unsigned-byte 32) (svref map 1)))
                (c (truly-the (unsigned-byte 32) (svref map 2)))
-               ;; elide the check for whether hash was precomputed. It has to have been,
-               ;; and even if it wasn't we'd just take the slow path, so no harm done.
                (hash (logand (ash (symbol-hash (truly-the symbol slot-name)) (- shift))
                              mask))
                (n-cells
@@ -106,8 +104,10 @@
           (cond ((eq entry slot-name)
                  (svref map (+ bin n-cells))) ; skip over the fixed portion
                 ((eql entry 0) nil)
-                (t
-                 (let ((v (truly-the simple-vector entry)))
+                ;; If a symbol is ommitted from the map because it names a raw slot,
+                ;; this cell might have a _different_ symbol in it, not a vector.
+                ((simple-vector-p (truly-the (or simple-vector symbol) entry))
+                 (let ((v entry))
                    ;; try to find slot-name in the collision vector
                    (dotimes (i (length v))
                      (when (eq (svref v i) slot-name)
@@ -118,7 +118,6 @@
 ;;; automatically cobbled together for SLOT-VALUE on an unknown type but constant slot name.
 ;;; While the global generic for a specific slot might only need to invoke a type-check,
 ;;; the dispatch function is not faster than this, if even as fast.
-#+64-bit
 (defun structure-slot-value (instance slot-name)
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((layout (%instance-layout (truly-the structure-object instance)))

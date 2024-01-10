@@ -95,7 +95,6 @@
              `(sb-pcl::accessor-slot-makunbound object ',(lvar-value slot-name)))))
 
   ;; this transform is tried LAST because we like to make things unintuitive
-  #+64-bit ; not really arch-specific but needs fastrem-32
   (deftransform slot-value ((object slot-name) (structure-object symbol) *
                             ;; safety 3 should check slot-unbound on structures
                             :policy (< safety 3))
