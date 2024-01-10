@@ -75,9 +75,7 @@
 
 (defun emit-inits (node block object lowtag inits args)
   (let ((unbound-marker-tn nil)
-        (funcallable-instance-tramp-tn nil)
         (dx-p (node-stack-allocate-p node)))
-    (declare (ignorable funcallable-instance-tramp-tn))
     (flet ((zero-init-p (x)
              ;; dynamic-space is already zeroed
              (and (not dx-p)
@@ -137,15 +135,7 @@
                                     (vop make-unbound-marker node block tn)
                                     tn))))
                        (:null
-                        (emit-constant nil))
-                       #-executable-funinstances
-                       (:funcallable-instance-tramp
-                        (or funcallable-instance-tramp-tn
-                            (setf funcallable-instance-tramp-tn
-                                  (let ((tn (make-restricted-tn
-                                             nil sb-vm:any-reg-sc-number)))
-                                    (vop make-funcallable-instance-tramp node block tn)
-                                    tn)))))
+                        (emit-constant nil)))
                      :allocator slot lowtag))))))))
   (unless (null args)
     (bug "Leftover args: ~S" args))

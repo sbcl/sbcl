@@ -289,11 +289,7 @@ during backtrace.
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
-  #+executable-funinstances (trampoline)
-  ;; FIXME: this :INIT seems completely silly.  I'm quite certain we can look up the
-  ;; assembler routine and assign it in a way totally consistent across the backends
-  ;; so that the special case in EMIT-INITS and the vops can go away.
-  #-executable-funinstances (trampoline :init :funcallable-instance-tramp)
+  (trampoline)
   ;; self-contained trampoline instructions go in the words following
   ;; the trampoline address. Currently the use of 2 words is based on
   ;; the requirement for x86-64 but it is relatively easy to change.

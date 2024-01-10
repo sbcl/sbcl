@@ -2268,7 +2268,6 @@ or they must be declared locally notinline at each call site.~@:>"
                                                     x))
                                        slot-names) &aux (object ,allocate))
                  ,@set-layout
-                 #+executable-funinstances
                  ,@(when (and (eq dd-type 'funcallable-structure)
                               ;; fmt-control is not an executable function
                               (neq class-name 'sb-format::fmt-control))

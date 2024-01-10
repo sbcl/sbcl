@@ -378,12 +378,6 @@
   (:generator 1
     (inst mov result unbound-marker-widetag)))
 
-(define-vop (make-funcallable-instance-tramp)
-  (:args)
-  (:results (result :scs (any-reg)))
-  (:generator 1
-    (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
-
 (define-vop (fixed-alloc)
   (:info name words type lowtag stack-allocate-p)
   (:ignore name)

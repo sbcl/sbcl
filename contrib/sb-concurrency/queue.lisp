@@ -192,7 +192,7 @@ must walk the entire queue."
     (let ((fin (sb-kernel:%make-funcallable-instance 1))
           (gate (make-gate)))
       (sb-kernel:%set-fun-layout fin (sb-kernel:find-layout 'function))
-      #+executable-funinstances (sb-vm::write-funinstance-prologue fin)
+      (sb-vm::write-funinstance-prologue fin)
       (setf (sb-kernel:%funcallable-instance-fun fin)
             (lambda (&rest args)
               (wait-on-gate gate)

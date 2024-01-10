@@ -1419,7 +1419,7 @@
 (defglobal *vops-allowed-within-pseudo-atomic*
     '(set-slot %raw-instance-set/word %raw-instance-set/signed-word %raw-instance-set/single
       %raw-instance-set/double %raw-instance-set/complex-single %raw-instance-set/complex-double
-      move move-operand make-unbound-marker make-funcallable-instance-tramp
+      move move-operand make-unbound-marker
       sb-vm::move-from-word/fixnum sb-vm::move-to-word/fixnum
       sb-vm::move-from-fixnum+1 sb-vm::move-from-fixnum-1))
 

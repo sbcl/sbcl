@@ -113,17 +113,6 @@
   (:generator 1
     (inst mov result unbound-marker-widetag)))
 
-(define-vop (make-funcallable-instance-tramp)
-  (:args)
-  (:results (result :scs (any-reg)))
-  (:temporary (:sc interior-reg) lip)
-  (:generator 1
-    (let ((fixup (gen-label)))
-      (inst load-from-label result lip fixup)
-      (assemble (:elsewhere)
-        (emit-label fixup)
-        (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine))))))
-
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)

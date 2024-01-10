@@ -1434,7 +1434,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "EMIT-NOP"
            "DEF-SETTER"
            "FIXED-ALLOC"
-           "MAKE-FUNCALLABLE-INSTANCE-TRAMP"
            "RETURN-SINGLE"
            "NOTE-NEXT-INSTRUCTION"
            "SET-SLOT"
