@@ -18,8 +18,6 @@ include Config.x86-64-bsd
 OS_LIBS += -lutil -L/usr/local/lib
 CPPFLAGS += -isystem/usr/local/include
 
-# use libthr (1:1 threading).  libpthread (m:n threading) does not work.
 ifdef LISP_FEATURE_SB_THREAD
-  #OS_LIBS += -lpthread
-  OS_LIBS += -lthr
+  OS_LIBS += -lpthread
 endif
