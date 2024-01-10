@@ -168,9 +168,6 @@
   (def symbol-package-id)
   (def symbol-hash)
   (def symbol-%info) ; primitive reader always needs a stub
-  ;; but the "wrapped" reader might not need a stub.
-  ;; If it's already a proper function, then it doesn't.
-  #.(if (fboundp 'symbol-dbinfo) (values) '(def symbol-dbinfo))
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
   (def get-lisp-obj-address)

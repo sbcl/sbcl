@@ -283,28 +283,6 @@
     (loadw result function closure-fun-slot fun-pointer-lowtag)
     (inst sub result (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))))
 
-;;;; symbol frobbing
-(defun load-symbol-dbinfo (result symbol)
-  (loadw result symbol symbol-info-slot other-pointer-lowtag)
-  ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-  ;; This CMOV safely reads from memory when it does not move, because if
-  ;; there is a PACKED-INFO in the slot, it has at least 4 data words in total
-  ;; - the header, at least one info descriptor, and at least one datum.
-  ;; And since 3 is odd, that would be aligned up to 4.
-  ;; Use bit index 2 of the lowtag to distinguish list from instance.
-  ;; An instance will have a 0 in that bit.
-  ;; This would compile to almost the same code without a VOP,
-  ;; but using a jmp around a mov instead.
-  (aver (= (logior instance-pointer-lowtag #b0100) list-pointer-lowtag))
-  (inst test :byte result #b0100)
-  (inst cmov :nz result (object-slot-ea result cons-cdr-slot list-pointer-lowtag)))
-
-(define-vop (symbol-dbinfo)
-  (:policy :fast-safe)
-  (:translate symbol-dbinfo)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:generator 1 (load-symbol-dbinfo res x)))
 
 ;;;; other miscellaneous VOPs
 

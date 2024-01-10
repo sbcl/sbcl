@@ -131,16 +131,13 @@
 ;;; Otherwise, it is in state 2 so return the value as-is.
 ;;; NIL is an acceptable substitute for +NIL-PACKED-INFOS+,
 ;;; but I might change that.
-;;;
-;;; Define SYMBOL-INFO as an inline function unless a vop translates it.
-;;; (Inlining occurs first, which would cause the vop not to be used.)
 #-sb-xc-host
-(sb-c::unless-vop-existsp (:translate sb-kernel:symbol-dbinfo)
-  (declaim (inline symbol-dbinfo))
-  (defun symbol-dbinfo (symbol)
-    (let ((info-holder (symbol-%info symbol)))
-      (truly-the (or null instance)
-                 (if (listp info-holder) (cdr info-holder) info-holder)))))
+(progn
+(declaim (inline symbol-dbinfo))
+(defun symbol-dbinfo (symbol)
+  (let ((info-holder (symbol-%info symbol)))
+    (truly-the (or null packed-info)
+               (if (listp info-holder) (cdr info-holder) info-holder)))))
 
 ;; Perform the equivalent of (GET-INFO-VALUE KIND +INFO-METAINFO-TYPE-NUM+)
 ;; but skipping the defaulting logic.

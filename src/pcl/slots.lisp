@@ -104,7 +104,7 @@
           (cond ((eq entry slot-name)
                  (svref map (+ bin n-cells))) ; skip over the fixed portion
                 ((eql entry 0) nil)
-                ;; If a symbol is ommitted from the map because it names a raw slot,
+                ;; If a symbol is omitted from the map because it names a raw slot,
                 ;; this cell might have a _different_ symbol in it, not a vector.
                 ((simple-vector-p (truly-the (or simple-vector symbol) entry))
                  (let ((v entry))

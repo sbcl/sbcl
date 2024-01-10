@@ -207,19 +207,6 @@
     (inst add ndescr offset ndescr)
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
-;;;
-(define-vop (symbol-dbinfo)
-  (:policy :fast-safe)
-  (:translate symbol-dbinfo)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-    (inst and temp res lowtag-mask)
-    (inst cmp temp list-pointer-lowtag)
-    (loadw res res cons-cdr-slot list-pointer-lowtag :eq)))
 
 ;;;; other miscellaneous VOPs
 
