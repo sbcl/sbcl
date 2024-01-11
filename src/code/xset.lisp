@@ -236,7 +236,8 @@
 ;;; Use modular addition since it is commutative and associative, and the low bits
 ;;; come out the same no matter the order of operations.
 (defun xset-elts-hash (xset)
-  (let ((h 0))
+  (let* ((c (xset-count xset))
+         (h (mix c c)))
     (declare (sb-xc:fixnum h))
     ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
     ;; allow bits to rollover into the sign bit
@@ -244,10 +245,22 @@
       (if (simple-vector-p hashes)
           (dovector (x hashes)
             (setq h (plus-mod-fixnum h (truly-the sb-xc:fixnum (if (listp x) (cdr x) x)))))
-          (map-xset (lambda (x)
-                      (when (typep x '(or symbol number character))
-                        (setq h (plus-mod-fixnum (sb-xc:sxhash x) h))))
-                    xset)))
+          (flet ((elt-hash (e)
+                   ;; SYMBOL-HASH is better than SXHASH for symbols (because SXHASH collides
+                   ;; on STRING= symbols - though SYMBOL-HASH does too at the moment).
+                   ;; and SXHASH is better than EQL-HASH for (OR CHARACTER NUMBER)
+                   ;; though either is technically an acceptable hash function on those types.
+                   #-sb-xc-host (if (symbolp e) (symbol-hash e) (sb-xc:sxhash e))
+                   #+sb-xc-host (sb-xc:sxhash e)))
+            ;; If stable hashes were never assigned, then the set must contain
+            ;; only these object types. There are some other objects (INSTANCE e.g.) that
+            ;; could have non-address-based EQL-hashes but they don't really appear
+            ;; in MEMBER types often enough to matter. (And in fact we'd have to use
+            ;; something other than EQL-hash)
+            (map-xset (lambda (x)
+                        (aver (typep x '(or symbol number character)))
+                        (setq h (plus-mod-fixnum (elt-hash x) h)))
+                      xset))))
     ;; Now mix the bits thoroughly and then mask to a positive fixnum.
     ;; I think this does not need to be compatible between host and target.
     ;; But I'm trying to make it compatible anyway because I'm not 100% sure
@@ -277,16 +290,21 @@
                    (t
                     (setf (gethash obj hashmap) (cons 1 (ctype-random))))))))
     (let ((hashes (make-array (xset-count xset)))
-          (i 0))
+          (index -1))
       (map-xset (lambda (elt)
-                  (multiple-value-bind (hashval eq?)
-                      #+sb-xc-host (if (sb-xc:typep elt '(or symbol character number))
-                                       (values (sb-xc:sxhash elt) nil)
-                                       (values 4 ; chosen by algorithm of https://xkcd.com/221/
-                                               t)) ; yes, it's address-based
-                      #-sb-xc-host (sb-impl::eql-hash elt)
-                    (setf (aref hashes i) (if eq? (get-stable-hash-cell elt) hashval))
-                    (incf i)))
+                  (setf (aref hashes (incf index))
+                        #-sb-xc-host
+                        (multiple-value-bind (hashval addr) (sb-impl::eql-hash elt)
+                          ;; EQL-HASH does _nothing_ to fixnums. Hash-tables perturb the hash
+                          ;; in PREFUZZ-HASH, so too should we mix bits some more here.
+                          (if addr (get-stable-hash-cell elt) (murmur-hash-word/fixnum hashval)))
+                        #+sb-xc-host
+                        (multiple-value-bind (hashval addr)
+                            (if (sb-xc:typep elt '(or symbol character number))
+                                (values (sb-xc:sxhash elt) nil)
+                                (values 4 ; chosen by algorithm of https://xkcd.com/221/
+                                        t)) ; yes, it's address-based
+                          (if addr (get-stable-hash-cell elt) hashval))))
                 xset)
       (setf (xset-extra xset) hashes)))
   xset)

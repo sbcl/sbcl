@@ -5,13 +5,29 @@
         (a (sb-int:alloc-xset)))
     (dolist (elt list)
       (sb-int:add-to-xset elt a))
+    (sb-kernel::xset-generate-stable-hashes a)
     (dotimes (i 10)
       (let ((b (sb-int:alloc-xset)))
         (dolist (elt (shuffle list))
           (sb-int:add-to-xset elt b))
+        (sb-kernel::xset-generate-stable-hashes b)
         (assert (sb-int:xset= a b))
         (assert (= (sb-int:xset-elts-hash a)
                    (sb-int:xset-elts-hash b)))))))
+
+(with-test (:name :xset-hash-numerics-better)
+  ;; It was very easy to make xsets which collided on their hash if any
+  ;; elements got assigned a stable hash. In such xsets, the non-pointer elements
+  ;; could hash to themselves. This meant that any set of fixnums which summed
+  ;; to the same as another set of fixnums might hash identically
+  (let ((str "hi")
+        (xset1 (sb-int:alloc-xset))
+        (xset2 (sb-int:alloc-xset)))
+    (dolist (e `(1 ,str 10)) (sb-int:add-to-xset e xset1))
+    (dolist (e `(8 3 ,str)) (sb-int:add-to-xset e xset2))
+    (sb-kernel::xset-generate-stable-hashes xset1)
+    (sb-kernel::xset-generate-stable-hashes xset2)
+    (assert (/= (sb-int:xset-elts-hash xset1) (sb-int:xset-elts-hash xset2)))))
 
 (with-test (:name :xset-fast-union)
   (let ((s1 (sb-int:alloc-xset))
