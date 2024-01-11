@@ -147,7 +147,9 @@ these hooks.")
 (defmacro with-push-char ((&key (element-type 'character) (initial-size 28)) &body body)
   (with-unique-names (string size pointer)
     `(let* ((,size ,initial-size)
-            (,string (make-array ,size :element-type ',element-type))
+            (,string (make-array ,size
+                                 :element-type ',element-type
+                                 :initial-element (code-char 0)))
             (,pointer 0))
        (declare (type (integer 0 ,array-dimension-limit) ,size)
                 (type (integer 0 ,(1- array-dimension-limit)) ,pointer)
@@ -157,7 +159,8 @@ these hooks.")
                 (when (= ,pointer ,size)
                   (let ((old ,string))
                     (setf ,size (* 2 (+ ,size 2))
-                          ,string (make-array ,size :element-type ',element-type))
+                          ,string (make-array ,size :element-type ',element-type
+                                                    :initial-element (code-char 0)))
                     (replace ,string old)))
                 (setf (char ,string ,pointer) char)
                 (incf ,pointer))
@@ -167,8 +170,10 @@ these hooks.")
                   (setf ,size 0
                         ,pointer 0
                         ,string ,(coerce "" `(simple-array ,element-type (*))))
-                  ;; This is really local, so we can be destructive!
-                  (%shrink-vector string size)
+                  ;; ASSUMPTION: we use pre-zeroed memory for unboxed objects.
+                  ;; So we can avoid calling %SHRINK-VECTOR, and instead directly
+                  ;; set the length.
+                  (setf (%array-fill-pointer string) size)
                   string)))
          ,@body))))
 

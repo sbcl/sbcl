@@ -196,13 +196,18 @@ variable: an unreadable object representing the error is printed instead.")
            (%with-output-to-string (stream)
               (sb-pretty:output-pretty-object stream fun object))
            (let ((buffer-size (approx-chars-in-repr object)))
-             (let* ((string (make-string buffer-size :element-type 'base-char))
+             (let* ((string (make-string buffer-size :element-type 'base-char
+                                         :initial-element (code-char 0)))
                     (stream (%make-finite-base-string-output-stream string)))
                (declare (inline %make-finite-base-string-output-stream))
                (declare (dynamic-extent stream))
                (output-integer object stream *print-base* *print-radix*)
-               (%shrink-vector string
-                               (finite-base-string-output-stream-pointer stream)))))))
+               ;; ASSUMPTION: we use pre-zeroed memory for unboxed objects.
+               ;; So we can avoid calling %SHRINK-VECTOR, and instead directly
+               ;; set the length.
+               (setf (%array-fill-pointer string)
+                     (finite-base-string-output-stream-pointer stream))
+               string)))))
     ;; Could do something for other numeric types, symbols, ...
     (t
      (%with-output-to-string (stream)
