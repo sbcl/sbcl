@@ -1057,4 +1057,11 @@
                         (loop for i below (- (length v) 2) by 2
                               sum (svref v (1+ i))))
                      nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v)
+                        (loop for i from (- (length v) 2) downto 0
+                              collect (svref v (1+ i))))
+                     nil))
              0)))

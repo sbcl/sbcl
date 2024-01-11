@@ -308,24 +308,30 @@
   (let* ((constraints (make-hash-table :test #'equal))
          (pred (block-pred block))
          (i -1))
-    ;; TODO: merge the amounts too
     (loop for pred in pred
           do
           (let ((out (block-out-for-successor pred block)))
             (when out
               (incf i)
-              (do-equality-constraints (in-con in-op not-p) var out
-                (let ((existing (gethash (list in-con in-op not-p) constraints -1)))
-                  (when (= existing (1- i))
-                    (setf (gethash (list in-con in-op not-p) constraints) i)))))))
+              (do-equality-constraints (in-con in-op not-p amount) var out
+                (let ((existing (gethash (list in-con in-op not-p) constraints)))
+                  (when (= (if existing
+                               (car existing)
+                               -1)
+                           (1- i))
+                    (setf (gethash (list in-con in-op not-p) constraints)
+                          (cons i (if existing
+                                      (min amount (cdr existing))
+                                      amount)))))))))
     (dohash ((key value) constraints)
-      (when (= value i)
+      (when (= (car value) i)
         (destructuring-bind (y op not-p) key
           (conset-adjoin
            (find-or-create-equality-constraint op
                                                var
                                                y
-                                               not-p)
+                                               not-p
+                                               (cdr value))
            in))))))
 
 (defun try-equality-constraint (call gen)
