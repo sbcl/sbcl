@@ -2078,7 +2078,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "FLOAT-WAIT" "DYNAMIC-SPACE-FREE-POINTER" "DYNAMIC-USAGE"
            "EFFECTIVE-FIND-POSITION-TEST"
            "EFFECTIVE-FIND-POSITION-KEY"
-           "ENSURE-SYMBOL-HASH"
            "ENSURE-SYMBOL-TLS-INDEX"
            "ERROR-NUMBER-OR-LOSE"
            "EXTERNAL-FORMAT-DESIGNATOR"

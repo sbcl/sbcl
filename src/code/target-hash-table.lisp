@@ -129,22 +129,6 @@
                       (logbitp bit ,(ldb (byte 32 0) mask))
                       (logbitp (- bit 32) ,(ash mask -32)))))))
 
-;;; this macro has not been tested on 32-bit
-;;; (quite obviously the OTHER-IMMEDIATE case is wrong) and
-;;; probably doesn't work on ppc64 due the alternate lowtag assignments.
-(defmacro lowtag-case (x &rest clauses)
-  `(case (lowtag-of ,x)
-     ,@(mapcar (lambda (clause)
-                 `(,(case (car clause)
-                      (instance sb-vm:instance-pointer-lowtag)
-                      (list sb-vm:list-pointer-lowtag)
-                      (function sb-vm:fun-pointer-lowtag)
-                      (other-immediate '(1 5 9 13))
-                      (fixnum sb-vm::fixnum-lowtags)
-                      (other-pointer sb-vm:other-pointer-lowtag))
-                    ,@(cdr clause)))
-               clauses)))
-
 ;;; As a consequence of change 3bdd4d28ed, the compiler started to emit multiple
 ;;; definitions of certain INLINE global functions.
 ;;; Genesis is so fraught with other pitfalls and traps that I want no chance
@@ -157,34 +141,17 @@
   ;; INSTANCE-SXHASH, it doesn't matter, and in fact it's quicker to use EQ-HASH.
   ;; If the outermost object passed as a key is LIST, then it descends using SXASH,
   ;; you will in fact get stable hashes for nested objects.
-  ;; Same for symbols- hash-tables don't care whether we use SYMBOL-HASH.
-  ;; It's mainly for users who call SXHASH directly that stable hashes are important.
-  ;; I have not benchmarked this for other than x86-64.
-  #+x86-64
-  (if (lowtag-case key
+  (if (case (lowtag-of key)
+        (#.sb-vm:list-pointer-lowtag t)
         ;; pathnames require SXHASH, all other instances are indifferent.
-        (instance (pathnamep (truly-the instance key)))
-        (list t)
-        (other-pointer (equal-hash-sxhash-widetag-p (%other-pointer-widetag key)))
-        (function nil)
-        (fixnum nil)
-        ;; EQUAL on numbers is the same as EQL on numbers, so single-float
-        ;; does *not* need to be picked off here.
-        (other-immediate nil))
+        (#.sb-vm:instance-pointer-lowtag (pathnamep (truly-the instance key)))
+        (#.sb-vm:other-pointer-lowtag
+         (if (= (%other-pointer-widetag key) sb-vm:symbol-widetag)
+             (return-from equal-hash
+               (values (symbol-hash (truly-the symbol key)) nil))
+             (equal-hash-sxhash-widetag-p (%other-pointer-widetag key)))))
       (values (sxhash key) nil)
-      (eq-hash key))
-  #-x86-64
-  (typecase key
-    ;; For some types the definition of EQUAL implies a special hash
-    ((or string cons number bit-vector pathname)
-     (values (sxhash key) nil))
-    (symbol (values (symbol-hash key) nil))
-    ;; Otherwise use an EQ hash, rather than SXHASH, since the values
-    ;; of SXHASH will be extremely badly distributed due to the
-    ;; requirements of the spec fitting badly with our implementation
-    ;; strategy.
-    (t
-     (eq-hash key))))
+      (eq-hash key)))
 
 (defun equalp-hash (key)
   (declare (values fixnum boolean))
