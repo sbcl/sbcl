@@ -519,7 +519,7 @@
                           (:cost 10)
                           (:arg-types (:or integer bignum) *))
                          ((:arg x (descriptor-reg) rdx-offset)
-                          (:arg y (descriptor-reg) rdi-offset)
+                          (:arg y (descriptor-reg any-reg) rdi-offset)
                           (:temp rcx unsigned-reg rcx-offset)
                           (:temp rax unsigned-reg rax-offset))
   (inst cmp x y)
@@ -551,4 +551,6 @@
 
 #-sb-assembling
 (define-vop (%eql/integer2 %eql/integer)
+  (:args (x :scs (descriptor-reg any-reg) :target x-arg-temp)
+         (y :scs (descriptor-reg) :target y-arg-temp))
   (:arg-types * (:or integer bignum)))

@@ -109,7 +109,7 @@
     (ecase kind
       (:temp)
       ((:arg :res)
-       (setf (reg-spec-temp reg) (make-symbol (symbol-name name)))))
+       (setf (reg-spec-temp reg) (symbolicate (symbol-name name) '-arg-temp))))
     reg))
 
 (defun expand-one-export-spec (export)
