@@ -374,17 +374,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
   (expand-pkg-iterator '((list-all-packages) :internal :external)
                        var body-decls result-form))
 
-;;;; SYMBOL-HASHSET stuff
-
-(defstruct (symtbl-magic (:conc-name "SYMTBL-")
-                         (:copier nil)
-                         (:predicate nil)
-                         (:constructor make-symtbl-magic (hash1-mask hash1-c
-                                                          hash2-mask hash2-c)))
-  (hash1-mask 0 :type (unsigned-byte 32))
-  (hash1-c    0 :type (unsigned-byte 32))
-  (hash2-mask 0 :type (unsigned-byte 32))
-  (hash2-c    0 :type (unsigned-byte 32)))
+;;;; SYMBOL-TABLE stuff
 
 (declaim (inline symtbl-cells))
 (defun symtbl-cells (table) (truly-the simple-vector (cdr (symtbl-%cells table))))
@@ -394,7 +384,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
                  (the fixnum (+ (symtbl-deleted table)
                                 (symtbl-free table))))))
 
-(defmethod print-object ((table symbol-hashset) stream)
+(defmethod print-object ((table symbol-table) stream)
   (declare (type stream stream))
   (print-unreadable-object (table stream :type t :identity t)
     (let* ((n-live (%symtbl-count table))
@@ -437,10 +427,10 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; The smallest table built here has three entries. This
 ;;; is necessary because the double hashing step size is calculated
 ;;; using a division by the table size minus two.
-(defun make-symbol-hashset (size &optional (load-factor 3/4))
+(defun make-symbol-table (size &optional (load-factor 3/4))
   (declare (sb-c::tlab :system)
            (inline make-symtbl-magic) ; to allow system-TLAB allocation
-           (inline %make-symbol-hashset))
+           (inline %make-symbol-table))
   (flet ((choose-good-size (size)
            (loop for n of-type fixnum
               from (logior (ceiling size load-factor) 1)
@@ -456,11 +446,10 @@ of :INHERITED :EXTERNAL :INTERNAL."
                (size (truncate (* n load-factor)))
                (reciprocals
                 (if (= n 3) ; minimal table
-                    (make-symtbl-magic 0 0 0 0) ; <-- should be LTV but can't be.
+                    (make-symtbl-magic 0 0 0) ; <-- should be LTV but can't be.
                                                 ; (package-cold-init called before LTV fixups)
-                    (make-symtbl-magic h1-mask h1-c h2-mask 0))))
-      (%make-symbol-hashset (cons reciprocals (make-array n :initial-element 0))
-                            size))))
+                    (make-symtbl-magic h1-mask h1-c h2-mask))))
+      (%make-symbol-table (cons reciprocals (make-array n :initial-element 0)) size))))
 
 (declaim (inline pkg-symbol-valid-p))
 (defun pkg-symbol-valid-p (x) (not (fixnump x)))
@@ -512,17 +501,17 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; calls to ADD-SYMBOL make no attempt to preserve Robinhood's minimization
 ;;; of the maximum probe sequence length. We can do it now because the
 ;;; entire vector will be swapped, which is concurrent reader safe.
-(defun resize-symbol-hashset (table size splat &optional (load-factor 3/4))
+(defun resize-symbol-table (table size splat &optional (load-factor 3/4))
   (when (zerop size)
-    (return-from resize-symbol-hashset
+    (return-from resize-symbol-table
       ;; Don't need a barrier here. Suppose a reader finished probing with a miss.
       ;; Whether it re-probes again or not, it will surely result in a miss.
       (setf (symtbl-%cells table)
-            (load-time-value (cons (make-symtbl-magic 0 0 0 0) #(0 0 0)) t)
+            (load-time-value (cons (make-symtbl-magic 0 0 0) #(0 0 0)) t)
             (symtbl-free table) 0
             (symtbl-size table) 0
             (symtbl-deleted table) 0)))
-  (let* ((temp-table (make-symbol-hashset size load-factor))
+  (let* ((temp-table (make-symbol-table size load-factor))
          (cells (symtbl-%cells temp-table))
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
@@ -1093,7 +1082,7 @@ Experimental: interface subject to change."
     ;; N.B.: Never pass 0 for the new size, as that will assign the
     ;; constant read-only vector #(0 0 0) into the cells.
     (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
-      (resize-symbol-hashset table new-size t)))
+      (resize-symbol-table table new-size t)))
   (let* ((cells (symtbl-%cells table))
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
@@ -1185,7 +1174,7 @@ Experimental: interface subject to change."
 ;;; that can't ever be freed.
 (defun tune-hashset-sizes-of-all-packages ()
   (flet ((tune-table-size (desired-lf table)
-           (resize-symbol-hashset table (%symtbl-count table) t desired-lf)
+           (resize-symbol-table table (%symtbl-count table) t desired-lf)
            ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
            #-darwin-jit (setf (symtbl-modified table) nil)))
     (dolist (package (list-all-packages))
@@ -1220,7 +1209,7 @@ Experimental: interface subject to change."
 (defun %lookup-symbol (table string name-length name-hash)
   (declare (optimize (sb-c::verify-arg-count 0)
                      (sb-c::insert-array-bounds-checks 0)))
-  (declare (symbol-hashset table) (simple-string string) (index name-length))
+  (declare (symbol-table table) (simple-string string) (index name-length))
   #+nil (atomic-incf *sym-lookups*)
   (macrolet
       ((probe (metric)
@@ -1292,7 +1281,7 @@ Experimental: interface subject to change."
 
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
-;;; NOTE: It's possible that NUKE-SYMBOL should never 0-fill the old symbol-hashset if downsizing.
+;;; NOTE: It's possible that NUKE-SYMBOL should never 0-fill the old symbol-table if downsizing.
 ;;; CLHS nowhere implies that altering accessability of a symbol already _present_ in a package
 ;;; counts as INTERNing. Iterating over directly present symbols of a package permits UNINTERN on
 ;;; the current symbol, which might rehash the storage vector, creating a new one. To allow it,
@@ -1323,7 +1312,7 @@ Experimental: interface subject to change."
   (let ((size (symtbl-size table))
         (used (%symtbl-count table)))
     (when (< used (truncate size 4))
-      (resize-symbol-hashset table (* used 2) splat))))
+      (resize-symbol-table table (* used 2) splat))))
 
 (defun list-all-packages ()
   "Return a list of all existing packages."
@@ -1947,7 +1936,7 @@ PACKAGE."
 ;;;; final initialization
 
 ;;;; Due to the relative difficulty - but not impossibility - of manipulating
-;;;; symbol-hashsets in the cross-compilation host, all interning operations
+;;;; symbol-tables in the cross-compilation host, all interning operations
 ;;;; are delayed until cold-init.
 ;;;; The cold loader (GENESIS) set *!INITIAL-SYMBOLS* to the target
 ;;;; representation of the hosts's *COLD-PACKAGE-SYMBOLS*.
@@ -1991,8 +1980,7 @@ PACKAGE."
       ;; though its only use be to name an FLET in a function
       ;; hanging on an otherwise uninternable symbol. strange but true :-(
       (flet ((!make-table (input)
-               (let ((table (make-symbol-hashset
-                             (length (the simple-vector input)))))
+               (let ((table (make-symbol-table (length (the simple-vector input)))))
                  (dovector (symbol input table)
                    (add-symbol table symbol)))))
         (let ((externals (!make-table external-v)))
@@ -2226,8 +2214,8 @@ PACKAGE."
           (setq table (make-hash-table :test 'equal)
                 *deferred-package-names* table))
         (or (gethash name table)
-            (let ((package (%make-package (make-symbol-hashset 0)
-                                          (make-symbol-hashset 0))))
+            (let ((package (%make-package (make-symbol-table 0)
+                                          (make-symbol-table 0))))
               (setf (symtbl-package (package-external-symbols package)) package)
               (with-package-names ()
                 (setf (package-%name package) name)

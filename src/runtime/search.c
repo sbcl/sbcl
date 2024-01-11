@@ -221,7 +221,7 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name)
     struct package* pkg = (void*)INSTANCE(package);
     int pass;
     for (pass = 0; pass <= 1; ++pass) {
-        struct symbol_hashset* table = (void*)
+        struct symbol_table* table = (void*)
           INSTANCE(barrier_load(pass ? &pkg->external_symbols : &pkg->internal_symbols));
         gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
         lispobj cells = barrier_load(&table->_cells);

@@ -43,8 +43,8 @@ implementation it is ~S." *!default-package-use-list*)
           ;; a "resolved" package is not in the global name->package mapping yet,
           ;; which is why the FIND-PACKAGE / CERROR below does not signal.
           (or (resolve-deferred-package name)
-              (%make-package (make-symbol-hashset internal-symbols)
-                             (make-symbol-hashset external-symbols))))
+              (%make-package (make-symbol-table internal-symbols)
+                             (make-symbol-table external-symbols))))
          (existing-pkg)
          (namelist (cons name nicks))
          (conflict))
@@ -202,7 +202,7 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; Setting PACKAGE-%NAME to NIL is required in order to
                           ;; make PACKAGE-NAME return NIL for a deleted package as
                           ;; ANSI requires. Setting the other slots to NIL
-                          ;; and blowing away the SYMBOL-HASHSETs is just done
+                          ;; and blowing away the SYMBOL-TABLEs is just done
                           ;; for tidiness and to help the GC.
                           (package-keys package) #()))
                   (atomic-incf *package-names-cookie*)
@@ -210,8 +210,8 @@ implementation it is ~S." *!default-package-use-list*)
                     (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
                   (setf (package-tables package) #()
                         (package-%shadowing-symbols package) nil
-                        (package-internal-symbols package) (make-symbol-hashset 0)
-                        (package-external-symbols package) (make-symbol-hashset 0)))
+                        (package-internal-symbols package) (make-symbol-table 0)
+                        (package-external-symbols package) (make-symbol-table 0)))
                 (return-from delete-package t)))))))
 
 ;;; Possible FIXME:

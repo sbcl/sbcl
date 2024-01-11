@@ -39,7 +39,7 @@
                 #:near-cond-jump-displacement #:mov #:call #:jmp
                 #:get-gpr #:reg-name
                 #:machine-ea #:machine-ea-base #:machine-ea-index #:machine-ea-disp)
-  (:import-from "SB-IMPL" #:symbol-hashset #:package-%name
+  (:import-from "SB-IMPL" #:symbol-table #:package-%name
                 #:symtbl-%cells
                 #:hash-table-pairs #:hash-table-%count))
 
@@ -216,10 +216,10 @@
     (dolist (string contents hs)
       (sb-int:hashset-insert hs string))))
 
-(defun scan-symbol-hashset (function table core)
+(defun scan-symbol-table (function table core)
   (let* ((spacemap (core-spacemap core))
          (nil-object (core-nil-object core))
-         (cells (translate (symtbl-%cells (truly-the symbol-hashset
+         (cells (translate (symtbl-%cells (truly-the symbol-table
                                                      (translate table spacemap)))
                            spacemap)))
     (dovector (x (translate (cdr cells) spacemap))
@@ -275,7 +275,7 @@
              (let ((externals (gethash package-name packages))
                    (n 0))
                (unless externals
-                 (scan-symbol-hashset
+                 (scan-symbol-table
                   (lambda (string symbol)
                     (declare (ignore symbol))
                     (incf n)
@@ -490,7 +490,7 @@
           (package-alist)
           (symbols (make-hash-table :test 'equal)))
       (labels ((scan-symtbl (table)
-                 (scan-symbol-hashset
+                 (scan-symbol-table
                     (lambda (str sym)
                       (pushnew (get-lisp-obj-address sym) (gethash str symbols)))
                     table core))

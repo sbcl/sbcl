@@ -12,7 +12,7 @@
 
 (in-package "SB-IMPL")
 
-;;;; the SYMBOL-HASHSET structure
+;;;; the SYMBOL-TABLE structure
 
 ;;; Packages are implemented using a special kind of hashtable -
 ;;; the storage is a single vector in which each cell is both key and value.
@@ -52,15 +52,27 @@
 (defconstant +package-id-user+     3)
 (defconstant +package-id-kernel+   4)
 
-(sb-xc:defstruct (symbol-hashset
+(sb-xc:defstruct (symtbl-magic (:conc-name "SYMTBL-")
+                  (:copier nil)
+                  (:predicate nil)
+                  (:constructor make-symtbl-magic (hash1-mask hash1-c hash2-mask)))
+  (hash1-mask 0 :type (unsigned-byte 32))
+  (hash1-c    0 :type (unsigned-byte 32))
+  ;; These values were both needed for the secondary hash but they aren't now
+  ;; because the secondary hash is not computed by taking a remainder. It's just a mask.
+  (hash2-mask 0 :type (unsigned-byte 32))
+  ;(hash2-c    0 :type (unsigned-byte 32))
+  )
+
+(sb-xc:defstruct (symbol-table
                   (:conc-name "SYMTBL-")
                   (:predicate nil)
-                  (:constructor %make-symbol-hashset
+                  (:constructor %make-symbol-table
                                 (%cells size &aux (free size)))
                   (:copier nil))
   ;; An extra indirection to the symbol vector allows atomically changing the symbols
   ;; and the division magic parameters.
-  (%cells (missing-arg) :type (cons t simple-vector))
+  (%cells (missing-arg) :type (cons symtbl-magic simple-vector))
   (modified nil :type boolean)
   (package nil :type (or null package)) ; backpointer, only if externals
   ;; SIZE is roughly related to the number of symbols the client code asked to be
@@ -100,11 +112,11 @@
   (mru-table-index 0 :type index)
   ;; packages that use this package
   (%used-by nil :type (or null weak-pointer))
-  ;; SYMBOL-HASHSETs of internal & external symbols
-  (internal-symbols nil :type symbol-hashset)
-  (external-symbols nil :type symbol-hashset)
+  ;; SYMBOL-TABLEs of internal & external symbols
+  (internal-symbols nil :type symbol-table)
+  (external-symbols nil :type symbol-table)
   ;; shadowing symbols
-  ;; Todo: dynamically changeover to a SYMBOL-HASHSET if list gets long
+  ;; Todo: dynamically changeover to a SYMBOL-TABLE if list gets long
   (%shadowing-symbols () :type list)
   ;; documentation string for this package
   (doc-string nil :type (or simple-string null))
@@ -125,7 +137,7 @@
   (%local-nicknames nil :type (or null (cons simple-vector weak-vector)))
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
-(proclaim '(freeze-type symbol-hashset package))
+(proclaim '(freeze-type symbol-table package))
 
 (defconstant +initial-package-bits+ 2) ; for genesis
 

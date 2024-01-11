@@ -4379,7 +4379,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
             (let ((child (case class
                            (sb-c::compiled-debug-info 'sb-c::compiled-debug-fun)
                            (defstruct-description 'defstruct-slot-description)
-                           (package 'sb-impl::symbol-hashset))))
+                           (package 'sb-impl::symbol-table))))
               (when child
                 (write-structure-object (layout-info (find-layout child)) stream)))
             (write-structure-object (layout-info (find-layout class))
