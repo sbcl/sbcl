@@ -1087,7 +1087,7 @@ Experimental: interface subject to change."
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
          (len (length vec))
-         (name-hash (symbol-hash symbol))
+         (name-hash (symbol-name-hash symbol))
          (h1 (symbol-table-hash 1 name-hash len))
          (h2 (symbol-table-hash 2 name-hash len)))
     (declare (fixnum name-hash))
@@ -1217,7 +1217,7 @@ Experimental: interface subject to change."
          `(let ((item (svref vec index)))
             (cond ((not (fixnump item))
                    (let ((symbol (truly-the symbol item)))
-                     (when (eq (symbol-hash symbol) name-hash)
+                     (when (eq (symbol-name-hash symbol) name-hash)
                        (let ((name (symbol-name symbol)))
                          ;; The pre-test for length is kind of an unimportant
                          ;; optimization, but passing it for both :end arguments
@@ -1298,7 +1298,7 @@ Experimental: interface subject to change."
 (defun nuke-symbol (table symbol splat)
   (let* ((string (symbol-name symbol))
          (length (length string))
-         (hash (symbol-hash symbol)))
+         (hash (symbol-name-hash symbol)))
     (declare (type index length)
              (hash-code hash))
     (with-symbol ((symbol index) table string length hash)
@@ -2003,7 +2003,7 @@ PACKAGE."
            ;; type decl is critical here - can't invoke a hairy aref routine yet
            (dovector (symbol (the simple-vector symbols))
              (when symbol ; skip NIL because of its magic-ness
-               (let* ((stored-hash (symbol-hash symbol))
+               (let* ((stored-hash (symbol-name-hash symbol))
                       (name (symbol-name symbol))
                       (computed-hash (calc-symbol-name-hash name (length name))))
                  (aver (= stored-hash computed-hash)))))))
