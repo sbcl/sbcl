@@ -673,7 +673,7 @@
          ;; Inherited slots are mixed in by calling the supertype's hash function.
          (hashed-slots
           (mapcan (lambda (slot &aux (type (getf (cddr slot) :type))
-                                     (hasher (getf (cddr slot) :hasher 'fallback-sxhash))
+                                     (hasher (getf (cddr slot) :hasher :fail))
                                      (comparator (getf (cddr slot) :test)))
                     (cond ((or comparator (null hasher))) ; ok
                           ((eq type 'ctype)
@@ -681,7 +681,9 @@
                           ((or (and (typep type '(cons (eql member)))
                                     (every #'symbolp (cdr type)))
                                (eq type 'boolean))
-                           (setq comparator 'eq))
+                           (setq comparator 'eq)
+                           (when (eq type 'boolean)
+                             (setq hasher '(lambda (x) (if x #xaa55aa #x55aa55)))))
                           (t (bug "Underspecified slot: ~S.~S type ~S~%"
                                   name (car slot) type)))
                     (when hasher (list (vector (car slot) hasher comparator))))
@@ -703,9 +705,9 @@
                    direct-slots))
        ;; Always define hash-consing functions if any new slots, even if abstract.
        ,@(when direct-slots
-           (let ((hashfn (symbolicate "CALC-" name "-HASH"))
-                 (compare (symbolicate name "-EQUIV")))
-             `((defun ,hashfn (x)
+           (let
+            ((functions
+             `((defun ,(symbolicate "CALC-" name "-HASH") (x)
                  #-sb-xc-host (declare (optimize (safety 0)))
                  (,(if (assoc :extra-mix-step options) 'type-hash-final-mix 'progn)
                   (type-hash-mix
@@ -714,13 +716,14 @@
                                                  (symbolicate conc-name (svref slot 0))))
                                `(,(svref slot 1) (,reader x)))
                              hashed-slots))))
-               (defun ,compare (a b)
+               (defun ,(symbolicate name "-EQUIV") (a b)
                  #-sb-xc-host (declare (optimize (safety 0)))
                  (and ,@(mapcar (lambda (slot &aux (reader
                                                     (symbolicate conc-name (svref slot 0))))
                                   `(,(elt slot 2) (,reader a) (,reader b)))
                                 hashed-slots)
                       ,@(when include `((,(symbolicate include "-EQUIV") a b))))))))
+             functions))
        ;; Define a hashset unless this is an abstract type
        ,@(unless (member name '(compound-type args-type))
            (let* ((stem (if direct-slots name include))
@@ -745,46 +748,49 @@
                              (array-type '(type-flags element-type)))
                           ,@(cdr private-ctor-args))))))))
 
-;;; The fallback hashing function might rely on the host's SXHASH but always produces
-;;; SB-XC:FIXNUM so that we can call our MIX on the value.
-;;; It turns out that we actually have to either reimplement numeric hashing almost entirely
-;;; because some hosts produce sufficiently bad hashes that they blow up our robinhood hashset
-;;; algorithm. But unlike SB-XC:SXHASH, this function does not have to match our output.
-;;; In fact, the matching that we attempt to do on floats may be pointless.
+(defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
+;;; The final mix ensures that all bits affect the masked hash.
+;;; Since it takes non-zero time, only do it for NUMERIC and ARRAY, where it seems
+;;; to make a large difference in the maximum probe sequence length.
+(defmacro type-hash-final-mix (val) `(murmur-hash-word/+fixnum ,val))
+
+;;; The fallback hashing functions might rely on the host's SXHASH but always
+;;; return an SB-XC:FIXNUM result so that we can call our MIX on the value.
+;;; It turns out that we have to largely reimplement numeric hashing because
+;;; some hosts produce sufficiently poor hashes that our type hashsets would explode
+;;; in size due to so many collisions were we to use the host's SXHASH.
 #+sb-xc-host
-(defun fallback-sxhash (x)
-  (typecase x
+(progn
+(defun number-hash (x) ; this does *not* have to match SB-IMPL::NUMBER-SXHASH
+  (etypecase x
     (integer
-     ;; Allthough FALLBACK-SXHASH is not required to match SBCL's SXHASH
-     ;; on a given input, it will for fixnums. Also the nested hashing calls for
-     ;; RATIO and BIGNUM may end up using SB-XC:SXHASH on fixnums, but again
-     ;; the final result need not match ours for RATIO and BIGNUM.
      (if (typep x 'sb-xc:fixnum)
          (sb-xc:sxhash x)
          ;; mix target-fixnum-sized chunks
          (let ((nbits (1+ (integer-length x))) (h #xbbbb) (pos 0))
            (dotimes (i (ceiling nbits sb-vm:n-positive-fixnum-bits) h)
              (let ((chunk (ldb (byte sb-vm:n-positive-fixnum-bits pos) x)))
-               (setf h (mix (fallback-sxhash chunk) h)))
+               (setf h (mix (number-hash chunk) h)))
              (incf pos sb-vm:n-positive-fixnum-bits)))))
-    (ratio
-     (mix (fallback-sxhash (numerator x)) (fallback-sxhash (denominator x))))
-    (single-float (fallback-sxhash (single-float-bits x)))
-    (double-float (mix (fallback-sxhash (double-float-low-bits x))
-                       (fallback-sxhash (double-float-high-bits x))))
-    (cons
-     (if (eq (car x) 'satisfies)
-         (sb-xc:sxhash (cadr x)) ; it's good enough
-         (error "please no: ~S" x)))
-    (t
-     (sb-xc:sxhash x)))) ; FLOAT representation as struct, or SYMBOL
-#-sb-xc-host (defmacro fallback-sxhash (x) `(sxhash ,x))
+    (ratio (mix (number-hash (numerator x)) (number-hash (denominator x))))
+    (single-float (number-hash (single-float-bits x)))
+    (double-float (mix (number-hash (double-float-low-bits x))
+                       (number-hash (double-float-high-bits x))))))
+(defun fallback-hash (x)
+  ;; This is used on a HAIRY specifier which could be an UNKNOWN (just a symbol), or a SATISFIES.
+  (etypecase x
+    (symbol
+     ;; There is no reason at all that two distinct symbols should hash the same when their
+     ;; names are STRING= so really we want something better than SXHASH, but it'll do.
+     (sb-xc:sxhash x))
+    (cons (if (eq (car x) 'satisfies)
+              (sb-xc:sxhash (cadr x)) ; it's good enough
+              (error "please no: ~S" x))))))
 
-(defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
-;;; The final mix ensures that all bits affect the masked hash.
-;;; Since it takes non-zero time, only do it for NUMERIC and ARRAY, where it seems
-;;; to make a large difference in the maximum probe sequence length.
-(defmacro type-hash-final-mix (val) `(murmur-hash-word/+fixnum ,val))
+#-sb-xc-host
+(progn
+  (defmacro number-hash (x) `(sb-impl::number-sxhash ,x))
+  (defmacro fallback-hash (x) `(sxhash ,x)))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
@@ -892,7 +898,7 @@
   ;; is that apparently we'll store _illegal_ type specifiers in a hairy-type.
   ;; There's an example in the regression test named
   ;;  :single-warning-for-single-undefined-type
-  (specifier nil :type t :test equal))
+  (specifier nil :type t :test equal :hasher fallback-hash))
 
 (macrolet ((hash-fp-zeros (x) ; order-insensitive
              `(let ((h 0))
@@ -939,7 +945,8 @@
   ;; is unspecified, it is *.
   (dimensions '* :type (or list (eql *)) :test equal :hasher hash-dims)
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
-  (complexp :maybe :type (member t nil :maybe))
+  (complexp :maybe :type (member t nil :maybe)
+            :hasher (lambda (s) (case s (:maybe #36rMAYBE) ((nil) #xffff) (t 1))))
   ;; the element type as originally specified
   (element-type nil :type ctype)
   ;; the element type as it is specialized in this implementation
@@ -1101,8 +1108,7 @@
                       (if (listp x)
                           (if x (values #x55AA55 (car x)) (return 0))
                           (values 0 x))
-                    (logxor h (#+sb-xc-host fallback-sxhash
-                               #-sb-xc-host sb-impl::number-sxhash v))))))
+                    (logxor h (number-hash v))))))
            (numbound-eql (a b)
              ;; Determine whether the 'low' and 'high' slots of two NUMERIC-TYPE instances
              ;; are "the same". It is a stricter test than in the SIMPLE-= method, because
@@ -1249,7 +1255,7 @@
 (def-type-model (simd-pack-type
                  (:constructor* %make-simd-pack-type (tag-mask)))
   (tag-mask (missing-arg) ; bitmask over possible simd-pack-tag values
-   :test =
+   :test = :hasher identity ; the tag-mask is its own hash
    :type (and (unsigned-byte #.(length +simd-pack-element-types+))
               (not (eql 0)))))
 
@@ -1257,7 +1263,7 @@
 (def-type-model (simd-pack-256-type
                  (:constructor* %make-simd-pack-256-type (tag-mask)))
   (tag-mask (missing-arg)
-   :test =
+   :test = :hasher identity ; the tag-mask is its own hash
    :type (and (unsigned-byte #.(length +simd-pack-element-types+))
               (not (eql 0)))))
 
