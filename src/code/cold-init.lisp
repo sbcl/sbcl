@@ -198,6 +198,13 @@
   ;; Must be done before any non-opencoded array references are made.
   (show-and-call sb-vm::!hairy-data-vector-reffer-init)
 
+  ;; It's not unreasonable to call PARSE-INTEGER in cold-init, which demands that
+  ;; WHITESPACE[1]P work properly, so it needs *STANDARD-READTABLE* established.
+  (let ((*readtable* (make-readtable)))
+    (show-and-call !reader-cold-init)
+    ;; *STANDARD-READTABLE* is assigned last to avoid an error about altering it.
+    (setf *standard-readtable* *readtable*))
+
   ;; Various toplevel forms call MAKE-ARRAY, which calls SUBTYPEP, so
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
@@ -307,9 +314,6 @@
     (show-and-call !reader-cold-init)
     (show-and-call !sharpm-cold-init)
     (show-and-call !backq-cold-init)
-    ;; The *STANDARD-READTABLE* is assigned at last because the above
-    ;; functions would operate on the standard readtable otherwise---
-    ;; which would result in an error.
     (setf *standard-readtable* *readtable*))
   (setf *readtable* (copy-readtable *standard-readtable*))
   (setf sb-debug:*debug-readtable* (copy-readtable *standard-readtable*))
