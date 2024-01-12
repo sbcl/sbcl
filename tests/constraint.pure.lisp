@@ -1065,3 +1065,12 @@
                               collect (svref v (1+ i))))
                      nil))
              0)))
+
+(with-test (:name :constraint-multiple-eql-variables)
+  (assert-type
+   (lambda (x y)
+     (declare (integer x y)
+              (optimize (debug 2)))
+     (assert (< x y))
+     (< x y))
+   (eql t)))
