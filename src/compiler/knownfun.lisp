@@ -197,6 +197,7 @@
                 :annotation ,annotation
                 ,@keys
                 :folder ,(and (memq 'foldable attributes)
+                              (not (getf keys :folder))
                               (or
                                (memq 'fixed-args attributes)
                                (memq 'unboxed-return attributes))
