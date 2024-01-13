@@ -1064,7 +1064,17 @@
                         (loop for i from (- (length v) 2) downto 0
                               collect (svref v (1+ i))))
                      nil))
-             0)))
+             0))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (type fixnum a))
+         (let ((j (+ a most-positive-fixnum)))
+           (let ((bbb a))
+             (dotimes (i a)
+               (incf bbb))
+             (< bbb j))))
+    ((3) t)))
 
 (with-test (:name :constraint-multiple-eql-variables)
   (assert-type
