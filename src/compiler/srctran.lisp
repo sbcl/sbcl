@@ -4312,17 +4312,21 @@
   (flet ((try-sword (x y x-v y-v)
            (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
                           (csubtypep (lvar-type y) (specifier-type 'word))))
-             `(if (typep ,y-v 'sb-vm:signed-word)
+             `(if (#+64-bit sb-kernel:signed-byte-64-p
+                   #-64-bit sb-kernel:signed-byte-32-p
+                   ,y-v)
                   (,fun ,x-v (truly-the sb-vm:signed-word ,y-v))
                   nil)))
          (try-word (x y x-v y-v)
            (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
                           (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
-             `(if (typep ,y-v 'word)
+             `(if (#+64-bit sb-kernel:unsigned-byte-64-p
+                   #-64-bit sb-kernel:unsigned-byte-32-p
+                   ,y-v)
                   (,fun ,x-v (truly-the word ,y-v))
                   nil)))
-         (do-float (x-v y-v type)
-           `(if (typep ,y-v ',type)
+         (do-float (x-v y-v predicate type)
+           `(if (,predicate ,y-v)
                 (,fun ,x-v (truly-the ,type ,y-v))
                 nil)))
     (let ((x-swordp (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
@@ -4342,17 +4346,17 @@
                       (let ((x-dfp (csubtypep (lvar-type x) (specifier-type 'double-float)))
                             (y-dfp (csubtypep (lvar-type y) (specifier-type 'double-float))))
                         (cond ((and x-dfp (not y-dfp))
-                               (do-float 'x 'y 'double-float))
+                               (do-float 'x 'y 'double-float-p 'double-float))
                               ((and y-dfp (not x-dfp))
-                               (do-float 'y 'x 'double-float))
+                               (do-float 'y 'x 'double-float-p 'double-float))
                               #-64-bit
                               (t
                                (let ((x-sfp (csubtypep (lvar-type x) (specifier-type 'single-float)))
                                      (y-sfp (csubtypep (lvar-type y) (specifier-type 'single-float))))
                                  (cond ((and x-sfp (not y-sfp))
-                                        (do-float 'x 'y 'single-float))
+                                        (do-float 'x 'y 'single-float-p 'single-float))
                                        ((and y-sfp (not x-sfp))
-                                        (do-float 'y 'x 'single-float)))))))))))))))
+                                        (do-float 'y 'x 'single-float-p 'single-float)))))))))))))))
 
 (deftransform eq ((x y) * *)
   "Simple equality transform"
