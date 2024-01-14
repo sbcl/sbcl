@@ -22,6 +22,13 @@
     (>= '<=)
     (t operator)))
 
+(defun not-operator (operator)
+  (case operator
+    (> '<=)
+    (< '>=)
+    (>= '<)
+    (<= '>)))
+
 (defmacro do-equality-constraints ((con op not-p &optional amount) var constraints &body body)
   (once-only ((var var)
               (constraints constraints))
@@ -224,7 +231,9 @@
                        (make-vector-length-constraint with))
                       (t
                        with)))
-              (add (x y &key (operator operator) (alternative alternative-constraints)
+              (add (x y &key (operator operator)
+                             (consequent consequent-constraints)
+                             (alternative alternative-constraints)
                              (amount min-amount))
                 (when (eq x y)
                   (return-from add))
@@ -233,7 +242,7 @@
                     (return-from add))
                   (rotatef x y)
                   (setf operator (invert-operator operator)))
-                (conset-add-equality-constraint consequent-constraints operator x y nil amount)
+                (conset-add-equality-constraint consequent operator x y nil amount)
                 (when alternative
                   (conset-add-equality-constraint alternative operator x y t amount))))
          (do-eql-vars (eql-x ((constraint-var x) constraints))
@@ -256,27 +265,38 @@
                   (when (lambda-var/vector-length-p y)
                     (do-equality-constraints (in-y in-op in-not-p in-amount) y constraints
                       (unless (eq in-y y)
-                        (multiple-value-bind (inherit inherit-amount)
-                            (inherit-equality-p operator in-op in-not-p min-amount max-amount in-amount)
-                          (when inherit
-                            (add x in-y :operator inherit
-                                        :amount inherit-amount
-                                        :alternative nil)
-                            (when (and (vector-length-constraint-p in-y)
-                                       (not (constant-p x)))
-                              (add x-type in-y :operator inherit :alternative nil
-                                               :amount 0)))))))))
+                        (flet ((add (operator target)
+                                 (multiple-value-bind (inherit inherit-amount)
+                                     (inherit-equality-p operator in-op in-not-p min-amount max-amount in-amount)
+                                   (when inherit
+                                     (add x in-y :operator inherit
+                                                 :amount inherit-amount
+                                                 :consequent target
+                                                 :alternative nil)
+                                     (when (and (vector-length-constraint-p in-y)
+                                                (not (constant-p x)))
+                                       (add x-type in-y :operator inherit
+                                                        :alternative nil
+                                                        :consequent target
+                                                        :amount 0))))))
+                          (add operator consequent-constraints)
+                          (when alternative-constraints
+                            (add (not-operator operator) alternative-constraints))))))))
            (inherit x y x-type operator)
            (inherit y x y-type (invert-operator operator))
            (when (lvar-p y)
              (loop for (in-op in-lvar in-min-amount) in (lvar-result-constraints y)
                    do
                    (unless (eq in-lvar first)
-                     (multiple-value-bind (inherit inherit-amount)
-                         (inherit-equality-p operator in-op nil min-amount max-amount in-min-amount)
-                       (when inherit
-                         (add-equality-constraint inherit x in-lvar
-                                                  constraints consequent-constraints nil inherit-amount))))))))))))
+                     (flet ((add (operator target)
+                              (multiple-value-bind (inherit inherit-amount)
+                                  (inherit-equality-p operator in-op nil min-amount max-amount in-min-amount)
+                                (when inherit
+                                  (add-equality-constraint inherit x in-lvar
+                                                           constraints target nil inherit-amount)))))
+                       (add operator consequent-constraints)
+                       (when alternative-constraints
+                         (add (not-operator operator) alternative-constraints))))))))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints

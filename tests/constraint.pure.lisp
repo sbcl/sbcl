@@ -827,8 +827,15 @@
                     (ctu:ir1-named-calls
                      `(lambda (x v)
                         (declare (integer x)
-                                 (simple-vector v)
-                                 (optimize (debug 1)))
+                                 (simple-vector v))
+                        (loop for i below (min x (length v))
+                              sum (aref v i)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x v)
+                        (declare (simple-vector v))
                         (loop for i below (min x (length v))
                               sum (aref v i)))
                      nil))
