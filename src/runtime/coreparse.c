@@ -414,7 +414,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
              * hence needs no adjustment. Otherwise, the word points within the funinstance.
              * Either way, adjust_word_at will do the right thing */
             adjust_word_at(where+1, adj);
-            // FALLTHROUGH_INTENDED
+            /* FALLTHRU */
         case INSTANCE_WIDETAG:
             layout = layout_of(where);
             adjusted_layout = adjust_word(adj, layout);
