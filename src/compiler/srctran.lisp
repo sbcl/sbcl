@@ -5015,13 +5015,13 @@
     (if (null rest)
         `(values (the real ,arg0))
         `(let ((maxrest (max ,@rest)))
-          (if (>= ,arg0 maxrest) ,arg0 maxrest)))))
+           (if (> maxrest ,arg0) maxrest ,arg0)))))
 (define-source-transform min (arg0 &rest rest)
   (once-only ((arg0 arg0))
     (if (null rest)
         `(values (the real ,arg0))
         `(let ((minrest (min ,@rest)))
-          (if (<= ,arg0 minrest) ,arg0 minrest)))))
+           (if (< minrest ,arg0) minrest ,arg0)))))
 
 ;;; Simplify some cross-type comparisons
 (macrolet ((def (comparator round)
