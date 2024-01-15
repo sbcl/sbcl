@@ -39,13 +39,6 @@
                       (cons (code-char source) (minimize target))))
         t)))
 
-(sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-    (let ((list '#.(sb-cold:read-from-file "output/ucd/bidi-mirrors.lisp-expr")))
-      (sb-impl::%stuff-hash-table
-       (make-hash-table :test #'eq :size (length list))
-       (loop for (k v) in list collect (cons k v))
-       t)))
-
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
   (declare (type (simple-array (unsigned-byte 32) 1) vector)
@@ -168,13 +161,6 @@ that have a digit value but no decimal digit value"
 Otherwise, returns NIL."
   (logbitp 5 (aref +character-misc-database+
                     (+ 5 (misc-index character)))))
-
-(defun bidi-mirroring-glyph (character)
-  "Returns the mirror image of CHARACTER if it exists.
-Otherwise, returns NIL."
-  (when (mirrored-p character)
-    (let ((ret (gethash (char-code character) **bidi-mirroring-glyphs**)))
-      (when ret (code-char ret)))))
 
 (defun east-asian-width (character)
   "Returns the East Asian Width property of CHARACTER as

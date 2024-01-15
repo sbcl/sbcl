@@ -54,10 +54,10 @@
 ;;;    0.033195 seconds of total run time (0.033104 user, 0.000091 system)
 ;;;    100.00% CPU
 
-(defmacro look-in-numeric-value-map (x)
+(defmacro find-in-perfect-hashmap (x filename value-type value-getter)
   (let ((pairs
          (remove-if (lambda (x) (>= (car x) char-code-limit))
-                    (read-from-file "output/ucd/numerics.lisp-expr"))))
+                    (read-from-file filename))))
     #-sb-unicode `(cdr (assoc (char-code ,x) ',pairs)) ; exactly 3 pairs
     #+sb-unicode
     (let*
@@ -71,12 +71,14 @@
          ;; This string is pasted in as though written literally in source,
          ;; therefore it gets relocated to read-only space in the core.
          (key-array (make-array n :element-type 'character))
-         (value-array (make-array n)))
+         (value-array (make-array n :element-type value-type)))
     (dolist (pair pairs)
-      (let ((index (funcall hasher (car pair))))
+      (let* ((index (funcall hasher (car pair)))
+             (value (funcall value-getter pair)))
         (aver (char= (char key-array index) (code-char 0)))
         (setf (char key-array index) (code-char (car pair))
-              (aref value-array index) (cdr pair))))
+              (aref value-array index)
+              (if (eq value-type 'character) (code-char value) value))))
     `(let ((hash (,lexpr (char-code ,x))))
        ;; Remember: even though the mapping is dense (range is 0..N-1)
        ;; a key which was not in the mapping as specified to the hash function
@@ -85,10 +87,21 @@
        (when (and (< hash ,n) (char= (char ,key-array hash) ,x))
          (aref ,value-array hash))))))
 
-(export 'numeric-value) ; was not exported because not defined
+;;; Functions not defined in make-host-2 did not get exported
+(export '(numeric-value
+          bidi-mirroring-glyph))
+
 (defun numeric-value (character)
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (look-in-numeric-value-map character)
+  (or (find-in-perfect-hashmap character "output/ucd/numerics.lisp-expr" t cdr)
       (digit-value character)))
+
+;;; FIXME: why does #-sb-unicode want or need this?
+(defun bidi-mirroring-glyph (character)
+  "Returns the mirror image of CHARACTER if it exists.
+Otherwise, returns NIL."
+  ;; This used to call MIRRORED-P before table lookup, but it's not faster to do so
+  (find-in-perfect-hashmap character "output/ucd/bidi-mirrors.lisp-expr"
+                           character second))
