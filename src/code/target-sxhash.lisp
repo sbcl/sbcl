@@ -601,8 +601,8 @@
                         ;; I really do not feel like figuring out nested backquotery
                         ;; as would be entailed to use IF-VOP-EXISTSP here.
                         ;; May this be incentive to implement %ash/right universally
-                        #+(or arm mips riscv x86 x86-64) `(sb-kernel:%ash/right ,n ,c)
-                        #-(or arm mips riscv x86 x86-64) `(ash ,n (- ,c)))))
+                        #-arm64 `(sb-kernel:%ash/right ,n ,c)
+                        #+arm64 `(ash ,n (- ,c)))))
            ;; We generate _really_ crappy code for 32-bit math on 64-bit machines.
            ;; I think the steps are sufficiently trivial that a single vop could choose
            ;; how to translate the arbitrary s-expression
