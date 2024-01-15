@@ -578,7 +578,7 @@
                            (sb-sys:vector-sap array) (length array))))
          (string (sb-unix::newcharstar-string c-result))
          (expr (with-standard-io-syntax
-                 (let ((*package* (find-package "SB-IMPL")))
+                 (let ((*package* #.(find-package "SB-IMPL")))
                    (read-from-string string)))))
     (labels ((containsp (e op)
                (if (consp e)
