@@ -55,6 +55,7 @@
 ;;;    100.00% CPU
 
 (defmacro find-in-perfect-hashmap (x filename value-type value-getter)
+  (declare (ignorable value-type value-getter))
   (let ((pairs
          (remove-if (lambda (x) (>= (car x) char-code-limit))
                     (read-from-file filename))))
@@ -99,9 +100,19 @@ The only constraint on the numeric value is that it be a rational number."
       (digit-value character)))
 
 ;;; FIXME: why does #-sb-unicode want or need this?
+;;; (Indeed the regression test for it is *disabled* so I reiterate - WHY?)
 (defun bidi-mirroring-glyph (character)
   "Returns the mirror image of CHARACTER if it exists.
 Otherwise, returns NIL."
   ;; This used to call MIRRORED-P before table lookup, but it's not faster to do so
+  #+sb-unicode
   (find-in-perfect-hashmap character "output/ucd/bidi-mirrors.lisp-expr"
-                           character second))
+                           character second)
+  #-sb-unicode
+  (macrolet ((direct-map (&aux (a (make-array char-code-limit :element-type 'character)))
+               (dolist (pair (read-from-file "output/ucd/bidi-mirrors.lisp-expr") a)
+                 (let ((key (car pair)))
+                   (when (< key char-code-limit)
+                     (setf (char a key) (code-char (second pair))))))))
+    (let ((answer (char (direct-map) (char-code character))))
+      (unless (char= answer (code-char 0)) answer))))
