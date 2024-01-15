@@ -5011,17 +5011,30 @@
 
 ;;; Expand MAX and MIN into the obvious comparisons.
 (define-source-transform max (arg0 &rest rest)
-  (once-only ((arg0 arg0))
-    (if (null rest)
-        `(values (the real ,arg0))
-        `(let ((maxrest (max ,@rest)))
-           (if (> maxrest ,arg0) maxrest ,arg0)))))
+  (if (null rest)
+      `(values (the real ,arg0))
+      (labels ((expand (arg0 &rest rest)
+                 (if (null rest)
+                     arg0
+                     (once-only ((arg0 arg0)
+                                 (minrest (apply #'expand rest)))
+                       `(if (> ,minrest ,arg0)
+                            ,minrest
+                            ,arg0)))))
+        (apply #'expand arg0 rest))))
+
 (define-source-transform min (arg0 &rest rest)
-  (once-only ((arg0 arg0))
-    (if (null rest)
-        `(values (the real ,arg0))
-        `(let ((minrest (min ,@rest)))
-           (if (< minrest ,arg0) minrest ,arg0)))))
+  (if (null rest)
+      `(values (the real ,arg0))
+      (labels ((expand (arg0 &rest rest)
+                 (if (null rest)
+                     arg0
+                     (once-only ((arg0 arg0)
+                                 (maxrest (apply #'expand rest)))
+                       `(if (< ,maxrest ,arg0)
+                            ,maxrest
+                            ,arg0)))))
+        (apply #'expand arg0 rest))))
 
 ;;; Simplify some cross-type comparisons
 (macrolet ((def (comparator round)
