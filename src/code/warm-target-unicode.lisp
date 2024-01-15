@@ -55,10 +55,13 @@
 ;;;    100.00% CPU
 
 (defmacro look-in-numeric-value-map (x)
-  (let* ((pairs
-          (remove-if (lambda (x) (>= (car x) char-code-limit))
-                     (read-from-file "output/ucd/numerics.lisp-expr")))
-         (mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
+  (let ((pairs
+         (remove-if (lambda (x) (>= (car x) char-code-limit))
+                    (read-from-file "output/ucd/numerics.lisp-expr"))))
+    #-sb-unicode `(cdr (assoc (char-code ,x) ',pairs)) ; exactly 3 pairs
+    #+sb-unicode
+    (let*
+        ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
          (lexpr (sb-impl:make-perfect-hash-lambda mapped-chars))
          ;; We need the lexpr at compile-time to build the key/value arrays
          ;; and run-time of course, where the expression is stuffed in as
@@ -80,7 +83,7 @@
        ;; generator can screw with the calculation, causing it to return a value
        ;; outside the expected range. So bounds check it and then confirm a hit.
        (when (and (< hash ,n) (char= (char ,key-array hash) ,x))
-         (aref ,value-array hash)))))
+         (aref ,value-array hash))))))
 
 (export 'numeric-value) ; was not exported because not defined
 (defun numeric-value (character)
