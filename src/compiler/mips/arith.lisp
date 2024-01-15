@@ -631,6 +631,43 @@
     (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
+(define-vop (fast-%ash/right/unsigned)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg)) (amount :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst srl result number amount)))
+
+(define-vop (fast-%ash/right/signed)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg)) (amount :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    (inst sra result number amount)))
+
+;;; I could not causes this vop to get selected
+(define-vop (fast-%ash/right/fixnum)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg)) (amount :scs (unsigned-reg)))
+  (:arg-types tagged-num unsigned-num)
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  ;; An ANY-REG must not leak out (on an interrupt) if it has 1 bits under the fixnum
+  ;; tag mask when it was supposed to hold a fixnum. But there's no "AND dst, src, Imm"
+  ;; operation to clear the bits, so this can't really be fewer than 3 instructions.
+  (:temporary (:sc signed-reg) temp)
+  (:generator 2
+    (inst sra temp number amount)
+    (inst li result (lognot fixnum-tag-mask))
+    (inst and result temp result)))
+
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
