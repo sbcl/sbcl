@@ -3341,6 +3341,7 @@ possibly temporarily, because it might be used internally.")
             ;; alien interface utilities
 
            "C-STRINGS->STRING-LIST"
+           "NEWCHARSTAR-STRING"
 
             ;; misc. utilities used internally
 
