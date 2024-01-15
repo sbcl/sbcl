@@ -922,7 +922,7 @@ static int hexeight(
 	final->used = 1;
 	if (i == 0)                                                   /* h8g */
 	  sprintf(final->line[0],
-                  infix ? "ub4 rsl = (val - (val >> %d)) & 7" : "(& (- val (>> val %d)) & 7)",
+                  infix ? "ub4 rsl = (val - (val >> %d)) & 7" : "(& (- val (>> val %d)) 7)",
                   j);
 	else                                                          /* h8h */
 	  sprintf(final->line[0],

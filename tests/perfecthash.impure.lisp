@@ -22,6 +22,29 @@
 (^ A (AREF TAB B)))))))
 |#
 
+(defun test-perfect-hashfun (fun keys &optional print)
+  (when (listp keys)
+    (setq keys (coerce keys 'vector)))
+  (let* ((n (length keys))
+         (seen (make-array n :initial-element nil)))
+    (sb-int:dovector (key keys)
+      (let ((hash
+             (etypecase key
+               ((unsigned-byte 32) (funcall fun key))
+               (symbol
+                (funcall fun (ldb (byte 32 0) (sb-kernel:symbol-hash key)))))))
+        (when print (format t "~s -> ~d~%" key hash))
+        ;; Can't exceed N-1, and can't repeat
+        (when (or (>= hash n) (aref seen hash))
+          (error "Hash was not perfect"))
+        (setf (aref seen hash) t)))))
+
+(with-test (:name :typo-example-1) ; of which there may be more
+  (let* ((keys (make-array 5 :element-type '(unsigned-byte 32)
+                           :initial-contents #(3739790036 1578584344 2172243460 496160493 696125627)))
+         (f (compile nil (sb-impl:make-perfect-hash-lambda keys))))
+    (test-perfect-hashfun f keys)))
+
 ;;; I have no plans to actually use perfect hashing of symbols in packages,
 ;;; since packages can have symools added and removed at runtime.
 ;;; However, they serve as a nice source of test data.
@@ -54,17 +77,6 @@
         (pprint expr)
         (terpri))
       (values (compile nil expr) expr))))
-
-(defun test-perfect-hashfun (fun symbols &optional print)
-  (let* ((n (length symbols))
-         (seen (make-array n :initial-element nil)))
-    (dolist (symbol symbols)
-      (let ((hash (funcall fun (ldb (byte 32 0) (sb-kernel:symbol-hash symbol)))))
-        (when print (format t "~s -> ~d~%" symbol hash))
-        ;; Can't exceed N-1, and can't repeat
-        (when (or (>= hash n) (aref seen hash))
-          (error "Hash was not perfect"))
-        (setf (aref seen hash) t)))))
 
 (with-test (:name :execrcise-perfect-hash-generator)
   (format t "~&Symbol count:")
