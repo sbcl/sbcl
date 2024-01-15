@@ -567,3 +567,43 @@
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
 
+(export 'make-perfect-hash-lambda)
+(defun make-perfect-hash-lambda (array)
+  (declare (type (simple-array (unsigned-byte 32) (*)) array))
+  (let* ((c-result
+          (sb-sys:with-pinned-objects (array)
+            (alien-funcall (extern-alien
+                            "generate_perfhash_sexpr"
+                            (function (* char) system-area-pointer int))
+                           (sb-sys:vector-sap array) (length array))))
+         (string (sb-unix::newcharstar-string c-result))
+         (expr (with-standard-io-syntax
+                 (let ((*package* (find-package "SB-IMPL")))
+                   (read-from-string string)))))
+    (labels ((containsp (e op)
+               (if (consp e)
+                   (or (containsp (car e) op) (containsp (cdr e) op))
+                   (eq e op))))
+      `(lambda (arg &aux (val (truly-the (unsigned-byte 32) arg)))
+         (declare (optimize (safety 0) (sb-c:store-source-form 0)))
+         ;; Remove the macros that aren't used, it helps with visual inspection
+         ;; of the result. However, one macro can't call another since CONTAINSP
+         ;; doesn't understand macros.
+         (macrolet ,(remove-if-not
+                     (lambda (m) (containsp expr (car m)))
+                     '((& (a b) `(logand ,a ,b)) ; purposely look more C-like
+                       (^ (a b) `(logxor ,a ,b)) ;  (for debugging)
+                       (u32+ (a b) `(logand (+ ,a ,b) #xFFFFFFFF))
+                       (^= (a b) `(setq ,a (logxor ,a ,b)))
+                       (+= (a b) `(setq ,a (logand (+ ,a ,b) #xFFFFFFFF)))
+                       (<< (n c) `(logand (ash ,n ,c) #xFFFFFFFF))
+                       (>> (n c)
+                        ;; I really do not feel like figuring out nested backquotery
+                        ;; as would be entailed to use IF-VOP-EXISTSP here.
+                        ;; May this be incentive to implement %ash/right universally
+                        #+(or arm mips riscv x86 x86-64) `(sb-kernel:%ash/right ,n ,c)
+                        #-(or arm mips riscv x86 x86-64) `(ash ,n (- ,c)))))
+           ;; We generate _really_ crappy code for 32-bit math on 64-bit machines.
+           ;; I think the steps are sufficiently trivial that a single vop could choose
+           ;; how to translate the arbitrary s-expression
+           ,@expr)))))
