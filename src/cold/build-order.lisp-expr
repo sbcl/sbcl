@@ -617,6 +617,7 @@
   ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
   "src/code/icf"
+  "src/code/warm-target-unicode"
   "src/code/defpackage")
 
  #+sb-fasteval

@@ -163,22 +163,6 @@ that have a digit value but no decimal digit value"
                                   (+ 3 (misc-index character))))))
     (if (< %digit 10) %digit nil)))
 
-(defun numeric-value (character)
-  "Returns the numeric value of CHARACTER or NIL if there is no such value.
-Numeric value is the most general of the Unicode numeric properties.
-The only constraint on the numeric value is that it be a rational number."
-  (or (gethash character
-               (load-time-value
-                (let ((list '#.(sb-cold:read-from-file "output/ucd/numerics.lisp-expr")))
-                  (sb-impl::%stuff-hash-table
-                   (make-hash-table :test #'eq :size (length list))
-                   (loop for (k . v) in list
-                         when (< k char-code-limit)
-                         collect (cons (code-char k) v))
-                   t))
-                t))
-      (digit-value character)))
-
 (defun mirrored-p (character)
   "Returns T if CHARACTER needs to be mirrored in bidirectional text.
 Otherwise, returns NIL."
