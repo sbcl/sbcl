@@ -1009,6 +1009,46 @@ symbol-case giving up: case=((V U) (F))
                                 (cond ((eq layout (car cell)) (return (cdr cell)))
                                       ((null (setq list (cdr list))) (return 0))))))))))))
 
+(sb-xc:defmacro %struct-typecase-index (cases object)
+  (let ((n (length cases)))
+    `(if (not (%instancep ,object))
+         0
+         (truly-the
+          (integer 0 ,n)
+          ;; TODO: if we access the cache by layout ID instead of the object,
+          ;; one word can store the layout ID and the clause index
+          ;; (certainly true for 64-bit, maybe not 32).
+          ;; The benefit would be never having to observe a key lacking a value.
+          ;; Also: we don't really need the test for the object layout's hash is 0
+          ;; because it can't be. On the other hand, we might want to utilize
+          ;; this macro on STANDARD-OBJECT.
+          (prog ((clause 0)
+                 ;; Assume the cache will want at least N lines
+                 (cache (load-time-value (sb-pcl::make-cache :key-count 1 :size ,n
+                                                             :value t)))
+                 (layout (%instance-layout ,object)))
+             (declare (optimize (safety 0)))
+             ,(funcall 'sb-pcl::emit-cache-lookup 'cache '(layout) 'miss 'clause)
+             (return clause)
+           MISS
+             (return (multiple-value-setq (clause cache)
+                       (sb-pcl::%struct-typecase-miss ,object cache ,cases))))))))
+
+(defun find-all-layouts (ctypes)
+  (let* ((seen)
+         (answer (map 'simple-vector
+                      (lambda (ctype)
+                        (let* ((classoids (if (union-type-p ctype)
+                                              (union-type-types ctype)
+                                              (list ctype)))
+                               ;; Result must not have duplicates
+                               (layouts (remove-if (lambda (x) (member x seen))
+                                                   (mapcar 'classoid-layout classoids))))
+                          (setf seen (union seen layouts))
+                          (coerce layouts 'simple-vector)))
+                      ctypes)))
+    answer))
+
 ;;; Given an arbitrary TYPECASE, see if it is a discriminator over
 ;;; an assortment of structure-object subtypes. If it is, potentially turn it
 ;;; into a dispatch based on layout-clos-hash.
@@ -1033,15 +1073,14 @@ symbol-case giving up: case=((V U) (F))
              (and (sb-kernel::built-in-classoid-p classoid)
                   (not (memq (classoid-name classoid)
                              sb-kernel::**non-instance-classoid-types**)))))
-       (discover-subtypes (specifier)
-           (let* ((parse (specifier-type specifier))
-                  (worklist
-                   (cond ((ok-classoid parse) (list parse))
-                         ((and (union-type-p parse)
-                               (every #'ok-classoid (union-type-types parse)))
-                          (copy-list (union-type-types parse)))
-                         (t
-                          (return-from discover-subtypes nil)))))
+       (discover-subtypes (ctype)
+         (let ((worklist
+                (cond ((ok-classoid ctype) (list ctype))
+                      ((and (union-type-p ctype)
+                            (every #'ok-classoid (union-type-types ctype)))
+                       (copy-list (union-type-types ctype)))
+                      (t
+                       (return-from discover-subtypes nil)))))
              ;; Assume that each "root" type would require its own test based
              ;; on %instance-layout of self and ancestor and that all root types
              ;; are disjoint. This may not be true if a later one includes
@@ -1058,9 +1097,10 @@ symbol-case giving up: case=((V U) (F))
                            (setf worklist (nconc worklist (list subclassoid)))))))
                (setf exhaustive-list (union (visited) exhaustive-list))
                (visited)))))
-    (let ((classoid-lists (mapcar #'discover-subtypes type-specs)))
+    (let* ((ctypes (mapcar #'specifier-type type-specs))
+           (classoid-lists (mapcar #'discover-subtypes ctypes)))
       (when (or (some #'null classoid-lists)
-                (< n-root-types 6)
+                (< n-root-types 5)
                 ;; Given something like:
                 ;; (typecase x
                 ;;   ((or parent1 parent2 parent3) ...)
@@ -1069,26 +1109,37 @@ symbol-case giving up: case=((V U) (F))
                 ;; it may be worse to use a hash-based lookup.
                 (> (length exhaustive-list) (* 3 n-root-types)))
         (return-from expand-struct-typecase))
-      (if (every (lambda (classoids)
-                   (every (lambda (classoid)
-                            (eq (classoid-state classoid) :sealed))
-                          classoids))
-                 classoid-lists)
-          `(let ((,temp ,keyform))
-             (case (%sealed-struct-typecase-index
-                    ,(mapcar (lambda (list) (mapcar #'classoid-name list))
-                             classoid-lists)
-                    ,temp)
-               ,@(loop for i from 1 for clause in normal-clauses
-                       collect `(,i
-                                 ;; CLAUSE is ((TYPEP #:G 'a-type) NIL . forms)
-                                 (sb-c::%type-constraint ,temp ,(third (car clause)))
-                                 ,@(cddr clause)))
-               (0 ,@(if errorp
-                        `((etypecase-failure ,temp ',type-specs))
-                        (cddr default)))))
-          ;; not done
-          nil))))
+      ;; If no new subtypes can be defined, then there is a compiled-time-computable
+      ;; mapping from CLOS-hash to jump table index.
+      (let ((all-sealed
+             (every (lambda (classoids)
+                      (every (lambda (classoid)
+                               (eq (classoid-state classoid) :sealed))
+                             classoids))
+                    classoid-lists)))
+        ;; The number of root types is an upper bound on the number of different TYPEP
+        ;; executions that could occur. Use a cache if it exceeds 8 but we couldn't use
+        ;; the "sealed" logic. The cache is usually an improvement over sequential tests
+        ;; but it's impossible to know (the first clause could get taken 99% of the time)
+        (when (or all-sealed (>= n-root-types 8))
+          (let ((clause-select
+                 (if all-sealed
+                     `(%sealed-struct-typecase-index
+                       ,(mapcar (lambda (list) (mapcar #'classoid-name list))
+                                classoid-lists)
+                       ,temp)
+                     `(%struct-typecase-index ,(find-all-layouts ctypes) ,temp))))
+            `(let ((,temp ,keyform))
+               (case ,clause-select
+                 ,@(loop for i from 1 for clause in normal-clauses
+                         collect `(,i
+                                   ;; CLAUSE is ((TYPEP #:G 'a-type) NIL . forms)
+                                   (sb-c::%type-constraint ,temp ,(third (car clause)))
+                                   ,@(cddr clause)))
+                 (0 ,@(if errorp
+                          `((etypecase-failure ,temp ',type-specs))
+                          (cddr default)))))))))))
+
 
 ;;; Turn a case over symbols into a case over their hashes.
 ;;; Regarding the apparently redundant UNREACHABLE branches:

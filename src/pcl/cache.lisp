@@ -582,6 +582,29 @@
                  :mask mask
                  :limit (cache-limit cache))))
 
+(defun %struct-typecase-miss (object cache layouts-v)
+  ;; If the layout of OBJECT is already in the cache, then returned the value
+  ;; from the cache. Otherwise try to compute and memoize the index.
+  ;; The caller always reassigns its cache from the secondary result.
+  (when (%instancep object)
+    (let ((layout (%instance-layout object))
+          (clause-index 0))
+      (macrolet ((lookup () (emit-cache-lookup 'cache '(layout) 'miss 'clause-index)))
+        (tagbody
+           (lookup)
+           (return-from %struct-typecase-miss (values clause-index cache))
+         MISS))
+      (setq clause-index 1)
+      (dovector (layouts layouts-v)
+        (dovector (layout layouts)
+          (when (sb-c::structure-typep object layout) ; success, to try memoize it
+            (let ((key (list layout)))
+              (unless (try-update-cache cache key clause-index)
+                (setf cache (copy-and-expand-cache cache key clause-index))))
+            (return-from %struct-typecase-miss (values clause-index cache))))
+        (incf clause-index))))
+  (values 0 cache))
+
 ;;;; For debugging & collecting statistics.
 
 (defun map-all-caches (function)
@@ -656,7 +679,7 @@
                      (multiple-value-bind (count capacity n-dirty n-obsolete histogram)
                          (cache-statistics cache t)
                        (list histogram count capacity n-dirty n-obsolete cache)))
-                   (funcall 'sb-vm::list-allocated-objects :all :test #'cache-p)))
+                   (sb-vm:list-allocated-objects :all :test #'cache-p)))
          (n 0)
          (n-shown 0)
          (histogram-column-width

@@ -483,3 +483,12 @@ Experimental."
       (simd-pack-256 (simd-subtype (%simd-pack-256-tag x) simd-pack-256))
       (t
        (classoid-of x)))))
+
+(defun sb-c::structure-typep (object test-layout)
+  (and (%instancep object)
+       (let ((object-layout (%instance-layout object)))
+        (or (eq object-layout test-layout)
+            (let ((depthoid (layout-depthoid test-layout))
+                  (inherits (layout-inherits object-layout)))
+              (and (> (length inherits) depthoid)
+                   (eq (svref inherits depthoid) test-layout)))))))
