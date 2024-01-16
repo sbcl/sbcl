@@ -102,7 +102,7 @@
 ;;; - 2 to leave space for the array header
 (defconstant array-dimension-limit (min (* max-dynamic-space-size
                                            ;; for bit-arrays
-                                           n-word-bits)
+                                           n-byte-bits)
                                         (- most-positive-fixnum 2))
   "the exclusive upper bound on any given dimension of an array")
 
