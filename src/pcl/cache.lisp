@@ -181,6 +181,7 @@
 
 ;;; The hash values are specifically designed so that LOGAND of all hash
 ;;; inputs is zero if and only if at least one hash is invalid.
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun cache-mixer-expression (operator operands associativep)
   (named-let recurse ((operands operands))
     (let ((n (length operands)))
@@ -197,7 +198,7 @@
                            ,(recurse (subseq operands half-n)))))
             (t
              (recurse (cons `(,operator ,(first operands) ,(second operands))
-                            (cddr operands))))))))
+                            (cddr operands)))))))))
 
 ;;; Emit code that does lookup in cache bound to CACHE-VAR using
 ;;; layouts bound to LAYOUT-VARS. Go to MISS-TAG on event of a miss or
@@ -207,18 +208,17 @@
 ;;; In other words, produces inlined code for COMPUTE-CACHE-INDEX when
 ;;; number of keys and presence of values in the cache is known
 ;;; beforehand.
-(defglobal *hash-vars*
-  (make-array 6 :initial-contents
-              (loop for i from 0 below 6 collect (make-symbol (format nil "H~D" i)))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun emit-cache-lookup (cache-var layout-vars miss-tag value-var)
-  (declare (muffle-conditions code-deletion-note))
   (multiple-value-bind (probe n-vector n-depth n-mask
                       MATCH-WRAPPERS EXIT-WITH-HIT)
       (values '#:probe '#:vect '#:depth '#:mask '#:try '#:hit)
     (let* ((num-keys (length layout-vars))
+           ;; just to avoid always freshly gensym'ing everything
+           (premade-hash-vars #(#:H0 #:H1 #:H2 #:H3 #:H4 #:H5))
            (hash-vars (loop for i from 0 below num-keys
-                            collect (if (< i #.(length *hash-vars*))
-                                        (aref *hash-vars* i)
+                            collect (if (< i (length premade-hash-vars))
+                                        (aref premade-hash-vars i)
                                         (make-symbol (format nil "H~D" i)))))
            (pointer
             ;; We don't need POINTER if the cache has 1 key and no value,
@@ -264,7 +264,7 @@
             (setf ,probe (next-cache-index ,n-mask ,probe ,line-size))
             ,@(if pointer `((setf ,pointer ,probe)))
             (go ,MATCH-WRAPPERS)
-            ,EXIT-WITH-HIT)))))
+            ,EXIT-WITH-HIT))))))
 
 ;;; Probes CACHE for LAYOUTS.
 ;;;
@@ -375,6 +375,36 @@
                      :limit (compute-limit adjusted-size))
         ;; Make a smaller one, then
         (make-cache :key-count key-count :value value :size (ceiling size 2)))))
+
+(defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
+  `(dotimes (,var (the fixnum ,count) ,result)
+     (declare (fixnum ,var))
+     ,@body))
+
+(define-load-time-global *pcl-misc-random-state* (make-random-state))
+
+(declaim (inline random-fixnum))
+(defun random-fixnum ()
+  (random (1+ most-positive-fixnum)
+          (load-time-value *pcl-misc-random-state*)))
+
+;;; Lambda which executes its body (or not) randomly. Used to drop
+;;; random cache entries.
+;;; This formerly punted with slightly greater than 50% probability,
+;;; and there was a periodicity to the nonrandomess.
+;;; If that was intentional, it should have been commented to that effect.
+(defmacro randomly-punting-lambda (lambda-list &body body)
+  (with-unique-names (drops drop-pos)
+    `(let ((,drops (random-fixnum)) ; means a POSITIVE fixnum
+           (,drop-pos sb-vm:n-positive-fixnum-bits))
+       (declare (fixnum ,drops)
+                (type (mod #.sb-vm:n-fixnum-bits) ,drop-pos))
+       (lambda ,lambda-list
+         (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
+           (locally ,@body))
+         (when (zerop ,drop-pos)
+           (setf ,drops (random-fixnum)
+                 ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
 ;;;; Copies and expands the cache, dropping any invalidated or
 ;;;; incomplete lines.
@@ -567,7 +597,7 @@
           (when (fboundp name)
             (let ((fun (fdefinition name)))
               (when (typep fun 'generic-function)
-                (let ((cache (gf-dfun-cache fun)))
+                (let ((cache (funcall 'gf-dfun-cache fun)))
                   (when cache
                     (funcall function name cache)))))))))))
 
@@ -626,7 +656,7 @@
                      (multiple-value-bind (count capacity n-dirty n-obsolete histogram)
                          (cache-statistics cache t)
                        (list histogram count capacity n-dirty n-obsolete cache)))
-                   (sb-vm::list-allocated-objects :all :test #'cache-p)))
+                   (funcall 'sb-vm::list-allocated-objects :all :test #'cache-p)))
          (n 0)
          (n-shown 0)
          (histogram-column-width

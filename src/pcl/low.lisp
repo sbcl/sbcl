@@ -81,35 +81,6 @@
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
 
-(defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
-  `(dotimes (,var (the fixnum ,count) ,result)
-     (declare (fixnum ,var))
-     ,@body))
-
-(define-load-time-global *pcl-misc-random-state* (make-random-state))
-
-(declaim (inline random-fixnum))
-(defun random-fixnum ()
-  (random (1+ most-positive-fixnum)
-          (load-time-value *pcl-misc-random-state*)))
-
-;;; Lambda which executes its body (or not) randomly. Used to drop
-;;; random cache entries.
-;;; This formerly punted with slightly greater than 50% probability,
-;;; and there was a periodicity to the nonrandomess.
-;;; If that was intentional, it should have been commented to that effect.
-(defmacro randomly-punting-lambda (lambda-list &body body)
-  (with-unique-names (drops drop-pos)
-    `(let ((,drops (random-fixnum)) ; means a POSITIVE fixnum
-           (,drop-pos sb-vm:n-positive-fixnum-bits))
-       (declare (fixnum ,drops)
-                (type (mod #.sb-vm:n-fixnum-bits) ,drop-pos))
-       (lambda ,lambda-list
-         (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
-           (locally ,@body))
-         (when (zerop ,drop-pos)
-           (setf ,drops (random-fixnum)
-                 ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
