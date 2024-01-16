@@ -538,7 +538,6 @@
  ("src/code/print" :not-host)
  ("src/code/pprint" :not-host)
 
- ("src/pcl/cache" :not-host)
  ("src/code/target-defstruct"  :not-host)
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host)
@@ -657,6 +656,7 @@
  ;; order dependencies from the old PCL defsys.lisp
  ;; dependency database.
  ("src/pcl/fngen"
+  "src/pcl/cache"
   "src/pcl/dlisp"
   "src/pcl/boot"
   "src/pcl/vector"
