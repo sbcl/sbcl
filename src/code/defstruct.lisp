@@ -1643,8 +1643,8 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;   Non-executable:                    #b...1010        -6
 ;;;       word0:     header
 ;;;       word1: (*) entry address
-;;;       word3: (t) implementation-fun
-;;;       word2: (u) layout
+;;;       word2: (t) implementation-fun
+;;;       word3: (u) layout
 ;;;       word4: (t) tagged slots ...
 ;;; (*) entry address can be treated as either tagged or raw.
 ;;;     For some architectures it has a lowtag, but points to

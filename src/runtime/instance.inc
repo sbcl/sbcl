@@ -24,7 +24,7 @@ static inline int instance_length(lispobj header)
     // * 64-bit machines do not need 'long' right-shifts, so truncate to int.
 
     int extra = ((unsigned int)header >> 10) & ((unsigned int)header >> 9) & 1;
-    return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
+    return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK) + extra;
 }
 
 // Calculate length of an object that is either INSTANCE or FUNCALLABLE-INSTANCE
@@ -112,7 +112,8 @@ static inline struct bitmap get_layout_bitmap(struct layout* layout)
     // The 2 bits for stable address-based hashing can't ever bet set
     // in an instance of LAYOUT.
     const int baseline_payload_words = (sizeof (struct layout) / N_WORD_BYTES) - 1;
-    int payload_words = ((unsigned int)layout->header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF;
+    int payload_words = ((unsigned int)layout->header >> INSTANCE_LENGTH_SHIFT)
+                        & INSTANCE_LENGTH_MASK;
     bitmap.bits = (sword_t*)((char*)layout + sizeof (struct layout)) + extra_id_words;
     bitmap.nwords = payload_words - baseline_payload_words - extra_id_words;
     return bitmap;
