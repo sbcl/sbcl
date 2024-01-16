@@ -525,15 +525,29 @@
 ;;; Return the name of the global hashset that OBJ (a CTYPE instance)
 ;;; would be stored in, if it were stored in one.
 ;;; This is only for bootstrap, and not 100% precise as it does not know
-;;; about the other MEMBER type containers.
+;;; about *EQL-TYPE-CACHE* or *MEMBER/EQ-TYPE-HASHSET*
 (defun ctype->hashset-sym (obj)
   (macrolet ((generate  ()
                (collect ((clauses))
-                 (dolist (type-class *type-class-list*
-                                     `(etypecase obj ,@(clauses)))
+                 (dolist (type-class *type-class-list*)
                    (dolist (instance-type (cdr type-class))
                      (clauses
-                      (list instance-type
+                      (cons instance-type
                             (unless (member instance-type '(classoid named-type))
-                              `',(symbolicate "*" instance-type "-HASHSET*")))))))))
+                              (symbolicate "*" instance-type "-HASHSET*"))))))
+                 #+sb-xc-host
+                 `(etypecase obj
+                    ,@(mapcar (lambda (x) `(,(car x) ',(cdr x))) (clauses)))
+                 ;; For cold-init, we need something guaranteed to work no matter the expansion
+                 ;; of TYPEP. If this is called too early, then the optimized code for TYPEP
+                 ;; (whatever it is) may fail. But Genesis is able to externalize an alist that
+                 ;; maps #<layout> to symbol, and it's mostly ok to compare layouts by EQ here,
+                 ;; but it fails on CLASSOID's subtypes, so recognize those specially.
+                 #-sb-xc-host
+                 (let ((alist (mapcar (lambda (x) (cons (find-layout (car x)) (cdr x)))
+                                      (clauses))))
+                   `(let ((cell (assoc (%instance-layout obj) ',alist)))
+                      (cond (cell (cdr cell))
+                            ((classoid-p obj) nil)
+                            (t (bug "ctype dumping problem"))))))))
     (generate)))
