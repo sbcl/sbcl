@@ -1571,6 +1571,8 @@
 (defun double-float-type () (parse-alien-type 'double-float nil))
 (defun sap-type () (parse-alien-type 'system-area-pointer nil))
 
+(declaim (freeze-type alien-type))
+
 ;;; Genesis is limited in its ability to patch load-time-values into objects
 ;;; other than code components. For this reason we want to emit a single sexpr
 ;;; to handle all levels of structure nesting.

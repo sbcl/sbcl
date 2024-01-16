@@ -432,7 +432,8 @@ between the ~A definition and the ~A definition"
         (let ((super (layout-classoid super-layout)))
           (when (and (eq (classoid-state super) :sealed)
                      (not (get-subclassoid classoid super)))
-            (warn "unsealing sealed class ~S in order to subclass it"
+            (#+sb-xc-host error
+             #-sb-xc-host warn "unsealing sealed class ~S in order to subclass it"
                   (classoid-name super))
             (setf (classoid-state super) :read-only))
           (add-subclassoid super classoid (or destruct-layout layout))))))
