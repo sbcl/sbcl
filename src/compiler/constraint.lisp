@@ -1541,9 +1541,10 @@
           ;; Propagate constraints
           (loop for block = (pop blocks-to-process)
                 while block do
-                  (unless (eq block (component-tail component))
-                    (when (update-block-in block join-types-p)
-                      (enqueue (find-block-type-constraints block nil))))))
+                (unless (or (block-delete-p block)
+                            (eq block (component-tail component)))
+                  (when (update-block-in block join-types-p)
+                    (enqueue (find-block-type-constraints block nil))))))
 
         rest-of-blocks))))
 

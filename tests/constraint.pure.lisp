@@ -1091,3 +1091,21 @@
      (assert (< x y))
      (< x y))
    (eql t)))
+
+(with-test (:name :dead-blocks)
+  (assert-type
+   (lambda (c d)
+     (declare ((integer -31307831194 26651266057) c))
+     (let ((v5 (if d
+                   -206316434836409151
+                   17179869177)))
+       (if (/= v5 c)
+           1
+           (if (> v5 c)
+               (logior
+                c
+                (loop for lv2 below 1
+                      sum
+                      (rem lv2 128)))
+               1))))
+   (eql 1)))
