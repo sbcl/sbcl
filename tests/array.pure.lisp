@@ -422,7 +422,10 @@
                   :skipped-on :ubsan)
   ;; 1-bit fixnum tags make array limits overflow the word length
   ;; when converted to bytes
-  (when (= sb-vm:n-fixnum-tag-bits 1)
+  (when (and (= sb-vm:n-fixnum-tag-bits 1)
+             (<= (- most-positive-fixnum
+                    array-total-size-limit)
+                 2))
     (multiple-value-bind (fun failure-p warnings)
         (checked-compile
          '(lambda ()

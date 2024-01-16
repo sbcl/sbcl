@@ -5599,9 +5599,7 @@
 
 (defoptimizer (length derive-type) ((sequence))
   (when (csubtypep (lvar-type sequence) (specifier-type 'list))
-    (specifier-type '(mod #.(truncate (or #+soft-card-marks
-                                          (* (/ (expt 2 31) sb-vm::cards-per-page) sb-c:+backend-page-bytes+)
-                                          (1- (expt 2 sb-vm:n-word-bits)))
+    (specifier-type '(mod #.(truncate sb-vm::max-dynamic-space-size
                              (* sb-vm:cons-size sb-vm:n-word-bytes))))))
 
 ;;; ENDP, NULL and NOT -> %REST-NULL

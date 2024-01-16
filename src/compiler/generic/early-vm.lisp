@@ -85,6 +85,11 @@
 (defconstant array-rank-limit 129
   "the exclusive upper bound on the rank of an array")
 
+(defconstant max-dynamic-space-size
+  (or #+soft-card-marks
+      (* (/ (expt 2 31) sb-vm::cards-per-page) sb-c:+backend-page-bytes+)
+      (1- (expt 2 sb-vm:n-word-bits))))
+
 ;;; FIXME: these limits are wrong at the most basic level according to the spec,
 ;;; because if there are different limits for different element types, then
 ;;; this constant should be the _smallest_ of the limits for any element type.
@@ -95,10 +100,13 @@
 #-ubsan ; usual way
 (progn
 ;;; - 2 to leave space for the array header
-(defconstant array-dimension-limit (- most-positive-fixnum 2)
+(defconstant array-dimension-limit (min (* max-dynamic-space-size
+                                           ;; for bit-arrays
+                                           n-word-bits)
+                                        (- most-positive-fixnum 2))
   "the exclusive upper bound on any given dimension of an array")
 
-(defconstant array-total-size-limit (- most-positive-fixnum 2)
+(defconstant array-total-size-limit array-dimension-limit
   "the exclusive upper bound on the total number of elements in an array")
 )
 
