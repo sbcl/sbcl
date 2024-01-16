@@ -392,3 +392,18 @@
              (the fixnum j))))
     ((most-positive-fixnum nil) nil)
     ((most-positive-fixnum t) (condition 'type-error))))
+
+(with-test (:name :logtest-memref-boxed)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (declare (sb-vm:word b))
+         (when (oddp b)
+           (lambda (m)
+             (when m
+               (setf b 1))
+             b)))
+    (((expt 2 (1- sb-vm:n-word-bits))) nil)
+    (((1+ (expt 2 (1- sb-vm:n-word-bits)))) t :test (lambda (x y)
+                                                      y
+                                                      (functionp (car x))))))

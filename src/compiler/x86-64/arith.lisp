@@ -2604,7 +2604,7 @@
 ;;; Try to absorb a memory load into LOGTEST.
 ;;; This removes one instruction and possibly shortens the TEST by eliding
 ;;; a REX prefix.
-(defoptimizer (sb-c::vop-optimize fast-logtest-c/fixnum) (vop)
+(defoptimizer (sb-c::vop-optimize fast-logtest-c/fixnum sb-c::select-representations) (vop)
   (unless (tn-ref-memory-access (vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  ;; TODO: missing data-vector-ref/simple-vector-c
@@ -2631,10 +2631,11 @@
         ;; between INSTANCE-INDEX-REF and LOGTEST, but it did not happen yet.
         (let* ((arg (vop-args vop))
                (info-arg (car (vop-codegen-info vop)))
-               (constant (if (member (vop-name prev) '(instance-index-ref-c slot))
-                             (ash info-arg n-fixnum-tag-bits)
+               (constant (if (sc-is (tn-ref-tn arg) any-reg)
+                             (fixnumize info-arg)
                              info-arg)))
-          (when (and (eq (tn-ref-tn (vop-results prev)) (tn-ref-tn arg))
+          (when (and (sc-is (tn-ref-tn arg) any-reg unsigned-reg signed-reg)
+                     (eq (tn-ref-tn (vop-results prev)) (tn-ref-tn arg))
                      (sb-c::very-temporary-p (tn-ref-tn arg))
                      (typep constant '(or word signed-word)))
             (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
@@ -2648,9 +2649,9 @@
               (sb-c::delete-vop vop)
               new)))))))
 (setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/signed))
-      #'vop-optimize-fast-logtest-c/fixnum-optimizer)
+      (cons #'vop-optimize-fast-logtest-c/fixnum-optimizer 'sb-c::select-representations))
 (setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/unsigned))
-      #'vop-optimize-fast-logtest-c/fixnum-optimizer)
+      (cons #'vop-optimize-fast-logtest-c/fixnum-optimizer 'sb-c::select-representations))
 
 ;;; TODO: The TEST instruction preceding this JEQ is entirely superfluous
 ;;; and can be removed with a vop optimizer:
