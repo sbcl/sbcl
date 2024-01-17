@@ -26,14 +26,17 @@
 (defstruct (macintosh (:include apple)))
 (defstruct (mulberry (:include tree)))
 
-;(disassemble 'f)
-
 (with-test (:name :cached-typecase)
   (assert (eq (f (make-mulberry)) 3))
   (assert (eq (f (make-macintosh)) 'computer))
   (assert (eq (f #p"file.name") 'yup)))
 
-;; eamine the cache a bit
-#+nil
-(let ((cache (ctu:find-code-constants #'f :type 'sb-pcl::cache)))
-  (print cache))
+(defvar *cell*  (car (ctu:find-code-constants #'f :type '(cons sb-pcl::cache))))
+(assert (sb-pcl::cache-p (car *cell*)))
+
+(dotimes (i 100)
+  (let ((form `(defstruct (,(intern (format nil "TUR~D" i)) (:Include fruit)))))
+    (eval form)
+    (assert (eq (f (funcall (intern (format nil "MAKE-TUR~D" i)))) 'jam))))
+(with-test (:name :expand-cache)
+  (assert (>= (sb-pcl::cache-statistics (car *cell*)) 100)))

@@ -1022,17 +1022,18 @@ symbol-case giving up: case=((V U) (F))
           ;; Also: we don't really need the test for the object layout's hash is 0
           ;; because it can't be. On the other hand, we might want to utilize
           ;; this macro on STANDARD-OBJECT.
-          (prog ((clause 0)
-                 ;; Assume the cache will want at least N lines
-                 (cache (load-time-value (sb-pcl::make-cache :key-count 1 :size ,n
-                                                             :value t)))
-                 (layout (%instance-layout ,object)))
+          (prog* ((clause 0)
+                  (cache-cell
+                   (load-time-value
+                    ;; Assume the cache will want at least N lines
+                    (cons (sb-pcl::make-cache :key-count 1 :size ,n :value t) ,cases)))
+                  (cache (car (truly-the cons cache-cell)))
+                  (layout (%instance-layout ,object)))
              (declare (optimize (safety 0)))
              ,(funcall 'sb-pcl::emit-cache-lookup 'cache '(layout) 'miss 'clause)
              (return clause)
            MISS
-             (return (multiple-value-setq (clause cache)
-                       (sb-pcl::%struct-typecase-miss ,object cache ,cases))))))))
+             (return (sb-pcl::%struct-typecase-miss ,object cache-cell)))))))
 
 (defun find-all-layouts (ctypes)
   (let* ((seen)

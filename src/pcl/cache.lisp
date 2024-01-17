@@ -417,10 +417,7 @@
       (setf length (* 2 length)))
     (tagbody
      :again
-       ;; Blow way the old vector first, so a GC potentially triggered by
-       ;; MAKE-ARRAY can collect it.
-       (setf (cache-vector copy) #()
-             (cache-vector copy) (make-cache-storage length)
+       (setf (cache-vector copy) (make-cache-storage length)
              (cache-depth copy) 0
              (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))
@@ -582,28 +579,29 @@
                  :mask mask
                  :limit (cache-limit cache))))
 
-(defun %struct-typecase-miss (object cache layouts-v)
+(defun %struct-typecase-miss (object cache-cell)
   ;; If the layout of OBJECT is already in the cache, then returned the value
   ;; from the cache. Otherwise try to compute and memoize the index.
-  ;; The caller always reassigns its cache from the secondary result.
   (when (%instancep object)
     (let ((layout (%instance-layout object))
+          (cache (car cache-cell))
           (clause-index 0))
       (macrolet ((lookup () (emit-cache-lookup 'cache '(layout) 'miss 'clause-index)))
         (tagbody
            (lookup)
-           (return-from %struct-typecase-miss (values clause-index cache))
+           (return-from %struct-typecase-miss clause-index)
          MISS))
       (setq clause-index 1)
-      (dovector (layouts layouts-v)
-        (dovector (layout layouts)
-          (when (sb-c::structure-typep object layout) ; success, to try memoize it
-            (let ((key (list layout)))
+      (dovector (layouts (cdr cache-cell))
+        (dovector (test-layout layouts)
+          (when (sb-c::structure-typep object test-layout) ; success, to try memoize it
+            (let ((key (list layout))) ; insert this object's layout
               (unless (try-update-cache cache key clause-index)
-                (setf cache (copy-and-expand-cache cache key clause-index))))
-            (return-from %struct-typecase-miss (values clause-index cache))))
+                (setf (car cache-cell)
+                      (copy-and-expand-cache cache key clause-index))))
+            (return-from %struct-typecase-miss clause-index)))
         (incf clause-index))))
-  (values 0 cache))
+  0)
 
 ;;;; For debugging & collecting statistics.
 
