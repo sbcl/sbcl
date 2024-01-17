@@ -2677,227 +2677,243 @@
     (inst mul temp dividend c) ; want only the low 64 bits
     (inst umulh remainder temp divisor))) ; want only the high 64 bits
 
-(macrolet ((def (name excl-low excl-high)
-             `(progn
-                (define-vop (,(symbolicate name '/c))
-                  (:translate ,name)
-                  (:args (x :scs (any-reg signed-reg unsigned-reg)))
-                  (:arg-types (:constant t)
-                              (:or tagged-num signed-num unsigned-num)
-                              (:constant t))
-                  (:info lo hi)
-                  (:temporary (:sc signed-reg
-                               :unused-if
-                               (cond ((or (= lo ,(if excl-low
-                                                     -1
-                                                     0))
-                                          (= hi
-                                             ,(if excl-high
-                                                  0
-                                                  -1))))))
-                              temp)
-                  (:conditional :ls)
-                  (:vop-var vop)
-                  (:policy :fast-safe)
-                  (:generator 2
-                    (aver (>= hi lo))
-                    (let ((lo (+ lo ,@(and excl-low
-                                           '(1))))
-                          (hi (+ hi ,@(and excl-high
-                                           '(-1)))))
-                      (multiple-value-bind (flo fhi one)
-                          (if (sc-is x any-reg)
-                              (values (fixnumize lo) (fixnumize hi) ,(fixnumize 1))
-                              (values lo hi 1))
-                        (cond
-                          ((and (sc-is x unsigned-reg)
-                                (< fhi 0))
-                           (inst cmp null-tn 0))
-                          ((or (= lo 0)
-                               (and (sc-is x unsigned-reg)
-                                    (<= lo 0)))
-                           (when (add-sub-immediate-p (+ fhi one))
-                             (incf fhi one)
-                             (change-vop-flags vop '(:lo)))
-                           (inst cmp x (add-sub-immediate fhi)))
-                          ((= hi -1)
-                           (setf flo (- flo))
-                           (cond ((add-sub-immediate-p (+ flo one))
-                                  (incf flo one)
-                                  (change-vop-flags vop '(:hi)))
-                                 (t
-                                  (change-vop-flags vop '(:hs))))
-                           (inst cmn x (add-sub-immediate flo)))
-                          (t
-                           (if (plusp flo)
-                               (inst sub temp x (add-sub-immediate flo))
-                               (inst add temp x (add-sub-immediate (abs flo))))
-                           (let ((cmp (- fhi flo)))
-                             (when (add-sub-immediate-p (+ cmp one))
-                               (incf cmp one)
-                               (change-vop-flags vop '(:lo)))
-                            (inst cmp temp (add-sub-immediate cmp)))))))))
+(macrolet ((def (name excl-low excl-high &optional check)
+               `(progn
+                  ,@(unless check
+                      `((define-vop (,(symbolicate name '/c))
+                          (:translate ,name)
+                          (:args (x :scs (any-reg signed-reg unsigned-reg)))
+                          (:arg-types (:constant t)
+                                      (:or tagged-num signed-num unsigned-num)
+                                      (:constant t))
+                          (:info lo hi)
+                          (:temporary (:sc signed-reg
+                                       :unused-if
+                                       (cond ((or (= lo ,(if excl-low
+                                                             -1
+                                                             0))
+                                                  (= hi
+                                                     ,(if excl-high
+                                                          0
+                                                          -1))))))
+                                      temp)
+                          (:conditional :ls)
+                          (:vop-var vop)
+                          (:policy :fast-safe)
+                          (:generator 2
+                            (aver (>= hi lo))
+                            (let ((lo (+ lo ,@(and excl-low
+                                                   '(1))))
+                                  (hi (+ hi ,@(and excl-high
+                                                   '(-1)))))
+                              (multiple-value-bind (flo fhi one)
+                                  (if (sc-is x any-reg)
+                                      (values (fixnumize lo) (fixnumize hi) ,(fixnumize 1))
+                                      (values lo hi 1))
+                                (cond
+                                  ((and (sc-is x unsigned-reg)
+                                        (< fhi 0))
+                                   (inst cmp null-tn 0))
+                                  ((or (= lo 0)
+                                       (and (sc-is x unsigned-reg)
+                                            (<= lo 0)))
+                                   (when (add-sub-immediate-p (+ fhi one))
+                                     (incf fhi one)
+                                     (change-vop-flags vop '(:lo)))
+                                   (inst cmp x (add-sub-immediate fhi)))
+                                  ((= hi -1)
+                                   (setf flo (- flo))
+                                   (cond ((add-sub-immediate-p (+ flo one))
+                                          (incf flo one)
+                                          (change-vop-flags vop '(:hi)))
+                                         (t
+                                          (change-vop-flags vop '(:hs))))
+                                   (inst cmn x (add-sub-immediate flo)))
+                                  (t
+                                   (if (plusp flo)
+                                       (inst sub temp x (add-sub-immediate flo))
+                                       (inst add temp x (add-sub-immediate (abs flo))))
+                                   (let ((cmp (- fhi flo)))
+                                     (when (add-sub-immediate-p (+ cmp one))
+                                       (incf cmp one)
+                                       (change-vop-flags vop '(:lo)))
+                                     (inst cmp temp (add-sub-immediate cmp)))))))))
 
-                (define-vop (,(symbolicate name '-integer/c))
-                  (:translate ,name)
-                  (:args (x :scs (descriptor-reg)))
-                  (:arg-types (:constant t) (:or integer bignum) (:constant t))
-                  (:info lo hi)
-                  (:temporary (:sc signed-reg
-                               :unused-if
-                               (cond ((or (= lo ,(if excl-low
-                                                     -1
-                                                     0))
-                                          (= hi
-                                             ,(if excl-high
-                                                  0
-                                                  -1))))))
-                              temp)
-                  (:conditional :ls)
-                  (:vop-var vop)
-                  (:policy :fast-safe)
-                  (:generator 5
-                    (let ((lo (fixnumize (+ lo ,@(and excl-low
-                                                      `(1)))))
-                          (hi (fixnumize (+ hi ,@(and excl-high
-                                                      `(-1)))))
-                          (lowest-bignum-address #+darwin (expt 2 32)
-                                                 #-darwin +backend-page-bytes+))
-
-                      (cond ((> lo hi)
-                             (inst cmp null-tn 0))
-                            ((= lo 0)
-                             (cond ((and (/= hi 0)
-                                         (power-of-two-p (+ hi (fixnumize 1))))
-                                    (change-vop-flags vop '(:eq))
-                                    (inst tst x (lognot hi)))
-                                   ((< hi lowest-bignum-address)
-                                    (inst cmp x (add-sub-immediate hi)))
-                                   (t
-                                    (inst tst x fixnum-tag-mask)
-                                    (inst ccmp x (ccmp-immediate hi) :eq #b10))))
-                            ((= hi ,(fixnumize -1))
-                             (change-vop-flags vop '(:hs))
-                             (inst tst x fixnum-tag-mask)
-                             (inst ccmn x (ccmp-immediate (- lo)) :eq))
-                            ((and (< -1 lo lowest-bignum-address)
-                                  (< -1 hi lowest-bignum-address))
-                             (inst sub temp x (add-sub-immediate lo))
-                             (inst cmp temp (add-sub-immediate (- hi lo))))
-                            (t
-                             (if (plusp lo)
-                                 (inst sub temp x (add-sub-immediate lo))
-                                 (inst add temp x (add-sub-immediate (abs lo))))
-                             (inst tst x fixnum-tag-mask)
-                             (inst ccmp temp (ccmp-immediate (- hi lo)) :eq #b10))))))
-
-                (define-vop ()
-                  (:translate ,name)
-                  (:args (lo :scs (any-reg immediate))
-                         (x :scs (any-reg signed-reg unsigned-reg))
-                         (hi :scs (any-reg immediate)))
-                  (:arg-types tagged-num
-                              (:or tagged-num signed-num unsigned-num)
-                              tagged-num)
-                  (:arg-refs lo-ref nil hi-ref)
-                  (:conditional ,(if excl-high :lt :le))
-                  (:vop-var vop)
-                  (:policy :fast-safe)
-                  (:generator 4
-                    (flet ((imm (i &optional (ccmp t))
-                             (let ((i (if (and (tn-p i)
-                                               (sc-is i immediate))
-                                          (tn-value i)
-                                          i)))
-                              (cond ((integerp i)
-                                     (funcall (if ccmp
-                                                  'ccmp-immediate
-                                                  'add-sub-immediate)
-                                              (if (sc-is x any-reg)
-                                                  (fixnumize i)
+                        (define-vop ()
+                          (:translate ,name)
+                          (:args (lo :scs (any-reg immediate))
+                                 (x :scs (any-reg signed-reg unsigned-reg))
+                                 (hi :scs (any-reg immediate)))
+                          (:arg-types tagged-num
+                                      (:or tagged-num signed-num unsigned-num)
+                                      tagged-num)
+                          (:arg-refs lo-ref nil hi-ref)
+                          (:conditional ,(if excl-high :lt :le))
+                          (:vop-var vop)
+                          (:policy :fast-safe)
+                          (:generator 4
+                            (flet ((imm (i &optional (ccmp t))
+                                     (let ((i (if (and (tn-p i)
+                                                       (sc-is i immediate))
+                                                  (tn-value i)
                                                   i)))
-                                    ((sc-is x any-reg)
-                                     i)
-                                    (ccmp
-                                     (inst asr tmp-tn i n-fixnum-tag-bits)
-                                     tmp-tn)
-                                    (t
-                                     (asr i n-fixnum-tag-bits))))))
-                      (cond
-                        ((sc-is x unsigned-reg)
-                         (inst tst x (ash 1 (- n-word-bits 1)))
-                         (inst ccmp x (imm lo) :eq 1)
-                         (inst ccmp x (imm hi) ,(if excl-low
-                                                    :gt
-                                                    :ge)))
-                        ((sc-is hi immediate)
-                         (let ((hi (tn-value hi)))
-                           (change-vop-flags vop '(,(if excl-low
-                                                        :gt
-                                                        :ge)))
-                           (if (typep hi `(integer (,most-negative-fixnum) -1))
-                               (inst cmn x (imm (- hi) nil))
-                               (inst cmp x (imm hi nil)))
-                           (inst ccmp x (imm lo) ,(if excl-high :lt :le) 1)))
-                        ((sc-is lo immediate)
-                         (let ((lo (tn-value lo)))
-                           (cond
-                             ((and (= lo ,(if excl-low
+                                       (cond ((integerp i)
+                                              (funcall (if ccmp
+                                                           'ccmp-immediate
+                                                           'add-sub-immediate)
+                                                       (if (sc-is x any-reg)
+                                                           (fixnumize i)
+                                                           i)))
+                                             ((sc-is x any-reg)
+                                              i)
+                                             (ccmp
+                                              (inst asr tmp-tn i n-fixnum-tag-bits)
+                                              tmp-tn)
+                                             (t
+                                              (asr i n-fixnum-tag-bits))))))
+                              (cond
+                                ((sc-is x unsigned-reg)
+                                 (inst tst x (ash 1 (- n-word-bits 1)))
+                                 (inst ccmp x (imm lo) :eq 1)
+                                 (inst ccmp x (imm hi) ,(if excl-low
+                                                            :gt
+                                                            :ge)))
+                                ((sc-is hi immediate)
+                                 (let ((hi (tn-value hi)))
+                                   (change-vop-flags vop '(,(if excl-low
+                                                                :gt
+                                                                :ge)))
+                                   (if (typep hi `(integer (,most-negative-fixnum) -1))
+                                       (inst cmn x (imm (- hi) nil))
+                                       (inst cmp x (imm hi nil)))
+                                   (inst ccmp x (imm lo) ,(if excl-high :lt :le) 1)))
+                                ((sc-is lo immediate)
+                                 (let ((lo (tn-value lo)))
+                                   (cond
+                                     ((and (= lo ,(if excl-low
+                                                      -1
+                                                      0))
+                                           (csubtypep (tn-ref-type hi-ref)
+                                                      (specifier-type 'unsigned-byte)))
+                                      (change-vop-flags vop '(,(if excl-high :lo :ls)))
+                                      (inst cmp x (imm hi nil)))
+                                     (t
+                                      (if (typep lo `(integer (,most-negative-fixnum) -1))
+                                          (inst cmn x (imm (- lo) nil))
+                                          (inst cmp x (imm lo nil)))
+                                      (inst ccmp x (imm hi) ,(if excl-low :gt :ge))))))
+                                (t
+                                 (inst cmp x (imm lo nil))
+                                 (inst ccmp x (imm hi) ,(if excl-low :gt :ge)))))))))
+
+                  (define-vop (,(symbolicate name '-integer/c))
+                    (:translate ,name)
+                    (:args (x :scs (descriptor-reg)))
+                    (:arg-types (:constant t) ,(if check
+                                                t
+                                                `(:or integer bignum)) (:constant t))
+                    (:info lo hi)
+                    (:temporary (:sc signed-reg
+                                 :unused-if
+                                 (cond ((or (= lo ,(if excl-low
+                                                       -1
+                                                       0))
+                                            (= hi
+                                               ,(if excl-high
+                                                    0
+                                                    -1))))))
+                                temp)
+                    (:conditional :ls)
+                    (:vop-var vop)
+                    (:policy :fast-safe)
+                    (:generator 5
+                      (let ((lo (fixnumize (+ lo ,@(and excl-low
+                                                        `(1)))))
+                            (hi (fixnumize (+ hi ,@(and excl-high
+                                                        `(-1)))))
+                            (lowest-bignum-address (cond
+                                                     ,(if check
+                                                          `(t 0)
+                                                          `(t
+                                                            #+darwin (expt 2 32)
+                                                            #-darwin +backend-page-bytes+)))))
+
+                        (cond ((> lo hi)
+                               (inst cmp null-tn 0))
+                              ((= lo 0)
+                               (cond ((and (/= hi 0)
+                                           (power-of-two-p (+ hi (fixnumize 1))))
+                                      (change-vop-flags vop '(:eq))
+                                      (inst tst x (lognot hi)))
+                                     ((< hi lowest-bignum-address)
+                                      (inst cmp x (add-sub-immediate hi)))
+                                     (t
+                                      (inst tst x fixnum-tag-mask)
+                                      (inst ccmp x (ccmp-immediate hi) :eq #b10))))
+                              ((= hi ,(fixnumize -1))
+                               (change-vop-flags vop '(:hs))
+                               (inst tst x fixnum-tag-mask)
+                               (inst ccmn x (ccmp-immediate (- lo)) :eq))
+                              ((and (< -1 lo lowest-bignum-address)
+                                    (< -1 hi lowest-bignum-address))
+                               (inst sub temp x (add-sub-immediate lo))
+                               (inst cmp temp (add-sub-immediate (- hi lo))))
+                              (t
+                               (if (plusp lo)
+                                   (inst sub temp x (add-sub-immediate lo))
+                                   (inst add temp x (add-sub-immediate (abs lo))))
+                               (inst tst x fixnum-tag-mask)
+                               (inst ccmp temp (ccmp-immediate (- hi lo)) :eq #b10))))))
+
+                  (define-vop (,(symbolicate name '-integer))
+                    (:translate ,name)
+                    (:args (lo :scs (any-reg immediate))
+                           (x :scs (descriptor-reg))
+                           (hi :scs (any-reg immediate)))
+                    (:arg-types tagged-num ,(if check
+                                                t
+                                                `(:or integer bignum)) tagged-num)
+                    (:arg-refs lo-ref nil hi-ref)
+                    (:conditional ,(if excl-high
+                                       :lt
+                                       :le))
+                    (:vop-var vop)
+                    (:policy :fast-safe)
+                    (:generator 6
+                      (labels ((imm (x)
+                                 (if (sc-is x immediate)
+                                     (fixnumize (tn-value x))
+                                     x))
+                               (ccmp (c cond &optional (flags 0))
+                                 (if (typep c `(integer (,most-negative-fixnum) -1))
+                                     (inst ccmn x (ccmp-immediate (- c)) cond flags)
+                                     (inst ccmp x (ccmp-immediate c) cond flags))))
+                        (inst tst x fixnum-tag-mask)
+                        (cond ((and (sc-is lo immediate)
+                                    (csubtypep (tn-ref-type hi-ref)
+                                               (specifier-type 'unsigned-byte))
+                                    (eql (tn-value lo)
+                                         ,(if excl-low
                                               -1
-                                              0))
-                                   (csubtypep (tn-ref-type hi-ref)
-                                              (specifier-type 'unsigned-byte)))
-                              (change-vop-flags vop '(,(if excl-high :lo :ls)))
-                              (inst cmp x (imm hi nil)))
-                             (t
-                              (if (typep lo `(integer (,most-negative-fixnum) -1))
-                                  (inst cmn x (imm (- lo) nil))
-                                  (inst cmp x (imm lo nil)))
-                              (inst ccmp x (imm hi) ,(if excl-low :gt :ge))))))
-                        (t
-                         (inst cmp x (imm lo nil))
-                         (inst ccmp x (imm hi) ,(if excl-low :gt :ge)))))))
-                (define-vop (,(symbolicate name '-integer))
-                  (:translate ,name)
-                  (:args (lo :scs (any-reg immediate))
-                         (x :scs (descriptor-reg))
-                         (hi :scs (any-reg immediate)))
-                  (:arg-types tagged-num (:or integer bignum) tagged-num)
-                  (:arg-refs lo-ref nil hi-ref)
-                  (:conditional ,(if excl-high
-                                     :lt
-                                     :le))
-                  (:vop-var vop)
-                  (:policy :fast-safe)
-                  (:generator 6
-                    (labels ((imm (x)
-                               (if (sc-is x immediate)
-                                   (fixnumize (tn-value x))
-                                   x))
-                             (ccmp (c cond &optional (flags 0))
-                               (if (typep c `(integer (,most-negative-fixnum) -1))
-                                   (inst ccmn x (ccmp-immediate (- c)) cond flags)
-                                   (inst ccmp x (ccmp-immediate c) cond flags))))
-                      (inst tst x fixnum-tag-mask)
-                      (cond ((and (sc-is lo immediate)
-                                  (csubtypep (tn-ref-type hi-ref)
-                                             (specifier-type 'unsigned-byte))
-                                  (eql (tn-value lo)
-                                       ,(if excl-low
-                                            -1
-                                            0)))
-                             (change-vop-flags vop '(,(if excl-high :lo :ls)))
-                             (ccmp (imm hi) :eq #b10))
-                            (t
-                             (ccmp (imm lo) :eq 1)
-                             (ccmp (imm hi) ,(if excl-low
-                                                 :gt
-                                                 :ge))))))))))
+                                              0)))
+                               (change-vop-flags vop '(,(if excl-high :lo :ls)))
+                               (ccmp (imm hi) :eq #b10))
+                              (t
+                               (ccmp (imm lo) :eq 1)
+                               (ccmp (imm hi) ,(if excl-low
+                                                   :gt
+                                                   :ge))))))))))
 
   (def range< t t)
   (def range<= nil nil)
   (def range<<= t nil)
-  (def range<=< nil t))
+  (def range<=< nil t)
+
+  (def check-range< t t t)
+  (def check-range<= nil nil t)
+  (def check-range<<= t nil t)
+  (def check-range<=< nil t t))
+
 
 (define-vop (signed-multiply-low-high)
   (:policy :fast-safe)

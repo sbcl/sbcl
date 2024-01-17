@@ -6425,6 +6425,33 @@
           (t
            (give-up-ir1-transform)))))
 
+(defun prev-node (node &key type (cast t))
+  (let (ctran)
+    (tagbody
+     :next
+       (setf ctran (node-prev node))
+       (setf node (ctran-use ctran))
+     :next-node
+       (typecase node
+         (ref
+          (unless (eq type :non-ref)
+            (return-from prev-node node)))
+         (cast
+          (unless cast
+            (return-from prev-node node)))
+         (enclose)
+         (null
+          (let ((pred (block-pred (ctran-block ctran))))
+            (when (cdr pred)
+              (return-from prev-node))
+            (setf node (block-last (car pred)))
+            (go :next-node)))
+         (t
+          (return-from prev-node
+            (unless (eq type :ref)
+              node))))
+       (go :next))))
+
 (defun next-node (node-or-block &key type (cast t) single-predecessor)
   (let ((node node-or-block)
         ctran)
@@ -6599,6 +6626,21 @@
                                                                    (>= '(and (<= l (truly-the fixnum x)) (< (truly-the fixnum x) h)))
                                                                    (> '(< l (truly-the fixnum x) h))))))))))
                                           (when form
+                                            (when-vop-existsp (:translate check-range<)
+                                              (let ((prev (prev-node node :type :non-ref)))
+                                                (when (and (if-p prev)
+                                                           (eq (if-alternative prev) alternative))
+                                                  (multiple-value-bind (type lvar) (if-type-check prev)
+                                                    (when (and type
+                                                               (csubtypep type (specifier-type 'integer)))
+                                                      (setf a lvar)
+                                                      (kill-if-branch-1 prev (if-test prev)
+                                                                        (node-block prev)
+                                                                        alternative)
+                                                      (setf form (cons (package-symbolicate "SB-KERNEL" "CHECK-" (car form))
+                                                                       (cdr form))))))))
+
+
                                             (kill-if-branch-1 if (if-test if)
                                                               (node-block if)
                                                               alternative)
@@ -6644,3 +6686,5 @@
 
 (defoptimizer (<= optimizer) ((a b) node)
   (range-transform '<= a b node))
+
+

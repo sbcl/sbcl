@@ -403,8 +403,8 @@
               ;; in %SOURCE-TRANSFORM-TYPEP, but even if it wasn't,
               ;; the OR will drop out due to constraint propagation.
               `(or (eq ,object ,low) (eq ,object ,high)))
-             #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
-             ((and (eql (numeric-type-class type) 'integer)
+             ((and (vop-existsp :translate 'fixnum-mod-p)
+                   (eql (numeric-type-class type) 'integer)
                    (or (eql low 0)
                        (and (eql low 1)
                             (not (eql high most-positive-fixnum))))

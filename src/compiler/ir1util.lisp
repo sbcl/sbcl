@@ -2961,6 +2961,13 @@ is :ANY, the function name is not checked."
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
 
+(defun if-type-check (if)
+  (let ((test (lvar-uses (if-test if))))
+    (when (combination-p test)
+      (let ((name (combination-fun-source-name test nil)))
+        (values (gethash name *backend-predicate-types*)
+                (car (combination-args test)))))))
+
 
 (defun proper-or-circular-list-p (x)
   (if (consp x)

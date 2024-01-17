@@ -110,6 +110,10 @@
                (eq (sb-c::ref-leaf ref)
                    (sb-c::ref-leaf ref2))))))))
 
+(defun power-of-two-limit-p (x)
+  (and (fixnump x)
+       (= (logcount (1+ x)) 1)))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
