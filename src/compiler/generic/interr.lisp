@@ -245,7 +245,8 @@
   condition
   sb-pcl::fast-method-call
   ((or symbol string) object-not-or-symbol-string)
-  ((and unsigned-byte fixnum) object-not-unsigned-fixnum)))
+  ((and unsigned-byte fixnum) object-not-unsigned-fixnum)
+  bit-index))
 
 (defun error-number-or-lose (name)
   (or (position name sb-c:+backend-internal-errors+
