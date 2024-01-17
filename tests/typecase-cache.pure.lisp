@@ -1,3 +1,6 @@
+(unless (cl:gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-template-names*)
+  (invoke-restart 'run-tests::skip-file))
+
 (defstruct animal)
 (defstruct (goat (:include animal)))
 (defstruct (kid (:include goat)))
