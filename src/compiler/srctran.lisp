@@ -6637,7 +6637,8 @@
                                                       (kill-if-branch-1 prev (if-test prev)
                                                                         (node-block prev)
                                                                         alternative)
-                                                      (setf form (cons (package-symbolicate "SB-KERNEL" "CHECK-" (car form))
+                                                      (setf form (cons (package-symbolicate #.(find-package "SB-KERNEL") "CHECK-"
+                                                                                            (car form))
                                                                        (cdr form))))))))
 
 
