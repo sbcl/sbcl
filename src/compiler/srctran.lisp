@@ -6637,9 +6637,10 @@
                                                       (kill-if-branch-1 prev (if-test prev)
                                                                         (node-block prev)
                                                                         alternative)
-                                                      (setf form (cons (package-symbolicate #.(find-package "SB-KERNEL") "CHECK-"
-                                                                                            (car form))
-                                                                       (cdr form))))))))
+                                                      (unless (csubtypep (lvar-type a) (specifier-type 'integer))
+                                                        (setf form (cons (package-symbolicate #.(find-package "SB-KERNEL") "CHECK-"
+                                                                                              (car form))
+                                                                         (cdr form)))))))))
 
 
                                             (kill-if-branch-1 if (if-test if)
