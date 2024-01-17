@@ -1013,7 +1013,8 @@
                     (setq not-type (type-union not-type other)))))
             (eql
              (let ((other-type (leaf-type other)))
-               (cond ((not not-p)
+               (cond ((not (type-for-constraints-p other-type)))
+                     ((not not-p)
                       (intersect-result other-type))
                      ((constant-p other)
                       (cond ((member-type-p other-type)
