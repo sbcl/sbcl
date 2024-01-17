@@ -3795,16 +3795,22 @@
                                             (t
                                              (inst mov temp2 x)
                                              temp2))))
-                               (generate-fixnum-test x)
-                               (inst jmp :ne (if not-p target skip))
                                (cond
                                  ((= lo 0)
-                                  (inst cmp x (imm hi))
-                                  (inst jmp (if not-p :a :be) target))
+                                  (cond ((power-of-two-p (+ hi (fixnumize 1)))
+                                         (inst test x (imm (lognot hi)))
+                                         (inst jmp (if not-p :ne :e) target))
+                                        (t
+                                         (inst cmp x (imm hi))
+                                         (inst jmp (if not-p :a :be) target))))
                                  ((= hi ,(fixnumize -1))
+                                  (generate-fixnum-test x)
+                                  (inst jmp :ne (if not-p target skip))
                                   (inst cmp x (imm lo))
                                   (inst jmp (if not-p :b :ae) target))
                                  (t
+                                  (generate-fixnum-test x)
+                                  (inst jmp :ne (if not-p target skip))
                                   (if (location= temp x)
                                       (if (plusp lo)
                                           (inst sub temp (imm lo))
