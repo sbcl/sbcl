@@ -73,8 +73,7 @@
 
 ;;; an index into an integer
 (sb-xc:deftype bit-index ()
-  `(integer 0 ,(* (1- (ash 1 (- sb-vm:n-word-bits sb-vm:n-widetag-bits)))
-                  sb-vm:n-word-bits)))
+  `(integer 0 ,(- (* (1+ maximum-bignum-length) sb-vm:n-word-bits) 1)))
 
 
 ;;;; hooks into the type system
