@@ -87,6 +87,7 @@ Standard definitions and types, Bob Jenkins
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
 
 typedef  uint32_t  ub4;   /* unsigned 4-byte quantities */
 #define UB4BITS 32
@@ -720,6 +721,47 @@ int findhash(
   return 1; // success
 }
 
+struct mem_stream {
+    int size;
+    char* buffer;
+    int position;
+};
+
+struct mem_stream* make_mem_stream() {
+    int size = 1024;
+    struct mem_stream* stream = malloc(sizeof(struct mem_stream));
+    stream->size = size;
+    stream->position = 0;
+    stream->buffer = malloc(size);
+    return stream;
+}
+
+void grow_mem_stream (struct mem_stream * stream) {
+    if (stream->position >= stream->size) {
+        int new_size = stream->size * 2;
+        stream->buffer = realloc(stream->buffer, new_size);
+        stream->size = new_size;
+    }
+}
+
+int mem_stream_printf(struct mem_stream * stream, char *fmt, ...) {
+    va_list args;
+
+    int written;
+    int position = stream->position;
+    int length;
+    do {
+        grow_mem_stream(stream);
+        length = stream->size - position;
+        va_start(args, fmt);
+        written = vsnprintf(stream->buffer + position, length, fmt, args);
+        va_end(args);
+        stream->position = position + written;
+    } while (written >= length);
+
+    return written;
+}
+
 /*
 ------------------------------------------------------------------------------
 Input/output type routines
@@ -782,73 +824,73 @@ static void make_c(
     ub4      *scramble,                                /* used in final hash */
     gencode  *final,                              /* code for the final hash */
     hashform *form,                                       /* user directives */
-    FILE     *output)
+    struct mem_stream *output)
 {
   ub4   i;
-  FILE *f = output;
+  struct mem_stream *f = output;
   int infix = form->infix;
   if (infix) {
-    fprintf(f, "/* table for the mapping for the perfect hash */\n");
-    fprintf(f, "#include <stdint.h>\n\
+    mem_stream_printf(f, "/* table for the mapping for the perfect hash */\n");
+    mem_stream_printf(f, "#include <stdint.h>\n\
 typedef uint32_t ub4;\n\
 typedef uint16_t ub2;\n\
 typedef uint8_t  ub1;\n");
-    fprintf(f, "/* The hash function */\n");
-    fprintf(f, "ub4 phash(ub4 val) {\n");
+    mem_stream_printf(f, "/* The hash function */\n");
+    mem_stream_printf(f, "ub4 phash(ub4 val) {\n");
   } else {
-    putc('(', f);
+      mem_stream_printf(f, "(");
   }
   int extra_parens = 0;
   char *et = 0; // lisp array element-type
   if (blen >= USE_SCRAMBLE)
   {
-    fprintf(f, infix ? "/* A way to make the 1-byte values in tab bigger */\n"
+    mem_stream_printf(f, infix ? "/* A way to make the 1-byte values in tab bigger */\n"
             : "(let ((scramble #.(coerce '(\n");
 
     if (smax > UB2MAXVAL+1)
     {
       et = "(unsigned-byte 32)";
-      if (infix) fprintf(f, "ub4 scramble[] = {\n");
+      if (infix) mem_stream_printf(f, "ub4 scramble[] = {\n");
       for (i=0; i<=UB1MAXVAL; i+=4)
-        fprintf(f,
+        mem_stream_printf(f,
                 infix ? "0x%.8x, 0x%.8x, 0x%.8x, 0x%.8x,\n" : " #x%8x #x%8x #x%8x #x%8x\n",
                 scramble[i+0], scramble[i+1], scramble[i+2], scramble[i+3]);
     }
     else
     {
       et = "(unsigned-byte 16)";
-      if (infix) fprintf(f, "ub2 scramble[] = {\n");
+      if (infix) mem_stream_printf(f, "ub2 scramble[] = {\n");
       for (i=0; i<=UB1MAXVAL; i+=8)
-        fprintf(f,
+        mem_stream_printf(f,
                 infix ? "0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x,\n"
                 : " #x%x #x%x #x%x #x%x #x%x #x%x #x%x #x%x\n",
                 scramble[i+0], scramble[i+1], scramble[i+2], scramble[i+3],
                 scramble[i+4], scramble[i+5], scramble[i+6], scramble[i+7]);
     }
-    fprintf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
+    mem_stream_printf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
     ++extra_parens;
   }
   if (blen > 0)
   {
-    fprintf(f, infix ? "/* small adjustments to _a_ to make values distinct */\n"
+    mem_stream_printf(f, infix ? "/* small adjustments to _a_ to make values distinct */\n"
             : "(let ((tab #.(coerce '(\n");
 
     if (smax <= UB1MAXVAL+1 || blen >= USE_SCRAMBLE) {
       et = "(unsigned-byte 8)";
-      if (infix) fprintf(f, "ub1 tab[] = {\n");
+      if (infix) mem_stream_printf(f, "ub1 tab[] = {\n");
     } else {
       et = "(unsigned-byte 16)";
-      if (infix) fprintf(f, "ub2 tab[] = {\n");
+      if (infix) mem_stream_printf(f, "ub2 tab[] = {\n");
     }
 
     if (blen < 16)
     {
-      for (i=0; i<blen; ++i) fprintf(f, infix?"%3d,":" %d", scramble[tab[i].val_b]);
+      for (i=0; i<blen; ++i) mem_stream_printf(f, infix?"%3d,":" %d", scramble[tab[i].val_b]);
     }
     else if (blen <= 1024)
     {
       for (i=0; i<blen; i+=16)
-        fprintf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
+        mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
                         : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
                 scramble[tab[i+0].val_b], scramble[tab[i+1].val_b],
                 scramble[tab[i+2].val_b], scramble[tab[i+3].val_b],
@@ -862,7 +904,7 @@ typedef uint8_t  ub1;\n");
     else if (blen < USE_SCRAMBLE)
     {
       for (i=0; i<blen; i+=8)
-        fprintf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,\n" : " %d %d %d %d %d %d %d %d\n",
+        mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,\n" : " %d %d %d %d %d %d %d %d\n",
                 scramble[tab[i+0].val_b], scramble[tab[i+1].val_b],
                 scramble[tab[i+2].val_b], scramble[tab[i+3].val_b],
                 scramble[tab[i+4].val_b], scramble[tab[i+5].val_b],
@@ -871,7 +913,7 @@ typedef uint8_t  ub1;\n");
     else
     {
       for (i=0; i<blen; i+=16)
-        fprintf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
+        mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
                         : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
                 tab[i+0].val_b, tab[i+1].val_b,
                 tab[i+2].val_b, tab[i+3].val_b,
@@ -882,28 +924,29 @@ typedef uint8_t  ub1;\n");
                 tab[i+12].val_b, tab[i+13].val_b,
                 tab[i+14].val_b, tab[i+15].val_b);
     }
-    fprintf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
+    mem_stream_printf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
     ++extra_parens;
   }
   int indent = 0, newline = 0;
   for (i=0; i<final->used; ++i) {
     if (!final->line[i][0]) continue; // empty line
-    if (newline) putc('\n', f);
+    if (newline) mem_stream_printf(f,"\n");
     newline = 0;
-    int j; for(j=0;j<indent;++j) putc(' ', f);
-    fputs("  ", f);
-    fprintf(f, "%s", final->line[i]);
+    int j; for(j=0;j<indent;++j) mem_stream_printf(f," ");
+    mem_stream_printf(f, "  ");
+
+    mem_stream_printf(f, "%s", final->line[i]);
     // Delay the newline in lisp mode so we prettily
     // close all the parens on the last line.
-    if (infix) fprintf(f, ";\n"); else newline = 1;
+    if (infix) mem_stream_printf(f, ";\n"); else newline = 1;
     if (!strncmp(final->line[i],"(let",4)) ++indent;
   }
   if (infix) {
-    fprintf(f, "  return rsl;\n}\n");
+    mem_stream_printf(f, "  return rsl;\n}\n");
   } else {
     indent += 1 + extra_parens;
-    while (indent--) putc(')', f);
-    putc('\n', f);
+    while (indent--) mem_stream_printf(f,")");
+    mem_stream_printf(f,"\n");
   }
 }
 
@@ -916,7 +959,7 @@ static void driver(
         hashform *form,                                   /* user directives */
         key* keys,
         int nkeys,
-        FILE* scratchfile)
+        struct mem_stream* scratchfile)
 {
   bstuff   *tab;                                       /* table indexed by b */
   ub4       smax;            /* scramble[] values in 0..smax-1, a power of 2 */
@@ -964,18 +1007,11 @@ char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys)
     keylist = this;
   }
   hashform form = { .hashtype = INT_HT, .perfect = MINIMAL_HP, .speed = SLOW_HS, .infix = 0 };
-  FILE * scratchfile = tmpfile();
+  struct mem_stream * scratchfile = make_mem_stream();
   driver(&form, keylist, nkeys, scratchfile);
-  fflush(scratchfile);
-  int filelen = ftell(scratchfile);
-  rewind(scratchfile);
-  char* result = malloc(filelen + 1); // return a null-terminated string
-  result[filelen] = 0;
-  if (fread(result, filelen, 1, scratchfile) != 1) {
-    free(result);
-    result = 0;
-  }
-  fclose(scratchfile);
+
+  char* result = realloc(scratchfile->buffer, scratchfile->position + 1);
+  free(scratchfile);
   return result;
 }
 
