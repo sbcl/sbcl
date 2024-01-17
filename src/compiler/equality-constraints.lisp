@@ -343,14 +343,27 @@
               (incf i)
               (do-equality-constraints (in-con in-op not-p amount) var out
                 (let ((existing (gethash (list in-con in-op not-p) constraints)))
-                  (when (= (if existing
-                               (car existing)
-                               -1)
-                           (1- i))
-                    (setf (gethash (list in-con in-op not-p) constraints)
-                          (cons i (if existing
-                                      (min amount (cdr existing))
-                                      amount)))))))))
+                  (cond ((= (if existing
+                                (car existing)
+                                -1)
+                            (1- i))
+                         (setf (gethash (list in-con in-op not-p) constraints)
+                               (list i
+                                     (if existing
+                                         (min amount (second existing))
+                                         amount)
+                                     (second existing))))
+                        ((and existing
+                              (= (car existing) i))
+                         ;; Maximize the current block value while
+                         ;; not exceeding the overall minimal amount.
+                         (let ((overall-min (third existing)))
+                           (setf (gethash (list in-con in-op not-p) constraints)
+                                 (list i
+                                       (if overall-min
+                                           (min (max amount (second existing)) overall-min)
+                                           (max amount (second existing)))
+                                       overall-min))))))))))
     (dohash ((key value) constraints)
       (when (= (car value) i)
         (destructuring-bind (y op not-p) key
@@ -359,7 +372,7 @@
                                                var
                                                y
                                                not-p
-                                               (cdr value))
+                                               (second value))
            in))))))
 
 (defun try-equality-constraint (call gen)

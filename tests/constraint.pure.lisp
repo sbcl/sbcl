@@ -1109,3 +1109,13 @@
                       (rem lv2 128)))
                1))))
    (eql 1)))
+
+(with-test (:name :multiple-equality-constraints)
+  (checked-compile
+   `(lambda (v)
+      (declare (simple-vector v))
+      (let* ((i (1- (length v))))
+        (declare (fixnum i))
+        (loop
+         (decf i)
+         (print (aref v i)))))))
