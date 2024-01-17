@@ -2760,7 +2760,9 @@
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
                                                       `(1)))))
                           (hi (fixnumize (+ hi ,@(and excl-high
-                                                      `(-1))))))
+                                                      `(-1)))))
+                          (lowest-bignum-address #+darwin (expt 2 32)
+                                                 #-darwin +backend-page-bytes+))
 
                       (cond ((> lo hi)
                              (inst cmp null-tn 0))
@@ -2769,6 +2771,8 @@
                                          (power-of-two-p (+ hi (fixnumize 1))))
                                     (change-vop-flags vop '(:eq))
                                     (inst tst x (lognot hi)))
+                                   ((< hi lowest-bignum-address)
+                                    (inst cmp x (add-sub-immediate hi)))
                                    (t
                                     (inst tst x fixnum-tag-mask)
                                     (inst ccmp x (ccmp-immediate hi) :eq #b10))))
@@ -2776,6 +2780,10 @@
                              (change-vop-flags vop '(:hs))
                              (inst tst x fixnum-tag-mask)
                              (inst ccmn x (ccmp-immediate (- lo)) :eq))
+                            ((and (< -1 lo lowest-bignum-address)
+                                  (< -1 hi lowest-bignum-address))
+                             (inst sub temp x (add-sub-immediate lo))
+                             (inst cmp temp (add-sub-immediate (- hi lo))))
                             (t
                              (if (plusp lo)
                                  (inst sub temp x (add-sub-immediate lo))

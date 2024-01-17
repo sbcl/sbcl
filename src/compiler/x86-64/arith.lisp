@@ -3785,7 +3785,8 @@
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
                                             '(1)))))
                           (hi (fixnumize (+ hi ,@(and excl-high
-                                            '(-1))))))
+                                            '(-1)))))
+                          (lowest-bignum-address +backend-page-bytes+))
                       (flet ((imm (x)
                                (cond ((plausible-signed-imm32-operand-p x)
                                       x)
@@ -3799,8 +3800,10 @@
                                (inst test x (imm (lognot hi)))
                                (inst jmp (if not-p :ne :e) target))
                               (t
-                               (generate-fixnum-test x)
-                               (inst jmp :ne (if not-p target skip))
+                               (unless (and (< -1 lo lowest-bignum-address)
+                                            (< -1 hi lowest-bignum-address))
+                                 (generate-fixnum-test x)
+                                 (inst jmp :ne (if not-p target skip)))
                                (cond
                                  ((= lo 0)
                                   (inst cmp x (imm hi))
