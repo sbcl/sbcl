@@ -13,8 +13,12 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun read-from-file (namestring &key (enforce-single-expr t) build-dependent)
-    (declare (ignore build-dependent))
-    (with-open-file (s namestring)
+    (declare (notinline concatenate) (ignore build-dependent))
+    (with-open-file
+        (s (concatenate 'string (if (boundp 'cl-user::*generated-sources-root*)
+                                    (symbol-value 'cl-user::*generated-sources-root*)
+                                    "")
+                        namestring))
       (let* ((result (read s))
              (eof-result (cons nil nil)))
         (unless enforce-single-expr

@@ -51,7 +51,7 @@ mv build-id.inc output
 
 # make-host-1 and copy the generated C headers to the target machine
 sh make-host-1.sh
-tar cf - src/runtime/genesis | ssh $ssh_port_opt $host cd $root \; tar xf -
+tar cf - src/runtime/genesis output/ucd | ssh $ssh_port_opt $host cd $root \; tar xf -
 
 # make-target-1 and copy back the artifacts
 ssh $ssh_port_opt $host cd $root \; $ENV sh make-target-1.sh
