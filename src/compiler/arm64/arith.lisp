@@ -2809,6 +2809,7 @@
                   (define-vop (,(symbolicate name '-integer/c))
                     (:translate ,name)
                     (:args (x :scs (descriptor-reg)))
+                    (:arg-refs x-ref)
                     (:arg-types (:constant t) ,(if check
                                                 t
                                                 `(:or integer bignum)) (:constant t))
@@ -2832,11 +2833,17 @@
                             (hi (fixnumize (+ hi ,@(and excl-high
                                                         `(-1)))))
                             (lowest-bignum-address (cond
-                                                     ,(if check
-                                                          `(t 0)
-                                                          `(t
-                                                            #+darwin (expt 2 32)
-                                                            #-darwin +backend-page-bytes+)))))
+                                                     ,@(and check
+                                                            #.(progn (assert
+                                                                      (< single-float-widetag character-widetag))
+                                                                     t)
+                                                            `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
+                                                               single-float-widetag)
+                                                              ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
+                                                               character-widetag)))
+                                                     (t
+                                                      #+darwin (expt 2 32)
+                                                      #-darwin +backend-page-bytes+))))
 
                         (cond ((> lo hi)
                                (inst cmp null-tn 0))
