@@ -403,7 +403,7 @@
               ;; in %SOURCE-TRANSFORM-TYPEP, but even if it wasn't,
               ;; the OR will drop out due to constraint propagation.
               `(or (eq ,object ,low) (eq ,object ,high)))
-             ((and (vop-existsp :translate 'fixnum-mod-p)
+             ((and (vop-existsp :translate fixnum-mod-p)
                    (eql (numeric-type-class type) 'integer)
                    (or (eql low 0)
                        (and (eql low 1)
