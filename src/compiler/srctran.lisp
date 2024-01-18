@@ -6527,20 +6527,11 @@
                                                          ((< <=) '(> >=))
                                                          ((> >=) '(< <=))))
                                                  (let ((after-then (next-node then)))
-                                                   (if (if-p after-then)
-                                                       (eq alternative
-                                                           (if reverse-if
-                                                               (if-consequent after-then)
-                                                               (if-alternative after-then)))
-                                                       (unless reverse-if
-                                                         (let ((ref (next-node alternative :type :ref :cast nil)))
-                                                           (and ref
-                                                                (constant-p (ref-leaf ref))
-                                                                (null (constant-value (ref-leaf ref)))
-                                                                (eq (node-lvar ref)
-                                                                    (node-lvar then))
-                                                                (eq (next-node ref)
-                                                                    (next-node then))))))))
+                                                   (and (if-p after-then)
+                                                        (eq alternative
+                                                            (if reverse-if
+                                                                (if-consequent after-then)
+                                                                (if-alternative after-then))))))
                                         (let* ((integerp (csubtypep (lvar-type a) (specifier-type 'integer)))
                                               (form
                                                 (cond ((when (and integerp

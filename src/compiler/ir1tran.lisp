@@ -1081,15 +1081,13 @@
            (type (or lvar null) result)
            (list form)
            (type global-var var))
-  (if (vop-existsp :named sb-vm::move-conditional-result)
-      (ir1-convert-combination-checking-type start next result form var)
-      (let ((info (info :function :info (leaf-source-name var))))
-        (if (and info
-                 (ir1-attributep (fun-info-attributes info) predicate)
-                 (not (if-p (and result (lvar-dest result)))))
-            (let ((*instrument-if-for-code-coverage* nil))
-              (ir1-convert start next result `(if ,form t nil)))
-            (ir1-convert-combination-checking-type start next result form var)))))
+  (let ((info (info :function :info (leaf-source-name var))))
+    (if (and info
+             (ir1-attributep (fun-info-attributes info) predicate)
+             (not (if-p (and result (lvar-dest result)))))
+        (let ((*instrument-if-for-code-coverage* nil))
+          (ir1-convert start next result `(if ,form t nil)))
+        (ir1-convert-combination-checking-type start next result form var))))
 
 ;;; Actually really convert a global function call that we are allowed
 ;;; to early-bind.

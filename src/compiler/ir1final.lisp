@@ -224,6 +224,37 @@
       (setf (ir1-attributep (fun-info-attributes info) callee-omit-arg-count-check)
             t))))
 
+;;; Unwrap predicates to enable tail calls
+(defun unwrap-predicates (combination)
+  (let ((info (combination-fun-info combination)))
+    (when (and info
+               (ir1-attributep (fun-info-attributes info) predicate))
+      (let ((if (node-dest combination)))
+        (when (and (if-p if)
+                   (immediately-used-p (node-lvar combination) combination t))
+          (let* ((con (if-consequent if))
+                 (alt (if-alternative if))
+                 (con-ref (next-node con :type :ref :single-predecessor t))
+                 (alt-ref (next-node alt :type :ref :single-predecessor t)))
+            (when (and con-ref alt-ref)
+              (let ((ref-lvar (node-lvar con-ref))
+                    (block (node-block if))
+                    (next (next-node con-ref)))
+                (when (and (constant-p (ref-leaf con-ref))
+                           (constant-p (ref-leaf alt-ref))
+                           (eq (constant-value (ref-leaf con-ref)) t)
+                           (eq (constant-value (ref-leaf alt-ref)) nil)
+                           (eq ref-lvar
+                               (node-lvar alt-ref))
+                           (eq next
+                               (next-node alt-ref)))
+                  (loop for succ in (block-succ block)
+                        do (unlink-blocks block succ))
+                  (unlink-node if)
+                  (%delete-lvar-use combination)
+                  (use-lvar combination ref-lvar)
+                  (link-blocks block (node-block next)))))))))))
+
 ;;; Convert function designators to functions in calls to known functions
 ;;; Also convert to TWO-ARG- variants
 (defun ir1-optimize-functional-arguments (component)
@@ -233,6 +264,8 @@
                  (eq (combination-kind node) :known)
                  ;; REDUCE can call with zero arguments.
                  (neq (lvar-fun-name (combination-fun node) t) 'reduce))
+        (when-vop-existsp (:named  sb-vm::move-conditional-result)
+          (unwrap-predicates node))
         (map-callable-arguments
          (lambda (lvar args results &key no-function-conversion &allow-other-keys)
            (declare (ignore results))
