@@ -3715,66 +3715,71 @@
 
 (in-package :sb-vm)
 
-(macrolet ((def (name excl-low excl-high)
+(macrolet ((def (name excl-low excl-high &optional check)
              `(progn
-                (define-vop (,(symbolicate name '/c))
-                  (:translate ,name)
-                  (:args (x :scs (any-reg signed-reg unsigned-reg) :target temp))
-                  (:arg-types (:constant t)
-                              (:or tagged-num signed-num unsigned-num)
-                              (:constant t))
-                  (:info lo hi)
-                  (:temporary (:sc signed-reg :from (:argument 0)) temp)
-                  (:temporary (:sc signed-reg) temp2)
-                  (:conditional :be)
-                  (:vop-var vop)
-                  (:policy :fast-safe)
-                  (:generator 2
-                    (let ((lo (+ lo ,@(and excl-low
-                                           '(1))))
-                          (hi (+ hi ,@(and excl-high
-                                           '(-1)))))
-                      (flet ((imm (x)
-                               (cond ((plausible-signed-imm32-operand-p x)
-                                      x)
-                                     (t
-                                      (inst mov temp2 x)
-                                      temp2))))
-                        (multiple-value-bind (flo fhi)
-                            (if (sc-is x any-reg)
-                                (values (fixnumize lo) (fixnumize hi))
-                                (values lo hi))
+                ,(unless check
+                   `(define-vop (,(symbolicate name '/c))
+                      (:translate ,name)
+                      (:args (x :scs (any-reg signed-reg unsigned-reg) :target temp))
+                      (:arg-types (:constant t)
+                                  (:or tagged-num signed-num unsigned-num)
+                                  (:constant t))
+                      (:info lo hi)
+                      (:temporary (:sc signed-reg :from (:argument 0)) temp)
+                      (:temporary (:sc signed-reg) temp2)
+                      (:conditional :be)
+                      (:vop-var vop)
+                      (:policy :fast-safe)
+                      (:generator 2
+                        (let ((lo (+ lo ,@(and excl-low
+                                               '(1))))
+                              (hi (+ hi ,@(and excl-high
+                                               '(-1)))))
+                          (flet ((imm (x)
+                                   (cond ((plausible-signed-imm32-operand-p x)
+                                          x)
+                                         (t
+                                          (inst mov temp2 x)
+                                          temp2))))
+                            (multiple-value-bind (flo fhi)
+                                (if (sc-is x any-reg)
+                                    (values (fixnumize lo) (fixnumize hi))
+                                    (values lo hi))
 
-                          (cond
-                            ((or (< hi lo)
-                                 (and (sc-is x unsigned-reg)
-                                      (< hi 0)))
-                             (inst cmp rsp-tn 0))
-                            ((or (= lo 0)
-                                 (and (sc-is x unsigned-reg)
-                                      (<= flo 0)))
-                             (cond ((and (power-of-two-limit-p hi)
-                                         (not (plausible-signed-imm32-operand-p fhi)))
-                                    (change-vop-flags vop '(:e))
-                                    (move temp x)
-                                    (inst shr temp (integer-length fhi)))
-                                   (t
-                                    (inst cmp x (imm fhi)))))
-                            ((= hi -1)
-                             (change-vop-flags vop '(:ae))
-                             (inst cmp x (imm flo)))
-                            (t
-                             (if (location= temp x)
-                                 (if (plusp flo)
-                                     (inst sub temp (imm flo))
-                                     (inst add temp (imm (- flo))))
-                                 (inst lea temp (ea (imm (- flo)) x)))
-                             (inst cmp temp (imm (- fhi flo))))))))))
+                              (cond
+                                ((or (< hi lo)
+                                     (and (sc-is x unsigned-reg)
+                                          (< hi 0)))
+                                 (inst cmp rsp-tn 0))
+                                ((or (= lo 0)
+                                     (and (sc-is x unsigned-reg)
+                                          (<= flo 0)))
+                                 (cond ((and (power-of-two-limit-p hi)
+                                             (not (plausible-signed-imm32-operand-p fhi)))
+                                        (change-vop-flags vop '(:e))
+                                        (move temp x)
+                                        (inst shr temp (integer-length fhi)))
+                                       (t
+                                        (inst cmp x (imm fhi)))))
+                                ((= hi -1)
+                                 (change-vop-flags vop '(:ae))
+                                 (inst cmp x (imm flo)))
+                                (t
+                                 (if (location= temp x)
+                                     (if (plusp flo)
+                                         (inst sub temp (imm flo))
+                                         (inst add temp (imm (- flo))))
+                                     (inst lea temp (ea (imm (- flo)) x)))
+                                 (inst cmp temp (imm (- fhi flo)))))))))))
 
                 (define-vop (,(symbolicate name '-integer/c))
                   (:translate ,name)
                   (:args (x :scs (descriptor-reg) :target temp))
-                  (:arg-types (:constant t) (:or integer bignum) (:constant t))
+                  (:arg-refs x-ref)
+                  (:arg-types (:constant t) ,(if check
+                                                 t
+                                                 `(:or integer bignum))
+                              (:constant t))
                   (:info target not-p lo hi)
                   (:temporary (:sc signed-reg :from (:argument 0)) temp)
                   (:temporary (:sc signed-reg) temp2)
@@ -3783,10 +3788,20 @@
                   (:policy :fast-safe)
                   (:generator 5
                     (let ((lo (fixnumize (+ lo ,@(and excl-low
-                                            '(1)))))
+                                                      '(1)))))
                           (hi (fixnumize (+ hi ,@(and excl-high
-                                            '(-1)))))
-                          (lowest-bignum-address +backend-page-bytes+))
+                                                      '(-1)))))
+                          (lowest-bignum-address (cond
+                                                   ,@(and check
+                                                          #.(progn (assert
+                                                                    (< single-float-widetag character-widetag))
+                                                                   t)
+                                                          `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
+                                                             single-float-widetag)
+                                                            ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
+                                                             character-widetag)))
+                                                   (t
+                                                    +backend-page-bytes+))))
                       (flet ((imm (x)
                                (cond ((plausible-signed-imm32-operand-p x)
                                       x)
@@ -3824,7 +3839,12 @@
   (def range< t t)
   (def range<= nil nil)
   (def range<<= t nil)
-  (def range<=< nil t))
+  (def range<=< nil t)
+
+  (def check-range< t t t)
+  (def check-range<= nil nil t)
+  (def check-range<<= t nil t)
+  (def check-range<=< nil t t))
 
 (define-vop (dpb-c/fixnum)
   (:translate %dpb)
