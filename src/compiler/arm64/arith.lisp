@@ -2849,7 +2849,7 @@
                                (inst cmp null-tn 0))
                               ((= lo 0)
                                (cond ((and (/= hi 0)
-                                           (power-of-two-p (+ hi (fixnumize 1))))
+                                           (= (logcount (+ hi (fixnumize 1))) 1))
                                       (change-vop-flags vop '(:eq))
                                       (inst tst x (lognot hi)))
                                      ((< hi lowest-bignum-address)

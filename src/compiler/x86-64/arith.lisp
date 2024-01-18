@@ -3754,7 +3754,7 @@
                                 ((or (= lo 0)
                                      (and (sc-is x unsigned-reg)
                                           (<= flo 0)))
-                                 (cond ((and (power-of-two-limit-p hi)
+                                 (cond ((and (= (logcount hi) 1)
                                              (not (plausible-signed-imm32-operand-p fhi)))
                                         (change-vop-flags vop '(:e))
                                         (move temp x)
@@ -3811,7 +3811,7 @@
                         (cond ((< hi lo)
                                (inst jmp (if not-p target skip)))
                               ((and (= lo 0)
-                                    (power-of-two-p (+ hi (fixnumize 1))))
+                                    (= (logcount (+ hi (fixnumize 1))) 1))
                                (inst test x (imm (lognot hi)))
                                (inst jmp (if not-p :ne :e) target))
                               (t

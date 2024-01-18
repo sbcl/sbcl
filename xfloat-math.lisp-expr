@@ -14472,6 +14472,7 @@
 (> (#.(D #x43CFFFFF #xE0000000) #.(S 0)) T)
 (> (#.(D #x43CFFFFF #xE0000000) #.(S #x5E7FFFFF)) NIL)
 (> (#.(D #x43CFFFFF #xE0000000) #.(D #x-3C300000 0)) T)
+(> (#.(D #x43CFFFFF #xE0000000) #.(D #x43CFFFFF #xE0000000)) NIL)
 (> (#.(D #x43CFFFFF #xFFFFFFFF) 0) T)
 (> (#.(D #x43CFFFFF #xFFFFFFFF) #.(D #x-3C300000 0)) T)
 (> (#.(D #x43CFFFFF #xFFFFFFFF) #.(D #x-3A52329B 0)) T)
