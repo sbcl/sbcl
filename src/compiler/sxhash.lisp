@@ -141,3 +141,47 @@
                              (constant-arg (member nil symbolp)))
                             * :important nil)
   `(symbol-hash* object 'non-null-symbol-p)) ; etc
+
+;;; To use this macro during cross-compilation we will have to emulate
+;;; generate_perfhash_sexpr using a file, similar to xfloat-math.
+(defun make-perfect-hash-lambda (array)
+  (declare (type (simple-array (unsigned-byte 32) (*)) array))
+  (let* ((string
+          #+sb-xc-host (emulate-generate-perfect-hash-sexpr array)
+          #-sb-xc-host
+          (sb-unix::newcharstar-string
+           (sb-sys:with-pinned-objects (array)
+             (alien-funcall (extern-alien
+                             "generate_perfhash_sexpr"
+                             (function (* char) system-area-pointer int))
+                            (sb-sys:vector-sap array) (length array)))))
+         (expr (with-standard-io-syntax
+                 (let ((*package* #.(find-package "SB-C")))
+                   (read-from-string string)))))
+    (labels ((containsp (e op)
+               (if (consp e)
+                   (or (containsp (car e) op) (containsp (cdr e) op))
+                   (eq e op))))
+      `(lambda (arg &aux (val (truly-the (unsigned-byte 32) arg)))
+         (declare (optimize (safety 0) (sb-c:store-source-form 0)))
+         ;; Remove the macros that aren't used, it helps with visual inspection
+         ;; of the result. However, one macro can't call another since CONTAINSP
+         ;; doesn't understand macros.
+         (macrolet ,(remove-if-not
+                     (lambda (m) (containsp expr (car m)))
+                     '((& (a b) `(logand ,a ,b)) ; purposely look more C-like
+                       (^ (a b) `(logxor ,a ,b)) ;  (for debugging)
+                       (u32+ (a b) `(logand (+ ,a ,b) #xFFFFFFFF))
+                       (^= (a b) `(setq ,a (logxor ,a ,b)))
+                       (+= (a b) `(setq ,a (logand (+ ,a ,b) #xFFFFFFFF)))
+                       (<< (n c) `(logand (ash ,n ,c) #xFFFFFFFF))
+                       (>> (n c) `(ash ,n (- ,c)))))
+           ;; We generate _really_ crappy code for 32-bit math on 64-bit machines.
+           ;; I think the steps are sufficiently trivial that a single vop could choose
+           ;; how to translate the arbitrary s-expression
+           ,@expr)))))
+(intern "TAB")
+(intern "SCRAMBLE")
+(defun emulate-generate-perfect-hash-sexpr (array)
+  (cerror "Use a cache instead"
+          "Can't perfectly hash ~S" array))

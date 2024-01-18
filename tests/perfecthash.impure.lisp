@@ -2,7 +2,7 @@
 ;;; The perfect hash generator can process any set of UB32 values.
 ;;; For example:
 #|
-(sb-impl:make-perfect-hash-lambda
+(sb-c:make-perfect-hash-lambda
   (map '(array (unsigned-byte 32) 1) (lambda (x) (ldb (byte 32 0) (sxhash x)))
        '(a b c d e f g h i j k l m n o p)))
  =>
@@ -42,7 +42,7 @@
 (with-test (:name :typo-example-1) ; of which there may be more
   (let* ((keys (make-array 5 :element-type '(unsigned-byte 32)
                            :initial-contents #(3739790036 1578584344 2172243460 496160493 696125627)))
-         (f (compile nil (sb-impl:make-perfect-hash-lambda keys))))
+         (f (compile nil (sb-c:make-perfect-hash-lambda keys))))
     (test-perfect-hashfun f keys)))
 
 ;;; I have no plans to actually use perfect hashing of symbols in packages,
@@ -69,16 +69,17 @@
               symbols)))
     ;; if symbols hash the same, we have a real problem
     (assert (= (length (remove-duplicates hashes)) (length hashes)))
-    (let ((expr (sb-impl:make-perfect-hash-lambda hashes)))
+    (let ((expr (sb-c:make-perfect-hash-lambda hashes)))
       #+nil
       (let ((*package* (find-package "SB-IMPL"))
+            (*print-readably* t)
             (*print-length* 20) ; don't show huge arrays
             (*print-right-margin* 200))
         (pprint expr)
         (terpri))
       (values (compile nil expr) expr))))
 
-(with-test (:name :execrcise-perfect-hash-generator)
+(with-test (:name :exercise-perfect-hash-generator)
   (format t "~&Symbol count:")
   (dolist (p (list-all-packages))
     ;; Get a bunch of symbols, generate a perfect hash function,
@@ -92,6 +93,35 @@
             (test-perfect-hashfun f symbols))))))
   (terpri))
 
+(defun find-tables (expression)
+  (let (tab scramble)
+    (sb-int:named-let recurse ((x expression))
+      (when (consp x)
+        (cond ((eq (car x) 'let)
+               (let* ((bindings (second x))
+                      (binding (first bindings))
+                      (var (first binding)))
+                 (case var
+                   (sb-c::scramble (setq scramble (second binding)))
+                   (sb-c::tab (setq tab (second binding)))))
+               (recurse (cddr x)))
+              (t
+               (recurse (car x))
+               (recurse (cdr x))))))
+    (values scramble tab)))
+
+(defun random-subset (random-state keys n)
+  (let ((result (make-array n :element-type '(unsigned-byte 32)))
+        (picked (make-hash-table)))
+    (dotimes (i n result)
+      (loop
+        (let* ((pick (random (length keys) random-state))
+               (key (aref keys pick)))
+          (unless (gethash key picked)
+            (setf (gethash key picked) t)
+            (setf (aref result i) key)
+            (return)))))))
+
 ;;; To exercise all the cases from 'h8a'..'h8i' and 'hna'..'hnr'
 ;;; we have to use many different set cardinalities.
 ;;; Even then there's no guarantee to hit them all.
@@ -100,17 +130,36 @@
 ;;; could be more stylish than just printf.
 ;;; Unfortunately the algorithm can get really slow on certain
 ;;; sets, and then go fast again when adding _more_ symbols.
-#+nil
+;;; This usually doesn't take more than about 5 seconds on a good machine,
+;;; but it's pretty random how long it takes.
 (with-test (:name :try-various-sizes)
   (let ((hashes (make-hash-table))
-        (symbols))
-    (do-all-symbols (sym)
-      (let ((hash (ldb (byte 32 0) (sb-kernel:symbol-hash sym))))
+        (random-state (make-random-state t))) ; randomly-seeded random-state
+    (dolist (str (sb-vm:list-allocated-objects :all :test #'stringp))
+      (let ((hash (ldb (byte 32 0) (sxhash str))))
         (unless (gethash hash hashes)
-          (setf (gethash hash hashes) t)
-          (push sym symbols)
-          (when (> (hash-table-count hashes) 4)
-            (when (zerop (random 100))
-              (format t "~&~D symbols~%" (hash-table-count hashes))
-              (let ((fun (generate-perfect-hashfun symbols)))
-                (test-perfect-hashfun fun symbols)))))))))
+          (setf (gethash hash hashes) t))))
+    (let ((a (make-array (hash-table-count hashes))))
+      (format t "~&~D unique hashes~%" (length a))
+      (let ((i -1))
+        (sb-int:dohash ((k v) hashes)
+          (declare (ignore v))
+          (setf (aref a (incf i)) k)))
+      (let (trials)
+        ;; Generate random sizes to try.
+        (dotimes (i 100)
+          (let ((n (floor (expt 10 (random 4.5 random-state)))))
+            (when (and (>= n 5) (<= n (/ (length a) 2)))
+              (push n trials))))
+        ;; Try those sizes
+        (dolist (n (sort trials #'<))
+          (let* ((subset (random-subset random-state a n))
+                 (lambda (sb-c:make-perfect-hash-lambda subset)))
+            (multiple-value-bind (scramble tab) (find-tables lambda)
+              (let ((fun (compile nil lambda)))
+                (test-perfect-hashfun fun subset)
+                (let ((*print-pretty* nil))
+                  (format t "~&~5D keys:~@[ tab=~S~]~@[ scramble=~S~]~%"
+                          n
+                          (if tab (type-of tab))
+                          (if scramble (type-of scramble))))))))))))

@@ -67,6 +67,7 @@ gencode *final;
   {
     if ((a&((ub4)1<<i)) != (b&((ub4)1<<i))) break;
   }
+  // FIXME: this can not possibly be right, right? How did Bob find test cases for it?
   /* h2b: 4,6 */
   sprintf(final->line[0], "  ub4 rsl = ((val << %ld) & 1);\n", i);
 }
@@ -951,7 +952,7 @@ static int hexeight(
 	  final->used = 1;
 	  sprintf(final->line[0],
                   infix ? "ub4 rsl = ((val >> %d) + (val >> %d) + (val >> %d)) & 7"
-                        : "(& (+ (>> val %d) (>> val %d) (>> val %d)) & 7)", i, j, k);
+                        : "(& (+ (>> val %d) (>> val %d) (>> val %d)) 7)", i, j, k);
 	  return TRUE;
 	}
       }

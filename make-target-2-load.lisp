@@ -442,11 +442,14 @@ Please check that all strings which were not recognizable to the compiler
       (#.(find-package "SB-ALIEN")
        (or (eq accessibility :external) (eq symbol 'sb-alien::alien-callback-p)))
       (#.(mapcar 'find-package
-                 '("SB-ASSEM" "SB-BROTHERTREE" "SB-C" "SB-DISASSEM" "SB-FORMAT"
+                 '("SB-ASSEM" "SB-BROTHERTREE" "SB-DISASSEM" "SB-FORMAT"
                    "SB-IMPL" "SB-KERNEL" "SB-MOP" "SB-PCL" "SB-PRETTY" "SB-PROFILE"
                    "SB-REGALLOC" "SB-SYS" "SB-UNICODE" "SB-UNIX" "SB-WALKER"))
        ;; Assume all and only external symbols must be retained
-       (eq accessibility :external))
+         (eq accessibility :external))
+      (#.(find-package "SB-C")
+       (or (eq accessibility :external)
+           (member symbol '(sb-c::tab sb-c::scramble))))
       (#.(find-package "SB-LOOP")
        (or (eq accessibility :external)
            ;; Retain some internals to keep CLSQL working.

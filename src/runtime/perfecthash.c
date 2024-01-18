@@ -841,16 +841,14 @@ typedef uint8_t  ub1;\n");
       mem_stream_printf(f, "(");
   }
   int extra_parens = 0;
-  char *et = 0; // lisp array element-type
   if (blen >= USE_SCRAMBLE)
   {
     mem_stream_printf(f, infix ? "/* A way to make the 1-byte values in tab bigger */\n"
-            : "(let ((scramble #.(coerce '(\n");
+                      : "(let ((scramble #a((256) (unsigned-byte ");
 
     if (smax > UB2MAXVAL+1)
     {
-      et = "(unsigned-byte 32)";
-      if (infix) mem_stream_printf(f, "ub4 scramble[] = {\n");
+      mem_stream_printf(f, infix ? "ub4 scramble[] = {\n" : "32)");
       for (i=0; i<=UB1MAXVAL; i+=4)
         mem_stream_printf(f,
                 infix ? "0x%.8x, 0x%.8x, 0x%.8x, 0x%.8x,\n" : " #x%8x #x%8x #x%8x #x%8x\n",
@@ -858,8 +856,7 @@ typedef uint8_t  ub1;\n");
     }
     else
     {
-      et = "(unsigned-byte 16)";
-      if (infix) mem_stream_printf(f, "ub2 scramble[] = {\n");
+      mem_stream_printf(f, infix ? "ub2 scramble[] = {\n" : "16)");
       for (i=0; i<=UB1MAXVAL; i+=8)
         mem_stream_printf(f,
                 infix ? "0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x, 0x%.4x,\n"
@@ -867,20 +864,18 @@ typedef uint8_t  ub1;\n");
                 scramble[i+0], scramble[i+1], scramble[i+2], scramble[i+3],
                 scramble[i+4], scramble[i+5], scramble[i+6], scramble[i+7]);
     }
-    mem_stream_printf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
+    mem_stream_printf(f, infix ? "};\n\n" : ")))\n");
     ++extra_parens;
   }
   if (blen > 0)
   {
     mem_stream_printf(f, infix ? "/* small adjustments to _a_ to make values distinct */\n"
-            : "(let ((tab #.(coerce '(\n");
+                      : "(let ((tab #a((%d) (unsigned-byte ", blen);
 
     if (smax <= UB1MAXVAL+1 || blen >= USE_SCRAMBLE) {
-      et = "(unsigned-byte 8)";
-      if (infix) mem_stream_printf(f, "ub1 tab[] = {\n");
+      mem_stream_printf(f, infix ? "ub1 tab[] = {\n" : "8)");
     } else {
-      et = "(unsigned-byte 16)";
-      if (infix) mem_stream_printf(f, "ub2 tab[] = {\n");
+      mem_stream_printf(f, infix ? "ub2 tab[] = {\n": "16)");
     }
 
     if (blen < 16)
@@ -924,7 +919,7 @@ typedef uint8_t  ub1;\n");
                 tab[i+12].val_b, tab[i+13].val_b,
                 tab[i+14].val_b, tab[i+15].val_b);
     }
-    mem_stream_printf(f, infix ? "};\n\n" : ") '(array %s 1))))\n", et);
+    mem_stream_printf(f, infix ? "};\n\n" : ")))\n");
     ++extra_parens;
   }
   int indent = 0, newline = 0;

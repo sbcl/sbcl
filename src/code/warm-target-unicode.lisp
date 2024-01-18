@@ -67,7 +67,7 @@
     #+sb-unicode
     (let*
         ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
-         (lexpr (sb-impl:make-perfect-hash-lambda mapped-chars))
+         (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
          ;; We need the lexpr at compile-time to build the key/value arrays
          ;; and run-time of course, where the expression is stuffed in as
          ;; a form headed by LAMBDA.
