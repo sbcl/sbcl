@@ -14,8 +14,9 @@
 ;;;; Note that this operation is used in compiler symbol table
 ;;;; lookups, so we'd like it to be fast.
 ;;;;
-;;;; As of 2004-03-10, we implement the one-at-a-time algorithm
-;;;; designed by Bob Jenkins (see
+;;;; As of 2024-07-31, we implement the 32-bit FNV-1A hash, which was
+;;;; found to be slightly faster on x86-64 that the Jenkins
+;;;; one-at-a-time hash (see
 ;;;; <http://burtleburtle.net/bob/hash/doobs.html> for some more
 ;;;; information).
 
@@ -32,12 +33,11 @@
   #-sb-xc-host (declare (optimize (speed 3) (safety 0)))
   (macrolet ((guts ()
                `(loop for i of-type index from start below end do
-                  (set-result (+ result (char-code (aref string i))))
-                  (set-result (+ result (ash result 10)))
-                  (set-result (logxor result (ash result -6)))))
+                 (set-result (logxor result (char-code (aref string i))))
+                 (set-result (* result 16777619))))
              (set-result (form)
                `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
-    (let ((result 238625159)) ; (logandc2 most-positive-fixnum (sxhash #\S)) on 32 bits
+    (let ((result 2166136261))
       (declare (type word result))
       ;; Avoid accessing elements of a (simple-array nil (*)).
       ;; The expansion of STRING-DISPATCH involves ETYPECASE,
@@ -50,9 +50,6 @@
       ;; just do it, don't care about loop unswitching or simple-ness of the string.
       #+sb-xc-host (guts)
 
-      (set-result (+ result (ash result 3)))
-      (set-result (logxor result (ash result -11)))
-      (set-result (logxor result (ash result 15)))
       (logand result most-positive-fixnum))))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))

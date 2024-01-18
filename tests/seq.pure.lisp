@@ -497,7 +497,7 @@
     ;; Since there's no canonical order within a bin - we don't know
     ;; whether bin 0 is {:AND,AND} or {AND,:AND} - this gets tricky to check.
     ;; This is unfortunately a change-detector (if we alter SXHASH, or anything).
-    (assert (equalp (car consts) #(:and and :not not :or or 0 0)))))
+    (assert (equalp (car consts) #(:and and :or or :not not 0 0)))))
 
 (with-test (:name :memq-empty-seq)
   (assert (not (funcall (checked-compile '(lambda (x) (member x '()))) 1)))
