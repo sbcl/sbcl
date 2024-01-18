@@ -930,8 +930,10 @@
 (defvar *perfect-hash-generator-mode* :PLAYBACK)
 (defvar *perfect-hash-generator-memo* nil)
 (defvar *perfect-hash-generator-journal* "xperfecthash.lisp-expr")
-#+sbcl (when (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
+#+sbcl (when (and (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
+                  (find-symbol "NEWCHARSTAR-STRING"))
          (format t "~&; NOTE: using host's perfect hash generator~%")
+         (pushnew :use-host-hash-generator cl:*features*)
          (setq *perfect-hash-generator-mode* :RECORD))
 
 ;;; I want this to work using the host-native readtable if sb-cold:*xc-readtable*
@@ -972,7 +974,7 @@
      ;; will be able to read this expression without error. This code won't be invoked
      ;; unless the version criteron is satisfied though.
      ;; I'm wrong about that, we can put in the usual "#.(cl:if ...)" idiom
-     #+sbcl
+     #+use-host-hash-generator
      (let ((string
             (sb-int:newcharstar-string
              (sb-sys:with-pinned-objects (array)
@@ -999,6 +1001,7 @@
     (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
       (compile nil new))))
 (defun maybe-save-perfect-hashfuns-for-playback ()
+  #+use-host-hash-generator
   (when (eq *perfect-hash-generator-mode* :record)
     (with-open-file (stream *perfect-hash-generator-journal*
                             :direction :output
@@ -1006,6 +1009,7 @@
       (write-char #\( stream)
       (dolist (entry *perfect-hash-generator-memo*)
         (destructuring-bind ((digest . array) . string) entry
+          (declare (ignore digest))
           (write (cons array string):stream stream :length nil :base 16
                  :pretty t :right-margin 128))
         (terpri stream))
