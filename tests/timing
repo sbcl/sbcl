@@ -321,4 +321,5 @@
 ("run-program.impure" 10937)
 ("timer-dead-thread.impure" 6116)
 ("signals.impure" 8113)
-("wait-for.pure" 8333))
+("wait-for.pure" 8333)
+("perfecthash.impure" 13000))

@@ -101,9 +101,10 @@
                (let* ((bindings (second x))
                       (binding (first bindings))
                       (var (first binding)))
-                 (case var
-                   (sb-c::scramble (setq scramble (second binding)))
-                   (sb-c::tab (setq tab (second binding)))))
+                 (cond ((string= var "SCRAMBLE")
+                        (setq scramble (second binding)))
+                       ((string= var "TAB")
+                        (setq tab (second binding)))))
                (recurse (cddr x)))
               (t
                (recurse (car x))
