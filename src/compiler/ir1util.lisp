@@ -2470,11 +2470,12 @@ is :ANY, the function name is not checked."
   (declare (type lvar x y))
   (let ((x-use (principal-lvar-use x))
         (y-use (principal-lvar-use y)))
-    (and (ref-p x-use)
-         (ref-p y-use)
-         (eq (ref-leaf x-use) (ref-leaf y-use))
-         (or (constant-reference-p x-use)
-             (refs-unchanged-p x-use y-use)))))
+    (when (and (ref-p x-use)
+               (ref-p y-use)
+               (eq (ref-leaf x-use) (ref-leaf y-use))
+               (or (constant-reference-p x-use)
+                   (refs-unchanged-p x-use y-use)))
+      y-use)))
 
 (defun refs-unchanged-p (ref1 ref2)
   (block nil
