@@ -959,63 +959,77 @@ symbol-case giving up: case=((V U) (F))
                     (values score1 answer1) ; not improved
                     (values score2 answer2))))))))) ; 2 bytes = better
 
-(defun build-sealed-struct-typecase-map (type-unions)
-  (let* ((layout-lists
-          (mapcar (lambda (x) (mapcar #'find-layout x)) type-unions))
-         (byte (nth-value 1
-                (pick-best-sxhash-bits (apply #'append layout-lists)
-                                       #'layout-clos-hash 1)))
-         (array (make-array (ash 1 (byte-size byte)) :initial-element nil))
-         (perfectp t)
-         (seen))
-    (loop for layout-list in layout-lists
-          for selector from 1
-          do (dolist (layout layout-list)
-               (unless (member layout seen) ; in case of dups / overlaps
-                 (push layout seen)
-                 (let ((bin (ldb byte (layout-clos-hash layout))))
-                   (when (aref array bin)
-                     (setq perfectp nil))
-                   (setf (aref array bin)
-                         (nconc (aref array bin) (list (cons layout selector))))))))
-    (values `(byte ,(byte-size byte) ,(byte-position byte))
-            perfectp
-            (if perfectp
-                ;; at most one element is in each bin
-                (let ((result (make-array (* (length array) 2) :initial-element 0)))
-                  (dotimes (index (length array) result)
-                    (awhen (aref array index)
-                      (setf (aref result index) (caar it)
-                            (aref result (+ index (length array))) (cdar it)))))
-                array))))
-
-(sb-xc:defmacro %sealed-struct-typecase-index (cases object)
-  (binding* (((byte perfectp cells) (build-sealed-struct-typecase-map cases))
-             (n-pairs (/ (length cells) 2)))
-    `(if (not (%instancep ,object))
-         0
-         (let* ((layout (%instance-layout ,object))
-                (index (ldb ,byte (layout-clos-hash layout)))
-                (cells ,cells))
-           (declare (optimize (safety 0)))
-           (the (mod ,(1+ (length cases)))
-                ,(if perfectp
-                     `(if (eq (aref cells index) layout) (aref cells (+ index ,n-pairs)) 0)
-                     ;; DOLIST performs a leading test, but we're OK with a cell
-                     ;; that is NIL. It'll miss and then exit at the end of the loop.
-                     ;; This potentially avoids one comparison vs NIL if we hit immediately.
-                     `(let ((list (svref cells index)))
-                        (loop (let ((cell (car list)))
-                                (cond ((eq layout (car cell)) (return (cdr cell)))
-                                      ((null (setq list (cdr list))) (return 0))))))))))))
+;;; Return three values:
+;;; 1. an array of LAYOUT
+;;; 2. an array of (unsigned-byte 16) for the clause index to select
+;;; 3. an expression mapping each layout in LAYOUT-LISTS to an integer 0..N-1
+(defun build-sealed-struct-typecase-map (layout-lists hashes)
+  (let* ((lambda (sb-c:make-perfect-hash-lambda hashes))
+         (phashfun #+sb-xc-host (sb-cold::compile-perfect-hashfun-for-host lambda)
+                   #-sb-xc-host (compile nil lambda))
+         (n (length hashes))
+         (domain (make-array n :initial-element nil))
+         (range (sb-xc:make-array n :element-type '(unsigned-byte 16))))
+    (loop for clause-index from 1 for list across layout-lists
+          do (dolist (layout list)
+               (let* ((hash (ldb (byte 32 0) (layout-clos-hash layout)))
+                      (index (funcall phashfun hash)))
+                 (aver (null (aref domain index)))
+                 (setf (aref domain index) layout
+                       (aref range index) clause-index))))
+    (values domain range lambda)))
 
 (declaim (ftype function sb-pcl::emit-cache-lookup))
-(sb-xc:defmacro %struct-typecase-index (cases object)
-  (let ((n (length cases)))
-    `(if (not (%instancep ,object))
-         0
-         (truly-the
-          (integer 0 ,n)
+(defun optimize-%typecase-index (layout-lists object sealed)
+  ;; Try the hash-based expansion if applicable. It's allowed to fail, as it will
+  ;; when 32-bit hashes are nonunique.
+  (when sealed
+    ;; TODO: this could eliminate an array lookup when there is only a single layout
+    ;; per clause. So instead of the perfect hash identifying a clause index via lookup,
+    ;; the hash _is_ the clause index; the clauses in the CASE need to be permuted
+    ;; to match the hashes, which doesn't work in the way TYPECASE currently expands.
+    (let ((seen-layouts)
+          (expanded-lists (make-array (length layout-lists) :initial-element nil))
+          (index 0))
+      (flet ((add-to-clause (layout)
+               (unless (member layout seen-layouts)
+                 (push layout seen-layouts)
+                 (push layout (aref expanded-lists index)))))
+        (dovector (layouts layout-lists)
+          (dolist (layout layouts)
+            ;; unless this layout was in a prior clause
+            (when (add-to-clause layout)
+              (sb-kernel::do-subclassoids ((classoid layout) (layout-classoid layout))
+               (declare (ignore classoid))
+               (add-to-clause layout))))
+          (incf index)))
+      (let ((hashes (map '(array (unsigned-byte 32) (*))
+                         (lambda (x) #+64-bit (ldb (byte 32 0) (layout-clos-hash x))
+                                     #-64-bit (layout-clos-hash x))
+                         seen-layouts)))
+        (when (= (length hashes) (length (remove-duplicates hashes)))
+          (multiple-value-bind (layouts indices expr)
+              (build-sealed-struct-typecase-map expanded-lists hashes)
+            (aver expr)
+            (return-from optimize-%typecase-index
+              `(truly-the
+                (integer 0 ,(length layout-lists))
+                (if (not (%instancep ,object))
+                    0
+                    (let* ((l (%instance-layout ,object)) ; layout
+                           (h (,expr (ldb (byte 32 0) (layout-clos-hash l))))) ; perfect hash
+                      (if (and (< h ,(length layouts)) (eq l (svref ,layouts h)))
+                          (aref ,indices h)
+                          0))))))))))
+  ;; The generated s-expression is too sensitive to the order LOAD-TIME-VALUE fixups are
+  ;; patched in by cold-init. You'll have a bad time if CACHE-CELL is an unbound-marker.
+  #+sb-xc-host (error "PCL cache won't work for cross-compiled TYPECASE")
+  ;; Use a PCL cache
+  (let ((n (length layout-lists)))
+    `(truly-the
+      (integer 0 ,n)
+      (if (not (%instancep ,object))
+          0
           ;; TODO: if we access the cache by layout ID instead of the object,
           ;; one word can store the layout ID and the clause index
           ;; (certainly true for 64-bit, maybe not 32).
@@ -1027,7 +1041,8 @@ symbol-case giving up: case=((V U) (F))
                   (cache-cell
                    (load-time-value
                     ;; Assume the cache will want at least N lines
-                    (cons (sb-pcl::make-cache :key-count 1 :size ,n :value t) ,cases)))
+                    (cons (sb-pcl::make-cache :key-count 1 :size ,n :value t)
+                          ,layout-lists)))
                   (cache (car (truly-the cons cache-cell)))
                   (layout (%instance-layout ,object)))
              (declare (optimize (safety 0)))
@@ -1035,21 +1050,6 @@ symbol-case giving up: case=((V U) (F))
              (return clause)
            MISS
              (return (sb-pcl::%struct-typecase-miss ,object cache-cell)))))))
-
-(defun find-all-layouts (ctypes)
-  (let* ((seen)
-         (answer (map 'simple-vector
-                      (lambda (ctype)
-                        (let* ((classoids (if (union-type-p ctype)
-                                              (union-type-types ctype)
-                                              (list ctype)))
-                               ;; Result must not have duplicates
-                               (layouts (remove-if (lambda (x) (member x seen))
-                                                   (mapcar 'classoid-layout classoids))))
-                          (setf seen (union seen layouts))
-                          (coerce layouts 'simple-vector)))
-                      ctypes)))
-    answer))
 
 ;;; Given an arbitrary TYPECASE, see if it is a discriminator over
 ;;; an assortment of structure-object subtypes. If it is, potentially turn it
@@ -1067,80 +1067,69 @@ symbol-case giving up: case=((V U) (F))
 ;;; In fact as far as I can tell, redefining a standard class doesn't require a new hash
 ;;; because the obsolete layout always gets clobbered to 0, and cache lookups always check
 ;;; for a match on both the hash and the layout.
-(defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp
-                               &aux (n-root-types 0) (exhaustive-list))
-  (labels
-      ((ok-classoid (classoid)
-         (or (structure-classoid-p classoid)
-             (and (sb-kernel::built-in-classoid-p classoid)
-                  (not (memq (classoid-name classoid)
-                             sb-kernel::**non-instance-classoid-types**)))))
-       (discover-subtypes (ctype)
-         (let ((worklist
-                (cond ((ok-classoid ctype) (list ctype))
-                      ((and (union-type-p ctype)
-                            (every #'ok-classoid (union-type-types ctype)))
-                       (copy-list (union-type-types ctype)))
-                      (t
-                       (return-from discover-subtypes nil)))))
-             ;; Assume that each "root" type would require its own test based
-             ;; on %instance-layout of self and ancestor and that all root types
-             ;; are disjoint. This may not be true if a later one includes
-             ;; an earlier one.
-             (incf n-root-types (length worklist))
-             (collect ((visited))
-               (loop (unless worklist (return))
-                     (let ((classoid (pop worklist)))
-                       (visited classoid)
-                       (sb-kernel::do-subclassoids ((subclassoid layout) classoid)
-                         (declare (ignore layout))
-                         (unless (or (member subclassoid (visited))
-                                     (member subclassoid worklist))
-                           (setf worklist (nconc worklist (list subclassoid)))))))
-               (setf exhaustive-list (union (visited) exhaustive-list))
-               (visited)))))
-    (let* ((ctypes (mapcar #'specifier-type type-specs))
-           (classoid-lists (mapcar #'discover-subtypes ctypes)))
-      (when (or (some #'null classoid-lists)
-                (< n-root-types 5)
-                ;; Given something like:
-                ;; (typecase x
-                ;;   ((or parent1 parent2 parent3) ...)
-                ;;   ((or parent4 parent5 parent6) ...)
-                ;; where eaach parent has dozens of children (directly or indirectly),
-                ;; it may be worse to use a hash-based lookup.
-                (> (length exhaustive-list) (* 3 n-root-types)))
+(defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp)
+  (let* ((n (length type-specs))
+         (n-base-types 0)
+         (layout-lists (make-array  n))
+         (exhaustive-list) ; of classoids
+         (all-sealed t))
+    (labels
+        ((ok-classoid (classoid)
+           ;; Return T if this is a classoid this expander can work with.
+           ;; Also figure if all classoids accepted by this test were sealed.
+           (when (or (structure-classoid-p classoid)
+                     (and (sb-kernel::built-in-classoid-p classoid)
+                          (not (memq (classoid-name classoid)
+                                     sb-kernel::**non-instance-classoid-types**))))
+             ;; If this classoid is sealed, then its children are sealed too,
+             ;; and we don't need to verify that.
+             (unless (eq (classoid-state classoid) :sealed)
+               (setq all-sealed nil))
+             (sb-kernel::do-subclassoids ((subclassoid layout) classoid)
+               (declare (ignore layout))
+               (pushnew subclassoid exhaustive-list))
+             t))
+         (get-layouts (ctype)
+           (let ((list
+                  (cond ((ok-classoid ctype) (list (classoid-layout ctype)))
+                        ((and (union-type-p ctype)
+                              (every #'ok-classoid (union-type-types ctype)))
+                         (mapcar 'classoid-layout (union-type-types ctype))))))
+             (incf n-base-types (length list))
+             list)))
+      ;; For each clause, if it effectively an OR over acceptable instance types,
+      ;; collect the layouts of those types.
+      (loop for i from 0 for spec in type-specs
+            do (let ((parse (specifier-type spec)))
+                 (setf (aref layout-lists i) (or (get-layouts parse)
+                                                 (return-from expand-struct-typecase nil)))))
+      ;; Let's say 1 to 4 TYPEP tests isn't to bad. Just do them sequentially.
+      ;; But given something like:
+      ;; (typecase x
+      ;;   ((or parent1 parent2 parent3) ...)
+      ;;   ((or parent4 parent5 parent6) ...)
+      ;; where eaach parent has dozens of children (directly or indirectly),
+      ;; it may be worse to use a hash-based lookup.
+      (when (or (< n-base-types 5)
+                (> (length exhaustive-list) (* 3 n-base-types)))
         (return-from expand-struct-typecase))
       ;; If no new subtypes can be defined, then there is a compiled-time-computable
       ;; mapping from CLOS-hash to jump table index.
-      (let ((all-sealed
-             (every (lambda (classoids)
-                      (every (lambda (classoid)
-                               (eq (classoid-state classoid) :sealed))
-                             classoids))
-                    classoid-lists)))
-        ;; The number of root types is an upper bound on the number of different TYPEP
-        ;; executions that could occur. Use a cache if it exceeds 8 but we couldn't use
-        ;; the "sealed" logic. The cache is usually an improvement over sequential tests
-        ;; but it's impossible to know (the first clause could get taken 99% of the time)
-        (when (or all-sealed (>= n-root-types 8))
-          (let ((clause-select
-                 (if all-sealed
-                     `(%sealed-struct-typecase-index
-                       ,(mapcar (lambda (list) (mapcar #'classoid-name list))
-                                classoid-lists)
-                       ,temp)
-                     `(%struct-typecase-index ,(find-all-layouts ctypes) ,temp))))
-            `(let ((,temp ,keyform))
-               (case ,clause-select
-                 ,@(loop for i from 1 for clause in normal-clauses
-                         collect `(,i
+      ;; The number of base types is an upper bound on the number of different TYPEP
+      ;; executions that could occur. Use a cache if it exceeds 8 but the sealed logic
+      ;; was inapplicable. A cache is usually an improvement over sequential tests
+      ;; but it's impossible to know (the first clause could get taken 99% of the time)
+      (when (or all-sealed (>= n-base-types 8))
+        `(let ((,temp ,keyform))
+           (case (sb-kernel::%typecase-index ,layout-lists ,temp ,all-sealed)
+             ,@(loop for i from 1 for clause in normal-clauses
+                     collect `(,i
                                    ;; CLAUSE is ((TYPEP #:G 'a-type) NIL . forms)
                                    (sb-c::%type-constraint ,temp ,(third (car clause)))
                                    ,@(cddr clause)))
-                 (0 ,@(if errorp
+             (0 ,@(if errorp
                           `((etypecase-failure ,temp ',type-specs))
-                          (cddr default)))))))))))
+                          (cddr default)))))))))
 
 
 ;;; Turn a case over symbols into a case over their hashes.

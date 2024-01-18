@@ -102,3 +102,11 @@
     (maphash (lambda (key value)
                (unless (cdr value) (remhash key registry))) ; cdr = "retain"
              registry)))
+
+(defun our-sharp-a-reader (stream char rank)
+  (declare (ignore char))
+  (assert (not rank))
+  (let ((contents (read stream t nil t)))
+    ;; Just like in src/code/sharpm
+    (destructuring-bind (dimensions type &rest contents) contents
+      (sb-xc:make-array dimensions :initial-contents contents :element-type type))))

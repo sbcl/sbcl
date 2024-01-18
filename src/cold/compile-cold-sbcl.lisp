@@ -100,6 +100,7 @@
 ;; Update the xc-readtable
 (set-macro-character #\` #'sb-impl::backquote-charmacro nil *xc-readtable*)
 (set-macro-character #\, #'sb-impl::comma-charmacro nil *xc-readtable*)
+(set-dispatch-macro-character #\# #\a 'sb-kernel::our-sharp-a-reader *xc-readtable*)
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
 (setf (sb-xc:macro-function 'sb-int:quasiquote)
@@ -241,6 +242,7 @@
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)
                 (clear-specialized-array-registry)))
              (format t "~&~50t ~f~%" total-time))
+           (sb-cold::maybe-save-perfect-hashfuns-for-playback)
            (sb-c::dump/restore-interesting-types 'write)))
      (write-sxhash-xcheck-data
       (sb-cold:find-bootstrap-file "output/sxhash-calls.lisp-expr" t))

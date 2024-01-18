@@ -198,17 +198,6 @@
   "Hints the processor that the current thread is spin-looping."
   (spin-loop-hint))
 
-;;; The stub for sb-c::%structure-is-a should really use layout-id in the same way
-;;; that the vop does, however, because the all 64-bit architectures other than
-;;; x86-64 need to use with-pinned-objects to extract a layout-id, it is cheaper not to.
-;;; I should add a vop for uint32 access to raw slots.
-(defun sb-c::%structure-is-a (object-layout test-layout)
-  (or (eq object-layout test-layout)
-      (let ((depthoid (layout-depthoid test-layout))
-            (inherits (layout-inherits object-layout)))
-        (and (> (length inherits) depthoid)
-             (eq (svref inherits depthoid) test-layout)))))
-
 (defun %other-pointer-subtype-p (x choices)
   (and (%other-pointer-p x)
        (member (%other-pointer-widetag x) choices)

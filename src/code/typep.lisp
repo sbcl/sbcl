@@ -484,6 +484,17 @@ Experimental."
       (t
        (classoid-of x)))))
 
+;;; The stub for sb-c::%structure-is-a should really use layout-id in the same way
+;;; that the vop does, however, because the all 64-bit architectures other than
+;;; x86-64 need to use with-pinned-objects to extract a layout-id, it is cheaper not to.
+;;; I should add a vop for uint32 access to raw slots.
+(defun sb-c::%structure-is-a (object-layout test-layout)
+  (or (eq object-layout test-layout)
+      (let ((depthoid (layout-depthoid test-layout))
+            (inherits (layout-inherits object-layout)))
+        (and (> (length inherits) depthoid)
+             (eq (svref inherits depthoid) test-layout)))))
+
 (defun sb-c::structure-typep (object test-layout)
   (and (%instancep object)
        (let ((object-layout (%instance-layout object)))
@@ -492,3 +503,17 @@ Experimental."
                   (inherits (layout-inherits object-layout)))
               (and (> (length inherits) depthoid)
                    (eq (svref inherits depthoid) test-layout)))))))
+
+;;; TODO: this could be further generalized to handle any type where layout-of correctly
+;;; chooses a clause. It would of course not work for types like MEMBER or (MOD 5)
+(defun %typecase-index (layout-lists object sealed)
+  (declare (ignore sealed))
+  (when (%instancep object)
+    (let ((object-layout (%instance-layout object)))
+      (let ((clause-index 1))
+        (dovector (layouts layout-lists)
+          (dolist (layout layouts)
+            (when (sb-c::%structure-is-a object-layout layout)
+              (return-from %typecase-index clause-index)))
+          (incf clause-index)))))
+  0)

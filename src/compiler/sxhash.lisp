@@ -147,7 +147,7 @@
 (defun make-perfect-hash-lambda (array)
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
   (let* ((string
-          #+sb-xc-host (emulate-generate-perfect-hash-sexpr array)
+          #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array)
           #-sb-xc-host
           (sb-unix::newcharstar-string
            (sb-sys:with-pinned-objects (array)
@@ -155,7 +155,11 @@
                              "generate_perfhash_sexpr"
                              (function (* char) system-area-pointer int))
                             (sb-sys:vector-sap array) (length array)))))
-         (expr (with-standard-io-syntax
+         (expr #+sb-xc-host ; don't rebind anything except *PACKAGE*
+               ;; especially as we need to keep our #\A charmacro
+               (let ((*package* #.(find-package "SB-C"))) (read-from-string string))
+               #-sb-xc-host
+               (with-standard-io-syntax
                  (let ((*package* #.(find-package "SB-C")))
                    (read-from-string string)))))
     (labels ((containsp (e op)
@@ -182,6 +186,3 @@
            ,@expr)))))
 (intern "TAB")
 (intern "SCRAMBLE")
-(defun emulate-generate-perfect-hash-sexpr (array)
-  (cerror "Use a cache instead"
-          "Can't perfectly hash ~S" array))

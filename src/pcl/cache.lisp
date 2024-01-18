@@ -593,8 +593,8 @@
          MISS))
       (setq clause-index 1)
       (dovector (layouts (cdr cache-cell))
-        (dovector (test-layout layouts)
-          (when (sb-c::structure-typep object test-layout) ; success, to try memoize it
+        (dolist (test-layout layouts)
+          (when (sb-c::%structure-is-a layout test-layout) ; success, to try memoize it
             (let ((key (list layout))) ; insert this object's layout
               (unless (try-update-cache cache key clause-index)
                 (setf (car cache-cell)

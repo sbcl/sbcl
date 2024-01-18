@@ -920,6 +920,100 @@
          (format t "~&; Math journal: wrote ~S (~d entries)"
                  filename (hash-table-count table))))))
 
+;;;; One more journal file because the math file isn't enough
+;;; Define this before renaming the SB- packages
+;;; A non-parallelized compile using a sufficiently new SBCL as the host
+;;; will use a paravirtualized implementation of generate-perfect-hash-sexpr
+;;; which is to say, it just uses the host; as a side-effect it records
+;;; the generated string so that we can replay it for any host
+;;; or for parallelized build.
+(defvar *perfect-hash-generator-mode* :PLAYBACK)
+(defvar *perfect-hash-generator-memo* nil)
+(defvar *perfect-hash-generator-journal* "xperfecthash.lisp-expr")
+#+sbcl (when (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
+         (format t "~&; NOTE: using host's perfect hash generator~%")
+         (setq *perfect-hash-generator-mode* :RECORD))
+
+;;; I want this to work using the host-native readtable if sb-cold:*xc-readtable*
+;;; isn't established. The caller should bind *READTABLE* to ours if reading
+;;; on a non-SBCL host; it's purposely not done here.
+(defun preload-perfect-hash-generator (pathname)
+  (with-open-file (stream pathname :if-does-not-exist nil)
+    (when stream
+      (let ((entries (let ((*read-base* 16)) (read stream))))
+        (setq *perfect-hash-generator-memo*
+              ;; Compute the XOR all the hashes of each entry as a quick pass/fail
+              ;; when searching, assuming thst EQUALP compares (CAR CONS) before
+              ;; the CDR, which is almost surely, though not necessarily, what it does.
+              (mapcar (lambda (entry)
+                        (destructuring-bind (array . string) entry
+                          ;; assert that the entry was stored in canonical form
+                          (assert (equalp array (sort (copy-seq array) #'<)))
+                          (let ((digest (reduce #'logxor array)))
+                            (cons (cons digest array) string))))
+                      entries))))))
+
+(defun emulate-generate-perfect-hash-sexpr (array)
+  ;; An entry in the file is stored with its hashes sorted in ascending order
+  ;; that we can compare sets by EQUALP which is a lot easier than coming up with
+  ;; an order-insensitive equality test. So we want to sort the array
+  ;; nondestructively in case something else looks at it in a specific order.
+  (let* ((canonical-array (sort (copy-seq array) #'<))
+         (digest (reduce #'logxor canonical-array))
+         (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
+                       :test #'equalp)))
+    (when match
+      (return-from emulate-generate-perfect-hash-sexpr (cdr match))))
+  (ecase *perfect-hash-generator-mode*
+    (:playback
+     (error "perfect hash file is missing a needed entry for ~x" array))
+    (:record
+     ;; I'm pretty sure any version of SBCL no matter how old that can compile SBCL
+     ;; will be able to read this expression without error. This code won't be invoked
+     ;; unless the version criteron is satisfied though.
+     ;; I'm wrong about that, we can put in the usual "#.(cl:if ...)" idiom
+     #+sbcl
+     (let ((string
+            (sb-int:newcharstar-string
+             (sb-sys:with-pinned-objects (array)
+               (sb-alien:alien-funcall
+                (sb-alien:extern-alien
+                 "generate_perfhash_sexpr"
+                 (function (* sb-alien:char) sb-alien:system-area-pointer sb-alien:int))
+                (sb-sys:vector-sap array) (length array))))))
+       ;; don't need the final newline, it looks un-lispy in the file
+       (let ((l (length string)))
+         (assert (char= (char string (1- l)) #\newline))
+         (setf string (subseq string 0 (1- l))))
+       ;; (format t "~&Adding perfect hash entry for ~X~%" array)
+       (setf *perfect-hash-generator-memo*
+             (nconc *perfect-hash-generator-memo*
+                    (list (cons (cons digest canonical-array) string))))
+       string))))
+
+(defun compile-perfect-hashfun-for-host (lambda)
+  ;; Remove the declare:
+  ;;   (declare (optimize (safety 0) (sb-c:store-source-form 0)))
+  (let ((third (third lambda)))
+    (assert (eq (car third) 'declare))
+    (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
+      (compile nil new))))
+(defun maybe-save-perfect-hashfuns-for-playback ()
+  (when (eq *perfect-hash-generator-mode* :record)
+    (with-open-file (stream *perfect-hash-generator-journal*
+                            :direction :output
+                            :if-existS :supersede :if-does-not-exist :create)
+      (write-char #\( stream)
+      (dolist (entry *perfect-hash-generator-memo*)
+        (destructuring-bind ((digest . array) . string) entry
+          (write (cons array string):stream stream :length nil :base 16
+                 :pretty t :right-margin 128))
+        (terpri stream))
+      (write-string ")
+;; EOF
+" stream)))
+  t)
+
 ;;;; Please avoid writing "consecutive" (un-nested) reader conditionals
 ;;;; in this file, whether for the same or different feature test.
 ;;;; The following example prints 3 different results in 3 different lisp

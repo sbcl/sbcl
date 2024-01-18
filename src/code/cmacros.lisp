@@ -22,6 +22,13 @@
 ;;;; purposes of cross-compiling. A problem is namespace clobbering:
 ;;;; these must not affect the host Lisp.
 
+;;; The function that corresponds to this macro is defined in src/code/typep.
+;;; This expansion is not particularly good for the interpreter, so just
+;;; call the function when not compiling.
+(define-compiler-macro sb-kernel::%typecase-index (layout-lists object sealed)
+  (let ((exp (sb-impl::optimize-%typecase-index layout-lists object sealed)))
+    exp))
+
 ;;; A sanity-checker for an extremely common programmer error.
 (define-compiler-macro format (&whole form destination control &rest args)
   (declare (ignore control args))
