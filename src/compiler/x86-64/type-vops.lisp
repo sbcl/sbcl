@@ -446,66 +446,6 @@
 
         (emit-label not-target)))))
 
-(defun power-of-two-limit-p (x)
-  (and (fixnump x)
-       (= (logcount (1+ x)) 1)))
-
-(define-vop (test-fixnum-mod-power-of-two)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg)))
-  (:arg-types *
-              (:constant (satisfies power-of-two-limit-p)))
-  (:translate fixnum-mod-p)
-  (:conditional :e)
-  (:info hi)
-  (:policy :fast-safe)
-  (:arg-refs value-ref)
-  (:vop-var vop)
-  (:generator 4
-    (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                         hi
-                         (fixnumize hi))))
-      (cond ((sc-is value descriptor-reg)
-             (let* ((mask (lognot fixnum-hi))
-                    (constant
-                      (if (= (ldb (byte 64 0) mask) non-negative-fixnum-mask-constant)
-                          (ea non-negative-fixnum-mask-constant-wired-address)
-                          (constantize mask))))
-               (inst test value constant)))
-            (t
-             (change-vop-flags vop '(:be))
-             (inst cmp value (constantize fixnum-hi)))))))
-
-(define-vop (test-fixnum-mod-tagged-unsigned)
-  (:args (value :scs (any-reg unsigned-reg signed-reg)))
-  (:arg-types (:or tagged-num unsigned-num signed-num)
-              (:constant fixnum))
-  (:translate fixnum-mod-p)
-  (:conditional :be)
-  (:info hi)
-  (:policy :fast-safe)
-  (:generator 5
-     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                          hi
-                          (fixnumize hi))))
-       (inst cmp value (constantize fixnum-hi)))))
-
-(define-vop (test-fixnum-mod-*)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant fixnum))
-  (:translate fixnum-mod-p)
-  (:conditional)
-  (:info target not-p hi)
-  (:policy :fast-safe)
-  (:generator 6
-     (let* ((fixnum-hi (fixnumize hi))
-            (skip (gen-label)))
-       (generate-fixnum-test value)
-       (inst jmp :ne (if not-p target skip))
-       (inst cmp value (constantize fixnum-hi))
-       (inst jmp (if not-p :a :be) target)
-       (emit-label skip))))
-
 ;;; SINGLE-FLOAT-P, CHARACTERP, UNBOUND-MARKER-P produce a flag result
 ;;; and never need a temporary.
 (macrolet ((define (name widetag)

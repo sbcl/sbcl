@@ -150,6 +150,11 @@
              (inst cmp :word (ea temp) c))))
     OUT))
 
+
+(defun power-of-two-limit-p (x)
+  (and (fixnump x)
+       (= (logcount (1+ x)) 1)))
+
 ;;;; bounds checking routine
 (defun emit-bounds-check (vop %test-fixnum array index limit)
   (let*  ((use-length-p (null limit))
