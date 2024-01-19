@@ -6675,28 +6675,36 @@
                   (deftransform ,(symbolicate "CHECK-" name)
                       ((l x h) ((constant-arg fixnum) t (constant-arg fixnum)) * :important nil)
                     (let* ((type (lvar-type x))
-                           (intersect (type-intersection type (specifier-type 'fixnum)))
-                           (range-type (specifier-type (list 'integer
-                                                             (+ (lvar-value l) ,ld)
-                                                             (+ (lvar-value h) ,hd)))))
+                           (l (+ (lvar-value l) ,ld))
+                           (h (+ (lvar-value h) ,hd))
+                           (range-type (specifier-type `(integer ,l ,h)))
+                           (intersect (type-intersection type (specifier-type 'fixnum))))
                       (cond ((csubtypep intersect range-type)
                              `(fixnump x))
+                            ((and (< l 0)
+                                  (csubtypep intersect
+                                             (specifier-type 'unsigned-byte)))
+                             `(check-range<= 0 x ,h))
                             ((let ((int (type-approximate-interval intersect)))
                                (when int
                                  (let ((power-of-two (1- (ash 1 (integer-length (interval-high int))))))
-                                   (when (< 0 power-of-two (lvar-value h))
+                                   (when (< 0 power-of-two h)
                                      `(check-range<= l x ,power-of-two))))))
                             (t
                              (give-up-ir1-transform)))))
 
                   (deftransform ,name ((l x h) ((constant-arg fixnum) integer (constant-arg fixnum)) * :important nil)
                     (let* ((type (lvar-type x))
-                           (range-type (specifier-type (list 'integer
-                                                             (+ (lvar-value l) ,ld)
-                                                             (+ (lvar-value h) ,hd)))))
+                           (l (+ (lvar-value l) ,ld))
+                           (h (+ (lvar-value h) ,hd))
+                           (range-type (specifier-type `(integer ,l ,h))))
                       (cond ((csubtypep (type-intersection type (specifier-type 'unsigned-byte))
                                         range-type)
                              `(>= x l))
+                            ((and (< l 0)
+                                  (csubtypep type
+                                             (specifier-type 'unsigned-byte)))
+                             `(range<= 0 x ,h))
                             (t
                              (give-up-ir1-transform))))))))
     (def range<= 0 0)
