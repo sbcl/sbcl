@@ -6668,4 +6668,38 @@
   (deftransform check-range<<= ((l x h) (t sb-vm:word t) * :important nil)
     `(range<<=))
   (deftransform check-range<=< ((l x h) (t sb-vm:word t) * :important nil)
-    `(range<=<)))
+    `(range<=<))
+
+  (macrolet ((def (name ld hd)
+               `(progn
+                  (deftransform ,(symbolicate "CHECK-" name)
+                      ((l x h) ((constant-arg fixnum) t (constant-arg fixnum)) * :important nil)
+                    (let* ((type (lvar-type x))
+                           (intersect (type-intersection type (specifier-type 'fixnum)))
+                           (range-type (specifier-type (list 'integer
+                                                             (+ (lvar-value l) ,ld)
+                                                             (+ (lvar-value h) ,hd)))))
+                      (cond ((csubtypep intersect range-type)
+                             `(fixnump x))
+                            ((let ((int (type-approximate-interval intersect)))
+                               (when int
+                                 (let ((power-of-two (1- (ash 1 (integer-length (interval-high int))))))
+                                   (when (< 0 power-of-two (lvar-value h))
+                                     `(check-range<= l x ,power-of-two))))))
+                            (t
+                             (give-up-ir1-transform)))))
+
+                  (deftransform ,name ((l x h) ((constant-arg fixnum) integer (constant-arg fixnum)) * :important nil)
+                    (let* ((type (lvar-type x))
+                           (range-type (specifier-type (list 'integer
+                                                             (+ (lvar-value l) ,ld)
+                                                             (+ (lvar-value h) ,hd)))))
+                      (cond ((csubtypep (type-intersection type (specifier-type 'unsigned-byte))
+                                        range-type)
+                             `(>= x l))
+                            (t
+                             (give-up-ir1-transform))))))))
+    (def range<= 0 0)
+    (def range< 1 -1)
+    (def range<<= 1 0)
+    (def range<=< 0 -1)))
