@@ -407,3 +407,10 @@
     (((1+ (expt 2 (1- sb-vm:n-word-bits)))) t :test (lambda (x y)
                                                       y
                                                       (functionp (car x))))))
+
+(with-test (:name :range-unsigned)
+  (assert-type
+   (lambda (d)
+     (declare (type (integer 1 109) d))
+     (typep (- d) '(integer -47727025476642942 -2593702250735)))
+   null))

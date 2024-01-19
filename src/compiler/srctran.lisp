@@ -6679,7 +6679,9 @@
                            (h (+ (lvar-value h) ,hd))
                            (range-type (specifier-type `(integer ,l ,h)))
                            (intersect (type-intersection type (specifier-type 'fixnum))))
-                      (cond ((csubtypep intersect range-type)
+                      (cond ((eq intersect *empty-type*)
+                             nil)
+                            ((csubtypep intersect range-type)
                              `(fixnump x))
                             ((and (< l 0)
                                   (csubtypep intersect
@@ -6697,9 +6699,11 @@
                     (let* ((type (lvar-type x))
                            (l (+ (lvar-value l) ,ld))
                            (h (+ (lvar-value h) ,hd))
-                           (range-type (specifier-type `(integer ,l ,h))))
-                      (cond ((csubtypep (type-intersection type (specifier-type 'unsigned-byte))
-                                        range-type)
+                           (range-type (specifier-type `(integer ,l ,h)))
+                           (unsigned-type (type-intersection type (specifier-type 'unsigned-byte))))
+                      (cond ((and (neq unsigned-type *empty-type*)
+                                  (csubtypep unsigned-type
+                                             range-type))
                              `(>= x l))
                             ((and (< l 0)
                                   (csubtypep type
