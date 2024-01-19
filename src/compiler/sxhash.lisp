@@ -166,8 +166,9 @@
                (if (consp e)
                    (or (containsp (car e) op) (containsp (cdr e) op))
                    (eq e op))))
-      `(lambda (arg &aux (val (truly-the (unsigned-byte 32) arg)))
-         (declare (optimize (safety 0) (sb-c:store-source-form 0)))
+      `(lambda (val)
+         (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
+         (declare (type (unsigned-byte 32) val))
          ;; Remove the macros that aren't used, it helps with visual inspection
          ;; of the result. However, one macro can't call another since CONTAINSP
          ;; doesn't understand macros.

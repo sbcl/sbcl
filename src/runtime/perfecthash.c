@@ -165,7 +165,7 @@ static void scrambleinit(
 static void checkdup(
     key      *key1,
     key      *key2,
-    hashform *form)
+    __attribute__((unused)) hashform *form)
 {
     if (key1->hash_k == key2->hash_k)
     {

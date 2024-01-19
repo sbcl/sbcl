@@ -1258,6 +1258,7 @@ static int inithex(
     ub4       nkeys,                               /* number of keys to hash */
     ub4       alen,                /* (a,b) has a in 0..alen-1, a power of 2 */
     ub4       blen,                /* (a,b) has b in 0..blen-1, a power of 2 */
+    __attribute__((unused))
     ub4       smax,               /* maximum range of computable hash values */
     ub4       salt,                  /* used to initialize the hash function */
     gencode  *final,                      /* output, code for the final hash */
