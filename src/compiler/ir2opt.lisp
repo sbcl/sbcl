@@ -1292,6 +1292,13 @@
     (or (ir2-block-%label block)
         (setf (ir2-block-%label block) (gen-label)))))
 
+(defun next-vop-label (vop)
+  (let* ((block (vop-block vop))
+         (next (ir2-block-next block)))
+    (when (eq (ir2-block-last-vop block) vop)
+      (or (ir2-block-%label next)
+          (setf (ir2-block-%label next) (gen-label))))))
+
 (when-vop-existsp (:named sb-vm::signed-byte-64-p-move-to-word)
   (flet ((opt (vop new-vop &optional not-vop)
            (let ((dest (branch-destination vop))

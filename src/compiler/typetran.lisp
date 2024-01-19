@@ -390,7 +390,8 @@
          (high (numeric-type-high type)))
     (ecase (numeric-type-complexp type)
       (:real
-       (cond ((and (eql (numeric-type-class type) 'integer)
+       (cond #-arm64
+             ((and (eql (numeric-type-class type) 'integer)
                    (and (fixnump low)
                         (fixnump high)
                         #+(or x86 x86-64 arm arm64)
