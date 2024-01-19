@@ -133,7 +133,7 @@
 ;;; sets, and then go fast again when adding _more_ symbols.
 ;;; This usually doesn't take more than about 5 seconds on a good machine,
 ;;; but it's pretty random how long it takes.
-(with-test (:name :try-various-sizes)
+(with-test (:name :try-various-sizes :skipped-on (:not :slow))
   (let ((hashes (make-hash-table))
         (random-state (make-random-state t))) ; randomly-seeded random-state
     (dolist (str (sb-vm:list-allocated-objects :all :test #'stringp))
