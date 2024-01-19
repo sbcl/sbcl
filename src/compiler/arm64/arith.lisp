@@ -2735,7 +2735,11 @@
                                            (inst sub temp x (add-sub-immediate flo))
                                            (inst add temp x (add-sub-immediate (abs flo)))))
                                    (let ((cmp (- fhi flo)))
-                                     (cond ((= (logcount (+ cmp one)) 1)
+                                     (cond ((and (sc-is x any-reg)
+                                                 (= hi most-positive-fixnum))
+                                            (change-vop-flags vop '(:ge))
+                                            (inst cmp x 0))
+                                           ((= (logcount (+ cmp one)) 1)
                                             (change-vop-flags vop '(:eq))
                                             (inst tst temp (lognot cmp)))
                                            (t
