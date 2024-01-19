@@ -7,17 +7,20 @@ tmpcore=$TEST_FILESTEM.core
 echo "::: Running :SAVE-CORE-MEM-SIZES"
 # executable core used as "--core" option should not save the memory sizes
 # that were originally saved, but the sizes in the process doing the save.
-run_sbcl_with_args --noinform --control-stack-size 320KB --dynamic-space-size 260MB \
+run_sbcl_with_args --noinform --control-stack-size 384KB --dynamic-space-size 260MB \
     --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
 echo "::: INFO: prepared test core"
 ./"$tmpcore" --no-userinit --no-sysinit --noprint <<EOF
-  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 320 1024)))
+  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 384 1024)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (assert (<= 0 (- (* 260 1048576) (dynamic-space-size)) 65536))
 EOF
+if [ $? -ne 0 ]; then
+   exit 1
+fi
 echo "::: Success"
 
 echo "::: Running :ALWAYS-ACCEPT-MEMORY-SIZES"
@@ -31,6 +34,9 @@ echo "::: Running :ALWAYS-ACCEPT-MEMORY-SIZES"
        (diff (sb-sys:sap- end start)))
   (assert (= diff (* 3 1048576))))
 EOF
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 echo "::: Success"
 
 echo "::: Running :DASH-DASH-STOP-PARSING"
@@ -43,6 +49,9 @@ echo "::: Running :DASH-DASH-STOP-PARSING"
   (assert (< diff (* 8 1024 1024 1024))) ; assert less than 8GB
   (assert (find "--" sb-ext:*posix-argv* :test 'string=)))
 EOF
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 echo "::: Success"
 
 echo "::: Running :DYNAMIC-SPACE-SIZE-ARG"
