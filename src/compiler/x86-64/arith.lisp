@@ -3720,12 +3720,12 @@
                 ,(unless check
                    `(define-vop (,(symbolicate name '/c))
                       (:translate ,name)
-                      (:args (x :scs (any-reg signed-reg unsigned-reg) :target temp))
+                      (:args (x :scs (any-reg signed-reg unsigned-reg)))
                       (:arg-types (:constant t)
                                   (:or tagged-num signed-num unsigned-num)
                                   (:constant t))
                       (:info lo hi)
-                      (:temporary (:sc signed-reg :from (:argument 0)) temp)
+                      (:temporary (:sc signed-reg) temp)
                       (:temporary (:sc signed-reg) temp2)
                       (:conditional :be)
                       (:vop-var vop)
@@ -3767,6 +3767,7 @@
                                 ((= hi -1)
                                  (change-vop-flags vop '(:ae))
                                  (inst cmp x (imm flo)))
+                                ((and (= hi (- (expt 2 7)))))
                                 (t
                                  (if (location= temp x)
                                      (if (plusp flo)
@@ -3777,14 +3778,14 @@
 
                 (define-vop (,(symbolicate name '-integer/c))
                   (:translate ,name)
-                  (:args (x :scs (descriptor-reg) :target temp))
+                  (:args (x :scs (descriptor-reg)))
                   (:arg-refs x-ref)
                   (:arg-types (:constant t) ,(if check
                                                  t
                                                  `(:or integer bignum))
                               (:constant t))
                   (:info target not-p lo hi)
-                  (:temporary (:sc signed-reg :from (:argument 0)) temp)
+                  (:temporary (:sc signed-reg) temp)
                   (:temporary (:sc signed-reg) temp2)
                   (:conditional)
                   (:vop-var vop)
