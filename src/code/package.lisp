@@ -72,7 +72,8 @@
                   (:copier nil))
   ;; An extra indirection to the symbol vector allows atomically changing the symbols
   ;; and the division magic parameters.
-  (%cells (missing-arg) :type (cons symtbl-magic simple-vector))
+  (%cells (missing-arg) :type (cons (or symtbl-magic (function (hash-code) index))
+                                    simple-vector))
   (modified nil :type boolean)
   (package nil :type (or null package)) ; backpointer, only if externals
   ;; SIZE is roughly related to the number of symbols the client code asked to be

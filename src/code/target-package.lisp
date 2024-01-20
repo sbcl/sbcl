@@ -1165,29 +1165,6 @@ Experimental: interface subject to change."
             (setf (svref table index) (if (singleton-p new) (car new) new))
             (decf (pkgtable-count table))))))))
 
-;;; Resize and optimize both hashsets of all packages.
-;;; Called from SAVE-LISP-AND-DIE to optimize space usage in the image.
-;;; A better approach may be to dump all SYMTBLs as plain vectors
-;;; and always rebuild them in start-lisp. This would not only unify COLD-INIT
-;;; with the general case, but would ensure that enlarging a table could
-;;; actually clobber old cells while minimizing the number of pseudostatic vectors
-;;; that can't ever be freed.
-(defun tune-hashset-sizes-of-all-packages ()
-  (flet ((tune-table-size (desired-lf table)
-           (resize-symbol-table table (%symtbl-count table) t desired-lf)
-           ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
-           #-darwin-jit (setf (symtbl-modified table) nil)))
-    (dolist (package (list-all-packages))
-      ;; Choose load factor based on whether INTERN is expected at runtime
-      (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
-                      ;; Despite being unalterable, give a slightly better average
-                      ;; probe sequence length to the CL package
-                      ((eq package *cl-package*) 90/100)
-                      ((system-package-p package) 95/100)
-                      (t 8/10))))
-      (tune-table-size lf (package-internal-symbols (truly-the package package)))
-      (tune-table-size lf (package-external-symbols package))))))
-
 ;;; Find where the symbol named STRING is stored in TABLE.
 ;;; INDEX-VAR is bound to the vector index if found, or -1 if not.
 ;;; LENGTH bounds the string, and NAME-HASH should be precomputed by
@@ -1236,22 +1213,31 @@ Experimental: interface subject to change."
                            (values 0 -1)
                            (try new)))))))))
       (named-let try ((cells (symtbl-%cells table)))
-        (let* ((reciprocals (car cells))
+        (let* ((magic (car cells))
                (vec (truly-the simple-vector (cdr cells)))
-               (len (length vec))
-               (index (symbol-table-hash 1 name-hash len)))
-          (declare (index index))
-          (probe (atomic-incf *sym-hit-1st-try*))
+               (len (length vec)))
+          (when (functionp magic)
+            (let ((perfect-hash (funcall magic (ldb (byte 32 0) name-hash))))
+              (when (< perfect-hash len)
+                (let ((symbol (truly-the symbol (svref vec perfect-hash))))
+                  (when (and (eql (symbol-hash symbol) name-hash)
+                             (string= (symbol-name symbol) string :end2 name-length))
+                    (return-from try (values symbol perfect-hash))))))
+            (return-from try (values 0 -1)))
+          (let* ((reciprocals magic)
+                 (index (symbol-table-hash 1 name-hash len)))
+            (declare (index index))
+            (probe (atomic-incf *sym-hit-1st-try*))
           ;; Compute a secondary hash H2, and add it successively to INDEX,
           ;; treating the vector as a ring. This loop is guaranteed to terminate
           ;; because there has to be at least one cell with a 0 in it.
           ;; Whenever we change a cell containing 0 to a symbol, the FREE count
           ;; is decremented. And FREE starts as a smaller number than the vector length.
-          (let ((h2 (symbol-table-hash 2 name-hash len)))
-            (declare (index h2))
-            (loop (when (>= (incf (truly-the index index) h2) len)
-                    (decf (truly-the index index) len))
-                  (probe nil)))))))
+            (let ((h2 (symbol-table-hash 2 name-hash len)))
+              (declare (index h2))
+              (loop (when (>= (incf (truly-the index index) h2) len)
+                      (decf (truly-the index index) len))
+                    (probe nil))))))))
 
 ;;; Almost like %lookup-symbol but compare by EQ, not by name.
 (defun symbol-externalp (symbol package)
@@ -1269,15 +1255,20 @@ Experimental: interface subject to change."
     (let ((table (package-external-symbols package))
           (name-hash (symbol-name-hash symbol)))
       (named-let try ((cells (symtbl-%cells table)))
-        (let* ((reciprocals (car cells))
+        (let* ((magic (car cells))
                (vec (truly-the simple-vector (cdr cells)))
-               (len (length vec))
-               (index (symbol-table-hash 1 name-hash len)))
-          (declare (index index))
-          (probe)
-          (let ((h2 (symbol-table-hash 2 name-hash len)))
-            (loop (when (>= (incf index h2) len) (decf index len))
-                  (probe))))))))
+               (len (length vec)))
+          (when (functionp magic)
+            (let ((perfect-hash (funcall magic (ldb (byte 32 0) name-hash))))
+              (return-from try
+                (and (< perfect-hash len) (eq (svref vec perfect-hash) symbol)))))
+          (let* ((reciprocals magic)
+                 (index (symbol-table-hash 1 name-hash len)))
+            (declare (index index))
+            (probe)
+            (let ((h2 (symbol-table-hash 2 name-hash len)))
+              (loop (when (>= (incf index h2) len) (decf index len))
+                    (probe)))))))))
 
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
@@ -1296,6 +1287,9 @@ Experimental: interface subject to change."
 ;;; If it were _also_ intended to be permissible to EXPORT or UNEXPORT, would it not have said
 ;;; that it is permissible to change accessibility ? I'm not sure.
 (defun nuke-symbol (table symbol splat)
+  (let ((cells (symtbl-%cells table)))
+    (when (functionp (car cells)) ; change table back to not-perfectly-hashed
+      (resize-symbol-table table (length (cdr cells)) splat)))
   (let* ((string (symbol-name symbol))
          (length (length string))
          (hash (symbol-name-hash symbol)))
