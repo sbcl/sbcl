@@ -1284,47 +1284,47 @@
                 ;; they be implemented on an all-or-none basis.
                 (unless (vop-existsp :named sb-vm::%negate/complex-double-float)
                 ;; negation
-                (deftransform %negate ((z) ((complex ,type)) *)
+                (deftransform %negate ((z) ((complex ,type)) * :important nil)
                   '(complex (%negate (realpart z)) (%negate (imagpart z))))
                 ;; complex addition and subtraction
-                (deftransform + ((w z) ((complex ,type) (complex ,type)) *)
+                (deftransform + ((w z) ((complex ,type) (complex ,type)) * :important nil)
                   '(complex (+ (realpart w) (realpart z))
                             (+ (imagpart w) (imagpart z))))
-                (deftransform - ((w z) ((complex ,type) (complex ,type)) *)
+                (deftransform - ((w z) ((complex ,type) (complex ,type)) * :important nil)
                   '(complex (- (realpart w) (realpart z))
                             (- (imagpart w) (imagpart z))))
                 ;; Add and subtract a complex and a real.
-                (deftransform + ((w z) ((complex ,type) real) *)
+                (deftransform + ((w z) ((complex ,type) real) * :important nil)
                   `(complex (+ (realpart w) z)
                             (+ (imagpart w) ,(coerce 0 ',type))))
-                (deftransform + ((z w) (real (complex ,type)) *)
+                (deftransform + ((z w) (real (complex ,type)) * :important nil)
                   `(complex (+ (realpart w) z)
                             (+ (imagpart w) ,(coerce 0 ',type))))
                 ;; Add and subtract a real and a complex number.
-                (deftransform - ((w z) ((complex ,type) real) *)
+                (deftransform - ((w z) ((complex ,type) real) * :important nil)
                   `(complex (- (realpart w) z)
                             (- (imagpart w) ,(coerce 0 ',type))))
-                (deftransform - ((z w) (real (complex ,type)) *)
+                (deftransform - ((z w) (real (complex ,type)) * :important nil)
                   `(complex (- z (realpart w))
                             (- ,(coerce 0 ',type) (imagpart w))))
                 ;; Multiply a complex by a real or vice versa.
-                (deftransform * ((w z) ((complex ,type) real) *)
+                (deftransform * ((w z) ((complex ,type) real) * :important nil)
                   '(complex (* (realpart w) z) (* (imagpart w) z)))
-                (deftransform * ((z w) (real (complex ,type)) *)
+                (deftransform * ((z w) (real (complex ,type)) * :important nil)
                   '(complex (* (realpart w) z) (* (imagpart w) z)))
                 ;; conjugate of complex number
-                (deftransform conjugate ((z) ((complex ,type)) *)
+                (deftransform conjugate ((z) ((complex ,type)) * :important nil)
                   '(complex (realpart z) (- (imagpart z))))
                 ;; comparison
-                (deftransform = ((w z) ((complex ,type) (complex ,type)) *)
+                (deftransform = ((w z) ((complex ,type) (complex ,type)) * :important nil)
                   '(and (= (realpart w) (realpart z))
                     (= (imagpart w) (imagpart z))))
-                (deftransform = ((w z) ((complex ,type) real) *)
+                (deftransform = ((w z) ((complex ,type) real) * :important nil)
                   '(and (= (realpart w) z) (zerop (imagpart w))))
-                (deftransform = ((w z) (real (complex ,type)) *)
+                (deftransform = ((w z) (real (complex ,type)) * :important nil)
                   '(and (= (realpart z) w) (zerop (imagpart z))))
                 ;; Multiply two complex numbers.
-                (deftransform * ((x y) ((complex ,type) (complex ,type)) *)
+                (deftransform * ((x y) ((complex ,type) (complex ,type)) * :important nil)
                   '(let* ((rx (realpart x))
                           (ix (imagpart x))
                           (ry (realpart y))
@@ -1332,12 +1332,12 @@
                     (complex (- (* rx ry) (* ix iy))
                              (+ (* rx iy) (* ix ry)))))
                 ;; Divide a complex by a real.
-                (deftransform / ((w z) ((complex ,type) real) *)
+                (deftransform / ((w z) ((complex ,type) real) * :important nil)
                   '(complex (/ (realpart w) z) (/ (imagpart w) z)))
                 )
 
                 ;; Divide two complex numbers.
-                (deftransform / ((x y) ((complex ,type) (complex ,type)) *)
+                (deftransform / ((x y) ((complex ,type) (complex ,type)) * :important nil)
                   (if (vop-existsp :translate sb-vm::swap-complex)
                       '(let* ((cs (conjugate (sb-vm::swap-complex x)))
                               (ry (realpart y))
@@ -1363,7 +1363,7 @@
                               (complex (/ (+ (* rx r) ix) dn)
                                        (/ (- (* ix r) rx) dn)))))))
                 ;; Divide a real by a complex.
-                (deftransform / ((x y) (real (complex ,type)) *)
+                (deftransform / ((x y) (real (complex ,type)) * :important nil)
                   (if (vop-existsp :translate sb-vm::swap-complex)
                       '(let* ((ry (realpart y))
                               (iy (imagpart y)))
@@ -1416,53 +1416,53 @@
 
 (flet ((def (op)
          (%deftransform op nil '(function (single-float real) single-float)
-                        #'single-float-real-contagion)
+                        #'single-float-real-contagion nil)
          (%deftransform op nil '(function (real single-float) single-float)
-                        #'real-single-float-contagion)
+                        #'real-single-float-contagion nil)
          (%deftransform op nil '(function (double-float real))
-                        #'double-float-real-contagion)
+                        #'double-float-real-contagion nil)
          (%deftransform op nil '(function (real double-float))
-                        #'real-double-float-contagion)
+                        #'real-double-float-contagion nil)
 
          (%deftransform op nil '(function ((complex single-float) real) (complex single-float))
-                        #'single-float-real-contagion)
+                        #'single-float-real-contagion nil)
          (%deftransform op nil '(function (real (complex single-float)) (complex single-float))
-                        #'real-single-float-contagion)
+                        #'real-single-float-contagion nil)
          (%deftransform op nil '(function ((complex double-float) real) (complex double-float))
-                        #'double-float-real-contagion)
+                        #'double-float-real-contagion nil)
          (%deftransform op nil '(function (real (complex double-float)) (complex double-float))
-                        #'real-double-float-contagion)))
+                        #'real-double-float-contagion nil)))
   (dolist (op '(+ * / -))
     (def op)))
 
 (flet ((def (op)
          (%deftransform op nil `(function (single-float (integer ,most-negative-exactly-single-float-integer
                                                                  ,most-positive-exactly-single-float-integer)))
-                        #'single-float-real-contagion)
+                        #'single-float-real-contagion nil)
          (%deftransform op nil `(function ((integer ,most-negative-exactly-single-float-integer
                                                     ,most-positive-exactly-single-float-integer)
                                            single-float))
-                        #'real-single-float-contagion)
+                        #'real-single-float-contagion nil)
 
          (%deftransform op nil `(function (double-float
                                            (or single-float
                                                (integer ,most-negative-exactly-double-float-integer
                                                         ,most-positive-exactly-double-float-integer))))
-                        #'double-float-real-contagion)
+                        #'double-float-real-contagion nil)
          (%deftransform op nil `(function ((or single-float
                                                (integer ,most-negative-exactly-double-float-integer
                                                         ,most-positive-exactly-double-float-integer))
                                            double-float))
-                        #'real-double-float-contagion)))
+                        #'real-double-float-contagion nil)))
   (dolist (op '(= < > <= >=))
     (def op)))
 
 (%deftransform '= nil '(function ((complex double-float) single-float))
-               #'double-float-real-contagion)
+               #'double-float-real-contagion nil)
 (%deftransform '= nil '(function (single-float (complex double-float)))
-               #'real-double-float-contagion)
+               #'real-double-float-contagion nil)
 
-(deftransform complex ((realpart &optional imagpart) (rational &optional (or null (integer 0 0))))
+(deftransform complex ((realpart &optional imagpart) (rational &optional (or null (integer 0 0))) * :important nil)
   'realpart)
 
 ;;; Here are simple optimizers for SIN, COS, and TAN. They do not
