@@ -3767,7 +3767,6 @@
                                 ((= hi -1)
                                  (change-vop-flags vop '(:ae))
                                  (inst cmp x (imm flo)))
-                                ((and (= hi (- (expt 2 7)))))
                                 (t
                                  (if (location= temp x)
                                      (if (plusp flo)
