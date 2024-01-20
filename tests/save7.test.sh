@@ -29,10 +29,7 @@ echo "::: Running :ALWAYS-ACCEPT-MEMORY-SIZES"
 # of dynamic space size for the OS/arch.
 # Test that we find the arg in the midst of the command-line args as well.
 ./"$tmpcore" --no-userinit --control-stack-size 3MB --no-sysinit --noprint <<EOF
-(let* ((end (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-end-slot))
-       (start (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-start-slot))
-       (diff (sb-sys:sap- end start)))
-  (assert (= diff (* 3 1048576))))
+(assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 3 1048576)))
 EOF
 if [ $? -ne 0 ]; then
   exit 1

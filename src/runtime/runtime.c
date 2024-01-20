@@ -462,27 +462,31 @@ parse_argv(struct memsize_options memsize_options,
         dynamic_space_size = memsize_options.dynamic_space_size;
         thread_control_stack_size = memsize_options.thread_control_stack_size;
         dynamic_values_bytes = memsize_options.thread_tls_bytes;
-#ifndef LISP_FEATURE_WIN32
-        sbcl_argv = successful_malloc((argc + 1) * sizeof(char *));
-        sbcl_argv[0] = argv[0];
         int stop_parsing = 0; // have we seen '--'
         int output_index = 1;
+
+#ifndef LISP_FEATURE_WIN32
+        sbcl_argv = successful_malloc((argc + 1) * sizeof(char *));
+        char **argv_source = argv;
+#else
+        int wargc;
+        wchar_t **argv_source;
+        argv_source = CommandLineToArgvW(GetCommandLineW(), &wargc);
+        sbcl_argv = successful_malloc((wargc + 1) * sizeof(wchar_t *));
+#endif
+        sbcl_argv[0] = argv_source[0];
+
         while (argi < argc) {
             if (stop_parsing) // just copy it over
-                sbcl_argv[output_index++] = argv[argi++];
+                sbcl_argv[output_index++] = argv_source[argi++];
             else if (!strcmp(argv[argi], "--")) // keep it, but parse nothing else
-                sbcl_argv[output_index++] = argv[argi++], stop_parsing = 1;
+                sbcl_argv[output_index++] = argv_source[argi++], stop_parsing = 1;
             else if ((n_consumed = is_memsize_arg(argv, argi, argc, &merge_core_pages)))
                 argi += n_consumed; // eat it
             else // default action - copy it
-                sbcl_argv[output_index++] = argv[argi++];
+                sbcl_argv[output_index++] = argv_source[argi++];
         }
         sbcl_argv[output_index] = 0;
-#else
-        int wargc;
-        sbcl_argv = CommandLineToArgvW(GetCommandLineW(), &wargc);
-        // Somebody who wishes this to work for #+win32 should feel free to do the same...
-#endif
     } else {
         bool end_runtime_options = 0;
         /* Parse our any of the command-line options that we handle from C,
