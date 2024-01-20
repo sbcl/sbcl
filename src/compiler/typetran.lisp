@@ -1715,3 +1715,13 @@
                      `(fixnum-mod-p x ,power-of-two))))))
             (t
              (give-up-ir1-transform))))))
+
+(when-vop-existsp (:translate signed-byte-8-p)
+  (macrolet ((def (bits)
+               `(deftransform ,(symbolicate "SIGNED-BYTE-" (princ-to-string bits) "-P")
+                    ((x) (unsigned-byte) * :important nil)
+                  '(typep x '(unsigned-byte ,(1- bits))))))
+    (def 8)
+    (def 16)
+    #+64-bit
+    (def 32)))
