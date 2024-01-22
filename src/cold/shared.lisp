@@ -956,42 +956,38 @@
                       entries))))))
 
 (defun emulate-generate-perfect-hash-sexpr (array)
-  ;; An entry in the file is stored with its hashes sorted in ascending order
-  ;; that we can compare sets by EQUALP which is a lot easier than coming up with
-  ;; an order-insensitive equality test. So we want to sort the array
-  ;; nondestructively in case something else looks at it in a specific order.
-  (let* ((canonical-array (sort (copy-seq array) #'<))
-         (digest (reduce #'logxor canonical-array))
-         (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
-                       :test #'equalp)))
-    (when match
-      (return-from emulate-generate-perfect-hash-sexpr (cdr match)))
+  (let ((computed
+         #+use-host-hash-generator
+         (let ((string
+                (sb-int:newcharstar-string
+                 (sb-sys:with-pinned-objects (array)
+                   (sb-alien:alien-funcall
+                    (sb-alien:extern-alien
+                     "generate_perfhash_sexpr"
+                     (function (* sb-alien:char) sb-alien:system-area-pointer sb-alien:int))
+                    (sb-sys:vector-sap array) (length array))))))
+           ;; don't need the final newline, it looks un-lispy in the file
+           (let ((l (length string)))
+             (assert (char= (char string (1- l)) #\newline))
+             (subseq string 0 (1- l))))))
+    ;; Entries are written to disk with hashes sorted in ascending order so that
+    ;; comparing as sets can be done using EQUALP.
+    ;; Sort nondestructively in case something else looks at the value as supplied.
+    (let* ((canonical-array (sort (copy-seq array) #'<))
+           (digest (reduce #'logxor canonical-array))
+           (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
+                         :test #'equalp)))
+      (when match
+        (when computed (assert (string= (cdr match) computed)))
+        (return-from emulate-generate-perfect-hash-sexpr (cdr match)))
     (ecase *perfect-hash-generator-mode*
       (:playback
        (error "perfect hash file is missing a needed entry for ~x" array))
       (:record
-     ;; I'm pretty sure any version of SBCL no matter how old that can compile SBCL
-     ;; will be able to read this expression without error. This code won't be invoked
-     ;; unless the version criteron is satisfied though.
-     ;; I'm wrong about that, we can put in the usual "#.(cl:if ...)" idiom
-       #+use-host-hash-generator
-       (let ((string
-              (sb-int:newcharstar-string
-               (sb-sys:with-pinned-objects (array)
-                 (sb-alien:alien-funcall
-                  (sb-alien:extern-alien
-                   "generate_perfhash_sexpr"
-                   (function (* sb-alien:char) sb-alien:system-area-pointer sb-alien:int))
-                  (sb-sys:vector-sap array) (length array))))))
-         ;; don't need the final newline, it looks un-lispy in the file
-         (let ((l (length string)))
-           (assert (char= (char string (1- l)) #\newline))
-           (setf string (subseq string 0 (1- l))))
-         ;; (format t "~&Adding perfect hash entry for ~X~%" array)
-         (setf *perfect-hash-generator-memo*
-               (nconc *perfect-hash-generator-memo*
-                      (list (cons (cons digest canonical-array) string))))
-         string)))))
+       (setf *perfect-hash-generator-memo*
+             (nconc *perfect-hash-generator-memo*
+                    (list (cons (cons digest canonical-array) computed))))
+       computed)))))
 
 (defun compile-perfect-hashfun-for-host (lambda)
   ;; Remove the declare:
