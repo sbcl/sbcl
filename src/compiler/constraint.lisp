@@ -1131,36 +1131,38 @@
                (kind (constraint-kind con)))
           (case kind
             (typep
-             (if not-p
-                 (if (member-type-p other)
-                     (mapc-member-type-members #'note-not other)
-                     (setq not-res (type-union not-res other)))
-                 (setq res (type-intersection res other))))
+             (when (type-for-constraints-p other)
+               (if not-p
+                   (if (member-type-p other)
+                       (mapc-member-type-members #'note-not other)
+                       (setq not-res (type-union not-res other)))
+                   (setq res (type-intersection res other)))))
             (eql
              (let ((other-type (leaf-type other)))
-               (if not-p
-                   (when (constant-p other)
-                     (cond ((member-type-p other-type)
-                            (note-not (constant-value other)))
-                           ;; Numeric types will produce interesting
-                           ;; negations, other than just "not equal"
-                           ;; which can be handled by the equality
-                           ;; constraints.
-                           ((numeric-type-p other-type)
-                            (add-to-xset (constant-value other) not-numeric))))
-                   (let ((leaf-type (leaf-type leaf)))
-                     (cond
-                       ((or (constant-p other)
-                            (and (leaf-refs other) ; protect from
+               (when (type-for-constraints-p other-type)
+                 (if not-p
+                     (when (constant-p other)
+                       (cond ((member-type-p other-type)
+                              (note-not (constant-value other)))
+                             ;; Numeric types will produce interesting
+                             ;; negations, other than just "not equal"
+                             ;; which can be handled by the equality
+                             ;; constraints.
+                             ((numeric-type-p other-type)
+                              (add-to-xset (constant-value other) not-numeric))))
+                     (let ((leaf-type (leaf-type leaf)))
+                       (cond
+                         ((or (constant-p other)
+                              (and (leaf-refs other) ; protect from
                                         ; deleted vars
-                                 (csubtypep other-type leaf-type)
-                                 (not (type= other-type leaf-type))
-                                 ;; Don't change to a LEAF not visible here.
-                                 (leaf-visible-from-node-p other ref)))
-                        (change-ref-leaf ref other)
-                        (when (constant-p other) (return)))
-                       (t
-                        (setq res (type-intersection res other-type))))))))
+                                   (csubtypep other-type leaf-type)
+                                   (not (type= other-type leaf-type))
+                                   ;; Don't change to a LEAF not visible here.
+                                   (leaf-visible-from-node-p other ref)))
+                          (change-ref-leaf ref other)
+                          (when (constant-p other) (return)))
+                         (t
+                          (setq res (type-intersection res other-type)))))))))
             ((< > <= >= =)
              (let ((type (type-after-comparison kind not-p res y)))
                (when type
