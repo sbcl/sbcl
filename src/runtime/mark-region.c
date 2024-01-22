@@ -56,7 +56,7 @@ static struct {
   _Atomic(uword_t) consider, scavenge, prefix;
   _Atomic(uword_t) trace, trace_alive, trace_running;
   _Atomic(uword_t) sweep, weak, sweep_lines, sweep_pages;
-  _Atomic(uword_t) compact, copy, fix, raise;
+  _Atomic(uword_t) compact, copy, fix, compact_resweep, raise;
   uword_t fresh_pointers; uword_t pinned_pages;
   uword_t compacts;
 } meters = { 0 };
@@ -72,14 +72,14 @@ void mr_print_meters() {
           "collection %d (%.0f%% compacting):\n"
           "  %ldus consider\n"
           "  %ld scavenge (%ld prefixes) %ld trace (%ld alive %ld running)\n"
-          "  %ld sweep (%ld lines %ld pages) %ld compact (%ld copy %ld fix)\n"
+          "  %ld sweep (%ld lines %ld pages) %ld compact (%ld copy %ld fix %ld resweep)\n"
           "  %ld raise; %ldB fresh %ldpg pinned\n",
           collection,
           collection ? 100.0 *  (float)meters.compacts / collection : 0.0,
           NORM(consider), NORM(scavenge), NORM(prefix),
           NORM(trace), NORM(trace_alive), NORM(trace_running),
           NORM(sweep), NORM(sweep_lines), NORM(sweep_pages),
-          NORM(compact), NORM(copy), NORM(fix),
+          NORM(compact), NORM(copy), NORM(fix), NORM(compact_resweep),
           NORM(raise), NORM(fresh_pointers), NORM(pinned_pages));
 #undef NORM
 }
@@ -1210,7 +1210,7 @@ void mr_collect_garbage(bool raise) {
      * we could snoop TLS of each GC thread instead. */
     run_on_thread_pool(commit_thread_local_remset);
     reset_alloc_start_pages(true);
-    METER(compact, run_compaction(&meters.copy, &meters.fix));
+    METER(compact, run_compaction(&meters.copy, &meters.fix, &meters.compact_resweep));
   }
 #endif
   /* scan_finalizers checks forwarding pointers, so we need to
@@ -1305,11 +1305,11 @@ void find_references_to(lispobj something) {
 void draw_page_table(int from, int to) {
   fprintf(stderr, "\n       ");
   for (int i = 0; i < 50; i++)
-    fprintf(stderr, "%3d", i);
+    fprintf(stderr, "%3d ", i);
   for (int i = from; i < to; i++) {
     if (i % 50 == 0) fprintf(stderr, "\n%6d ", i);
     fprintf(stderr,
-            "\033[%c;9%cm%c%c%c\033[0m",
+            "\033[%c;9%cm%c%c%c\033[0m ",
             (page_table[i].type & SINGLE_OBJECT_FLAG) ? '1' : '0',
             '0' + (page_table[i].type & 7),
             64 + page_table[i].type,
