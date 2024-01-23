@@ -996,6 +996,7 @@
     (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
       (compile nil new))))
 (defun maybe-save-perfect-hashfuns-for-playback ()
+  ;; FIXME: file corruption occurs for -jN > 1 from make-all-targets.sh
   #+use-host-hash-generator
   (when (eq *perfect-hash-generator-mode* :record)
     (with-open-file (stream *perfect-hash-generator-journal*
