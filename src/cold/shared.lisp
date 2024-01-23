@@ -932,7 +932,6 @@
 (defvar *perfect-hash-generator-journal* "xperfecthash.lisp-expr")
 #+sbcl (when (and (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
                   (find-symbol "NEWCHARSTAR-STRING" "SB-INT"))
-         (format t "~&; NOTE: using host's perfect hash generator~%")
          (pushnew :use-host-hash-generator cl:*features*)
          (setq *perfect-hash-generator-mode* :RECORD))
 
