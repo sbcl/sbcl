@@ -394,8 +394,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
       (format stream
               "(~D+~D)/~D [~@[~,3f words/sym,~]load=~,1f%]"
               n-live n-deleted n-cells
-              (unless (zerop n-live)
-                (/ (* (1+ (/ sb-vm:n-word-bytes)) n-cells) n-live))
+              (unless (zerop n-live) (/ n-cells n-live))
               (* 100 (/ n-filled n-cells))))))
 
 (defun optimized-symtbl-remainder-params (denominator)
