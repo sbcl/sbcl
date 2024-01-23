@@ -336,7 +336,7 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
                  struct code __attribute__((unused)) *code,
                  lispobj __attribute__((unused)) original_vaddr)
 {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#if defined LISP_FEATURE_PERMGEN || defined LISP_FEATURE_IMMOBILE_SPACE
     // Dynamic space always gets relocated before immobile space does,
     // and dynamic space code does not use fixups (except on 32-bit x86).
     // So if we're here, it must be to relocate an immobile object.
@@ -388,7 +388,7 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
 #endif
 }
 
-static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
+static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
     int widetag;
     long nwords;
@@ -559,8 +559,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         adjust_pointers(where+1, nwords-1, adj);
     }
 #if SHOW_SPACE_RELOCATION
-    fprintf(stderr, "space @ %p..%p: fixed %d absolute + %d relative pointers\n",
-            (lispobj*)start, end, adj->n_relocs_abs, adj->n_relocs_rel);
+    if (end)
+        fprintf(stderr, "space @ %p..%p: fixed %d absolute + %d relative pointers\n",
+                (lispobj*)start, end, adj->n_relocs_abs, adj->n_relocs_rel);
 #endif
 }
 
@@ -577,24 +578,22 @@ static void relocate_heap(struct heap_adjust* adj)
                         (char*)adj->range[i].end + adj->range[i].delta);
     }
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-    relocate_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, adj);
+    fix_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, adj);
     // Relocate the CAR slot of nil-as-a-list, which needs to point to
     // itself.
     adjust_pointers((void*)(NIL - LIST_POINTER_LOWTAG), 1, adj);
 #endif
-    relocate_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, adj);
-    relocate_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
-#ifdef LISP_FEATURE_PERMGEN_SPACE
-    relocate_space(PERMGEN_SPACE_START, permgen_space_free_pointer, adj);
-#endif
+    fix_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, adj);
+    fix_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
+    fix_space(PERMGEN_SPACE_START, permgen_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
+    fix_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
 #endif
-    relocate_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(),
+    fix_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(),
                    adj);
     // FIXME: This fixes pointers in the space but I think it won't work
     // if the space itself fails to map where requested.
-    relocate_space(TEXT_SPACE_START, text_space_highwatermark, adj);
+    fix_space(TEXT_SPACE_START, text_space_highwatermark, adj);
 }
 
 #if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_SPACE)
@@ -765,7 +764,7 @@ process_directory(int count, struct ndir_entry *entry,
     }
 
     for ( ; --count >= 0 ; ++entry) {
-        long id = entry->identifier;
+        long id = entry->identifier; // FIXME: is this 'long' and not 'int' for a reason?
         uword_t addr = entry->address;
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
@@ -806,7 +805,6 @@ process_directory(int count, struct ndir_entry *entry,
                 READ_ONLY_SPACE_START = READ_ONLY_SPACE_END = addr;
             }
         }
-        if (id == PERMGEN_CORE_SPACE_ID) PERMGEN_SPACE_START = addr;
         if (len != 0) {
             spaces[id].len = len;
             size_t request = spaces[id].desired_size;
@@ -819,6 +817,9 @@ process_directory(int count, struct ndir_entry *entry,
             addr = (uword_t)reserve_space(id, sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                           (os_vm_address_t)addr, request);
             switch (id) {
+            case PERMGEN_CORE_SPACE_ID:
+                PERMGEN_SPACE_START = addr;
+                break;
             case STATIC_CORE_SPACE_ID:
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
                 STATIC_SPACE_START = addr;
@@ -915,6 +916,7 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
     set_adjustment(&spaceadj, STATIC_CORE_SPACE_ID, STATIC_SPACE_START);
 #endif
+    set_adjustment(&spaceadj, PERMGEN_CORE_SPACE_ID, PERMGEN_SPACE_START);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     set_adjustment(&spaceadj, IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, FIXEDOBJ_SPACE_START);
     if (!apply_pie_relocs(TEXT_SPACE_START
@@ -1328,7 +1330,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         {READ_ONLY_CORE_SPACE_ID, 0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
         {STATIC_CORE_SPACE_ID, 0, 0, STATIC_SPACE_START, &static_space_free_pointer},
 #ifdef LISP_FEATURE_PERMGEN
-        {PERMGEN_CORE_SPACE_ID, PERMGEN_SPACE_SIZE, 0,
+        {PERMGEN_CORE_SPACE_ID, PERMGEN_SPACE_SIZE | 1, 0,
          PERMGEN_SPACE_START, &permgen_space_free_pointer},
 #endif
 #ifdef LISP_FEATURE_DARWIN_JIT

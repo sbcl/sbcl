@@ -1777,15 +1777,14 @@
                                      (logior (sap-int (sap+ (space-physaddr text-space spacemap)
                                                             (aref offsets-vector j)))
                                              other-pointer-lowtag))))
-                       ;; Assert that there are no fixups other than GC card table mask fixups
+                       ;; Assert that there are no relative fixups
                        (let ((fixups (sb-vm::%code-fixups physobj)))
                          (unless (fixnump fixups)
                            (setq fixups (translate fixups spacemap))
                            (aver (typep fixups 'bignum)))
                          (multiple-value-bind (list1 list2 list3)
                              (sb-c::unpack-code-fixup-locs fixups)
-                           (declare (ignore list3))
-                           (aver (null list1))
+                           (declare (ignore list1 list3))
                            (aver (null list2))))
                        (patch-lisp-codeblob physobj vaddr spacemap
                                             static-space-asm-code text-space-asm-code))))

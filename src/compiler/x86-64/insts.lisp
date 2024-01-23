@@ -3393,7 +3393,7 @@
            (offset (fixup-note-position note))
            (flavor (fixup-flavor fixup)))
       (cond ((eq flavor :card-table-index-mask) (push offset imm-fixups))
-            #+immobile-space
+            #+(or permgen immobile-space)
             ((and (eq (fixup-note-kind note) :abs32)
                   (memq flavor ; these all point to fixedobj space
                         '(:fdefn-call :layout :immobile-symbol :symbol-value)))
