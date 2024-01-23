@@ -399,7 +399,8 @@
 (SIMPLE-VECTOR 62)
 ))
 
-(with-test (:name :array-type-hash-mixer)
+(with-test (:name :array-type-hash-mixer
+            :skipped-on :gc-stress)
   (let* ((hs sb-kernel::*array-type-hashset*)
          (pre (compute-max-psl hs)))
     (assert (<= pre 9))
@@ -424,7 +425,8 @@
 ;; Histogram:    1    2    3    4    5    6    7    8    9   10   11   12
 ;;             314  172   57   24   14    6    1    0    0    0    0    0
 ;; Avg=1.7653061
-(with-test (:name :numeric-type-hash-mixer)
+(with-test (:name :numeric-type-hash-mixer
+            :skipped-on :gc-stress)
   (let* ((hs sb-kernel::*numeric-type-hashset*)
          ;; Theoretically we should be more concerned with the _average_
          ;; number of probes assuming all keys are sought equally (which is seldom true),
