@@ -1297,16 +1297,16 @@ static int inithex(
       final->line[0][0] = final->line[1][0] = final->line[2][0] = final->line[3][0] =
       final->line[4][0] = final->line[5][0] = final->line[6][0] = final->line[7][0] = 0;
       if (form->infix) strcpy(final->line[0], "ub4 a, b, rsl");
-      if (blen < USE_SCRAMBLE)
+    }
+    if (blen < USE_SCRAMBLE)
       {                                                               /* hns */
 	sprintf(final->line[7], form->infix ? "rsl = (a^tab[b])" : "(^ a (aref tab b))");
       }
-      else
+    else
       {                                                               /* hnt */
 	sprintf(final->line[7], form->infix ? "rsl = (a^scramble[tab[b]])"
                 : "(^ a (aref scramble (aref tab b)))");
       }
-    }
     hexn(keys, salt, alen, blen, final, form->infix);
     return FALSE;
   }
