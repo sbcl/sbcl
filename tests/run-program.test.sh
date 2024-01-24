@@ -39,9 +39,8 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
   (assert (not (zerop (sb-ext:process-exit-code
                        (sb-ext:run-program "false" () :search t :wait t)))))
   (let ((string (with-output-to-string (stream)
-                  (our-run-program    "/bin/echo"
-                                      '("foo" "bar")
-                                      :output stream))))
+                  (run-program  "echo" '("foo" "bar")
+                                :search t :output stream))))
     (assert (string= string "foo bar
 ")))
   (format t ";;; Smoke tests: PASS~%")
@@ -103,8 +102,8 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
   ;; make sure that a stream input argument is basically reasonable.
   (let ((string (let ((i (make-string-input-stream "abcdef")))
                   (with-output-to-string (stream)
-                    (our-run-program "/bin/cat" ()
-                                        :input i :output stream)))))
+                    (run-program "cat" ()
+                                 :search t :input i :output stream)))))
     (assert (= (length string) 6))
     (assert (string= string "abcdef")))
 

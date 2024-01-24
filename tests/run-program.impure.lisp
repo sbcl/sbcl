@@ -15,7 +15,7 @@
 
 (defun bin-pwd-ignoring-result ()
   (let ((initially-open-fds (directory "/proc/self/fd/*" :resolve-symlinks nil)))
-    (sb-ext:run-program "/usr/bin/pwd" nil :input :stream :output :stream :wait nil)
+    (sb-ext:run-program "pwd" nil :search t :input :stream :output :stream :wait nil)
     (length initially-open-fds)))
 
 (with-test (:name (run-program :autoclose-streams)
@@ -49,7 +49,7 @@
 (with-test (:name (run-program :cat 2)
                   :skipped-on (or (not :sb-thread) :win32))
   ;; Tests that reading from a FIFO is interruptible.
-  (let* ((process (run-program "/bin/cat" '()
+  (let* ((process (run-program "cat" '() :search t
                                :wait nil :output :stream :input :stream))
          (in (process-input process))
          (out (process-output process))
@@ -167,7 +167,7 @@
   (defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*)))
 
 (with-test (:name (run-program :cat 5) :fails-on :win32)
-  (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out*
+  (let ((cat (run-program "cat" nil :search t :input *cat-in* :output *cat-out*
                           :wait nil)))
     (dolist (test '("This is a test!"
                     "This is another test!"
@@ -310,14 +310,16 @@
   (let ((had-error-p nil))
     (flet ((barf (&optional (format :default))
              (with-output-to-string (stream)
-               (run-program #-netbsd "/usr/bin/perl" #+netbsd "/usr/pkg/bin/perl"
+               (run-program "perl"
                             '("-e" "print \"\\x20\\xfe\\xff\\x0a\"")
+                            :search t
                             :output stream
                             :external-format format)))
            (no-barf ()
              (with-output-to-string (stream)
-               (run-program "/bin/echo"
+               (run-program "echo"
                             '("This is a test")
+                            :search t
                             :output stream))))
       (handler-case
           (barf :utf-8)
@@ -353,9 +355,9 @@
                ;; If the permitted inputs are :ANY then leave it be
                (listp (symbol-value 'run-tests::*allowed-inputs*)))
       (push (namestring file) (symbol-value 'run-tests::*allowed-inputs*)))
-    (assert (null (run-program "/bin/cat" '() :input file)))
-    (assert (null (run-program "/bin/cat" '() :output #.(or *compile-file-truename*
-                                                            *load-truename*)
+    (assert (null (run-program "cat" '() :search t :input file)))
+    (assert (null (run-program "cat" '() :search t :output #.(or *compile-file-truename*
+                                                                 *load-truename*)
                                       :if-output-exists nil)))))
 
 
