@@ -880,9 +880,13 @@
                (multiple-value-bind (keyword var def sup-p-var)
                    (parse-key-arg-spec elt default-default)
                  (let ((temp (gensym)))
-                   (bind `(,temp (ds-getf ,input ',keyword)))
-                   (bind-if :not `(eql ,temp 0) `(car (truly-the cons ,temp))
-                            var sup-p-var def))))
+                   (cond ((and (not sup-p-var)
+                               (constantp def))
+                          (bind-pat var `(getf ,input ',keyword ,@(and def `(,def)))))
+                         (t
+                          (bind `(,temp (getf ,input ',keyword (make-unbound-marker))))
+                          (bind-if :not `(unbound-marker-p ,temp) temp
+                                   var sup-p-var def))))))
 
              ;; &AUX bindings aren't destructured. Finally something easy.
              (dolist (elt aux)
@@ -1085,25 +1089,6 @@
                               (signal 'compiler-macro-keyword-problem
                                       :argument key))))
                     (check-ds-bind-keys input list valid-keys pattern)))))
-
-;; Like GETF but return CDR of the cell whose CAR contained the found key,
-;; instead of CADR; and return 0 for not found.
-;; This helps destructuring-bind slightly by avoiding a secondary value as a
-;; found/not-found indicator, and using 0 is better for backends which don't
-;; wire a register to NIL. Also, NIL would accidentally allow taking its CAR
-;; if the caller were to try, whereas we'd want to see a explicit error.
-(defun ds-getf (place indicator)
-  (do ((plist place (cddr plist)))
-      ((null plist) 0)
-    (cond ((atom (cdr plist))
-           (error 'simple-type-error
-                  :format-control "malformed property list: ~S."
-                  :format-arguments (list place)
-                  :datum (cdr plist)
-                  :expected-type 'cons))
-          ((eq (car plist) indicator)
-           ;; Typecheck the next cell so that calling code doesn't get an atom.
-           (return (the cons (cdr plist)))))))
 
 ;;; Make a lambda expression that receives an s-expression, destructures it
 ;;; according to LAMBDA-LIST, and executes BODY.

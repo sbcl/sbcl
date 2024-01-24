@@ -103,8 +103,6 @@
   (if (symbolp x) nil (error "Called SIMPLE-FUN-P on ~S" x)))
 (defun closurep (x)
   (if (symbolp x) nil (error "Called CLOSUREP on ~S" x)))
-(defun unbound-marker-p (x)
-  (if (symbolp x) nil (error "Called UNBOUND-MARKER-P on ~S" x)))
 (defun vector-with-fill-pointer-p (x)
   (if (symbolp x) nil (error "Called VECTOR-WITH-FILL-POINTER-P on ~S" x)))
 
@@ -403,3 +401,10 @@
 (defun range<<= (l x h) (and (< l x) (<= x h)))
 (defun range<=< (l x h) (and (<= l x) (< x h)))
 
+(defvar *unbound-marker* (make-symbol "UNBOUND-MARKER"))
+
+(defun make-unbound-marker ()
+  *unbound-marker*)
+
+(defun unbound-marker-p (x)
+  (eq x *unbound-marker*))
