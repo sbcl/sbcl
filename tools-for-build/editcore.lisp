@@ -1700,7 +1700,7 @@
                         (fixnump (load-wordindexed sap 2)))
                    (unboxed-like-simple-vector sap))
                :unboxed)
-              ((or (member widetag `(,symbol-widetag ,weak-pointer-widetag))
+              ((or (member widetag `(,symbol-widetag ,weak-pointer-widetag ,fdefn-widetag))
                    (and (= widetag instance-widetag)
                         (not (instance-strictly-boxed-p sap spacemap)))
                    (and (= widetag simple-vector-widetag)
@@ -1725,7 +1725,13 @@
   (let* ((sap (physical-sap descriptor old-spacemap))
          (old-size (size-of sap))
          (size old-size)
-         (largep (>= size large-object-size))
+         ;;; Prevent page-spanning small objects for gencgc. Reorganizing is
+         ;;; primarily for mark-region GC which disallows page-spanning other than
+         ;;; for large objects. With gencgc we'd have to compute the scan-start
+         ;;; on subsequent pages, and put the end-of-page free space in a list.
+         ;;; It's not worth the hassle.
+         (largep #+gencgc (>= size sb-vm:gencgc-page-bytes)
+                 #-gencgc (>= size large-object-size))
          (page-type (pick-page-type descriptor sap largep old-spacemap))
          (newspace (get-space dynamic-core-space-id new-spacemap))
          (new-nslots) ; only set if it's a resized instance
@@ -1774,6 +1780,7 @@
                        (object-index (ash (- new-vaddr page-base) (- n-lowtag-bits))))
                   (incf (page-words-used pte) nwords)
                   (setf (sbit (page-bitmap pte) object-index) 1)
+                  (aver (>= (cdr gap) size))
                   (if (plusp (decf (cdr gap) size))
                       (incf (car gap) size) ; the gap is moved upward by SIZE
                       (setf (cdr list) (delq1 gap (cdr list)))))
@@ -1782,6 +1789,7 @@
                   (setq new-vaddr (+ dynamic-space-start (* page gencgc-page-bytes)))
                   (setf (bit (page-bitmap (claim-page 0 nwords)) 0) 1)
                   (let ((gap (cons (+ new-vaddr size) (- gencgc-page-bytes size))))
+                    (aver (> (cdr gap) 0))
                     (nconc list (list gap))))))))
     (let ((new-sap (physical-sap new-vaddr new-spacemap))
           (old-sap (physical-sap descriptor old-spacemap))
@@ -1904,7 +1912,8 @@
             (setf initfun (gethash initfun seen))
             (flet ((n (spaces)
                      (space-next-free-page (get-space dynamic-core-space-id spaces))))
-              (format t "Compactor: n-pages was ~D, is ~D~%" (n spacemap) (n new-spacemap)))
+              (when print
+                (format t "Compactor: n-pages was ~D, is ~D~%" (n spacemap) (n new-spacemap))))
             ;; Shrink the page table and encode the page types as required
             (setf (space-page-table newspace)
                   (subseq (space-page-table newspace) 0 (space-next-free-page newspace)))
