@@ -442,24 +442,30 @@ between the ~A definition and the ~A definition"
 
 ;;; Arrange the inherited layouts to appear at their expected depth,
 ;;; ensuring that hierarchical type tests succeed. Layouts with
-;;; DEPTHOID >= 0 (i.e. hierarchical classes) are placed first,
-;;; at exactly that index in the INHERITS vector. Then, non-hierarchical
+;;; DEPTHOID >= 0 (i.e. hierarchical classes) are placed first, at
+;;; exactly that index in the INHERITS vector. Then, non-hierarchical
 ;;; layouts are placed in remaining elements. Then, any still-empty
-;;; elements are filled with their successors, ensuring that each
-;;; element contains a valid layout.
+;;; elements are filled with their successors, as might happen when
+;;; layouts corresponding to classes which can be multiply-inherited
+;;; but aren't, ensuring that each element contains a valid layout.
 ;;;
-;;; *** FIXME *** the preceding comment seems dubious, and I'm not sure whether
-;;; to fix the code or the comment or both. The code works as-is, but is too hairy.
-;;; I fail to see how "still-empty" elements can exist after filling in mandatory
-;;; elements. It seems to anticipate being able to create a type whose INHERITS vector
-;;; length exceeds depthoid, or, say, a type at depthoid 5 which inherits STREAM but
-;;; might lack an entry at depth index 1 for example. As to why I think the comment
-;;; is false: FILE-STREAM and STRING-STREAM each have depthoid 4, but their INHERITS
-;;; vector has length 2. So they don't store elements that would be at index 2 and 3.
-;;; Length less than depthoid is opposite of what the fill-in logic supports.
-;;; How, in practice, could a user achieve such weird states as need this logic?
-;;; If impossible, then simplify it.
-
+;;; KLUDGE: when constructing the built in classoids themselves,
+;;; ORDER-LAYOUT-INHERITS is not called.  This leads to the
+;;; layout-inherits of those built-in-classoids not following the
+;;; rules (for example, the layout-inherits of FILE-STREAM is of
+;;; length 2, containing just the layouts of T and STREAM; STREAM is
+;;; defined to be at depth 3, so why don't we see problems?  For two
+;;; reasons, I think; firstly, type checks of the classoids at
+;;; specified fixed depth is actually handled through special bits in
+;;; the layout hash, rather than the previous implementation of
+;;; indexing the layout-inherits vector at the known depth and
+;;; checking for EQLity.  Secondly, the built-in-classoids with this
+;;; property (a specified depth with space for multiple-inheritance)
+;;; are all abstract; even if we were still indexing the
+;;; layout-inherits vector, it's not possible to create a direct
+;;; instance of FILE-STREAM / STRING-STREAM / SEQUENCE in order to
+;;; (possibly) get the wrong answer from TYPEP.  -- CSR, 2024-01-24
+;;;
 ;;; This reordering may destroy CPL ordering, so the inherits should
 ;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)
@@ -1137,7 +1143,7 @@ between the ~A definition and the ~A definition"
          (sequence
           :translation (or cons (member nil) vector extended-sequence)
           :state :read-only
-          :depth 1)
+          :depth 2)
          (vector
           :translation vector :codes (,sb-vm:complex-vector-widetag)
           :direct-superclasses (array sequence)
@@ -1263,16 +1269,16 @@ between the ~A definition and the ~A definition"
          (stream
           :predicate streamp
           :state :read-only
-          :depth 2)
+          :depth 3)
          (file-stream
           :predicate file-stream-p
           :state :read-only
-          :depth 4
+          :depth 5
           :inherits (stream))
          (string-stream
           :predicate string-stream-p
           :state :read-only
-          :depth 4
+          :depth 5
           :inherits (stream))
          ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
                  unless (member (sb-vm:saetp-specifier x) '(t character base-char nil bit))

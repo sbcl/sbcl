@@ -59,6 +59,12 @@
 (declaim (inline coerce-to-list))
 (declaim (inline coerce-to-vector))
 
+(defun coerce-to-extended-sequence (object class)
+  (let ((prototype (sb-mop:class-prototype
+                    (sb-pcl:ensure-class-finalized class))))
+    (sb-sequence:make-sequence-like
+     prototype (length object) :initial-contents object)))
+
 (defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because
   ;; it's so big and because optimizing away the outer ETYPECASE
@@ -233,13 +239,11 @@
            (sequence (sequence-to-vector* object output-type-spec))
            (t
             (coerce-error))))
-        ((and (csubtypep type (specifier-type 'sequence))
-              (find-class output-type-spec nil))
-         (let ((prototype (sb-mop:class-prototype
-                           (sb-pcl:ensure-class-finalized
-                            (find-class output-type-spec)))))
-           (sb-sequence:make-sequence-like
-            prototype (length object) :initial-contents object)))
+        ((csubtypep type (specifier-type 'sequence))
+         (let ((class (find-class output-type-spec nil)))
+           (if class
+               (coerce-to-extended-sequence object class)
+               (coerce-error))))
         ((csubtypep type (specifier-type 'function))
          (coerce-to-fun object))
         (t
