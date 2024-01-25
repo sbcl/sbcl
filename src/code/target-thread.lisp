@@ -220,7 +220,7 @@ a simple-string (not necessarily unique) or NIL."
               ;; if not finished, show the STATE as a list.
               ;; if finished, show the VALUES.
               "~@[tid=~D ~]~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
-              (or #+linux (thread-os-tid thread))
+              (thread-os-tid thread)
               (thread-name thread)
               (eq :finished state)
               state
@@ -2256,9 +2256,9 @@ subject to change."
         ;; -- DFL
         (setf *thruption-pending* t)))))
 
-#+linux
 (defun thread-os-tid (thread)
   (declare (ignorable thread))
+  #+(or linux win32 freebsd darwin openbsd)
   (if (eq *current-thread* thread)
       (my-kernel-thread-id)
       (with-deathlok (thread c-thread)
