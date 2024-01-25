@@ -2804,7 +2804,7 @@
 (sb-mop:remove-direct-subclass (find-class 'standard-object)
                                (sb-ext:weak-pointer-value *removing-a-class*))
 
-(with-test (:name :removing-a-class)
+(with-test (:name :removing-a-class :fails-on :permgen)
   (sb-ext:gc :full t)
   (assert (not (sb-ext:weak-pointer-value *removing-a-class*))))
 

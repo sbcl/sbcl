@@ -66,7 +66,7 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
-#+immobile-space
+#+(or immobile-space permgen) ; i.e. can LAYOUT instance have immediate SC
 (defun type-err-type-tn-loadp (thing)
   (cond ((sc-is thing immediate)
          (let ((obj (tn-value thing)))
@@ -92,7 +92,7 @@
                                                 unsigned-reg signed-reg constant
                                                 single-reg double-reg
                                                 complex-single-reg complex-double-reg)
-                                          #+immobile-space
+                                          #+(or immobile-space permgen)
                                           ,@(if (eq name 'sb-c::%type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))

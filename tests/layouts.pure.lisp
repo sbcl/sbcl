@@ -1,7 +1,23 @@
 
+(defun list-all-layouts ()
+  #+permgen
+  (let (list)
+    ;; I should probably incorporate permgen into the set of spaces
+    ;; that can be listed, but until then ...
+    (sb-vm::map-objects-in-range
+     (lambda (obj widetag size)
+       (declare (ignore widetag size))
+       (when (sb-kernel::layout-p obj)
+         (push obj list)))
+     (sb-kernel:%make-lisp-obj sb-vm:permgen-space-start)
+     (sb-kernel:%make-lisp-obj (sb-sys:sap-int sb-vm:*permgen-space-free-pointer*)))
+    list)
+  #-permgen
+  (sb-vm:list-allocated-objects :all :type sb-vm:instance-widetag
+                                     :test #'sb-kernel::layout-p))
+
 (with-test (:name :funinstance-layout-bitmaps-all-same)
-  (let* ((list (sb-vm:list-allocated-objects :all :type sb-vm:instance-widetag
-                                                  :test #'sb-kernel::layout-p))
+  (let* ((list (list-all-layouts))
          (fun-layouts
           (remove-if-not (lambda (x) (find (sb-kernel:find-layout 'function)
                                            (sb-kernel:layout-inherits x)))

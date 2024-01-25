@@ -40,6 +40,15 @@ search_read_only_space(void *pointer)
 lispobj *
 search_static_space(void *pointer)
 {
+#ifdef LISP_FEATURE_PERMGEN // consider it part of static space
+    {
+    lispobj* found = 0;
+    if ((uword_t)pointer >= PERMGEN_SPACE_START &&
+        (lispobj*)pointer < permgen_space_free_pointer &&
+        ((found = gc_search_space((lispobj*)PERMGEN_SPACE_START, pointer)) != NULL))
+        return found;
+    }
+#endif
     lispobj *start = (lispobj *)STATIC_SPACE_OBJECTS_START;
     lispobj *end = static_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))

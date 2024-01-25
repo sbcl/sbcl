@@ -12,7 +12,7 @@
 (with-test (:name :compact-instance-header-layout
             :skipped-on (or :win32
                             :gc-stress
-                            (:not (:and :compact-instance-header :soft-card-marks)))
+                            (:not (:and :gencgc :compact-instance-header :soft-card-marks)))
             :fails-on (and :darwin :x86-64)) ;; can't compile the .so
   (unless (probe-file "gc-testlib.so")
     (sb-ext:run-program "sh"
