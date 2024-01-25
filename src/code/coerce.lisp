@@ -244,7 +244,7 @@
            (if class
                (coerce-to-extended-sequence object class)
                (coerce-error))))
-        ((csubtypep type (specifier-type 'function))
+        ((type= type (specifier-type 'function))
          (coerce-to-fun object))
         (t
          (coerce-error))))))

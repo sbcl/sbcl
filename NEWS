@@ -4,6 +4,8 @@ changes relative to sbcl-2.4.1:
   * bug fix: restore the ability to inherit from both SEQUENCE and
     SB-MOP:FUNCALLABLE-STANDARD-OBJECT.  (lp#2050088, reported by Christophe
     Junke)
+  * bug fix: COERCE will not convert lambda forms to functions if given a type
+    naming a (strict) subclass of FUNCTION.
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the

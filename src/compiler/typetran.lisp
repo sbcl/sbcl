@@ -1646,7 +1646,7 @@
          (if (null class)
              (give-up-ir1-transform)
              `(coerce-to-extended-sequence x (load-time-value (find-class ',tval) t)))))
-      ((csubtypep tspec (specifier-type 'function))
+      ((type= tspec (specifier-type 'function))
        (if (csubtypep (lvar-type x) (specifier-type 'symbol))
            `(coerce-symbol-to-fun x)
            ;; if X can later be derived as FUNCTION then we don't want
