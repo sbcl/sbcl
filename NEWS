@@ -1,8 +1,39 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.0:
-  * optimization: eliminate bound checks with relative offsets. (lp#1830314)
-
+  * enhancement: compact instance headers are partially supported with the
+    mark-region parallel garbage collector.
+  * enhancement: functions with declared return types have their return values
+    type-checked in optimization regimes with high SAFETY and (DEBUG 3).
+  * platform support:
+    ** disable ASLR on FreeBSD.  (lp#2047655, thanks to Konstantin Belousov)
+    ** link to libpthread on FreeBSD.  (thanks to Konstantin Belousov)
+    ** restore build on 64-bit riscv.  (lp#2034713, lp#2048869, reported by
+       Guillaume LE VAILLANT)
+    ** restore build on 64-bit ppc.
+    ** fix case in referring to a header file.  (lp#2047726, thanks to Andrew Kravchuk)
+    ** the fastrem-32 feature (for optimized computations of FLOOR) is now
+       available on all platforms.
+  * bug fix: resweep moved lines after compaction in the mark-region parallel
+    garbage collector.
+  * bug fix: infinite loops in the compiler on some constructs with SATISFIES
+    types.  (lp#2047289, lp#2047706, lp#2049631)
+  * optimization: various hash tables implementing part of the system
+    (packages, Unicode data tables) have been converted to use perfect hash
+    functions.
+  * optimization: TYPECASE on structure class hierarchies is implemented using
+    a perfect hash.
+  * optimization: eliminate bound checks with relative offsets.  (lp#1830314)
+  * optimization: the compiler has more knowledge of how to optimize
+    DIGIT-CHAR.
+  * optimization: the compiler can elide intermediates for some calls to
+    APPLY, CONCATENATE and MAKE-ARRAY with arguments that are freshly-consed
+    modifications of existing sequences.
+  * optimization: (LOOP FOR X IN (REVERSE LIST) ...) is now faster and conses
+    less.
+  * optimization: (LOOP ... APPEND ...) is more compact, and does less work if
+    appending NIL.
+  * optimization: type tests of various array types are faster and shorter.
 
 changes in sbcl-2.4.0 relative to sbcl-2.3.11:
   * minor incompatible change: *COMPILE-VERBOSE* and *LOAD-VERBOSE* are bound
@@ -15,7 +46,7 @@ changes in sbcl-2.4.0 relative to sbcl-2.3.11:
     standard (CL) symbols ARRAY-RANK, ARRAY-TOTAL-SIZE, PATHNAME-HOST,
     PATHNAME-TYPE, PATHNAME-DIRECTORY, FLOAT-RADIX or FLOAT-DIGITS.
     (lp#2045559)
-  * platform support
+  * platform support:
     ** the mark-region parallel garbage collector can be enabled on arm64.
        (Thanks to Hayley Patton)
     ** fix build on modern FreeBSDs.  (lp#2046966, thanks to David J. Flander)
