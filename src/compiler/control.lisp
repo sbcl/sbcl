@@ -157,7 +157,14 @@
                     (eq (basic-combination-kind last) :local)
                     (not (eq (node-environment last)
                              (lambda-environment (combination-lambda last)))))
-               (combination-lambda last))
+               (let* ((lambda (combination-lambda last))
+                      (entry-fun (or (functional-entry-fun lambda)
+                                     (and (lambda-optional-dispatch lambda)
+                                          (functional-entry-fun (lambda-optional-dispatch lambda))))))
+                 ;; Let its XEP have a drop through to this function
+                 (unless (and entry-fun
+                              (not (block-flag (lambda-block entry-fun))))
+                   lambda)))
               (t
                (let ((component-tail (component-tail (block-component block)))
                      (block-succ (block-succ block))
