@@ -510,24 +510,20 @@
 (defmethod print-object ((cblock cblock) stream)
   (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)
-        (format stream "~W :START c~W"
-            (block-number cblock)
-            (cont-num (block-start cblock))))
+        (let ((component (block-component cblock)))
+          (cond ((and component
+                      (eq cblock
+                          (component-head component)))
+                 (format stream "~W :HEAD" (block-number cblock)))
+                ((and component
+                      (eq cblock
+                          (component-tail component)))
+                 (format stream "~W :TAIL" (block-number cblock)))
+                (t
+                 (format stream "~W :START c~W"
+                         (block-number cblock)
+                         (cont-num (block-start cblock)))))))
       (print-unreadable-object (cblock stream :type t :identity t))))
-
-;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
-;;; different BLOCK-INFO annotation structures so that code
-;;; (specifically control analysis) can be shared.
-(defstruct (block-annotation (:constructor nil)
-                             (:copier nil))
-  ;; The IR1 block that this block is in the INFO for.
-  (block (missing-arg) :type cblock)
-  ;; the next and previous block in emission order (not DFO). This
-  ;; determines which block we drop though to, and is also used to
-  ;; chain together overflow blocks that result from splitting of IR2
-  ;; blocks in lifetime analysis.
-  (next nil :type (or block-annotation null))
-  (prev nil :type (or block-annotation null)))
 
 ;;; A COMPONENT structure provides a handle on a connected piece of
 ;;; the flow graph. Most of the passes in the compiler operate on

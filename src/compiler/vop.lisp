@@ -132,9 +132,16 @@
 ;;; An IR2-BLOCK holds information about a block that is used during
 ;;; and after IR2 conversion. It is stored in the BLOCK-INFO slot for
 ;;; the associated block.
-(defstruct (ir2-block (:include block-annotation)
-                      (:constructor make-ir2-block (block))
+(defstruct (ir2-block (:constructor make-ir2-block (block))
                       (:copier nil))
+  ;; The IR1 block that this block is in the INFO for.
+  (block (missing-arg) :type cblock)
+  ;; the next and previous block in emission order (not DFO). This
+  ;; determines which block we drop though to, and is also used to
+  ;; chain together overflow blocks that result from splitting of IR2
+  ;; blocks in lifetime analysis.
+  (next nil :type (or ir2-block null))
+  (prev nil :type (or ir2-block null))
   ;; the IR2-BLOCK's number, which differs from BLOCK's BLOCK-NUMBER
   ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))

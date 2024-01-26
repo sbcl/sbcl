@@ -20,12 +20,12 @@
 
 ;;; Insert BLOCK in the emission order after the block AFTER.
 (defun add-to-emit-order (block after)
-  (declare (type block-annotation block after))
-  (let ((next (block-annotation-next after)))
-    (setf (block-annotation-next after) block)
-    (setf (block-annotation-prev block) after)
-    (setf (block-annotation-next block) next)
-    (setf (block-annotation-prev next) block))
+  (declare (type ir2-block block after))
+  (let ((next (ir2-block-next after)))
+    (setf (ir2-block-next after) block)
+    (setf (ir2-block-prev block) after)
+    (setf (ir2-block-next block) next)
+    (setf (ir2-block-prev next) block))
   (values))
 
 ;;; If BLOCK looks like the head of a loop, then attempt to rotate it.
@@ -142,7 +142,7 @@
 ;;; making error code the drop-through.
 (defun control-analyze-block (block tail)
   (declare (type cblock block)
-           (type block-annotation tail))
+           (type ir2-block tail))
   (unless (block-flag block)
     (let ((block (find-rotated-loop-head block)))
       (setf (block-flag block) t)
@@ -150,7 +150,7 @@
       (add-to-emit-order (or (block-info block)
                              (setf (block-info block)
                                    (make-ir2-block block)))
-                         (block-annotation-prev tail))
+                         (ir2-block-prev tail))
 
       (let ((last (block-last block)))
         (cond ((and (combination-p last) (node-tail-p last)
@@ -185,22 +185,22 @@
   (declare (type clambda fun)
            (type component component))
   (let* ((tail-block (block-info (component-tail component)))
-         (prev-block (block-annotation-prev tail-block))
+         (prev-block (ir2-block-prev tail-block))
          (bind-block (node-block (lambda-bind fun))))
     (unless (block-flag bind-block)
       (dolist (nlx (environment-nlx-info (lambda-environment fun)))
         (control-analyze-block (nlx-info-target nlx) tail-block))
       (cond
        ((block-flag bind-block)
-        (let* ((block-note (block-info bind-block))
-               (prev (block-annotation-prev block-note))
-               (next (block-annotation-next block-note)))
-          (setf (block-annotation-prev next) prev)
-          (setf (block-annotation-next prev) next)
-          (add-to-emit-order block-note prev-block)))
+        (let* ((block2 (block-info bind-block))
+               (prev (ir2-block-prev block2))
+               (next (ir2-block-next block2)))
+          (setf (ir2-block-prev next) prev)
+          (setf (ir2-block-next prev) next)
+          (add-to-emit-order block2 prev-block)))
        (t
         (let ((new-fun (control-analyze-block bind-block
-                                              (block-annotation-next
+                                              (ir2-block-next
                                                prev-block))))
           (when new-fun
             (control-analyze-1-fun new-fun component)))))))
@@ -224,8 +224,8 @@
          (tail-block (make-ir2-block tail)))
     (setf (block-info head) head-block)
     (setf (block-info tail) tail-block)
-    (setf (block-annotation-prev tail-block) head-block)
-    (setf (block-annotation-next head-block) tail-block)
+    (setf (ir2-block-prev tail-block) head-block)
+    (setf (ir2-block-next head-block) tail-block)
 
     (clear-flags component)
 
