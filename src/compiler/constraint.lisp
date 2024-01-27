@@ -52,6 +52,7 @@
 ;;; zero-length, non-zero-total-size vector-with-fill-pointer.
 (declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
+(defvar *blocks-to-terminate*)
 
 (defstruct (vector-length-constraint
             (:constructor make-vector-length-constraint (var))
@@ -1197,7 +1198,13 @@
                    (t
                     (derive-node-type ref
                                       (make-single-value-type type))
-                    (maybe-terminate-block ref nil)))))))
+                    (when (eq (node-derived-type ref) *empty-type*)
+                      ;; Terminating blocks early may leave loops with
+                      ;; just one entry point, resulting in
+                      ;; monotonically growing variables without a
+                      ;; starting point which will propagate new
+                      ;; constraints for each increment.
+                      (pushnew ref *blocks-to-terminate*))))))))
   (values))
 
 ;;;; Flow analysis
@@ -1562,8 +1569,10 @@
         (setf (if-alternative-constraints last) nil)
         (setf (if-consequent-constraints last) nil))))
   (setf (block-out (component-head component)) (make-conset))
-  (dolist (block (find-and-propagate-constraints component))
-    (unless (block-delete-p block)
-      (use-result-constraints block)))
-
+  (let (*blocks-to-terminate*)
+    (dolist (block (find-and-propagate-constraints component))
+      (unless (block-delete-p block)
+        (use-result-constraints block)))
+    (loop for node in *blocks-to-terminate*
+          do (maybe-terminate-block node nil)))
   (values))

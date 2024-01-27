@@ -1110,6 +1110,20 @@
                1))))
    (eql 1)))
 
+(with-test (:name :dead-blocks.2)
+  (checked-compile `(lambda (a b)
+                      (declare (type (integer 0 171951449) a)
+                               ((member -1965785401190741689 18014398509481983) b)
+                               (optimize (debug 2)))
+                      (let ((v3 b)
+                            (v6 116510974941639))
+                        (if (> v6 v3)
+                            (if (> v3 v6)
+                                (let ((v3 (logand a v3)))
+                                  (loop for lv1 below 3
+                                        count (let ((v8 (min lv1 v3)))
+                                                (<= v8  576460752303423490))))))))))
+
 (with-test (:name :multiple-equality-constraints)
   (checked-compile
    `(lambda (v)
