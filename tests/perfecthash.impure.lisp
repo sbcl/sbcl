@@ -22,6 +22,26 @@
 (^ A (AREF TAB B)))))))
 |#
 
+(with-test (:name :minimal-vs-non-minimal)
+  (let* ((symbols (sb-impl::symtbl-cells (sb-impl::package-internal-symbols
+                                          (find-package "SB-WALKER"))))
+         (hashes (map '(simple-array (unsigned-byte 32) (*))
+                      (lambda (x) (ldb (byte 32 0) (sxhash x)))
+                      symbols))
+         (n (length hashes))
+         (expr1 (sb-c:make-perfect-hash-lambda hashes))
+         (expr2 (sb-c:make-perfect-hash-lambda hashes nil))
+         (fun1 (compile nil expr1))
+         (fun2 (compile nil expr2))
+         (range1 (map 'list fun1 hashes))
+         (range2 (map 'list fun2 hashes)))
+    ;; Not much can be asserted about the non-minimal function.
+    ;; It happens to be a function that returns a value higher than N for this
+    ;; input set, but it need not- the generator might return a minimal hash
+    ;; through pure luck.
+    (assert (= (reduce #'max range1) (1- n)))
+    (assert (loop for val in range2 thereis (>= val n)))))
+
 (defun test-perfect-hashfun (fun keys &optional print)
   (when (listp keys)
     (setq keys (coerce keys 'vector)))

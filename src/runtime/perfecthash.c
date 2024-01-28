@@ -990,7 +990,7 @@ static void driver(
   free((void *)tab);
 }
 
-char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys)
+char* generate_perfhash_sexpr(int flags, unsigned int *key_array, int nkeys)
 {
   key* keylist = 0;
   key* keyspace = calloc(nkeys, sizeof (key));
@@ -1001,7 +1001,12 @@ char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys)
     this->next_k = keylist;
     keylist = this;
   }
-  hashform form = { .hashtype = INT_HT, .perfect = MINIMAL_HP, .speed = SLOW_HS, .infix = 0 };
+  hashform form = {
+    .hashtype = INT_HT,
+    .perfect = (flags & 1) ? MINIMAL_HP : NORMAL_HP,
+    .speed = (flags & 2) ? FAST_HS : SLOW_HS,
+    .infix = 0
+  };
   struct mem_stream * scratchfile = make_mem_stream();
   driver(&form, keylist, nkeys, scratchfile);
 

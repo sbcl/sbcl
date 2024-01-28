@@ -139,8 +139,20 @@
 
 ;;; To use this macro during cross-compilation we will have to emulate
 ;;; generate_perfhash_sexpr using a file, similar to xfloat-math.
-(defun make-perfect-hash-lambda (array)
+;;; MINIMAL (the default) returns a a function that returns an output
+;;; in the range 0..N-1 for N possible symbols. If non-minimal, the output
+;;; range is the power-of-2-ceiling of N.
+;;; It could be worth using a non-minimal perfect hash if it avoids needing
+;;; a lookup table and can be done entirely with arithmetic and logical ops.
+;;; That seldom seems to be the case.
+;;; FAST should make the generator try less hard to do a good job.
+;;; Practically speaking it does not often make the generator run faster,
+;;; and it might run slower! In no way does it say anything about the speed
+;;; of the generated function. So you pretty much don't want to supply it.
+;;; Indeed one should avoid passing either optional arg to this function.
+(defun make-perfect-hash-lambda (array &optional (minimal t) (fast nil))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
+  (declare (ignorable minimal fast))
   (let* ((string
           #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array)
           #-sb-xc-host
@@ -148,7 +160,8 @@
            (sb-sys:with-pinned-objects (array)
              (alien-funcall (extern-alien
                              "generate_perfhash_sexpr"
-                             (function (* char) system-area-pointer int))
+                             (function (* char) int system-area-pointer int))
+                            (logior (if minimal 1 0) (if fast 2 0))
                             (sb-sys:vector-sap array) (length array)))))
          (expr #+sb-xc-host ; don't rebind anything except *PACKAGE*
                ;; especially as we need to keep our #\A charmacro
