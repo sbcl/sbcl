@@ -543,23 +543,6 @@
 (defvar *sxhash-crosscheck* nil)
 )
 
-#+sb-xc-host
-(defun sb-xc:sxhash (obj)
-  (let ((answer
-         (etypecase obj ; croak on anything but these
-            (symbol (let ((s (string obj)))
-                      ;; !PACKAGE-COLD-INIT will cross-check this hash
-                      (return-from sb-xc:sxhash
-                        (calc-symbol-name-hash s (length s)))))
-            (sb-xc:fixnum #.(sxhash-fixnum-xform 'obj))
-            ;; calc-member-type-hash seems to want to invoke sb-xc:sxhash on
-            ;; signed zeros. I'm not sure if the answer has to match SBCL's
-            ;; answer, but this makes it so it does.
-            (single-float #.(sxhash-single-float-xform 'obj))
-            (double-float #.(sxhash-double-float-xform 'obj)))))
-    (push (cons obj answer) *sxhash-crosscheck*)
-    answer))
-
 #-sb-xc-host
 (progn
 (defun weak-hashset-linear-find/eq (key hashset)

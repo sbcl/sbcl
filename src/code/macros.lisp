@@ -1163,8 +1163,9 @@ symbol-case giving up: case=((V U) (F))
       #+sb-devel (format t "~&symbol-case giving up: probes=~d byte=~d~%"
                          maxprobes byte)
       (return-from expand-symbol-case nil))
-    (let* ((default (when (eql (caar clauses) 't) (pop clauses)))
-           (unique-symbols)
+    (binding*
+          ((default (when (eql (caar clauses) 't) (pop clauses)))
+           (unique-symbols nil)
            (clauses
             ;; This is crummy, but we first have to undo our pre-expansion
             ;; and remove dups. Otherwise the (BUG "Messup") below could occur.
@@ -1200,32 +1201,26 @@ symbol-case giving up: case=((V U) (F))
            (symbol (gensym "S"))
            (hash (gensym "H"))
            (vector (gensym "V"))
-           (is-hashable
+           ((is-hashable expr)
             ;; For x86-64, any non-immediate object is considered hashable,
             ;; so we only do a lowtag test on the object, though the correct hash
             ;; is obtained only if the object is a symbol.
-            #+x86-64 `(pointerp ,symbol)
+            #+x86-64 (values `(pointerp ,symbol)
+                             `(,(if (eq hash-fun 'sxhash) 'hash-as-if-symbol-name hash-fun) ,symbol))
             ;; For others backends, the set of keys in a particular CASE form
             ;; makes a difference. NIL as a possible key mandates choosing SYMBOLP
             ;; but NON-NULL-SYMBOL-P is the quicker test.
-            #-x86-64 `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol))
-           (sxhash
-             ;; Always access the pre-memoized value in the hash slot.
-             ;; SYMBOL-HASH* reads the word following the header word
-             ;; in any pointer object regardless of lowtag.
-             #+x86-64
-             (if (eq hash-fun 'sxhash) `(symbol-hash* ,symbol nil) `(,hash-fun ,symbol))
-             ;; For others, use SYMBOL-HASH.
-             #-x86-64 `(,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol))
+            #-x86-64 (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol)
+                             `(,hash-fun ,symbol)))
            (calc-hash
              (if (vectorp byte) ; mix 2 bytes
                  ;; FIXME: this could be performed as ((h >> c1) ^ (h >> c2)) & mask
                  ;; instead of having two AND operations as it does now.
                  (let ((b1 (elt byte 0)) (b2 (elt byte 1)))
-                   `(let ((,hash ,sxhash))
+                   `(let ((,hash ,expr))
                       (logxor (ldb (byte ,(byte-size b1) ,(byte-position b1)) ,hash)
                               (ldb (byte ,(byte-size b2) ,(byte-position b2)) ,hash))))
-                 `(ldb (byte ,(byte-size byte) ,(byte-position byte)) ,sxhash))))
+                 `(ldb (byte ,(byte-size byte) ,(byte-position byte)) ,expr))))
 
       (flet ((trivial-result-p (clause)
                ;; Return 2 values: T/NIL if the clause's consequent

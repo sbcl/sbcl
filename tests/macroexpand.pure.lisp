@@ -340,7 +340,7 @@
   (contains-if (lambda (x)
                  (and (symbolp x)
                       (or (string= x "SYMBOL-HASH")
-                          (string= x "SYMBOL-HASH*"))))
+                          (string= x "HASH-AS-IF-SYMBOL-NAME"))))
                tree))
 
 (with-test (:name :symbol-case-conservatively-fail)

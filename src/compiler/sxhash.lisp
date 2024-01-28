@@ -134,13 +134,8 @@
 ;; All symbols have a precomputed hash.
 (deftransform sxhash ((x) (symbol)) `(symbol-hash x))
 
-(deftransform symbol-hash* ((object predicate) (symbol null) * :important nil)
-  `(symbol-hash* object 'symbolp)) ; annotate that object satisfies SYMBOLP
-(deftransform symbol-hash* ((object predicate)
-                            ((and (not null) symbol)
-                             (constant-arg (member nil symbolp)))
-                            * :important nil)
-  `(symbol-hash* object 'non-null-symbol-p)) ; etc
+(deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)
+  `(symbol-hash object))
 
 ;;; To use this macro during cross-compilation we will have to emulate
 ;;; generate_perfhash_sexpr using a file, similar to xfloat-math.

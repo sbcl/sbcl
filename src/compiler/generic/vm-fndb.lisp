@@ -116,15 +116,14 @@
 (defknown sb-impl::calc-symbol-name-hash (simple-string index) hash-code ())
 
 (defknown (symbol-hash) (symbol) hash-code (flushable movable))
-;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
-;;; object, not only symbols. The result is meaningful only if the object
-;;; is a symbol. The second argument indicates a predicate that the first
-;;; argument is known to satisfy, if any.
-;;; There is one more case, but an uninteresting one: the object is known
-;;; to be anything except NIL. That predicate would be IDENTITY,
-;;; which is not terribly helpful from a code generation stance.
-(defknown symbol-hash* (t (member nil symbolp non-null-symbol-p))
-  hash-code (flushable movable always-translatable))
+;;; This accessor will read the word at SYMBOL-HASH-SLOT in any object, not only symbols.
+;;; The value is predictable only if the object is a symbol. The trick is to either:
+;;; 1) Access taggedptr - lowtag + offset using a few registers, OR
+;;; 2) Compute the untagged base pointer, while also holding the tagged pointer
+;;;    in a register (implicitly pinned), and then access via the untagged pointer.
+;;; x86-64 implements this as a vop, though arm64 probably could too, unless compiled
+;;; with #+relocatable-static-space.
+(defknown hash-as-if-symbol-name (t) hash-code (flushable movable always-translatable))
 
 (defknown %set-symbol-hash (symbol hash-code)
   t ())

@@ -78,6 +78,7 @@
     (declare (notinline trick))
     (trick x)))
 #+sb-xc-host
+(progn
 (defun calc-symbol-name-hash (string length)
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
@@ -86,6 +87,21 @@
       ;; out-of-order with defconstant nil-value
       (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits))
       (logxor (%sxhash-simple-string string) most-positive-fixnum)))
+(defun sb-xc:sxhash (obj)
+  (let ((answer
+         (etypecase obj ; croak on anything but these
+            (symbol (let ((s (string obj)))
+                      ;; !PACKAGE-COLD-INIT will cross-check this hash
+                      (return-from sb-xc:sxhash
+                        (calc-symbol-name-hash s (length s)))))
+            (sb-xc:fixnum #.(sxhash-fixnum-xform 'obj))
+            ;; calc-member-type-hash seems to want to invoke sb-xc:sxhash on
+            ;; signed zeros. I'm not sure if the answer has to match SBCL's
+            ;; answer, but this makes it so it does.
+            (single-float #.(sxhash-single-float-xform 'obj))
+            (double-float #.(sxhash-double-float-xform 'obj)))))
+    (push (cons obj answer) *sxhash-crosscheck*)
+    answer)))
 
 ;;;; mixing hash values
 
