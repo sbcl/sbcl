@@ -3399,8 +3399,7 @@ static void verify_hash_table(struct hash_table* ht, bool fix_bad)
               fprintf(stderr, " index=%d key=%lx next=%d\n", index, data[2*index], nvdata[index]);
               if (index == j || index == 0) break;
             }
-            extern void ldb_monitor();
-            ldb_monitor();
+            lose("ht should be marked for rehash");
         }
     }
 }

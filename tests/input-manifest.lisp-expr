@@ -65,6 +65,7 @@
   "tests/data/wonky4.lisp")
  ("load.pure.lisp"
   "tests/data/wonky1.lisp")
+ ("mrgc-ht-rehash.impure.lisp" "src/pcl/walk.lisp")
  ("octets.pure.lisp"
   "tests/data/compile-file-pos.lisp"
   "tests/data/compile-file-pos-utf16be.lisp")
