@@ -4489,8 +4489,8 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
     if (state->object_addr) {
         lispobj obj = compute_lispobj(state->object_addr);
         page_index_t pg = find_page_index(state->object_addr);
-        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%d) sees %s\n",
-                (void*)thing, (uword_t)where, obj, (int)pg, str);
+        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%d,h=%"OBJ_FMTX") sees %s\n",
+                (void*)thing, (uword_t)where, obj, (int)pg, *native_pointer(obj), str);
         // Record this in state->err_objs if possible
         int i;
         for(i=0; i<MAX_ERR_OBJS; ++i)
