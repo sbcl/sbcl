@@ -1133,3 +1133,16 @@
         (loop
          (decf i)
          (print (aref v i)))))))
+
+(with-test (:name :min/max-constraints-set)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (let ((x
+              (if (< a c)
+                  c
+                  a))
+            (y (setq a (min most-positive-fixnum b))))
+        (> y x)))
+   ((1 5 3) t)
+   ((2 4 6) nil)))

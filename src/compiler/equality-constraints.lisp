@@ -689,7 +689,9 @@
                (when (and (ref-p ref1) (ref-p ref2))
                  (let ((var1 (ok-ref-lambda-var ref1))
                        (var2 (ok-ref-lambda-var ref2)))
-                   (when (and var1 var2)
+                   (when (and var1 var2
+                              (not (lambda-var-sets var1))
+                              (not (lambda-var-sets var2)))
                      (labels ((normalize-not (op not)
                                 (if not
                                     (case op
