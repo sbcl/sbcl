@@ -19,26 +19,6 @@
     (mapcar (lambda (x) (cons (car x) (sb-xc:coerce (cdr x) '(vector (unsigned-byte 32)))))
             '#.(plist-to-alist (sb-cold:read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
-(sb-ext:define-load-time-global **confusables**
-    (let ((data '#.(sb-cold:read-from-file "output/ucd/confusables.lisp-expr")))
-      (sb-impl::%stuff-hash-table
-        (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))
-        (loop for (source . target) in data
-            when (and #-sb-unicode (< source char-code-limit))
-            collect (flet ((minimize (x)
-                        (case (length x)
-                          (1
-                           (elt x 0))
-                          (2
-                           (pack-3-codepoints (elt x 0) (elt x 1)))
-                          (3
-                           (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
-                          (t
-                           (logically-readonlyize
-                            (possibly-base-stringize (map 'string #'code-char x)))))))
-                      (cons (code-char source) (minimize target))))
-        t)))
-
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
   (declare (type (simple-array (unsigned-byte 32) 1) vector)
@@ -1574,31 +1554,5 @@ with variable-weight characters, as described in UTS #10"
              :start2 start2 :end2 end2)
    (unicode> string1 string2 :start1 start1 :end1 end1
              :start2 start2 :end2 end2)))
-
-
-;;; Confusable detection
-
-(defun canonically-deconfuse (string)
-  (let (result)
-    (loop for char across string
-          for deconfused = (gethash char **confusables**)
-          do (cond ((not deconfused)
-                    (push (string char) result))
-                   ((integerp deconfused)
-                    (push (sb-impl::unpack-3-codepoints deconfused)
-                          result))
-                   (t
-                    (push deconfused result))))
-    (apply #'concatenate 'string (nreverse result))))
-
-(defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Determines whether STRING1 and STRING2 could be visually confusable
-according to the IDNA confusableSummary.txt table"
-    (let* ((form #+sb-unicode :nfd #-sb-unicode :nfc)
-           (str1 (normalize-string (subseq string1 start1 end1) form))
-           (str2 (normalize-string (subseq string2 start2 end2) form))
-           (skeleton1 (normalize-string (canonically-deconfuse str1) form))
-           (skeleton2 (normalize-string (canonically-deconfuse str2) form)))
-      (string= skeleton1 skeleton2)))
 
 (clear-info :function :compiler-macro-function 'proplist-p)
