@@ -239,7 +239,7 @@
 (defoptimizer (nconc derive-type) ((&rest args))
   (derive-append-type args))
 
-(deftransform sb-impl::append2 ((x y) (null t))
+(deftransform sb-impl::append2 ((x y) (null t) * :important nil)
   'y)
 
 (flet ((remove-nil (fun args)
