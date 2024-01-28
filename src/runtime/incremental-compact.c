@@ -300,7 +300,7 @@ void run_compaction(_Atomic(uword_t) *copy_meter,
       METER(resweep_meter, resweep_moved_lines());
       should_compact("I just moved, but still");
       extern int check_hash_tables;
-      check_hash_tables = 2;
+      if (check_hash_tables) check_hash_tables = 2;
     }
     memset(target_pages, 0, page_table_pages);
     remset = NULL;
