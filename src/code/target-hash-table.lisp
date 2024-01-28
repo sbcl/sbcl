@@ -2142,7 +2142,7 @@ table itself."
                  (incf n-chains))))
     (format t "maxlen=~d avglen=~f~%" max-len (/ tot-len n-chains))
     (show-chain "Freelist:" (hash-table-next-free-kv tbl))
-    (awhen (hash-table-smashed-cells tbl)
+    (awhen (and (typep tbl 'general-hash-table) (hash-table-smashed-cells tbl))
       (format t "smashed=~d~%"
               (mapcar (lambda (x)
                         (if (fixnump x)
