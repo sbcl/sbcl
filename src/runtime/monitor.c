@@ -65,6 +65,8 @@ struct crash_preamble {
     uword_t static_nbytes;
     uword_t readonly_start;
     uword_t readonly_nbytes;
+    uword_t permgen_start;
+    uword_t permgen_nbytes;
     uword_t dynspace_start;
     long dynspace_npages_total;
     long dynspace_npages_used;
@@ -114,7 +116,7 @@ static void maybe_show_contents(__attribute__((unused)) char *legend,
 
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
 #include <errno.h>
-struct filewriter { long total; int fd; };
+struct filewriter { long total; int fd; bool verbose; };
 
 
 
@@ -130,21 +132,22 @@ static void checked_write(char *section, struct filewriter* writer, void* buf, l
     if (write(writer->fd, label, sizeof label) != sizeof label
         || (wrote = write(writer->fd, buf, nbytes)) != nbytes)
         lose("short write, errno=%d", errno);
-    fprintf(stderr, "%s: %lx bytes\n", section, (long)(nbytes + sizeof label));
+    if (writer->verbose) fprintf(stderr, "%s: %lx bytes\n", section, (long)(nbytes + sizeof label));
     maybe_show_contents(section, buf, nbytes);
     writer->total += nbytes + sizeof label;
 }
 
 #include "immobile-space.h"
 void save_gc_crashdump(char *pathname,
-                       lispobj* cur_thread_approx_stackptr)
+                       lispobj* cur_thread_approx_stackptr,
+                       bool verbose)
 {
     extern int pin_all_dynamic_space_code;
     int fd = open(pathname, O_WRONLY|O_CREAT|O_TRUNC, 0666);
     struct thread* th;
     int nthreads = 0;
     for_each_thread(th) ++nthreads;
-    fprintf(stderr, "save: %d threads\n", nthreads);
+    if (verbose) fprintf(stderr, "save: %d threads\n", nthreads);
     struct crash_preamble preamble;
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
@@ -153,6 +156,8 @@ void save_gc_crashdump(char *pathname,
     preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
     preamble.readonly_start = READ_ONLY_SPACE_START;
     preamble.readonly_nbytes = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
+    preamble.permgen_start = PERMGEN_SPACE_START;
+    preamble.permgen_nbytes = (uword_t)permgen_space_free_pointer - PERMGEN_SPACE_START;
     preamble.dynspace_start = DYNAMIC_SPACE_START;
     preamble.dynspace_npages_total = dynamic_space_size / GENCGC_PAGE_BYTES;
     preamble.dynspace_npages_used = next_free_page;
@@ -177,13 +182,12 @@ void save_gc_crashdump(char *pathname,
     preamble.tlsf_control_size = tlsf_size();
     memcpy(preamble.sentinel_block, tlsf_memory_end-3*N_WORD_BYTES, 3*N_WORD_BYTES);
 #endif
-    struct filewriter writer;
-    writer.fd = fd;
-    writer.total = 0;
+    struct filewriter writer = { .fd = fd, .total = 0, .verbose = verbose };
     // write the preamble and static + readonly spaces
     checked_write("preamble", &writer, &preamble, sizeof preamble);
     checked_write("static", &writer, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     checked_write("R/O", &writer, (char*)READ_ONLY_SPACE_START, preamble.readonly_nbytes);
+    checked_write("perm", &writer, (char*)PERMGEN_SPACE_START, preamble.permgen_nbytes);
 
     // write the dynamic-space, PTEs, card table
     checked_write("dynamic", &writer, (char*)DYNAMIC_SPACE_START, nbytes_heap);
@@ -269,7 +273,7 @@ void save_gc_crashdump(char *pathname,
     }
     checked_write("sig", &writer, "SB.Crash", 8); // trailing signature
     close(fd);
-    fprintf(stderr, "Total: %ld bytes\n", writer.total);
+    if (verbose) fprintf(stderr, "Total: %ld bytes\n", writer.total);
 }
 #endif
 
@@ -300,7 +304,7 @@ static int save_cmd(char **ptr) {
     }
 #if (defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64) && defined LISP_FEATURE_SB_THREAD
     suspend_other_threads();
-    save_gc_crashdump(name, (lispobj*)__builtin_frame_address(0));
+    save_gc_crashdump(name, (lispobj*)__builtin_frame_address(0), 1);
     unsuspend_other_threads();
 #else
     fprintf(stderr, "Unimplemented\n");
@@ -1091,6 +1095,18 @@ int load_gc_crashdump(char* pathname)
         READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + preamble.readonly_nbytes;
         read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_END;
 #endif
+    }
+    if (!preamble.permgen_nbytes) {
+        checked_read("perm", fd, 0, 0);
+    } else {
+        void* actual =
+            os_alloc_gc_space(PERMGEN_CORE_SPACE_ID, 0, (char*)preamble.permgen_start,
+                              ALIGN_UP(preamble.permgen_nbytes, 4096));
+        if (actual != (void*)preamble.permgen_start)
+            lose("Couldn't map permgen as required (%p)", (char*)preamble.permgen_start);
+        checked_read("perm", fd, (char*)preamble.permgen_start, preamble.permgen_nbytes);
+        PERMGEN_SPACE_START = preamble.permgen_start;
+        permgen_space_free_pointer = (lispobj*)(preamble.permgen_start + preamble.permgen_nbytes);
     }
     //
     gc_allocate_ptes();
