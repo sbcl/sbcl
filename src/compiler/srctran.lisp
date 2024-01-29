@@ -6390,6 +6390,11 @@
         (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex/without-gcing))
               (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex)))))
 
+(defoptimizer (sb-impl::%with-standard-io-syntax derive-type) ((function))
+  (let ((type (lvar-fun-type function t t)))
+    (when (fun-type-p type)
+      (fun-type-returns type))))
+
 (deftransform pointerp ((object))
   (let ((type (lvar-type object)))
     (cond ((csubtypep type (specifier-type '(or fixnum character #+64-bit single-float)))
