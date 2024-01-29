@@ -153,6 +153,13 @@
 (defun make-perfect-hash-lambda (array &optional (minimal t) (fast nil))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
   (declare (ignorable minimal fast))
+  (when (< (length array) 5)
+    (return-from make-perfect-hash-lambda)) ; a limitation for now
+  (let ((dedup (alloc-xset)))
+    (dovector (x array)
+      (when (xset-member-p x dedup) (return-from make-perfect-hash-lambda))
+      (add-to-xset x dedup)))
+  ;; no dups present
   (let* ((string
           #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array)
           #-sb-xc-host

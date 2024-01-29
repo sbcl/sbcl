@@ -964,20 +964,22 @@ symbol-case giving up: case=((V U) (F))
 ;;; 2. an array of (unsigned-byte 16) for the clause index to select
 ;;; 3. an expression mapping each layout in LAYOUT-LISTS to an integer 0..N-1
 (defun build-sealed-struct-typecase-map (layout-lists hashes)
-  (let* ((lambda (sb-c:make-perfect-hash-lambda hashes))
-         (phashfun #+sb-xc-host (sb-cold::compile-perfect-hashfun-for-host lambda)
-                   #-sb-xc-host (compile nil lambda))
-         (n (length hashes))
-         (domain (make-array n :initial-element nil))
-         (range (sb-xc:make-array n :element-type '(unsigned-byte 16))))
-    (loop for clause-index from 1 for list across layout-lists
+  (let ((lambda (sb-c:make-perfect-hash-lambda hashes)))
+    (unless lambda
+      (return-from build-sealed-struct-typecase-map (values nil nil nil)))
+    (let* ((phashfun #+sb-xc-host (sb-cold::compile-perfect-hashfun-for-host lambda)
+                     #-sb-xc-host (compile nil lambda))
+           (n (length hashes))
+           (domain (make-array n :initial-element nil))
+           (range (sb-xc:make-array n :element-type '(unsigned-byte 16))))
+      (loop for clause-index from 1 for list across layout-lists
           do (dolist (layout list)
                (let* ((hash (ldb (byte 32 0) (layout-clos-hash layout)))
                       (index (funcall phashfun hash)))
                  (aver (null (aref domain index)))
                  (setf (aref domain index) layout
                        (aref range index) clause-index))))
-    (values domain range lambda)))
+      (values domain range lambda))))
 
 (declaim (ftype function sb-pcl::emit-cache-lookup))
 (defun optimize-%typecase-index (layout-lists object sealed)
@@ -1007,10 +1009,9 @@ symbol-case giving up: case=((V U) (F))
                          (lambda (x) #+64-bit (ldb (byte 32 0) (layout-clos-hash x))
                                      #-64-bit (layout-clos-hash x))
                          seen-layouts)))
-        (when (= (length hashes) (length (remove-duplicates hashes)))
-          (multiple-value-bind (layouts indices expr)
-              (build-sealed-struct-typecase-map expanded-lists hashes)
-            (aver expr)
+        (multiple-value-bind (layouts indices expr)
+            (build-sealed-struct-typecase-map expanded-lists hashes)
+          (when expr
             (return-from optimize-%typecase-index
               `(truly-the
                 (integer 0 ,(length layout-lists))
