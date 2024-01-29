@@ -735,6 +735,10 @@ that digit stands, else returns NIL."
   "All arguments must be integers. Returns a character object that represents
 a digit of the given weight in the specified radix. Returns NIL if no such
 character exists."
-  (and (typep weight 'fixnum)
-       (>= weight 0) (< weight radix) (< weight 36)
-       (code-char (if (< weight 10) (+ 48 weight) (+ 55 weight)))))
+  (declare (explicit-check weight))
+  (cond ((typep weight '(and unsigned-byte fixnum))
+         (and (< weight radix)
+              (code-char (if (< weight 10) (+ 48 weight) (+ 55 weight)))))
+        (t
+         (the unsigned-byte weight)
+         nil)))
