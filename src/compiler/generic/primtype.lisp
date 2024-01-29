@@ -275,7 +275,17 @@
                             (ecase n-machine-word-bits
                               (32 'unsigned-byte-32)
                               (64 'unsigned-byte-64)))
-                        t2))))))
+                        t2))
+                 ((bignum integer)
+                  (cond ((and (eq t1-name 'bignum)
+                              (eq t2-name 'bignum))
+                         t1)
+                        ((memq t2-name '(positive-fixnum fixnum
+                                         integer bignum
+                                         . #.(ecase n-machine-word-bits
+                                               (32 '(unsigned-byte-31 unsigned-byte-32 signed-byte-32))
+                                               (64 '(unsigned-byte-63 unsigned-byte-64 signed-byte-64)))))
+                         (primitive-type-or-lose 'integer))))))))
       (etypecase type
         (numeric-type
          (let ((lo (numeric-type-low type))
