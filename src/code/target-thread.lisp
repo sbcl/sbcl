@@ -2256,16 +2256,17 @@ subject to change."
         ;; -- DFL
         (setf *thruption-pending* t)))))
 
-(defun thread-os-tid (thread)
-  (declare (ignorable thread))
-  #+(or linux win32 freebsd darwin openbsd)
-  (if (eq *current-thread* thread)
-      (my-kernel-thread-id)
-      (with-deathlok (thread c-thread)
-        (unless (= c-thread 0)
-          (sap-ref-32 (int-sap c-thread)
-                      (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
-                         #+(and 64-bit big-endian) 4))))))
+#+(or linux win32 freebsd darwin openbsd)
+(progn
+  (declaim (ftype (sfunction (thread) (or null (unsigned-byte 32))) thread-os-tid))
+  (defun thread-os-tid (thread)
+    (if (eq *current-thread* thread)
+        (my-kernel-thread-id)
+        (with-deathlok (thread c-thread)
+          (unless (= c-thread 0)
+            (sap-ref-32 (int-sap c-thread)
+                        (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
+                           #+(and 64-bit big-endian) 4)))))))
 
 (defun interrupt-thread (thread function)
   (declare (ignorable thread))
