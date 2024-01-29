@@ -1211,7 +1211,7 @@ symbol-case giving up: case=((V U) (F))
             ;; makes a difference. NIL as a possible key mandates choosing SYMBOLP
             ;; but NON-NULL-SYMBOL-P is the quicker test.
             #-x86-64 (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol)
-                             `(,hash-fun ,symbol)))
+                             `(,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol)))
            (calc-hash
              (if (vectorp byte) ; mix 2 bytes
                  ;; FIXME: this could be performed as ((h >> c1) ^ (h >> c2)) & mask
