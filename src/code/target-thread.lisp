@@ -220,7 +220,8 @@ a simple-string (not necessarily unique) or NIL."
               ;; if not finished, show the STATE as a list.
               ;; if finished, show the VALUES.
               "~@[tid=~D ~]~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
-              (thread-os-tid thread)
+              (or #+(or linux win32 freebsd darwin openbsd)
+                  (thread-os-tid thread))
               (thread-name thread)
               (eq :finished state)
               state
