@@ -990,7 +990,7 @@ static void driver(
   free((void *)tab);
 }
 
-char* generate_perfhash_sexpr(int flags, unsigned int *key_array, int nkeys)
+char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
 {
   key* keylist = 0;
   key* keyspace = calloc(nkeys, sizeof (key));
@@ -1013,6 +1013,9 @@ char* generate_perfhash_sexpr(int flags, unsigned int *key_array, int nkeys)
   char* result = realloc(scratchfile->buffer, scratchfile->position + 1);
   free(scratchfile);
   return result;
+}
+char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys) {
+  return lisp_perfhash_with_options(1, key_array, nkeys); // MINIMAL
 }
 
 #ifdef DEFINE_MAIN

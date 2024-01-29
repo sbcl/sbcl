@@ -159,7 +159,7 @@
           (sb-unix::newcharstar-string
            (sb-sys:with-pinned-objects (array)
              (alien-funcall (extern-alien
-                             "generate_perfhash_sexpr"
+                             "lisp_perfhash_with_options"
                              (function (* char) int system-area-pointer int))
                             (logior (if minimal 1 0) (if fast 2 0))
                             (sb-sys:vector-sap array) (length array)))))
