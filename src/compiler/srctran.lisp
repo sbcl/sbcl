@@ -6367,19 +6367,28 @@
 
 #+sb-thread
 (progn
-(defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
-  (let ((type (lvar-fun-type function t t)))
-    (when (fun-type-p type)
-      (let ((null-p (not (and (constant-lvar-p waitp)
-                              (lvar-value waitp)
-                              (lvar-value-is timeout nil)))))
-        (if null-p
-            (values-type-union (fun-type-returns type)
-                               (values-specifier-type '(values null &optional)))
-            (fun-type-returns type))))))
+  (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
+    (let ((type (lvar-fun-type function t t)))
+      (when (fun-type-p type)
+        (let ((null-p (not (and (constant-lvar-p waitp)
+                                (lvar-value waitp)
+                                (lvar-value-is timeout nil)))))
+          (if null-p
+              (values-type-union (fun-type-returns type)
+                                 (values-specifier-type '(values null &optional)))
+              (fun-type-returns type))))))
 
-(setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-recursive-lock))
-      (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-mutex))))
+  (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-recursive-lock))
+        (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-mutex)))
+
+  (defoptimizer (sb-thread::call-with-system-mutex derive-type) ((function mutex))
+    (let ((type (lvar-fun-type function t t)))
+      (when (fun-type-p type)
+        (fun-type-returns type))))
+
+  (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex/allow-with-interrupts))
+        (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex/without-gcing))
+              (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex)))))
 
 (deftransform pointerp ((object))
   (let ((type (lvar-type object)))
