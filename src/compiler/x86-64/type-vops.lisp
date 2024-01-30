@@ -745,7 +745,7 @@
 (define-vop (fixnump simple-type-predicate)
   (:translate fixnump)
   (:arg-refs arg-ref)
-  (:args (value :scs (any-reg descriptor-reg) :load-if (tn-ref-memory-access arg-ref)))
+  (:args (value :scs (any-reg descriptor-reg)))
   (:conditional :z)
   ;; the compiler is very sensitive to this cost here as regards boxing. DON'T TOUCH !!!
   (:generator 3
