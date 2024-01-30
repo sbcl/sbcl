@@ -1239,7 +1239,7 @@
        (let ((fun (bind-lambda node)))
          (case (functional-kind fun)
            (:let
-            (loop with call = (node-dest (first (lambda-refs fun)))
+            (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
                   for var in (lambda-vars fun)
                   and val in (combination-args call)
                   when (and val (lambda-var-constraints var))
@@ -1249,7 +1249,7 @@
                      (maybe-add-eql-var-var-constraint var val gen)
                      (add-var-result-constraints var val gen)))
            (:mv-let
-            (add-mv-let-result-constraints (node-dest (first (lambda-refs fun))) fun gen)))))
+            (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
