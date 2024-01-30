@@ -2789,7 +2789,9 @@
         (when (or from-end (not (gethash elt map)))
           (setf (gethash elt map) position))))
     (flet ((hash (key) (ldb (byte 32 0) (symbol-name-hash key))))
-      (binding* ((keys (loop for k being each hash-key of map collect k))
+      ;; Sort to avoid sensitivity to the hash-table iteration order when cross-compiling.
+      ;; Not necessary for the target but not worth a #+/- either.
+      (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
                  (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
                  (lambda (make-perfect-hash-lambda hashes) :exit-if-null)
                  (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
@@ -2798,8 +2800,8 @@
                  (range
                   (when (eq fun-name 'position)
                     (sb-xc:make-array n :element-type
-                                      (cond ((<= n #xFF) '(unsigned-byte 8))
-                                            ((<= n #xFFFF) '(unsigned-byte 16))
+                                      (cond ((<= n #x100) '(unsigned-byte 8))
+                                            ((<= n #x10000) '(unsigned-byte 16))
                                             (t '(unsigned-byte 32))))))
                  (phashfun (sb-c::compile-perfect-hash lambda hashes)))
         (when (and (eq fun-name 'find) certainp) ; nothing to do. Wasted some time, no big deal
