@@ -463,7 +463,6 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;;      will degenerate to a list.
 ;;; * 32 bits of name-based hash, essential for package operations
 ;;;      and also useful for compiling CASE expressions.
-(defmacro symbol-name-hash (s) `(sxhash ,s)) ; TODO: mask out PRNG bits from SYMBOL-HASH
 (defmacro symbol-table-hash (selector name-hash ncells
                              &aux (reciprocals 'reciprocals)) ; KLUDGE, unhygienic
   (declare (type (member 1 2) selector)) ; primary or secondary hash function

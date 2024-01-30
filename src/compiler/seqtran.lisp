@@ -2769,6 +2769,62 @@
          (%coerce-callable-to-fun ,key)
          #'identity)))
 
+(defun note-perfect-hash-used (description expr)
+  (declare (ignorable description))
+  #+nil
+  (let ((*print-pretty* t) (*print-right-margin* 200)
+        (*print-lines* nil) (*print-level* nil) (*print-length* nil))
+    (format t "~&;; NOTE: ~A~%-> ~A~%" description expr))
+  expr)
+
+(defun try-perfect-find/position-map (fun-name lvar-type items from-end)
+  (when (< (length items) 3) ; not worth doing a hash calculation for 2 keys
+    (return-from try-perfect-find/position-map))
+  (let ((map (make-hash-table)))
+    (dotimes (position (length items))
+      (let ((elt (svref items position)))
+        ;; FROM-END will replace an entry already in MAP, as doing so exhibits
+        ;; the desired behavior of using the rightmost match.
+        ;; Otherwise, when *not* FROM-END, take only the leftmost occurrence.
+        (when (or from-end (not (gethash elt map)))
+          (setf (gethash elt map) position))))
+    (flet ((hash (key) (ldb (byte 32 0) (symbol-name-hash key))))
+      (binding* ((keys (loop for k being each hash-key of map collect k))
+                 (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
+                 (lambda (make-perfect-hash-lambda hashes) :exit-if-null)
+                 (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
+                 (n (length hashes))
+                 (domain (make-array n))
+                 (range
+                  (when (eq fun-name 'position)
+                    (sb-xc:make-array n :element-type
+                                      (cond ((<= n #xFF) '(unsigned-byte 8))
+                                            ((<= n #xFFFF) '(unsigned-byte 16))
+                                            (t '(unsigned-byte 32))))))
+                 (phashfun (sb-c::compile-perfect-hash lambda hashes)))
+        (when (and (eq fun-name 'find) certainp) ; nothing to do. Wasted some time, no big deal
+          (return-from try-perfect-find/position-map 'item)) ; transform arg is always named ITEM
+        (maphash (lambda (key val &aux (phash (funcall phashfun (hash key))))
+                   (setf (svref domain phash) key)
+                   (when range (setf (aref range phash) val)))
+                 map)
+        ;; TRULY-THE around PHASH is warranted when CERTAINP because while the compiler can
+        ;; derive the type of the final LOGAND, it's a complete mystery to it that the range
+        ;; of the perfect hash is smaller than 2^N.
+        (note-perfect-hash-used
+         `(,fun-name ,items)
+         `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
+                                        ; return a _NAME_ hash in 32 bits, with a different
+                                        ; vop to obtain pseudo-random stable hash bits,
+                                        ; stored as two halves of the SYMBOL-HASH slot.
+                            #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
+                            #-x86-64 (if (symbolp item) (symbol-name-hash item) 0)))
+                 (phash (,lambda hash)))
+            ,(if (and (eq fun-name 'position) certainp)
+                 `(aref ,range (truly-the (mod ,n) phash))
+                 `(if (and (< phash ,n) (eq item (svref ,domain phash)))
+                      ,(if (eq fun-name 'find) 'item `(aref ,range phash))))))))))
+
 (macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
                                              from-end (start 0) end
@@ -2794,63 +2850,29 @@
                   ;; constant, its contents can't change. We don't need to reference
                   ;; the sequence itself to compare elements.
                   ;; There are two transforms to try in this situation:
-                  ;; 1) Use CASE if the sequence contains only perfectly-hashed symbols.
-                  ;;    There is no upper limit on the sequence length- as it increases,
-                  ;;    so does the bias against using a series of IFs.  In fact, CASE
-                  ;;    might even consider the constant-returning mode to allow
-                  ;;    some hash colllisions, which it doesn't currently.
+                  ;; 1) If we can make a perfect map of N symbols, then do that. No upper bound
+                  ;;    on N. This could be enhanced to take fixnums and characters- any objects for
+                  ;;    which the hash values are computable at compile-time.
                   ;; 2) Otherwise, use COND, not to exceed some length limit.
                   (when (and const-seq
                              (member effective-test '(eql eq char= char-equal))
                              (not start) (not end) (not key)
                              (or (not from-end) (constant-lvar-p from-end)))
-                    (let ((items (coerce const-seq 'list))
+                    (let ((items (coerce const-seq 'simple-vector))
                           ;; It seems silly to use :from-end and a constant list
                           ;; in a way where it actually matters (with repeated elements),
                           ;; but we either have to do it right or not do it.
                           (reversedp (and from-end (lvar-value from-end))))
-                      (when (and (every #'symbolp items)
-                                 (memq effective-test '(eql eq))
-                                 ;; PICK-BEST will stupidly hash dups and call that a collision.
-                                 (= (pick-best-sxhash-bits (remove-duplicates items)) 1))
-                        ;; Construct a map from symbol to position so that correct results
-                        ;; are obtained for :from-end, and/or with duplicates present.
-                        ;; Precomputing it is easier than trying to roll the logic into the
-                        ;; production of the result form. :TEST can be ignored.
-                        (let ((map (loop for x in items for i from 0
-                                         collect (cons x
-                                                       (ecase ',fun-name
-                                                         (position i)
-                                                         (find `',x)))))
-                              (clauses)
-                              (seen))
-                          (dolist (x (if reversedp (reverse map) map))
-                            (let ((sym (car x)))
-                              (unless (member sym seen)
-                                ;; NIL, T, OTHERWISE need wrapping in () since they should not signify
-                                ;; an empty list of keys or the "otherwise" case respectively.
-                                (push (list (if (memq sym '(nil t otherwise))
-                                                (list sym)
-                                                sym)
-                                            (cdr x))
-                                      clauses)
-                                (push sym seen))))
-                          ;; CASE could decide not to use hash-based lookup, as there is a
-                          ;; minimum item count cutoff, but that's ok, the code is good either way.
-                          (return-from ,fun-name
-                            `(lambda (item sequence &rest rest)
-                               (declare (ignore sequence rest))
-                               (case item
-                                 ,@(nreverse clauses)
-                                 ;; This CASE looks like it could return NIL, which is potentially
-                                 ;; in conflict with the derived type of POSITION when we have already
-                                 ;; determined that the item is in the list. So the fallthrough
-                                 ;; value has to be numeric. It's actually unreachable.
-                                 ,@(when (and (eq ',fun-name 'position)
-                                              (csubtypep (lvar-type item) (specifier-type `(member ,@seen))))
-                                     `(((t 0)))))))))
-                      (unless (nthcdr 10 items)
-                        (let ((clauses (loop for x in items for i from 0
+                      (awhen (and (memq effective-test '(eql eq))
+                                  (every #'symbolp items)
+                                  (try-perfect-find/position-map
+                                   ',fun-name (lvar-type item) items reversedp))
+                        (return-from ,fun-name
+                          `(lambda (item sequence &rest rest)
+                             (declare (ignore sequence rest))
+                             ,it)))
+                      (unless (> (length items) 10)
+                        (let ((clauses (loop for x across items for i from 0
                                              ;; Later transforms will change EQL to EQ if appropriate.
                                              collect `((,effective-test item ',x)
                                                        ,(ecase ',fun-name

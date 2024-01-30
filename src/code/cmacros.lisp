@@ -88,3 +88,7 @@
             (push (list var (pop keys)) bind))))))
 
 (defmacro def!struct (&rest args) `(defstruct ,@args))
+
+;; TODO: mask out pseudo-random bits from SYMBOL-HASH (when I implement that).
+;; Or it will be a vop that extracts a half-lisp-word-sized quantity.
+(defmacro symbol-name-hash (s) `(symbol-hash ,s))

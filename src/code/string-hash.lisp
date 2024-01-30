@@ -79,6 +79,9 @@
     (trick x)))
 #+sb-xc-host
 (progn
+(defun symbol-name-hash (symbol) ; emulate our slot reader
+  (let ((name (symbol-name symbol)))
+    (calc-symbol-name-hash name (length name))))
 (defun calc-symbol-name-hash (string length)
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
