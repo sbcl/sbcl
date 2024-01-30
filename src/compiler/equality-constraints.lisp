@@ -779,7 +779,7 @@
                  (list (if (> low 0)
                            (list '< a low (interval-high interval))
                            (list '<= a)))))))
-          ((csubtypep (lvar-type b) (specifier-type '(integer 0)))
+          ((csubtypep (lvar-type b) (specifier-type '(integer * -1)))
            (let ((interval (type-approximate-interval (lvar-type b))))
              (when interval
                (let* ((interval (interval-neg interval))
