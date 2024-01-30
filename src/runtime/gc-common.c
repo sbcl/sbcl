@@ -3329,6 +3329,7 @@ extern void check_barrier (lispobj young, lispobj old, int wp) {
 }
 #endif
 
+#ifdef LISP_FEATURE_MARK_REGION_GC
 static void verify_hash_table(struct hash_table* ht, bool fix_bad)
 {
     struct vector* kvv = (void*)native_pointer(ht->pairs);
@@ -3449,3 +3450,4 @@ void verify_hash_tables(bool fix_bad)
 {
     walk_generation(verify_tables_in_range, -1, fix_bad);
 }
+#endif
