@@ -46,6 +46,7 @@ tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/mmap-rwx
 tools-for-build/where-is-mcontext
+tools-for-build/perfecthash
 contrib/asdf/asdf-upstream
 doc/manual/*.html
 version.lisp-expr

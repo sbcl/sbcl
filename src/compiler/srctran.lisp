@@ -6395,6 +6395,11 @@
     (when (fun-type-p type)
       (fun-type-returns type))))
 
+(defoptimizer (call-with-timing derive-type) ((timer function &rest arguments))
+  (let ((type (lvar-fun-type function t t)))
+    (when (fun-type-p type)
+      (fun-type-returns type))))
+
 (deftransform pointerp ((object))
   (let ((type (lvar-type object)))
     (cond ((csubtypep type (specifier-type '(or fixnum character #+64-bit single-float)))
