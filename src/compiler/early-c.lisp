@@ -104,6 +104,10 @@
 
 ;;;; miscellaneous utilities
 
+(defmacro compile-phashfun (arg)
+  #+sb-xc-host `(sb-cold::compile-perfect-hashfun-for-host ,arg)
+  #-sb-xc-host `(compile nil ,arg))
+
 (defstruct (debug-name-marker (:print-function print-debug-name-marker)
                               (:copier nil)))
 (declaim (freeze-type debug-name-marker))

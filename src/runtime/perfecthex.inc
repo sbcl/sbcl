@@ -73,20 +73,20 @@ gencode *final;
 }
 
 
+#endif
 
 /*
  * find the value to xor to a and b and c to make none of them 3
  * assert, (a,b,c) are three distinct values in (0,1,2,3).
  */
-static ub4 find_adder(a,b,c)
-ub4 a;
-ub4 b;
-ub4 c;
+static ub4 find_adder(ub4 a, ub4 b, ub4 c)
 {
   return (a^b^c^3);
 }
 
 
+#define PH_FAIL -1
+#define PH_OK 0
 
 /*
  * Find a perfect hash when there are only three keys.  Max 6 instructions.
@@ -100,10 +100,9 @@ ub4 c;
  * A minimal perfect hash needs to xor one of 0,1,2,3 afterwards to cause
  * the hole to land on 3.  find_adder() finds that constant
  */
-static void hexthree(keys, final, form)
-key      *keys;
-gencode  *final;
-hashform *form;
+static int hexthree(key      *keys,
+                    gencode  *final,
+                    hashform *form)
 {
   ub4 a = keys->hash_k;
   ub4 b = keys->next_k->hash_k;
@@ -114,9 +113,13 @@ hashform *form;
 
   if (a == b || a == c || b == c)
   {
-    printf("fatal error: duplicate keys\n");
-    exit(SUCCESS);
+    fprintf(stderr, "fatal error: duplicate keys\n");
+    return PH_FAIL;
   }
+
+  // Most of the Lisp expressions have an end-of-line comment which can be
+  // helpful to assert coverage of a line of this generator.
+  int infix = form->infix;
 
   /* one instruction */
   x = a&3;
@@ -127,15 +130,16 @@ hashform *form;
     if (form->perfect == NORMAL_HP || (x != 3 && y != 3 && z != 3))
     {
       /* h3a: 0,1,2 */
-      sprintf(final->line[0], "  ub4 rsl = (val & 3);\n");
+      sprintf(final->line[0], infix ? "ub4 rsl = val & 3" : "(& val 3) ;h3a");
     }
     else
     {
       /* h3b: 0,3,2 */
-      sprintf(final->line[0], "  ub4 rsl = ((val & 3) ^ %d);\n",
+      sprintf(final->line[0],
+              infix ? "ub4 rsl = (val & 3) ^ %d)" : "(^ (& val 3) %d) ;h3b",
 	      find_adder(x,y,z));
     }
-    return;
+    return PH_OK;
   }
 
   x = a>>(UB4BITS-2);
@@ -146,15 +150,18 @@ hashform *form;
     if (form->perfect == NORMAL_HP || (x != 3 && y != 3 && z != 3))
     {
       /* h3c: 3fffffff, 7fffffff, bfffffff */
-      sprintf(final->line[0], "  ub4 rsl = (val >> %ld);\n", (ub4)(UB4BITS-2));
+      sprintf(final->line[0],
+              infix ? "ub4 rsl = val >> %d" : "(>> val %d) ;h3c",
+              (ub4)(UB4BITS-2));
     }
     else
     {
       /* h3d: 7fffffff, bfffffff, ffffffff */
-      sprintf(final->line[0], "  ub4 rsl = ((val >> %ld) ^ %ld);\n",
+      sprintf(final->line[0],
+              infix ? "ub4 rsl = (val >> %d) ^ %d" : "(^ (>> val %d) %d) ;h3d",
 	      (ub4)(UB4BITS-2), find_adder(x,y,z));
     }
-    return;
+    return PH_OK;
   }
 
   /* two instructions */
@@ -168,15 +175,17 @@ hashform *form;
       if (form->perfect == NORMAL_HP || (x != 3 && y != 3 && z != 3))
       {
 	/* h3e: ffff3fff, ffff7fff, ffffbfff */
-	sprintf(final->line[0], "  ub4 rsl = ((val >> %ld) & 3);\n", i);
+	sprintf(final->line[0],
+                infix ? "ub4 rsl = (val >> %d) & 3" : "(& (>> val %d) 3) ;h3e", i);
       }
       else
       {
 	/* h3f: ffff7fff, ffffbfff, ffffffff */
-	sprintf(final->line[0], "  ub4 rsl = (((val >> %ld) & 3) ^ %ld);\n", i,
-		find_adder(x,y,z));
+	sprintf(final->line[0],
+                infix ? "ub4 rsl = ((val >> %d) & 3) ^ %d" : "(^ (& (>> val %d) 3) %d) ;h3f",
+                i, find_adder(x,y,z));
       }
-      return;
+      return PH_OK;
     }
   }
 
@@ -191,15 +200,19 @@ hashform *form;
       if (form->perfect == NORMAL_HP || (x != 3 && y != 3 && z != 3))
       {
 	/* h3g: 0x000, 0x001, 0x100 */
-	sprintf(final->line[0], "  ub4 rsl = ((val+(val>>%ld))&3);\n", i);
+	sprintf(final->line[0],
+                infix ? "ub4 rsl = (val+(val>>%d))&3" : "(& (+ val (>> val %d)) 3) ;h3g",
+                i);
       }
       else
       {
 	/* h3h: 0x001, 0x100, 0x101 */
-	sprintf(final->line[0], "  ub4 rsl = (((val+(val>>%ld))&3)^%ld);\n", i,
-		find_adder(x,y,z));
+	sprintf(final->line[0],
+                infix ? "ub4 rsl = ((val+(val>>%d))&3)^%d"
+                      : "(^ (& (+ val (>> val %d)) 3) %d) ;h3h",
+                i, find_adder(x,y,z));
       }
-      return;
+      return PH_OK;
     }
   }
 
@@ -228,22 +241,25 @@ hashform *form;
 	{
 	  /* h3i: 0x00, 0x04, 0x10 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = (((val>>%ld) ^ (val>>%ld)) & 3);\n", i, j);
+                  infix ? "ub4 rsl = ((val>>%d) ^ (val>>%d)) & 3"
+                        : "(& (^ (>> val %d) (>> val %d)) 3) ;h3i",
+                  i, j);
 	}
 	else
 	{
 	  /* h3j: 0x04, 0x10, 0x14 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((((val>>%ld) ^ (val>>%ld)) & 3) ^ %ld);\n",
+		  infix ? "ub4 rsl = (((val>>%d) ^ (val>>%d)) & 3) ^ %d"
+                        : "(^ (& (^ (>> val %d) (>> val %d)) 3) %d) ;h3j",
 		  i, j, find_adder(x,y,z));
 	}
-	return;
+	return PH_OK;
       }
     }
   }
 
-  printf("fatal error: hexthree\n");
-  exit(SUCCESS);
+  fprintf(stderr, "fatal error: hexthree\n");
+  return PH_FAIL;
 }
 
 
@@ -252,11 +268,7 @@ hashform *form;
  * Check that a,b,c,d are some permutation of 0,1,2,3
  * Assume that a,b,c,d are all have values less than 32.
  */
-static int testfour(a,b,c,d)
-ub4 a;
-ub4 b;
-ub4 c;
-ub4 d;
+static int testfour(ub4 a, ub4 b, ub4 c, ub4 d)
 {
   ub4 mask = (1<<a)^(1<<b)^(1<<c)^(1<<d);
   return (mask == 0xf);
@@ -268,9 +280,7 @@ ub4 d;
  * Find a perfect hash when there are only four keys.  Max 10 instructions.
  * Note that a perfect hash for 4 keys will automatically be minimal.
  */
-static void hexfour(keys, final)
-key     *keys;
-gencode *final;
+static int hexfour(key *keys, gencode *final, int infix)
 {
   ub4 a = keys->hash_k;
   ub4 b = keys->next_k->hash_k;
@@ -281,8 +291,8 @@ gencode *final;
 
   if (a==b || a==c || a==d || b==c || b==d || c==d)
   {
-    printf("fatal error: Duplicate keys\n");
-    exit(SUCCESS);
+    fprintf(stderr, "fatal error: Duplicate keys\n");
+    return PH_FAIL;
   }
 
   final->used = 1;
@@ -296,8 +306,8 @@ gencode *final;
     z = d&3;
     if (testfour(w,x,y,z))
     {
-      sprintf(final->line[0], "  ub4 rsl = (val & 3);\n");   /* h4a: 0,1,2,3 */
-      return;
+      sprintf(final->line[0], infix?"ub4 rsl = val & 3":"(& val 3) ;h4a"); /* h4a: 0,1,2,3 */
+      return PH_OK;
     }
   }
 
@@ -309,8 +319,9 @@ gencode *final;
     z = d>>(UB4BITS-2);
     if (testfour(w,x,y,z))
     {                         /* h4b: 0fffffff, 4fffffff, 8fffffff, cfffffff */
-      sprintf(final->line[0], "  ub4 rsl = (val >> %ld);\n", (ub4)(UB4BITS-2));
-      return;
+      sprintf(final->line[0], infix ? "ub4 rsl = val >> %d" : "(>> val %d) ;h4b",
+              (ub4)(UB4BITS-2));
+      return PH_OK;
     }
   }
 
@@ -325,8 +336,9 @@ gencode *final;
       z = (d>>i)&3;
       if (testfour(w,x,y,z))
       {                                                      /* h4c: 0,2,4,6 */
-	sprintf(final->line[0], "  ub4 rsl = ((val >> %ld) & 3);\n", i);
-	return;
+	sprintf(final->line[0], infix ? "ub4 rsl = (val >> %d) & 3)"
+                                      : "(& (>> val %d) 3) ;h4c", i);
+	return PH_OK;
       }
     }
   }
@@ -345,8 +357,9 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4d: 0,1,2,4 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val + (val >> %ld)) & 3);\n", i);
-	  return;
+		  infix ? "ub4 rsl = (val + (val >> %d)) & 3"
+                        : "(& (+ val (>> val %d)) 3) ;h4d", i);
+	  return PH_OK;
 	}
 
 	w = (a-(a>>i))&3;
@@ -356,8 +369,9 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4e: 0,1,3,5 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val - (val >> %ld)) & 3);\n", i);
-	  return;
+		  infix ? "ub4 rsl = (val - (val >> %d)) & 3"
+                        : "(& (- val (>> val %d)) 3) ;h4e", i);
+	  return PH_OK;
 	}
 
 	/* h4f: ((val>>k)-val)&3: redundant with h4e */
@@ -369,8 +383,9 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4g: 3,4,5,8 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val ^ (val >> %ld)) & 3);\n", i);
-	  return;
+		  infix ? "ub4 rsl = (val ^ (val >> %d)) & 3"
+                        : "(& (^ val (>> val %d)) 3) ;h4g", i);
+	  return PH_OK;
 	}
       }
     }
@@ -391,8 +406,10 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4h: 1,2,6,8 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val & 3) ^ ((val >> %ld) & 1));\n", i);
-	  return;
+                  infix ? "ub4 rsl = (val & 3) ^ ((val >> %d) & 1)"
+                        : "(^ (& val 3) (& (>> val %d) 1)) ;h4h",
+                  i);
+	  return PH_OK;
 	}
 
 	w = (a&2)^((a>>i)&1);
@@ -402,8 +419,10 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4i: 1,2,8,a */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val & 2) ^ ((val >> %ld) & 1));\n", i);
-	  return;
+		  infix ? "ub4 rsl = (val & 2) ^ ((val >> %d) & 1)"
+                        : "(^ (& val 2) (& (>> val %d) 1)) ;h4i",
+                  i);
+	  return PH_OK;
 	}
       }
 
@@ -417,8 +436,10 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4j: 0,1,3,4 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val & 3) ^ ((val >> %ld) & 2));\n", i);
-	  return;
+		  infix ? "ub4 rsl = (val & 3) ^ ((val >> %d) & 2)"
+                        : "(^ (& val 3) (& (>> val %d) 2)) ;h4j",
+                  i);
+	  return PH_OK;
 	}
 
 	w = (a&1)^((a>>i)&2);
@@ -428,8 +449,10 @@ gencode *final;
 	if (testfour(w,x,y,z))
 	{                                                    /* h4k: 1,4,7,8 */
 	  sprintf(final->line[0],
-		  "  ub4 rsl = ((val & 1) ^ ((val >> %ld) & 2));\n", i);
-	  return;
+                  infix ? "ub4 rsl = (val & 1) ^ ((val >> %d) & 2)"
+                        : "(^ (& val 1) (& (>> val %d) 2)) ;h4k",
+                  i);
+	  return PH_OK;
 	}
       }
     }
@@ -452,9 +475,10 @@ gencode *final;
 	  if (testfour(w,x,y,z))
 	  {                                                /* h4l: testcase? */
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) + (val >> %ld)) & 3);\n",
+		    infix ? "ub4 rsl = ((val >> %d) + (val >> %d)) & 3"
+                          : "(& (+ (>> val %d) (>> val %d)) 3) ;h4l",
 		    i, j);
-	    return;
+	    return PH_OK;
 	  }
 
 	  /* test - */
@@ -465,9 +489,10 @@ gencode *final;
 	  if (testfour(w,x,y,z))
 	  {                                                /* h4m: testcase? */
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) - (val >> %ld)) & 3);\n",
+		    infix ? "ub4 rsl = ((val >> %d) - (val >> %d)) & 3"
+                          : "(& (- (>> val %d) (>> val %d)) 3) ;h4m",
 		    i, j);
-	    return;
+	    return PH_OK;
 	  }
 
 	  /* test ^ */
@@ -478,9 +503,10 @@ gencode *final;
 	  if (testfour(w,x,y,z))
 	  {                                                /* h4n: testcase? */
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) ^ (val >> %ld)) & 3);\n",
+		    infix ? "ub4 rsl = ((val >> %d) ^ (val >> %d)) & 3"
+                          : "(& (^ (>> val %d) (>> val %d)) 3) ;h4n",
 		    i, j);
-	    return;
+	    return PH_OK;
 	  }
 	}
       }
@@ -503,9 +529,10 @@ gencode *final;
 	  if (testfour(w,x,y,z))
 	  {                                                  /* h4o: 0,4,8,a */
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) & 3) ^ ((val >> %ld) & 1));\n",
+		    infix ? "ub4 rsl = ((val >> %d) & 3) ^ ((val >> %d) & 1)"
+                          : "(^ (& (>> val %d) 3) (& (>> val %d) 1)) ;h4o",
 		    j, i);
-	    return;
+	    return PH_OK;
 	  }
 
 	  w = ((a>>j)&2)^((a>>i)&1);
@@ -515,9 +542,10 @@ gencode *final;
 	  if (testfour(w,x,y,z))
 	  {                                   /* h4p: 0x04, 0x08, 0x10, 0x14 */
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) & 2) ^ ((val >> %ld) & 1));\n",
+                    infix ? "ub4 rsl = ((val >> %d) & 2) ^ ((val >> %d) & 1)"
+                          : "(^ (& (>> val %d) 2) (& (>> val %d) 1)) ;h4p",
 		    j, i);
-	    return;
+	    return PH_OK;
 	  }
 	}
 
@@ -540,22 +568,23 @@ gencode *final;
 	  if (i==0)                                          /* h4q: 0,4,5,8 */
 	  {
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) ^ (val << 1)) & 3);\n",
-		    j);
+		    infix ? "ub4 rsl = ((val >> %d) ^ (val << 1)) & 3"
+                          : "(& (^ (>> val %d) (<< val 1)) 3) ;h4q", j);
 	  }
 	  else if (i==1)                         /* h4r: 0x01,0x09,0x0b,0x10 */
 	  {
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) & 3) ^ (val & 2));\n",
-		    j);
+		    infix ? "ub4 rsl = ((val >> %d) & 3) ^ (val & 2)"
+                          : "(^ (& (>> val %d) 3) (& val 2)) ;h4r", j);
 	  }
 	  else                                               /* h4s: 0,2,6,8 */
 	  {
 	    sprintf(final->line[0],
-		    "  ub4 rsl = (((val >> %ld) & 3) ^ ((val >> %ld) & 2));\n",
+		    infix ? "ub4 rsl = ((val >> %d) & 3) ^ ((val >> %d) & 2)"
+                          : "(^ (& (>> val %d) 3) (& (>> val %d) 2)) ;h4s",
 		    j, (i-1));
 	  }
-	  return;
+	  return PH_OK;
 	}
 
 	w = ((a>>j)&1)^((a>>i)&2);
@@ -565,9 +594,10 @@ gencode *final;
 	if (testfour(w,x,y,z))                   /* h4t: 0x20,0x14,0x10,0x06 */
 	{
 	  sprintf(final->line[0],
-		  "  ub4 rsl = (((val >> %ld) & 1) ^ ((val >> %ld) & 2));\n",
+		  infix ? "ub4 rsl = ((val >> %d) & 1) ^ ((val >> %d) & 2)"
+                        : "(^ (& (>> val %d) 1) (& (>> val %d) 2)) ;h4t",
 		  j, i);
-	  return;
+	  return PH_OK;
 	}
       }
     }
@@ -615,8 +645,8 @@ gencode *final;
   /* Assert: bits i,j,k were found which distinguish a,b,c,d */
   if (i==UB4BITS || j==UB4BITS || k==UB4BITS)
   {
-    printf("Fatal error: hexfour(), i %ld j %ld k %ld\n", i,j,k);
-    exit(SUCCESS);
+    fprintf(stderr, "Fatal error: hexfour(), i %d j %d k %d\n", i,j,k);
+    return PH_FAIL;
   }
 
   /* now try the four cases */
@@ -646,15 +676,18 @@ gencode *final;
       if (m==0)                                                   /* 0,2,8,9 */
       {
 	sprintf(final->line[0],
-		"  ub4 rsl = (((val^(val>>%ld))&1)^((val>>%ld)&2));\n", o, n-1);
+		infix ? "ub4 rsl = (((val^(val>>%d))&1)^((val>>%d)&2))"
+                      : "(^ (& (^ val (>> val %d)) 1) (& (>> val %d) 2)) ;1",
+                o, n-1);
       }
       else                                            /* 0x00,0x04,0x10,0x12 */
       {
 	sprintf(final->line[0],
-		"  ub4 rsl = ((((val>>%ld) ^ (val>>%ld)) & 1) ^ ((val>>%ld) & 2));\n",
+		infix ? "ub4 rsl = (((val>>%d) ^ (val>>%d)) & 1) ^ ((val>>%d) & 2)"
+                      : "(^ (& (^ (>> val %d) (>> val %d)) 1) (& (>> val %d) 2)) ;2",
 		m, o, n-1);
       }
-      return;
+      return PH_OK;
     }
 
     /* six to seven instructions, multiply bit o by 2 */
@@ -669,22 +702,25 @@ gencode *final;
       if (m==0)                                                   /* 0,1,5,8 */
       {
 	sprintf(final->line[0],
-		"  ub4 rsl = ((val & 1) ^ (((val>>%ld) ^ (val>>%ld)) & 2));\n",
+		infix ? "ub4 rsl = (val & 1) ^ (((val>>%d) ^ (val>>%d)) & 2)"
+                      : "(^ (& val 1) (& (^ (>> val %d) (>> val %d)) 2)) ;3",
 		n-1, o-1);
       }
       else if (o==0)                                  /* 0x00,0x04,0x05,0x10 */
       {
 	sprintf(final->line[0],
-		"  ub4 rsl = (((val>>%ld) & 2) ^ (((val>>%ld) ^ val) & 1));\n",
+		infix ? "ub4 rsl = ((val>>%d) & 2) ^ (((val>>%d) ^ val) & 1)"
+                      : "(^ (& (>> val %d) 2) (& (^ (>> val %d) val) 1)) ;4",
 		m-1, n);
       }
       else                                            /* 0x00,0x02,0x0a,0x10 */
       {
 	sprintf(final->line[0],
-		"  ub4 rsl = (((val>>%ld) & 1) ^ (((val>>%ld) ^ (val>>%ld)) & 2));\n",
+                infix ? "ub4 rsl = ((val>>%d) & 1) ^ (((val>>%d) ^ (val>>%d)) & 2)"
+                      : "(^ (& (>> val %d) 1) (& (^ (>> val %d) (>> val %d)) 2)) ;5",
 		m, n-1, o-1);
       }
-      return;
+      return PH_OK;
     }
 
     /* multiplying by 3 is a pain: seven or eight instructions */
@@ -695,62 +731,77 @@ gencode *final;
     if (testfour(w,x,y,z))
     {
       final->used = 2;
-      sprintf(final->line[0], "  ub4 b = (val >> %ld) & 1;\n", o);
+      sprintf(final->line[0],
+              infix ? "ub4 b = (val >> %d) & 1" : "(let ((b (& (>> val %d) 1))) ;6",
+              o);
       if (m==o-1 && m==0)                             /* 0x02,0x10,0x11,0x18 */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = ((val & 3) ^ ((val >> %ld) & 2) ^ b);\n", n-1);
+		infix ? "ub4 rsl = (val & 3) ^ ((val >> %d) & 2) ^ b"
+                      : "(^ (& val 3) (& (>> val %d) 2) b) ;7", n-1);
       }
       else if (m==o-1)                                            /* 0,4,6,c */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = (((val >> %ld) & 3) ^ ((val >> %ld) & 2) ^ b);\n",
+                infix ? "ub4 rsl = ((val >> %d) & 3) ^ ((val >> %d) & 2) ^ b"
+                      : "(^ (& (>> val %d) 3) (& (>> val %d) 2) b) ;8",
 		m, n-1);
       }
       else if (m==n-1 && m==0)                                /* 02,0a,0b,18 */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = ((val & 3) ^ b ^ (b << 1));\n");
+                infix ? "ub4 rsl = (val & 3) ^ b ^ (b << 1)"
+                      : "(^ (& val 3) b (<< b 1)) ;9");
       }
       else if (m==n-1)                                            /* 0,2,4,8 */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = (((val >> %ld) & 3) ^ b ^ (b << 1));\n", m);
+                infix ? "ub4 rsl = ((val >> %d) & 3) ^ b ^ (b << 1)"
+                      : "(^ (& (>> val %d) 3) b (<< b 1)) ;10",
+                m);
       }
       else if (o==n-1 && m==0)                          /* h4am: not reached */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = ((val & 1) ^ ((val >> %ld) & 3) ^ (b <<1 ));\n",
+                infix ? "ub4 rsl = (val & 1) ^ ((val >> %d) & 3) ^ (b << 1)"
+                      : "(^ (& val 1) (& (>> val %d) 3) (<< b 1)) ;11",
 		o);
       }
       else if (o==n-1)                                /* 0x00,0x02,0x08,0x10 */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = (((val >> %ld) & 1) ^ ((val >> %ld) & 3) ^ (b << 1));\n",
+                infix ? "ub4 rsl = ((val >> %d) & 1) ^ ((val >> %d) & 3) ^ (b << 1)"
+                      : "(^ (& (>> val %d) 1) (& (>> val %d) 3) (<< b 1)) ;12",
 		m, o);
       }
       else if ((m != o-1) && (m != n-1) && (o != m-1) && (o != n-1))
       {
 	final->used = 3;
-	sprintf(final->line[0], "  ub4 newval = val & 0x%lx;\n",
+	sprintf(final->line[0],
+                infix ? "ub4 newval = val & 0x%x" : "(let ((newval (& val #x%x)))",
 		(((ub4)1<<m)^((ub4)1<<n)^((ub4)1<<o)));
 	if (o==0)                                     /* 0x00,0x01,0x04,0x10 */
 	{
-	  sprintf(final->line[1], "  ub4 b = -newval;\n");
+	  sprintf(final->line[1], infix?"ub4 b = -newval":"(let ((b (u32- newval))) ;13");
 	}
 	else                                          /* 0x00,0x04,0x09,0x10 */
 	{
-	  sprintf(final->line[1], "  ub4 b = -(newval >> %ld);\n", o);
+	  sprintf(final->line[1],
+                  infix ? "ub4 b = -(newval >> %d)" : "(let ((b (u32- (>> newval %d)))) ;14",
+                  o);
 	}
 	if (m==0)                                     /* 0x00,0x04,0x09,0x10 */
 	{
 	  sprintf(final->line[2],
-		  "  ub4 rsl = ((newval ^ (newval>>%ld) ^ b) & 3);\n", n-1);
+                  infix ? "ub4 rsl = (newval ^ (newval>>%d) ^ b) & 3"
+                        : "(& (^ newval (>> newval %d) b) 3) ;15",
+                  n-1);
 	}
 	else                                          /* 0x00,0x03,0x04,0x10 */
 	{
 	  sprintf(final->line[2],
-		  "  ub4 rsl = (((newval>>%ld) ^ (newval>>%ld) ^ b) & 3);\n",
+                  infix ? "ub4 rsl = ((newval>>%d) ^ (newval>>%d) ^ b) & 3"
+                        : "(& (^ (>> newval %d) (>> newval %d) b) 3) ;16",
 		  m, n-1);
 	}
       }
@@ -758,38 +809,43 @@ gencode *final;
       {
 	if (o==0)                                     /* 0x02,0x03,0x0a,0x10 */
 	{
-	  sprintf(final->line[0], "  ub4 b = (val<<1) & 2;\n");
+	  sprintf(final->line[0],
+                  infix ? "ub4 b = (val<<1) & 2" : "(let ((b (& (<< val 1) 2))) ;17");
 	}
 	else if (o==1)                                /* 0x00,0x02,0x04,0x10 */
 	{
-	  sprintf(final->line[0], "  ub4 b = val & 2;\n");
+	  sprintf(final->line[0], infix ? "ub4 b = val & 2" : "(let ((b (& val 2))) ;18");
 	}
 	else                                          /* 0x00,0x04,0x08,0x20 */
 	{
-	  sprintf(final->line[0], "  ub4 b = (val>>%ld) & 2;\n", o-1);
+	  sprintf(final->line[0],
+                  infix ? "ub4 b = (val>>%d) & 2" : "(let ((b (& (>> val %d) 2))) ;19",
+                  o-1);
 	}
 
 	if (o==0)                                     /* 0x02,0x03,0x0a,0x10 */
 	{
 	  sprintf(final->line[1],
-		  "  ub4 rsl = ((val & 3) ^ ((val>>%ld) & 1) ^ b);\n",
-		  n);
+                  infix ? "ub4 rsl = (val & 3) ^ ((val>>%d) & 1) ^ b"
+                        : "(^ (& val 3) (& (>> val %d) 1) b) ;20", n);
 	}
 	else                                          /* 0x00,0x02,0x04,0x10 */
 	{
 	  sprintf(final->line[1],
-		  "  ub4 rsl = (((val>>%ld) & 3) ^ ((val>>%ld) & 1) ^ b);\n",
+		  infix ? "ub4 rsl = ((val>>%d) & 3) ^ ((val>>%d) & 1) ^ b"
+                        : "(^ (& (>> val %d) 3) (& (>> val %d) 1) b) ;21",
 		  o, n);
 	}
       }
       else                         /* h4ax: 10 instructions, but not reached */
       {
 	sprintf(final->line[1],
-		"  ub4 rsl = (((val>>%ld) & 1) ^ ((val>>%ld) & 2) ^ b ^ (b<<1));\n",
+		infix ? "ub4 rsl = ((val>>%d) & 1) ^ ((val>>%d) & 2) ^ b ^ (b<<1)"
+                      : "(^ (& (>> val %d) 1) (& (>> val %d) 2) b (<< b 1)); h4ax",
 		m, n-1);
       }
 
-      return;
+      return PH_OK;
     }
 
     /* five instructions, multiply bit o by 0, covered before the big guns */
@@ -800,16 +856,16 @@ gencode *final;
     if (testfour(w,x,y,z))
     {                                                    /* h4v, not reached */
       sprintf(final->line[0],
-	      "  ub4 rsl = (((val>>%ld) & 1) ^ ((val>>%ld) & 2));\n", m, n-1);
-      return;
+              infix ? "ub4 rsl = ((val>>%d) & 1) ^ ((val>>%d) & 2)":
+                      "(^ (& (>> val %d) 1) (& (>> val %d) 2)) ;h4v",
+              m, n-1);
+      return PH_OK;
     }
   }
 
-  printf("fatal error: bug in hexfour!\n");
-  exit(SUCCESS);
-  return;
+  fprintf(stderr, "fatal error: bug in hexfour!\n");
+  return PH_FAIL;
 }
-#endif
 
 
 /* test if a_k is distinct and in range for all keys */
@@ -1264,7 +1320,7 @@ static int inithex(
     gencode  *final,                      /* output, code for the final hash */
     hashform *form)                                       /* user directives */
 {
-  if (nkeys < 5) { fprintf(stderr, "More keys if you please\n"); exit(1); }
+  if (nkeys < 3) { fprintf(stderr, "More keys if you please\n"); exit(1); }
   setlow(keys, final);
 
   switch (nkeys)
@@ -1276,13 +1332,13 @@ static int inithex(
   case 2:
     hextwo(keys, final);
     return TRUE;
+#endif
   case 3:
-    hexthree(keys, final, form);
+    if (hexthree(keys, final, form) < 0) return PH_FAIL;
     return TRUE;
   case 4:
-    hexfour(keys, final);
+    if (hexfour(keys, final, form->infix) < 0) return PH_FAIL;
     return TRUE;
-#endif
   case 5:  case 6:  case 7:  case 8:
     if (salt == 1 &&                                  /* first time through */
 	hexeight(keys, nkeys, final, form)) /* get lucky, don't need tab[] ? */

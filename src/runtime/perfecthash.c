@@ -238,6 +238,7 @@ static int initkey(
 {
   /* Do the initial hash of the keys */
   int finished = inithex(keys, nkeys, alen, blen, smax, salt, final, form);
+  if (finished < 0) return -1;
   if (finished) return 2;
   return inittab(tabb, blen, keys, form, FALSE);
 }
@@ -640,11 +641,12 @@ int findhash(
   bad_perfect = 0;
   for (trysalt=1; ; ++trysalt)
   {
-    ub4 rslinit;
+    int rslinit;
     /* Try to find distinct (A,B) for all keys */
 
     rslinit = initkey(keys, nkeys, *tabb, *alen, *blen, *smax, trysalt,
                       form, final);
+    if (rslinit < 0) return -1;
 
     if (rslinit == 2)
     {      /* initkey actually found a perfect hash, not just distinct (a,b) */
@@ -922,7 +924,7 @@ typedef uint8_t  ub1;\n");
     mem_stream_printf(f, infix ? "};\n\n" : ")))\n");
     ++extra_parens;
   }
-  int indent = 0, newline = 0;
+  int indent = 0, newline = 0, commented = 0;
   for (i=0; i<final->used; ++i) {
     if (!final->line[i][0]) continue; // empty line
     if (newline) mem_stream_printf(f,"\n");
@@ -933,12 +935,17 @@ typedef uint8_t  ub1;\n");
     mem_stream_printf(f, "%s", final->line[i]);
     // Delay the newline in lisp mode so we prettily
     // close all the parens on the last line.
-    if (infix) mem_stream_printf(f, ";\n"); else newline = 1;
+    if (infix) mem_stream_printf(f, ";\n");
+    else {
+      newline = 1;
+      commented = strchr(final->line[i], ';') != NULL;
+    }
     if (!strncmp(final->line[i],"(let",4)) ++indent;
   }
   if (infix) {
     mem_stream_printf(f, "  return rsl;\n}\n");
   } else {
+    if (commented) mem_stream_printf(f,"\n");
     indent += 1 + extra_parens;
     while (indent--) mem_stream_printf(f,")");
     mem_stream_printf(f,"\n");
@@ -950,7 +957,7 @@ typedef uint8_t  ub1;\n");
 Read in the keys, find the hash, and write the .c and .h files
 ------------------------------------------------------------------------------
 */
-static void driver(
+static int driver(
         hashform *form,                                   /* user directives */
         key* keys,
         int nkeys,
@@ -974,8 +981,8 @@ static void driver(
   for (i=0; i<10; ++i) final.line[i] = buf[i];
 
   /* find the hash */
-  findhash(&tab, &alen, &blen, &salt, &final,
-           scramble, &smax, keys, nkeys, form);
+  if (findhash(&tab, &alen, &blen, &salt, &final,
+               scramble, &smax, keys, nkeys, form) < 0) return -1;
 
   /* generate the phash.h file */
   if (form->infix) {
@@ -988,6 +995,7 @@ static void driver(
 
   /* clean up memory sources */
   free((void *)tab);
+  return 0;
 }
 
 char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
@@ -1008,9 +1016,10 @@ char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
     .infix = 0
   };
   struct mem_stream * scratchfile = make_mem_stream();
-  driver(&form, keylist, nkeys, scratchfile);
+  if (driver(&form, keylist, nkeys, scratchfile) < 0) return NULL;
 
   char* result = realloc(scratchfile->buffer, scratchfile->position + 1);
+  //fprintf(stderr, "#|\n%s|#\n", result);
   free(scratchfile);
   return result;
 }

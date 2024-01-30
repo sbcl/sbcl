@@ -137,6 +137,9 @@
 (deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)
   `(symbol-hash object))
 
+(intern "SCRAMBLE" "SB-C")
+(intern "TAB" "SB-C")
+
 ;;; To use this macro during cross-compilation we will have to emulate
 ;;; generate_perfhash_sexpr using a file, similar to xfloat-math.
 ;;; MINIMAL (the default) returns a a function that returns an output
@@ -153,7 +156,7 @@
 (defun make-perfect-hash-lambda (array &optional (minimal t) (fast nil))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
   (declare (ignorable minimal fast))
-  (when (< (length array) 5)
+  (when (< (length array) 3) ; one or two keys - why are you doing this?
     (return-from make-perfect-hash-lambda)) ; a limitation for now
   (let ((dedup (alloc-xset)))
     (dovector (x array)
@@ -181,6 +184,7 @@
                (if (consp e)
                    (or (containsp (car e) op) (containsp (cdr e) op))
                    (eq e op))))
+     (values
       `(lambda (val)
          (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
          (declare (type (unsigned-byte 32) val))
@@ -190,8 +194,9 @@
          (macrolet ,(remove-if-not
                      (lambda (m) (containsp expr (car m)))
                      '((& (a b) `(logand ,a ,b)) ; purposely look more C-like
-                       (^ (a b) `(logxor ,a ,b)) ;  (for debugging)
+                       (^ (&rest r) `(logxor ,@r)) ;  (for debugging)
                        (u32+ (a b) `(logand (+ ,a ,b) #xFFFFFFFF))
+                       (u32- (a) `(logand (- ,a) #xFFFFFFFF))
                        (^= (a b) `(setq ,a (logxor ,a ,b)))
                        (+= (a b) `(setq ,a (logand (+ ,a ,b) #xFFFFFFFF)))
                        (<< (n c) `(logand (ash ,n ,c) #xFFFFFFFF))
@@ -199,6 +204,5 @@
            ;; We generate _really_ crappy code for 32-bit math on 64-bit machines.
            ;; I think the steps are sufficiently trivial that a single vop could choose
            ;; how to translate the arbitrary s-expression
-           ,@expr)))))
-(intern "TAB")
-(intern "SCRAMBLE")
+           ,@expr))
+      string))))
