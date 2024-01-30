@@ -40,8 +40,6 @@ tests/run-tests-*
 tests/last-random-state.lisp-expr
 tests/ansi-test/
 tools-for-build/avx2*
-tools-for-build/determine-endianness
-tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/mmap-rwx
