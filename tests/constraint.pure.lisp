@@ -1146,3 +1146,11 @@
         (> y x)))
    ((1 5 3) t)
    ((2 4 6) nil)))
+
+(with-test (:name :mod)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (v i)
+                        (svref v (mod i (length v))))
+                     nil))
+             0)))

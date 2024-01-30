@@ -738,6 +738,14 @@
       (when vector-length
         (conset-add-equality-constraint target 'eq var vector-length nil)))))
 
+(defun add-mv-let-result-constraints (call fun constraints &optional (target constraints))
+  (let ((vars (lambda-vars fun))
+        (lvars (basic-combination-args call)))
+    (when (= (length lvars) 1)
+      (loop for (nth-value operator second min-amount max-amount) in (nth-value 1 (lvar-result-constraints (car lvars)))
+            do
+            (add-equality-constraint operator (elt vars nth-value) second constraints target nil min-amount max-amount)))))
+
 ;;; Need a separate function because a set clears the constraints of the var
 (defun add-set-constraints (var lvar constraints)
   (let (gen)
@@ -839,3 +847,8 @@
 
 (defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
   (list (list 'vector-length length)))
+
+(defoptimizer (floor constraint-propagate-result) ((x y) node)
+  (when (csubtypep (lvar-type y) (specifier-type '(real 0)))
+    (values nil
+            (list (list 1 '< y)))))
