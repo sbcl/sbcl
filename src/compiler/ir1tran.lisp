@@ -476,6 +476,16 @@
     (link-node-to-previous-ctran old temp))
   (values))
 
+(defun insert-node-after (old new)
+  (let ((next (node-next old)))
+    (cond (next
+           (insert-node-before (ctran-next next) new))
+          (t
+           (let ((ctran (make-ctran)))
+             (link-node-to-previous-ctran new ctran)
+             (setf (block-last (node-block old)) new)
+             (use-ctran old ctran))))))
+
 ;;; This function is used to set the ctran for a node, and thus
 ;;; determine what receives the value.
 (defun use-lvar (node lvar)

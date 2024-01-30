@@ -1027,7 +1027,7 @@ and no value was provided for it." name))))))))))
                          (and (not (return-p (lvar-dest lvar)))
                               (not (mv-combination-p (lvar-dest lvar)))
                               (lvar-has-single-use-p lvar))))
-            (when (assert-lvar-type lvar returns policy 'ftype-context)
+            (when (assert-node-type call returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
     (let* ((name (lvar-fun-name (combination-fun call) t))
            (info (and name

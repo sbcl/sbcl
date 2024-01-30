@@ -803,6 +803,16 @@
     (reoptimize-lvar lvar)
     cast))
 
+(defun insert-cast-after (node lvar type policy &optional context)
+  (declare (type node node) (type lvar lvar) (type ctype type))
+  (with-ir1-environment-from-node node
+    (let ((cast (make-cast lvar type policy context)))
+      (let ((lvar (cast-value cast)))
+        (insert-node-after node cast)
+        (setf (lvar-dest lvar) cast)
+        (reoptimize-lvar lvar)
+        cast))))
+
 (defun insert-ref-before (leaf node)
   (let ((ref (make-ref leaf))
         (lvar (make-lvar node)))

@@ -411,6 +411,18 @@
         (use-lvar cast internal-lvar)
         t))))
 
+(defun assert-node-type (node type policy &optional context)
+  (declare (type node node) (type ctype type))
+  (let ((lvar (node-lvar node)))
+    (unless (type-asserted-p lvar type)
+      (let ((new-lvar (make-lvar)))
+        (%delete-lvar-use node)
+        (use-lvar node new-lvar)
+        (let ((cast (insert-cast-after node new-lvar type policy
+                                       context)))
+          (use-lvar cast lvar)
+          t)))))
+
 
 ;;;; IR1-OPTIMIZE
 
