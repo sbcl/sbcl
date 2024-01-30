@@ -966,20 +966,26 @@
   ;; but honestly that's more engineering than I care to do.
   ;; So what if this has to fork() two dozen times?
   (let ((computed
-         #+use-host-hash-generator
-         (let* ((input (make-string-input-stream (format nil "~{~X~%~}"
-                                                         (coerce array 'list))))
-                (output (make-string-output-stream))
-                (process
-                 (sb-ext:run-program (perfect-hash-generator-program)
-                                     '("perfecthash")
-                                     :input input :output output)))
-           (when (zerop (sb-ext:process-exit-code process))
-             (let* ((string (get-output-stream-string output))
-                    ;; don't need the final newline, it looks un-lispy in the file
-                    (l (length string)))
-               (assert (char= (char string (1- l)) #\newline))
-               (subseq string 0 (1- l)))))))
+          #+use-host-hash-generator
+          (let* ((output (make-string-output-stream))
+                 (process
+                   (sb-ext:run-program (perfect-hash-generator-program)
+                                       '("perfecthash")
+                                       ;; win32 misbehaves with :input string-stream
+                                       :input :stream :output :stream
+                                       :wait nil)))
+            (format (sb-ext:process-input process) "~{~X~%~}" (coerce array 'list))
+            (close (sb-ext:process-input process))
+            (loop for char = (read-char (sb-ext:process-output process) nil)
+                  while char
+                  do (write-char char output))
+            (sb-ext:process-wait process)
+            (when (zerop (sb-ext:process-exit-code process))
+              (let* ((string (get-output-stream-string output))
+                     ;; don't need the final newline, it looks un-lispy in the file
+                     (l (length string)))
+                (assert (char= (char string (1- l)) #\newline))
+                (subseq string 0 (1- l)))))))
     ;; Entries are written to disk with hashes sorted in ascending order so that
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
