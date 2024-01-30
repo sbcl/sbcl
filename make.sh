@@ -29,6 +29,11 @@ sh make-config.sh "$@" --check-host-lisp || exit $?
 . output/prefix.def
 . output/build-config
 
+echo //building host tools
+# Build the perfect-hash-generator. It's actually OK if this fails,
+# as long as xperfecthash.lisp-expr is up-to-date
+$GNUMAKE -C tools-for-build perfecthash || true
+
 build_started=`date`
 echo "//Starting build: $build_started"
 # Apparently option parsing succeeded. Print out the results.

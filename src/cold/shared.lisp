@@ -930,8 +930,14 @@
 (defvar *perfect-hash-generator-mode* :PLAYBACK)
 (defvar *perfect-hash-generator-memo* nil)
 (defvar *perfect-hash-generator-journal* "xperfecthash.lisp-expr")
-#+sbcl (when (and (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
-                  (find-symbol "NEWCHARSTAR-STRING" "SB-INT"))
+
+(defun perfect-hash-generator-program ()
+  ;; The path depends on what the host is, not what the target is
+  #+unix "tools-for-build/perfecthash"
+  #+win32 "tools-for-build/perfecthash.exe")
+
+#+sbcl (when (and (probe-file (perfect-hash-generator-program))
+                  (find-symbol "RUN-PROGRAM" "SB-EXT"))
          (pushnew :use-host-hash-generator cl:*features*)
          (setq *perfect-hash-generator-mode* :RECORD))
 
@@ -943,7 +949,7 @@
     (when stream
       (let ((entries (let ((*read-base* 16)) (read stream))))
         (setq *perfect-hash-generator-memo*
-              ;; Compute the XOR all the hashes of each entry as a quick pass/fail
+              ;; Compute the XOR of all the hashes of each entry as a quick pass/fail
               ;; when searching, assuming thst EQUALP compares (CAR CONS) before
               ;; the CDR, which is almost surely, though not necessarily, what it does.
               (mapcar (lambda (entry)
@@ -955,20 +961,25 @@
                       entries))))))
 
 (defun emulate-generate-perfect-hash-sexpr (array)
+  ;; I suppose we could make one long-lived child process which reads
+  ;; input up to an empty line and then returns a result,
+  ;; but honestly that's more engineering than I care to do.
+  ;; So what if this has to fork() two dozen times?
   (let ((computed
          #+use-host-hash-generator
-         (let ((string
-                (sb-int:newcharstar-string
-                 (sb-sys:with-pinned-objects (array)
-                   (sb-alien:alien-funcall
-                    (sb-alien:extern-alien
-                     "generate_perfhash_sexpr"
-                     (function (* sb-alien:char) sb-alien:system-area-pointer sb-alien:int))
-                    (sb-sys:vector-sap array) (length array))))))
-           ;; don't need the final newline, it looks un-lispy in the file
-           (let ((l (length string)))
-             (assert (char= (char string (1- l)) #\newline))
-             (subseq string 0 (1- l))))))
+         (let* ((input (make-string-input-stream (format nil "~{~X~%~}"
+                                                         (coerce array 'list))))
+                (output (make-string-output-stream))
+                (process
+                 (sb-ext:run-program (perfect-hash-generator-program)
+                                     '("perfecthash")
+                                     :input input :output output)))
+           (when (zerop (sb-ext:process-exit-code process))
+             (let* ((string (get-output-stream-string output))
+                    ;; don't need the final newline, it looks un-lispy in the file
+                    (l (length string)))
+               (assert (char= (char string (1- l)) #\newline))
+               (subseq string 0 (1- l)))))))
     ;; Entries are written to disk with hashes sorted in ascending order so that
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
@@ -977,24 +988,26 @@
            (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
                          :test #'equalp)))
       (when match
-        (when computed (assert (string= (cdr match) computed)))
+        (when computed
+          ;; We can't compare by STRING= because I reserve the right to try to improve
+          ;; the output format (by better pretty-printing).
+          ;; In fact this may not be a good test - as long as the hash function works,
+          ;; do we even care if it is not the exact same expression as from the file?
+          (multiple-value-bind (expr-computed expr-from-journal)
+              (let ((*package* (find-package "SB-C")))
+                (values (read-from-string computed)
+                        (read-from-string (cdr match))))
+            (assert (equalp expr-computed expr-from-journal))))
         (return-from emulate-generate-perfect-hash-sexpr (cdr match)))
-    (ecase *perfect-hash-generator-mode*
-      (:playback
-       (error "perfect hash file is missing a needed entry for ~x" array))
-      (:record
-       (setf *perfect-hash-generator-memo*
-             (nconc *perfect-hash-generator-memo*
-                    (list (cons (cons digest canonical-array) computed))))
-       computed)))))
+      (ecase *perfect-hash-generator-mode*
+        (:playback
+         (error "perfect hash file is missing a needed entry for ~x" array))
+        (:record
+         (setf *perfect-hash-generator-memo*
+               (nconc *perfect-hash-generator-memo*
+                      (list (cons (cons digest canonical-array) computed))))
+         computed)))))
 
-(defun compile-perfect-hashfun-for-host (lambda)
-  ;; Remove the declare:
-  ;;   (declare (optimize (safety 0) (sb-c:store-source-form 0)))
-  (let ((third (third lambda)))
-    (assert (eq (car third) 'declare))
-    (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
-      (compile nil new))))
 (defun maybe-save-perfect-hashfuns-for-playback ()
   ;; FIXME: file corruption occurs for -jN > 1 from make-all-targets.sh
   #+use-host-hash-generator

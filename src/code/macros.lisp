@@ -967,7 +967,7 @@ symbol-case giving up: case=((V U) (F))
   (let ((lambda (sb-c:make-perfect-hash-lambda hashes)))
     (unless lambda
       (return-from build-sealed-struct-typecase-map (values nil nil nil)))
-    (let* ((phashfun (sb-c::compile-phashfun lambda))
+    (let* ((phashfun (sb-c::compile-perfect-hash lambda hashes))
            (n (length hashes))
            (domain (make-array n :initial-element nil))
            (range (sb-xc:make-array n :element-type '(unsigned-byte 16))))

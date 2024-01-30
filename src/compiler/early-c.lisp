@@ -104,9 +104,24 @@
 
 ;;;; miscellaneous utilities
 
-(defmacro compile-phashfun (arg)
-  #+sb-xc-host `(sb-cold::compile-perfect-hashfun-for-host ,arg)
-  #-sb-xc-host `(compile nil ,arg))
+(defun compile-perfect-hash (lambda test-inputs)
+  ;; Don't blindly trust the hash generator: assert that computed values are
+  ;; in range and not repeated.
+  (let ((seen (make-array (length test-inputs) :element-type 'bit :initial-element 0))
+        (f #-sb-xc-host (compile nil lambda)
+           #+sb-xc-host
+           ;; Remove the DECLARE:
+           ;;   (declare (optimize (safety 0) (sb-c:store-source-form 0)))
+           (let ((third (third lambda)))
+             (assert (eq (car third) 'declare))
+             (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
+               (compile nil new)))))
+    (loop for input across test-inputs
+          do (let ((h (funcall f input)))
+               (unless (zerop (bit seen h))
+                 (bug "Perfect hash generator failed on ~X" test-inputs))
+               (setf (bit seen h) 1)))
+    f))
 
 (defstruct (debug-name-marker (:print-function print-debug-name-marker)
                               (:copier nil)))

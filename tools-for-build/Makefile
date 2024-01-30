@@ -17,7 +17,10 @@ LDLIBS:=$(OS_LIBS)
 
 all: grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2
 
+perfecthash: ../src/runtime/perfecthash.c
+	$(CC) -DDEFINE_MAIN $(LINKFLAGS) $(CPPFLAGS) $(CFLAGS) -o $@ $^
+
 clean:
-	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2
+	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx avx2 perfecthash
 	rm -f *.exe
 	rm -fr *.dSYM
