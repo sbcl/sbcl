@@ -2961,13 +2961,13 @@
                 (<= width sb-vm:n-fixnum-bits))
            (let ((size (lvar-value size))
                  (posn (lvar-value posn)))
-             `(logand (ash (mask-signed-field sb-vm:n-fixnum-bits int) ,(- posn))
+             `(logand (ash (mask-signed-field ,sb-vm:n-fixnum-bits int) ,(- posn))
                       ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
           ((and width
                 (<= width sb-vm:n-word-bits))
            (let ((size (lvar-value size))
                  (posn (lvar-value posn)))
-             `(logand (ash (logand int most-positive-word) ,(- posn))
+             `(logand (ash (logand int ,most-positive-word) ,(- posn))
                       ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
           ((let* ((posn-max (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
                   (width (and size-max posn-max
