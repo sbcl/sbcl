@@ -33,29 +33,7 @@ task:
     - ./make.sh
 
   test_script:
-    - cd tests; ./run-tests.sh
+    - cd tests; ./run-tests.sh --slow
 
   ansi_test_script:
     - cd tests; ./ansi-tests.sh
-
-task:
-  name: macOS arm64
-  macos_instance:
-    image: ghcr.io/cirruslabs/macos-ventura-base:latest
-    cpu: 2
-    memory: 1G
-
-  prepare_script:
-    - brew install sbcl
-
-  env:
-    SBCL_MAKE_JOBS: -j6
-  build_script:
-    - echo '"1.9.99.999"' > version.lisp-expr
-    - ./make.sh
-
-  # test_script:
-  #   - cd tests; ./run-tests.sh
-
-  # ansi_test_script:
-  #   - cd tests; ./ansi-tests.sh

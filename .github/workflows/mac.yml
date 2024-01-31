@@ -5,10 +5,13 @@ on: [push]
 jobs:
   build:
 
-    runs-on: macOS-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'macos-14' || 'macOS-latest' }}
     strategy: 
-      matrix: 
-        options: [--with-sb-thread, --without-sb-thread, --with-mark-region-gc]
+      matrix:
+        arch: [arm64, x86-64]
+        options: [--with-sb-thread, --with-mark-region-gc]
+        include:
+          - { os: x86-64, options: --without-sb-thread }
       fail-fast: false
 
     steps:
@@ -21,20 +24,20 @@ jobs:
       run: ./make.sh ${{ matrix.options }} --xc-host='sbcl --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make binary
       run: |
-        name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-darwin-x86-64
-        mkdir sbcl-mac-binary${{ matrix.options }};
+        name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-darwin-${{ matrix.arch }}
+        mkdir sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
         cd ..
         mv sbcl $name
         ./$name/binary-distribution.sh $name
         bzip2 $name-binary.tar
         mv $name sbcl
-        mv $name-binary.tar.bz2 sbcl/sbcl-mac-binary${{ matrix.options }}
+        mv $name-binary.tar.bz2 sbcl/sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
     - name: save binary
       uses: actions/upload-artifact@v1
       with:
-        name: sbcl-mac-binary${{ matrix.options }}
-        path: sbcl-mac-binary${{ matrix.options }}
+        name: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
+        path: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
     - name: test
-      run: cd tests; ./run-tests.sh
+      run: cd tests; ./run-tests.sh --slow
     - name: ansi-test
       run: cd tests; ./ansi-tests.sh
