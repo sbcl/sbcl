@@ -58,80 +58,89 @@
   (map 'simple-vector
        (lambda (args)
          (apply #'!make-saetp args))
-       `(;; Erm.  Yeah.  There aren't a lot of things that make sense
-         ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
-         (nil #:mu 0 simple-array-nil)
-         #-sb-unicode
-         (character ,(cl:code-char 0) 8 simple-base-string
-                    ;; (SIMPLE-BASE-STRINGs are stored with an extra
-                    ;; trailing #\NULL for convenience in calling out
-                    ;; to C.)
-                    :n-pad-elements 1
-                    :complex-typecode #.complex-base-string-widetag)
-         #+sb-unicode
-         (base-char ,(cl:code-char 0) 8 simple-base-string
-                    ;; (SIMPLE-BASE-STRINGs are stored with an extra
-                    ;; trailing #\NULL for convenience in calling out
-                    ;; to C.)
-                    :n-pad-elements 1
-                    :complex-typecode #.complex-base-string-widetag)
-         #+sb-unicode
-         (character ,(cl:code-char 0) 32 simple-character-string
-                    :complex-typecode #.complex-character-string-widetag)
-         (single-float $0.0f0 32 simple-array-single-float)
-         (double-float $0.0d0 64 simple-array-double-float)
-         (bit 0 1 simple-bit-vector
-              :complex-typecode #.complex-bit-vector-widetag)
-         ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
-         ;; before their SIGNED-BYTE partners is significant in the
-         ;; implementation of the compiler; some of the cross-compiler
-         ;; code (see e.g. COERCE-TO-SMALLEST-ELTYPE in
-         ;; src/compiler/debug-dump.lisp) attempts to create an array
-         ;; specialized on (UNSIGNED-BYTE FOO), where FOO could be 7;
-         ;; (UNSIGNED-BYTE 7) is SUBTYPEP (SIGNED-BYTE 8), so if we're
-         ;; not careful we could get the wrong specialized array when
-         ;; we try to FIND-IF, below. -- CSR, 2002-07-08
-         ((unsigned-byte 2) 0 2 simple-array-unsigned-byte-2)
-         ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4)
-         ((unsigned-byte 7) 0 8 simple-array-unsigned-byte-7)
-         ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8)
-         ((unsigned-byte 15) 0 16 simple-array-unsigned-byte-15)
-         ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16)
-         #-64-bit
-         ((unsigned-byte #.n-positive-fixnum-bits)
-          0 32 simple-array-unsigned-fixnum
-          :fixnum-p t)
-         ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31)
-         ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32)
-         #+64-bit
-         ((unsigned-byte #.n-positive-fixnum-bits)
-          0 64 simple-array-unsigned-fixnum
-          :fixnum-p t)
-         #+64-bit
-         ((unsigned-byte 63) 0 64 simple-array-unsigned-byte-63)
-         #+64-bit
-         ((unsigned-byte 64) 0 64 simple-array-unsigned-byte-64)
-         ((signed-byte 8) 0 8 simple-array-signed-byte-8)
-         ((signed-byte 16) 0 16 simple-array-signed-byte-16)
-         ;; KLUDGE: See the comment in PRIMITIVE-TYPE-AUX,
-         ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
-         ;; not (SIGNED-BYTE 30)
-         #-64-bit
-         (fixnum 0 32 simple-array-fixnum :fixnum-p t)
-         ((signed-byte 32) 0 32 simple-array-signed-byte-32)
-         ;; KLUDGE: see above KLUDGE for the 32-bit case
-         #+64-bit
-         (fixnum 0 64 simple-array-fixnum :fixnum-p t)
-         #+64-bit
-         ((signed-byte 64) 0 64 simple-array-signed-byte-64)
-         ((complex single-float) ,(complex $0f0 $0f0) 64
-          simple-array-complex-single-float)
-         ((complex double-float) ,(complex $0d0 $0d0) 128
-          simple-array-complex-double-float)
-         #+long-float
-         ((complex long-float) ,(complex $0L0 $0L0) #+x86 192 #+sparc 256
-          simple-array-complex-long-float)
-         (t 0 #.n-word-bits simple-vector))))
+       (let ((table (make-hash-table :test 'equal)))
+         ;; KLUDGE: same as in src/code/class.lisp
+         (labels ((hash-cons (thing)
+                    (cond
+                      ((atom thing) thing)
+                      ((gethash thing table))
+                      (t (setf (gethash thing table)
+                               (cons (hash-cons (car thing)) (hash-cons (cdr thing))))))))
+           (hash-cons
+            `(;; Erm.  Yeah.  There aren't a lot of things that make sense
+              ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
+              (nil #:mu 0 simple-array-nil)
+              #-sb-unicode
+              (character ,(cl:code-char 0) 8 simple-base-string
+                         ;; (SIMPLE-BASE-STRINGs are stored with an extra
+                         ;; trailing #\NULL for convenience in calling out
+                         ;; to C.)
+                         :n-pad-elements 1
+                         :complex-typecode #.complex-base-string-widetag)
+              #+sb-unicode
+              (base-char ,(cl:code-char 0) 8 simple-base-string
+                         ;; (SIMPLE-BASE-STRINGs are stored with an extra
+                         ;; trailing #\NULL for convenience in calling out
+                         ;; to C.)
+                         :n-pad-elements 1
+                         :complex-typecode #.complex-base-string-widetag)
+              #+sb-unicode
+              (character ,(cl:code-char 0) 32 simple-character-string
+                         :complex-typecode #.complex-character-string-widetag)
+              (single-float $0.0f0 32 simple-array-single-float)
+              (double-float $0.0d0 64 simple-array-double-float)
+              (bit 0 1 simple-bit-vector
+                   :complex-typecode #.complex-bit-vector-widetag)
+              ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
+              ;; before their SIGNED-BYTE partners is significant in the
+              ;; implementation of the compiler; some of the cross-compiler
+              ;; code (see e.g. COERCE-TO-SMALLEST-ELTYPE in
+              ;; src/compiler/debug-dump.lisp) attempts to create an array
+              ;; specialized on (UNSIGNED-BYTE FOO), where FOO could be 7;
+              ;; (UNSIGNED-BYTE 7) is SUBTYPEP (SIGNED-BYTE 8), so if we're
+              ;; not careful we could get the wrong specialized array when
+              ;; we try to FIND-IF, below. -- CSR, 2002-07-08
+              ((unsigned-byte 2) 0 2 simple-array-unsigned-byte-2)
+              ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4)
+              ((unsigned-byte 7) 0 8 simple-array-unsigned-byte-7)
+              ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8)
+              ((unsigned-byte 15) 0 16 simple-array-unsigned-byte-15)
+              ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16)
+              #-64-bit
+              ((unsigned-byte #.n-positive-fixnum-bits)
+               0 32 simple-array-unsigned-fixnum
+               :fixnum-p t)
+              ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31)
+              ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32)
+              #+64-bit
+              ((unsigned-byte #.n-positive-fixnum-bits)
+               0 64 simple-array-unsigned-fixnum
+               :fixnum-p t)
+              #+64-bit
+              ((unsigned-byte 63) 0 64 simple-array-unsigned-byte-63)
+              #+64-bit
+              ((unsigned-byte 64) 0 64 simple-array-unsigned-byte-64)
+              ((signed-byte 8) 0 8 simple-array-signed-byte-8)
+              ((signed-byte 16) 0 16 simple-array-signed-byte-16)
+              ;; KLUDGE: See the comment in PRIMITIVE-TYPE-AUX,
+              ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
+              ;; not (SIGNED-BYTE 30)
+              #-64-bit
+              (fixnum 0 32 simple-array-fixnum :fixnum-p t)
+              ((signed-byte 32) 0 32 simple-array-signed-byte-32)
+              ;; KLUDGE: see above KLUDGE for the 32-bit case
+              #+64-bit
+              (fixnum 0 64 simple-array-fixnum :fixnum-p t)
+              #+64-bit
+              ((signed-byte 64) 0 64 simple-array-signed-byte-64)
+              ((complex single-float) ,(complex $0f0 $0f0) 64
+               simple-array-complex-single-float)
+              ((complex double-float) ,(complex $0d0 $0d0) 128
+               simple-array-complex-double-float)
+              #+long-float
+              ((complex long-float) ,(complex $0L0 $0L0) #+x86 192 #+sparc 256
+                                                         simple-array-complex-long-float)
+              (t 0 #.n-word-bits simple-vector)))))))
 
 ;; The compiler can see that the number of types that must be present in a
 ;; union of arrays to convert (OR (array t1) ... (array tN)) to (ARRAY *)
