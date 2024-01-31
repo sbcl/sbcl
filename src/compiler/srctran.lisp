@@ -3238,10 +3238,10 @@
             (t
              (give-up-ir1-transform))))))
 
-;;; Not declaring it as actually being RATIO becuase it is used as one
+;;; Not declaring it as actually being RATIO because it is used as one
 ;;; of the legs in the EXPT transform below and that may result in
 ;;; some unwanted type conflicts, e.g. (random (expt 2 (the integer y)))
-(declaim (type (sfunction (integer) rational) reciprocate))
+(declaim (ftype (sfunction (integer) rational) reciprocate))
 (defun reciprocate (x)
   (declare (optimize (safety 0)))
   #+sb-xc-host (error "Can't call reciprocate ~D" x)

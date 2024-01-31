@@ -716,9 +716,9 @@ the operating system native pathname conventions."
 
 ;;; Recursively (e.g. for the directory component) change the case of
 ;;; the pathname component THING.
-(declaim (type (sfunction ((or symbol integer string pattern list))
-                          (or symbol integer string pattern list))
-               diddle-case))
+(declaim (ftype (sfunction ((or symbol integer string pattern list))
+                           (or symbol integer string pattern list))
+                diddle-case))
 (defun diddle-case (thing)
   (labels ((check-for (pred in)
              (typecase in
