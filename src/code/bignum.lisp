@@ -536,11 +536,11 @@
 #-bignum-assertions
 (defmacro bignum-replace (dest src &key (start1 0) (end1 `(%bignum-length ,dest))
                                         (start2 0) (end2 `(%bignum-length ,src)))
-  (flet ((@ (obj index)
-           `(sap+ (sap+ (int-sap (get-lisp-obj-address ,obj)) (ash ,index sb-vm:word-shift))
-                  (- (ash sb-vm:bignum-digits-offset sb-vm:word-shift)
-                     sb-vm:other-pointer-lowtag))))
-    `(let ((count ,(if (and (eql start1 0) (eql start2 0))
+  `(macrolet ((@ (obj index)
+                `(sap+ (int-sap (get-lisp-obj-address ,obj))
+                       (- (ash (+ ,index sb-vm:bignum-digits-offset) sb-vm:word-shift)
+                          sb-vm:other-pointer-lowtag))))
+     (let ((count ,(if (and (eql start1 0) (eql start2 0))
                        `(min ,end1 ,end2)
                        `(min (- ,end1 ,start1) (- ,end2 ,start2)))))
        (cond ((= count 2) ; COUNT is almost always 2
@@ -553,7 +553,7 @@
                                      system-area-pointer sb-unix::size-t)
                            :extern ,(if (eq dest src) "memmove" "memcpy")))
                 (with-pinned-objects (,dest ,src)
-                  (alien-funcall replace ,(@ dest start1) ,(@ src start2)
+                  (alien-funcall replace (@ ,dest ,start1) (@ ,src ,start2)
                                  (ash count sb-vm:word-shift)))))))))
 #+bignum-assertions
 (progn
