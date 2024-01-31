@@ -334,12 +334,12 @@
           (if defun-only
               `(defun ,name ,@stuff)
               `(let ((fun (named-lambda (deftransform ,name) ,@stuff)))
-                 ,@(loop for arg-types in (if (typep arg-types '(cons (eql :or)))
-                                              (cdr arg-types)
-                                              (list arg-types))
+                 ,@(loop for types in (if (typep arg-types '(cons (eql :or)))
+                                          (cdr arg-types)
+                                          (list arg-types))
                          collect `(%deftransform ',name
                                                  ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
-                                                 '(function ,arg-types ,result-type)
+                                                 '(function ,types ,result-type)
                                                  fun
                                                  ,important)))))))))
 

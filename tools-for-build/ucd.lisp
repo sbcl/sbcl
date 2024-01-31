@@ -698,12 +698,12 @@ Length should be adjusted when the standard changes.")
                        (push (cons cp fold) *different-casefolds*))))))))
 
 (defun fixup-ages ()
-  (let ((age (sort
-              (loop for code-point being the hash-keys in *age-table*
-                 using (hash-value true-age)
-                      collect (cons code-point true-age))
-              #'< :key #'car)))
-    (loop for (code-point . true-age) in age
+  (let ((age-data (sort
+                   (loop for code-point being the hash-keys in *age-table*
+                           using (hash-value true-age)
+                         collect (cons code-point true-age))
+                   #'< :key #'car)))
+    (loop for (code-point . true-age) in age-data
        for misc-index = (ucd-misc (gethash code-point *ucd-entries*))
        for (gc bidi ccc digit decomp flags script lb age) = (aref *misc-table* misc-index)
        unless (= age true-age) do
