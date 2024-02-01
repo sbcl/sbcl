@@ -812,18 +812,6 @@
   ;;      (EQ (SB-KERNEL:%OTHER-POINTER-WIDETAG #:OBJECT0) something))
   )
 
-(defun check-integerp-cmp-opcodes (expect type)
-  (count-cmp-opcodes type expect
-          `(lambda (x)
-             (declare (optimize (sb-c::verify-arg-count 0)
-                                #+sb-safepoint (sb-c::insert-safepoints 0)))
-             (typep x ',type))))
-
-(with-test (:name :typep-integer-doubleton)
-  ;; This was taking 3 comparisons because it was a FIXNUMP test
-  ;; and some range-based testing rather than just 2 EQ tests.
-  (check-integerp-cmp-opcodes 2 '(integer 1 2)))
-
 (defun show-pretty-lines (type lines)
   (format t ";;;; Type: ~s~%" type)
   (dolist (line lines)

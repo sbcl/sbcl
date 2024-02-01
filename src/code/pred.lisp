@@ -156,11 +156,6 @@
   (def-type-predicate-wrapper stringp)
   (def-type-predicate-wrapper vectorp))
 
-(sb-c::when-vop-existsp (:translate fixnum-mod-p)
-  (defun fixnum-mod-p (x limit)
-    (and (fixnump x)
-         (<= 0 x limit))))
-
 (sb-c::when-vop-existsp (:translate car-eq-if-listp)
   (defun car-eq-if-listp (value object)
     (car-eq-if-listp value object)))

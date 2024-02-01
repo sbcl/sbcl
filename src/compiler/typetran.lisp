@@ -390,32 +390,7 @@
          (high (numeric-type-high type)))
     (ecase (numeric-type-complexp type)
       (:real
-       (cond #-arm64
-             ((and (eql (numeric-type-class type) 'integer)
-                   (and (fixnump low)
-                        (fixnump high)
-                        #+(or x86 x86-64 arm arm64)
-                        (/= low 0)
-                        (< (- high low) 2)))
-              ;; The fixnum-mod-p case is worse than just EQ testing with
-              ;; only 2 values in the range. (INTEGER 1 2) would have become
-              ;;   (and (not (eq x 0)) (fixnump x) (not (> x 2))).
-              ;; If exactly 1 value, it should have been picked off by TYPE-SINGLETON-P
-              ;; in %SOURCE-TRANSFORM-TYPEP, but even if it wasn't,
-              ;; the OR will drop out due to constraint propagation.
-              `(or (eq ,object ,low) (eq ,object ,high)))
-             ((and (vop-existsp :translate fixnum-mod-p)
-                   (eql (numeric-type-class type) 'integer)
-                   (or (eql low 0)
-                       (and (eql low 1)
-                            (not (eql high most-positive-fixnum))))
-                   (fixnump high))
-              (let ((mod-p `(fixnum-mod-p ,object ,high)))
-                (if (eql low 1)
-                    `(and (not (eq ,object 0))
-                          ,mod-p)
-                    mod-p)))
-             ((and (vop-existsp :translate check-range<=)
+       (cond ((and (vop-existsp :translate check-range<=)
                    (eql (numeric-type-class type) 'integer)
                    (fixnump low)
                    (fixnump high))
@@ -1700,26 +1675,6 @@
     (if pred
         `(not (,pred object))
         (give-up-ir1-transform))))
-
-(when-vop-existsp (:translate fixnum-mod-p)
-  (deftransform fixnum-mod-p ((x mod) (t (constant-arg fixnum)) * :important nil)
-    (let* ((type (lvar-type x))
-           (mod (lvar-value mod))
-           (intersect (type-intersection type (specifier-type 'fixnum)))
-           (mod-type (specifier-type `(mod ,(1+ mod)))))
-      (cond ((csubtypep intersect mod-type)
-             `(fixnump x))
-            ((and (csubtypep type (specifier-type 'fixnum))
-                  (csubtypep (type-intersection type (specifier-type 'unsigned-byte))
-                             mod-type))
-             `(>= x 0))
-            ((let ((int (type-approximate-interval intersect)))
-               (when int
-                 (let ((power-of-two (1- (ash 1 (integer-length (interval-high int))))))
-                   (when (< 0 power-of-two mod)
-                     `(fixnum-mod-p x ,power-of-two))))))
-            (t
-             (give-up-ir1-transform))))))
 
 (when-vop-existsp (:translate signed-byte-8-p)
   (macrolet ((def (bits)

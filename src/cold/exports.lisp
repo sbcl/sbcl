@@ -1883,7 +1883,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%FIND-POSITION-VECTOR-MACRO" "%FIND-POSITION-IF"
            "%FIND-POSITION-IF-VECTOR-MACRO" "%FIND-POSITION-IF-NOT"
            "%FIND-POSITION-IF-NOT-VECTOR-MACRO"
-           "FIXNUM-MOD-P"
            "%HYPOT"
            "%INSTANCE-CAS"
            "%LDB" "%LOG" "%LOGB" "%LOG10"

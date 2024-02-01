@@ -6675,7 +6675,7 @@
     `(range<= l x h))
   (deftransform check-range<= ((l x h) (t sb-vm:word t) * :important nil)
     `(range<= l x h))
-  
+
   (deftransform check-range<=
       ((l x h) ((constant-arg fixnum) t (constant-arg fixnum)) * :important nil)
     (let* ((type (lvar-type x))
@@ -6700,25 +6700,22 @@
              (give-up-ir1-transform)))))
 
   (macrolet ((def (name ld hd)
-               `(progn
-                  
-
-                  (deftransform ,name ((l x h) ((constant-arg fixnum) integer (constant-arg fixnum)) * :important nil)
-                    (let* ((type (lvar-type x))
-                           (l (+ (lvar-value l) ,ld))
-                           (h (+ (lvar-value h) ,hd))
-                           (range-type (specifier-type `(integer ,l ,h)))
-                           (unsigned-type (type-intersection type (specifier-type 'unsigned-byte))))
-                      (cond ((and (neq unsigned-type *empty-type*)
-                                  (csubtypep unsigned-type
-                                             range-type))
-                             `(>= x l))
-                            ((and (< l 0)
-                                  (csubtypep type
-                                             (specifier-type 'unsigned-byte)))
-                             `(range<= 0 x ,h))
-                            (t
-                             (give-up-ir1-transform))))))))
+               `(deftransform ,name ((l x h) ((constant-arg fixnum) integer (constant-arg fixnum)) * :important nil)
+                  (let* ((type (lvar-type x))
+                         (l (+ (lvar-value l) ,ld))
+                         (h (+ (lvar-value h) ,hd))
+                         (range-type (specifier-type `(integer ,l ,h)))
+                         (unsigned-type (type-intersection type (specifier-type 'unsigned-byte))))
+                    (cond ((and (neq unsigned-type *empty-type*)
+                                (csubtypep unsigned-type
+                                           range-type))
+                           `(>= x l))
+                          ((and (< l 0)
+                                (csubtypep type
+                                           (specifier-type 'unsigned-byte)))
+                           `(range<= 0 x ,h))
+                          (t
+                           (give-up-ir1-transform)))))))
     (def range<= 0 0)
     (def range< 1 -1)
     (def range<<= 1 0)
