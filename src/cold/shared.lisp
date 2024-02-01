@@ -996,14 +996,14 @@
                   while char
                   do (write-char char output))
             (sb-ext:process-wait process)
-            (prog1
-                (when (zerop (sb-ext:process-exit-code process))
-                  (let* ((string (get-output-stream-string output))
-                         ;; don't need the final newline, it looks un-lispy in the file
-                         (l (length string)))
-                    (assert (char= (char string (1- l)) #\newline))
-                    (subseq string 0 (1- l))))
-              (close (sb-ext:process-output process))))))
+            (sb-ext:process-close process)
+            (if (zerop (sb-ext:process-exit-code process))
+                (let* ((string (get-output-stream-string output))
+                       ;; don't need the final newline, it looks un-lispy in the file
+                       (l (length string)))
+                  (assert (char= (char string (1- l)) #\newline))
+                  (subseq string 0 (1- l)))
+                (erorr "Error running perfecthash.")))))
     ;; Entries are written to disk with hashes sorted in ascending order so that
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
