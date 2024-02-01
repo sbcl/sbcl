@@ -554,12 +554,20 @@
                `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
                     number
                     ,(symbol-value (symbolicate 'most-positive-fixnum- type))))
-             (shift (type integer count)
-               `(,(case type
-                    #-64-bit
-                    (double-float 'ash)
-                    (t 'bignum-ashift-left-fixnum))
-                 ,integer ,count)))
+             (shift (type)
+               (case type
+                 #-64-bit
+                 (double-float
+                  ;; Shifting negatives right is different
+                  `(let ((truncated (ash bits exp)))
+                     (if (minusp sign)
+                         (- truncated)
+                         truncated)))
+                 (t
+                  `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                  (- bits)
+                                                  bits)
+                                              exp)))))
     (number-dispatch ((number real))
       ((integer) (values number 0))
       ((ratio)
@@ -573,11 +581,7 @@
                      (- number
                         (coerce truncated '(dispatch-type number)))))
            (multiple-value-bind (bits exp sign) (integer-decode-float number)
-             (let ((truncated (shift (dispatch-type number)
-                                     (if (minusp sign)
-                                         (- bits)
-                                         bits)
-                                     exp)))
+             (let ((truncated (shift (dispatch-type number))))
                (values
                 truncated
                 #+64-bit
@@ -592,14 +596,19 @@
                `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
                   (declare (inline ,decode))
                   (multiple-value-bind (bits exp sign) (,decode number)
-                    (let ((truncated (,(case type
-                                         #-64-bit
-                                         (double-float 'ash)
-                                         (t 'bignum-ashift-left-fixnum))
-                                      (if (minusp sign)
-                                          (- bits)
-                                          bits)
-                                      exp)))
+                    (let ((truncated ,(case type
+                                        #-64-bit
+                                        (double-float
+                                         ;; Shifting negatives right is different
+                                         `(let ((truncated (ash bits exp)))
+                                            (if (minusp sign)
+                                                (- truncated)
+                                                truncated)))
+                                        (t
+                                         `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                                         (- bits)
+                                                                         bits)
+                                                                     exp)))))
                       (values
                        truncated
                        ,(case type
@@ -615,12 +624,19 @@
               `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
                  (declare (inline ,decode))
                  (multiple-value-bind (bits exp sign) (,decode number)
-                   (,(case type
-                       #-64-bit
-                       (double-float 'ash)
-                       (t 'bignum-ashift-left-fixnum))
-                    (if (minusp sign) (- bits) bits)
-                    exp))))))
+                   ,(case type
+                      #-64-bit
+                      (double-float
+                       ;; Shifting negatives right is different
+                       `(let ((truncated (ash bits exp)))
+                          (if (minusp sign)
+                              (- truncated)
+                              truncated)))
+                      (t
+                       `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                       (- bits)
+                                                       bits)
+                                                   exp))))))))
   (def double-float)
   (def single-float))
 
