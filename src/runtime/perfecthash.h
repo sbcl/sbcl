@@ -59,6 +59,7 @@ struct hashform
     SLOW_HS                                                     /* slow mode */
   } speed;
   int infix;
+  int comments;
 };
 typedef  struct hashform  hashform;
 

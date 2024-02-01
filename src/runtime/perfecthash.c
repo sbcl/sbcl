@@ -924,28 +924,32 @@ typedef uint8_t  ub1;\n");
     mem_stream_printf(f, infix ? "};\n\n" : ")))\n");
     ++extra_parens;
   }
-  int indent = 0, newline = 0, commented = 0;
+  int indent = 0, newline = 0;
+  char *comment = 0;
   for (i=0; i<final->used; ++i) {
-    if (!final->line[i][0]) continue; // empty line
+    char* line = final->line[i];
+    if (!line[0]) continue; // empty line
     if (newline) mem_stream_printf(f,"\n");
     newline = 0;
     int j; for(j=0;j<indent;++j) mem_stream_printf(f," ");
     mem_stream_printf(f, "  ");
 
-    mem_stream_printf(f, "%s", final->line[i]);
+    comment = strchr(line, ';');
+    if (comment && !form->comments) { // strip the comment
+        mem_stream_printf(f, "%.*s", comment-line, line);
+        comment = 0;
+    } else
+        mem_stream_printf(f, "%s", line);
     // Delay the newline in lisp mode so we prettily
     // close all the parens on the last line.
     if (infix) mem_stream_printf(f, ";\n");
-    else {
-      newline = 1;
-      commented = strchr(final->line[i], ';') != NULL;
-    }
-    if (!strncmp(final->line[i],"(let",4)) ++indent;
+    else newline = 1;
+    if (!strncmp(line,"(let",4)) ++indent;
   }
   if (infix) {
     mem_stream_printf(f, "  return rsl;\n}\n");
   } else {
-    if (commented) mem_stream_printf(f,"\n");
+    if (comment) mem_stream_printf(f,"\n");
     indent += 1 + extra_parens;
     while (indent--) mem_stream_printf(f,")");
     mem_stream_printf(f,"\n");
@@ -1013,7 +1017,8 @@ char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
     .hashtype = INT_HT,
     .perfect = (flags & 1) ? MINIMAL_HP : NORMAL_HP,
     .speed = (flags & 2) ? FAST_HS : SLOW_HS,
-    .infix = 0
+    .infix = 0,
+    .comments = 1
   };
   struct mem_stream * scratchfile = make_mem_stream();
   if (driver(&form, keylist, nkeys, scratchfile) < 0) return NULL;
@@ -1030,7 +1035,8 @@ char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys) {
 #ifdef DEFINE_MAIN
 int main(int argc, char *argv[])
 {
-  hashform form = { .hashtype = INT_HT, .perfect = MINIMAL_HP, .speed = SLOW_HS, .infix = 0 };
+  hashform form = { .hashtype = INT_HT, .perfect = MINIMAL_HP, .speed = SLOW_HS,
+                    .infix = 0, .comments = 0 };
   if (argc == 2 && !strcmp(argv[1],"infix")) form.infix = 1;
   key* keylist = 0;
   int keycount = 0;

@@ -947,18 +947,34 @@
 (defun preload-perfect-hash-generator (pathname)
   (with-open-file (stream pathname :if-does-not-exist nil)
     (when stream
-      (let ((entries (let ((*read-base* 16)) (read stream))))
+      (let ((entries (let ((*read-base* 16)) (read stream)))
+            (uniqueness-checker (make-hash-table :test 'equalp))
+            (errors 0)
+            (linenum 0))
         (setq *perfect-hash-generator-memo*
               ;; Compute the XOR of all the hashes of each entry as a quick pass/fail
               ;; when searching, assuming thst EQUALP compares (CAR CONS) before
               ;; the CDR, which is almost surely, though not necessarily, what it does.
               (mapcar (lambda (entry)
+                        (incf linenum)
                         (destructuring-bind (array . string) entry
                           ;; assert that the entry was stored in canonical form
                           (assert (equalp array (sort (copy-seq array) #'<)))
+                          ;; assert that there are not redundant lines.
+                          ;; (Changing the pretty-printing from C must not write
+                          ;; a distinct line if its key already existed)
+                          (let ((existsp (gethash array uniqueness-checker)))
+                            (cond ((not existsp)
+                                   (setf (gethash array uniqueness-checker) (list string linenum)))
+                                  (t
+                                   (warn "~X maps to~%~{~S from line ~D~}~%~S from line ~D~%"
+                                         array existsp string linenum)
+                                   (incf errors))))
                           (let ((digest (reduce #'logxor array)))
                             (cons (cons digest array) string))))
-                      entries))))))
+                      entries))
+        (when (plusp errors)
+          (error "hash generator duplicates: ~D" errors))))))
 
 (defun emulate-generate-perfect-hash-sexpr (array)
   ;; I suppose we could make one long-lived child process which reads
@@ -1015,9 +1031,15 @@
          computed)))))
 
 (defun maybe-save-perfect-hashfuns-for-playback ()
-  ;; FIXME: file corruption occurs for -jN > 1 from make-all-targets.sh
+  ;; Check again for corruption
+  (let ((uniqueness-checker (make-hash-table :test 'equalp)))
+    (dolist (entry *perfect-hash-generator-memo*)
+      (let ((array (cdar entry)))
+        (assert (not (gethash array uniqueness-checker)))
+        (setf (gethash array uniqueness-checker) t))))
   #+use-host-hash-generator
-  (when (eq *perfect-hash-generator-mode* :record)
+  (when (and (eq *perfect-hash-generator-mode* :record)
+             (not (search "/xbuild/" *host-obj-prefix*)))
     (with-open-file (stream *perfect-hash-generator-journal*
                             :direction :output
                             :if-existS :supersede :if-does-not-exist :create)

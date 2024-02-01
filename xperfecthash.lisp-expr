@@ -7,18 +7,6 @@
     (^ a (aref tab b))))))")
 (#(1413723C 14649E4B 177496E1 1D1DA96C 1D9E8454 1EA0F6A5 1F5BB9C8) . "(  (& (+ (>> val 2) (>> val 16)) 7))")
 (#(11F408CD 132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1CE8558C
-   1D5E7DE2 1DF948BE 1FDEDBDB)
- . "((let ((tab #a((8) (unsigned-byte 8) 0 0 8 4 10 12 7 13)))
-  (let ((b (& (>> val 18) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(11F408CD 132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1CE8558C
-   1D5E7DE2 1FDEDBDB)
- . "((let ((tab #a((8) (unsigned-byte 8) 4 0 13 8 5 0 12 0)))
-  (let ((b (& (>> val 17) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(11F408CD 132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1CE8558C
    1D5E7DE2 1FDEDBDB)
  . "((let ((tab #a((8) (unsigned-byte 8) 4 0 13 8 5 0 12 0)))
   (let ((b (& (>> val 17) #x7)))
@@ -38,7 +26,6 @@
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
 (#(132E6150 143C4289 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1FDEDBDB) . "(  (& (+ (>> val 9) (>> val 16)) 7))")
-(#(1413723C 14649E4B 177496E1 1D1DA96C 1D9E8454 1EA0F6A5 1F5BB9C8) . "(  (& (+ (>> val 2) (>> val 16)) 7))")
 (#(132E6150 13D6F91D 143C4289 14F00D49 16A102A7 19A622BB 1B45E924 1C2EDDD1 1FDEDBDB)
  . "((let ((tab #a((8) (unsigned-byte 8) 12 5 3 0 6 0 0 0)))
   (let ((b (& (>> val 4) #x7)))
@@ -49,21 +36,9 @@
   (let ((b (& (>> val 14) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
-(#(11F408CD 132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1CE8558C
-   1D5E7DE2 1DF948BE 1FDEDBDB)
- . "((let ((tab #a((8) (unsigned-byte 8) 0 0 8 4 10 12 7 13)))
-  (let ((b (& (>> val 18) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
 (#(132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1DF948BE 1FDEDBDB)
  . "((let ((tab #a((8) (unsigned-byte 8) 4 5 12 0 12 14 15 1)))
   (let ((b (& (>> val 14) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(11F408CD 132E6150 13D6F91D 13F99856 143C4289 14F00D49 15C68E29 16A102A7 17F587AA 19A622BB 1B45E924 1C2EDDD1 1CE8558C
-   1D5E7DE2 1FDEDBDB)
- . "((let ((tab #a((8) (unsigned-byte 8) 4 0 13 8 5 0 12 0)))
-  (let ((b (& (>> val 17) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
 (#(10DF3586 11202785 1127E4A2 1242E9DE 12484468 141A7AF3 14C0332A 14D3B353 1535BEDE 153AECDC 1589BF4C 15F1FBBE 161C2E73
@@ -170,31 +145,6 @@
 )))
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 7) 28)))
-    (^ a (aref tab b))))))")
-(#(F8ABEE3 4B574AE2 4F94B5E7 4FD472D8 714D6B00 88BA357D 8A6265B8 B313FB62 C0D75980 C40838B8 C888E122 D2205031 D37E3DCA DB3125F9
-   DE352140)
- . "((let ((tab #a((8) (unsigned-byte 8) 0 15 8 13 0 5 11 0)))
-  (let ((b (& (>> val 20) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(F8ABEE3 4B574AE2 4F94B5E7 4FD472D8 714D6B00 88BA357D 8A6265B8 B313FB62 C0D75980 C40838B8 C888E122 D2205031 D37E3DCA DB3125F9
-   DE352140)
- . "((let ((tab #a((8) (unsigned-byte 8) 0 15 8 13 0 5 11 0)))
-  (let ((b (& (>> val 20) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(F8ABEE3 4B574AE2 4F94B5E7 4FD472D8 714D6B00 88BA357D 8A6265B8 B313FB62 C0D75980 C40838B8 C888E122 D2205031 D37E3DCA DB3125F9
-   DE352140 FCD93907)
- . "((let ((tab #a((8) (unsigned-byte 8) 12 0 0 0 15 5 9 6)))
-  (let ((b (& (>> val 15) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(1E214301 43E6A03E 48AF4A42 7168FDB3 96565735 BE92D34F EBCF9692) . "(  (& (+ (>> val 2) (>> val 15)) 7))")
-(#(F8ABEE3 4B574AE2 4F94B5E7 4FD472D8 714D6B00 88BA357D 8A6265B8 B313FB62 C0D75980 C40838B8 C888E122 D2205031 D37E3DCA DB3125F9
-   DE352140 FCD93907)
- . "((let ((tab #a((8) (unsigned-byte 8) 12 0 0 0 15 5 9 6)))
-  (let ((b (& (>> val 15) #x7)))
-   (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
 (#(874B4BCB B6F3711F B8A52F9F BBCCDE6E CB85BF00) . "(  (& (- (>> val 1) (>> val 21)) 7))")
 (#(B9C768B 10F03C3F 12B1CA05 45F0CFC0 50CB4174 590BA280 5B1BC013 71D09675 85684073 9BD471AE 9D9A6442 9ED11C51 C04C0C03 C2A9CF02
@@ -553,32 +503,19 @@
   (let ((b (& (>> val 1) #x1f)))
    (let ((a (>> (<< val 9) 27)))
     (^ a (aref tab b))))))")
-(#(50EDFBF1 6C16ABD3 AC25889A E8DC3557) . "(  (& (>> val 19) 3) ;h4c
-)")
-(#(361A9014 4D9F74B8 AAA32BC0) . "(  (>> val 30) ;h3c
-)")
-(#(64688A38 B690AE2E D1146057 E0A39FB8) . "(  (& (- val (>> val 7)) 3) ;h4e
-)")
-(#(2C90A766 4499E855 61F4228E 76DB0CD0) . "(  (& (>> val 9) 3) ;h4c
-)")
-(#(21FDBD3 11E3A7FE 19C62B17 1C5C0C65) . "(  (& (+ val (>> val 1)) 3) ;h4d
-)")
-(#(15BC6795 3A0738E7 7A38389C EED2914F) . "(  (& (>> val 3) 3) ;h4c
-)")
-(#(69CB71D F56E488 106B9AF3 1234DE4D) . "(  (& (>> val 6) 3) ;h4c
-)")
-(#(21FDBD3 10C09302 155C0369 1DC7A611) . "(  (& (>> val 23) 3) ;h4c
-)")
-(#(B6F7117 14F9B468 19CB1459 1DF3D23A) . "(  (& val 3) ;h4a
-)")
-(#(6C16ABD3 71CA0302 B5CE1611 F4569369) . "(  (& (- val (>> val 3)) 3) ;h4e
-)")
-(#(326AE117 80CE8459 DCF9423A FCF00468) . "(  (& val 3) ;h4a
-)")
-(#(72984B1 9800221 180941AA) . "(  (& (>> val 3) 3) ;h3e
-)")
-(#(47CD79C 852CFC4 16AE3239 1FE4E0A8) . "(  (& (>> val 4) 3) ;h4c
-)")
+(#(50EDFBF1 6C16ABD3 AC25889A E8DC3557) . "(  (& (>> val 19) 3) )")
+(#(361A9014 4D9F74B8 AAA32BC0) . "(  (>> val 30) )")
+(#(64688A38 B690AE2E D1146057 E0A39FB8) . "(  (& (- val (>> val 7)) 3) )")
+(#(2C90A766 4499E855 61F4228E 76DB0CD0) . "(  (& (>> val 9) 3) )")
+(#(21FDBD3 11E3A7FE 19C62B17 1C5C0C65) . "(  (& (+ val (>> val 1)) 3) )")
+(#(15BC6795 3A0738E7 7A38389C EED2914F) . "(  (& (>> val 3) 3) )")
+(#(69CB71D F56E488 106B9AF3 1234DE4D) . "(  (& (>> val 6) 3) )")
+(#(21FDBD3 10C09302 155C0369 1DC7A611) . "(  (& (>> val 23) 3) )")
+(#(B6F7117 14F9B468 19CB1459 1DF3D23A) . "(  (& val 3) )")
+(#(6C16ABD3 71CA0302 B5CE1611 F4569369) . "(  (& (- val (>> val 3)) 3) )")
+(#(326AE117 80CE8459 DCF9423A FCF00468) . "(  (& val 3) )")
+(#(72984B1 9800221 180941AA) . "(  (& (>> val 3) 3) )")
+(#(47CD79C 852CFC4 16AE3239 1FE4E0A8) . "(  (& (>> val 4) 3) )")
 (#(104000C 2668546 31DAFDC 5306AD9 6344932 706CB28 734DBFC C3DE2BA C6B04A8 D096A28 EEFFD62 15D901F3 16130C9E 176FC723 1BCD5E7E
    1C540056 1D1D1C45 1D68FF88)
  . "((let ((tab #a((16) (unsigned-byte 8) 1 15 13 3 0 13 15 0 0 0 1 13 26 0 24 13
