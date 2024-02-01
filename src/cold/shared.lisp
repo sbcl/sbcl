@@ -1003,7 +1003,7 @@
                        (l (length string)))
                   (assert (char= (char string (1- l)) #\newline))
                   (subseq string 0 (1- l)))
-                (erorr "Error running perfecthash.")))))
+                (error "Error running perfecthash.")))))
     ;; Entries are written to disk with hashes sorted in ascending order so that
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
