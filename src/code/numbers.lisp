@@ -1234,15 +1234,16 @@ the first."
                               minusp)
                              ((= x low)
                               (not minusp))
-                             (t))))))
-                (sb-c::when-vop-existsp (:translate check-range<)
-                 (defun ,(symbolicate "CHECK-" name) (low x high)
-                   (when (typep x 'fixnum)
-                     (,name low x high)))))))
+                             (t)))))))))
   (def-range range< <)
   (def-range range<= <=)
   (def-range range<<= <<= < <=)
   (def-range range<=< <=< <= <))
+
+(sb-c::when-vop-existsp (:translate check-range<=)
+  (defun check-range<= (low x high)
+    (when (typep x 'fixnum)
+      (range<= low x high))))
 
 
 ;;;; logicals
