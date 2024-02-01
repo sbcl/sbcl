@@ -2036,3 +2036,136 @@ constant shift greater than word length")))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.
+
+(in-package :sb-vm)
+
+(macrolet ((def (name excl-low excl-high &optional check)
+             `(progn
+                ,(unless check
+                   `(define-vop (,(symbolicate name '/c))
+                      (:translate ,name)
+                      (:args (x :scs (any-reg signed-reg unsigned-reg)))
+                      (:arg-types (:constant t)
+                                  (:or tagged-num signed-num unsigned-num)
+                                  (:constant t))
+                      (:info lo hi)
+                      (:temporary (:sc signed-reg) temp)
+                      (:conditional :be)
+                      (:vop-var vop)
+                      (:policy :fast-safe)
+                      (:generator 2
+                        (let ((lo (+ lo ,@(and excl-low
+                                               '(1))))
+                              (hi (+ hi ,@(and excl-high
+                                               '(-1)))))
+                          (multiple-value-bind (flo fhi)
+                              (if (sc-is x any-reg)
+                                  (values (fixnumize lo) (fixnumize hi))
+                                  (values lo hi))
+                            (cond
+                              ((or (< hi lo)
+                                   (and (sc-is x unsigned-reg)
+                                        (< hi 0)))
+                               (inst cmp esp-tn 0))
+                              ((or (= lo 0)
+                                   (and (sc-is x unsigned-reg)
+                                        (<= flo 0)))
+                               (cond ((and (sc-is x any-reg)
+                                           (= hi most-positive-fixnum))
+                                      (inst test x x)
+                                      (change-vop-flags vop '(:ge)))
+                                     ((and (= (logcount (+ hi 1)) 1)
+                                           (> fhi 127))
+                                      (change-vop-flags vop '(:e))
+                                      (move temp x)
+                                      (inst shr temp (integer-length fhi)))
+                                     (t
+                                      (inst cmp x fhi))))
+                              ((= hi -1)
+                               (change-vop-flags vop '(:ae))
+                               (inst cmp x flo))
+                              (t
+                               (if (location= temp x)
+                                   (if (plusp flo)
+                                       (inst sub temp flo)
+                                       (inst add temp (- flo)))
+                                   (inst lea temp (make-ea :dword :base x :disp (- flo))))
+                               (inst cmp temp (- fhi flo)))))))))
+
+                (define-vop (,(symbolicate name '-integer/c))
+                  (:translate ,name)
+                  (:args (x :scs (descriptor-reg)))
+                  (:arg-refs x-ref)
+                  (:arg-types (:constant t) ,(if check
+                                                 t
+                                                 `(:or integer bignum))
+                              (:constant t))
+                  (:info target not-p lo hi)
+                  (:temporary (:sc signed-reg) temp)
+                  (:conditional)
+                  (:vop-var vop)
+                  (:policy :fast-safe)
+                  (:generator 5
+                    (let ((lo (fixnumize (+ lo ,@(and excl-low
+                                                      '(1)))))
+                          (hi (fixnumize (+ hi ,@(and excl-high
+                                                      '(-1)))))
+                          (lowest-bignum-address (cond
+                                                   ,@(and check
+                                                          #.(progn (assert
+                                                                    (< single-float-widetag character-widetag))
+                                                                   t)
+                                                          `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
+                                                             single-float-widetag)
+                                                            ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
+                                                             character-widetag)))
+                                                   (t
+                                                    +backend-page-bytes+))))
+                      (flet ((test-fixnum (lo hi)
+                               (unless (and (< -1 lo lowest-bignum-address)
+                                            (< -1 hi lowest-bignum-address))
+                                 (generate-fixnum-test x)
+                                 (inst jmp :ne (if not-p target skip)))))
+                        (cond ((< hi lo)
+                               (inst jmp (if not-p target skip)))
+                              ((= lo hi)
+                               (inst cmp x lo)
+                               (inst jmp (if not-p :ne :e) target))
+                              ((= hi ,(fixnumize -1))
+                               (test-fixnum lo hi)
+                               (inst cmp x lo)
+                               (inst jmp (if not-p :b :ae) target))
+                              (t
+                               (if (= lo 0)
+                                   (setf temp x)
+                                   (if (location= temp x)
+                                       (if (plusp lo)
+                                           (inst sub temp lo)
+                                           (inst add temp (- lo)))
+                                       (let ((imm (- lo)))
+                                         (if (integerp imm)
+                                             (inst lea temp (make-ea :dword :base x :disp imm))
+                                             (inst add temp x)))))
+                               (let ((diff (- hi lo)))
+                                 (cond ((= diff (fixnumize most-positive-fixnum))
+                                        (test-fixnum 0 diff)
+                                        (inst test temp temp)
+                                        (inst jmp (if not-p :l :ge) target))
+                                       ((= (logcount (+ diff (fixnumize 1))) 1)
+                                        (inst test temp (lognot diff))
+                                        (inst jmp (if not-p :ne :e) target))
+                                       (t
+                                        (test-fixnum 0 diff)
+                                        (inst cmp temp diff)
+                                        (inst jmp (if not-p :a :be) target))))))))
+                    skip)))))
+
+  (def range< t t)
+  (def range<= nil nil)
+  (def range<<= t nil)
+  (def range<=< nil t)
+
+  (def check-range< t t t)
+  (def check-range<= nil nil t)
+  (def check-range<<= t nil t)
+  (def check-range<=< nil t t))

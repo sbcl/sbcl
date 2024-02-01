@@ -85,6 +85,11 @@
   (:generator 1
     (inst cmp (make-ea :byte :disp rank-disp :base array) (encode-array-rank 1)))))
 
+
+(defun power-of-two-limit-p (x)
+  (and (fixnump x)
+       (= (logcount (1+ x)) 1)))
+
 ;;;; bounds checking routine
 (define-vop (check-bound)
   (:translate %check-bound)

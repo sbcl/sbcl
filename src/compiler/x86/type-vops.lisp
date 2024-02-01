@@ -274,56 +274,6 @@
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
-
-(defun power-of-two-limit-p (x)
-  (and (fixnump x)
-       (= (logcount (1+ x)) 1)))
-
-(define-vop (test-fixnum-mod-power-of-two)
-  (:args (value :scs (any-reg descriptor-reg
-                      unsigned-reg signed-reg)))
-  (:arg-types *
-              (:constant (satisfies power-of-two-limit-p)))
-  (:translate sb-c::fixnum-mod-p)
-  (:conditional :e)
-  (:info hi)
-  (:policy :fast-safe)
-  (:generator 4
-     (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                           hi
-                           (fixnumize hi))))
-       (inst test value (lognot fixnum-hi)))))
-
-(define-vop (test-fixnum-mod-tagged-unsigned)
-  (:args (value :scs (any-reg unsigned-reg signed-reg)))
-  (:arg-types (:or tagged-num unsigned-num signed-num)
-              (:constant fixnum))
-  (:translate sb-c::fixnum-mod-p)
-  (:conditional :be)
-  (:info hi)
-  (:policy :fast-safe)
-  (:generator 5
-     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                          hi
-                          (fixnumize hi))))
-       (inst cmp value fixnum-hi))))
-
-(define-vop (test-fixnum-mod-*)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant fixnum))
-  (:translate sb-c::fixnum-mod-p)
-  (:conditional)
-  (:info target not-p hi)
-  (:policy :fast-safe)
-  (:generator 6
-     (let* ((fixnum-hi (fixnumize hi))
-            (skip (gen-label)))
-       (generate-fixnum-test value)
-       (inst jmp :ne (if not-p target skip))
-       (inst cmp value fixnum-hi)
-       (inst jmp (if not-p :a :be) target)
-       (emit-label skip))))
-
 
 ;;;; list/symbol types
 ;;;
