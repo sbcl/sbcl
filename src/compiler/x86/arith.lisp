@@ -2165,7 +2165,4 @@ constant shift greater than word length")))
   (def range<<= t nil)
   (def range<=< nil t)
 
-  (def check-range< t t t)
-  (def check-range<= nil nil t)
-  (def check-range<<= t nil t)
-  (def check-range<=< nil t t))
+  (def check-range<= nil nil t))

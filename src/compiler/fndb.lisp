@@ -283,7 +283,7 @@
     (fixnum real fixnum) boolean
     (foldable flushable movable no-verify-arg-count))
 
-(defknown (check-range< check-range<= check-range<<= check-range<=<)
+(defknown (check-range<=)
     (fixnum t fixnum) boolean
     (foldable flushable movable no-verify-arg-count))
 
