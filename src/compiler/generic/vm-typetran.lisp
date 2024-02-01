@@ -178,7 +178,9 @@
           for union-types = (union-type-types (aref predicates x))
           when (subsetp union-types types :test #'type=)
           return (values (aref predicates (1+ x))
-                         (set-difference types union-types)))))
+                         (remove-if
+                          (lambda (x) (member x union-types :test #'type=))
+                          types)))))
 
 (unless-vop-existsp (:translate keywordp)
 (define-source-transform keywordp (x)
