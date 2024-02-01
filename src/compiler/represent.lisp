@@ -408,11 +408,11 @@
          (any-ptype *backend-t-primitive-type*)
          (op-ptype (tn-primitive-type op-tn)))
     (let ((other-ptype (if (or (eq other-ptype any-ptype)
-                               (eq (primitive-type-name other-ptype) 'integer))
+                               (memq (primitive-type-name other-ptype) '(bignum integer)))
                            op-ptype
                            other-ptype))
           (op-ptype (if (or (eq op-ptype any-ptype)
-                            (eq (primitive-type-name op-ptype) 'integer))
+                            (memq (primitive-type-name op-ptype) '(bignum integer)))
                         other-ptype
                         op-ptype)))
       (dolist (info (if write-p
