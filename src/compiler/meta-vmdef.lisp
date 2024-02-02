@@ -1264,7 +1264,7 @@
             :result-load-scs ',result-scs
 
             :more-arg-costs ',more-arg-costs
-            :more-arg-load-scs ',(unless (eq more-arg-costs +no-loads+)
+            :more-arg-load-scs ',(unless (eq more-arg-costs +no-costs+)
                                    (substitute-if nil #'listp more-arg-scs))
 
             :more-result-costs
