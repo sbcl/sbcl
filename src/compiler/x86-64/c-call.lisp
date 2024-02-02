@@ -275,17 +275,18 @@
     #+sb-safepoint
     '((:save-p t))
     #-sb-safepoint
-    (let ((gprs (list rcx-offset rdx-offset
-                      #-win32 rsi-offset #-win32 rdi-offset
-                      r8-offset r9-offset r10-offset r11-offset))
+    (let ((gprs (list '#:rcx '#:rdx #-win32 '#:rsi #-win32 '#:rdi
+                      '#:r8 '#:r9 '#:r10 '#:r11))
           (vars))
       (append
        (loop for gpr in gprs
-             collect `(:temporary (:sc any-reg :offset ,gpr :from :eval :to :result)
-                                  ,(car (push (gensym) vars))))
+             for offset = (symbol-value (intern (concatenate 'string (symbol-name gpr) "-OFFSET") "SB-VM"))
+             collect `(:temporary (:sc any-reg :offset ,offset :from :eval :to :result)
+                                  ,(car (push gpr vars))))
        (loop for float to 15
+             for varname = (format nil "FLOAT~D" float)
              collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
-                                  ,(car (push (gensym) vars))))
+                                  ,(car (push (make-symbol varname) vars))))
        `((:ignore ,@vars))))))
 
 (define-vop (call-out)
