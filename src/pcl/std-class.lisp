@@ -776,7 +776,7 @@
        ;; So maybe we can figure out how to bundle two lambdas together?
        (lambda ()
          (let* ((dd (layout-dd (class-wrapper class)))
-                (f (%make-structure-instance-allocator dd nil)))
+                (f (%make-structure-instance-allocator dd nil nil)))
            (if (functionp f)
                (funcall (setf (slot-value class 'defstruct-constructor) f))
                (error "Can't allocate ~S" class)))))

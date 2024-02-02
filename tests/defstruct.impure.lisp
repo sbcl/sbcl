@@ -1375,8 +1375,6 @@ redefinition."
                     (make-x :y t))
            '(:X-Y #S(X :Y T)))))
 
-(in-package sb-kernel)
-
 ;; The word order for halves of double-floats on 32-bit platforms
 ;; should match the platform's native order.
 (defun compare-memory (obj1 obj1-word-ofs obj2 obj2-word-ofs n-words)
@@ -1461,3 +1459,14 @@ redefinition."
 (test-util:with-test (:name :make-string-type-inference)
   (let ((things (ctu:find-code-constants #'make-badbuf :type 'list)))
     (assert (not things))))
+
+(with-test (:name :non-top-level-constructor-cache)
+  (let ((name (gensym)))
+    (funcall
+     (checked-compile `(lambda ()
+                         (defstruct (,name
+                                     (:constructor ,name)
+                                     (:predicate nil)
+                                     (:copier nil))
+                           (a 0 :type sb-vm:word :read-only t)))))
+    (typep (funcall name :a 3) name)))
