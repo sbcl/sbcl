@@ -3721,6 +3721,7 @@
                    `(define-vop (,(symbolicate name '/c))
                       (:translate ,name)
                       (:args (x :scs (any-reg signed-reg unsigned-reg)))
+                      (:arg-refs x-ref)
                       (:arg-types (:constant t)
                                   (:or tagged-num signed-num unsigned-num)
                                   (:constant t))
@@ -3734,7 +3735,8 @@
                         (let ((lo (+ lo ,@(and excl-low
                                                '(1))))
                               (hi (+ hi ,@(and excl-high
-                                               '(-1)))))
+                                               '(-1))))
+                              (int (sb-c::type-approximate-interval (tn-ref-type x-ref))))
                           (flet ((imm (x)
                                    (cond ((plausible-signed-imm32-operand-p x)
                                           x)
@@ -3746,13 +3748,22 @@
                                     (values (fixnumize lo) (fixnumize hi))
                                     (values lo hi))
                               (cond
+                                ((sb-c::interval-high<=n int hi)
+                                 (change-vop-flags vop '(:ge))
+                                 (inst cmp x (imm flo)))
+                                ((and (sb-c::interval-low>=n int lo)
+                                      (cond ((< lo 0))
+                                            (t
+                                             (setf lo 0
+                                                   flo 0)
+                                             nil)))
+                                 (change-vop-flags vop '(:le))
+                                 (inst cmp x (imm fhi)))
                                 ((or (< hi lo)
                                      (and (sc-is x unsigned-reg)
                                           (< hi 0)))
                                  (inst cmp rsp-tn 0))
-                                ((or (= lo 0)
-                                     (and (sc-is x unsigned-reg)
-                                          (<= flo 0)))
+                                ((= lo 0)
                                  (cond ((and (sc-is x any-reg)
                                              (= hi most-positive-fixnum))
                                         (inst test x x)
@@ -3790,21 +3801,30 @@
                   (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 5
-                    (let ((lo (fixnumize (+ lo ,@(and excl-low
-                                                      '(1)))))
-                          (hi (fixnumize (+ hi ,@(and excl-high
-                                                      '(-1)))))
-                          (lowest-bignum-address (cond
-                                                   ,@(and check
-                                                          #.(progn (assert
-                                                                    (< single-float-widetag character-widetag))
-                                                                   t)
-                                                          `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
-                                                             single-float-widetag)
-                                                            ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
-                                                             character-widetag)))
-                                                   (t
-                                                    +backend-page-bytes+))))
+                    (let* ((orig-lo (+ lo ,@ (and excl-low
+                                                  `(1))))
+                           (orig-hi (+ hi ,@ (and excl-high
+                                                  `(-1))))
+                           (lo (fixnumize orig-lo))
+                           (hi (fixnumize orig-hi))
+                           (lowest-bignum-address (cond
+                                                    ,@(and check
+                                                           #.(progn (assert
+                                                                     (< single-float-widetag character-widetag))
+                                                                    t)
+                                                           `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
+                                                              single-float-widetag)
+                                                             ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
+                                                              character-widetag)))
+                                                    (t
+                                                     +backend-page-bytes+)))
+                           (int (sb-c::type-approximate-interval (tn-ref-type x-ref))))
+                      (when (sb-c::interval-low>=n int orig-lo)
+                        (setf lo (if (>= orig-lo 0)
+                                     0
+                                     ,(fixnumize most-negative-fixnum))))
+                      (when (sb-c::interval-high<=n int orig-hi)
+                        (setf hi ,(fixnumize most-positive-fixnum)))
                       (flet ((imm (x &optional (const t) (temp temp2))
                                (cond ((plausible-signed-imm32-operand-p x)
                                       x)
@@ -3827,6 +3847,14 @@
                                (test-fixnum lo hi)
                                (inst cmp x (imm lo))
                                (inst jmp (if not-p :b :ae) target))
+                              ((= hi ,(fixnumize most-positive-fixnum))
+                               (test-fixnum lo hi)
+                               (inst cmp x (imm lo))
+                               (inst jmp (if not-p :l :ge) target))
+                              ((= lo ,(fixnumize most-negative-fixnum))
+                               (test-fixnum lo hi)
+                               (inst cmp x (imm hi))
+                               (inst jmp (if not-p :g :le) target))
                               (t
                                (if (= lo 0)
                                    (setf temp x)

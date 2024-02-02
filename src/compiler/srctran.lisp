@@ -1282,6 +1282,24 @@
              (<= (car high) n)
              (< high n)))))
 
+(defun interval-high<=n (interval n)
+  (and interval
+       (let ((high (interval-high interval)))
+         (and high
+              (sb-xc:<= (if (consp high)
+                            (car high)
+                            high)
+                        n)))))
+
+(defun interval-low>=n (interval n)
+  (and interval
+       (let ((low (interval-low interval)))
+         (and low
+              (sb-xc:>= (if (consp low)
+                            (car low)
+                            low)
+                        n)))))
+
 ;;; Does it contain integers?
 (defun interval-ratio-p (interval)
   (let ((low (interval-low interval))

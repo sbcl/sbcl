@@ -2683,6 +2683,7 @@
                       `((define-vop (,(symbolicate name '/c))
                           (:translate ,name)
                           (:args (x :scs (any-reg signed-reg unsigned-reg)))
+                          (:arg-refs x-ref)
                           (:arg-types (:constant t)
                                       (:or tagged-num signed-num unsigned-num)
                                       (:constant t))
@@ -2705,7 +2706,8 @@
                             (let ((lo (+ lo ,@(and excl-low
                                                    '(1))))
                                   (hi (+ hi ,@(and excl-high
-                                                   '(-1)))))
+                                                   '(-1))))
+                                  (int (sb-c::type-approximate-interval (tn-ref-type x-ref))))
                               (multiple-value-bind (flo fhi one)
                                   (if (sc-is x any-reg)
                                       (values (fixnumize lo) (fixnumize hi) ,(fixnumize 1))
@@ -2714,6 +2716,17 @@
                                   ((and (sc-is x unsigned-reg)
                                         (< fhi 0))
                                    (inst cmp null-tn 0))
+                                  ((sb-c::interval-high<=n int hi)
+                                   (change-vop-flags vop '(:ge))
+                                   (inst cmp x (add-sub-immediate flo)))
+                                  ((and (sb-c::interval-low>=n int lo)
+                                        (cond ((< lo 0))
+                                              (t
+                                               (setf lo 0
+                                                     flo 0)
+                                               nil)))
+                                   (change-vop-flags vop '(:le))
+                                   (inst cmp x (add-sub-immediate fhi)))
                                   ((= lo hi)
                                    (change-vop-flags vop '(:eq))
                                    (inst cmp x (add-sub-immediate flo)))
@@ -2726,11 +2739,8 @@
                                           (change-vop-flags vop '(:hs))))
                                    (inst cmn x (add-sub-immediate flo)))
                                   (t
-                                   (if (or (= lo 0)
-                                           (and (sc-is x unsigned-reg)
-                                                (<= lo 0)))
-                                       (setf flo 0
-                                             temp x)
+                                   (if (= lo 0)
+                                       (setf temp x)
                                        (if (plusp flo)
                                            (inst sub temp x (add-sub-immediate flo))
                                            (inst add temp x (add-sub-immediate (abs flo)))))
@@ -2837,23 +2847,32 @@
                     (:vop-var vop)
                     (:policy :fast-safe)
                     (:generator 5
-                      (let ((lo (fixnumize (+ lo ,@(and excl-low
-                                                        `(1)))))
-                            (hi (fixnumize (+ hi ,@(and excl-high
-                                                        `(-1)))))
-                            (lowest-bignum-address (cond
-                                                     ,@(and check
-                                                            #.(progn (assert
-                                                                      (< single-float-widetag character-widetag))
-                                                                     t)
-                                                            `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
-                                                               single-float-widetag)
-                                                              ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
-                                                               character-widetag)))
-                                                     (t
-                                                      #+darwin (expt 2 32)
-                                                      #-darwin +backend-page-bytes+)))
-                            (branch (sb-c::next-vop-is sb-assem::*current-vop* '(branch-if))))
+                      (let* ((orig-lo (+ lo ,@(and excl-low
+                                                   `(1))))
+                             (orig-hi (+ hi ,@(and excl-high
+                                                   `(-1))))
+                             (lo (fixnumize orig-lo))
+                             (hi (fixnumize orig-hi))
+                             (lowest-bignum-address (cond
+                                                      ,@(and check
+                                                             #.(progn (assert
+                                                                       (< single-float-widetag character-widetag))
+                                                                      t)
+                                                             `(((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'single-float))
+                                                                single-float-widetag)
+                                                               ((types-equal-or-intersect (tn-ref-type x-ref) (specifier-type 'character))
+                                                                character-widetag)))
+                                                      (t
+                                                       #+darwin (expt 2 32)
+                                                       #-darwin +backend-page-bytes+)))
+                             (branch (sb-c::next-vop-is sb-assem::*current-vop* '(branch-if)))
+                             (int (sb-c::type-approximate-interval (tn-ref-type x-ref))))
+                        (when (sb-c::interval-low>=n int orig-lo)
+                          (setf lo (if (>= orig-lo 0)
+                                       0
+                                       ,(fixnumize most-negative-fixnum))))
+                        (when (sb-c::interval-high<=n int orig-hi)
+                          (setf hi ,(fixnumize most-positive-fixnum)))
                         (destructuring-bind (&optional branch-label branch-not flags)
                             (and branch
                                  (sb-c::vop-codegen-info branch))
@@ -2862,7 +2881,8 @@
                                                 (if branch-not
                                                     branch-label
                                                     (sb-c::next-vop-label branch)))))
-                            (cond ((> lo hi)
+                            (cond
+                                  ((> lo hi)
                                    (inst cmp null-tn 0))
                                   ((= lo hi)
                                    (change-vop-flags vop '(:eq))
@@ -2875,6 +2895,22 @@
                                          (t
                                           (inst tst x fixnum-tag-mask)
                                           (inst ccmn x (ccmp-immediate (- lo)) :eq))))
+                                  ((eq lo ,(fixnumize most-positive-fixnum))
+                                   (change-vop-flags vop '(:le))
+                                   (cond (tbz-label
+                                          (inst tbnz* x 0 tbz-label)
+                                          (inst cmp x (add-sub-immediate hi)))
+                                         (t
+                                          (inst tst x fixnum-tag-mask)
+                                          (inst ccmp x (ccmp-immediate hi) :eq))))
+                                  ((= hi ,(fixnumize most-positive-fixnum))
+                                   (change-vop-flags vop '(:ge))
+                                   (cond (tbz-label
+                                          (inst tbnz* x 0 tbz-label)
+                                          (inst cmp x (add-sub-immediate lo)))
+                                         (t
+                                          (inst tst x fixnum-tag-mask)
+                                          (inst ccmp x (ccmp-immediate lo) :eq #b1000))))
                                   ((and (> lo 0)
                                         (= (logcount (+ hi (fixnumize 1))) 1))
                                    (inst tst x (lognot hi))
