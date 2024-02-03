@@ -724,8 +724,11 @@
                      n-operands arg1 arg2 arg3)
              (when (functionp function)
                (format *trace-output* " ~35t~(~a~)" (%fun-name function))
-               (when (eql (%fun-name function) 'fop-push)
-                 (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))))))))))
+               (case (%fun-name function)
+                 (fop-push (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))
+                 (fop-word-integer (format *trace-output* " ~V,'0X" (* 2 sb-vm:n-word-bytes) result))
+                 (fop-byte-integer (format *trace-output* " ~2,'0X" result))
+                 (fop-integer (format *trace-output* " ~X" result)))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
