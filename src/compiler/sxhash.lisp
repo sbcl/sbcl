@@ -153,9 +153,9 @@
 ;;; and it might run slower! In no way does it say anything about the speed
 ;;; of the generated function. So you pretty much don't want to supply it.
 ;;; Indeed one should avoid passing either optional arg to this function.
-(defun make-perfect-hash-lambda (array &optional (minimal t) (fast nil))
+(defun make-perfect-hash-lambda (array &optional objects (minimal t) (fast nil))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
-  (declare (ignorable minimal fast))
+  (declare (ignorable objects minimal fast))
   (when (< (length array) 3) ; one or two keys - why are you doing this?
     (return-from make-perfect-hash-lambda)) ; a limitation for now
   (let ((dedup (alloc-xset)))
@@ -164,7 +164,7 @@
       (add-to-xset x dedup)))
   ;; no dups present
   (let* ((string
-          #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array)
+          #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array objects)
           #-sb-xc-host
           (sb-unix::newcharstar-string
            (sb-sys:with-pinned-objects (array)

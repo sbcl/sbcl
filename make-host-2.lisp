@@ -2,12 +2,6 @@
 (setf *print-level* 5 *print-length* 5)
 (load "src/cold/shared.lisp")
 (in-package "SB-COLD")
-(compile 'preload-perfect-hash-generator)
-;;; Always read the file since we need the complete set of entries
-;;; for 32-bit and 64-bit builds, which may differ, and we don't want
-;;; to wipe out whatever file entries weren't needed in this build.
-(let ((*readtable* sb-cold:*xc-readtable*))
-  (preload-perfect-hash-generator *perfect-hash-generator-journal*))
 
 ;;; FIXME: these prefixes look like non-pathnamy ways of defining a
 ;;; relative pathname.  Investigate whether they can be made relative
@@ -17,6 +11,8 @@
 (load "src/cold/set-up-cold-packages.lisp")
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)
+;;; Set up the perfect hash generator for the target's value of N-FIXNUM-BITS.
+(preload-perfect-hash-generator (perfect-hash-generator-journal))
 
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)

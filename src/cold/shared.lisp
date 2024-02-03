@@ -929,7 +929,14 @@
 ;;; or for parallelized build.
 (defvar *perfect-hash-generator-mode* :PLAYBACK)
 (defvar *perfect-hash-generator-memo* nil)
-(defvar *perfect-hash-generator-journal* "xperfecthash.lisp-expr")
+
+;;; A separate file is used for each possible value of N-FIXNUM-BITS.
+;;; Therefore any particular set of symbols appears at most once per file.
+(defun perfect-hash-generator-journal ()
+  (let ((bits (symbol-value (intern "N-FIXNUM-BITS" "SB-VM"))))
+    (ecase bits
+      ((30 61 63)
+       (format nil "xperfecthash~D.lisp-expr" bits)))))
 
 (defun perfect-hash-generator-program ()
   ;; The path depends on what the host is, not what the target is
@@ -957,7 +964,10 @@
               ;; the CDR, which is almost surely, though not necessarily, what it does.
               (mapcar (lambda (entry)
                         (incf linenum)
-                        (destructuring-bind (array . string) entry
+                        (destructuring-bind (array identifier expression) entry
+                          ;; ARRAY is read as simple-vector, not UB32.
+                          ;; (It actually doesn't matter how it's stored in memory)
+                          (setq array (coerce array '(simple-array (unsigned-byte 32) (*))))
                           ;; assert that the entry was stored in canonical form
                           (assert (equalp array (sort (copy-seq array) #'<)))
                           ;; assert that there are not redundant lines.
@@ -965,18 +975,20 @@
                           ;; a distinct line if its key already existed)
                           (let ((existsp (gethash array uniqueness-checker)))
                             (cond ((not existsp)
-                                   (setf (gethash array uniqueness-checker) (list string linenum)))
+                                   (setf (gethash array uniqueness-checker)
+                                         (list expression linenum)))
                                   (t
                                    (warn "~X maps to~%~{~S from line ~D~}~%~S from line ~D~%"
-                                         array existsp string linenum)
+                                         array existsp expression linenum)
                                    (incf errors))))
                           (let ((digest (reduce #'logxor array)))
-                            (cons (cons digest array) string))))
+                            (list* (cons digest array) identifier expression))))
                       entries))
         (when (plusp errors)
           (error "hash generator duplicates: ~D" errors))))))
+(compile 'preload-perfect-hash-generator)
 
-(defun emulate-generate-perfect-hash-sexpr (array)
+(defun emulate-generate-perfect-hash-sexpr (array identifier)
   ;; I suppose we could make one long-lived child process which reads
   ;; input up to an empty line and then returns a result,
   ;; but honestly that's more engineering than I care to do.
@@ -1020,18 +1032,61 @@
           (multiple-value-bind (expr-computed expr-from-journal)
               (let ((*package* (find-package "SB-C")))
                 (values (read-from-string computed)
-                        (read-from-string (cdr match))))
+                        (read-from-string (cddr match))))
             (assert (equalp expr-computed expr-from-journal))))
-        (return-from emulate-generate-perfect-hash-sexpr (cdr match)))
+        (return-from emulate-generate-perfect-hash-sexpr (cddr match)))
       (ecase *perfect-hash-generator-mode*
         (:playback
          (error "perfect hash file is missing a needed entry for ~x" array))
         (:record
+         ;; This will only display anything when we didn't have the data,
+         ;; so it's actually not too "noisy" in a normal build.
+         (let ((*print-right-margin* 200) (*print-level* nil) (*print-length* nil))
+           (format t "~&Recording perfect hash:~%~S~%~X~%"
+                   identifier array))
          (setf *perfect-hash-generator-memo*
                (nconc *perfect-hash-generator-memo*
-                      (list (cons (cons digest canonical-array) computed))))
+                      (list (list* (cons digest canonical-array)
+                                   identifier
+                                   computed))))
          computed)))))
 
+;;; Unlike xfloat-math which expresses universal truths, the perfect-hash file
+;;; expresses facts about the behavior of a _particular_ SBCL revision.
+;;; It was overly challenging to alter the calc-symbol-name-hash algorithm
+;;; without being forced to re-run every cross-build to determine what the 32-bit
+;;; inputs would be to the perfect hash generator. By storing a representations of
+;;; objects that contributed to the key calculation, we can in theory recreate the
+;;; perfect hash file for all relevant objects without a rebuild under every
+;;; combination of architectures and features. A few difficulties:
+;;; * Hashes should be emitted in base 16 because the C program wants that,
+;;;   but our extended array syntax uses base 10 since it's more natural.
+;;;   i..e "#A((16) (unsigned-byte 8) ...)"
+;;; * Packages have to exist when the file is read, so we can't read symbols
+;;;   into an architecture-specific package like sb-arm-asm.
+;;;   Since symbol-name-hash is based solely on print-name, it's irrelevant what
+;;;   the package is, so it's always OK to use keywords.
+;;;
+;;; I screwed this up multiple differerent ways when developing it.
+;;; For example the symbol ADD was getting printed without a colon, and reparsed
+;;; as 2781 in base 16.
+;;; Finally I hit upon a solution which solves just about everything:
+;;; write the identifying information as a string, which works around nonexistence
+;;; of the following, among others:
+;;;  - symbol SB-KERNEL:SIMD-PACK-TYPE for #-x86-64
+;;;  - symbol SB-KERNEL:HANDLE-WIN32-EXCEPTION for #-win32
+;;;  - package SB-APROF for #-x86-64
+;;;
+;;; Separating the files by N-FIXNUM-TAG-BITS works to nearly guarantee
+;;; that any particular set of symbols appears once and once only, so you don't
+;;; have to wonder why it appears more than once, and under what circumstance
+;;; the hashes should be different for the same symbols.
+;;; Unfortunately, that was too aspirational. The problem stems from NIL in a
+;;; list of symbols. Since the address of NIL depends on the architecture,
+;;; and not only that, the particular *FEATURES*, we might have different
+;;; hashes for NIL. Like without sb-thread, there will be an alloc-region
+;;; placed in static space below NIL which shifts NIL's address higher,
+;;; which changes its hash.
 (defun maybe-save-perfect-hashfuns-for-playback ()
   ;; Check again for corruption
   (let ((uniqueness-checker (make-hash-table :test 'equalp)))
@@ -1042,16 +1097,23 @@
   #+use-host-hash-generator
   (when (and (eq *perfect-hash-generator-mode* :record)
              (not (search "/xbuild/" *host-obj-prefix*)))
-    (with-open-file (stream *perfect-hash-generator-journal*
+    (with-open-file (stream (perfect-hash-generator-journal)
                             :direction :output
-                            :if-existS :supersede :if-does-not-exist :create)
-      (write-char #\( stream)
-      (dolist (entry *perfect-hash-generator-memo*)
-        (destructuring-bind ((digest . array) . string) entry
-          (declare (ignore digest))
-          (write (cons array string):stream stream :length nil :base 16
-                 :pretty t :right-margin 128))
-        (terpri stream))
+                            :if-exists :supersede :if-does-not-exist :create)
+      (write-string "(
+" stream)
+      (let ((*print-pretty* t) (*print-length* nil) (*print-level* nil)
+            (*print-lines* nil) (*print-right-margin* 128)
+            (*standard-output* stream))
+        (dolist (entry *perfect-hash-generator-memo*)
+          (destructuring-bind ((digest . array) identifier . string) entry
+            (declare (ignore digest))
+            (unless (stringp identifier)
+              ;; If this entry was read from the file, it's already a string
+              (setq identifier
+                    (let ((*package* (find-package "SB-KERNEL")))
+                      (write-to-string identifier :escape :t :pretty nil))))
+            (format t "(~X~% ~S~% ~S)~%" array identifier string))))
       (write-string ")
 ;; EOF
 " stream)))

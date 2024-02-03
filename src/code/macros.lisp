@@ -964,7 +964,17 @@ symbol-case giving up: case=((V U) (F))
 ;;; 2. an array of (unsigned-byte 16) for the clause index to select
 ;;; 3. an expression mapping each layout in LAYOUT-LISTS to an integer 0..N-1
 (defun build-sealed-struct-typecase-map (layout-lists hashes)
-  (let ((lambda (sb-c:make-perfect-hash-lambda hashes)))
+  ;; The hash-generator emulator wants a cookie identifying the set of objects
+  ;; that were hashed.
+  (let ((lambda (sb-c:make-perfect-hash-lambda
+                 hashes
+                 #+sb-xc-host
+                 (map 'vector
+                      (lambda (list)
+                        (mapcar (lambda (layout)
+                                  (list :type (classoid-name (layout-classoid layout))))
+                                list))
+                      layout-lists))))
     (unless lambda
       (return-from build-sealed-struct-typecase-map (values nil nil nil)))
     (let* ((phashfun (sb-c::compile-perfect-hash lambda hashes))

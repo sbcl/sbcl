@@ -2793,7 +2793,7 @@
       ;; Not necessary for the target but not worth a #+/- either.
       (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
                  (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
-                 (lambda (make-perfect-hash-lambda hashes) :exit-if-null)
+                 (lambda (make-perfect-hash-lambda hashes items) :exit-if-null)
                  (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
                  (n (length hashes))
                  (domain (make-array n))

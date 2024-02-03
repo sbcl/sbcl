@@ -880,6 +880,8 @@ typedef uint8_t  ub1;\n");
       mem_stream_printf(f, infix ? "ub2 tab[] = {\n": "16)");
     }
 
+    // When emitting sexprs instead of C, assume that the Lisp pretty-printer
+    // can nicely reformat the string after reading it.
     if (blen < 16)
     {
       for (i=0; i<blen; ++i) mem_stream_printf(f, infix?"%3d,":" %d", scramble[tab[i].val_b]);
@@ -888,7 +890,7 @@ typedef uint8_t  ub1;\n");
     {
       for (i=0; i<blen; i+=16)
         mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
-                        : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+                        : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
                 scramble[tab[i+0].val_b], scramble[tab[i+1].val_b],
                 scramble[tab[i+2].val_b], scramble[tab[i+3].val_b],
                 scramble[tab[i+4].val_b], scramble[tab[i+5].val_b],
@@ -901,7 +903,7 @@ typedef uint8_t  ub1;\n");
     else if (blen < USE_SCRAMBLE)
     {
       for (i=0; i<blen; i+=8)
-        mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,\n" : " %d %d %d %d %d %d %d %d\n",
+        mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,\n" : " %d %d %d %d %d %d %d %d",
                 scramble[tab[i+0].val_b], scramble[tab[i+1].val_b],
                 scramble[tab[i+2].val_b], scramble[tab[i+3].val_b],
                 scramble[tab[i+4].val_b], scramble[tab[i+5].val_b],
@@ -911,7 +913,7 @@ typedef uint8_t  ub1;\n");
     {
       for (i=0; i<blen; i+=16)
         mem_stream_printf(f, infix ? "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,\n"
-                        : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+                        : " %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
                 tab[i+0].val_b, tab[i+1].val_b,
                 tab[i+2].val_b, tab[i+3].val_b,
                 tab[i+4].val_b, tab[i+5].val_b,
