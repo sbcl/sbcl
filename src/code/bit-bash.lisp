@@ -849,4 +849,8 @@
 (clear-info :function :inlinep '%bit-position/0)
 (clear-info :function :inlinep '%bit-position/1)
 
+;;; These are needed ASAP (in target-unicode)
+(defun shift-towards-start (number count) (shift-towards-start number count))
+(defun shift-towards-end (number count) (shift-towards-end number count))
+
 (run-bit-position-assertions)

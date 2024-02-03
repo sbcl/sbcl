@@ -11,13 +11,41 @@
 
 (in-package "SB-UNICODE")
 
+(export
+ '(general-category bidi-class combining-class decimal-value digit-value
+   numeric-value mirrored-p bidi-mirroring-glyph age hangul-syllable-type
+   east-asian-width script char-block unicode-1-name line-break-class
+   proplist-p uppercase-p lowercase-p cased-p case-ignorable-p alphabetic-p
+   ideographic-p math-p whitespace-p hex-digit-p soft-dotted-p default-ignorable-p
+   normalize-string normalized-p uppercase lowercase titlecase casefold
+   grapheme-break-class word-break-class sentence-break-class graphemes
+   words sentences lines
+   unicode= unicode-equal unicode< unicode<= unicode> unicode>=
+   confusable-p))
+
+(eval-when (:compile-toplevel :execute)
+  (defun read-from-file (namestring &key (enforce-single-expr t) build-dependent)
+    (declare (notinline concatenate) (ignore build-dependent))
+    (with-open-file
+        (s (concatenate 'string (if (boundp 'cl-user::*generated-sources-root*)
+                                    (symbol-value 'cl-user::*generated-sources-root*)
+                                    "")
+                        namestring))
+      (let* ((result (read s))
+             (eof-result (cons nil nil)))
+        (unless enforce-single-expr
+          (return-from read-from-file result))
+        (unless (eq (read s nil eof-result) eof-result)
+          (error "more than one expression in file ~S" namestring))
+        result))))
+
 (eval-when (:compile-toplevel)
   (defun plist-to-alist (list)
     (loop for (key value) on list by #'cddr collect (cons key value))))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *proplist-properties*
-    (mapcar (lambda (x) (cons (car x) (sb-xc:coerce (cdr x) '(vector (unsigned-byte 32)))))
-            '#.(plist-to-alist (sb-cold:read-from-file "output/ucd/misc-properties.lisp-expr")))))
+    (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
+            '#.(plist-to-alist (read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
@@ -83,7 +111,7 @@ with underscores replaced by dashes."
 
 (eval-when (:compile-toplevel)
   (defvar *slurped-random-constants*
-    (sb-cold:read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))
+    (read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))
   (defun read-ucd-constant (symbol)
     (map 'vector
          (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
@@ -108,11 +136,6 @@ with underscores replaced by dashes."
       (svref-or-null
        #.(read-ucd-constant '*bidi-classes*)
        (aref +character-misc-database+ (1+ (misc-index character))))))
-
-(declaim (inline combining-class))
-(defun combining-class (character)
-  "Returns the canonical combining class (CCC) of CHARACTER"
-  (aref +character-misc-database+ (+ 2 (misc-index character))))
 
 (defun decimal-value (character)
   "Returns the decimal digit value associated with CHARACTER or NIL if
@@ -163,10 +186,10 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
          (block-index (ordered-ranges-position
                        code
-                       #.(coerce (sb-cold:read-from-file "output/ucd/block-ranges.lisp-expr")
+                       #.(coerce (read-from-file "output/ucd/block-ranges.lisp-expr")
                                        '(vector (unsigned-byte 32))))))
     (if block-index
-        (aref #.(sb-cold:read-from-file "output/ucd/block-names.lisp-expr") block-index)
+        (aref #.(read-from-file "output/ucd/block-names.lisp-expr") block-index)
         :no-block)))
 
 (defun unicode-1-name (character)
@@ -295,7 +318,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
   (proplist-p character :soft-dotted))
 
 (eval-when (:compile-toplevel)
-  (sb-xc:defmacro coerce-to-ordered-ranges (array)
+  (defmacro coerce-to-ordered-ranges (array)
     (coerce array '(vector (unsigned-byte 32)))))
 
 (defun default-ignorable-p (character)
@@ -311,241 +334,14 @@ disappears when accents are placed on top of it. and NIL otherwise"
          (coerce-to-ordered-ranges
           #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
             #x110BD #x110BD)))))))
-
-
-;;; Implements UAX#15: Normalization Forms
-(declaim (inline char-decomposition-info))
-(defun char-decomposition-info (char)
-  (let ((value (aref +character-misc-database+
-                     (+ 4 (misc-index char)))))
-    (values (clear-flag 7 value) (logbitp 7 value))))
-
-(defun char-decomposition (char length callback)
-  (declare (function callback))
-  ;; Caller should have gotten length from char-decomposition-info
-  (let* ((cp (char-code char))
-         (cp-high (ash cp -8))
-         (decompositions +character-decompositions+)
-         (high-page (aref +character-high-pages+ cp-high))
-         (index (unless (logbitp 15 high-page) ;; Hangul syllable
-                  (aref +character-low-pages+
-                        (+ 1 (* 2 (+ (ldb (byte 8 0) cp) (ash high-page 8))))))))
-    (cond ((= length 1)
-           (funcall callback (code-char (aref decompositions index))))
-          ((<= #xac00 cp #xd7a3)
-           ;; see Unicode 6.2, section 3-12
-           (let* ((sbase #xac00)
-                  (lbase #x1100)
-                  (vbase #x1161)
-                  (tbase #x11a7)
-                  (vcount 21)
-                  (tcount 28)
-                  (ncount (* vcount tcount))
-                  (sindex (- cp sbase))
-                  (lindex (floor sindex ncount))
-                  (vindex (floor (mod sindex ncount) tcount))
-                  (tindex (mod sindex tcount)))
-             (funcall callback (code-char (+ lbase lindex)))
-             (funcall callback (code-char (+ vbase vindex)))
-             (when (> tindex 0)
-               (funcall callback  (code-char (+ tbase tindex))))))
-
-          (t
-           (loop for i below length
-                 do
-                 (funcall callback (code-char (aref decompositions (+ index i)))))))))
-
-(defun decompose-char (char compatibility callback)
-  (declare (function callback))
-  (multiple-value-bind (info compat) (char-decomposition-info char)
-    (if (and (plusp info)
-             (or compatibility
-                 (not compat)))
-        (if compatibility
-            (dx-flet ((callback (char)
-                        (decompose-char char t callback)))
-              (char-decomposition char info #'callback))
-            (char-decomposition char info callback))
-        (funcall callback char))))
-
-(defun decompose-string (string compatibility filter)
-  (let (chars
-        (length 0)
-        (previous-combining-class 0))
-    (declare (type index length))
-    (dx-flet ((callback (char)
-                        (let ((combining-class (combining-class char)))
-                          (incf length)
-                          (cond ((< 0 combining-class previous-combining-class)
-                                 ;; Ensure it's sorted
-                                 (loop for cons on chars
-                                       for next-char = (cadr cons)
-                                       when (or (not next-char)
-                                                (<= 0 (combining-class next-char) combining-class))
-                                       do (setf (cdr cons)
-                                                (cons char (cdr cons)))
-                                          (return)))
-                                (t
-                                 (push char chars)
-                                 (setf previous-combining-class combining-class))))))
-      (sb-kernel:with-array-data ((string string) (start) (end)
-                                  :check-fill-pointer t)
-        (let ((calback (if filter
-                           (let ((filter (sb-kernel:%coerce-callable-to-fun filter)))
-                             (lambda (char)
-                               (when (funcall filter char)
-                                 (callback char))))
-                           #'callback)))
-          (loop for i from start below end
-                for char = (schar string i)
-                do
-                (decompose-char char compatibility calback))))
-      (nreverse chars))))
-
-(defun primary-composition (char1 char2)
-  #-sb-unicode
-  (declare (ignore char1 char2))
-  #-sb-unicode
-  #.(let* ((data (sb-cold:read-from-file "output/ucd/comp.lisp-expr"))
-           (entries (loop for pair across data
-                          for key = (car pair)
-                          for c1 = (ldb (byte 21 21) key)
-                          for c2 = (ldb (byte 21 0) key)
-                          when (and (< c1 sb-xc:char-code-limit)
-                                    (< c2 sb-xc:char-code-limit))
-                          collect pair)))
-      (aver (null entries))
-      nil)
-  #+sb-unicode
-  (flet ((composition-hangul-syllable-type (cp)
-           (cond
-             ((and (<= #x1100 cp) (<= cp #x1112)) :L)
-             ((and (<= #x1161 cp) (<= cp #x1175)) :V)
-             ((and (<= #x11a8 cp) (<= cp #x11c2)) :T)
-             ((and (<= #xac00 cp) (<= cp #.(+ #xac00 11171)))
-              (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
-    (declare (inline composition-hangul-syllable-type))
-    (let ((c1 (char-code char1))
-          (c2 (char-code char2)))
-       (cond
-         ((gethash (dpb c1 (byte 21 21) c2)
-                   (load-time-value
-                    (let ((data '#.(sb-cold:read-from-file "output/ucd/comp.lisp-expr")))
-                      (sb-impl::%stuff-hash-table
-                       (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
-                       (loop for pair across data
-                             collect (cons (car pair) (code-char (cdr pair))))
-                       t))
-                    t)))
-         ((and (eql (composition-hangul-syllable-type c1) :L)
-               (eql (composition-hangul-syllable-type c2) :V))
-          (let ((lindex (- c1 #x1100))
-                (vindex (- c2 #x1161)))
-            (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
-         ((and (eql (composition-hangul-syllable-type c1) :LV)
-               (eql (composition-hangul-syllable-type c2) :T))
-          (code-char (+ c1 (- c2 #x11a7))))))))
-
-(defun canonically-compose (list)
-  (let* ((result list)
-         (combine-with (member 0 result :key #'combining-class))
-         (previous combine-with)
-         (current (cdr combine-with)))
-    (when (null current)
-      (return-from canonically-compose list))
-    (tagbody
-     again
-       (when (and (neq previous combine-with)
-                  ;; test for Blocked (Unicode 3.11 para. D115)
-                  ;;
-                  ;; (assumes here that string has sorted combiners,
-                  ;; so can look back just one step)
-                  (>= (combining-class (car previous))
-                      (combining-class (car current))))
-         (when (= (combining-class (car current)) 0)
-           (setf combine-with current))
-         (setf previous current)
-         (pop current)
-         (go next))
-
-       (let ((comp (primary-composition (car combine-with) (car current))))
-         (cond
-           (comp
-            (setf (car combine-with) comp
-                  (cdr previous) (setf current (cdr current))))
-           (t
-            (when (= (combining-class (car current)) 0)
-              (setf combine-with current))
-            (setf previous current)
-            (pop current))))
-     next
-       (when current
-         (go again)))
-    result))
-
-(defun normalize-string (string &optional (form :nfd)
-                                          filter)
-  "Normalize STRING to the Unicode normalization form FORM.
-Acceptable values for form are :NFD, :NFC, :NFKD, and :NFKC.
-If FILTER is a function it is called on each decomposed character and
-only characters for which it returns T are collected."
-  (declare (type (member :nfd :nfkd :nfc :nfkc) form))
-  #-sb-unicode
-  (declare (ignore filter))
-  #-sb-unicode
-  (etypecase string
-    ((array nil (*)) string)
-    (string
-     (ecase form
-       ((:nfc :nfkc) string)
-       ((:nfd :nfkd) (error "Cannot normalize to ~A form in #-SB-UNICODE builds" form)))))
-  #+sb-unicode
-  (etypecase string
-    (base-string string)
-    ((array character (*))
-     (coerce
-      (ecase form
-        ((:nfc)
-         (canonically-compose (decompose-string string nil filter)))
-        ((:nfd)
-         (decompose-string string nil filter))
-        ((:nfkc)
-         (canonically-compose (decompose-string string t filter)))
-        ((:nfkd)
-         (decompose-string string t filter)))
-      'string))
-    ((array nil (*)) string)))
-
-(defun normalized-p (string &optional (form :nfd))
-  "Tests if STRING is normalized to FORM"
-  (etypecase string
-    (base-string t)
-    ((array character (*))
-     (flet ((=-to-list (list)
-              (sb-kernel:with-array-data ((string string) (start) (end)
-                                          :check-fill-pointer t)
-                (loop for i from start below end
-                      for char = (schar string i)
-                      always (eql char (pop list))))))
-       (ecase form
-         ((:nfc)
-          (=-to-list (canonically-compose (decompose-string string nil nil))))
-         ((:nfd)
-          (=-to-list (decompose-string string nil nil)))
-         ((:nfkc)
-          (=-to-list (canonically-compose (decompose-string string t nil))))
-         ((:nfkd)
-          (=-to-list (decompose-string string t nil))))))
-    ((array nil (*)) t)))
-
 
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
 (sb-ext:define-load-time-global **special-titlecases**
-  '#.(sb-cold:read-from-file "output/ucd/titlecases.lisp-expr"))
+  '#.(read-from-file "output/ucd/titlecases.lisp-expr"))
 
 (sb-ext:define-load-time-global **special-casefolds**
-  '#.(sb-cold:read-from-file "output/ucd/foldcases.lisp-expr"))
+  '#.(read-from-file "output/ucd/foldcases.lisp-expr"))
 
 (defun has-case-p (char)
   ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
@@ -1372,7 +1168,7 @@ it defaults to 80 characters"
 
 ;;; Collation
 (defconstant +maximum-variable-primary-element+
-  #.(sb-cold:read-from-file "output/ucd/other-collation-info.lisp-expr"))
+  #.(read-from-file "output/ucd/other-collation-info.lisp-expr"))
 
 (defun unpack-collation-key (key)
   (flet ((unpack (value)
@@ -1389,7 +1185,7 @@ it defaults to 80 characters"
 
 (macrolet ((collations-hash-table ()
              (let ((data (let ((*read-base* 16))
-                           (sb-cold:read-from-file "output/ucd/collation.lisp-expr"))))
+                           (read-from-file "output/ucd/collation.lisp-expr"))))
                #+64-bit (dovector (item data) (aver (fixnump (car item))))
                `(load-time-value
                  (sb-impl::%stuff-hash-table
@@ -1554,5 +1350,153 @@ with variable-weight characters, as described in UTS #10"
              :start2 start2 :end2 end2)
    (unicode> string1 string2 :start1 start1 :end1 end1
              :start2 start2 :end2 end2)))
+
+;;;;
+
+;;; This macro produces a lookup table that uses half the storage of a hash-table
+;;; and achieves around double the performance on this test:
+;;;
+;;; * (time (loop for i below char-code-limit count (numeric-value (code-char i))))
+;;;
+;;; x86-64-based mac:
+;;; Old
+;;; ===
+;;;    0.029 seconds of real time
+;;;    0.029656 seconds of total run time (0.029644 user, 0.000012 system)
+;;;    103.45% CPU
+;;;    71,169,208 processor cycles
+;;; New
+;;; ===
+;;;    0.012 seconds of real time
+;;;    0.012075 seconds of total run time (0.012061 user, 0.000014 system)
+;;;    100.00% CPU
+;;;    29,034,292 processor cycles
+;;;
+;;; arm-based mac:
+;;; Old
+;;; ===
+;;;    0.051 seconds of real time
+;;;    0.050890 seconds of total run time (0.050709 user, 0.000181 system)
+;;;    100.00% CPU
+;;; New
+;;; ===
+;;;    0.033 seconds of real time
+;;;    0.033195 seconds of total run time (0.033104 user, 0.000091 system)
+;;;    100.00% CPU
+
+(defmacro find-in-perfect-hashmap (x filename value-type value-getter)
+  (let ((pairs
+         (remove-if (lambda (x) (>= (car x) char-code-limit))
+                    (read-from-file filename))))
+    (when (< (length pairs) 5)
+      (aver (eq value-getter 'cdr))
+      (return-from find-in-perfect-hashmap
+        `(cdr (assoc (char-code ,x) ',pairs))))
+    (unless (symbolp value-getter)
+      (setq value-getter (compile nil value-getter)))
+    (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
+           (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
+           ;; We need the lexpr at compile-time to build the key/value arrays
+           ;; and run-time of course, where the expression is stuffed in as
+           ;; a form headed by LAMBDA.
+           (hasher (compile nil lexpr))
+           (n (length mapped-chars))
+           ;; This array is pasted in as though written literally in source,
+           ;; therefore it gets relocated to read-only space in the core.
+           (key-array (make-array n :element-type '(unsigned-byte 32)))
+           (value-array (make-array n :element-type value-type)))
+      (dolist (pair pairs)
+        (let ((index (funcall hasher (car pair))))
+          (aver (/= (car pair) 0)) ; a key can't be zero
+          (aver (= (aref key-array index) 0)) ; confirm perfect hashing
+          (setf (aref key-array index) (car pair)
+                (aref value-array index) (funcall value-getter pair))))
+      `(let* ((code (char-code ,x)) (hash (,lexpr code)))
+         ;; Remember: even though the mapping is dense (range is 0..N-1)
+         ;; a key which was not in the mapping as specified to the hash function
+         ;; generator may cause it return any value outside the expected range.
+         ;; So bounds check it and then confirm a hit.
+         (when (and (< hash ,n) (= (aref ,key-array hash) code))
+           (aref ,value-array hash))))))
+
+(defun numeric-value (character)
+  "Returns the numeric value of CHARACTER or NIL if there is no such value.
+Numeric value is the most general of the Unicode numeric properties.
+The only constraint on the numeric value is that it be a rational number."
+  (or (find-in-perfect-hashmap character "output/ucd/numerics.lisp-expr" t cdr)
+      (digit-value character)))
+
+;;; FIXME: why does #-sb-unicode want or need this?
+;;; (Indeed the regression test for it is *disabled* so I reiterate - WHY?)
+(defun bidi-mirroring-glyph (character)
+  "Returns the mirror image of CHARACTER if it exists.
+Otherwise, returns NIL."
+  ;; This used to call MIRRORED-P before table lookup, but it's not faster to do so
+  #+sb-unicode
+  (find-in-perfect-hashmap character "output/ucd/bidi-mirrors.lisp-expr"
+                           character (lambda (x) (code-char (second x))))
+  #-sb-unicode
+  (macrolet ((direct-map (&aux (a (make-array char-code-limit :element-type 'character)))
+               (dolist (pair (read-from-file "output/ucd/bidi-mirrors.lisp-expr") a)
+                 (let ((key (car pair)))
+                   (when (< key char-code-limit)
+                     (setf (char a key) (code-char (second pair))))))))
+    (let ((answer (char (direct-map) (char-code character))))
+      (unless (char= answer (code-char 0)) answer))))
+
+;;; Confusable detection
+
+;;; hash-table:
+;;;   * (time (loop for i below char-code-limit count (gethash (code-char i) **confusables**)))
+;;;     0.020 seconds of real time
+;;; perfect hash:
+;;;   * (time (loop for i below char-code-limit count (lookup (code-char i))))
+;;;     0.008 seconds of real time
+(defun canonically-deconfuse (string)
+  (declare (string string))
+  ;; BUG: filtering by (CAR pair) is inadequate for #-sb-unicode when reading confusables,
+  ;; and it always was. An error could be observed by calling canonically-deconfuse
+  ;; on any key of this alist:
+  ;; ((175 713) (240 8706 821) (162 99 824) (231 99 806) (199 67 806) (208 68 821)
+  ;;   (248 111 824) (216 79 824) (37 186 47 8320) (165 89 821) (181 956) (246 1577))
+  ;; which would call CODE-CHAR on illegal inputs. The list came from:
+  ;; (remove-if (lambda (x) (or (> (car x) 255) (< (reduce #'max (cdr x)) 256)))
+  ;;            (with-open-file (f "output/ucd/confusables.lisp-expr") (read f)))
+  ;; Maybe we should filter CDR pair here, though it would leave extra keys in the map
+  ;; which seems to cause no immediate harm.
+  (flet ((lookup (character)
+           (find-in-perfect-hashmap
+            character "output/ucd/confusables.lisp-expr" t
+            (lambda (pair &aux (x (cdr pair)))
+              (case (length x)
+                (1 (elt x 0))
+                (2 (pack-3-codepoints (elt x 0) (elt x 1)))
+                (3 (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
+                (t (logically-readonlyize
+                    (possibly-base-stringize (map 'string #'code-char x)))))))))
+    (let (result)
+      (loop for char across string
+            for deconfused = (lookup char)
+            do (cond ((not deconfused)
+                      (push (string char) result))
+                     ((integerp deconfused)
+                      (push (sb-impl::unpack-3-codepoints deconfused)
+                            result))
+                     (t
+                      (push deconfused result))))
+      (apply #'concatenate 'string (nreverse result)))))
+
+;;; This function is weird! It reports that every string is confusable with itself
+;;; even if it contains no confusable characters at all.
+;;; e.g. (lookup-confusable #\W) => NIL but (confusable-p "W" "W") => T
+(defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  "Determines whether STRING1 and STRING2 could be visually confusable
+according to the IDNA confusableSummary.txt table"
+    (let* ((form #+sb-unicode :nfd #-sb-unicode :nfc)
+           (str1 (normalize-string (subseq string1 start1 end1) form))
+           (str2 (normalize-string (subseq string2 start2 end2) form))
+           (skeleton1 (normalize-string (canonically-deconfuse str1) form))
+           (skeleton2 (normalize-string (canonically-deconfuse str2) form)))
+      (string= skeleton1 skeleton2)))
 
 (clear-info :function :compiler-macro-function 'proplist-p)
