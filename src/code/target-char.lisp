@@ -403,11 +403,15 @@
 ;;; PRIMARY-COMPOSITION, with (+ (ash codepoint1 21) codepoint2) as
 ;;; keys and the composition as the value
 
-(declaim (ftype (sfunction (t) (unsigned-byte 16)) misc-index))
 (defun misc-index (char)
   (misc-index-from-char-code (char-code char)
                              sb-unicode::+character-high-pages+
                              sb-unicode::+character-low-pages+))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (aver (csubtypep (global-ftype 'misc-index)
+                   (specifier-type '(sfunction (t) (unsigned-byte 16)))))
+  (proclaim `(ftype ,(type-specifier (global-ftype 'misc-index)) misc-index)))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category)
          (inline ucd-general-category))
