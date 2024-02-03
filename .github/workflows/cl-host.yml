@@ -148,11 +148,48 @@ jobs:
         name: xc-host-fasls
         path: sbcl-host-fasls.tgz
 
+  self:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: install host sbcl
+      run: |
+        sudo apt-get -qq update | true
+        sudo apt-get -qq install sbcl libcapstone-dev git-restore-mtime
+    - name: build
+      env:
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: |
+        ./make.sh --xc-host='sbcl --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
+        cp src/runtime/sbcl output/sbcl.core /tmp
+        git restore-mtime
+        ./make.sh --xc-host='/tmp/sbcl --core /tmp/sbcl.core --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
+    - name: archive sbcl-xc fasls
+      run: tar --transform 's,^,self-host/,' -cf self-host-fasls.tgz obj/from-xc/
+    - name: upload self-xc archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: xc-host-fasls
+        path: self-host-fasls.tgz
+
   compare-xc-host-fasls:
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [ccl, sbcl, cmucl, clisp]
+    needs: [ccl, sbcl, cmucl, clisp, self]
+
+    strategy:
+      matrix:
+        host: [ccl, clisp]
+        or: [false]
+        include:
+        - { host: cmucl, or: true }
+        - { host: self, or: true }
+
+      fail-fast: false
 
     steps:
     - name: download xc-host fasls
@@ -161,12 +198,8 @@ jobs:
         name: xc-host-fasls
     - name: extract xc-host fasls
       run: |
-        tar xf ccl-host-fasls.tgz
         tar xf sbcl-host-fasls.tgz
-        tar xf clisp-host-fasls.tgz
-        tar xf cmucl-host-fasls.tgz
+        tar xf ${{ matrix.host }}-host-fasls.tgz
     - name: compare xc-host fasls
       run: |
-        diff -ur sbcl-host/ ccl-host/
-        diff -ur sbcl-host/ clisp-host/
-        diff -ur sbcl-host/ cmucl-host/ || true
+        diff -ur sbcl-host/ ${{ matrix.host }}-host/ || ${{ matrix.or }}
