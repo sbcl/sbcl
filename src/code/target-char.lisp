@@ -43,17 +43,45 @@
 (eval-when (:compile-toplevel)
   (defconstant +misc-width+ 9)
   (defmacro misc-index-from-char-code (codepoint high-pages low-pages)
-    `(let* ((cp ,codepoint)
-            (cp-high (ash cp -8))
-            (high-index (aref ,high-pages cp-high)))
-       (if (logbitp 15 high-index)
-           (* ,+misc-width+ (clear-flag 15 high-index))
-           (* ,+misc-width+ (aref ,low-pages (* 2 (+ (ldb (byte 8 0) cp) (ash high-index 8))))))))
+    (let ((high-pages-value (and (boundp high-pages)
+                                 (symbol-value high-pages)))
+          (low-pages-value (and (boundp low-pages)
+                                (symbol-value low-pages))))
+      `(let* ((cp ,codepoint)
+              (cp-high (ash cp -8))
+              (high-index (aref ,high-pages cp-high)))
+         (* ,+misc-width+
+            (if (logbitp 15 high-index)
+                (truly-the
+                 (integer 0
+                          ,(if high-pages-value
+                               (loop for x across high-pages-value
+                                     when (logbitp 15 x)
+                                     maximize (clear-flag 15 x))
+                               '*))
+                 (clear-flag 15 high-index))
+                (truly-the
+                 (integer 0
+                          ,(if low-pages-value
+                               (loop for i below (length low-pages-value) by 2
+                                     maximize
+                                     (aref low-pages-value i))
+                               '*))
+                 (aref ,low-pages
+                       (* 2 (+ (ldb (byte 8 0) cp)
+                               (ash (truly-the
+                                     (integer 0
+                                              ,(if high-pages-value
+                                                   (loop for x across high-pages-value
+                                                         unless (logbitp 15 x)
+                                                         maximize x)
+                                                   '*))
+                                     high-index)
+                                    8))))))))))
   (setf (sb-xc:macro-function 'misc-index-from-char-code)
         (lambda (form env)
           (declare (ignore env))
-          (funcall (cl:macro-function 'misc-index-from-char-code) form nil)))
-)
+          (funcall (cl:macro-function 'misc-index-from-char-code) form nil))))
 
 (macrolet ((frob ()
              (flet ((file (name type)
