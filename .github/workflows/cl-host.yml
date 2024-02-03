@@ -45,7 +45,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: instal host clisp
+    - name: install host clisp
       run: |
         sudo apt-get -qq update | true
         sudo apt-get -qq install clisp git-restore-mtime
@@ -70,7 +70,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: instal host ccl
+    - name: install host ccl
       run: |
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/ccl-host.tgz
         tar xf ccl-host.tgz
@@ -97,7 +97,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: instal host cmucl
+    - name: install host cmucl
       run: |
         mkdir cmucl
         cd cmucl
@@ -130,7 +130,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: instal host sbcl
+    - name: install host sbcl
       run: |
         sudo apt-get -qq update | true
         sudo apt-get -qq install sbcl libcapstone-dev git-restore-mtime
@@ -168,5 +168,5 @@ jobs:
     - name: compare xc-host fasls
       run: |
         diff -ur sbcl-host/ ccl-host/
-        diff -ur sbcl-host/ clisp-host/ || true
+        diff -ur sbcl-host/ clisp-host/
         diff -ur sbcl-host/ cmucl-host/ || true
