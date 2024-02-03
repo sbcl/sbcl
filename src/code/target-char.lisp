@@ -408,10 +408,9 @@
                              sb-unicode::+character-high-pages+
                              sb-unicode::+character-low-pages+))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (aver (csubtypep (global-ftype 'misc-index)
-                   (specifier-type '(sfunction (t) (unsigned-byte 16)))))
-  (proclaim `(ftype ,(type-specifier (global-ftype 'misc-index)) misc-index)))
+(aver (csubtypep (global-ftype 'misc-index)
+                 (specifier-type '(sfunction (t) (unsigned-byte 16)))))
+(proclaim `(ftype ,(type-specifier (global-ftype 'misc-index)) misc-index))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category)
          (inline ucd-general-category))
@@ -626,11 +625,16 @@ is either numeric or alphabetic."
                    (aref #.+character-case-pages+ shifted))))
     (if (= page 255)
         code
-        (let ((down-code
-                (aref #.+character-cases+
-                      (* (+ (ash page 6)
-                            (ldb (byte 6 0) code))
-                         2))))
+        (let* ((page (truly-the (integer 0
+                                         #.(loop for x across +character-case-pages+
+                                                 unless (= x 255)
+                                                 maximize x))
+                                page))
+               (down-code
+                 (aref #.+character-cases+
+                       (* (+ (ash page 6)
+                             (ldb (byte 6 0) code))
+                          2))))
           (if (zerop down-code)
               code
               down-code)))))
