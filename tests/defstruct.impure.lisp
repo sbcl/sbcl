@@ -1378,7 +1378,7 @@ redefinition."
 ;; The word order for halves of double-floats on 32-bit platforms
 ;; should match the platform's native order.
 (defun compare-memory (obj1 obj1-word-ofs obj2 obj2-word-ofs n-words)
-  (with-pinned-objects (obj1 obj2)
+  (sb-sys:with-pinned-objects (obj1 obj2)
     (let ((sap1 (int-sap (logandc2 (get-lisp-obj-address obj1) sb-vm:lowtag-mask)))
           (sap2 (int-sap (logandc2 (get-lisp-obj-address obj2) sb-vm:lowtag-mask))))
       (dotimes (i n-words)
