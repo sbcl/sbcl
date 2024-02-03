@@ -2424,12 +2424,18 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; COLD-LOAD loads stuff into the core image being built by calling
 ;;; LOAD-AS-FASL with the fop function table rebound to a table of cold
 ;;; loading functions.
-(defun cold-load (filename verbose)
+(defun cold-load (filename verbose show-fops-p)
   "Load the file named by FILENAME into the cold load image being built."
   (when verbose
     (write-line (namestring filename)))
   (with-open-file (s filename :element-type '(unsigned-byte 8))
-    (load-as-fasl s nil nil)))
+    (if show-fops-p
+        (with-open-file (f (make-pathname :type "foptrace" :defaults filename)
+                           :direction :output :if-exists :supersede)
+          (let ((sb-fasl::*show-fops-p* t)
+                (*trace-output* f))
+            (load-as-fasl s nil nil)))
+        (load-as-fasl s nil nil))))
 
 ;;;; miscellaneous cold fops
 
@@ -4004,7 +4010,7 @@ III. initially undefined function references (alphabetically):
 ;;;   CORE-FILE-NAME gets a Lisp core.
 ;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
-(defun sb-cold:genesis (&key object-file-names tls-init
+(defun sb-cold:genesis (&key object-file-names foptrace-file-names tls-init
                              defstruct-descriptions
                              build-id
                              core-file-name c-header-dir-name map-file-name
@@ -4115,7 +4121,7 @@ III. initially undefined function references (alphabetically):
           ;; There should be exactly 1 assembler file, and 1 code object in it.
           (when files ; But it's present only in 2nd genesis.
             (aver (singleton-p files))
-            (cold-load (car files) verbose)))
+            (cold-load (car files) verbose nil)))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
       (mapc 'funcall *deferred-undefined-tramp-refs*)
       (makunbound '*deferred-undefined-tramp-refs*)
@@ -4144,7 +4150,7 @@ III. initially undefined function references (alphabetically):
       (dolist (file-name object-file-names)
         (push (cold-cons :begin-file (string-literal-to-core file-name))
               *!cold-toplevels*)
-        (cold-load file-name verbose))
+        (cold-load file-name verbose (find file-name foptrace-file-names :test 'equal)))
 
       (sb-cold::check-no-new-cl-symbols)
 

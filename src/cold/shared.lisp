@@ -426,8 +426,7 @@
 ;;;; master list of source files and their properties
 
 ;;; flags which can be used to describe properties of source files
-(defparameter
-  *expected-stem-flags*
+(defparameter *expected-stem-flags*
   '(;; meaning: This file is needed to generate C headers if doing so
     ;; independently of make-host-1
     :c-headers
@@ -446,6 +445,10 @@
     ;; of exciting low-level information about representation selection,
     ;; VOPs used by the compiler, and bits of assembly.
     :trace-file
+    ;; meaning: When cold-loading this file while producing the
+    ;; initial cold core, genesis should produce a trace file of the
+    ;; fops (fasl operations) executed.
+    :foptrace-file
     ;; meaning: The #'COMPILE-STEM argument :BLOCK-COMPILE should be
     ;; T. That is, the entire file will be block compiled. Like
     ;; :TRACE-FILE, this applies to all COMPILE-FILEs which support
