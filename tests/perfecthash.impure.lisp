@@ -30,7 +30,7 @@
                       symbols))
          (n (length hashes))
          (expr1 (sb-c:make-perfect-hash-lambda hashes))
-         (expr2 (sb-c:make-perfect-hash-lambda hashes nil))
+         (expr2 (sb-c:make-perfect-hash-lambda hashes nil nil))
          (fun1 (compile nil expr1))
          (fun2 (compile nil expr2))
          (range1 (map 'list fun1 hashes))
