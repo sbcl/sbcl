@@ -1379,11 +1379,11 @@ redefinition."
 ;; should match the platform's native order.
 (defun compare-memory (obj1 obj1-word-ofs obj2 obj2-word-ofs n-words)
   (sb-sys:with-pinned-objects (obj1 obj2)
-    (let ((sap1 (int-sap (logandc2 (get-lisp-obj-address obj1) sb-vm:lowtag-mask)))
-          (sap2 (int-sap (logandc2 (get-lisp-obj-address obj2) sb-vm:lowtag-mask))))
+    (let ((sap1 (sb-sys:int-sap (logandc2 (sb-kernel:get-lisp-obj-address obj1) sb-vm:lowtag-mask)))
+          (sap2 (sb-sys:int-sap (logandc2 (sb-kernel:get-lisp-obj-address obj2) sb-vm:lowtag-mask))))
       (dotimes (i n-words)
-        (let ((w1 (sap-ref-32 sap1 (ash (+ obj1-word-ofs i) sb-vm:word-shift)))
-              (w2 (sap-ref-32 sap2 (ash (+ obj2-word-ofs i) sb-vm:word-shift))))
+        (let ((w1 (sb-sys:sap-ref-32 sap1 (ash (+ obj1-word-ofs i) sb-vm:word-shift)))
+              (w2 (sb-sys:sap-ref-32 sap2 (ash (+ obj2-word-ofs i) sb-vm:word-shift))))
           (assert (= w1 w2)))))))
 
 (defstruct struct-df (a pi :type double-float))
@@ -1395,7 +1395,7 @@ redefinition."
 (defvar *acdf* (make-array 1 :element-type '(complex double-float)
                              :initial-element *c*))
 
-(test-util:with-test (:name :dfloat-endianness
+(with-test (:name :dfloat-endianness
                       :skipped-on (not (or :mips :x86))) ; only tested on these
   (compare-memory pi 2 *adf* 2 2) ; Array
   (compare-memory pi 2 (make-struct-df) 2 2) ; Structure
@@ -1403,7 +1403,7 @@ redefinition."
   (compare-memory *c* 2 *acdf* 2 4) ; Array
   (compare-memory *c* 2 (make-struct-cdf) 2 4)) ; Structure
 
-(test-util:with-test (:name :recklessly-continuable-defstruct)
+(with-test (:name :recklessly-continuable-defstruct)
   (flet ((redefine-defstruct (from to)
            (eval from)
            (handler-bind
@@ -1425,7 +1425,7 @@ redefinition."
              '(defstruct redefinable (a nil :type symbol))
              '(defstruct redefinable (a nil :type cons))))))
 
-(test-util:with-test (:name :non-total-satisfies-predicate)
+(with-test (:name :non-total-satisfies-predicate)
   ;; This definition is perfectly fine as long as you always pass
   ;; only numbers to the constructor.
   ;; In particular, the macroexpander must not test whether a random
@@ -1435,7 +1435,7 @@ redefinition."
 
 
 (defstruct foo4130 bar)
-(test-util:with-test (:name :duplicated-slot-names)
+(with-test (:name :duplicated-slot-names)
       (flet ((assert-that (expect form)
                (multiple-value-bind (ret error) (ignore-errors (eval form))
                  (assert (not ret))
@@ -1446,7 +1446,7 @@ redefinition."
     (assert-that "slot name BAR duplicated via included FOO4130"
                  `(defstruct (foo4132 (:include foo4130)) bar))))
 
-(test-util:with-test (:name :specialized-equalp)
+(with-test (:name :specialized-equalp)
   ;; make sure we didn't mess up PATHNAME and HASH-TABLE
   (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'pathname))))
     (assert (eq f #'sb-int:pathname=)))
@@ -1456,7 +1456,7 @@ redefinition."
 (defstruct (badbuf (:constructor make-badbuf ()))
   (str (make-string 128) :type (simple-array character (128))))
 
-(test-util:with-test (:name :make-string-type-inference)
+(with-test (:name :make-string-type-inference)
   (let ((things (ctu:find-code-constants #'make-badbuf :type 'list)))
     (assert (not things))))
 
