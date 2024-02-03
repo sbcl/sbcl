@@ -110,13 +110,13 @@ with underscores replaced by dashes."
       form))
 
 (eval-when (:compile-toplevel)
-  (defvar *slurped-random-constants*
-    (read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))
   (defun read-ucd-constant (symbol)
-    (map 'vector
-         (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
-         (or (cadr (assoc symbol *slurped-random-constants*))
-             (error "Missing entry in more-ucd-consts for ~S" symbol)))))
+    (let ((more-ucd-consts (load-time-value
+                            (read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))))
+      (map 'vector
+           (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
+           (or (cadr (assoc symbol more-ucd-consts))
+               (error "Missing entry in more-ucd-consts for ~S" symbol))))))
 
 (declaim (inline svref-or-null))
 (defun svref-or-null (vector index)
