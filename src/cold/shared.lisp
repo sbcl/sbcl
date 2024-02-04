@@ -231,7 +231,11 @@
            (unuse-package ext "CL-USER")))
 
 #+cmu
-(setq cl:*compile-print* nil) ; too much noise, can't see the actual warnings
+(progn
+  ;; too much noise, can't see the actual warnings
+  (setq cl:*compile-print* nil
+        ext:*gc-verbose* nil))
+
 #+sbcl
 (progn
   (setq cl:*compile-print* nil)
