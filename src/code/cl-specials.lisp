@@ -170,7 +170,7 @@
 ;;; Ensure some VM symbols get wired TLS.
 (in-package "SB-VM")
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (dolist (entry '#.(copy-tree per-thread-c-interface-symbols))
+  (dolist (entry '#.per-thread-c-interface-symbols)
     (let ((symbol (if (consp entry) (car entry) entry)))
       (declare (notinline sb-int:info (setf sb-int:info)))
       ;; CURRENT-{CATCH/UWP}-BLOCK are thread slots,

@@ -192,23 +192,23 @@
 ;;; On #+sb-thread builds, these are not static, because access to them
 ;;; is via the TLS, not the symbol.
 (defconstant-eqx per-thread-c-interface-symbols
-  `((*free-interrupt-context-index* 0)
-    (sb-sys:*allow-with-interrupts* t)
-    (sb-sys:*interrupts-enabled* t)
-    sb-sys:*interrupt-pending*
-    #+sb-safepoint sb-sys:*thruption-pending*
-    *in-without-gcing*
-    *gc-inhibit*
-    *gc-pending*
-    #+sb-safepoint sb-impl::*in-safepoint*
-    #+sb-thread *stop-for-gc-pending*
-    sb-impl::*unweakened-vectors*
-    *pinned-objects*
-    (*gc-pin-code-pages* 0)
-    ;; things needed for non-local-exit
-    (*current-catch-block* 0)
-    (*current-unwind-protect-block* 0)
-    )
+    (hash-cons
+     '((*free-interrupt-context-index* 0)
+       (sb-sys:*allow-with-interrupts* t)
+       (sb-sys:*interrupts-enabled* t)
+       sb-sys:*interrupt-pending*
+       #+sb-safepoint sb-sys:*thruption-pending*
+       *in-without-gcing*
+       *gc-inhibit*
+       *gc-pending*
+       #+sb-safepoint sb-impl::*in-safepoint*
+       #+sb-thread *stop-for-gc-pending*
+       sb-impl::*unweakened-vectors*
+       *pinned-objects*
+       (*gc-pin-code-pages* 0)
+       ;; things needed for non-local-exit
+       (*current-catch-block* 0)
+       (*current-unwind-protect-block* 0)))
   #'equal)
 
 (defconstant-eqx +common-static-symbols+
