@@ -183,11 +183,10 @@ jobs:
 
     strategy:
       matrix:
-        host: [ccl, clisp]
+        host: [ccl, clisp, self]
         or: [false]
         include:
         - { host: cmucl, or: true }
-        - { host: self, or: true }
 
       fail-fast: false
 

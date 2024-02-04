@@ -3149,7 +3149,7 @@ possibly temporarily, because it might be used internally.")
            "POWER-OF-TWO-CEILING"
            "PRINT-NOT-READABLE-ERROR"
            "HASH-TABLE-REPLACE"
-           "RECONS"
+           "HASH-CONS" "RECONS"
            "SET-CLOSURE-NAME"
 
             ;; ..and macros..

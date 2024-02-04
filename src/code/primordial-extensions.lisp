@@ -314,6 +314,21 @@
   `(defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
 
+;;; utility for coalescing list substructure in quoted constants, for
+;;; ease of guarding against differences in host compilers with
+;;; respect to coalescing structure in (host) fasl files, which might
+;;; then be used in compiling the target.
+(defun hash-cons (list)
+  (declare (type list list))
+  (let ((table (make-hash-table :test 'equal)))
+    (labels ((hc (thing)
+               (cond
+                 ((atom thing) thing)
+                 ((gethash thing table))
+                 (t (setf (gethash thing table)
+                          (cons (hc (car thing)) (hc (cdr thing))))))))
+      (hc list))))
+
 ;;; These are shorthand.
 ;;; If in some policy we decide to open-code MEMBER, there should be
 ;;; no discernable difference between MEMQ and (MEMBER ... :test 'EQ).
