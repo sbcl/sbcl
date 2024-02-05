@@ -1,1 +1,0 @@
-:avx2 :gencgc :sb-simd-pack :sb-simd-pack-256 :little-endian :immobile-space

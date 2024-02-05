@@ -935,11 +935,18 @@
 
 ;;; A separate file is used for each possible value of N-FIXNUM-BITS.
 ;;; Therefore any particular set of symbols appears at most once per file.
-(defun perfect-hash-generator-journal ()
-  (let ((bits (symbol-value (intern "N-FIXNUM-BITS" "SB-VM"))))
-    (ecase bits
-      ((30 61 63)
-       (format nil "xperfecthash~D.lisp-expr" bits)))))
+(defun perfect-hash-generator-journal (direction)
+  (let* ((bits (symbol-value (intern "N-FIXNUM-BITS" "SB-VM")))
+         (stem (ecase bits
+                 ((30 61 63)
+                  (format nil "xperfecthash~D.lisp-expr" bits)))))
+    (ecase direction
+      (:input stem)
+      (:output (if (search "/xbuild/" *host-obj-prefix*)
+                   ;; parallel build writes to a subdirectory
+                   (concatenate 'string sb-cold::*host-obj-prefix* stem)
+                   ;; normal build writes the file in place
+                   stem)))))
 
 (defun perfect-hash-generator-program ()
   ;; The path depends on what the host is, not what the target is
@@ -1098,9 +1105,8 @@
         (assert (not (gethash array uniqueness-checker)))
         (setf (gethash array uniqueness-checker) t))))
   #+use-host-hash-generator
-  (when (and (eq *perfect-hash-generator-mode* :record)
-             (not (search "/xbuild/" *host-obj-prefix*)))
-    (with-open-file (stream (perfect-hash-generator-journal)
+  (when (eq *perfect-hash-generator-mode* :record)
+    (with-open-file (stream (perfect-hash-generator-journal :output)
                             :direction :output
                             :if-exists :supersede :if-does-not-exist :create)
       (write-string "(

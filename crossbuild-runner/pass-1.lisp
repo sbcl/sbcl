@@ -1,8 +1,19 @@
 ;; (setq *default-pathname-defaults* #p"") ; FIXME: causes redefinition warnings!
-(let* ((target-name (second sb-ext:*posix-argv*))
-       (build-dir (format nil "obj/xbuild/~A/" target-name))
+(sb-int:binding*
+      (((configuration-name target-name features)
+        (destructuring-bind (first second third) (cdr *posix-argv*)
+          (values first second third)))
+       (arch-symbol (intern (string-upcase target-name) "KEYWORD"))
+       (os-features (case arch-symbol ; ToDO: specify these in the control file
+                      (:sparc ":unix :sunos :elf")
+                      ((:x86 :x86-64) ":win32 :sb-thread :sb-safepoint")
+                      (t ":unix :linux :elf")))
+       ;; TODO: allow subtractive features too
+       (add-features (read-from-string features))
+       (build-dir (format nil "obj/xbuild/~A/" configuration-name))
        (ltf (format nil "~A/local-target-features" build-dir))
        (objroot (format nil "~A/from-host/" build-dir)))
+  ;; (format t "~&added features: ~S~%" add-features)
   (ensure-directories-exist objroot)
   (defvar *sbcl-host-obj-prefix* objroot)
   (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
@@ -13,15 +24,11 @@
   (with-open-file (*standard-output* ltf :direction :output
                                      :if-does-not-exist :create
                                      :if-exists :supersede)
-    (let ((target-symbol (intern (string-upcase target-name) "KEYWORD")))
-      (format t "(lambda (features) (union features (list :crossbuild-test :os-provides-dlopen ~s ~a~%"
-              target-symbol
-              (case target-symbol
-                (:sparc ":unix :sunos :elf")
-                ((:x86 :x86-64) ":win32 :sb-thread :sb-safepoint")
-                (t ":unix :linux :elf"))))
+    (format t "(lambda (features)
+(union features (list :crossbuild-test :os-provides-dlopen ~s ~a~{ ~s~}~%"
+            arch-symbol os-features add-features)
     ;; "features" contains the mandatory set of symbols for any build of that target.
-    (dolist (features-filename '("features" "local-target-features"))
+    (let ((features-filename "features"))
       (with-open-file (f (format nil "crossbuild-runner/backends/~a/~a"
                                  target-name features-filename))
         (let ((string (make-string (file-length f))))

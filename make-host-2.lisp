@@ -12,7 +12,7 @@
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)
 ;;; Set up the perfect hash generator for the target's value of N-FIXNUM-BITS.
-(preload-perfect-hash-generator (perfect-hash-generator-journal))
+(preload-perfect-hash-generator (perfect-hash-generator-journal :input))
 
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)
