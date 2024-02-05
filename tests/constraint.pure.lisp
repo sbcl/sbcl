@@ -1154,3 +1154,21 @@
                         (svref v (mod i (length v))))
                      nil))
              0)))
+
+(with-test (:name :index-ranges)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (a)
+                        (when (= (length a) 2)
+                          (svref a 1)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (a l i)
+                        (declare ((integer 2 3) l)
+                                 ((integer 0 1) i))
+                        (when (= (length a) l)
+                          (svref a i)))
+                     nil))
+             0)))
