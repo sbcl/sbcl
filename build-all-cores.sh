@@ -2,7 +2,6 @@
 ./run-sbcl.sh --noprint --disable-debugger $* <<\EOF
 (defvar *configs-to-build* (cdr *posix-argv*))
 
-;;; TODO: allow this to be specified on the command line
 (defparameter *jobs*
   (max 1
        #+unix
@@ -11,7 +10,22 @@
                                       (function sb-alien:long sb-alien:int))
                sb-unix::sc-nprocessors-onln)
               2)))
-(format t "~&Using up to ~D job~:P~%" *jobs*)
+
+(let ((first (car *configs-to-build*)))
+  (if (and (stringp first)
+           (>= (length first) 2)
+           (string= first "-j" :end1 2))
+      ;; allow "-jN" as two args
+      (cond ((= (length first) 2)
+             (pop *configs-to-build*)
+             (setq *jobs* (parse-integer (pop *configs-to-build*))))
+            ((digit-char-p (char first 2)) ; or "-jN" as one arg
+             (setq *jobs* (parse-integer first :start 2))
+             (pop *configs-to-build*))
+            (t
+             (error "-j requires a number")))))
+
+(when (> *jobs* 1) (format t "~&Using up to ~D job~:P~%" *jobs*))
 
 ;;; I should probably have a way to add a fixed set of features in
 ;;; for an architecture, such as :LITTLE-ENDIAN for x86{-64}.
@@ -102,6 +116,7 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
                       *all-configurations*))))
 
 (ensure-directories-exist "obj/xbuild/")
+;; if it's just one target this could exec() instead
 (defvar *process*
   (run-program "make"
                `(,(format nil "-j~D" *jobs*)

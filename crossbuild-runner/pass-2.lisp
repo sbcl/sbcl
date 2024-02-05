@@ -9,11 +9,13 @@
   (defparameter *host-obj-prefix* (format nil "~A/from-host/" build-dir))
   (defparameter *target-obj-prefix* objroot)
   (defparameter *build-dependent-generated-sources-root* objroot)
-  (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
-                              :if-does-not-exist :create :if-exists :supersede)
-        sb-sys:*stderr* (open (format nil "~A/stderr" objroot) :direction :output
-                              :if-does-not-exist :create :if-exists :supersede)))
-(setf (sb-impl::fd-stream-buffering sb-sys:*stdout*) :line)
+  (let ((makeflags (sb-ext:posix-getenv "MAKEFLAGS")))
+    (when (search "--jobserver-fds" makeflags)
+      (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
+                                  :if-does-not-exist :create :if-exists :supersede)
+            sb-sys:*stderr* (open (format nil "~A/stderr" objroot) :direction :output
+                                  :if-does-not-exist :create :if-exists :supersede))
+      (setf (sb-impl::fd-stream-buffering sb-sys:*stdout*) :line))))
 (load "src/cold/set-up-cold-packages.lisp")
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)

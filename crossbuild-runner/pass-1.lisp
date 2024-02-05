@@ -12,10 +12,12 @@
   ;; (format t "~&added features: ~S~%" add-features)
   (ensure-directories-exist objroot)
   (defvar *sbcl-host-obj-prefix* objroot)
-  (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
-                              :if-does-not-exist :create :if-exists :supersede)
-        sb-sys:*stderr* (open (format nil "~A/stderr" objroot) :direction :output
-                              :if-does-not-exist :create :if-exists :supersede))
+  (let ((makeflags (sb-ext:posix-getenv "MAKEFLAGS")))
+    (when (search "--jobserver-fds" makeflags)
+      (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
+                                  :if-does-not-exist :create :if-exists :supersede)
+            sb-sys:*stderr* (open (format nil "~A/stderr" objroot) :direction :output
+                                  :if-does-not-exist :create :if-exists :supersede))))
   (defvar *sbcl-local-target-features-file* ltf)
   (with-open-file (*standard-output* ltf :direction :output
                                      :if-does-not-exist :create
