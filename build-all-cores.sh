@@ -25,10 +25,15 @@
               ("ppc-thread" :big-endian :sb-thread))
     ("ppc64"  ("ppc64" :ppc64 :big-endian)) ; sb-thread is the default and required
     ("riscv"  ("riscv" :64-bit :little-endian :sb-thread))
-    ("sparc"  ("sparc" :big-endian))
+    ("sparc"  ("sparc-sunos" :big-endian :unix :sunos :elf)
+              ("sparc-linux" :big-endian :unix :linux :elf))
     ("x86"    ("x86" :little-endian :largefile)
-              ("x86-thread" :little-endian :largefile :sb-thread))
+              ("x86-thread" :little-endian :largefile :sb-thread)
+              ("x86-linux" :little-endian :largefile :sb-thread :linux :unix :elf :sb-thread))
     ("x86-64" ("x86-64" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256)
+              ("x86-64-linux" :linux :unix :elf :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256)
+              ("x86-64-darwin" :darwin :bsd :unix :elf :little-endian :avx2 :gencgc
+                               :sb-simd-pack :sb-simd-pack-256)
               ("x86-64-imm" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
                             :immobile-space)
               ("x86-64-permgen" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
@@ -50,6 +55,15 @@
            (fragments (the string (cdr pair)))
            (setq start (1+ end))))))))
 
+(defun add-os-features (arch features)
+  (if (intersection '(:unix :win32) features)
+      features
+      (let* ((arch-symbol (sb-int:keywordicate (string-upcase arch)))
+             (os-features (case arch-symbol
+                            ((:x86 :x86-64) '(:win32 :sb-thread :sb-safepoint))
+                            (t '(:unix :linux :elf)))))
+        (append os-features features))))
+
 ;;; TODOs:
 ;;; 1) Consider not rewriting Makefile if nothing changed. Write to a temp file first
 ;;;    and switch it out when different. On the other hand, isn't this the same problem
@@ -68,6 +82,7 @@ DEPS1=crossbuild-runner/pass-1.lisp src/cold/build-order.lisp-expr~%")
   (dolist (arch+configs *all-configurations*)
     (dolist (config (cdr arch+configs))
       (destructuring-bind (config-name . features) config
+        (setq features (add-os-features (car arch+configs) features))
         (format makefile
                 (interpolate
                  "~%obj/xbuild/{cfg}/xc.core: $(DEPS1)
@@ -76,7 +91,8 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
 	$(SBCL) $(ARGS) {cfg} < $(SCRIPT2)~%"
                  `(("cfg" . ,config-name)
                    ("arch" . ,(car arch+configs))
-                   ("feat" . ,(write-to-string features))))
+                   ;; features string can't contain a #\newline
+                   ("feat" . ,(write-to-string features :pretty nil))))
                 )))))
 
 (defun corefiles ()
@@ -86,11 +102,22 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
                       *all-configurations*))))
 
 (ensure-directories-exist "obj/xbuild/")
-(run-program "make"
-             `(,(format nil "-j~D" *jobs*)
-               "-k"
-               "-fcrossbuild-runner/Makefile"
-               ,@(corefiles))
-             :output t :error t
-             :search t)
+(defvar *process*
+  (run-program "make"
+               `(,(format nil "-j~D" *jobs*)
+                 "-k"
+                 "-fcrossbuild-runner/Makefile"
+                 ,@(corefiles))
+               :output t :error t
+               :search t))
+(when (= (process-exit-code *process*) 0)
+  (load "src/cold/shared" :verbose t)
+  ;; TODO: merge the xfloat-math files, unless we decide to get rid of them
+  (dolist (nbits '(30 61 63))
+    (let* ((filename (format nil "xperfecthash~D.lisp-expr" nbits))
+           (sources (directory (format nil "obj/xbuild/*/from-xc/~A" filename))))
+      (when sources
+        (funcall (intern "UPDATE-PERFECT-HASHFUNS" "SB-COLD")
+                 sources filename))))
+  (format t "~&Success~%"))
 EOF

@@ -889,7 +889,7 @@
   ;; on top of the source file. For more than one, we could either merge them
   ;; or just ignore any modifications.
   (let* ((base "xfloat-math.lisp-expr")
-         (local (concatenate 'string sb-cold::*host-obj-prefix* base)))
+         (local (concatenate 'string *host-obj-prefix* base)))
     (pathname
      (ecase direction
        (:input (if (probe-file local) local base))
@@ -944,7 +944,7 @@
       (:input stem)
       (:output (if (search "/xbuild/" *host-obj-prefix*)
                    ;; parallel build writes to a subdirectory
-                   (concatenate 'string sb-cold::*host-obj-prefix* stem)
+                   (concatenate 'string *target-obj-prefix* stem)
                    ;; normal build writes the file in place
                    stem)))))
 
@@ -1097,6 +1097,46 @@
 ;;; hashes for NIL. Like without sb-thread, there will be an alloc-region
 ;;; placed in static space below NIL which shifts NIL's address higher,
 ;;; which changes its hash.
+(defun save-perfect-hashfuns (pathname entries)
+  (with-open-file (*standard-output* pathname
+                   :direction :output
+                   :if-exists :supersede
+                   :if-does-not-exist :create)
+    (write-string "(
+")
+    (let ((*print-pretty* t) (*print-length* nil) (*print-level* nil)
+          (*print-lines* nil) (*print-right-margin* 128))
+      (dolist (entry entries)
+        (destructuring-bind ((digest . array) identifier . string) entry
+          (declare (ignore digest))
+          (unless (stringp identifier)
+            ;; If this entry was read from the file, it's already a string
+            (setq identifier
+                  (let ((*package* (find-package "SB-KERNEL")))
+                    (write-to-string identifier :escape :t :pretty nil))))
+          (format t "(~X~% ~S~% ~S)~%" array identifier string))))
+    (write-string ")
+;; EOF
+")))
+(compile 'save-perfect-hashfuns)
+
+(defun update-perfect-hashfuns (sources destination)
+  (flet ((load-file (pathname)
+           (mapcar (lambda (entry)
+                     (destructuring-bind (array identifier expression) entry
+                       (setq array (coerce array '(simple-array (unsigned-byte 32) (*))))
+                       (assert (equalp array (sort (copy-seq array) #'<)))
+                       (let ((digest (reduce #'logxor array)))
+                         (list* (cons digest array) identifier expression))))
+                   (with-open-file (stream pathname)
+                     (let ((*read-base* 16)) (read stream))))))
+    (let ((entries (load-file destination)))
+      (dolist (source sources)
+        (dolist (entry (load-file source))
+          (unless (assoc (car entry) entries :test #'equalp)
+            (nconc entries (list entry)))))
+      (save-perfect-hashfuns destination entries))))
+
 (defun maybe-save-perfect-hashfuns-for-playback ()
   ;; Check again for corruption
   (let ((uniqueness-checker (make-hash-table :test 'equalp)))
@@ -1106,26 +1146,8 @@
         (setf (gethash array uniqueness-checker) t))))
   #+use-host-hash-generator
   (when (eq *perfect-hash-generator-mode* :record)
-    (with-open-file (stream (perfect-hash-generator-journal :output)
-                            :direction :output
-                            :if-exists :supersede :if-does-not-exist :create)
-      (write-string "(
-" stream)
-      (let ((*print-pretty* t) (*print-length* nil) (*print-level* nil)
-            (*print-lines* nil) (*print-right-margin* 128)
-            (*standard-output* stream))
-        (dolist (entry *perfect-hash-generator-memo*)
-          (destructuring-bind ((digest . array) identifier . string) entry
-            (declare (ignore digest))
-            (unless (stringp identifier)
-              ;; If this entry was read from the file, it's already a string
-              (setq identifier
-                    (let ((*package* (find-package "SB-KERNEL")))
-                      (write-to-string identifier :escape :t :pretty nil))))
-            (format t "(~X~% ~S~% ~S)~%" array identifier string))))
-      (write-string ")
-;; EOF
-" stream)))
+    (save-perfect-hashfuns (perfect-hash-generator-journal :output)
+                           *perfect-hash-generator-memo*))
   t)
 
 ;;;; Please avoid writing "consecutive" (un-nested) reader conditionals

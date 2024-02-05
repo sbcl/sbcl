@@ -4,10 +4,6 @@
         (destructuring-bind (first second third) (cdr *posix-argv*)
           (values first second third)))
        (arch-symbol (intern (string-upcase target-name) "KEYWORD"))
-       (os-features (case arch-symbol ; ToDO: specify these in the control file
-                      (:sparc ":unix :sunos :elf")
-                      ((:x86 :x86-64) ":win32 :sb-thread :sb-safepoint")
-                      (t ":unix :linux :elf")))
        ;; TODO: allow subtractive features too
        (add-features (read-from-string features))
        (build-dir (format nil "obj/xbuild/~A/" configuration-name))
@@ -25,8 +21,8 @@
                                      :if-does-not-exist :create
                                      :if-exists :supersede)
     (format t "(lambda (features)
-(union features (list :crossbuild-test :os-provides-dlopen ~s ~a~{ ~s~}~%"
-            arch-symbol os-features add-features)
+(union features (list :crossbuild-test :os-provides-dlopen ~s~{ ~s~}~%"
+            arch-symbol add-features)
     ;; "features" contains the mandatory set of symbols for any build of that target.
     (let ((features-filename "features"))
       (with-open-file (f (format nil "crossbuild-runner/backends/~a/~a"

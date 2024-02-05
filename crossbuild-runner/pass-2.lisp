@@ -24,8 +24,15 @@
 (host-sb-int:encapsulate 'stem-source-path 'wrap
   (lambda (realfun stem)
     (if (string= stem "output/stuff-groveled-from-headers")
-        (format nil "crossbuild-runner/backends/~a/stuff-groveled-from-headers.lisp"
-                (string-downcase (sb-cold::target-platform-keyword)))
+        (let* ((arch (string-downcase (sb-cold::target-platform-keyword)))
+               (guess
+                (format nil "crossbuild-runner/backends/~a/stuff-groveled-from-headers.lisp"
+                        arch)))
+          (cond ((probe-file guess) guess)
+                ((member :win32 sb-xc:*features*)
+                 (format nil "crossbuild-runner/backends/~a/win32-headers.lisp" arch))
+                (t
+                 (format nil "crossbuild-runner/backends/~a/posix-headers.lisp" arch))))
         (funcall realfun stem))))
 
 (format t "~&Target features: ~S~%" sb-xc:*features*)
