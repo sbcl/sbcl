@@ -487,7 +487,9 @@
 (with-test (:name :position-empty-seq)
   (assert (not (funcall (checked-compile '(lambda (x) (position x #()))) 1))))
 
-(with-test (:name :hash-based-memq)
+;;; I'm keeping this not-very-great test so that if I decide to re-allow hash collisions
+;;; in the hash-based MEMBER transform, then there's already a test for it.
+(with-test (:name :hash-based-memq :skipped-on :sbcl)
   (let* ((f (checked-compile
              '(lambda (x)
                (if (member x '(:and :or :not and or not)) t nil))))

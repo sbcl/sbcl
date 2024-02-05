@@ -22,6 +22,12 @@
 ;;;; purposes of cross-compiling. A problem is namespace clobbering:
 ;;;; these must not affect the host Lisp.
 
+;; This macro is needed right away because of "stealth" use in transforms that
+;; can fire during compilation of TLFs appearing later in this same file.
+;; TODO: mask out pseudo-random bits from SYMBOL-HASH (when I implement that).
+;; Or it will be a vop that extracts a half-lisp-word-sized quantity.
+(defmacro symbol-name-hash (s) `(symbol-hash ,s))
+
 ;;; The function that corresponds to this macro is defined in src/code/typep.
 ;;; This expansion is not particularly good for the interpreter, so just
 ;;; call the function when not compiling.
@@ -88,7 +94,3 @@
             (push (list var (pop keys)) bind))))))
 
 (defmacro def!struct (&rest args) `(defstruct ,@args))
-
-;; TODO: mask out pseudo-random bits from SYMBOL-HASH (when I implement that).
-;; Or it will be a vop that extracts a half-lisp-word-sized quantity.
-(defmacro symbol-name-hash (s) `(symbol-hash ,s))
