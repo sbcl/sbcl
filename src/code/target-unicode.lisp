@@ -47,6 +47,41 @@
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
             '#.(plist-to-alist (read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
+(defmacro find-in-perfect-hashmap (x filename value-type value-getter)
+  (let ((pairs
+         (remove-if (lambda (x) (>= (car x) char-code-limit))
+                    (read-from-file filename))))
+    (when (< (length pairs) 5)
+      (aver (eq value-getter 'cdr))
+      (return-from find-in-perfect-hashmap
+        `(cdr (assoc (char-code ,x) ',pairs))))
+    (unless (symbolp value-getter)
+      (setq value-getter (compile nil value-getter)))
+    (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
+           (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
+           ;; We need the lexpr at compile-time to build the key/value arrays
+           ;; and run-time of course, where the expression is stuffed in as
+           ;; a form headed by LAMBDA.
+           (hasher (compile nil lexpr))
+           (n (length mapped-chars))
+           ;; This array is pasted in as though written literally in source,
+           ;; therefore it gets relocated to read-only space in the core.
+           (key-array (make-array n :element-type '(unsigned-byte 32)))
+           (value-array (make-array n :element-type value-type)))
+      (dolist (pair pairs)
+        (let ((index (funcall hasher (car pair))))
+          (aver (/= (car pair) 0)) ; a key can't be zero
+          (aver (= (aref key-array index) 0)) ; confirm perfect hashing
+          (setf (aref key-array index) (car pair)
+                (aref value-array index) (funcall value-getter pair))))
+      `(let* ((code (char-code ,x)) (hash (,lexpr code)))
+         ;; Remember: even though the mapping is dense (range is 0..N-1)
+         ;; a key which was not in the mapping as specified to the hash function
+         ;; generator may cause it return any value outside the expected range.
+         ;; So bounds check it and then confirm a hit.
+         (when (and (< hash ,n) (= (aref ,key-array hash) code))
+           (aref ,value-array hash))))))
+
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
   (declare (type (simple-array (unsigned-byte 32) 1) vector)
@@ -336,12 +371,6 @@ disappears when accents are placed on top of it. and NIL otherwise"
             #x110BD #x110BD)))))))
 
 ;;; Unicode case algorithms
-;; FIXME: Make these parts less redundant (macro?)
-(sb-ext:define-load-time-global **special-titlecases**
-  '#.(read-from-file "output/ucd/titlecases.lisp-expr"))
-
-(sb-ext:define-load-time-global **special-casefolds**
-  '#.(read-from-file "output/ucd/foldcases.lisp-expr"))
 
 (defun has-case-p (char)
   ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
@@ -371,23 +400,15 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun char-titlecase (char)
   (unless (has-case-p char) (return-from char-titlecase (list char)))
-  (let* ((cp (char-code char))
-         (value (assoc cp **special-titlecases**)))
-    (if value
-        (if (atom (cdr value))
-            (list (code-char (cdr value)))
-            (mapcar #'code-char (cdr value)))
-        (char-uppercase char))))
+  (or (find-in-perfect-hashmap char "output/ucd/titlecases.lisp-expr" t
+                               (lambda (x)  (mapcar #'code-char (ensure-list (cdr x)))))
+      (char-uppercase char)))
 
 (defun char-foldcase (char)
   (unless (has-case-p char) (return-from char-foldcase (list char)))
-  (let* ((cp (char-code char))
-         (value (assoc cp **special-casefolds**)))
-    (if value
-        (if (atom (cdr value))
-            (list (code-char (cdr value)))
-            (mapcar #'code-char (cdr value)))
-        (char-lowercase char))))
+  (or (find-in-perfect-hashmap char "output/ucd/foldcases.lisp-expr" t
+                               (lambda (x)  (mapcar #'code-char (ensure-list (cdr x)))))
+      (char-lowercase char)))
 
 (defun string-somethingcase (fn string special-fn)
   (let (result (len (length string)))
@@ -1383,41 +1404,6 @@ with variable-weight characters, as described in UTS #10"
 ;;;    0.033 seconds of real time
 ;;;    0.033195 seconds of total run time (0.033104 user, 0.000091 system)
 ;;;    100.00% CPU
-
-(defmacro find-in-perfect-hashmap (x filename value-type value-getter)
-  (let ((pairs
-         (remove-if (lambda (x) (>= (car x) char-code-limit))
-                    (read-from-file filename))))
-    (when (< (length pairs) 5)
-      (aver (eq value-getter 'cdr))
-      (return-from find-in-perfect-hashmap
-        `(cdr (assoc (char-code ,x) ',pairs))))
-    (unless (symbolp value-getter)
-      (setq value-getter (compile nil value-getter)))
-    (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
-           (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
-           ;; We need the lexpr at compile-time to build the key/value arrays
-           ;; and run-time of course, where the expression is stuffed in as
-           ;; a form headed by LAMBDA.
-           (hasher (compile nil lexpr))
-           (n (length mapped-chars))
-           ;; This array is pasted in as though written literally in source,
-           ;; therefore it gets relocated to read-only space in the core.
-           (key-array (make-array n :element-type '(unsigned-byte 32)))
-           (value-array (make-array n :element-type value-type)))
-      (dolist (pair pairs)
-        (let ((index (funcall hasher (car pair))))
-          (aver (/= (car pair) 0)) ; a key can't be zero
-          (aver (= (aref key-array index) 0)) ; confirm perfect hashing
-          (setf (aref key-array index) (car pair)
-                (aref value-array index) (funcall value-getter pair))))
-      `(let* ((code (char-code ,x)) (hash (,lexpr code)))
-         ;; Remember: even though the mapping is dense (range is 0..N-1)
-         ;; a key which was not in the mapping as specified to the hash function
-         ;; generator may cause it return any value outside the expected range.
-         ;; So bounds check it and then confirm a hit.
-         (when (and (< hash ,n) (= (aref ,key-array hash) code))
-           (aref ,value-array hash))))))
 
 (defun numeric-value (character)
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
