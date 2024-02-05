@@ -165,6 +165,7 @@ jobs:
       run: |
         ./make.sh --xc-host='sbcl --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
         cp src/runtime/sbcl output/sbcl.core /tmp
+        git reset --hard
         git restore-mtime
         ./make.sh --xc-host='/tmp/sbcl --core /tmp/sbcl.core --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
     - name: archive sbcl-xc fasls

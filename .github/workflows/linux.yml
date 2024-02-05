@@ -47,28 +47,28 @@ jobs:
 
     - name: crossbuild arm
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh arm
+      run: ./build-all-cores.sh -j 1 arm
     - name: crossbuild arm64
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh arm64
+      run: ./build-all-cores.sh -j 1 arm64
     - name: crossbuild mips
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh mips
+      run: ./build-all-cores.sh -j 1 mips
     - name: crossbuild ppc
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh ppc
+      run: ./build-all-cores.sh -j 1 ppc
     - name: crossbuild ppc64
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh ppc64
+      run: ./build-all-cores.sh -j 1 ppc64
     - name: crossbuild riscv
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh riscv
+      run: ./build-all-cores.sh -j 1 riscv
     - name: crossbuild sparc
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh sparc
+      run: ./build-all-cores.sh -j 1 sparc
     - name: crossbuild x86
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh x86
+      run: ./build-all-cores.sh -j 1 x86
     - name: crossbuild x86-64
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh x86-64
+      run: ./build-all-cores.sh -j 1 x86-64
