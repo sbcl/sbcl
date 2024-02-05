@@ -232,6 +232,52 @@ int wait_for_exec(int pid, int channel[2]) {
 }
 
 extern char **environ;
+
+#include <spawn.h>
+
+int pspawn(char *program, char *argv[], int sin, int sout, int serr,
+          int search, char *envp[], __attribute__((unused)) char *pty_name,
+          int channel[2],
+          __attribute__((unused)) char *pwd, __attribute__((unused)) int* dont_close)
+{
+    pid_t pid;
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+
+    posix_spawn_file_actions_init(&actions);
+    posix_spawnattr_init(&attr);
+
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK);
+
+
+    sigset_t sset;
+    sigemptyset(&sset);
+
+    if (sin >= 0)
+        posix_spawn_file_actions_adddup2(&actions, sin, 0);
+    if (sout >= 0)
+        posix_spawn_file_actions_adddup2(&actions, sout, 1);
+    if (serr >= 0)
+        posix_spawn_file_actions_adddup2(&actions, serr, 2);
+
+#ifdef LISP_FEATURE_DARWIN
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_CLOEXEC_DEFAULT);
+#elif defined LISP_FEATURE_LINUX
+    posix_spawn_file_actions_addclosefrom_np(&actions, 3);
+#endif
+
+    if (search)
+        posix_spawnp(&pid, program, &actions, &attr, argv, envp);
+    else
+        posix_spawn(&pid, program, &actions, &attr, argv, envp);
+
+    posix_spawn_file_actions_destroy(&actions);
+    posix_spawnattr_destroy(&attr);
+    close (channel[0]);
+    close (channel[1]);
+    return pid;
+}
+
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name,
           int channel[2],
@@ -328,4 +374,3 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     }
     _exit(failure_code);
 }
-

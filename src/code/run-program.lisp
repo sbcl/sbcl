@@ -600,6 +600,21 @@ status slot."
   (preserve-fds (* int)))
 
 #-win32
+(define-alien-routine pspawn
+     int
+  (program c-string)
+  (argv (* c-string))
+  (stdin int)
+  (stdout int)
+  (stderr int)
+  (search int)
+  (envp (* c-string))
+  (pty-name c-string)
+  (channel (array int 2))
+  (dir c-string)
+  (preserve-fds (* int)))
+
+#-win32
 (define-alien-routine wait-for-exec
   int
   (pid int)
@@ -726,7 +741,8 @@ status slot."
                       directory
                       preserve-fds
                       #+win32 (escape-arguments t)
-                      #+win32 (window nil))
+                      #+win32 (window nil)
+                      #+(or linux darwin) use-posix-spawn) ;; experimental
   "RUN-PROGRAM creates a new process specified by PROGRAM.
 ARGS is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
@@ -929,18 +945,29 @@ Users Manual for details about the PROCESS structure.
                                  (with-pinned-objects (preserve-fds)
                                    (with-args (args-vec args)
                                      (with-system-mutex (*spawn-lock*)
-                                       (spawn progname args-vec
-                                              stdin stdout stderr
-                                              (if search 1 0)
-                                              environment-vec pty-name
-                                              channel
-                                              directory
-                                              (if preserve-fds
-                                                  (vector-sap preserve-fds)
-                                                  (int-sap 0))))))))
+                                       (if use-posix-spawn
+                                           (pspawn progname args-vec
+                                                  stdin stdout stderr
+                                                  (if search 1 0)
+                                                  environment-vec pty-name
+                                                  channel
+                                                  directory
+                                                  (if preserve-fds
+                                                      (vector-sap preserve-fds)
+                                                      (int-sap 0)))
+                                           (spawn progname args-vec
+                                                  stdin stdout stderr
+                                                  (if search 1 0)
+                                                  environment-vec pty-name
+                                                  channel
+                                                  directory
+                                                  (if preserve-fds
+                                                      (vector-sap preserve-fds)
+                                                      (int-sap 0)))))))))
                          (unless (minusp child)
                            #-win32
-                           (setf child (wait-for-exec child channel))
+                           (unless use-posix-spawn
+                             (setf child (wait-for-exec child channel)))
                            (unless (minusp child)
                              (setf proc
                                    (make-process
