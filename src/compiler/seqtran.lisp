@@ -449,7 +449,7 @@
   (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
 
-  (when (and (eq name 'member)
+  (when (and (member name '(member assoc rassoc))
              ;; If the test was EQL, we've already changed it to NIL.
              (or (not test) (lvar-fun-is test '(eq)))
              (not test-not) ; keep it simple, no other keywords allowed
@@ -458,10 +458,12 @@
     (let ((items (lvar-value list)))
       ;; spec says MEMBER "Should be prepared to signal an error of type type-error
       ;; if list is not a proper list." This optimization can't do that.
-      (when (and (proper-list-p items) (every #'symbolp items))
+      ;; TRY-mumble will figure out based on what function it is trying to transform
+      ;; whether all keys are acceptable.
+      (when (proper-list-p items)
         (let* ((conditional (if-p (node-dest node)))
                (expr (try-perfect-find/position-map
-                      'member
+                      name
                       (if conditional ''(t)) ; returned value if present in the mapping
                       (lvar-type item) items nil)))
           (when expr
@@ -2773,6 +2775,9 @@
 ;;; FIND directed to an IF is a little funny because if you find a NIL then it has to
 ;;; return NIL; but FIND does not use a value vector anyway, so there is nothing gained
 ;;; by avoiding a value vector.
+;;; TODO: a common idiom is (CDR (ASSOC x '(const-alist))) - similarly (CAR (RASSOC)) -
+;;; in which case the mapping souldn't contain cons cells as the range, but instead just
+;;; the counterpart (CDR,CAR resp.) of the item you're seeking.
 (defun try-perfect-find/position-map (fun-name conditional lvar-type items from-end)
   (declare (type (member find position member assoc rassoc) fun-name))
   ;; It's certainly not worth doing a hash calculation for 2 keys.
@@ -2782,6 +2787,18 @@
   ;; hit in the key vector. Straightforwardly testing takes 3 jumps, so just do that.
   (when (< (length items) (if (eq fun-name 'member) 4 3))
     (return-from try-perfect-find/position-map))
+  (let ((hashable
+         (every #'symbolp ; TODO: allow (OR CHARACTER FIXNUM) also
+                (case fun-name
+                  (assoc (mapcar 'car items))
+                  (rassoc (mapcar 'cdr items))
+                  (t items)))))
+    (unless hashable
+      (return-from try-perfect-find/position-map)))
+  ;; alists can contain NIL which does not represent a pair at all.
+  ;; (Why is such a seemingly random stipulation even part of the language?)
+  (when (member fun-name '(assoc rassoc))
+    (setf items (remove-if #'null items)))
   (let ((map (make-hash-table)))
     (cond ((vectorp items)
            (dotimes (position (length items))
@@ -2799,8 +2816,6 @@
                (member
                 (let ((elt (car list)))
                   (unless (gethash elt map) (setf (gethash elt map) list))))
-               ;; FIXME: NILs in ITEMS need to be skipped as per the spec.
-               ;; This code is not enabled yet, so it's fine.
                (assoc
                 (let* ((pair (car list)) (key (car pair)))
                   (unless (gethash key map) (setf (gethash key map) pair))))
@@ -2810,6 +2825,10 @@
     (flet ((hash (key) (ldb (byte 32 0) (symbol-name-hash key))))
       ;; Sort to avoid sensitivity to the hash-table iteration order when cross-compiling.
       ;; Not necessary for the target but not worth a #+/- either.
+      ;; TODO: rather than sorting, compute KEYS from the originally-specified ITEMS after
+      ;; removing duplicates. If we permit keys to be (OR CHARACTER SYMBOL FIXNUM)
+      ;; there is not really a good sort order on a mixture of those, though I suppose
+      ;; we could sort by the hash, since that has to be unique or the transform fails.
       (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
                  (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
                  (lambda (make-perfect-hash-lambda hashes items) :exit-if-null)
@@ -2893,7 +2912,6 @@
                           ;; but we either have to do it right or not do it.
                           (reversedp (and from-end (lvar-value from-end))))
                       (awhen (and (memq effective-test '(eql eq))
-                                  (every #'symbolp items)
                                   (try-perfect-find/position-map
                                    ',fun-name nil (lvar-type item) items reversedp))
                         (return-from ,fun-name
