@@ -1011,7 +1011,9 @@
                                        '("perfecthash")
                                        ;; win32 misbehaves with :input string-stream
                                        :input :stream :output :stream
-                                       :wait nil)))
+                                       :wait nil
+                                       :allow-other-keys t
+                                       :use-posix-spawn t)))
             (format (sb-ext:process-input process) "~{~X~%~}" (coerce array 'list))
             (close (sb-ext:process-input process))
             (loop for char = (read-char (sb-ext:process-output process) nil)
