@@ -938,34 +938,36 @@ Users Manual for details about the PROCESS structure.
                          (with-pinned-objects (preserve-fds)
                            (with-args (args-vec args)
                              (with-system-mutex (*spawn-lock*)
-                               (if use-posix-spawn
-                                   (setf child
-                                         (pspawn progname args-vec
-                                                 stdin stdout stderr
-                                                 (if search 1 0)
-                                                 environment-vec pty-name
-                                                 directory
-                                                 (if preserve-fds
-                                                     (vector-sap preserve-fds)
-                                                     (int-sap 0))))
-                                   (with-alien ((channel (array int 2)))
-                                     (multiple-value-bind (readfd writefd) (sb-unix:unix-pipe)
-                                       (if (null readfd) ; writefd = errno when it fails
-                                           (file-perror nil writefd "Error creating pipe")
-                                           (setf (deref channel 0) readfd
-                                                 (deref channel 1) writefd)))
-                                     (setf child
-                                           (spawn progname args-vec
-                                                  stdin stdout stderr
-                                                  (if search 1 0)
-                                                  environment-vec pty-name
-                                                  channel
-                                                  directory
-                                                  (if preserve-fds
-                                                      (vector-sap preserve-fds)
-                                                      (int-sap 0))))
-                                     (unless (minusp child)
-                                       (setf child (wait-for-exec child channel)))))))))
+                               (cond #+(or linux darwin)
+                                     (use-posix-spawn
+                                      (setf child
+                                            (pspawn progname args-vec
+                                                    stdin stdout stderr
+                                                    (if search 1 0)
+                                                    environment-vec pty-name
+                                                    directory
+                                                    (if preserve-fds
+                                                        (vector-sap preserve-fds)
+                                                        (int-sap 0)))))
+                                     (t
+                                      (with-alien ((channel (array int 2)))
+                                        (multiple-value-bind (readfd writefd) (sb-unix:unix-pipe)
+                                          (if (null readfd) ; writefd = errno when it fails
+                                              (file-perror nil writefd "Error creating pipe")
+                                              (setf (deref channel 0) readfd
+                                                    (deref channel 1) writefd)))
+                                        (setf child
+                                              (spawn progname args-vec
+                                                     stdin stdout stderr
+                                                     (if search 1 0)
+                                                     environment-vec pty-name
+                                                     channel
+                                                     directory
+                                                     (if preserve-fds
+                                                         (vector-sap preserve-fds)
+                                                         (int-sap 0))))
+                                        (unless (minusp child)
+                                          (setf child (wait-for-exec child channel))))))))))
                        (unless (minusp child)
                          (setf proc
                                (make-process
