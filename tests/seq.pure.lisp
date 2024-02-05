@@ -802,3 +802,12 @@
   (assert
    (nth-value 2 (checked-compile `  (lambda (c) (find c #*10 :test #'char-equal))
                                     :allow-warnings t))))
+
+(with-test (:name :subseq-nil-array)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (subseq s 2))
+   (((make-array 5 :element-type nil))
+    3 :test (lambda (s n)
+              (= (car n) (length (car s)))))))
