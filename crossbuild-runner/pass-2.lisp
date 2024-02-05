@@ -20,19 +20,21 @@
 (preload-perfect-hash-generator (perfect-hash-generator-journal :input))
 
 ;;; Redefine STEM-SOURCE-PATH to take 'stuff-groveled-from-headers' from the
-;;; architecture-dependent location, but otherwise the normal location.
+;;; configuration-dependent location, but otherwise the normal locpation.
 (host-sb-int:encapsulate 'stem-source-path 'wrap
   (lambda (realfun stem)
     (if (string= stem "output/stuff-groveled-from-headers")
-        (let* ((arch (string-downcase (sb-cold::target-platform-keyword)))
-               (guess
-                (format nil "crossbuild-runner/backends/~a/stuff-groveled-from-headers.lisp"
-                        arch)))
-          (cond ((probe-file guess) guess)
-                ((member :win32 sb-xc:*features*)
-                 (format nil "crossbuild-runner/backends/~a/win32-headers.lisp" arch))
-                (t
-                 (format nil "crossbuild-runner/backends/~a/posix-headers.lisp" arch))))
+        (let ((arch (string-downcase (sb-cold::target-platform-keyword))))
+          (flet ((try (name &optional (check-existence t))
+                   (let ((fullname
+                          (format nil "crossbuild-runner/backends/~a/~a.lisp" arch name)))
+                     (when (or (not check-existence) (probe-file fullname))
+                       fullname))))
+            (or (and (member :win32 sb-xc:*features*) (try "win32-headers"))
+                (and (member :linux sb-xc:*features*) (try "linux-headers"))
+                (and (member :darwin sb-xc:*features*) (try "darwin-headers"))
+                (try "posix-headers")
+                (try "stuff-groveled-from-headers" nil))))
         (funcall realfun stem))))
 
 (format t "~&Target features: ~S~%" sb-xc:*features*)

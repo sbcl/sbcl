@@ -15,7 +15,7 @@ obj/xbuild/arm64.core: obj/xbuild/arm64/xc.core
 	$(SBCL) $(ARGS) arm64 < $(SCRIPT2)
 
 obj/xbuild/arm64-darwin/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) arm64-darwin arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :DARWIN-JIT)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) arm64-darwin arm64 "(:DARWIN :BSD :UNIX :MACH-O :LITTLE-ENDIAN :SB-THREAD :DARWIN-JIT)" < $(SCRIPT1)
 obj/xbuild/arm64-darwin.core: obj/xbuild/arm64-darwin/xc.core
 	$(SBCL) $(ARGS) arm64-darwin < $(SCRIPT2)
 
@@ -80,7 +80,7 @@ obj/xbuild/x86-64-linux.core: obj/xbuild/x86-64-linux/xc.core
 	$(SBCL) $(ARGS) x86-64-linux < $(SCRIPT2)
 
 obj/xbuild/x86-64-darwin/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86-64-darwin x86-64 "(:DARWIN :BSD :UNIX :ELF :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86-64-darwin x86-64 "(:DARWIN :BSD :UNIX :MACH-O :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256)" < $(SCRIPT1)
 obj/xbuild/x86-64-darwin.core: obj/xbuild/x86-64-darwin/xc.core
 	$(SBCL) $(ARGS) x86-64-darwin < $(SCRIPT2)
 
