@@ -195,11 +195,11 @@ Acceptable values for form are :NFD, :NFC, :NFKD, and :NFKC.
 If FILTER is a function it is called on each decomposed character and
 only characters for which it returns T are collected."
   (declare (type (member :nfd :nfkd :nfc :nfkc) form))
+  (declare (string string))
   #-sb-unicode
   (declare (ignore filter))
   #-sb-unicode
   (etypecase string
-    ((array nil (*)) string)
     (string
      (ecase form
        ((:nfc :nfkc) string)
@@ -218,11 +218,11 @@ only characters for which it returns T are collected."
          (canonically-compose (decompose-string string t filter)))
         ((:nfkd)
          (decompose-string string t filter)))
-      'string))
-    ((array nil (*)) string)))
+      'string))))
 
 (defun normalized-p (string &optional (form :nfd))
   "Tests if STRING is normalized to FORM"
+  (declare (string string))
   (etypecase string
     (base-string t)
     ((array character (*))
@@ -240,5 +240,4 @@ only characters for which it returns T are collected."
          ((:nfkc)
           (=-to-list (canonically-compose (decompose-string string t nil))))
          ((:nfkd)
-          (=-to-list (decompose-string string t nil))))))
-    ((array nil (*)) t)))
+          (=-to-list (decompose-string string t nil))))))))
