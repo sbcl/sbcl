@@ -3997,15 +3997,6 @@ III. initially undefined function references (alphabetically):
 ;;; Read the FASL files in OBJECT-FILE-NAMES and produce a Lisp core,
 ;;; and/or information about a Lisp core, therefrom.
 ;;;
-;;; input file arguments:
-;;;   SYMBOL-TABLE-FILE-NAME names a UNIX-style .nm file *with* *any*
-;;;     *tab* *characters* *converted* *to* *spaces*. (We push
-;;;     responsibility for removing tabs out to the caller it's
-;;;     trivial to remove them using UNIX command line tools like
-;;;     sed, whereas it's a headache to do it portably in Lisp because
-;;;     #\TAB is not a STANDARD-CHAR.) If this file is not supplied,
-;;;     a core file cannot be built (but a C header file can be).
-;;;
 ;;; output files arguments (any of which may be NIL to suppress output):
 ;;;   CORE-FILE-NAME gets a Lisp core.
 ;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
@@ -4014,8 +4005,7 @@ III. initially undefined function references (alphabetically):
                              defstruct-descriptions
                              build-id
                              core-file-name c-header-dir-name map-file-name
-                             symbol-table-file-name (verbose t))
-  (declare (ignorable symbol-table-file-name))
+                             (verbose t))
 
   (when verbose
     (format t

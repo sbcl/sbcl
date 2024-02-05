@@ -21,7 +21,6 @@ do
   # Whether any of the :OS-PROVIDES-* features are present is mostly immaterial
   # to this cross-build test. Some of the provisions are only for C code which
   # we don't compile. Or else it doesn't matter much which lisp code is compiled.
-  # Assume that dlopen() is provided so that we don't try to read sbcl.nm though.
   echo '(lambda (features) (union features (list :os-provides-dlopen ' > $ltf
   echo ":$arch" >> $ltf
   # x86 and x86-64 are tested as if #+win32. Unix is otherwise plenty tested.

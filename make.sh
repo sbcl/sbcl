@@ -58,7 +58,7 @@ $SBCL_XC_HOST < tools-for-build/canonicalize-whitespace.lisp || exit 1
 #     system.
 #   On the target system:
 #     sh make-target-1.sh
-#   Copy src/runtime/sbcl.nm and output/stuff-groveled-from-headers.lisp
+#   Copy output/stuff-groveled-from-headers.lisp
 #     from the target system to the host system.
 #   On the host system:
 #     SBCL_XC_HOST=<whatever> sh make-host-2.sh
