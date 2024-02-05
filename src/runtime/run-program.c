@@ -237,7 +237,6 @@ extern char **environ;
 
 int pspawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], __attribute__((unused)) char *pty_name,
-          int channel[2],
           __attribute__((unused)) char *pwd, __attribute__((unused)) int* dont_close)
 {
     pid_t pid;
@@ -247,11 +246,10 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
     posix_spawn_file_actions_init(&actions);
     posix_spawnattr_init(&attr);
 
-    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK);
-
-
     sigset_t sset;
     sigemptyset(&sset);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK);
+    posix_spawnattr_setsigmask(&attr, &sset);
 
     if (sin >= 0)
         posix_spawn_file_actions_adddup2(&actions, sin, 0);
@@ -273,8 +271,6 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
 
     posix_spawn_file_actions_destroy(&actions);
     posix_spawnattr_destroy(&attr);
-    close (channel[0]);
-    close (channel[1]);
     return pid;
 }
 
