@@ -264,13 +264,21 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
     posix_spawn_file_actions_addclosefrom_np(&actions, 3);
 #endif
 
+    int ret;
+
     if (search)
-        posix_spawnp(&pid, program, &actions, &attr, argv, envp);
+        ret = posix_spawnp(&pid, program, &actions, &attr, argv, envp);
     else
-        posix_spawn(&pid, program, &actions, &attr, argv, envp);
+        ret = posix_spawn(&pid, program, &actions, &attr, argv, envp);
 
     posix_spawn_file_actions_destroy(&actions);
     posix_spawnattr_destroy(&attr);
+
+    if (ret) {
+        errno = ret;
+        return -2;
+    }
+
     return pid;
 }
 
