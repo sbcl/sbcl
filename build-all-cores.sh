@@ -78,16 +78,11 @@
                             (t '(:unix :linux :elf)))))
         (append os-features features))))
 
-;;; TODOs:
-;;; 1) Consider not rewriting Makefile if nothing changed. Write to a temp file first
-;;;    and switch it out when different. On the other hand, isn't this the same problem
-;;;    as canonicalize-whitespace.lisp altering timestamps on unchanged files,
-;;;    or did we fix that?
-;;; 2) Put in correct dependencies for each target based on build-order.lisp-expr
-(with-open-file (makefile "crossbuild-runner/Makefile"
-                          :direction :output
-                          :if-exists :supersede)
-  (format makefile
+;;; TODO: dependencies for each target based on build-order.lisp-expr
+(let
+  ((new
+    (with-output-to-string (makefile)
+      (format makefile
           "SBCL=src/runtime/sbcl
 ARGS=--core output/sbcl.core --noinform --disable-debugger --noprint --no-userinit --no-sysinit
 SCRIPT1=crossbuild-runner/pass-1.lisp
@@ -106,8 +101,15 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
                  `(("cfg" . ,config-name)
                    ("arch" . ,(car arch+configs))
                    ;; features string can't contain a #\newline
-                   ("feat" . ,(write-to-string features :pretty nil))))
-                )))))
+                   ("feat" . ,(write-to-string features :pretty nil))))))))))
+   (existing (with-open-file (stream "crossbuild-runner/Makefile")
+               (let ((a (make-array (file-length stream) :element-type 'character)))
+                 (read-sequence a stream)
+                 a))))
+ (unless (string= new existing)
+    (with-open-file (stream "crossbuild-runner/Makefile" :direction :output :if-exists :supersede)
+      (write-string new stream))
+    (format t "~&Rewrote Makefile~%")))
 
 (defun corefiles ()
   (mapcar (lambda (x) (format nil "obj/xbuild/~A.core" x))
