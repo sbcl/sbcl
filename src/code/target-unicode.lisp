@@ -51,12 +51,13 @@
   (let ((pairs
          (remove-if (lambda (x) (>= (car x) char-code-limit))
                     (read-from-file filename))))
-    (when (< (length pairs) 5)
-      (aver (eq value-getter 'cdr))
-      (return-from find-in-perfect-hashmap
-        `(cdr (assoc (char-code ,x) ',pairs))))
     (unless (symbolp value-getter)
       (setq value-getter (compile nil value-getter)))
+    (when (< (length pairs) 5)
+      ;; Call the pair transformer to signal invalid char-code errors if #-sb-unicode.
+      (let ((new (mapcar (lambda (x) (cons (car x) (funcall value-getter x))) pairs)))
+        (return-from find-in-perfect-hashmap
+          `(cdr (assoc (char-code ,x) ',new)))))
     (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
            (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
            ;; We need the lexpr at compile-time to build the key/value arrays
@@ -404,10 +405,25 @@ disappears when accents are placed on top of it. and NIL otherwise"
                                (lambda (x)  (mapcar #'code-char (ensure-list (cdr x)))))
       (char-uppercase char)))
 
+
+#-sb-unicode
+(defmacro find-in-abridged-casefold-map (arg file dummy1 dummy2)
+  (declare (ignore dummy1 dummy2))
+  (let ((filtered-pairs
+         (mapcan (lambda (pair)
+                   (let ((values (remove-if (lambda (x) (>= x char-code-limit))
+                                            (ensure-list (cdr pair))))
+                         (key (car pair)))
+                     (when (and (< key char-code-limit) values)
+                       (list (cons (code-char key) (mapcar 'code-char values))))))
+                 (read-from-file file))))
+    `(cdr (assoc ,arg ',filtered-pairs))))
+
 (defun char-foldcase (char)
   (unless (has-case-p char) (return-from char-foldcase (list char)))
-  (or (find-in-perfect-hashmap char "output/ucd/foldcases.lisp-expr" t
-                               (lambda (x)  (mapcar #'code-char (ensure-list (cdr x)))))
+  (or (#-sb-unicode find-in-abridged-casefold-map #+sb-unicode find-in-perfect-hashmap
+                    char "output/ucd/foldcases.lisp-expr" t
+                    (lambda (x) (mapcar #'code-char (ensure-list (cdr x)))))
       (char-lowercase char)))
 
 (defun string-somethingcase (fn string special-fn)
