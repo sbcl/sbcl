@@ -47,6 +47,33 @@
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
             '#.(plist-to-alist (read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
+(eval-when (:compile-toplevel)
+  (defvar *phash-cache-file-pathname* #P"tools-for-build/unicode-phash.lisp-expr")
+  (defvar *phash-cache-file-contents* nil)
+  (defun cached-perfect-hash-lambda (keys)
+    (unless *phash-cache-file-contents*
+      (let ((ht (make-hash-table :test 'equalp)))
+        (setf *phash-cache-file-contents* ht)
+        (with-open-file (stream *phash-cache-file-pathname* :if-does-not-exist nil)
+          (when stream
+            (let ((*package* (find-package "SB-C")))
+              (loop (acond ((let ((*read-base* 16)) (read stream nil))
+                            (setf (gethash it ht) (read stream)))
+                           (t
+                            (return)))))))))
+    (or (gethash keys *phash-cache-file-contents*)
+        (let ((answer (sb-c:make-perfect-hash-lambda keys)))
+          (format *debug-io* "~&Computed perfect hash of ~D keys~%" (length keys))
+          (with-open-file (stream *phash-cache-file-pathname*
+                                  :direction :output
+                                  :if-does-not-exist :create :if-exists :append)
+            (let ((*print-readably* t) ; cause array to get its specialization written
+                  (*package* (find-package "SB-C")) ; suppresses SB-C: prefixes
+                  (*print-pretty* t) (*print-right-margin* 200)
+                  (*print-lines* nil) (*print-length* nil))
+              (format stream "~X~%~S~%" keys answer)))
+          answer))))
+
 (defmacro find-in-perfect-hashmap (x filename value-type value-getter)
   (let ((pairs
          (remove-if (lambda (x) (>= (car x) char-code-limit))
@@ -59,7 +86,7 @@
         (return-from find-in-perfect-hashmap
           `(cdr (assoc (char-code ,x) ',new)))))
     (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
-           (lexpr (sb-c:make-perfect-hash-lambda mapped-chars))
+           (lexpr (cached-perfect-hash-lambda mapped-chars))
            ;; We need the lexpr at compile-time to build the key/value arrays
            ;; and run-time of course, where the expression is stuffed in as
            ;; a form headed by LAMBDA.

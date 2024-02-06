@@ -1,3 +1,4 @@
+(load "compiler-test-util.lisp")
 
 ;;; The perfect hash generator can process any set of UB32 values.
 ;;; For example:
@@ -62,6 +63,20 @@
             (format *error-output* "~&Key vector:~%~X~%" keys))
           (error "Hash was not perfect"))
         (setf (aref seen hash) t)))))
+
+(with-test (:name :test-unicode-phash-cache)
+  (with-open-file (stream "../tools-for-build/unicode-phash.lisp-expr")
+    (loop
+      (let ((keys (let ((*read-base* 16)) (read stream nil))))
+        (unless keys (return))
+        (let* ((lexpr (let ((*package* (find-package "SB-C"))) (read stream)))
+               (fun (compile nil lexpr))
+               (constants (ctu:find-code-constants fun)))
+          (dolist (const constants)
+            ;; This assertion failed when the printed representation of
+            ;; the lambda omitted array specializations
+            (assert (typep const 'sb-kernel:simple-unboxed-array)))
+          (test-perfect-hashfun fun keys))))))
 
 (with-test (:name :typo-example-1) ; of which there may be more
   (let* ((keys (make-array 5 :element-type '(unsigned-byte 32)
