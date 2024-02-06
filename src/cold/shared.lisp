@@ -999,6 +999,7 @@
 (compile 'preload-perfect-hash-generator)
 
 (defun emulate-generate-perfect-hash-sexpr (array identifier)
+  (declare #-use-host-hash-generator (ignore identifier))
   (let (computed)
     (declare (ignorable computed))
     ;; Entries are written to disk with hashes sorted in ascending order so that
