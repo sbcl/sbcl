@@ -242,18 +242,20 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
     pid_t pid;
     posix_spawn_file_actions_t actions;
     posix_spawnattr_t attr;
+    short flags = POSIX_SPAWN_SETSIGMASK;
 
     posix_spawn_file_actions_init(&actions);
     posix_spawnattr_init(&attr);
 
     sigset_t sset;
     sigemptyset(&sset);
-    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK);
+
     posix_spawnattr_setsigmask(&attr, &sset);
 
-    if (sin >= 0)
+    if (sin >= 0) {
         posix_spawn_file_actions_adddup2(&actions, sin, 0);
-    else
+        flags |= POSIX_SPAWN_SETPGROUP;
+    } else
     {
 #ifdef LISP_FEATURE_DARWIN
         posix_spawn_file_actions_addinherit_np(&actions, 0);
@@ -277,10 +279,12 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
     }
 
 #ifdef LISP_FEATURE_DARWIN
-    posix_spawnattr_setflags(&attr, POSIX_SPAWN_CLOEXEC_DEFAULT);
+    flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
 #elif defined LISP_FEATURE_LINUX
     posix_spawn_file_actions_addclosefrom_np(&actions, 3);
 #endif
+
+    posix_spawnattr_setflags(&attr, flags);
 
     int ret;
 
