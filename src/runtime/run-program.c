@@ -253,10 +253,28 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
 
     if (sin >= 0)
         posix_spawn_file_actions_adddup2(&actions, sin, 0);
+    else
+    {
+#ifdef LISP_FEATURE_DARWIN
+        posix_spawn_file_actions_addinherit_np(&actions, 0);
+#endif
+    }
     if (sout >= 0)
         posix_spawn_file_actions_adddup2(&actions, sout, 1);
+    else
+    {
+#ifdef LISP_FEATURE_DARWIN
+        posix_spawn_file_actions_addinherit_np(&actions, 1);
+#endif
+    }
     if (serr >= 0)
         posix_spawn_file_actions_adddup2(&actions, serr, 2);
+    else
+    {
+#ifdef LISP_FEATURE_DARWIN
+        posix_spawn_file_actions_addinherit_np(&actions, 2);
+#endif
+    }
 
 #ifdef LISP_FEATURE_DARWIN
     posix_spawnattr_setflags(&attr, POSIX_SPAWN_CLOEXEC_DEFAULT);
