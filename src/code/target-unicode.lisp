@@ -47,9 +47,10 @@
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
             '#.(plist-to-alist (read-from-file "output/ucd/misc-properties.lisp-expr")))))
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel) ; WHY DOES THIS NEED TO BE A SEPARATE FORM?
   (defvar *phash-cache-file-pathname* #P"tools-for-build/unicode-phash.lisp-expr")
-  (defvar *phash-cache-file-contents* nil)
+  (defvar *phash-cache-file-contents* nil))
+(eval-when (:compile-toplevel)
   (defun cached-perfect-hash-lambda (keys)
     (unless *phash-cache-file-contents*
       (let ((ht (make-hash-table :test 'equalp)))
