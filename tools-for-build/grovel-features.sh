@@ -50,6 +50,8 @@ featurep os-provides-poll
 
 featurep os-provides-close-range-wrapper
 
+featurep os-provides-posix-spawn
+
 if [ "$sbcl_arch" = arm ] ; then
    featurep arm-softfp
 fi

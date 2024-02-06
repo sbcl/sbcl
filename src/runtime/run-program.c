@@ -233,8 +233,10 @@ int wait_for_exec(int pid, int channel[2]) {
 
 extern char **environ;
 
-#include <spawn.h>
 
+#ifdef LISP_FEATURE_OS_PROVIDES_POSIX_SPAWN
+
+#include <spawn.h>
 int pspawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], __attribute__((unused)) char *pty_name,
           __attribute__((unused)) char *pwd, __attribute__((unused)) int* dont_close)
@@ -303,6 +305,7 @@ int pspawn(char *program, char *argv[], int sin, int sout, int serr,
 
     return pid;
 }
+#endif
 
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name,

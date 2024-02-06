@@ -741,7 +741,7 @@ status slot."
                       preserve-fds
                       #+win32 (escape-arguments t)
                       #+win32 (window nil)
-                      #+(or linux darwin) use-posix-spawn) ;; experimental
+                      #+os-provides-posix-spawn use-posix-spawn) ;; experimental
   "RUN-PROGRAM creates a new process specified by PROGRAM.
 ARGS is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
@@ -938,7 +938,7 @@ Users Manual for details about the PROCESS structure.
                          (with-pinned-objects (preserve-fds)
                            (with-args (args-vec args)
                              (with-system-mutex (*spawn-lock*)
-                               (cond #+(or linux darwin)
+                               (cond #+os-provides-posix-spawn
                                      (use-posix-spawn
                                       (setf child
                                             (pspawn progname args-vec
