@@ -119,27 +119,18 @@
                    (define-vop (,vop)
                      (:translate ,vop)
                      (:policy :fast-safe)
-                     (:args (,@(first args) :target ,r) ,(second args) (,@(third args) :target xmm0))
-                     (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (first argument-records)))) tmp)
+                     (:args (,@(first args) :target ,r) (,@(second args) :to :save) (,@(third args) :target xmm0))
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (second argument-records)))
-                                  :from (:argument 0) :to :result :offset 0) xmm0)
+                                  :from (:argument 2) :to :save :offset 0) xmm0)
                      (:info ,@info)
                      (:results ,@results)
                      (:arg-types ,@arg-types)
                      (:result-types ,@result-types)
                      (:generator
-                      ,cost
-                      (move xmm0 ,z)
-                      (cond ((location= ,x ,r)
-                             (inst ,mnemonic ,@prefix ,r ,y xmm0 ,@suffix))
-                            ((or (not (tn-p ,y))
-                                 (not (location= ,y ,r)))
-                             (move ,r ,x)
-                             (inst ,mnemonic ,@prefix ,r ,y xmm0 ,@suffix))
-                            (t
-                             (move tmp ,x)
-                             (inst ,mnemonic ,@prefix tmp ,y xmm0 ,@suffix)
-                             (move ,r tmp))))))))
+                       ,cost
+                       (move xmm0 ,z)
+                       (move ,r ,x)
+                       (inst ,mnemonic ,@prefix ,r ,y xmm0 ,@suffix))))))
              (:fma
               (assert mnemonic)
               (let ((x (first asyms))
