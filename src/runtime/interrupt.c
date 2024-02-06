@@ -2273,10 +2273,14 @@ int sb_toggle_sigprof(os_context_t* context, int block) {
         // This case is used with INTERRUPT-THREAD to unmask SIGPROF in any thread
         // other than the current thread.
         gc_assert(!block);
+
         // Alter the mask on return from the _outermost_ signal context, which
         // should usually be the supplied context, but not if nesting happened.
-        context = nth_interrupt_context(0, get_sb_vm_thread());
-        gc_assert(context);
+        if (read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,get_sb_vm_thread()) > 0) {
+            context = nth_interrupt_context(0, get_sb_vm_thread());
+            gc_assert(context);
+        }
+
         sigset_t *mask = os_context_sigmask_addr(context);
         int was_blocked = sigismember(mask, SIGPROF);
         if (block) sigaddset(mask, SIGPROF); else sigdelset(mask, SIGPROF);
