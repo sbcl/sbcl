@@ -24,20 +24,22 @@
    confusable-p))
 
 (eval-when (:compile-toplevel :execute)
-  (defun read-from-file (namestring &key (enforce-single-expr t) build-dependent)
-    (declare (notinline concatenate) (ignore build-dependent))
-    (with-open-file
-        (s (concatenate 'string (if (boundp 'cl-user::*generated-sources-root*)
-                                    (symbol-value 'cl-user::*generated-sources-root*)
-                                    "")
-                        namestring))
-      (let* ((result (read s))
-             (eof-result (cons nil nil)))
-        (unless enforce-single-expr
-          (return-from read-from-file result))
-        (unless (eq (read s nil eof-result) eof-result)
-          (error "more than one expression in file ~S" namestring))
-        result))))
+  (defun lisp-expr-file-pathname (namestring)
+    (declare (notinline concatenate))
+    ;; Presence of slash in the NAMESTRING implies a source file,
+    ;; that is to say, *not* a generated file. Otherwise, it is generated.
+    (let ((dirname
+           ;; src/cold/warm assigns these directories our usual values
+           ;; but other build systems may arrange files differently.
+           (if (find #\/ namestring)
+               cl-user::*sbclroot*
+               cl-user::*generated-sources-root*)))
+      (pathname (concatenate 'string dirname namestring ".lisp-expr"))))
+  (defun read-lisp-expr-file (namestring)
+    (with-open-file (s (lisp-expr-file-pathname namestring))
+      (prog1 (read s)
+        (unless (eq (read s nil s) s)
+          (error "more than one expression in file ~S" namestring))))))
 
 (eval-when (:compile-toplevel)
   (defun plist-to-alist (list)
@@ -45,10 +47,11 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *proplist-properties*
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
-            '#.(plist-to-alist (read-from-file "output/ucd/misc-properties.lisp-expr")))))
+            '#.(plist-to-alist (read-lisp-expr-file "misc-properties")))))
 
 (eval-when (:compile-toplevel) ; WHY DOES THIS NEED TO BE A SEPARATE FORM?
-  (defvar *phash-cache-file-pathname* #P"tools-for-build/unicode-phash.lisp-expr")
+  (defvar *phash-cache-file-pathname*
+    (lisp-expr-file-pathname "tools-for-build/unicode-phash"))
   (defvar *phash-cache-file-contents* nil))
 (eval-when (:compile-toplevel)
   (defun cached-perfect-hash-lambda (keys)
@@ -65,20 +68,23 @@
     (or (gethash keys *phash-cache-file-contents*)
         (let ((answer (sb-c:make-perfect-hash-lambda keys)))
           (format *debug-io* "~&Computed perfect hash of ~D keys~%" (length keys))
+          ;; If you want to recreate the whole cache file from scratch, you need to
+          ;; initialize a 0-length file, because this won't write to a nonexistent file,
+          ;; which avoids attempting to write into a read-only source tree.
           (with-open-file (stream *phash-cache-file-pathname*
                                   :direction :output
-                                  :if-does-not-exist :create :if-exists :append)
+                                  :if-does-not-exist nil :if-exists :append)
             (let ((*print-readably* t) ; cause array to get its specialization written
                   (*package* (find-package "SB-C")) ; suppresses SB-C: prefixes
                   (*print-pretty* t) (*print-right-margin* 200)
                   (*print-lines* nil) (*print-length* nil))
-              (format stream "~X~%~S~%" keys answer)))
+              (when stream (format stream "~X~%~S~%" keys answer))))
           answer))))
 
 (defmacro find-in-perfect-hashmap (x filename value-type value-getter)
   (let ((pairs
          (remove-if (lambda (x) (>= (car x) char-code-limit))
-                    (read-from-file filename))))
+                    (read-lisp-expr-file filename))))
     (unless (symbolp value-getter)
       (setq value-getter (compile nil value-getter)))
     (when (< (length pairs) 5)
@@ -176,7 +182,7 @@ with underscores replaced by dashes."
 (eval-when (:compile-toplevel)
   (defun read-ucd-constant (symbol)
     (let ((more-ucd-consts (load-time-value
-                            (read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))))
+                            (read-lisp-expr-file "tools-for-build/more-ucd-consts"))))
       (map 'vector
            (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
            (or (cadr (assoc symbol more-ucd-consts))
@@ -250,10 +256,10 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
          (block-index (ordered-ranges-position
                        code
-                       #.(coerce (read-from-file "output/ucd/block-ranges.lisp-expr")
-                                       '(vector (unsigned-byte 32))))))
+                       #.(coerce (read-lisp-expr-file "block-ranges")
+                                 '(vector (unsigned-byte 32))))))
     (if block-index
-        (aref #.(read-from-file "output/ucd/block-names.lisp-expr") block-index)
+        (aref #.(read-lisp-expr-file "block-names") block-index)
         :no-block)))
 
 (defun unicode-1-name (character)
@@ -429,7 +435,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun char-titlecase (char)
   (unless (has-case-p char) (return-from char-titlecase (list char)))
-  (or (find-in-perfect-hashmap char "output/ucd/titlecases.lisp-expr" t
+  (or (find-in-perfect-hashmap char "titlecases" t
                                (lambda (x)  (mapcar #'code-char (ensure-list (cdr x)))))
       (char-uppercase char)))
 
@@ -444,13 +450,13 @@ disappears when accents are placed on top of it. and NIL otherwise"
                          (key (car pair)))
                      (when (and (< key char-code-limit) values)
                        (list (cons (code-char key) (mapcar 'code-char values))))))
-                 (read-from-file file))))
+                 (read-lisp-expr-file file))))
     `(cdr (assoc ,arg ',filtered-pairs))))
 
 (defun char-foldcase (char)
   (unless (has-case-p char) (return-from char-foldcase (list char)))
   (or (#-sb-unicode find-in-abridged-casefold-map #+sb-unicode find-in-perfect-hashmap
-                    char "output/ucd/foldcases.lisp-expr" t
+                    char "foldcases" t
                     (lambda (x) (mapcar #'code-char (ensure-list (cdr x)))))
       (char-lowercase char)))
 
@@ -1233,7 +1239,7 @@ it defaults to 80 characters"
 
 ;;; Collation
 (defconstant +maximum-variable-primary-element+
-  #.(read-from-file "output/ucd/other-collation-info.lisp-expr"))
+  #.(read-lisp-expr-file "other-collation-info"))
 
 (defun unpack-collation-key (key)
   (flet ((unpack (value)
@@ -1249,8 +1255,8 @@ it defaults to 80 characters"
   (<= 1 x +maximum-variable-primary-element+))
 
 (macrolet ((collations-hash-table ()
-             (let ((data (let ((*read-base* 16))
-                           (read-from-file "output/ucd/collation.lisp-expr"))))
+             (let ((data
+                    (let ((*read-base* 16)) (read-lisp-expr-file "collation"))))
                #+64-bit (dovector (item data) (aver (fixnump (car item))))
                `(load-time-value
                  (sb-impl::%stuff-hash-table
@@ -1453,7 +1459,7 @@ with variable-weight characters, as described in UTS #10"
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (find-in-perfect-hashmap character "output/ucd/numerics.lisp-expr" t cdr)
+  (or (find-in-perfect-hashmap character "numerics" t cdr)
       (digit-value character)))
 
 ;;; FIXME: why does #-sb-unicode want or need this?
@@ -1463,11 +1469,11 @@ The only constraint on the numeric value is that it be a rational number."
 Otherwise, returns NIL."
   ;; This used to call MIRRORED-P before table lookup, but it's not faster to do so
   #+sb-unicode
-  (find-in-perfect-hashmap character "output/ucd/bidi-mirrors.lisp-expr"
+  (find-in-perfect-hashmap character "bidi-mirrors"
                            character (lambda (x) (code-char (second x))))
   #-sb-unicode
   (macrolet ((direct-map (&aux (a (make-array char-code-limit :element-type 'character)))
-               (dolist (pair (read-from-file "output/ucd/bidi-mirrors.lisp-expr") a)
+               (dolist (pair (read-lisp-expr-file "bidi-mirrors") a)
                  (let ((key (car pair)))
                    (when (< key char-code-limit)
                      (setf (char a key) (code-char (second pair))))))))
@@ -1496,7 +1502,7 @@ Otherwise, returns NIL."
   ;; which seems to cause no immediate harm.
   (flet ((lookup (character)
            (find-in-perfect-hashmap
-            character "output/ucd/confusables.lisp-expr" t
+            character "confusables" t
             (lambda (pair &aux (x (cdr pair)))
               (case (length x)
                 (1 (elt x 0))

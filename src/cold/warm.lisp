@@ -149,6 +149,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
 ;;;     (declare (optimize (speed 0))))))
 ;;;
 (defvar *sbclroot* "")
+(defvar *generated-sources-root* "output/ucd/")
 (let ((sources (with-open-file (f (merge-pathnames "build-order.lisp-expr" *load-pathname*))
                  (read f) ; skip over the make-host-{1,2} input files
                  (read f)))
