@@ -999,35 +999,8 @@
 (compile 'preload-perfect-hash-generator)
 
 (defun emulate-generate-perfect-hash-sexpr (array identifier)
-  ;; I suppose we could make one long-lived child process which reads
-  ;; input up to an empty line and then returns a result,
-  ;; but honestly that's more engineering than I care to do.
-  ;; So what if this has to fork() two dozen times?
-  (let ((computed
-          #+use-host-hash-generator
-          (let* ((output (make-string-output-stream))
-                 (process
-                   (sb-ext:run-program (perfect-hash-generator-program)
-                                       '("perfecthash")
-                                       ;; win32 misbehaves with :input string-stream
-                                       :input :stream :output :stream
-                                       :wait nil
-                                       :allow-other-keys t
-                                       :use-posix-spawn t)))
-            (format (sb-ext:process-input process) "~{~X~%~}" (coerce array 'list))
-            (close (sb-ext:process-input process))
-            (loop for char = (read-char (sb-ext:process-output process) nil)
-                  while char
-                  do (write-char char output))
-            (sb-ext:process-wait process)
-            (sb-ext:process-close process)
-            (if (zerop (sb-ext:process-exit-code process))
-                (let* ((string (get-output-stream-string output))
-                       ;; don't need the final newline, it looks un-lispy in the file
-                       (l (length string)))
-                  (assert (char= (char string (1- l)) #\newline))
-                  (subseq string 0 (1- l)))
-                (error "Error running perfecthash.")))))
+  (let (computed)
+    (declare (ignorable computed))
     ;; Entries are written to disk with hashes sorted in ascending order so that
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
@@ -1036,16 +1009,6 @@
            (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
                          :test #'equalp)))
       (when match
-        (when computed
-          ;; We can't compare by STRING= because I reserve the right to try to improve
-          ;; the output format (by better pretty-printing).
-          ;; In fact this may not be a good test - as long as the hash function works,
-          ;; do we even care if it is not the exact same expression as from the file?
-          (multiple-value-bind (expr-computed expr-from-journal)
-              (let ((*package* (find-package "SB-C")))
-                (values (read-from-string computed)
-                        (read-from-string (cddr match))))
-            (assert (equalp expr-computed expr-from-journal))))
         (return-from emulate-generate-perfect-hash-sexpr (cddr match)))
       (ecase *perfect-hash-generator-mode*
         (:playback
@@ -1053,15 +1016,40 @@
         (:record
          ;; This will only display anything when we didn't have the data,
          ;; so it's actually not too "noisy" in a normal build.
-         (let ((*print-right-margin* 200) (*print-level* nil) (*print-length* nil))
-           (format t "~&Recording perfect hash:~%~S~%~X~%"
-                   identifier array))
-         (setf *perfect-hash-generator-memo*
-               (nconc *perfect-hash-generator-memo*
-                      (list (list* (cons digest canonical-array)
-                                   identifier
-                                   computed))))
-         computed)))))
+         #+use-host-hash-generator
+         (let ((output (make-string-output-stream))
+               (process
+                (sb-ext:run-program (perfect-hash-generator-program)
+                                    '("perfecthash")
+                                    ;; win32 misbehaves with :input string-stream
+                                    :input :stream :output :stream
+                                    :wait nil
+                                    :allow-other-keys t
+                                    :use-posix-spawn t)))
+           (format (sb-ext:process-input process) "~{~X~%~}" (coerce array 'list))
+           (close (sb-ext:process-input process))
+           (loop for char = (read-char (sb-ext:process-output process) nil)
+                 while char
+                 do (write-char char output))
+           (sb-ext:process-wait process)
+           (sb-ext:process-close process)
+           (unless (zerop (sb-ext:process-exit-code process))
+             (error "Error running perfecthash: exit code ~D"
+                    (sb-ext:process-exit-code process)))
+           (let* ((string (get-output-stream-string output))
+                  ;; don't need the final newline, it looks un-lispy in the file
+                  (l (length string)))
+             (assert (char= (char string (1- l)) #\newline))
+             (setq computed (subseq string 0 (1- l))))
+           (let ((*print-right-margin* 200) (*print-level* nil) (*print-length* nil))
+             (format t "~&Recording perfect hash:~%~S~%~X~%"
+                     identifier array))
+           (setf *perfect-hash-generator-memo*
+                 (nconc *perfect-hash-generator-memo*
+                        (list (list* (cons digest canonical-array)
+                                     identifier
+                                     computed))))
+           computed))))))
 
 ;;; Unlike xfloat-math which expresses universal truths, the perfect-hash file
 ;;; expresses facts about the behavior of a _particular_ SBCL revision.
