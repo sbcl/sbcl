@@ -1172,3 +1172,13 @@
                           (svref a i)))
                      nil))
              0)))
+
+(with-test (:name :map-equality-constraints)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c d)
+      (declare (notinline identity)
+               (bit d))
+      (dotimes (e 3 (identity (logior c 10 (- d -6 e))))))
+   ((2 1) 14)
+   ((9 0) 11)))

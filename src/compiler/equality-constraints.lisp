@@ -371,12 +371,12 @@
             (replace-combination-with-constant result call))
           t)))))
 
-(defun map-equality-constraints (x lvar-y constraints function)
-  (let* ((x (cond ((lambda-var/vector-length-p x)
-                   x)
-                  ((ok-lvar-lambda-var/vector-length x constraints t))
+(defun map-equality-constraints (lvar-x lvar-y constraints function)
+  (let* ((x (cond ((lambda-var/vector-length-p lvar-x)
+                   lvar-x)
+                  ((ok-lvar-lambda-var/vector-length lvar-x constraints t))
                   (t
-                   x)))
+                   lvar-x)))
          (y (cond ((ok-lvar-lambda-var/vector-length lvar-y constraints t))
                   (t
                    lvar-y)))
@@ -385,6 +385,7 @@
       (unless (lambda-var/vector-length-p y)
         (return-from map-equality-constraints))
       (rotatef x y)
+      (rotatef lvar-x lvar-y)
       (setf invert t))
     (do-equality-constraints (in-y op not-p) x constraints
       (when (or (vector-constraint-eq-p in-y y)
