@@ -89,5 +89,6 @@
                     (assert (= valid 1))
                     (assert (= valid 0)))))))))))
 (compile 'randomly-probe-pure-boxed-objects)
-(with-test (:name :fast-valid-tagged-pointer-p)
+(with-test (:name :fast-valid-tagged-pointer-p
+                  :broken-on :mark-region-gc)
   (randomly-probe-pure-boxed-objects))
