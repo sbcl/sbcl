@@ -599,7 +599,7 @@ status slot."
   (dir c-string)
   (preserve-fds (* int)))
 
-#-win32
+#+os-provides-posix-spawn
 (define-alien-routine pspawn
      int
   (program c-string)
