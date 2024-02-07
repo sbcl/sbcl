@@ -13,7 +13,7 @@
   (ensure-directories-exist objroot)
   (defvar *sbcl-host-obj-prefix* objroot)
   (let ((makeflags (sb-ext:posix-getenv "MAKEFLAGS")))
-    (when (search "--jobserver-fds" makeflags)
+    (when (search "--jobserver" makeflags)
       (setq sb-sys:*stdout* (open (format nil "~A/stdout" objroot) :direction :output
                                   :if-does-not-exist :create :if-exists :supersede)
             sb-sys:*stderr* (open (format nil "~A/stderr" objroot) :direction :output
