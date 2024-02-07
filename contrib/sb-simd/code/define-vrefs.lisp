@@ -17,20 +17,18 @@
               `(define-inline ,name (array index)
                  (declare (type (array ,element-type) array)
                           (index index))
+                 (sb-kernel:check-bound array (array-total-size array) (+ index ,(1- simd-width)))
                  (multiple-value-bind (vector index)
-                     (sb-kernel:%data-vector-and-index
-                      array
-                      (sb-kernel:check-bound array (- (array-total-size array) ,(1- simd-width)) index))
+                     (sb-kernel:%data-vector-and-index array index)
                    (declare (type (simple-array ,element-type (*)) vector))
                    (,vop vector index 0))))
              (:store
               `(define-inline ,name (value array index)
                  (declare (type (array ,element-type) array)
                           (index index))
+                 (sb-kernel:check-bound array (array-total-size array) (+ index ,(1- simd-width)))
                  (multiple-value-bind (vector index)
-                     (sb-kernel:%data-vector-and-index
-                      array
-                      (sb-kernel:check-bound array (- (array-total-size array) ,(1- simd-width)) index))
+                     (sb-kernel:%data-vector-and-index array index)
                    (declare (type (simple-array ,element-type (*)) vector))
                    (,vop (,(value-record-name value-record) value) vector index 0))))))))
      (define-vrefs ()
