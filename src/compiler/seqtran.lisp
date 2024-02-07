@@ -2788,11 +2788,15 @@
   (when (< (length items) (if (eq fun-name 'member) 4 3))
     (return-from try-perfect-find/position-map))
   (let ((hashable
-         (every #'symbolp ; TODO: allow (OR CHARACTER FIXNUM) also
-                (case fun-name
-                  (assoc (mapcar 'car items))
-                  (rassoc (mapcar 'cdr items))
-                  (t items)))))
+          ;; TODO: allow (OR CHARACTER FIXNUM) also
+          (every (lambda (item)
+                   (case fun-name
+                     (assoc (and (listp item)
+                                 (symbolp (car item))))
+                     (rassoc (and (listp item)
+                                  (symbolp (cdr item))))
+                     (t (symbolp item))))
+                 items)))
     (unless hashable
       (return-from try-perfect-find/position-map)))
   ;; alists can contain NIL which does not represent a pair at all.
