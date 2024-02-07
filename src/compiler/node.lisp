@@ -1510,7 +1510,9 @@
   (info nil)
   (step-info nil)
   ;; A plist of inline expansions
-  (inline-expansions *inline-expansions* :type list :read-only t))
+  (inline-expansions *inline-expansions* :type list :read-only t)
+  (constraints-in)
+  #+() (constraints-out))
 
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that

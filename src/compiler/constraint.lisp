@@ -1297,27 +1297,39 @@
          (when (node-lvar node)
            (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))))
       (combination
-       (when (eq (combination-kind node) :known)
-         (unless (and preprocess-refs-p
-                      (try-equality-constraint node gen))
-           (let ((lvar (node-lvar node)))
-             (when lvar
-               (add-var-result-constraints lvar lvar gen)))
-           (binding* ((info (combination-fun-info node) :exit-if-null)
-                      (propagate (fun-info-constraint-propagate info)
-                                 :exit-if-null)
-                      (constraints (funcall propagate node gen))
-                      (register (if (policy node
-                                        (> compilation-speed speed))
-                                    #'conset-add-constraint
-                                    #'conset-add-constraint-to-eql)))
-             (map nil (lambda (constraint)
-                        (destructuring-bind (kind x y &optional not-p) constraint
-                          (when (and kind x y)
-                            (funcall register gen
-                                     kind x y
-                                     not-p))))
-                  constraints)))))))
+       (case (combination-kind node)
+         (:known
+          (unless (and preprocess-refs-p
+                       (try-equality-constraint node gen))
+            (let ((lvar (node-lvar node)))
+              (when lvar
+                (add-var-result-constraints lvar lvar gen)))
+            (binding* ((info (combination-fun-info node) :exit-if-null)
+                       (propagate (fun-info-constraint-propagate info)
+                                  :exit-if-null)
+                       (constraints (funcall propagate node gen))
+                       (register (if (policy node
+                                         (> compilation-speed speed))
+                                     #'conset-add-constraint
+                                     #'conset-add-constraint-to-eql)))
+              (map nil (lambda (constraint)
+                         (destructuring-bind (kind x y &optional not-p) constraint
+                           (when (and kind x y)
+                             (funcall register gen
+                                      kind x y
+                                      not-p))))
+                   constraints))))
+         (:local
+          (when (boundp '*constraint-blocks*)
+            (let ((fun (combination-lambda node))
+                  (call-in (combination-constraints-in node)))
+
+              (when (and (null (functional-kind fun))
+                         (not (and call-in
+                                   (conset= call-in gen))))
+                (enqueue-block-for-constraints (lambda-block fun))
+                (setf (combination-constraints-in node)
+                      (copy-conset gen))))))))))
   gen)
 
 (defun constraint-propagate-if (block gen)
@@ -1465,17 +1477,35 @@
       (join-equality-constraints var block in))))
 
 (defun compute-block-in (block join-types-p)
-  (let ((in nil))
-    (dolist (pred (block-pred block))
-      ;; If OUT has not been calculated, assume it to be the universal
-      ;; set.
-      (let ((out (block-out-for-successor pred block)))
-        (when out
-          (if in
-              (conset-intersection in out)
-              (setq in (copy-conset out))))))
-    (when (rest (block-pred block))
-      (join-type-constraints in block (not join-types-p)))
+  (let ((in nil)
+        (bind (block-start-node block)))
+    (cond
+      ((and (bind-p bind)
+            (and (eq (functional-kind (bind-lambda bind)) nil)))
+       (let ((fun (bind-lambda bind)))
+         (loop for ref in (lambda-refs fun)
+               for call = (node-dest ref)
+               for call-in = (and call
+                                  (combination-constraints-in call))
+               do (cond
+                    ((not call-in)
+                     (setf in nil)
+                     (return))
+                    (in
+                     (conset-intersection in call-in))
+                    (t
+                     (setf in (copy-conset call-in)))))))
+      (t
+       (dolist (pred (block-pred block))
+         ;; If OUT has not been calculated, assume it to be the universal
+         ;; set.
+         (let ((out (block-out-for-successor pred block)))
+           (when out
+             (if in
+                 (conset-intersection in out)
+                 (setq in (copy-conset out))))))
+       (when (rest (block-pred block))
+         (join-type-constraints in block (not join-types-p)))))
     (or in (make-conset))))
 
 (defun update-block-in (block join-types-p)
@@ -1496,10 +1526,14 @@
   (declare (type component component))
   (collect ((leading-blocks) (rest-of-blocks))
     (do-blocks (block component)
-      (let ((leading t))
-        (dolist (pred (block-pred block))
-          (unless (block-flag pred)
-            (setq leading nil)))
+      (let ((leading t)
+            (bind))
+        (if (and (bind-p (setf bind (block-start-node block)))
+                 (and (eq (functional-kind (bind-lambda bind)) nil)))
+            (setf leading nil)
+            (dolist (pred (block-pred block))
+              (unless (block-flag pred)
+                (setq leading nil))))
         (setf (block-flag block) leading)
         (when (block-type-check block)
           (if leading
@@ -1520,46 +1554,49 @@
     (when (eql (car x) obj)
       (return-from nconc-new list))))
 
-(defun find-and-propagate-constraints (component)
-  (let ((blocks-to-process ()))
-    (flet ((enqueue (blocks)
-             (dolist (block blocks)
-               (when (block-type-check block)
-                 (setq blocks-to-process (nconc-new block blocks-to-process))))))
-      (clear-flags component)
-      (multiple-value-bind (leading-blocks rest-of-blocks)
-          (leading-component-blocks component)
-        ;; Update every block once to account for changes in the
-        ;; IR1. The constraints of the lead blocks cannot be changed
-        ;; after the first pass so we might as well use them and skip
-        ;; USE-RESULT-CONSTRAINTS later.
-        (dolist (block leading-blocks)
-          (setf (block-in block) (compute-block-in block t))
-          (find-block-type-constraints block t))
-        ;; We can only start joining types on blocks in which
-        ;; constraint propagation might have to run multiple times (to
-        ;; fixpoint) once all type constraints are definitely
-        ;; correct. They may not be the first time around because EQL
-        ;; constraint propagation is optimistic, i.e. un-EQL variables
-        ;; may be considered EQL before constraint propagation is
-        ;; done, hence any inherited type constraints from such
-        ;; constraints will be wrong as well.
-        (dolist (join-types-p '(nil t))
-          (setq blocks-to-process (copy-list rest-of-blocks))
-          ;; The rest of the blocks.
-          (dolist (block rest-of-blocks)
-            (aver (eq block (pop blocks-to-process)))
-            (setf (block-in block) (compute-block-in block join-types-p))
-            (enqueue (find-block-type-constraints block nil)))
-          ;; Propagate constraints
-          (loop for block = (pop blocks-to-process)
-                while block do
-                (unless (or (block-delete-p block)
-                            (eq block (component-tail component)))
-                  (when (update-block-in block join-types-p)
-                    (enqueue (find-block-type-constraints block nil))))))
+(defvar *constraint-blocks*)
 
-        rest-of-blocks))))
+(defun enqueue-block-for-constraints (block)
+  (when (block-type-check block)
+    (setq *constraint-blocks* (nconc-new block *constraint-blocks*))))
+
+(defun find-and-propagate-constraints (component)
+  (clear-flags component)
+  (multiple-value-bind (leading-blocks rest-of-blocks)
+      (leading-component-blocks component)
+    ;; Update every block once to account for changes in the
+    ;; IR1. The constraints of the lead blocks cannot be changed
+    ;; after the first pass so we might as well use them and skip
+    ;; USE-RESULT-CONSTRAINTS later.
+    (dolist (block leading-blocks)
+      (setf (block-in block) (compute-block-in block t))
+      (find-block-type-constraints block t))
+    ;; We can only start joining types on blocks in which
+    ;; constraint propagation might have to run multiple times (to
+    ;; fixpoint) once all type constraints are definitely
+    ;; correct. They may not be the first time around because EQL
+    ;; constraint propagation is optimistic, i.e. un-EQL variables
+    ;; may be considered EQL before constraint propagation is
+    ;; done, hence any inherited type constraints from such
+    ;; constraints will be wrong as well.
+    (dolist (join-types-p '(nil t))
+      (let ((*constraint-blocks* (copy-list rest-of-blocks)))
+        ;; The rest of the blocks.
+        (dolist (block rest-of-blocks)
+          (aver (eq block (pop *constraint-blocks*)))
+          (setf (block-in block) (compute-block-in block join-types-p))
+          (mapc #'enqueue-block-for-constraints
+                (find-block-type-constraints block nil)))
+        ;; Propagate constraints
+        (loop for block = (pop *constraint-blocks*)
+              while block do
+              (unless (or (block-delete-p block)
+                          (eq block (component-tail component)))
+                (when (update-block-in block join-types-p)
+                  (mapc #'enqueue-block-for-constraints
+                        (find-block-type-constraints block nil)))))))
+
+    rest-of-blocks))
 
 (defun constraint-propagate (component)
   (declare (type component component))

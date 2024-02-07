@@ -1182,3 +1182,14 @@
       (dotimes (e 3 (identity (logior c 10 (- d -6 e))))))
    ((2 1) 14)
    ((9 0) 11)))
+
+(with-test (:name :local-call)
+  (assert-type
+   (lambda (a)
+     (flet ((b ()
+              a))
+       (declare (notinline b))
+       (the integer a)
+       (b)
+       (b)))
+   integer))
