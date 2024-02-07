@@ -66,8 +66,11 @@
                            (t
                             (return)))))))))
     (or (gethash keys *phash-cache-file-contents*)
-        (let ((answer (sb-c:make-perfect-hash-lambda keys)))
-          (format *debug-io* "~&Computed perfect hash of ~D keys~%" (length keys))
+        (let ((start (get-internal-real-time))
+              (answer (sb-c:make-perfect-hash-lambda keys)))
+          (format *debug-io* "~&Computed perfect hash of ~D keys: ~F sec~%"
+                  (length keys)
+                  (/ (- (get-internal-real-time) start) internal-time-units-per-second))
           ;; If you want to recreate the whole cache file from scratch, you need to
           ;; initialize a 0-length file, because this won't write to a nonexistent file,
           ;; which avoids attempting to write into a read-only source tree.
@@ -1254,15 +1257,50 @@ it defaults to 80 characters"
 (defun variable-p (x)
   (<= 1 x +maximum-variable-primary-element+))
 
-(macrolet ((collations-hash-table ()
-             (let ((data
-                    (let ((*read-base* 16)) (read-lisp-expr-file "collation"))))
-               #+64-bit (dovector (item data) (aver (fixnump (car item))))
-               `(load-time-value
-                 (sb-impl::%stuff-hash-table
-                  (make-hash-table :size ,(length data) #+64-bit :test #+64-bit 'eq)
-                  ',data t)
-                 t))))
+;;; I wanted to check the the performance of a non-minimal perfect hash function.
+;;; As expected, the simpler non-minimal formula is faster, but it uses 2^16
+;;; cells for the key and value vectors which is either less or more wsteful
+;;; than a hash-table depending on machine word size.
+;;;
+;;; Core file sizes:
+;;;     32-bit      64-bit
+;;;   ----------  ----------
+;;;    26125916    38770040    hash-table
+;;;    25982340    38868336    non-minimal perfect hash
+;;;    25736204    38376736    minimal perfect hash
+
+(macrolet
+    ((lookup-collation-key (key-expr)
+       (let*
+          ((data (let ((*read-base* 16)) (read-lisp-expr-file "collation")))
+           (key-type (or #+64-bit 'fixnum t))
+           ;; The hash values that are passed to the perfect hash generator
+           ;; are derived from MIX-EXPR on the key, because taking a slice
+           ;; of 32 bits anywhere within the keys as they are yields duplicates.
+           ;; The function at the bottom of this file can find the shift amounts
+           ;; that work.
+           (mix-expr '(ldb (byte 32 0) (logxor (ash k -25) k)))
+           (mixfun (compile nil `(lambda (x &aux (k (the ,key-type (car x))))
+                                   ,mix-expr)))
+           (hash-array (map '(array (unsigned-byte 32) (*)) mixfun data))
+           (lexpr (cached-perfect-hash-lambda hash-array))
+           (phashfun (compile nil lexpr))
+           ;; N will just be (LENGTH DATA) when the hash is minimal-perfect
+           (n (1+ (loop for pair across data
+                        maximize (funcall phashfun (funcall mixfun pair)))))
+           (domain (make-array n :element-type key-type
+                               :initial-element (if (eq key-type 'fixnum) -1)))
+           ;; One of the elements is a 574-bit integer- Look at the line whose
+           ;; CAR is #xFDFA (I have absolutely no idea how this table works)
+           (range (make-array n :initial-element nil)))
+         (dovector (pair data)
+           (let ((phash (funcall phashfun (funcall mixfun pair))))
+             (aver (null (aref range phash)))
+             (setf (aref domain phash) (car pair) (aref range phash) (cdr pair))))
+         `(let* ((k ,key-expr) (phash (,lexpr ,mix-expr)))
+            (if (and (< phash ,n) (eql (aref ,domain phash) k))
+                (svref ,range phash))))))
+
 (defun collation-key (string start end)
   (let (char1
         (char2 (code-char 0))
@@ -1278,8 +1316,8 @@ it defaults to 80 characters"
        ;; There are never more than three characters in a contraction, right?
        (return-from collation-key nil)))
     (let* ((code1 (char-code char1))
-           (packed-key (gethash (pack-3-codepoints code1 (char-code char2) (char-code char3))
-                                (collations-hash-table))))
+           (packed-key (lookup-collation-key
+                        (pack-3-codepoints code1 (char-code char2) (char-code char3)))))
       (if packed-key
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
@@ -1536,3 +1574,30 @@ according to the IDNA confusableSummary.txt table"
       (string= skeleton1 skeleton2)))
 
 (clear-info :function :compiler-macro-function 'proplist-p)
+
+#|
+;;; For offline use.
+;;; This could insert a call to MIX if it found nothing that worked.
+(defun find-good-32-bit-hash-mixdown ()
+  (flet ((validp (input)
+           (let ((xset (alloc-xset)))
+             (dolist (elt input t)
+               (when (xset-member-p elt xset)
+                 (return-from validp nil))
+               (add-to-xset elt xset)))))
+    (let ((keys
+           (map 'list #'car
+                (with-open-file (f "output/ucd/collation.lisp-expr")
+                  (let ((*read-base* 16)) (read f))))))
+      (print (length keys))
+      (loop for right-shift from 1 to 30
+            do
+            (let ((32-bit-keys
+                   (mapcar (lambda (x)
+                             (ldb (byte 32 0)
+                                  (logxor (ash x (- right-shift)) x)))
+                           keys)))
+              (when (validp 32-bit-keys)
+                (format t "~&Valid: shr ~d, extract @ ~d~%"
+                        right-shift 0)))))))
+|#
