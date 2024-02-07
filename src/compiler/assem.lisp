@@ -2045,3 +2045,7 @@
                             any-changes t)
                       (return)))))))))
       (unless any-changes (return)))))
+
+;; Remove macros that users should not invoke
+(push '("SB-ASSEM" define-instruction define-instruction-macro)
+      *!removable-symbols*)
