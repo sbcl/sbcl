@@ -100,7 +100,7 @@
            ;; We need the lexpr at compile-time to build the key/value arrays
            ;; and run-time of course, where the expression is stuffed in as
            ;; a form headed by LAMBDA.
-           (hasher (compile nil lexpr))
+           (hasher (sb-c::compile-perfect-hash lexpr mapped-chars))
            (n (length mapped-chars))
            ;; This array is pasted in as though written literally in source,
            ;; therefore it gets relocated to read-only space in the core.
@@ -119,6 +119,47 @@
          ;; So bounds check it and then confirm a hit.
          (when (and (< hash ,n) (= (aref ,key-array hash) code))
            (aref ,value-array hash))))))
+
+#+sb-unicode
+(macrolet ((lookup (arg)
+             (let* ((data (read-lisp-expr-file "comp"))
+                    (hashes (map '(array (unsigned-byte 32) (*))
+                                 (lambda (x) (ldb (byte 32 0) (car x)))
+                                 data))
+                    (lexpr (cached-perfect-hash-lambda hashes))
+                    (phashfun (sb-c::compile-perfect-hash lexpr hashes))
+                    (n (length hashes))
+                    (domain (make-array n :element-type (or #+x86-64 'fixnum t)))
+                    (range (make-array n :element-type '(unsigned-byte 32))))
+               (dovector (pair data)
+                 (let ((phash (funcall phashfun (ldb (byte 32 0) (car pair)))))
+                   (aver (zerop (aref range phash)))
+                   (setf (aref domain phash) (car pair)
+                         (aref range phash) (cdr pair))))
+               `(let* ((k ,arg) (phash (,lexpr (ldb (byte 32 0) k))))
+                  (if (and (< phash ,n) (eql (aref ,domain phash) k))
+                      (code-char (aref ,range phash)))))))
+(defun primary-composition (char1 char2)
+  (flet ((composition-hangul-syllable-type (cp)
+           (cond
+             ((and (<= #x1100 cp) (<= cp #x1112)) :L)
+             ((and (<= #x1161 cp) (<= cp #x1175)) :V)
+             ((and (<= #x11a8 cp) (<= cp #x11c2)) :T)
+             ((and (<= #xac00 cp) (<= cp #.(+ #xac00 11171)))
+              (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
+    (declare (inline composition-hangul-syllable-type))
+    (let ((c1 (char-code char1))
+          (c2 (char-code char2)))
+       (cond
+         ((lookup (dpb c1 (byte 21 21) c2)))
+         ((and (eql (composition-hangul-syllable-type c1) :L)
+               (eql (composition-hangul-syllable-type c2) :V))
+          (let ((lindex (- c1 #x1100))
+                (vindex (- c2 #x1161)))
+            (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
+         ((and (eql (composition-hangul-syllable-type c1) :LV)
+               (eql (composition-hangul-syllable-type c2) :T))
+          (code-char (+ c1 (- c2 #x11a7)))))))))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
@@ -1284,7 +1325,7 @@ it defaults to 80 characters"
                                    ,mix-expr)))
            (hash-array (map '(array (unsigned-byte 32) (*)) mixfun data))
            (lexpr (cached-perfect-hash-lambda hash-array))
-           (phashfun (compile nil lexpr))
+           (phashfun (sb-c::compile-perfect-hash lexpr hash-array))
            ;; N will just be (LENGTH DATA) when the hash is minimal-perfect
            (n (1+ (loop for pair across data
                         maximize (funcall phashfun (funcall mixfun pair)))))

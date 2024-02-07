@@ -107,10 +107,11 @@
                 (decompose-char char compatibility calback))))
       (nreverse chars))))
 
+(declaim (ftype (sfunction (character character) (or character null))
+                primary-composition))
+#-sb-unicode
 (defun primary-composition (char1 char2)
-  #-sb-unicode
   (declare (ignore char1 char2))
-  #-sb-unicode
   #.(let* ((data (sb-cold:read-from-file "output/ucd/comp.lisp-expr"))
            (entries (loop for pair across data
                           for key = (car pair)
@@ -119,37 +120,8 @@
                           when (and (< c1 sb-xc:char-code-limit)
                                     (< c2 sb-xc:char-code-limit))
                           collect pair)))
-      (aver (null entries))
-      nil)
-  #+sb-unicode
-  (flet ((composition-hangul-syllable-type (cp)
-           (cond
-             ((and (<= #x1100 cp) (<= cp #x1112)) :L)
-             ((and (<= #x1161 cp) (<= cp #x1175)) :V)
-             ((and (<= #x11a8 cp) (<= cp #x11c2)) :T)
-             ((and (<= #xac00 cp) (<= cp #.(+ #xac00 11171)))
-              (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
-    (declare (inline composition-hangul-syllable-type))
-    (let ((c1 (char-code char1))
-          (c2 (char-code char2)))
-       (cond
-         ((gethash (dpb c1 (byte 21 21) c2)
-                   (load-time-value
-                    (let ((data '#.(sb-cold:read-from-file "output/ucd/comp.lisp-expr")))
-                      (sb-impl::%stuff-hash-table
-                       (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
-                       (loop for pair across data
-                             collect (cons (car pair) (code-char (cdr pair))))
-                       t))
-                    t)))
-         ((and (eql (composition-hangul-syllable-type c1) :L)
-               (eql (composition-hangul-syllable-type c2) :V))
-          (let ((lindex (- c1 #x1100))
-                (vindex (- c2 #x1161)))
-            (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
-         ((and (eql (composition-hangul-syllable-type c1) :LV)
-               (eql (composition-hangul-syllable-type c2) :T))
-          (code-char (+ c1 (- c2 #x11a7))))))))
+      (aver (null entries)))
+  nil)
 
 (defun canonically-compose (list)
   (let* ((result list)
