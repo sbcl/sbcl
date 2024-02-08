@@ -1320,16 +1320,16 @@
                                       not-p))))
                    constraints))))
          (:local
-          (when (boundp '*constraint-blocks*)
-            (let ((fun (combination-lambda node))
-                  (call-in (combination-constraints-in node)))
+          (let ((fun (combination-lambda node))
+                (call-in (combination-constraints-in node)))
 
-              (when (and (null (functional-kind fun))
-                         (not (and call-in
-                                   (conset= call-in gen))))
-                (enqueue-block-for-constraints (lambda-block fun))
-                (setf (combination-constraints-in node)
-                      (copy-conset gen))))))))))
+            (when (and (null (functional-kind fun))
+                       (not (and call-in
+                                 (conset= call-in gen))))
+              (setf (combination-constraints-in node)
+                    (copy-conset gen))
+              (when (boundp '*constraint-blocks*)
+                (enqueue-block-for-constraints (lambda-block fun))))))))))
   gen)
 
 (defun constraint-propagate-if (block gen)
@@ -1487,14 +1487,10 @@
                for call = (node-dest ref)
                for call-in = (and call
                                   (combination-constraints-in call))
-               do (cond
-                    ((not call-in)
-                     (setf in nil)
-                     (return))
-                    (in
-                     (conset-intersection in call-in))
-                    (t
-                     (setf in (copy-conset call-in)))))))
+               when call-in
+               do (if in
+                      (conset-intersection in call-in)
+                      (setf in (copy-conset call-in))))))
       (t
        (dolist (pred (block-pred block))
          ;; If OUT has not been calculated, assume it to be the universal
@@ -1527,10 +1523,17 @@
   (collect ((leading-blocks) (rest-of-blocks))
     (do-blocks (block component)
       (let ((leading t)
-            (bind))
-        (if (and (bind-p (setf bind (block-start-node block)))
-                 (and (eq (functional-kind (bind-lambda bind)) nil)))
-            (setf leading nil)
+            (bind (block-start-node block))
+            fun)
+        (if (and (bind-p bind)
+                 (and (eq (functional-kind (setf fun (bind-lambda bind))) nil)))
+            (loop for ref in (lambda-refs fun)
+                  for call = (node-dest ref)
+                  for call-block = (and call
+                                        (node-block call))
+                  do (unless (and call-block
+                                  (block-flag call-block))
+                       (setq leading nil)))
             (dolist (pred (block-pred block))
               (unless (block-flag pred)
                 (setq leading nil))))

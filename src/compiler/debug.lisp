@@ -1021,7 +1021,7 @@
                      (if (node-tail-p node) "tail " "")
                      kind
                      (type-of node))
-             (format t "{~a " (combination-fun-source-name node nil))
+             (format t "{~a " (combination-fun-debug-name node))
              (print-lvar (basic-combination-fun node))
              (format t "} ")
              (dolist (arg (basic-combination-args node))

@@ -1356,11 +1356,11 @@
   (do-blocks (block component)
     (loop while
           (and (singleton-p (block-succ block))
-               (join-successor-if-possible block)))))
+               (join-successor-if-possible block t)))))
 
 ;;; Try to join with a successor block. If we succeed, we return true,
 ;;; otherwise false.
-(defun join-successor-if-possible (block)
+(defun join-successor-if-possible (block &optional local-calls)
   (declare (type cblock block))
   (let ((next (first (block-succ block))))
     (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
@@ -1380,7 +1380,12 @@
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
               (neq (block-type-check block)
-                   (block-type-check next)))
+                   (block-type-check next))
+              (and (not local-calls)
+                   (let ((last (block-last block)))
+                     (and (combination-p last)
+                          (eq (combination-kind last) :local)
+                          (null (functional-kind (combination-lambda last)))))))
              nil)
             (t
              (join-blocks block next)

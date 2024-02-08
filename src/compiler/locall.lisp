@@ -129,6 +129,10 @@
   (declare (type ref ref) (type combination call) (type clambda fun))
   (propagate-to-args call fun)
   (setf (basic-combination-kind call) :local)
+
+  ;; Constraint propagation needs it to be the last node.
+  ;; join-blocks-if-possible will join things eventually.
+  (node-ends-block call)
   (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
   (mark-dynamic-extent-args call fun)
   (merge-tail-sets call fun)

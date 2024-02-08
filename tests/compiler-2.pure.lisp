@@ -3413,7 +3413,7 @@
                               913097464
                               5)))
            39)))))
-    '(values (or (integer 21 22) (integer 336 337)) (integer -38 0) &optional))))
+    '(values (or (integer 22 22) (integer 337 337)) (integer -38 -1) &optional))))
 
 (with-test (:name :boundp-ir2-optimizer)
   (checked-compile-and-assert
