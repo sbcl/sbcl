@@ -1028,6 +1028,7 @@ char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
   char* result = realloc(scratchfile->buffer, scratchfile->position + 1);
   //fprintf(stderr, "#|\n%s|#\n", result);
   free(scratchfile);
+  free(keyspace);
   return result;
 }
 char* generate_perfhash_sexpr(unsigned int *key_array, int nkeys) {
