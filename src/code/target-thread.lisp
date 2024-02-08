@@ -206,8 +206,8 @@ a simple-string (not necessarily unique) or NIL."
                            (typecase thing
                              (null '(:running))
                              (cons
-                              (list "waiting on:" (cdr thing)
-                                    "timeout: " (car thing)))
+                              ;; It's a DX cons, can't look at it.
+                              (list "waiting on a mutex with a timeout"))
                              (t
                               (list "waiting on:" thing)))))
                         ((eq values :aborted) '(:aborted))
