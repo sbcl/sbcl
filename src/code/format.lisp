@@ -470,21 +470,19 @@
         (collect ((expander-bindings) (runtime-bindings))
           (dolist (spec specs)
             (destructuring-bind (var default) spec
-              (let ((symbol (gensym "FVAR")))
-                (expander-bindings
-                 `(,var ',symbol))
-                (runtime-bindings
-                 `(list ',symbol
-                   (let* ((param-and-offset (pop ,params))
-                          (offset (car param-and-offset))
-                          (param (cdr param-and-offset)))
-                     (case param
-                       (:arg `(or ,(expand-next-arg offset) ,,default))
-                       (:remaining
-                        (setf *only-simple-args* nil)
-                        '(length args))
-                       ((nil) ,default)
-                       (t param))))))))
+              (expander-bindings `(,var ',var))
+              (runtime-bindings
+               `(list ',var
+                 (let* ((param-and-offset (pop ,params))
+                        (offset (car param-and-offset))
+                        (param (cdr param-and-offset)))
+                   (case param
+                     (:arg `(or ,(expand-next-arg offset) ,,default))
+                     (:remaining
+                      (setf *only-simple-args* nil)
+                      '(length args))
+                     ((nil) ,default)
+                     (t param)))))))
           `(let ,(expander-bindings)
             `(let ,(list ,@(runtime-bindings))
               ,@(if ,params
@@ -1317,9 +1315,9 @@
                          ,@(expand-directive-list (pop segments))))
                  ,(expand-bind-defaults
                       ((extra 0)
-                       (line-len '(or (sb-impl::line-length stream) 72)))
+                       (line-length '(or (sb-impl::line-length stream) 72)))
                       (directive-params first-semi)
-                    `(setf extra-space ,extra line-len ,line-len))))
+                    `(setf extra-space ,extra line-len ,line-length))))
            ,@(mapcar (lambda (segment)
                        `(push (%with-output-to-string (stream)
                                 ,@(expand-directive-list segment))
