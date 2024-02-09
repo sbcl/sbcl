@@ -470,21 +470,19 @@
         (collect ((expander-bindings) (runtime-bindings))
           (dolist (spec specs)
             (destructuring-bind (var default) spec
-              (let ((symbol (gensym "FVAR")))
-                (expander-bindings
-                 `(,var ',symbol))
-                (runtime-bindings
-                 `(list ',symbol
-                   (let* ((param-and-offset (pop ,params))
-                          (offset (car param-and-offset))
-                          (param (cdr param-and-offset)))
-                     (case param
-                       (:arg `(or ,(expand-next-arg offset) ,,default))
-                       (:remaining
-                        (setf *only-simple-args* nil)
-                        '(length args))
-                       ((nil) ,default)
-                       (t param))))))))
+              (expander-bindings `(,var ',var))
+              (runtime-bindings
+               `(list ',var
+                 (let* ((param-and-offset (pop ,params))
+                        (offset (car param-and-offset))
+                        (param (cdr param-and-offset)))
+                   (case param
+                     (:arg `(or ,(expand-next-arg offset) ,,default))
+                     (:remaining
+                      (setf *only-simple-args* nil)
+                      '(length args))
+                     ((nil) ,default)
+                     (t param)))))))
           `(let ,(expander-bindings)
             `(let ,(list ,@(runtime-bindings))
               ,@(if ,params
