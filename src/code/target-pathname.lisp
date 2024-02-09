@@ -1574,27 +1574,44 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                 (pathname-host (sane-default-pathname-defaults))))
            namestring))
 
+(defun lpn-word-char-p (char)
+  ;; This predicate is just {alpha|digit|dash} but by expressing it as
+  ;; range comparison we can - I hope - avoid cross-compiling many of
+  ;; the Unicode tables and particularly MISC-INDEX. Taking them out of
+  ;; make-host-2 removes some hassle around dumping specialized vectors.
+  (and (base-char-p (truly-the character char))
+       (let ((code (char-code char)))
+         (or (<= (char-code #\a) code (char-code #\z))
+             (<= (char-code #\A) code (char-code #\Z))
+             (<= (char-code #\0) code (char-code #\9))
+             (= code (char-code #\-))))))
+
 ;;; Canonicalize a logical pathname word by uppercasing it checking that it
 ;;; contains only legal characters.
 (defun logical-word-or-lose (word)
   (declare (string word))
+  ;; Maybe this function used to be called only on the HOST part of a namestring,
+  ;; and so the error message about an empty string made sense in that it mentioned
+  ;; "logical host", but this is also called by UPCASE-MAYBE via INTERN-PATHNAME
+  ;; on every part - name, type, and directory.
+  ;; Maybe INTERN-PATHNAME is the one that's wrong?
   (when (string= word "")
+    ;; https://www.lispworks.com/documentation/HyperSpec/Body/19_cbb.htm
     (error 'namestring-parse-error
-           :complaint "Attempted to treat invalid logical hostname ~
-                       as a logical host:~%  ~S"
+           :complaint "A string of length 0 is not a valid value for any
+~ component of a logical pathname"
            :args (list word)
            :namestring word :offset 0))
-  (let ((word (string-upcase word)))
-    (dotimes (i (length word))
-      (let ((ch (schar word i)))
-        (unless (and (typep ch 'standard-char)
-                     (or (alpha-char-p ch) (digit-char-p ch) (char= ch #\-)))
+  (dotimes (i (length word) (string-upcase word))
+    ;; um, how do we know it's SIMPLE-STRING when the decl at the top
+    ;; only says STRING?
+    (let ((ch (schar word i)))
+      (unless (lpn-word-char-p ch)
           (error 'namestring-parse-error
                  :complaint "logical namestring character which ~
                              is not alphanumeric or hyphen:~%  ~S"
                  :args (list ch)
-                 :namestring word :offset i))))
-    (coerce word 'string))) ; why not simple-string?
+                 :namestring word :offset i)))))
 
 ;;; Given a logical host or string, return a logical host. If ERROR-P
 ;;; is NIL, then return NIL when no such host exists.
@@ -1679,8 +1696,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
          (when (> end prev)
             (chunks (cons (nstring-upcase (subseq namestr prev end)) prev))))
       (let ((ch (schar namestr i)))
-        (unless (or (alpha-char-p ch) (digit-char-p ch)
-                    (member ch '(#\- #\*)))
+        (unless (or (lpn-word-char-p ch) (char= ch #\*))
           (when (> i prev)
             (chunks (cons (nstring-upcase (subseq namestr prev i)) prev)))
           (setq prev (1+ i))
