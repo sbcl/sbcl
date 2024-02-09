@@ -234,7 +234,7 @@
   (make-flonum :+infinity format)
   (make-flonum :-infinity format))
 
-(defun float-ops-cache-insert (key values table)
+(defun float-ops-cache-insert (table key values)
   ;; Verify results (when possible) prior to inserting into the hash-table.
   ;; If we were to support different floating-point formats across the various
   ;; backends, this check should confined to the scenarios where the host's
@@ -273,6 +273,47 @@
                   authoritative-answer)))))
   (setf (gethash key table) (if (singleton-p values) (car values) (cons '&values values))))
 
+(defun parse-xfloat-math-file (stream table mode)
+  (declare (type (member :all :merge) mode))
+  ;; Ensure that we're reading the correct variant of the file
+  ;; in case there is more than one set of floating-point formats.
+  (assert (eq (read stream) :default))
+  (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL")))
+        (line 0))
+    (loop for (alias . actual) in '(("S" . sb-kernel:make-single-float)
+                                    ("D" . sb-kernel:make-double-float))
+          do (setf (fdefinition (intern alias pkg)) (fdefinition actual)))
+    (unwind-protect
+         (dolist (expr (let ((*package* pkg)) (read stream)))
+           (incf line)
+           (destructuring-bind (fun args . values) expr
+             ;; It seem so unnecessarily convoluted to remove &VALUES and re-insert
+             ;; in the table and remove for comparison below.
+             ;; Why not just NOT do any of that? After all, a list is a perfectly
+             ;; good representation of one or more values.
+             (let* ((key (cons fun args))
+                    (existsp (gethash key table))
+                    (values (if (and (symbolp (first values))
+                                     (string= (symbol-name (first values))
+                                              "&VALUES"))
+                                (rest values)
+                                values)))
+               (when existsp
+                 (case mode
+                   (:merge
+                    (when (and existsp
+                               (not (equal
+                                     (if (and (listp existsp) (eq (car existsp) '&values))
+                                         (cdr existsp)
+                                         existsp)
+                                     (if (singleton-p values) (car values) values))))
+                      (error "Got different answers for ~S: ~S and ~S"
+                             key existsp values)))
+                   (:all ; should not happen
+                    (error "Line ~D of float cache: ~S is repeated" line key))))
+               (float-ops-cache-insert table key values))))
+      (delete-package pkg))))
+
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
   (when (atom cache)
     (return-from get-float-ops-cache cache))
@@ -282,32 +323,7 @@
       (with-open-file (stream (setq pathname (sb-cold::math-journal-pathname :input))
                               :if-does-not-exist nil)
         (when stream
-          ;; Ensure that we're reading the correct variant of the file
-          ;; in case there is more than one set of floating-point formats.
-          (assert (eq (read stream) :default))
-          (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL")))
-                (line 0))
-            (loop for (alias . actual) in '(("MAKE-SINGLE-FLOAT" . sb-kernel:make-single-float)
-                                            ("MAKE-DOUBLE-FLOAT" . sb-kernel:make-double-float)
-                                            ("S" . sb-kernel:make-single-float)
-                                            ("D" . sb-kernel:make-double-float))
-                  do (setf (fdefinition (intern alias pkg)) (fdefinition actual)))
-            (dolist (expr (let ((*package* pkg)) (read stream)))
-              (incf line)
-              (destructuring-bind (fun args . values) expr
-                (let ((old-count (hash-table-count table)))
-                  (float-ops-cache-insert (cons fun args)
-                                        (if (and (symbolp (first values))
-                                                 (string= (symbol-name (first values))
-                                                          "&VALUES"))
-                                            (rest values)
-                                            values)
-                                        table)
-                  (unless (= (hash-table-count table) (1+ old-count))
-                    (let ((*print-pretty* nil))
-                      (error "~&Line ~D of float cache: PUTHASH ~S did not insert a new key"
-                             line (cons fun args)))))))
-            (delete-package pkg))
+          (parse-xfloat-math-file stream table :all)
           (setf (cdr cache) (hash-table-count table))
           (when cl:*compile-verbose*
             (format t "~&; Math journal: prefilled ~D entries from ~S~%"
@@ -322,7 +338,7 @@
          ;; args list is potentially on stack, so copy it
          (key (cons fun (if (listp args) (copy-list args) args)))
          (old-count (hash-table-count table)))
-    (float-ops-cache-insert key values table)
+    (float-ops-cache-insert table key values)
     (unless (= (hash-table-count table) (1+ old-count))
       (bug "Non-canonical math journal entry ~S" key)))
   (apply #'values values))
@@ -1081,6 +1097,29 @@
                   ;; Can't use ENSURE-LIST. We need NIL -> (NIL)
                   (if (consp result) result (list result)))))))
   (format stream ")~%"))
+
+;;; Recipe:
+;;; $ ./build-all-cores.sh
+;;; $ /path/to/host/sbcl
+;;; * (load "load-xc")
+;;; * (sb-impl:merge-all-xfloat-files)
+(export 'merge-all-xfloat-files)
+(defun merge-all-xfloat-files ()
+  (let ((ht sb-cold::*math-ops-memoization*)
+        (total-delta 0))
+    (dolist (pathname (directory "obj/xbuild/**/xfloat-math.lisp-expr"))
+      (let ((old-count (hash-table-count ht)))
+        (with-open-file (stream pathname)
+          (parse-xfloat-math-file stream ht :merge)
+          (let ((delta (- (hash-table-count ht) old-count)))
+            (incf total-delta delta)
+            (when (plusp delta)
+              (format t "~D new entr~@:P from ~S~%" delta pathname))))))
+    (if (zerop total-delta)
+        (format t "~&Nothing new~%")
+        (with-open-file (stream "xfloat-math.lisp-expr"
+                                :direction :output :if-exists :supersede)
+          (dump-math-memoization-table ht stream)))))
 
 (defun show-interned-numbers (stream)
   (flet ((to-native (x)
