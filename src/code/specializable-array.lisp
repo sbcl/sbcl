@@ -110,3 +110,23 @@
     ;; Just like in src/code/sharpm
     (destructuring-bind (dimensions type &rest contents) contents
       (sb-xc:make-array dimensions :initial-contents contents :element-type type))))
+
+(defun sb-impl::read-ub8-vector (pathname)
+  (with-open-file (stream pathname :element-type '(unsigned-byte 8))
+    (let* ((length (file-length stream))
+           (array (sb-xc:make-array length :element-type '(unsigned-byte 8)
+                                           :retain-specialization-for-after-xc-core t)))
+      (read-sequence array stream)
+      array)))
+
+(defun sb-impl::ubN-array-from-octets (raw-bytes element-type raw-octets-per-elt)
+  (let* ((n raw-octets-per-elt)
+         (array (sb-xc:make-array (/ (length raw-bytes) n) :element-type element-type
+                                  :retain-specialization-for-after-xc-core t)))
+    (loop for i from 0 below (length raw-bytes) by n
+          do (loop with element = 0
+                   for offset from 0 below n
+                   do (incf element (ash (aref raw-bytes (+ i offset))
+                                         (* 8 (- n offset 1))))
+                   finally (setf (aref array (/ i n)) element)))
+    array))

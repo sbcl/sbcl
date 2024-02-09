@@ -86,33 +86,12 @@
 (macrolet ((frob ()
              (flet ((file (name type)
                       (sb-cold:find-bootstrap-file (format nil "output/ucd/~A.~A" name type)))
-                    (read-ub8-vector (pathname)
-                      (with-open-file (stream pathname
-                                              :element-type '(unsigned-byte 8))
-                        (let* ((length (file-length stream))
-                               (array (sb-xc:make-array
-                                       length :element-type '(unsigned-byte 8)
-                                       :retain-specialization-for-after-xc-core t)))
-                          (read-sequence array stream)
-                          array)))
                     (make-ubn-vector (raw-bytes n)
-                      (let* ((et (if (= n 3)
-                                     '(unsigned-byte 31)
-                                     `(unsigned-byte ,(* 8 n))))
-                             (array (sb-xc:make-array (/ (length raw-bytes) n)
-                                                      :element-type et
-                                                      :retain-specialization-for-after-xc-core t)))
-                        (loop for i from 0 below (length raw-bytes) by n
-                           do (loop with element = 0
-                                 for offset from 0 below n
-                                 do (incf element (ash (aref raw-bytes (+ i offset))
-                                                       (* 8 (- n offset 1))))
-                                 finally (setf (aref array (/ i n)) element)))
-                        array)))
+                      (aver (member n '(1 2)))
+                      (ubN-array-from-octets raw-bytes `(unsigned-byte ,(* 8 n)) n)))
               (let* ((misc-database (read-ub8-vector (file "ucdmisc" "dat")))
                      (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
                      (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
-                     (decompositions (read-ub8-vector (file "decomp" "dat")))
                      (case-data (read-ub8-vector (file "case" "dat")))
                      (case-pages (read-ub8-vector (file "casepages" "dat")))
                      (high-pages (make-ubn-vector ucd-high-pages 2))
@@ -123,8 +102,6 @@
                     (defconstant-eqx sb-unicode::+character-misc-database+ ,misc-database #'equalp)
                     (defconstant-eqx sb-unicode::+character-high-pages+ ,high-pages #'equalp)
                     (defconstant-eqx sb-unicode::+character-low-pages+ ,low-pages #'equalp)
-                    (defconstant-eqx sb-unicode::+character-decompositions+
-                        ,(make-ubn-vector decompositions 3) #'equalp)
                     (defconstant-eqx +character-case-pages+ ,%*character-case-pages*% #'equalp)
                     ,@(let* ((unicode-table
                                  (make-array

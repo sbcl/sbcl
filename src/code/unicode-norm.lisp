@@ -30,7 +30,10 @@
   ;; Caller should have gotten length from char-decomposition-info
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (decompositions +character-decompositions+)
+         (decompositions #.(sb-impl::ubN-array-from-octets
+                            (sb-impl::read-ub8-vector
+                             (sb-cold:find-bootstrap-file "output/ucd/decomp.dat"))
+                            '(unsigned-byte 31) 3))
          (high-page (aref +character-high-pages+ cp-high))
          (index (unless (logbitp 15 high-page) ;; Hangul syllable
                   (aref +character-low-pages+
