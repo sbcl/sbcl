@@ -49,11 +49,10 @@
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
             '#.(plist-to-alist (read-lisp-expr-file "misc-properties")))))
 
-(eval-when (:compile-toplevel) ; WHY DOES THIS NEED TO BE A SEPARATE FORM?
+(eval-when (:compile-toplevel)
   (defvar *phash-cache-file-pathname*
     (lisp-expr-file-pathname "tools-for-build/unicode-phash"))
-  (defvar *phash-cache-file-contents* nil))
-(eval-when (:compile-toplevel)
+  (defvar *phash-cache-file-contents* nil)
   (defun cached-perfect-hash-lambda (keys)
     (unless *phash-cache-file-contents*
       (let ((ht (make-hash-table :test 'equalp)))
@@ -224,13 +223,13 @@ with underscores replaced by dashes."
       form))
 
 (eval-when (:compile-toplevel)
+  (defvar *slurped-random-constants*
+    (read-lisp-expr-file "tools-for-build/more-ucd-consts"))
   (defun read-ucd-constant (symbol)
-    (let ((more-ucd-consts (load-time-value
-                            (read-lisp-expr-file "tools-for-build/more-ucd-consts"))))
-      (map 'vector
-           (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
-           (or (cadr (assoc symbol more-ucd-consts))
-               (error "Missing entry in more-ucd-consts for ~S" symbol))))))
+    (map 'vector
+         (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
+         (or (cadr (assoc symbol *slurped-random-constants*))
+             (error "Missing entry in more-ucd-consts for ~S" symbol)))))
 
 (declaim (inline svref-or-null))
 (defun svref-or-null (vector index)
