@@ -42,6 +42,7 @@
     ("sparc"  ("sparc-sunos" :big-endian :unix :sunos :elf)
               ("sparc-linux" :big-endian :unix :linux :elf))
     ("x86"    ("x86" :little-endian :largefile)
+              ("x86-ascii" :little-endian :largefile (not :sb-unicode))
               ("x86-thread" :little-endian :largefile :sb-thread)
               ("x86-linux" :little-endian :largefile :sb-thread :linux :unix :elf :sb-thread))
     ("x86-64" ("x86-64" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256)

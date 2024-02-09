@@ -4,12 +4,14 @@
         (destructuring-bind (first second third) (cdr *posix-argv*)
           (values first second third)))
        (arch-symbol (intern (string-upcase target-name) "KEYWORD"))
-       ;; TODO: allow subtractive features too
-       (add-features (read-from-string features))
+       (features (read-from-string features))
+       (subtract-features
+        (mapcan (lambda (x) (if (typep x '(cons (eql not))) (list (cadr x))))
+                features))
+       (add-features (remove-if-not #'symbolp features))
        (build-dir (format nil "obj/xbuild/~A/" configuration-name))
        (ltf (format nil "~A/local-target-features" build-dir))
        (objroot (format nil "~A/from-host/" build-dir)))
-  ;; (format t "~&added features: ~S~%" add-features)
   (ensure-directories-exist objroot)
   (defvar *sbcl-host-obj-prefix* objroot)
   (let ((makeflags (sb-ext:posix-getenv "MAKEFLAGS")))
@@ -23,7 +25,7 @@
                                      :if-does-not-exist :create
                                      :if-exists :supersede)
     (format t "(lambda (features)
-(union features (list :crossbuild-test :os-provides-dlopen ~s~{ ~s~}~%"
+(set-difference (union features (list :crossbuild-test :os-provides-dlopen ~s~{ ~s~}~%"
             arch-symbol add-features)
     ;; "features" contains the mandatory set of symbols for any build of that target.
     (let ((features-filename "features"))
@@ -32,7 +34,7 @@
         (let ((string (make-string (file-length f))))
           (read-sequence string f)
           (write-string string))))
-    (format t ")))~%"))
+    (format t ")) '~S))~%" subtract-features))
   (load "make-host-1.lisp")
   (finish-output sb-sys:*stdout*)
   (finish-output sb-sys:*stderr*)

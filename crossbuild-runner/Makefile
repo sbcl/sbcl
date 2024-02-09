@@ -59,6 +59,11 @@ obj/xbuild/x86/xc.core: $(DEPS1)
 obj/xbuild/x86.core: obj/xbuild/x86/xc.core
 	$(SBCL) $(ARGS) x86 < $(SCRIPT2)
 
+obj/xbuild/x86-ascii/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) x86-ascii x86 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :LARGEFILE (NOT :SB-UNICODE))" < $(SCRIPT1)
+obj/xbuild/x86-ascii.core: obj/xbuild/x86-ascii/xc.core
+	$(SBCL) $(ARGS) x86-ascii < $(SCRIPT2)
+
 obj/xbuild/x86-thread/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) x86-thread x86 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :LARGEFILE :SB-THREAD)" < $(SCRIPT1)
 obj/xbuild/x86-thread.core: obj/xbuild/x86-thread/xc.core

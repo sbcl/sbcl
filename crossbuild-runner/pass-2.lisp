@@ -45,7 +45,7 @@
                   sb-c::*undefined-warnings*)))
   (finish-output host-sb-sys:*stdout*)
   (finish-output host-sb-sys:*stderr*)
-  (when (and warnings (not (target-featurep :win32)))
+  (when warnings
     (error "Fail")))
 
 (load "tools-for-build/corefile.lisp" :verbose nil)
