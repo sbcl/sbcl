@@ -1579,7 +1579,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
   ;; range comparison we can - I hope - avoid cross-compiling many of
   ;; the Unicode tables and particularly MISC-INDEX. Taking them out of
   ;; make-host-2 removes some hassle around dumping specialized vectors.
-  (and (base-char-p (truly-the character char))
+  (and (typep (truly-the character char) 'base-char)
        (let ((code (char-code char)))
          (or (<= (char-code #\a) code (char-code #\z))
              (<= (char-code #\A) code (char-code #\Z))

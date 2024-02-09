@@ -1605,6 +1605,7 @@
   (declare (type component component))
   (init-var-constraints component)
   ;; Previous results can confuse propagation and may loop forever
+  (print-all-blocks component)
   (do-blocks (block component)
     (setf (block-out block) nil)
     (let ((last (block-last block)))

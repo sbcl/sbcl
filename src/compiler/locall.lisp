@@ -1363,6 +1363,20 @@
                (return nil)))
             (t (return nil)))))))
 
+(defun local-tail-local-p (call)
+  (let ((return (node-dest call))
+        (fun (combination-lambda call)))
+    (and (return-p return)
+         (immediately-used-p (return-result return) call)
+         (only-harmless-cleanups (node-block call)
+                                 (node-block return))
+         ;; If the call is in an XEP, we might decide to make it
+         ;; non-tail so that we can use known return inside the
+         ;; component.
+         (not (eq (functional-kind (node-home-lambda call))
+                  :external))
+         (not (block-delete-p (lambda-block fun))))))
+
 ;;; If a potentially TR local call really is TR, then convert it to
 ;;; jump directly to the called function. We also call
 ;;; MAYBE-CONVERT-TO-ASSIGNMENT. The first value is true if we
@@ -1442,7 +1456,7 @@
                        (return nil))
                      (let ((home (node-home-lambda ref)))
                        (if (eq home fun)
-                           (unless (node-tail-p dest)
+                           (unless (local-tail-local-p dest)
                              (return nil))
                            (let ((dest-ctran
                                    (or (node-next dest)
