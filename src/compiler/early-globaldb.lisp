@@ -224,8 +224,7 @@
                 (get-info-value ,name ,(meta-info-number meta-info))))
 
   (def (setf info) (new-value category kind name)
-    (let* (#+sb-xc-host (sb-xc:*gensym-counter* sb-xc:*gensym-counter*)
-           (tin (meta-info-number meta-info)) ; info-type id number
+    (let* ((tin (meta-info-number meta-info)) ; info-type id number
            (type-spec (meta-info-type-spec meta-info))
            (new (make-symbol "NEW"))
            (check

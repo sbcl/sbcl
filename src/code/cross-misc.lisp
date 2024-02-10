@@ -122,8 +122,6 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
-(defvar sb-xc:*gensym-counter* 0)
-
 ;;; While cross-compiling, we do not use *GENSYM-COUNTER* to make part
 ;;; of the new symbol's name.  This is for two reasons: firstly,
 ;;; genesis can coalesce uninterned symbols of similar names, which
