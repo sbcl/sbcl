@@ -88,7 +88,7 @@
         (buffer (make-array longest-unicode-char-name :element-type 'base-char))
         (bufpos longest-unicode-char-name))
    (declare (dynamic-extent buffer))
-   (declare ((mod 500) nbits)) ; the longest encoding is 385 bits for now
+   (declare (type (mod 500) nbits)) ; the longest encoding is 385 bits for now
    (labels ((choose (branch)
               (destructuring-bind (left right) (cdr branch)
                 (if (logbitp (decf nbits) code) right left)))
