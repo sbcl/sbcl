@@ -39,8 +39,8 @@
               ("ppc-thread" :big-endian :sb-thread))
     ("ppc64"  ("ppc64" :ppc64 :big-endian)) ; sb-thread is the default and required
     ("riscv"  ("riscv" :64-bit :little-endian :sb-thread))
-    ("sparc"  ("sparc-sunos" :big-endian :unix :sunos :elf)
-              ("sparc-linux" :big-endian :unix :linux :elf))
+    ("sparc"  ("sparc" :big-endian)
+              ("sparc-sunos" :big-endian :unix :sunos :elf))
     ("x86"    ("x86" :little-endian :largefile)
               ("x86-ascii" :little-endian :largefile (not :sb-unicode))
               ("x86-thread" :little-endian :largefile :sb-thread)
@@ -138,4 +138,5 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
         (funcall (intern "UPDATE-PERFECT-HASHFUNS" "SB-COLD")
                  sources filename))))
   (format t "~&Success~%"))
+(sb-ext:exit :code (sb-ext:process-exit-code *process*))
 EOF

@@ -44,15 +44,15 @@ obj/xbuild/riscv/xc.core: $(DEPS1)
 obj/xbuild/riscv.core: obj/xbuild/riscv/xc.core
 	$(SBCL) $(ARGS) riscv < $(SCRIPT2)
 
+obj/xbuild/sparc/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) sparc sparc "(:UNIX :LINUX :ELF :BIG-ENDIAN)" < $(SCRIPT1)
+obj/xbuild/sparc.core: obj/xbuild/sparc/xc.core
+	$(SBCL) $(ARGS) sparc < $(SCRIPT2)
+
 obj/xbuild/sparc-sunos/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) sparc-sunos sparc "(:BIG-ENDIAN :UNIX :SUNOS :ELF)" < $(SCRIPT1)
 obj/xbuild/sparc-sunos.core: obj/xbuild/sparc-sunos/xc.core
 	$(SBCL) $(ARGS) sparc-sunos < $(SCRIPT2)
-
-obj/xbuild/sparc-linux/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) sparc-linux sparc "(:BIG-ENDIAN :UNIX :LINUX :ELF)" < $(SCRIPT1)
-obj/xbuild/sparc-linux.core: obj/xbuild/sparc-linux/xc.core
-	$(SBCL) $(ARGS) sparc-linux < $(SCRIPT2)
 
 obj/xbuild/x86/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) x86 x86 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :LARGEFILE)" < $(SCRIPT1)
