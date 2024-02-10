@@ -1946,7 +1946,13 @@
   (declare (type segment segment)
            (type stream stream)
            (type disassem-state dstate))
-  (let ((*print-pretty* nil)) ; otherwise the pp conses hugely
+  (let ((*print-pretty* nil) ; otherwise the pp conses hugely
+        ;; million-element bit vectors are no fun to see
+        (*print-vector-length*
+         (min (if (integerp *print-vector-length*)
+                  *print-vector-length*
+                  most-positive-fixnum)
+              100)))
     (number-labels dstate)
     (map-segment-instructions
      (lambda (chunk inst)
