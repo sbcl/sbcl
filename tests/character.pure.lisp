@@ -220,4 +220,4 @@
        (unless line (return))
        (sb-int:binding* (((codepoint end) (read-from-string line))
                          (name (read-from-string line t nil :start end)))
-         (assert (string-equal (char-name (code-char codepoint)) name)))))))                        
+         (assert (string-equal (char-name (code-char codepoint)) name)))))))
