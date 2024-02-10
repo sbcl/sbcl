@@ -58,31 +58,59 @@
                  (huffman-node-key tree))))
     (finish-tree (merge-table (huffman-weights corpus)))))
 
-(defun huffman-decode (code tree)
-  (let ((original code))
-   (labels ((pop-bit ()
-              (let* ((bits (integer-length code))
-                     (bit (ldb (byte 1 (- bits 2)) code)))
-                (setf code (dpb 1 (byte 1 (- bits 2))
-                                (ldb (byte (- bits 1) 0) code)))
-                bit))
-            (choose (branch)
-              (destructuring-bind (key left right) branch
-                  (declare (ignore key))
-                (if (zerop (pop-bit))
-                    left
-                    right)))
+;; won't need this eval-when after moving this file into warm build
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; actually 88 (for now), but leave some wiggle room
+  (defconstant longest-unicode-char-name 96))
+;;; The :ALL-CHAR-NAMES test in character.pure.lisp shows that this decoder
+;;; is faster than and much less consy than the old one.
+;;; (time (...)) old way
+;;;   0.540 seconds of real time
+;;;  741,593,840 bytes consed
+;;; new way
+;;;   0.128 seconds of real time
+;;;  13,414,128 bytes consed
+
+;;; At the moment, OUTPUT is always passed as NIL but I plan to use it as an efficient
+;;; way to represent the name->char table. Consider: hash the name using PSXHASH
+;;; for case-insensitivity, then perfectly map the hash to an integer 0..N into a table
+;;; of characters; fetch the indexed character and decode its name into a dynamic-extent
+;;; string. If it matches the given name, then return that character.
+;;; It's like a SYMTBL in src/code/target-package where the value is its own key.
+;;; So we'd get rid of the two DOUBLE-VECTOR-BINARY-SEARCH calls and reduce the storage
+;;; per character to only 32 bits instead of 2 lispwords.
+(defun huffman-decode-into (output code tree)
+  (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
+           (integer code))
+  ;; The highest 1 bit acts only to demarcate the end of the encoding.
+  ;; Therefore the number of data bits in the encoding is 1 fewer than that.
+  (let ((nbits (1- (integer-length code)))
+        (buffer (make-array longest-unicode-char-name :element-type 'base-char))
+        (bufpos longest-unicode-char-name))
+   (declare (dynamic-extent buffer))
+   (declare ((mod 500) nbits)) ; the longest encoding is 385 bits for now
+   (labels ((choose (branch)
+              (destructuring-bind (left right) (cdr branch)
+                (if (logbitp (decf nbits) code) right left)))
             (decode (branch)
-              (when (zerop code)
-                (error "Invalid Huffman-code: ~S" original))
+              (when (zerop nbits)
+                (error "Invalid Huffman-code: ~S" code))
               (let ((next (choose branch)))
                  (cond ((consp next)
                         (decode next))
-                       ((< 1 code)
-                        (concatenate 'string next (decode tree)))
                        (t
-                        next)))))
-     (decode tree))))
+                        (when (> nbits 1) (decode tree))
+                        (setf (char buffer (decf bufpos))
+                              (char (the (simple-base-string 1) next) 0)))))))
+     (decode tree)
+     (cond (output
+            (replace output buffer :start2 bufpos)
+            (- (length output) bufpos)) ; return number of significant chars
+           (t
+            (subseq buffer bufpos))))))
+
+(defun huffman-decode (code tree)
+  (huffman-decode-into nil code tree))
 
 (defun huffman-match (char node)
   (if (consp node)
