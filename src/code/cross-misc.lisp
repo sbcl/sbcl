@@ -122,16 +122,42 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
-;;; We maintain a separate GENSYM counter since the host is allowed to
-;;; mutate its counter however it wishes.
 (defvar sb-xc:*gensym-counter* 0)
 
+;;; While cross-compiling, we do not use *GENSYM-COUNTER* to make part
+;;; of the new symbol's name.  This is for two reasons: firstly,
+;;; genesis can coalesce uninterned symbols of similar names, which
+;;; leads to significant space savings in the resulting core;
+;;; secondly, it is very hard to maintain a consistent state of
+;;; *GENSYM-COUNTER*, even if we attempt to maintain our own: the
+;;; presence of (EVAL-WHEN (:COMPILE-TOPLEVEL ...) ...) in expansions
+;;; of e.g. SB-XC:DEFMACRO, SB-XC:DEFINE-COMPILER-MACRO and so on can
+;;; lead to macro-functions of target macros on the host, which then
+;;; will GENSYM varying number of times depending on whether they are
+;;; minimally-compiled or not: the only way to guarantee identical
+;;; symbol names at the same point in the compilation is not to use
+;;; *GENSYM-COUNTER* at all.
+;;;
+;;; Not using *GENSYM-COUNTER* would not be an issue under normal
+;;; circumstances, modulo the demands of the language spec: the only
+;;; thing that matters for the typical use of GENSYMs in code is the
+;;; identity of the symbol, not its name.  However, the coalescing of
+;;; uninterned symbols by genesis introduces a potential pitfall: if a
+;;; macro-writing-macro generates symbols at first use that the
+;;; newly-defined macro will use when *it* expands, the coalescing in
+;;; genesis would lead to that inner macro no longer having the
+;;; correct expansion.  (Or equivalents, such as macros expanded
+;;; inside definitions of functions declaimed INLINE).  In the event
+;;; of truly weird behaviour of some macro leading the intrepid
+;;; maintainer to this comment: try turning off uninterned symbol
+;;; coalescing in genesis by redefining GET-UNINTERNED-SYMBOL; if
+;;; things work after that, find the offending use of GENSYM and make
+;;; sure that everything has a distinct symbol name.  (This is not an
+;;; issue for user code, which is compiled with a normal
+;;; implementation of GENSYM).
 (defun sb-xc:gensym (&optional (thing "G"))
   (declare (type string thing))
-  (let ((n sb-xc:*gensym-counter*))
-    (prog1
-        (make-symbol (concatenate 'string thing (write-to-string n :base 10 :radix nil :pretty nil)))
-      (incf sb-xc:*gensym-counter*))))
+  (make-symbol thing))
 
 ;;; These functions are needed for constant-folding.
 (defun simple-array-nil-p (object)
