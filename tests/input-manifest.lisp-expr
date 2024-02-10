@@ -9,6 +9,7 @@
  ("brothertree.impure.lisp"
   "src/code/brothertree.lisp")
  ("case.pure.lisp" "tests/case-test.lisp")
+ ("character.pure.lisp" "../output/ucd/ucd-names.lisp-expr")
  ("chill.test.sh"
   "src/cold/chill.lisp"
   "package-data-list.lisp-expr")

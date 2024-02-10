@@ -211,3 +211,13 @@
      (declare ((or (eql 5) (eql 10)) b))
      (typep (code-char b) 'base-char))
    (member t)))
+
+(with-test (:name :all-char-names :skipped-on (not :sb-unicode))
+  (with-open-file (f "../output/ucd/ucd-names.lisp-expr")
+    (read-line f) ; skip comment line
+    (loop
+     (let ((line (read-line f nil)))
+       (unless line (return))
+       (sb-int:binding* (((codepoint end) (read-from-string line))
+                         (name (read-from-string line t nil :start end)))
+         (assert (string-equal (char-name (code-char codepoint)) name)))))))                        

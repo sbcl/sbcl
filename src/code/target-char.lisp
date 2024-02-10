@@ -435,18 +435,6 @@ strings and symbols of length 1."
                    "Symbol name is not of length one: ~S" (list object))))
       (t (do-error "~S cannot be coerced to a character." (list object))))))
 
-(defun char-name (char)
-  "Return the name (a STRING) for a CHARACTER object."
-  (let ((char-code (char-code char)))
-    (or (second (assoc char-code *base-char-name-alist*))
-        (let ((h-code (double-vector-binary-search char-code
-                                                   +unicode-char-name-database+)))
-          (cond
-            (h-code
-             (huffman-decode h-code sb-unicode::+unicode-character-name-huffman-tree+))
-            (t
-             (format nil "U~X" char-code)))))))
-
 (defun name-char (name)
   "Given an argument acceptable to STRING, NAME-CHAR returns a character whose
 name is that string, if one exists. Otherwise, NIL is returned."
