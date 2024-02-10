@@ -212,12 +212,17 @@
      (typep (code-char b) 'base-char))
    (member t)))
 
-(with-test (:name :all-char-names :skipped-on (not :sb-unicode))
-  (with-open-file (f "../output/ucd/ucd-names.lisp-expr")
+(defun test-char-names (name-getter test-inputs)
+  (with-open-file (f test-inputs)
     (read-line f) ; skip comment line
     (loop
      (let ((line (read-line f nil)))
        (unless line (return))
        (sb-int:binding* (((codepoint end) (read-from-string line))
                          (name (read-from-string line t nil :start end)))
-         (assert (string-equal (char-name (code-char codepoint)) name)))))))
+         (assert (string-equal (funcall name-getter (code-char codepoint)) name)))))))
+
+(with-test (:name :all-char-names :skipped-on (not :sb-unicode))
+  (test-char-names #'char-name "../output/ucd/ucd-names.lisp-expr"))
+(with-test (:name :unicode-1-char-names :skipped-on (not :sb-unicode))
+  (test-char-names #'sb-unicode:unicode-1-name "../output/ucd/ucd1-names.lisp-expr"))

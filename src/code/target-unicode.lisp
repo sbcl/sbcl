@@ -119,49 +119,63 @@
          (when (and (< hash ,n) (= (aref ,key-array hash) code))
            (aref ,value-array hash))))))
 
-(defun char-name (char)
+(macrolet
+    ((lookup (database-name exceptions-alist-name direct-map-end form)
+       ;; DIRECT-MAP-END is an arbitrarily chosen codepoint below which we use char-code
+       ;; as an array index. It is an exclusive upper bound.
+       ;; Unused direct mappings waste memory.
+       (let* ((small-alist (symbol-value exceptions-alist-name))
+              (alist (mapcar (lambda (x) (cons (first x) (second x))) small-alist)))
+         (loop with db = (symbol-value database-name)
+               for i below (length db) by 2
+               unless (assoc (aref db i) small-alist)
+               do (push (cons (aref db i) (aref db (1+ i))) alist))
+         (let* ((max-codepoint (reduce #'max alist :key #'car))
+                (bits (make-array (- (1+ max-codepoint) direct-map-end)
+                                  :element-type 'bit :initial-element 0))
+                (sparse-pairs
+                 (remove-if (lambda (pair) (< (car pair) direct-map-end))
+                            alist))
+                (hashes (map '(array (unsigned-byte 32) (*)) #'car sparse-pairs))
+                (lexpr (cached-perfect-hash-lambda hashes))
+                (hashfn (sb-c::compile-perfect-hash lexpr hashes))
+                (result (make-array (+ direct-map-end (length sparse-pairs))
+                                    :initial-element nil)))
+           (dolist (pair alist)
+             (let ((cp (car pair)))
+               (if (< cp direct-map-end)
+                   (setf (svref result cp) (cdr pair))
+                   (let ((hash (funcall hashfn cp)))
+                     (setf (svref result (+ hash direct-map-end)) (cdr pair)
+                           (sbit bits (- cp direct-map-end)) 1)))))
+           `(let* ((char-code (char-code character))
+                   (name
+                    (cond ((< char-code ,direct-map-end)
+                           (svref ,result char-code)) ; could be NIL
+                          ;; This discards the keys (the characters themselves).
+                          ;; We ascertain that CHAR-CODE exists in the set via a bitmap.
+                          ((and (<= char-code ,max-codepoint)
+                                (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
+                           (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
+              ,form)))))
+(defun unicode-1-name (character)
+  "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
+from the name currently assigned to CHARACTER. Otherwise, returns NIL.
+This property has been officially obsoleted by the Unicode standard, and
+is only included for backwards compatibility."
+  (lookup +unicode-1-char-name-database+ nil 32
+          (if (integerp name)
+              (huffman-decode name +unicode-character-name-huffman-tree+)
+              name)))
+(defun char-name (character)
   "Return the name (a STRING) for a CHARACTER object."
-  (macrolet
-      ((generate-body ()
-         (let* ((small-alist sb-impl::*base-char-name-alist*)
-                (alist (mapcar (lambda (x) (cons (first x) (second x))) small-alist)))
-           (loop with db = sb-impl::+unicode-char-name-database+
-                 for i below (length db) by 2
-                 unless (assoc (aref db i) small-alist)
-                 do (push (cons (aref db i) (aref db (1+ i))) alist))
-           (let* ((max-codepoint (reduce #'max alist :key #'car))
-                  (direct-map-end #x800) ; exclusive upper bound. this was hand-chosen
-                  (bits (make-array (- (1+ max-codepoint) direct-map-end)
-                                    :element-type 'bit :initial-element 0))
-                  (sparse-pairs
-                   (remove-if (lambda (pair) (< (car pair) direct-map-end))
-                              alist))
-                  (hashes (map '(array (unsigned-byte 32) (*)) #'car sparse-pairs))
-                  (lexpr (cached-perfect-hash-lambda hashes))
-                  (hashfn (sb-c::compile-perfect-hash lexpr hashes))
-                  (result (make-array (+ direct-map-end (length sparse-pairs))
-                                      :initial-element nil)))
-             (dolist (pair alist)
-               (let ((cp (car pair)))
-                 (if (< cp direct-map-end)
-                     (setf (svref result cp) (cdr pair))
-                     (let ((hash (funcall hashfn cp)))
-                       (setf (svref result (+ hash direct-map-end)) (cdr pair)
-                             (sbit bits (- cp direct-map-end)) 1)))))
-             `(let ((name
-                     (cond ((< char-code ,direct-map-end)
-                            (svref ,result char-code)) ; could be NIL
-                           ((and (<= char-code ,max-codepoint)
-                                 (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
-                            (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
-                (cond ((integerp name)
-                       (huffman-decode name +unicode-character-name-huffman-tree+))
-                      ;; spec says this can return NIL, so why don't we?
-                      ((null name) (format nil "U~X" char-code))
-                      (t name)))))))
-    (let ((char-code (char-code char)))
-      (declare (notinline format)) ; will not be called on "reasonable" inputs
-      (generate-body))))
+  (declare (notinline format)) ; will not be called on "reasonable" inputs
+  (lookup sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist* #x800
+          (cond ((integerp name)
+                 (huffman-decode name +unicode-character-name-huffman-tree+))
+                ;; spec says this can return NIL, so why don't we?
+                ((null name) (format nil "U~X" char-code))
+                (t name)))))
 
 #+sb-unicode
 (macrolet ((lookup (arg)
@@ -348,17 +362,6 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
     (if block-index
         (aref #.(read-lisp-expr-file "block-names") block-index)
         :no-block)))
-
-(defun unicode-1-name (character)
-  "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
-from the name currently assigned to CHARACTER. Otherwise, returns NIL.
-This property has been officially obsoleted by the Unicode standard, and
-is only included for backwards compatibility."
-  (let* ((char-code (char-code character))
-         (h-code (double-vector-binary-search char-code
-                                              +unicode-1-char-name-database+)))
-    (when h-code
-      (huffman-decode h-code +unicode-character-name-huffman-tree+))))
 
 (defun age (character)
   "Returns the version of Unicode in which CHARACTER was assigned as a pair
