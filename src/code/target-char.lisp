@@ -434,36 +434,6 @@ strings and symbols of length 1."
                   (do-error
                    "Symbol name is not of length one: ~S" (list object))))
       (t (do-error "~S cannot be coerced to a character." (list object))))))
-
-(defun name-char (name)
-  "Given an argument acceptable to STRING, NAME-CHAR returns a character whose
-name is that string, if one exists. Otherwise, NIL is returned."
-  (let ((char-code (car (rassoc-if (lambda (names)
-                                     (member name names :test #'string-equal))
-                                   *base-char-name-alist*))))
-    (cond (char-code
-           (code-char char-code))
-          ((let ((start (cond ((eql (string-not-equal "U+" name) 2)
-                               2)
-                              ((eql (string-not-equal "U" name) 1)
-                               1))))
-             (and start
-                  (loop for i from start
-                        below (length name)
-                        always (digit-char-p (char name i) 16))
-                  (code-char (parse-integer name :start start :radix 16)))))
-          (t
-           (let ((encoding (huffman-encode (string-upcase name)
-                                           sb-unicode::+unicode-character-name-huffman-tree+)))
-             (when encoding
-               (let ((char-code
-                       (or
-                        (double-vector-binary-search encoding
-                                                     +unicode-name-char-database+)
-                        (double-vector-binary-search encoding
-                                                     +unicode-1-name-char-database+))))
-                 (and char-code
-                      (code-char char-code)))))))))
 
 ;;;; predicates
 

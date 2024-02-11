@@ -71,15 +71,7 @@
 ;;;   0.128 seconds of real time
 ;;;  13,414,128 bytes consed
 
-;;; At the moment, OUTPUT is always passed as NIL but I plan to use it as an efficient
-;;; way to represent the name->char table. Consider: hash the name using PSXHASH
-;;; for case-insensitivity, then perfectly map the hash to an integer 0..N into a table
-;;; of characters; fetch the indexed character and decode its name into a dynamic-extent
-;;; string. If it matches the given name, then return that character.
-;;; It's like a SYMTBL in src/code/target-package where the value is its own key.
-;;; So we'd get rid of the two DOUBLE-VECTOR-BINARY-SEARCH calls and reduce the storage
-;;; per character to only 32 bits instead of 2 lispwords.
-(defun huffman-decode-into (output code tree)
+(defun huffman-decode (tree code output)
   (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
            (integer code))
   ;; The highest 1 bit acts only to demarcate the end of the encoding.
@@ -108,9 +100,6 @@
             (- (length output) bufpos)) ; return number of significant chars
            (t
             (subseq buffer bufpos))))))
-
-(defun huffman-decode (code tree)
-  (huffman-decode-into nil code tree))
 
 (defun huffman-match (char node)
   (if (consp node)

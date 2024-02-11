@@ -120,7 +120,7 @@
            (aref ,value-array hash))))))
 
 (macrolet
-    ((lookup (database-name exceptions-alist-name direct-map-end form)
+    ((lookup (database-name exceptions-alist-name direct-map-end)
        ;; DIRECT-MAP-END is an arbitrarily chosen codepoint below which we use char-code
        ;; as an array index. It is an exclusive upper bound.
        ;; Unused direct mappings waste memory.
@@ -157,25 +157,186 @@
                           ((and (<= char-code ,max-codepoint)
                                 (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
                            (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
-              ,form)))))
+              (if (integerp name)
+                  (huffman-decode +unicode-character-name-huffman-tree+ name result)
+                  name))))))
+(defun unicode-1-char->name (character result)
+  (lookup +unicode-1-char-name-database+ nil 32))
+(defun unicode-char->name (character result)
+  (lookup sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist* #x800)))
+
 (defun unicode-1-name (character)
   "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
 from the name currently assigned to CHARACTER. Otherwise, returns NIL.
 This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
-  (lookup +unicode-1-char-name-database+ nil 32
-          (if (integerp name)
-              (huffman-decode name +unicode-character-name-huffman-tree+)
-              name)))
+  (unicode-1-char->name character nil))
+
 (defun char-name (character)
   "Return the name (a STRING) for a CHARACTER object."
   (declare (notinline format)) ; will not be called on "reasonable" inputs
-  (lookup sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist* #x800
-          (cond ((integerp name)
-                 (huffman-decode name +unicode-character-name-huffman-tree+))
-                ;; spec says this can return NIL, so why don't we?
-                ((null name) (format nil "U~X" char-code))
-                (t name)))))
+  (or (unicode-char->name character nil)
+      ;; spec says this can return NIL, so why don't we?
+      (format nil "U~X" (char-code character))))
+
+;;; The NAME-CHAR function perfectly hashes the PSXHASH of name to an index
+;;; in a table of characters. Unfortunately PSXHASH is not good enough to feed
+;;; into the perfect hash generator.
+;;; For 64-bit, it almost is - we just add a murmur3 final mix because there exists
+;;; a 32-bit slice of the full hashes that are all distinct.
+;;; For 32-bit it's far from adequate because the PSXHASH of some strings collide:
+;;; * (eql (psxhash "HENTAIGANA_LETTER_SE-5") (psxhash "SHARADA_LETTER_VOCALIC_L")) => T
+;;; * (eql (psxhash "TANGSA_LETTER_UEQ") (psxhash "BOPOMOFO_LETTER_SH")) => T
+;;; but we can implement an ad-hoc final mix that makes the outputs differ
+;;; just enough to resolve all collisions.
+;;;
+;;; The mechanism can be extended as follows if collisions are unavoidable:
+;;; - take all names that do not have any collisions, and apply the fast logic
+;;; - build a separate table of names where collisions occur; instead of those
+;;;   table cells containing 1 character, they contain >1 to try inverting
+;;;   via CHAR-NAME.
+;;; Each lookup would have to search in both collection of characters,
+;;; not to mention that we already have to look in 3 different tables.
+;;;
+;;; The main goal of all this was to reduce the memory usage. But it's also much
+;;; faster as it does not call STRING-UPCASE or HUFFMAN-ENCODE. Core sizes:
+;;;          64-bit    32-bit
+;;;   old: 38114496  25629352
+;;;   new: 37524432  25485476
+;;;
+;;; Speed Test:
+#|
+(defvar *names*
+ (with-open-file (f "output/ucd/ucd-names.lisp-expr")
+   (read-line f)
+   (let (line) (loop while (setq line (read-line f nil))
+                     collect (read-from-string line t nil
+                              :start (position #\space line))))))
+(defun timeit () (loop for name in *names* count (name-char name)))
+|#
+;;; * (time (timeit)) ; old
+;;;   0.584 seconds of real time
+;;;   161,194,464 bytes consed
+;;; * (time (timeit)) ; new
+;;;   0.108 seconds of real time
+;;;   0 bytes consed
+(eval-when (:compile-toplevel :execute)
+(defmacro psxhash-to-name-hash (h str)
+  (declare (ignorable str))
+  #+64-bit `(ldb (byte 32 32) (sb-impl::murmur3-fmix-word (sb-ext:truly-the fixnum ,h)))
+  #-64-bit `(word-mix (sb-impl::murmur3-fmix-word (sb-ext:truly-the fixnum ,h))
+                      (let ((c (char-code (char ,str 0))))
+                        (if (or (<= (char-code #\a) c (char-code #\z))
+                                (<= (char-code #\A) c (char-code #\Z)))
+                            (sb-impl::murmur3-fmix-word (logand c #b11111))
+                            0))))
+;; This actually doesn't rely critically on caching the lambda.
+;; The compute times are quite tolerable:
+;; - Computed perfect hash of 1978 keys: 0.024 sec
+;; - Computed perfect hash of 45995 keys: 0.204 sec
+;; - Computed perfect hash of 181 keys: 0.004 sec
+;; The psxhash values differ by machine word size and I don't really
+;; see the need to cache.
+(defun ucd-name->char-expander (file charname-decoder temp-string)
+  ;; Figure out whether any names incur hash collisions
+  (let ((ht (make-hash-table))
+        (any-collisions))
+    (with-open-file (stream file)
+      (read-line stream) ; skip comment line
+      (loop
+        (let ((line (read-line stream nil)))
+          (unless line (return))
+          (sb-int:binding* (((codepoint end) (read-from-string line))
+                            (name (read-from-string line t nil :start end)))
+            (let ((name-hash (psxhash-to-name-hash (psxhash name) name)))
+              (when (gethash name-hash ht)
+                (setf any-collisions t))
+              (push (cons codepoint name) (gethash name-hash ht)))))))
+    (when any-collisions
+      (format *error-output* "~&Hash collisions:~%")
+      (maphash (lambda (k v) (when (cdr v) (format t "~X = ~S~%" k v))) ht)
+      (error "Can't proceed. Please find a better string hashing algorithm"))
+    (let* ((hashes (make-array (hash-table-count ht)
+                               :initial-contents
+                               (loop for k being each hash-key of ht collect k)
+                               :element-type '(unsigned-byte 32)))
+           (lexpr (sb-c:make-perfect-hash-lambda hashes))
+           (hashfn (sb-c::compile-perfect-hash lexpr hashes))
+           ;; this could be shrunk to a UB8 array with each codepoint taking 3 octets
+           ;; but it would at best save only about 46kb
+           (chars (make-array (length hashes) :element-type '(signed-byte 32))))
+      (dohash ((k v) ht)
+        (setf (aref chars (funcall hashfn k)) (caar v)))
+      `(let ((index (,lexpr name-hash)))
+         (when (< index ,(length hashes))
+           (let* ((candidate (code-char (aref ,chars index)))
+                  (length (,charname-decoder candidate ,temp-string)))
+             (when (and (= length (length string))
+                        (string-equal ,temp-string string :end1 length))
+               candidate))))))))
+
+(macrolet ((try-base-char ()
+             (flet ((string-prehash (s) (ldb (byte 32 0) (psxhash s))))
+               (let* ((alist sb-impl::*base-char-name-alist*)
+                      (hashes (mapcan (lambda (x) (mapcar #'string-prehash x)) alist)))
+                 (or (= (length (remove-duplicates hashes)) (length hashes))
+                     (error "can't perfectly hash *base-char-name-alist*"))
+                 (setq hashes (coerce hashes '(array (unsigned-byte 32) (*))))
+                 (let* ((lexpr (sb-c:make-perfect-hash-lambda hashes)) ; don't cache
+                        (hashfn (sb-c::compile-perfect-hash lexpr hashes))
+                        (bins (make-array (length hashes) :initial-element nil)))
+                   (dolist (list alist)
+                     (dolist (name (cdr list))
+                       (let ((index (funcall hashfn (string-prehash name))))
+                         (aver (null (aref bins index)))
+                         (setf (aref bins index)
+                               (cons (code-char (car list)) (cdr list))))))
+                   `(let ((index (,lexpr name-hash)))
+                      (when (< index ,(length bins))
+                        (let ((candidate (svref ,bins index)))
+                          (when (member string (cdr candidate) :test #'string-equal)
+                            (car candidate)))))))))
+           (try-unicode (file charname-decoder)
+             (ucd-name->char-expander (lisp-expr-file-pathname file)
+                                      charname-decoder 'name-buffer)))
+(defun name-char (name)
+  "Given an argument acceptable to STRING, NAME-CHAR returns a character whose
+name is that string, if one exists. Otherwise, NIL is returned."
+  ;; Avoid a hash computation if it looks like NAME is comprised of hex digits.
+  ;; Does the Unicode Consortium promise never to name things
+  ;; like "UBAD" ("accidental hex")? I sure as hell hope it can't happen.
+  (let* ((string (string name))
+         (len (length string)))
+    (when (zerop len) (return-from name-char nil))
+    (when (char-equal (char string 0) #\U)
+      (let ((start (if (and (>= len 2) (char= (char string 1) #\+)) 2 1)))
+        ;; To prevent whitespace or +/- sign, just check DIGIT-CHAR-P on the next char.
+        (when (and (> len start) (digit-char-p (char string start) 16))
+          (multiple-value-bind (val end)
+              (parse-integer string :start start :radix 16 :junk-allowed t)
+            ;; It's not ok if PARSE-INTEGER did not consume all input.
+            ;; If a character were officially named UFAAAAA don't fail on it.
+            (when (and val (< val char-code-limit) (= (length name) end))
+              (return-from name-char (code-char val)))))))
+    (let ((psxhash (psxhash string)))
+      ;; The base char name alist is short enough that PSXHASH's result
+      ;; contains enough entropy to admit a perfect hash.
+      ;; The unicode lists need a final mix with improved avalanche behavior.
+      (or (let ((name-hash (ldb (byte 32 0) psxhash)))
+            (try-base-char))
+          ;; We might want to change this to use alien strings for the
+          ;; architectures that won't stack-allocate a string.
+          ;; On the other hand, that's a really crappy limitation of those
+          ;; which if rectified would improve more than just this one thing.
+          (let ((name-hash (psxhash-to-name-hash psxhash string))
+                (name-buffer (make-array sb-impl::longest-unicode-char-name
+                                         :element-type 'base-char)))
+            ;; We might want to use a local alien string for the backends which
+            ;; can't make DX strings thought "want" isn't exactly how I feel
+            ;; about that. I'd rather DX strings work as intended.
+            (declare (dynamic-extent name-buffer))
+            (or (try-unicode "ucd-names" unicode-char->name)
+                (try-unicode "ucd1-names" unicode-1-char->name))))))))
 
 #+sb-unicode
 (macrolet ((lookup (arg)
