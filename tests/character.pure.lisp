@@ -220,19 +220,29 @@
        (unless line (return))
        (sb-int:binding* (((codepoint end) (read-from-string line))
                          (name (read-from-string line t nil :start end)))
-         (assert (string-equal (funcall name-getter (code-char codepoint)) name))
-         (let ((found (name-char name)))
-           (unless found
-             (warn "Didn't find ~S using ~S" name name-getter))
-           (when (and (/= (char-code found) codepoint) err/warn)
-             (funcall err/warn
-                      "Found wrong char from ~S~% * wanted codepoint ~x (now named ~S)
+       (if (>= codepoint char-code-limit)
+           ;; The problem with BELL is that in modern Unicode, "BELL" is the
+           ;; name of the character at code point #x1F514 but since #-sb-unicode
+           ;; does not have that character, it instead finds the character
+           ;; under its deprecated Unicode 1.0 name at codepoint 7.
+           ;; So when feeding in the test data from 'ucd-names.lisp-expr'
+           ;; - that is, the "new" names - we DO find something where this otherwise
+           ;; asserts that it doesn't find.  I give up.
+           (unless (string= name "BELL")
+             (assert (not (name-char name))))
+           (let ((found (name-char name)))
+             (assert (string-equal (funcall name-getter (code-char codepoint)) name))
+             (unless found
+               (warn "Didn't find ~S using ~S" name name-getter))
+             (when (and (/= (char-code found) codepoint) err/warn)
+               (funcall err/warn
+                        "Found wrong char from ~S~% * wanted codepoint ~x (now named ~S)
  * actually found ~x (now named ~A)"
-                   name
-                   codepoint (char-name (code-char codepoint))
-                   (char-code found) (char-name found)))))))))
+                        name
+                        codepoint (char-name (code-char codepoint))
+                        (char-code found) (char-name found))))))))))
 
-(with-test (:name :all-char-names :skipped-on (not :sb-unicode))
+(with-test (:name :all-char-names)
   (test-char-names #'char-name "../output/ucd/ucd-names.lisp-expr" 'error))
 ;;; If enabled, the warning shows about 60 instances of:
 ;;;   WARNING: Found wrong thing from "BELL"
@@ -242,6 +252,6 @@
 ;;;    * wanted codepoint 1B7 (now named "LATIN_CAPITAL_LETTER_EZH")
 ;;;    * actually found 21C (now named LATIN_CAPITAL_LETTER_YOGH)
 ;;; which aren't relevant since unicode-1 names are deprecated.
-(with-test (:name :unicode-1-char-names :skipped-on (not :sb-unicode))
+(with-test (:name :unicode-1-char-names)
   (test-char-names #'sb-unicode:unicode-1-name "../output/ucd/ucd1-names.lisp-expr"
                    nil))

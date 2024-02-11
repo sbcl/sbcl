@@ -54,6 +54,9 @@
     (lisp-expr-file-pathname "tools-for-build/unicode-phash"))
   (defvar *phash-cache-file-contents* nil)
   (defun cached-perfect-hash-lambda (keys)
+    (when (<= (length keys) 300) ; don't bother with the cache
+      (return-from cached-perfect-hash-lambda
+        (sb-c:make-perfect-hash-lambda keys)))
     (unless *phash-cache-file-contents*
       (let ((ht (make-hash-table :test 'equalp)))
         (setf *phash-cache-file-contents* ht)
@@ -119,8 +122,35 @@
          (when (and (< hash ,n) (= (aref ,key-array hash) code))
            (aref ,value-array hash))))))
 
+;;; This macro contains an unsightly KLUDGE - possibly having to do with support of
+;;; Unicode 1.0 char names but I'm not certain - and the fact that we don't Huffman-encode
+;;; *BASE-CHAR-NAME-ALIST*. The uncertainty is that my failing example was from ucd1-names
+;;; with a non-Unicode build, but I think it was a mere conincidence.
+;;; The underlying bug was that the vector which should contain only Huffman encodings
+;;; also contains strings. The resulting failure was as follows: you call NAME-CHAR on any
+;;; string whose perturbed PSXHASH maps to a cell containing a string. We returned that
+;;; string to NAME-CHAR where it expected an integer result from HUFFMAN-DECODE.
+;;;
+;;; I don't know why it never happened in #+sb-unicode, but I think it's simply that all
+;;; inputs in both ucd-names files are legal and map to exactly what they should under
+;;; the perfect hash. But by random luck under #-sb-unicode, some test string that should
+;;; have made NAME-CHAR return NIL crashed.
+;;; Specifically it was "LATIN_SMALL_LETTER_E_CIRCUMFLEX" from the ucd1 test file
+;;; but there were probably other examples. I didn't go looking. Incidentally the new name
+;;; of that is "LATIN_SMALL_LETTER_E_WITH_CIRCUMFLEX" but that's irrelevant.
+;;;
+;;; The temporary fix is that if a string buffer is provided, we have to make this macro
+;;; act as though it _always_ Huffman-decoded something, which means returning a count
+;;; of characters, and never just a string.
+;;; The permanent fix is that the names of base chars should be stored Huffman-encoded.
+;;;
+;;; And speaking of that example cited above, you may be wondering why NAME-CHAR crashed
+;;; if code point 234 exists regardless of +/- sb-unicode. That's simply because we look
+;;; in the unicode-1 names only after the "good" names. Flipping the lookup order would
+;;; not help the underlying problem that any bad input could randomly hash to a cell that
+;;; didn't contain an integer, and therefore would similarly crash.
 (macrolet
-    ((lookup (database-name exceptions-alist-name direct-map-end)
+    ((char->name (database-name exceptions-alist-name direct-map-end)
        ;; DIRECT-MAP-END is an arbitrarily chosen codepoint below which we use char-code
        ;; as an array index. It is an exclusive upper bound.
        ;; Unused direct mappings waste memory.
@@ -128,7 +158,8 @@
               (alist (mapcar (lambda (x) (cons (first x) (second x))) small-alist)))
          (loop with db = (symbol-value database-name)
                for i below (length db) by 2
-               unless (assoc (aref db i) small-alist)
+               unless (or (>= (aref db i) char-code-limit)
+                          (assoc (aref db i) small-alist))
                do (push (cons (aref db i) (aref db (1+ i))) alist))
          (let* ((max-codepoint (reduce #'max alist :key #'car))
                 (bits (make-array (- (1+ max-codepoint) direct-map-end)
@@ -149,7 +180,7 @@
                      (setf (svref result (+ hash direct-map-end)) (cdr pair)
                            (sbit bits (- cp direct-map-end)) 1)))))
            `(let* ((char-code (char-code character))
-                   (name
+                   (h-code ; the Huffman-encoded name (usually)
                     (cond ((< char-code ,direct-map-end)
                            (svref ,result char-code)) ; could be NIL
                           ;; This discards the keys (the characters themselves).
@@ -157,13 +188,19 @@
                           ((and (<= char-code ,max-codepoint)
                                 (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
                            (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
-              (if (integerp name)
-                  (huffman-decode +unicode-character-name-huffman-tree+ name result)
-                  name))))))
+              (cond ((integerp h-code)
+                     (huffman-decode +unicode-character-name-huffman-tree+ h-code result))
+                    ((and result (stringp h-code))
+                     ;; KLUDGE/FIXME - see comments at top
+                     (replace result h-code)
+                     (length h-code))
+                    (t
+                     h-code)))))))
 (defun unicode-1-char->name (character result)
-  (lookup +unicode-1-char-name-database+ nil 32))
+  (char->name +unicode-1-char-name-database+ nil 32))
 (defun unicode-char->name (character result)
-  (lookup sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist* #x800)))
+  (char->name sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist*
+               #-sb-unicode 32 #+sb-unicode #x800)))
 
 (defun unicode-1-name (character)
   "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
@@ -248,10 +285,11 @@ is only included for backwards compatibility."
           (unless line (return))
           (sb-int:binding* (((codepoint end) (read-from-string line))
                             (name (read-from-string line t nil :start end)))
-            (let ((name-hash (psxhash-to-name-hash (psxhash name) name)))
-              (when (gethash name-hash ht)
-                (setf any-collisions t))
-              (push (cons codepoint name) (gethash name-hash ht)))))))
+            (when (< codepoint char-code-limit)
+              (let ((name-hash (psxhash-to-name-hash (psxhash name) name)))
+                (when (gethash name-hash ht)
+                  (setf any-collisions t))
+                (push (cons codepoint name) (gethash name-hash ht))))))))
     (when any-collisions
       (format *error-output* "~&Hash collisions:~%")
       (maphash (lambda (k v) (when (cdr v) (format t "~X = ~S~%" k v))) ht)
