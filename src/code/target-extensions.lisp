@@ -100,26 +100,6 @@ these hooks.")
   (let ((index (binary-search* value seq key)))
     (if index
         (svref seq index))))
-
-(defun double-vector-binary-search (value vector)
-  (declare (simple-vector vector)
-           (optimize speed)
-           (integer value))
-  (labels ((recurse (start end)
-             (declare (type index start end))
-             (when (< start end)
-               (let* ((i (+ start (truncate (- end start) 2)))
-                      (elt (svref vector (truly-the index (* 2 i)))))
-                 (declare (type integer elt)
-                          (type index i))
-                 (cond ((< value elt)
-                        (recurse start i))
-                       ((> value elt)
-                        (recurse (1+ i) end))
-                       (t
-                        (svref vector (truly-the index (1+ (* 2 i))))))))))
-    (recurse 0 (truncate (length vector) 2))))
-
 
 ;;;; helpers for C library calls
 
