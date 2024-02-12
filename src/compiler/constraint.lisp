@@ -1323,7 +1323,7 @@
           (let ((fun (combination-lambda node))
                 (call-in (combination-constraints-in node)))
 
-            (when (and (null (functional-kind fun))
+            (when (and (memq (functional-kind fun) '(nil :assignment :optional :cleanup))
                        (not (and call-in
                                  (conset= call-in gen))))
               (setf (combination-constraints-in node)
@@ -1481,7 +1481,7 @@
         (bind (block-start-node block)))
     (cond
       ((and (bind-p bind)
-            (and (eq (functional-kind (bind-lambda bind)) nil)))
+            (memq (functional-kind (bind-lambda bind)) '(nil :assignment :optional :cleanup)))
        (let ((fun (bind-lambda bind)))
          (loop for ref in (lambda-refs fun)
                for call = (node-dest ref)
@@ -1526,7 +1526,7 @@
             (bind (block-start-node block))
             fun)
         (if (and (bind-p bind)
-                 (and (eq (functional-kind (setf fun (bind-lambda bind))) nil)))
+                 (memq (functional-kind (setf fun (bind-lambda bind))) '(nil :assignment :optional :cleanup)))
             (loop for ref in (lambda-refs fun)
                   for call = (node-dest ref)
                   for call-block = (and call

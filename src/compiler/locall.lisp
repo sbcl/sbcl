@@ -593,6 +593,8 @@
         (sset-adjoin ep (lambda-calls-or-closes (node-home-lambda call)))
         (merge-tail-sets call ep)
         (change-ref-leaf ref ep)
+        ;; For constraints
+        (node-ends-block call)
         (if (singleton-p args)
             (assert-lvar-type
              (first args)

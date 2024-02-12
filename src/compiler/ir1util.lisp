@@ -1385,7 +1385,8 @@
                    (let ((last (block-last block)))
                      (and (combination-p last)
                           (eq (combination-kind last) :local)
-                          (null (functional-kind (combination-lambda last)))))))
+                          (memq (functional-kind (combination-lambda last))
+                                '(nil :assignment :optional :cleanup))))))
              nil)
             (t
              (join-blocks block next)

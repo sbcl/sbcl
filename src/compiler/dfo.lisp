@@ -136,7 +136,8 @@
             fun)
         (when (and (combination-p last)
                    (eq (combination-kind last) :local)
-                   (null (functional-kind (setf fun (combination-lambda last)))))
+                   (memq (functional-kind (setf fun (combination-lambda last)))
+                         '(nil :assignment :optional :cleanup)))
           (find-dfo-aux (lambda-block fun) head component)))
 
       (remove-from-dfo block)
