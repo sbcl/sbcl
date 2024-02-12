@@ -3407,12 +3407,7 @@ possibly temporarily, because it might be used internally.")
            "CLEAR-FLAG"
            "PACK-3-CODEPOINTS"
 
-            ;; Huffman trees
-
-           "HUFFMAN-ENCODE"
-           "HUFFMAN-DECODE"
-           "BINARY-SEARCH"
-           "DOUBLE-VECTOR-BINARY-SEARCH"))
+           "BINARY-SEARCH"))
 
 (defpackage* "SB-MOP"
   (:documentation

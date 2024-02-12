@@ -122,6 +122,26 @@
          (when (and (< hash ,n) (= (aref ,key-array hash) code))
            (aref ,value-array hash))))))
 
+(eval-when (:compile-toplevel)
+  (defun call-with-name-db-entries (function file)
+    (with-open-file (stream (lisp-expr-file-pathname file))
+      (loop for code-point = (read stream nil nil)
+            for char-name = (string-upcase (read stream nil nil))
+            while (and code-point (< code-point char-code-limit))
+            do (funcall function code-point (string-upcase char-name)))))
+  (defun charname-tree-maker (&aux (names (make-hash-table :test 'equal)))
+    (dolist (db '("ucd-names" "ucd1-names"))
+      (call-with-name-db-entries (lambda (codepoint name)
+                                   (declare (ignore codepoint))
+                                   (setf (gethash name names) t))
+                                 db))
+    (make-huffman-tree (loop for k being each hash-key of names collect k))))
+;; There's no reason not to encode some of the base char names, but we currently don't.
+;; Very few share prefixes so I would not expect much compression, however
+;; it would be nice to remove the KLUDGE explained below.
+(defconstant-eqx +character-name-huffman-tree+ '#.(charname-tree-maker)
+  #'equal)
+
 ;;; This macro contains an unsightly KLUDGE - possibly having to do with support of
 ;;; Unicode 1.0 char names but I'm not certain - and the fact that we don't Huffman-encode
 ;;; *BASE-CHAR-NAME-ALIST*. The uncertainty is that my failing example was from ucd1-names
@@ -156,11 +176,12 @@
        ;; Unused direct mappings waste memory.
        (let* ((small-alist (symbol-value exceptions-alist-name))
               (alist (mapcar (lambda (x) (cons (first x) (second x))) small-alist)))
-         (loop with db = (symbol-value database-name)
-               for i below (length db) by 2
-               unless (or (>= (aref db i) char-code-limit)
-                          (assoc (aref db i) small-alist))
-               do (push (cons (aref db i) (aref db (1+ i))) alist))
+         (call-with-name-db-entries
+          (lambda (codepoint name)
+            (unless (assoc codepoint small-alist)
+              (push (cons codepoint (huffman-encode name +character-name-huffman-tree+))
+                    alist)))
+          database-name)
          (let* ((max-codepoint (reduce #'max alist :key #'car))
                 (bits (make-array (- (1+ max-codepoint) direct-map-end)
                                   :element-type 'bit :initial-element 0))
@@ -189,7 +210,7 @@
                                 (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
                            (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
               (cond ((integerp h-code)
-                     (huffman-decode +unicode-character-name-huffman-tree+ h-code result))
+                     (huffman-decode +character-name-huffman-tree+ h-code result))
                     ((and result (stringp h-code))
                      ;; KLUDGE/FIXME - see comments at top
                      (replace result h-code)
@@ -197,9 +218,9 @@
                     (t
                      h-code)))))))
 (defun unicode-1-char->name (character result)
-  (char->name +unicode-1-char-name-database+ nil 32))
+  (char->name "ucd1-names" nil 32))
 (defun unicode-char->name (character result)
-  (char->name sb-impl::+unicode-char-name-database+ sb-impl::*base-char-name-alist*
+  (char->name "ucd-names" *base-char-name-alist*
                #-sb-unicode 32 #+sb-unicode #x800)))
 
 (defun unicode-1-name (character)
@@ -315,7 +336,7 @@ is only included for backwards compatibility."
 
 (macrolet ((try-base-char ()
              (flet ((string-prehash (s) (ldb (byte 32 0) (psxhash s))))
-               (let* ((alist sb-impl::*base-char-name-alist*)
+               (let* ((alist *base-char-name-alist*)
                       (hashes (mapcan (lambda (x) (mapcar #'string-prehash x)) alist)))
                  (or (= (length (remove-duplicates hashes)) (length hashes))
                      (error "can't perfectly hash *base-char-name-alist*"))
@@ -367,7 +388,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
           ;; On the other hand, that's a really crappy limitation of those
           ;; which if rectified would improve more than just this one thing.
           (let ((name-hash (psxhash-to-name-hash psxhash string))
-                (name-buffer (make-array sb-impl::longest-unicode-char-name
+                (name-buffer (make-array longest-unicode-char-name
                                          :element-type 'base-char)))
             ;; We might want to use a local alien string for the backends which
             ;; can't make DX strings thought "want" isn't exactly how I feel

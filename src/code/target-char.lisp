@@ -159,85 +159,10 @@
                                      (setf (aref table (* i 2)) lower
                                            (aref table (1+ (* i 2))) upper)))))
                           `((defconstant-eqx +character-unicode-cases+ ,unicode-table #'equalp)
-                            (defconstant-eqx +character-cases+ ,table #'equalp)))
-
-                    ,@(with-open-file
-                         (stream (file "ucd-names" "lisp-expr"))
-                       (with-open-file (u1-stream (file "ucd1-names" "lisp-expr"))
-                         (flet ((convert-to-double-vector (vector &optional reversed)
-                                  (let ((result (make-array (* (length vector) 2))))
-                                    (loop for (code . name) across vector
-                                          for i by 2
-                                          do
-                                          (when reversed
-                                            (rotatef code name))
-                                          (setf (aref result i) code
-                                                (aref result (1+ i)) name))
-                                    result)))
-                           (let ((names (make-hash-table))
-                                 (u1-names (make-hash-table)))
-                             (loop
-                               for code-point = (read stream nil nil)
-                               for char-name = (string-upcase (read stream nil nil))
-                               while code-point
-                               do (setf (gethash code-point names) char-name))
-                             (loop
-                               for code-point = (read u1-stream nil nil)
-                               for char-name = (string-upcase (read u1-stream nil nil))
-                               while code-point
-                               do (setf (gethash code-point u1-names) char-name))
-                             (let ((tree
-                                     (make-huffman-tree
-                                      (let (list)
-                                        (maphash (lambda (code name)
-                                                   (declare (ignore code))
-                                                   (push name list))
-                                                 names)
-                                        (maphash (lambda (code u1-name)
-                                                   (declare (ignore code))
-                                                   (push u1-name list))
-                                                 u1-names)
-                                        list)))
-                                   (code->name
-                                     (make-array (hash-table-count names)
-                                                 :fill-pointer 0))
-                                   (name->code nil)
-                                   (code->u1-name
-                                     (make-array (hash-table-count u1-names)
-                                                 :fill-pointer 0))
-                                   (u1-name->code nil))
-                               (maphash (lambda (code name)
-                                          (vector-push
-                                           (cons code (huffman-encode name tree))
-                                           code->name))
-                                        names)
-                               (maphash (lambda (code name)
-                                          (vector-push
-                                           (cons code (huffman-encode name tree))
-                                           code->u1-name))
-                                        u1-names)
-                               (setf name->code
-                                     (sort (copy-seq code->name) #'< :key #'cdr)
-                                     code->name
-                                     (sort (copy-seq name->code) #'< :key #'car)
-                                     u1-name->code
-                                     (sort (copy-seq code->u1-name) #'< :key #'cdr)
-                                     code->u1-name
-                                     (sort (copy-seq u1-name->code) #'< :key #'car))
-                               `((defconstant-eqx +unicode-char-name-database+
-                                     ,(convert-to-double-vector code->name) #'equalp)
-                                 (defconstant-eqx +unicode-name-char-database+
-                                     ,(convert-to-double-vector name->code t) #'equalp)
-                                 (defconstant-eqx sb-unicode::+unicode-1-char-name-database+
-                                     ,(convert-to-double-vector code->u1-name) #'equalp)
-                                 (defconstant-eqx +unicode-1-name-char-database+
-                                     ,(convert-to-double-vector u1-name->code t) #'equalp)
-                                 (defconstant-eqx sb-unicode::+unicode-character-name-huffman-tree+
-                                     ',tree #'equal))))))))))))
-
+                            (defconstant-eqx +character-cases+ ,table #'equalp))))))))
   (frob))
 
-(define-load-time-global *base-char-name-alist*
+(define-load-time-global sb-unicode::*base-char-name-alist*
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.

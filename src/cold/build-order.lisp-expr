@@ -165,8 +165,6 @@
 
  ("src/code/early-float")
 
- ("src/code/huffman")
-
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
  ("src/code/early-time" :c-headers)
 
@@ -627,7 +625,8 @@
   "src/interpreter/special-forms"
   "src/interpreter/eval"
   "src/interpreter/debug")
- ("src/code/target-unicode")
+ ("src/code/huffman"
+  "src/code/target-unicode")
 
  ;; For an easy core size decrease by 3.5% put :UNICODE-LITE in
  ;; features to exclude a few external-formats that you'll probably

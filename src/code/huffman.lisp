@@ -10,11 +10,12 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL")
+(in-package "SB-UNICODE")
 
+(eval-when (:compile-toplevel :execute)
 (defstruct (huffman-node (:constructor make-huffman-node (key weight))
                          (:copier nil))
-  (key nil :read-only t)
+  (key nil :read-only t :type simple-base-string)
   (weight nil :read-only t))
 
 (defstruct (huffman-pair
@@ -22,14 +23,14 @@
              (:copier nil)
              (:constructor make-huffman-pair
                            (left right &aux
-                                 (key   (concatenate 'string
+                                 (key   (concatenate 'base-string
                                                      (huffman-node-key left)
                                                      (huffman-node-key right)))
                                  (weight (+ (huffman-node-weight left)
                                             (huffman-node-weight right))))))
   (left nil :read-only t)
   (right nil :read-only t))
-(declaim (freeze-type huffman-node))
+(declaim (sb-ext:freeze-type huffman-node))
 
 (defun huffman-weights (corpus)
   (let ((weight-table (make-hash-table :test #'equal)))
@@ -38,7 +39,11 @@
              do (incf (gethash char weight-table 0))))
     (let (alist)
       (maphash (lambda (char weight)
-                 (push (make-huffman-node (string char) weight) alist))
+                 ;; Stupidly verbose code here because (some seem to think) the spec
+                 ;; permits absurd constructs like (SETF (CHAR (STRING #\a) 0) #\u+fffff)
+                 ;; and thus (STRING base-char) does not produce a base-string.
+                 ;; To me this is manifestly wrong.
+                 (push (make-huffman-node (coerce (string char) 'base-string) weight) alist))
                weight-table)
       (sort alist #'string< :key #'huffman-node-key))))
 
@@ -57,11 +62,10 @@
                        (finish-tree (huffman-pair-right tree)))
                  (huffman-node-key tree))))
     (finish-tree (merge-table (huffman-weights corpus)))))
+) ; end EVAL-WHEN
 
-;; won't need this eval-when after moving this file into warm build
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; actually 88 (for now), but leave some wiggle room
-  (defconstant longest-unicode-char-name 96))
+;; actually 88 (for now), but leave some wiggle room
+(defconstant longest-unicode-char-name 96)
 ;;; The :ALL-CHAR-NAMES test in character.pure.lisp shows that this decoder
 ;;; is faster than and much less consy than the old one.
 ;;; (time (...)) old way
@@ -101,6 +105,7 @@
            (t
             (subseq buffer bufpos))))))
 
+(eval-when (:compile-toplevel :execute)
 (defun huffman-match (char node)
   (if (consp node)
       (find char (the string (car node)) :test #'equal)
@@ -126,3 +131,4 @@
       (loop for char across string
          do (encode nil char tree))
       code)))
+) ; end EVAL-WHEN
