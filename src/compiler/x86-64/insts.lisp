@@ -3584,3 +3584,37 @@
       (add-stmt-labels stmt (stmt-labels next))
       (delete-stmt next)
       stmt)))
+
+;;; Possible enhancement: it should be possible to eliminate more jumps-to-jumps
+;;; by knowing something about implication of one condition upon another, e.g.
+;;; either JC or JZ jumping to JBE would take the second jump, since JBE is (CF=1 or ZF=1).
+(defun sb-assem::perform-jump-to-jump-elimination (starting-stmt label->stmt-map)
+  (flet ((jmp-cond (stmt)
+           (if (cdr (stmt-operands stmt))
+               (conditional-opcode (car (stmt-operands stmt)))
+               :always))
+         (jmp-target (stmt)
+           (car (last (stmt-operands stmt)))))
+    (do ((stmt starting-stmt (stmt-next stmt)))
+        ((null stmt))
+      (when (eq (stmt-mnemonic stmt) 'jmp)
+        (let* ((to-label (car (last (stmt-operands stmt))))
+               (to-stmt (gethash to-label label->stmt-map)))
+          (when (and to-stmt (eq (stmt-mnemonic to-stmt) 'jmp))
+            (let ((cond1 (jmp-cond stmt))
+                  (cond2 (jmp-cond to-stmt)))
+              (cond ((or (eq cond1 cond2) (eq cond2 :alwys))
+                     ;;  conditional to same condition  -> jump to target of 2nd jump
+                     ;;  conditional to :ALWAYS         -> jump to target of 2nd jump
+                     ;;   (this includes "always" to "always" either way you look at it)
+                     (setf (car (last (stmt-operands stmt))) (jmp-target to-stmt)))
+                    ((and (fixnump cond1) (fixnump cond2) (eq (logxor cond1 1) cond2))
+                     ;; A conditional jump to the negation of that condition
+                     ;; goes to the instruction after the 2nd jump.
+                     (let* ((fallthrough (stmt-next to-stmt))
+                            (label ; the statement might already be labeled
+                             (or (first (ensure-list (stmt-labels fallthrough)))
+                                 (let ((label (gen-label))) ; maake a new label
+                                   (setf (gethash label label->stmt-map) fallthrough)
+                                   (add-stmt-labels fallthrough label)))))
+                       (setf (car (last (stmt-operands stmt))) label)))))))))))

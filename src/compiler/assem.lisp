@@ -2044,7 +2044,16 @@
                       (setq next (stmt-prev new-next)
                             any-changes t)
                       (return)))))))))
-      (unless any-changes (return)))))
+      (unless any-changes (return))))
+  #+x86-64
+  ;; Build the label -> stmt map
+  (let ((label->stmt (make-hash-table)))
+    (do ((stmt (section-start section) (stmt-next stmt)))
+        ((null stmt))
+      (dolist (label (ensure-list (stmt-labels stmt)))
+        (aver (not (gethash label label->stmt)))
+        (setf (gethash label label->stmt) stmt)))
+    (perform-jump-to-jump-elimination (section-start section) label->stmt)))
 
 ;; Remove macros that users should not invoke
 (push '("SB-ASSEM" define-instruction define-instruction-macro)

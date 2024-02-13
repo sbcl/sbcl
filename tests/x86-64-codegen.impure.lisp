@@ -1375,3 +1375,25 @@
                   thereis (search "MOV WORD PTR" line))) ; constant #\a
     (assert (loop for line in lines
                   thereis (search "MOV DWORD PTR" line))))) ; constant NIL
+
+(defun count-labeled-instructions (function &aux (answer 0))
+  (let ((lines (disassembly-lines function)))
+    (dolist (line lines answer)
+      (when (and (>= (length line) 3)
+                 (char= (char line 0) #\L)
+                 (let ((p (position #\: line)))
+                   (every #'digit-char-p (subseq line 1 p))))
+        (incf answer)))))
+
+;;; Jump-to-jump elimination helps with conditional vops (those returning the result in EFLAGS)
+;;; which also contain an internal jump, and naturally are followed by a conditional jump.
+;;; It's usually possible to redirect the internal jump, if it has either exactly the same
+;;; sense of or is exactly the negation of the jump that follows the vop.
+(with-test (:name :jump-to-jump-elimination)
+  ;; NON-NULL SYMBOL-P tests lowtag and widetag, and thus has 2 jumps
+  ;; but there's only 1 target of a jump.
+  (assert (= (count-labeled-instructions
+              (lambda (x)
+                (declare (optimize (sb-c::verify-arg-count 0)))
+                (if (sb-kernel:non-null-symbol-p x) 'zook (foo))))
+             1)))
