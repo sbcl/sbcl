@@ -1393,7 +1393,8 @@
   ;; NON-NULL SYMBOL-P tests lowtag and widetag, and thus has 2 jumps
   ;; but there's only 1 target of a jump.
   (assert (= (count-labeled-instructions
-              (lambda (x)
-                (declare (optimize (sb-c::verify-arg-count 0)))
-                (if (sb-kernel:non-null-symbol-p x) 'zook (foo))))
+              (checked-compile
+               `(lambda (x)
+                  (declare (optimize (sb-c::verify-arg-count 0)))
+                  (if (sb-kernel:non-null-symbol-p x) 'zook (foo)))))
              1)))
