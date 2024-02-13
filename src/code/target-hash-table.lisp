@@ -419,6 +419,9 @@ Examples:
 ;;; Maybe I can figure out how to make concurrent weak GETHASH threadsafe,
 ;;; but I've spent a bit of time on it and it is quite difficult.
 
+(declaim (ftype (sfunction (t t t t t t t) (values hash-table))
+                %make-hash-table))
+
 (defun make-hash-table (&key (test 'eql)
                              (size #.+min-hash-table-size+)
                              (rehash-size #.default-rehash-size)
