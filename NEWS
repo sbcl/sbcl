@@ -6,6 +6,10 @@ changes relative to sbcl-2.4.1:
     Junke)
   * bug fix: COERCE will not convert lambda forms to functions if given a type
     naming a (strict) subclass of FUNCTION.
+  * bug fix: LOG with a double-float and a ratio argument (in either order) do
+    not lose precision through a single-float intermediate argument.
+  * bug fix: LOG to the base 2 of integer powers of 2 are more likely to get
+    the mathematically precise answer.
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the
