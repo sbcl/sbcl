@@ -267,7 +267,7 @@
         (return-from recurse (sharp-equal-wrapper-value tree)))
       ;; pick off types that never need to be sought in or added to the xset.
       ;; (there are others, but these are common and quick to check)
-      (when (typep tree '(or number symbol))
+      (when (or (unbound-marker-p tree) (typep tree '(or number symbol)))
         (return-from recurse tree))
       (unless (xset-member-p tree circle-table)
         (add-to-xset tree circle-table)

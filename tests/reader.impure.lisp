@@ -342,4 +342,17 @@
       (assert (eq t (set-dispatch-macro-character #\# #\~ fun nil)))
       (assert (eq fun (get-dispatch-macro-character #\# #\~ nil))))))
 
+(defclass junk () (a))
+(defstruct foo a b)
+(with-test (:name :sharp=-visit-unbound-slot-no-crash)
+  (unwind-protect
+       (progn
+         (sb-int:encapsulate 'sb-int:add-to-xset 'wrap
+          (compile nil
+                   '(lambda (realfun elt xset)
+                     (cond ((sb-int:unbound-marker-p elt) (error "oh no"))
+                           (t (funcall realfun elt xset))))))
+         (read-from-string "#1=#S(FOO :A #.(MAKE-INSTANCE 'junk))"))
+    (sb-int:unencapsulate 'sb-int:add-to-xset 'wrap)))
+
 ;;; success
