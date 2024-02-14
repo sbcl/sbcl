@@ -1173,7 +1173,7 @@
 (defknown sb-impl::gethash3 (t hash-table t) (values t boolean)
   (flushable no-verify-arg-count)) ; not FOLDABLE, since hash table contents can change
 (defknown (sb-impl::gethash/eq-hash/flat
-           sb-impl::gethash/eq-hash
+           sb-impl::gethash/eq-hash/common
            sb-impl::gethash/eq-hash/safe
            sb-impl::gethash/eql-hash/flat
            sb-impl::gethash/eql-hash
@@ -1188,7 +1188,7 @@
   (no-verify-arg-count)
   :derive-type #'result-type-last-arg)
 (defknown (sb-impl::puthash/eq-hash/flat
-           sb-impl::puthash/eq-hash
+           sb-impl::puthash/eq-hash/common
            sb-impl::puthash/eq-hash/safe
            sb-impl::puthash/eql-hash/flat
            sb-impl::puthash/eql-hash
@@ -1199,7 +1199,7 @@
     (no-verify-arg-count))
 (defknown remhash (t (modifying hash-table)) boolean ())
 (defknown (sb-impl::remhash/eq-hash/flat
-           sb-impl::remhash/eq-hash
+           sb-impl::remhash/eq-hash/common
            sb-impl::remhash/eq-hash/safe
            sb-impl::remhash/eql-hash/flat
            sb-impl::remhash/eql-hash

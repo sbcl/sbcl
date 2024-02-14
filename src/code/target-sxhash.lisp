@@ -31,6 +31,28 @@
             (values string start end))
           (values x 0 (length x)))
     (%sxhash-simple-substring string start end)))
+
+(defun %sxhash-string/truncating (x max-length)
+  (declare (type string x)
+           (type fixnum max-length)
+           (optimize speed (safety 0)))
+  (multiple-value-bind (string start end)
+      (if (array-header-p x)
+          (with-array-data ((string x) (start) (end) :check-fill-pointer t)
+            (values string start end))
+          (values x 0 (length x)))
+    (%sxhash-simple-substring/truncating string start end max-length)))
+
+(defmacro %%sxhash-string (x max-length on-truncate)
+  (once-only ((x x) (max-length max-length))
+    (with-unique-names (hash n-chars-truncated)
+      `(if ,max-length
+           (multiple-value-bind (,hash ,n-chars-truncated)
+               (%sxhash-string/truncating ,x ,max-length)
+             (unless (zerop ,n-chars-truncated)
+               ,on-truncate)
+             ,hash)
+           (%sxhash-string ,x)))))
 
 ;;;; the SXHASH function
 
@@ -255,76 +277,108 @@
   ;; toss in a LOGNOT so that (the word a) and (int-sap a) hash differently
   (murmur-hash-word/+fixnum (logand (lognot (sap-int x)) most-positive-word)))
 
-(defun sxhash (x)
-  ;; profiling SXHASH is hard, but we might as well try to make it go
-  ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
-  ;; So, yes, profiling is a little tough but not impossible with some added
-  ;; instrumentation in each stanza of the COND, either manually or
-  ;; automagically. Based on a manual approach, the order of the tests below
-  ;; are now better arranged by approximate descending frequency in terms
-  ;; of calls observed in certain test. Regardless of the fact that applications
-  ;; will vary by use-cases, this seems like a good order because:
-  ;;  * despite that INSTANCE is often the 2nd-most common object type in the heap
-  ;;    (right behind CONS), there are probably at least as many heap words
-  ;;    that are FIXNUM as instance pointers. So it stands to reason that
-  ;;    SXHASH-RECURSE is invoked very often on FIXNUM.
-  ;;  * SYMBOLs are extremely common as table keys, more so than INSTANCE,
-  ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
-  ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
-  ;;    it is particularly dumb (by design), so performing that test later
-  ;;    doesn't incur much of a penalty.
-  ;; Anyway, afaiu, the code below was previously ordered by gut feeling
-  ;; rather than than actual measurement, so having any rationale for ordering
-  ;; is better than having no rationale. And as a further comment observes,
-  ;; we could do away with the question of order if only we had jump tables.
-  ;; (Also, could somebody perhaps explain how these magic numbers were chosen?)
-  (declare (optimize speed))
-  (labels ((sxhash-recurse (x depthoid)
-             (declare (type index depthoid))
-             (typecase x
-               ;; we test for LIST here, rather than CONS, because the
-               ;; type test for CONS is in fact the test for
-               ;; LIST-POINTER-LOWTAG followed by a negated test for
-               ;; NIL.  If we're going to have to test for NIL anyway,
-               ;; we might as well do it explicitly and pick off the
-               ;; answer.  -- CSR, 2004-07-14
-               (list
-                (if (null x)
-                    (sxhash x)          ; through DEFTRANSFORM
-                    (if (plusp depthoid)
+;;; Like SXHASH, but the amount of hashing effort can be controlled.
+;;;
+;;; MAX-DEPTHOID overrides +MAX-HASH-DEPTHOID+.
+;;;
+;;; MAX-LENGTH limits the number of characters to hash in a single
+;;; string. Currently, an equal number of characters from the
+;;; beginning and end of the string are hashed. NIL means no limit.
+;;;
+;;; ON-TRUNCATE is a form that's evaluated whenever (even multiple
+;;; times) some data in X is discarded and higher limits (MAX-ATOMS
+;;; and MAX-LENGTH) may change the hash. Thus ON-TRUNCATE is not
+;;; evaluated if we bail out because there are too many cycles.
+(defmacro %sxhash (x max-depthoid max-length &key on-truncate)
+  (once-only ((x x) (max-depthoid max-depthoid) (max-length max-length))
+    `(locally (declare (optimize speed))
+       ;; Profiling SXHASH is hard, but we might as well try to make
+       ;; it go fast, in case it is the bottleneck somewhere. -- CSR,
+       ;; 2003-03-14 So, yes, profiling is a little tough but not
+       ;; impossible with some added instrumentation in each stanza of
+       ;; the COND, either manually or automagically. Based on a
+       ;; manual approach, the order of the tests below are now better
+       ;; arranged by approximate descending frequency in terms of
+       ;; calls observed in certain test. Regardless of the fact that
+       ;; applications will vary by use-cases, this seems like a good
+       ;; order because:
+       ;;
+       ;;  * despite that INSTANCE is often the 2nd-most common object
+       ;;    type in the heap (right behind CONS), there are probably
+       ;;    at least as many heap words that are FIXNUM as instance
+       ;;    pointers. So it stands to reason that FIXNUMs quite
+       ;;    commonly occur in objects.
+       ;;
+       ;;  * SYMBOLs are extremely common as table keys, more so than
+       ;;    INSTANCE, so we should pick off SYMBOL sooner than
+       ;;    INSTANCE as well.
+       ;;
+       ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway -
+       ;;    in fact it is particularly dumb (by design), so
+       ;;    performing that test later doesn't incur much of a
+       ;;    penalty.
+       ;;
+       ;; Anyway, afaiu, the code below was previously ordered by gut
+       ;; feeling rather than than actual measurement, so having any
+       ;; rationale for ordering is better than having no rationale.
+       ;; And as a further comment observes, we could do away with the
+       ;; question of order if only we had jump tables. (Also, could
+       ;; somebody perhaps explain how these magic numbers were
+       ;; chosen?)
+       (labels
+           ((sxhash-recurse (x depthoid)
+              (declare (type index depthoid))
+              (typecase x
+                ;; We test for LIST here, rather than CONS, because
+                ;; the type test for CONS is in fact the test for
+                ;; LIST-POINTER-LOWTAG followed by a negated test for
+                ;; NIL. If we're going to have to test for NIL anyway,
+                ;; we might as well do it explicitly and pick off the
+                ;; answer. -- CSR, 2004-07-14
+                (list
+                 (cond ((null x)
+                        (sxhash x))     ; through DEFTRANSFORM
+                       ((plusp depthoid)
                         (mix (sxhash-recurse (car x) (1- depthoid))
-                             (sxhash-recurse (cdr x) (1- depthoid)))
+                             (sxhash-recurse (cdr x) (1- depthoid))))
+                       (t
+                        (when (< ,max-depthoid 32)
+                          ,on-truncate)
                         261835505)))
-               (symbol (sxhash x)) ; through DEFTRANSFORM
-               (fixnum (sxhash x)) ; through DEFTRANSFORM
-               (instance
-                (if (pathnamep x)
-                    (pathname-sxhash x)
-                    (instance-sxhash x)))
-               (array
-                (typecase x
-                  (string (%sxhash-string x))
-                  (bit-vector (%sxhash-bit-vector x))
-                  ;; Would it be legal to mix in the widetag?
-                  (t (logxor 191020317 (sxhash (array-rank x))))))
-               ;; general, inefficient case of NUMBER
-               ;; There's a spurious FIXNUMP test here, as we've already picked it off.
-               ;; Maybe the NUMBERP emitter could be informed that X can't be a fixnum,
-               ;; because writing this case as (OR BIGNUM RATIO FLOAT COMPLEX)
-               ;; produces far worse code.
-               (number (number-sxhash x))
-               (character
-                (logxor 72185131
-                        (sxhash (char-code x)))) ; through DEFTRANSFORM
-               (funcallable-instance
-                (if (logtest (layout-flags (%fun-layout x)) +pcl-object-layout-flag+)
-                    ;; We have a hash code, so might as well use it.
-                    (fsc-instance-hash x)
-                    ;; funcallable structure, not funcallable-standard-object
-                    9550684))
-               (system-area-pointer (sap-hash x))
-               (t 42))))
-    (sxhash-recurse x +max-hash-depthoid+)))
+                (symbol (sxhash x))     ; through DEFTRANSFORM
+                (fixnum (sxhash x))     ; through DEFTRANSFORM
+                (instance
+                 (if (pathnamep x)
+                     (pathname-sxhash x)
+                     (instance-sxhash x)))
+                (array
+                 (typecase x
+                   (string (%%sxhash-string x ,max-length ,on-truncate))
+                   (bit-vector (%sxhash-bit-vector x))
+                   (t
+                    ;; We could even mix in the widetag.
+                    (logxor 191020317 (sxhash (array-rank x))))))
+                ;; general, inefficient case of NUMBER
+                ;; There's a spurious FIXNUMP test here, as we've already picked it off.
+                ;; Maybe the NUMBERP emitter could be informed that X can't be a fixnum,
+                ;; because writing this case as (OR BIGNUM RATIO FLOAT COMPLEX)
+                ;; produces far worse code.
+                (number (number-sxhash x))
+                (character
+                 (logxor 72185131
+                         (sxhash (char-code x)))) ; through DEFTRANSFORM
+                (funcallable-instance
+                 (if (logtest (layout-flags (%fun-layout x)) +pcl-object-layout-flag+)
+                     ;; We have a hash code, so might as well use it.
+                     (fsc-instance-hash x)
+                     ;; funcallable structure, not funcallable-standard-object
+                     9550684))
+                (system-area-pointer (sap-hash x))
+                (t 42))))
+         (sxhash-recurse ,x (min (truly-the index ,max-depthoid) 32))))))
+
+(defun sxhash (x)
+  (%sxhash x +max-hash-depthoid+ nil))
 
 ;;;; the PSXHASH function
 
@@ -569,3 +623,4 @@
 
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
+(clear-info :function :inlining-data '%sxhash-simple-substring/truncating)

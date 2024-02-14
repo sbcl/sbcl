@@ -638,7 +638,7 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
     uint32_t* nvdata = (void*)VECTOR(ht->next_vector)->data;
     unsigned ivmask = vector_len(iv) - 1;
     int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
-    sword_t state = fixnum_value(ht->hash_fun_state);
+    sword_t state = (sword_t)ht->sw__hash_fun_state;
 
     if (file)
         fprintf(file,
@@ -665,8 +665,13 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
                     fprintf(file, "[%4d] %12lx %16lx  %08x %4x (",
                             j, key, val, h, h & ivmask);
             } else {
-                // print the hash
-                h = fixnum_value(funcall1(ht->hash_fun, key));
+                // print the hash and then fuzzed hash;
+                if (state >= 0) {
+                    h = fixnum_value(funcall2(ht->hash_fun, key,
+                                              make_fixnum(state)));
+                } else {
+                    h = fixnum_value(funcall1(ht->hash_fun, key));
+                }
                 if (file)
                     fprintf(file, "[%4d] %12lx %16lx %016lx (", j,
                             key, val, (unsigned long int)h);

@@ -45,6 +45,58 @@
       #+sb-xc-host (guts)
 
       (logand result most-positive-fixnum))))
+
+;;; Like %SXHASH-SIMPLE-SUBSTRING, but don't hash more than
+;;; MAX-N-CHARS (skipping characters in the middle).
+#-sb-xc-host (declaim (inline %sxhash-simple-substring/truncating))
+(defun %sxhash-simple-substring/truncating (string start end max-n-chars)
+  ;; FIXME: As in MIX above, we wouldn't need (SAFETY 0) here if the
+  ;; cross-compiler were smarter about ASH, but we need it for
+  ;; sbcl-0.5.0m.  (probably no longer true?  We might need SAFETY 0
+  ;; to elide some type checks, but then again if this is inlined in
+  ;; all the critical places, we might not -- CSR, 2004-03-10)
+
+  ;; Never decrease safety in the cross-compiler. It's not worth the headache
+  ;; of tracking down insidious host/target compatibility bugs.
+  #-sb-xc-host (declare (type string string)
+                        (type index start end)
+                        (type fixnum max-n-chars)
+                        (optimize (speed 3) (safety 0)))
+  (let* ((len (- end start))
+         (n (min max-n-chars len))
+         ;; Mixing in the length is a cheap way to introduce some
+         ;; information about the hole.
+         (result len)
+         (limit (+ start (ash n -1))))
+    (declare (type word result))
+    (macrolet ((guts ()
+                 `(let ((i start))
+                    (loop while (< i limit)
+                          for j of-type index downfrom (1- end)
+                          do (add-char (aref string i))
+                             (add-char (aref string j))
+                             (incf i))
+                    (when (oddp n)
+                      (add-char (aref string i)))))
+               (add-char (char)
+                 `(progn
+                    (set-result (logxor result (char-code ,char)))
+                    (set-result (* result 16777619))))
+               (set-result (form)
+                 `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
+      ;; Avoid accessing elements of a (simple-array nil (*)). The
+      ;; expansion of STRING-DISPATCH involves ETYPECASE, so we can't
+      ;; simply omit one case. Therefore that macro is unusable here.
+      #-sb-xc-host (typecase string
+                     (simple-base-string (guts))
+                     ((simple-array character (*)) (guts)))
+
+      ;; Just do it, don't care about loop unswitching or simple-ness
+      ;; of the string.
+      #+sb-xc-host (guts)
+
+      (values (logand result most-positive-fixnum) (the fixnum (- len n))))))
+
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)

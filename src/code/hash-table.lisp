@@ -66,7 +66,7 @@
                                 gethash-impl
                                 puthash-impl
                                 remhash-impl
-                                hash-fun-state
+                                %hash-fun-state
                                 test
                                 test-fun
                                 hash-fun
@@ -86,7 +86,11 @@
   ;; for the different HASH-FUNs. Thus, it completely identifies the
   ;; hash function. It may be changed during the lifetime of the hash
   ;; table, which allows us to do adaptive hashing.
-  (hash-fun-state 0 :type fixnum)
+  (%hash-fun-state 0
+   ;; HASH-FUN-STATE easily fits into a fixnum, but having it unboxed
+   ;; as a signed word allows EQ-HASH/SMALL in EQ-HASH/COMMON to be
+   ;; compiled a bit more tightly.
+   :type (signed-byte #.sb-vm:n-word-bits))
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
@@ -186,7 +190,7 @@
                                 gethash-impl
                                 puthash-impl
                                 remhash-impl
-                                hash-fun-state
+                                %hash-fun-state
                                 test
                                 test-fun
                                 hash-fun
@@ -240,7 +244,6 @@
 
 ;;; HASH-TABLE-HASH-FUN-STATEs not specific to a particular hash test
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +hft-default+ -5)
   ;; This is redundant with HASH-TABLE-USERFUN-FLAG, but sometimes
   ;; more convenient to inspect the state. User-defined hash functions
   ;; are never adaptive.
@@ -281,6 +284,8 @@
       ,default-rehash-size
       1.0)))
 
+(defconstant +max-hash-table-bits+ #-64-bit 29 #+64-bit 31)
+
 ;; Our hash-tables store precomputed hashes to speed rehash and to guard
 ;; the call of the general comparator.
 ;; i.e. we take the value from mumble-hash {SXHASH, EQ-HASH, etc}
@@ -288,4 +293,8 @@
 ;; (As a practical matter, this limits tables to 2^31 bins.)
 ;; Address-sensitive keys can't store a precomputed hash. They instead
 ;; store this value that indicates address-sensitivity.
-(defconstant +magic-hash-vector-value+ #xFFFFFFFF)
+(defconstant +magic-hash-vector-value+
+  (logandc2 #xFFFFFFFF
+            ;; Zero the highest bit in the hash table range for
+            ;; SET-TRUNCATED-HASH-P.
+            (ash 1 (1- +max-hash-table-bits+))))
