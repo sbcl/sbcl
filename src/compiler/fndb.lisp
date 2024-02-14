@@ -540,7 +540,7 @@
 (defknown digit-char (unsigned-byte &optional (integer 2 36))
   (or character null) (movable foldable flushable))
 (defknown char-int (character) %char-code (movable foldable flushable))
-(defknown char-name (character) (or simple-string null)
+(defknown char-name (character) (or simple-base-string null)
   (movable foldable flushable))
 (defknown name-char (string-designator) (or character null)
   (movable foldable flushable))

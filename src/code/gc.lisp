@@ -299,6 +299,7 @@ used to specify the oldest generation guaranteed to be collected."
 
 (define-alien-routine scrub-control-stack void)
 
+(defglobal sb-unicode::*name->char-buffers* nil)
 (defun unsafe-clear-roots (gen)
   (declare (ignorable gen))
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
@@ -308,6 +309,7 @@ used to specify the oldest generation guaranteed to be collected."
   ;; Power cache of the bignum printer: drops overly large bignums and
   ;; removes duplicate entries.
   (scrub-power-cache)
+  (setf sb-unicode::*name->char-buffers* nil)
   ;; Clear caches depending on the generation being collected.
   (cond ((eql 0 gen)
          ;; Drop strings because the hash is pointer-hash

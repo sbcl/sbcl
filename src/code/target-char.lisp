@@ -166,7 +166,10 @@
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.
-  '((#x00 "Nul" "Null" "^@")
+  ;; Note 2: names in parenthese are omitted from the special cases of NAME-CHAR
+  ;; as the name is present in "ucd1-names.lisp-expr" and will be found via that.
+  ;; The indicated names will need to be reinstated if we drop Unicode 1 names.
+  '((#x00 "Nul" ("Null") "^@")
     (#x01 "Soh" "^a")
     (#x02 "Stx" "^b")
     (#x03 "Etx" "^c")
@@ -175,7 +178,7 @@
     (#x06 "Ack" "^f")
     ;; Don't alias to Bell, another Unicode character has that name.
     (#x07 "Bel" "^g")
-    (#x08 "Backspace" "^h" "Bs") ; *** See Note above
+    (#x08 ("Backspace") "^h" "Bs") ; *** See Note above
     (#x09 "Tab" "^i" "Ht") ; *** See Note above
     (#x0A "Newline" "Linefeed" "^j" "Lf" "Nl") ; *** See Note above
     (#x0B "Vt" "^k")
@@ -194,18 +197,15 @@
     (#x18 "Can" "^x")
     (#x19 "Em" "^y")
     (#x1A "Sub" "^z")
-    (#x1B "Esc" "Escape" "^[" "Altmode" "Alt")
+    (#x1B "Esc" ("Escape") "^[" "Altmode" "Alt")
     (#x1C "Fs" "^\\")
     (#x1D "Gs" "^]")
     (#x1E "Rs" "^^")
     (#x1F "Us" "^_")
-    (#x20 "Space" "Sp") ; *** See Note above
-    (#x7f "Rubout" "Delete" "Del")
-    (#x80 "C80")
-    (#x81 "C81")
+    (#x20 ("Space") "Sp") ; *** See Note above
+    (#x7f "Rubout" ("Delete") "Del") ; *** See Note above
     (#x82 "Break-Permitted")
     (#x83 "No-Break-Permitted")
-    (#x84 "C84")
     (#x85 "Next-Line")
     (#x86 "Start-Selected-Area")
     (#x87 "End-Selected-Area")
@@ -226,13 +226,12 @@
     (#x96 "Start-Guarded-Area")
     (#x97 "End-Guarded-Area")
     (#x98 "Start-String")
-    (#x99 "C99")
     (#x9A "Single-Character-Introducer")
     (#x9B "Control-Sequence-Introducer")
     (#x9C "String-Terminator")
     (#x9D "Operating-System-Command")
     (#x9E "Privacy-Message")
-    (#x9F "Application-Program-Command"))) ; *** See Note above
+    (#x9F "Application-Program-Command")))
 
 ;;;; UCD accessor functions
 

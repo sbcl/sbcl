@@ -175,7 +175,9 @@
        ;; as an array index. It is an exclusive upper bound.
        ;; Unused direct mappings waste memory.
        (let* ((small-alist (symbol-value exceptions-alist-name))
-              (alist (mapcar (lambda (x) (cons (first x) (second x))) small-alist)))
+              (alist (mapcar (lambda (x &aux (name (second x)))
+                               (cons (first x) (if (listp name) (car name) name)))
+                             small-alist)))
          (call-with-name-db-entries
           (lambda (codepoint name)
             (unless (assoc codepoint small-alist)
@@ -233,9 +235,11 @@ is only included for backwards compatibility."
 (defun char-name (character)
   "Return the name (a STRING) for a CHARACTER object."
   (declare (notinline format)) ; will not be called on "reasonable" inputs
-  (or (unicode-char->name character nil)
-      ;; spec says this can return NIL, so why don't we?
-      (format nil "U~X" (char-code character))))
+  (sb-ext:truly-the
+   (or simple-base-string null)
+   (or (unicode-char->name character nil)
+       ;; spec says this can return NIL, so why don't we?
+       (format nil "U~X" (char-code character)))))
 
 ;;; The NAME-CHAR function perfectly hashes the PSXHASH of name to an index
 ;;; in a table of characters. Unfortunately PSXHASH is not good enough to feed
@@ -336,7 +340,10 @@ is only included for backwards compatibility."
 
 (macrolet ((try-base-char ()
              (flet ((string-prehash (s) (ldb (byte 32 0) (psxhash s))))
-               (let* ((alist *base-char-name-alist*)
+               (let* ((alist (mapcar (lambda (line)
+                                       (cons (code-char (car line))
+                                             (remove-if-not #'stringp (cdr line))))
+                                     *base-char-name-alist*))
                       (hashes (mapcan (lambda (x) (mapcar #'string-prehash x)) alist)))
                  (or (= (length (remove-duplicates hashes)) (length hashes))
                      (error "can't perfectly hash *base-char-name-alist*"))
@@ -344,12 +351,13 @@ is only included for backwards compatibility."
                  (let* ((lexpr (sb-c:make-perfect-hash-lambda hashes)) ; don't cache
                         (hashfn (sb-c::compile-perfect-hash lexpr hashes))
                         (bins (make-array (length hashes) :initial-element nil)))
+                   ;; This is less efficient than could be, because it maps a perfect hash
+                   ;; to a list of the names to test even though we know which should match.
                    (dolist (list alist)
                      (dolist (name (cdr list))
                        (let ((index (funcall hashfn (string-prehash name))))
                          (aver (null (aref bins index)))
-                         (setf (aref bins index)
-                               (cons (code-char (car list)) (cdr list))))))
+                         (setf (aref bins index) list))))
                    `(let ((index (,lexpr name-hash)))
                       (when (< index ,(length bins))
                         (let ((candidate (svref ,bins index)))
@@ -383,19 +391,20 @@ name is that string, if one exists. Otherwise, NIL is returned."
       ;; The unicode lists need a final mix with improved avalanche behavior.
       (or (let ((name-hash (ldb (byte 32 0) psxhash)))
             (try-base-char))
-          ;; We might want to change this to use alien strings for the
-          ;; architectures that won't stack-allocate a string.
-          ;; On the other hand, that's a really crappy limitation of those
-          ;; which if rectified would improve more than just this one thing.
           (let ((name-hash (psxhash-to-name-hash psxhash string))
-                (name-buffer (make-array longest-unicode-char-name
-                                         :element-type 'base-char)))
-            ;; We might want to use a local alien string for the backends which
-            ;; can't make DX strings thought "want" isn't exactly how I feel
-            ;; about that. I'd rather DX strings work as intended.
+                (name-buffer
+                 ;; After git rev 8b606d636cc1 we have no feature indicating
+                 ;; support for DX strings but this is close enough.
+                 (or #-c-stack-is-control-stack (sb-ext:atomic-pop *name->char-buffers*)
+                     (make-array longest-unicode-char-name
+                                 :element-type 'base-char))))
             (declare (dynamic-extent name-buffer))
-            (or (try-unicode "ucd-names" unicode-char->name)
-                (try-unicode "ucd1-names" unicode-1-char->name))))))))
+            ;; try ucd1-names first since it contains some important
+            ;; names such as #\null and #\space
+            (prog1 (or (try-unicode "ucd1-names" unicode-1-char->name)
+                       (try-unicode "ucd-names" unicode-char->name))
+              #-c-stack-is-control-stack
+              (sb-ext:atomic-push name-buffer *name->char-buffers*))))))))
 
 #+sb-unicode
 (macrolet ((lookup (arg)
