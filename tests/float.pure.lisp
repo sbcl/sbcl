@@ -301,6 +301,22 @@
                 collect (cons i x))))
     (assert (null diffs))))
 
+(with-test (:name (:log :ratios-near-1))
+  ;; LOG of 1 +/- 1/2^100 is approximately +/-1/2^100, comfortably
+  ;; within single-float range.
+  (let ((nvals
+          (loop for i from -128 to 128
+                for x = (log (/ (+ i (expt 2 100)) (+ i (expt 2 100) 1)))
+                collect x))
+        (pvals
+          (loop for i from -128 to 128
+                for x = (log (/ (+ i (expt 2 100) 1) (+ i (expt 2 100))))
+                collect x)))
+    (assert (= (length (remove-duplicates nvals)) 1))
+    (assert (< (first nvals) 0))
+    (assert (= (length (remove-duplicates pvals)) 1))
+    (assert (> (first pvals) 0))))
+
 ;; Bug reported by Eric Marsden on July 15 2009. The compiler
 ;; used not to constant fold calls with arguments of type
 ;; (EQL foo).

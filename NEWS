@@ -10,6 +10,8 @@ changes relative to sbcl-2.4.1:
     not lose precision through a single-float intermediate argument.
   * bug fix: LOG to the base 2 of integer powers of 2 are more likely to get
     the mathematically precise answer.
+  * bug fix: LOG on ratios very near 1 with numerator or denominator being
+    near a power of 2 will use log1p and so will lose less precision.
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the
