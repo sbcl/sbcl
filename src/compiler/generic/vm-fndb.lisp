@@ -809,7 +809,7 @@
   (double-float (signed-byte 32)) double-float
   (movable foldable flushable))
 
-(defknown (%log1p)
+(defknown (%log1p %log2)
   (double-float) double-float
   (movable foldable flushable))
 

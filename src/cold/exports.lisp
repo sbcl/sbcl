@@ -1890,7 +1890,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%LAST1"
            "%LASTN/FIXNUM"
            "%LASTN/BIGNUM"
-           "%LOG1P"
+           "%LOG1P" "%LOG2"
            #+long-float "%LONG-FLOAT"
            "%MAKE-ARRAY"
            "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE"

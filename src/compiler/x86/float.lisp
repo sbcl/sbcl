@@ -2507,6 +2507,57 @@
        ((0 1))
        (t (inst fstd y)))))
 
+(define-vop (flog2)
+  (:translate %log2)
+  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
+  (:temporary (:sc double-reg :offset fr0-offset
+                   :from :argument :to :result) fr0)
+  (:temporary (:sc double-reg :offset fr1-offset
+                   :from :argument :to :result) fr1)
+  (:results (y :scs (double-reg)))
+  (:arg-types double-float)
+  (:result-types double-float)
+  (:policy :fast-safe)
+  (:note "inline log2 function")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 5
+     (note-this-location vop :internal-error)
+     (sc-case x
+        (double-reg
+         (case (tn-offset x)
+            (0
+             ;; x is in fr0
+             (inst fstp fr1)
+             (inst fld1)
+             (inst fxch fr1))
+            (1
+             ;; x is in fr1
+             (inst fstp fr0)
+             (inst fld1)
+             (inst fxch fr1))
+            (t
+             ;; x is in a FP reg, not fr0 or fr1
+             (inst fstp fr0)
+             (inst fstp fr0)
+             (inst fld1)
+             (inst fldd (make-random-tn :kind :normal
+                                        :sc (sc-or-lose 'double-reg)
+                                        :offset (1- (tn-offset x))))))
+         (inst fyl2x))
+        ((double-stack descriptor-reg)
+         (inst fstp fr0)
+         (inst fstp fr0)
+         (inst fld1)
+         (if (sc-is x double-stack)
+             (inst fldd (ea-for-df-stack x))
+             (inst fldd (ea-for-df-desc x)))
+         (inst fyl2x)))
+     (inst fld fr0)
+     (case (tn-offset y)
+       ((0 1))
+       (t (inst fstd y)))))
+
 (define-vop (fpow)
   (:translate %pow)
   (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0)

@@ -95,6 +95,7 @@
 (def-math-rtn "pow" 2)
 #-(or x86 x86-64 arm-vfp arm64 riscv) (def-math-rtn "sqrt" 1)
 #-x86 (def-math-rtn "log1p" 1)
+#-x86 (def-math-rtn "log2" 1)
 
 
 ;;;; power functions

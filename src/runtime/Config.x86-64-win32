@@ -36,7 +36,7 @@ LIBSBCL += mswin64.def mswin.def
 USE_LIBSBCL += -Wl,mswin64.def -Wl,mswin.def
 __LDFLAGS__ =
 
-OS_LIBS = -l ws2_32 -ladvapi32
+OS_LIBS = -l ws2_32 -ladvapi32 -lm
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lzstd
 endif
