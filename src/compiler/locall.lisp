@@ -775,6 +775,12 @@
              (temp more-temps (cddr temp)))
             ((null key))
           (let ((lvar (first key)))
+            (unless (types-equal-or-intersect (lvar-type lvar)
+                                              (specifier-type 'symbol))
+              (setf (combination-kind call) :error)
+              (compiler-warn "Argument of type ~s cannot be used as a keyword."
+                             (type-specifier (lvar-type lvar)))
+              (return-from convert-more-call))
             (unless (constant-lvar-p lvar)
               (when flame
                 (compiler-notify "non-constant keyword in keyword call"))
@@ -800,11 +806,11 @@
                                (setq loser (list name)))))
                 (let ((info (lambda-var-arg-info var)))
                   (when (eq (arg-info-key info) name)
-                      (ignores dummy)
-                      (if (member var (supplied) :key #'car)
-                          (ignores val)
-                          (supplied (cons var val)))
-                      (return)))))))
+                    (ignores dummy)
+                    (if (member var (supplied) :key #'car)
+                        (ignores val)
+                        (supplied (cons var val)))
+                    (return)))))))
 
         (when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
           (compiler-warn "function called with unknown argument keyword ~S"
