@@ -399,10 +399,11 @@ name is that string, if one exists. Otherwise, NIL is returned."
                      (make-array longest-unicode-char-name
                                  :element-type 'base-char))))
             (declare (dynamic-extent name-buffer))
-            ;; try ucd1-names first since it contains some important
-            ;; names such as #\null and #\space
-            (prog1 (or (try-unicode "ucd1-names" unicode-1-char->name)
-                       (try-unicode "ucd-names" unicode-char->name))
+            ;; Look in ucd-names first, since there are overlaps with ucd1-names,
+            ;; and we always want to return the new codepoint that a name finds,
+            ;; not the old, in the case of a conflict.
+            (prog1 (or (try-unicode "ucd-names" unicode-char->name)
+                       (try-unicode "ucd1-names" unicode-1-char->name))
               #-c-stack-is-control-stack
               (sb-ext:atomic-push name-buffer *name->char-buffers*))))))))
 
