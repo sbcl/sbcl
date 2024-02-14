@@ -465,7 +465,7 @@
                (expr (try-perfect-find/position-map
                       name
                       (if conditional ''(t)) ; returned value if present in the mapping
-                      (lvar-type item) items nil)))
+                      (lvar-type item) items nil node)))
           (when expr
             ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
             ;; are declared in fndb to return a list. If it were just the symbol T,
@@ -2775,10 +2775,10 @@
 ;;; FIND directed to an IF is a little funny because if you find a NIL then it has to
 ;;; return NIL; but FIND does not use a value vector anyway, so there is nothing gained
 ;;; by avoiding a value vector.
-;;; TODO: a common idiom is (CDR (ASSOC x '(const-alist))) - similarly (CAR (RASSOC)) -
-;;; in which case the mapping souldn't contain cons cells as the range, but instead just
-;;; the counterpart (CDR,CAR resp.) of the item you're seeking.
-(defun try-perfect-find/position-map (fun-name conditional lvar-type items from-end)
+;;; This can optimize out one CAR or CDR operation in CDR of ASSOC or CAR of ASSOC,
+;;; but (TODO) it can't completely optimize out CADR in (CADR (ASSOC x '((:s1 val1) ...)))
+;;; enough though it should be equivalent to (CAR (ASSOC x '((:s1 . val1) ...))).
+(defun try-perfect-find/position-map (fun-name conditional lvar-type items from-end node)
   (declare (type (member find position member assoc rassoc) fun-name))
   ;; It's certainly not worth doing a hash calculation for 2 keys.
   ;; And it's usually not worth it for 3 keys. At least for the MEMBER operation, the code size
@@ -2803,7 +2803,21 @@
   ;; (Why is such a seemingly random stipulation even part of the language?)
   (when (member fun-name '(assoc rassoc))
     (setf items (remove-if #'null items)))
-  (let ((map (make-hash-table)))
+  (let ((alistp) ; T if an alist, :SYNTHETIC if we avoid using conses in the mapping
+        (map (make-hash-table)))
+    ;; Optimize out the CDR operation in (CDR (ASSOC ...)) respectively
+    ;; the CAR in (CAR (RASSOC ...)).
+    ;; CADR and SECOND would have been converted as (CAR (CDR ...)
+    ;; so it works for those also.
+    (when (member fun-name '(assoc rassoc))
+      (setq alistp t)
+      (let ((expect (if (eq fun-name 'assoc) '(cdr) '(car)))
+            (dest (node-dest node)))
+        (when (and (combination-p dest)
+                   (lvar-fun-is (combination-fun dest) expect)
+                   (lvar-has-single-use-p (car (combination-args dest))))
+          (aver (eq (lvar-use (car (combination-args dest))) node))
+          (setq alistp :synthetic))))
     (cond ((vectorp items)
            (dotimes (position (length items))
              (let ((elt (svref items position)))
@@ -2822,10 +2836,12 @@
                   (unless (gethash elt map) (setf (gethash elt map) list))))
                (assoc
                 (let* ((pair (car list)) (key (car pair)))
-                  (unless (gethash key map) (setf (gethash key map) pair))))
+                  (unless (gethash key map)
+                    (setf (gethash key map) (if (eq alistp t) pair (cdr pair))))))
                (rassoc
                 (let* ((pair (car list)) (key (cdr pair)))
-                  (unless (gethash key map) (setf (gethash key map) pair))))))))
+                  (unless (gethash key map)
+                    (setf (gethash key map) (if (eq alistp t) pair (car pair))))))))))
     (flet ((hash (key) (ldb (byte 32 0) (symbol-name-hash key))))
       ;; Sort to avoid sensitivity to the hash-table iteration order when cross-compiling.
       ;; Not necessary for the target but not worth a #+/- either.
@@ -2846,6 +2862,9 @@
                                              ((<= n #x10000) '(unsigned-byte 16))
                                              (t '(unsigned-byte 32)))))
                         ((or conditional (eq fun-name 'find)) nil)
+                        ;; if ALISTP=T then use a single array of cons cells,
+                        ;; which the user wants (or seems to)
+                        ((eq alistp t) domain)
                         (t (make-array n))))
                  (phashfun (sb-c::compile-perfect-hash lambda hashes)))
         (when certainp
@@ -2855,27 +2874,44 @@
           (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
             (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
         (maphash (lambda (key val &aux (phash (funcall phashfun (hash key))))
-                   (setf (svref domain phash) key)
-                   (when range (setf (aref range phash) val)))
+                   (cond ((eq alistp t)
+                          (setf (aref domain phash) val)) ; VAL is the (key . val) pair
+                         (t
+                          (setf (svref domain phash) key)
+                          (when range (setf (aref range phash) val)))))
                  map)
+        (when (eq alistp :synthetic)
+          (let* ((car/cdr (node-dest node))
+                 (fun (lvar-use (combination-fun car/cdr))))
+            (aver (ref-p fun))
+            (change-ref-leaf fun (find-free-fun 'values "?") :recklessly t)
+            (setf (combination-fun-info car/cdr) (info :function :info 'values))
+            ;; This is cargo-culted from a related transform on MEMBER where we cause it to
+            ;; return a value that is not based on the input list directly.
+            (derive-node-type node (specifier-type 't) :from-scratch t)
+            (reoptimize-node car/cdr)))
         ;; TRULY-THE around PHASH is warranted when CERTAINP because while the compiler can
         ;; derive the type of the final LOGAND, it's a complete mystery to it that the range
         ;; of the perfect hash is smaller than 2^N.
-        (note-perfect-hash-used
-         `(,fun-name ,conditional ,items)
-         `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
+        (let ((key-expr (let ((key `(svref ,domain phash)))
+                          (if (eq alistp t)
+                              `(,(if (eq fun-name 'assoc) 'car 'cdr) ,key)
+                              key))))
+          (note-perfect-hash-used
+           `(,fun-name ,conditional ,items)
+           `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
                                         ; return a _NAME_ hash in 32 bits, with a different
                                         ; vop to obtain pseudo-random stable hash bits,
                                         ; stored as two halves of the SYMBOL-HASH slot.
                             #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
                             #-x86-64 (if (symbolp item) (symbol-name-hash item) 0)))
-                 (phash (,lambda hash)))
-            ,(if certainp
-                 `(aref ,range (truly-the (mod ,n) phash))
-                 `(if (and (< phash ,n) (eq item (svref ,domain phash)))
-                      ,(cond (conditional) ; return whatever this expression is
-                             ((eq fun-name 'find) 'item)
-                             (t `(aref ,range phash)))))))))))
+                   (phash (,lambda hash)))
+              ,(if certainp
+                   `(aref ,range (truly-the (mod ,n) phash))
+                   `(if (and (< phash ,n) (eq ,key-expr item))
+                        ,(cond (conditional) ; return whatever this expression is
+                               ((eq fun-name 'find) 'item)
+                               (t `(aref ,range phash))))))))))))
 
 (macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
@@ -2917,7 +2953,7 @@
                           (reversedp (and from-end (lvar-value from-end))))
                       (awhen (and (memq effective-test '(eql eq))
                                   (try-perfect-find/position-map
-                                   ',fun-name nil (lvar-type item) items reversedp))
+                                   ',fun-name nil (lvar-type item) items reversedp nil))
                         (return-from ,fun-name
                           `(lambda (item sequence &rest rest)
                              (declare (ignore sequence rest))

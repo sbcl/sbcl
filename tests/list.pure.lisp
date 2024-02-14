@@ -268,6 +268,24 @@
 
       (test 'rassoc nil  tricky  '(:test #'eq)          '(c . nil)))))
 
+(defun cdr-assoc-in-const-list (x)
+  (cdr (assoc x '((:a . #\A) (:b . #\B) (:c . #\C) nil (nil . foo)
+                  (:z . #\Z) (:y . #\Y) (:x . #\X) (:z . "dup")))))
+(with-test (:name :cdr-assoc-hash-based)
+  (dolist (input '(nil :a :b :c :x :y :z))
+    (let ((result (cdr-assoc-in-const-list input))
+          (expect (if (eq input nil) 'foo (char (string input) 0))))
+      (assert (eq result expect))))
+  (let ((constants (ctu:find-code-constants #'cdr-assoc-in-const-list)))
+    ;; The ASSOC should have been compiled into a perfectly hashed
+    ;; lookup into a key vector, and a parallel value vector.
+    ;; There are no conses in the vectors. The order of items depends
+    ;; on the symbol-hash, so we don't care what it is.
+    (assert (= (length constants) 2))
+    (dolist (vector constants)
+      (assert (typep vector '(simple-vector 7)))
+      (assert (every #'atom vector)))))
+
 ;;;; member-if & assoc-if & rassoc-if
 (with-test (:name (member-if assoc-if rassoc-if) :slow t)
   (macrolet ((test (value form)
