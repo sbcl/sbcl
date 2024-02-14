@@ -1871,9 +1871,11 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
            ;; in a non-findable key which we'd have to heuristically allow based on
            ;; implicit pinning.
            (let ((i (* 2 index)))
-             (setf (aref kv-vector i) key (aref kv-vector (1+ i)) value
+             (setf (aref kv-vector i) key
+                   (aref kv-vector (truly-the index (1+ i))) value
                    (hash-table-cache hash-table) i)))
-         (incf (hash-table-%count hash-table))
+         (locally (declare (optimize (safety 0)))
+           (incf (hash-table-%count hash-table)))
          value))
 
   (defun puthash/weak (key hash-table value)
