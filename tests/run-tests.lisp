@@ -256,7 +256,8 @@
       ,(maybe "SB-THREAD" "*ALLOCATOR-METRICS*")
       sb-pcl::*dfun-constructors*
       #+win32 sb-impl::*waitable-timer-handle*
-      #+win32 sb-impl::*timer-thread*)))
+      #+win32 sb-impl::*timer-thread*
+      sb-unicode::*name->char-buffers*)))
 
 (defun collect-symbol-values ()
   (let (result)
