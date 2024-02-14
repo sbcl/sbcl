@@ -73,11 +73,8 @@
 (defun float-sign-bit (x) ; return 1 or 0, literally the sign bit
   (declare (explicit-check))
   (number-dispatch ((x float))
-    ((single-float)
-     (logand (ash (single-float-bits x) -31) 1))
-    ((double-float)
-     #-64-bit (logand (ash (double-float-high-bits x) -31) 1)
-     #+64-bit (ash (logand (double-float-bits x) most-positive-word) -63))))
+    ((single-float) (float-sign-bit x))
+    ((double-float) (float-sign-bit x))))
 
 (declaim (inline float-digits float-radix))
 

@@ -190,6 +190,12 @@
             (if (minusp ,bits) (- ,temp) ,temp)))
         `(if (minusp ,bits) $-1d0 $1d0))))
 
+(deftransform float-sign-bit ((x) (single-float) *)
+  `(logand (ash (single-float-bits x) -31) 1))
+(deftransform float-sign-bit ((x) (double-float) *)
+  #-64-bit `(logand (ash (double-float-high-bits x) -31) 1)
+  #+64-bit `(ash (logand (double-float-bits x) most-positive-word) -63))
+
 ;;; This doesn't deal with complex at the moment.
 (deftransform signum ((x) (number))
   (let* ((ctype (lvar-type x))
