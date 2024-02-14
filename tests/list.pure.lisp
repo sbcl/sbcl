@@ -271,6 +271,8 @@
 (defun cdr-assoc-in-const-list (x)
   (cdr (assoc x '((:a . #\A) (:b . #\B) (:c . #\C) nil (nil . foo)
                   (:z . #\Z) (:y . #\Y) (:x . #\X) (:z . "dup")))))
+(compile 'cdr-assoc-in-const-list)
+
 (with-test (:name :cdr-assoc-hash-based)
   (dolist (input '(nil :a :b :c :x :y :z))
     (let ((result (cdr-assoc-in-const-list input))
