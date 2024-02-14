@@ -2851,21 +2851,36 @@
       ;; we could sort by the hash, since that has to be unique or the transform fails.
       (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
                  (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
-                 (lambda (make-perfect-hash-lambda hashes items) :exit-if-null)
-                 (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
                  (n (length hashes))
-                 (domain (make-array n))
+                 (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
+                 (pow2size (power-of-two-ceiling n))
+                 ;; For {FIND,POSITION,MEMBER} or a synthetic alist, a non-minimal hash
+                 ;; might avoid a few math operations at the cost of a few wasted cells.
+                 ;; If it's a "real" alist, there's a question of what to put in the empty
+                 ;; slots so that a CAR/CDR operation is valid, because it has to be a cons.
+                 (minimal
+                  (if (eq alistp t)
+                      t ; require minimal
+                      (let ((waste (- pow2size n)))
+                        (if (<= waste 3) ; arbitrary. Should it be a percentage of N maybe?
+                            nil   ; do not require minimal
+                            t)))) ; do require minimal
+                 (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
+                 (keyspace-size (if minimal n pow2size))
+                 (domain (make-array keyspace-size))
                  (range
                   (cond ((eq fun-name 'position)
-                         (sb-xc:make-array n :element-type
-                                       (cond ((<= n #x100) '(unsigned-byte 8))
-                                             ((<= n #x10000) '(unsigned-byte 16))
-                                             (t '(unsigned-byte 32)))))
+                         (sb-xc:make-array keyspace-size
+                                           :element-type
+                                           (cond ((<= n #x100) '(unsigned-byte 8))
+                                                 ((<= n #x10000) '(unsigned-byte 16))
+                                                 (t '(unsigned-byte 32)))
+                                           :initial-element 0))
                         ((or conditional (eq fun-name 'find)) nil)
                         ;; if ALISTP=T then use a single array of cons cells,
                         ;; which the user wants (or seems to)
                         ((eq alistp t) domain)
-                        (t (make-array n))))
+                        (t (make-array keyspace-size))))
                  (phashfun (sb-c::compile-perfect-hash lambda hashes)))
         (when certainp
           (when conditional
@@ -2884,6 +2899,8 @@
           (let* ((car/cdr (node-dest node))
                  (fun (lvar-use (combination-fun car/cdr))))
             (aver (ref-p fun))
+            (when (every #'fixnump range)
+              (setq range (coerce-to-smallest-eltype range)))
             (change-ref-leaf fun (find-free-fun 'values "?") :recklessly t)
             (setf (combination-fun-info car/cdr) (info :function :info 'values))
             ;; This is cargo-culted from a related transform on MEMBER where we cause it to
@@ -2893,10 +2910,17 @@
         ;; TRULY-THE around PHASH is warranted when CERTAINP because while the compiler can
         ;; derive the type of the final LOGAND, it's a complete mystery to it that the range
         ;; of the perfect hash is smaller than 2^N.
-        (let ((key-expr (let ((key `(svref ,domain phash)))
-                          (if (eq alistp t)
-                              `(,(if (eq fun-name 'assoc) 'car 'cdr) ,key)
-                              key))))
+        (let* ((key-expr (let ((key `(svref ,domain phash)))
+                           (if (eq alistp t)
+                               `(,(if (eq fun-name 'assoc) 'car 'cdr) ,key)
+                               key)))
+               ;; An unexpected symbol-hash fed into a minimal perfect hash function
+               ;; can produce garbage out, so we have to bounds-check it.
+               ;; Otherwise, with a non-minimal hash function, the table size is
+               ;; exactly right for the number of bits of output of the function
+               (hit-expr (if minimal
+                             `(and (< phash ,n) (eq ,key-expr item))
+                             `(eq ,key-expr item))))
           (note-perfect-hash-used
            `(,fun-name ,conditional ,items)
            `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
@@ -2908,7 +2932,7 @@
                    (phash (,lambda hash)))
               ,(if certainp
                    `(aref ,range (truly-the (mod ,n) phash))
-                   `(if (and (< phash ,n) (eq ,key-expr item))
+                   `(if ,hit-expr
                         ,(cond (conditional) ; return whatever this expression is
                                ((eq fun-name 'find) 'item)
                                (t `(aref ,range phash))))))))))))

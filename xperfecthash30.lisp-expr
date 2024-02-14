@@ -875,5 +875,20 @@
   (let ((b (>> (<< val 3) 28)))
    (let ((a (& val #xf)))
     (^ a (aref tab b))))))")
+(#(440002 A8F03FB AD1E8BA B2215A5)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (& (>> val 16) 3) )")
+(#(104000C A8F03FB AD1E8BA B2215A5)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (& val 3) )")
+(#(1040002 A8F03FB AD1E8BA B2215A5)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (& (>> val 16) 3) )")
+(#(3E4000C A8F03FB AD1E8BA B2215A5)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (& val 3) )")
+(#(8844002 A8F03FB AD1E8BA B2215A5)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (& (>> val 16) 3) )")
 )
 ;; EOF

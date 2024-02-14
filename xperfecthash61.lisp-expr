@@ -429,5 +429,8 @@
   (let ((b (& (>> val 10) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(820022 6F4E2B12 8612A6FE CF79C550)
+ "(NIL :ASSIGNMENT :OPTIONAL :CLEANUP)"
+ "(  (>> val 30) )")
 )
 ;; EOF

@@ -157,7 +157,7 @@
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
   (declare (ignorable objects minimal fast))
   (when (< (length array) 3) ; one or two keys - why are you doing this?
-    (return-from make-perfect-hash-lambda)) ; a limitation for now
+    (return-from make-perfect-hash-lambda))
   (let ((dedup (alloc-xset)))
     (dovector (x array)
       (when (xset-member-p x dedup) (return-from make-perfect-hash-lambda))

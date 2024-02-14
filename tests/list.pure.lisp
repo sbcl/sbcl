@@ -285,7 +285,7 @@
     ;; on the symbol-hash, so we don't care what it is.
     (assert (= (length constants) 2))
     (dolist (vector constants)
-      (assert (typep vector '(simple-vector 7)))
+      (assert (typep vector '(simple-vector 8)))
       (assert (every #'atom vector)))))
 
 ;;;; member-if & assoc-if & rassoc-if

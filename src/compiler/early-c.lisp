@@ -107,7 +107,8 @@
 (defun compile-perfect-hash (lambda test-inputs)
   ;; Don't blindly trust the hash generator: assert that computed values are
   ;; in range and not repeated.
-  (let ((seen (make-array (length test-inputs) :element-type 'bit :initial-element 0))
+  (let ((seen (make-array (power-of-two-ceiling (length test-inputs))
+                          :element-type 'bit :initial-element 0))
         (f #-sb-xc-host (compile nil lambda)
            #+sb-xc-host
            ;; Remove the DECLARE:
