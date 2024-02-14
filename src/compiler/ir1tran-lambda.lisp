@@ -1268,18 +1268,29 @@
                      (or (fun-info-transforms info)
                          (fun-info-templates info)
                          (fun-info-ir2-convert info))))
-      (if (block-compile *compilation*)
-          (progn
-            (substitute-leaf fun var)
-            ;; If in a simple environment, then we can allow backward
-            ;; references to this function from following top-level
-            ;; forms.
-            (when simple-lexenv-p
-              (setf (defined-fun-functional var) fun)))
-          (substitute-leaf-if
-           (lambda (ref)
-             (policy ref (> recognize-self-calls 0)))
-           fun var)))
+      (let (type)
+        (if (block-compile *compilation*)
+            (progn
+              (substitute-leaf fun var)
+              ;; If in a simple environment, then we can allow backward
+              ;; references to this function from following top-level
+              ;; forms.
+              (when simple-lexenv-p
+                (setf (defined-fun-functional var) fun)))
+            (substitute-leaf-if
+             (lambda (ref)
+               (if (policy ref (> recognize-self-calls 0))
+                   t
+                   (let ((type (or type
+                                   (setf type (definition-type fun))))
+                         (call (node-dest ref)))
+                     (when (and (combination-p call)
+                                (eq (combination-fun call)
+                                    (ref-lvar ref))
+                                (fun-type-p type))
+                       (assert-call-type call type t :defined-here))
+                     nil)))
+             fun var))))
     fun))
 
 ;;; Convert a lambda for global inline expansion.

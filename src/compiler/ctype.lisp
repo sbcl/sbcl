@@ -909,9 +909,11 @@ and no value was provided for it." name))))))))))
 (defun map-combination-args-and-types (fun call &optional info
                                                           unknown-keys-fun
                                                           defined-here
-                                                          asserted-type)
+                                                          asserted-type
+                                                          type)
   (declare (type function fun) (type combination call))
-  (binding* ((type (lvar-fun-type (combination-fun call) defined-here asserted-type))
+  (binding* ((type (or type
+                       (lvar-fun-type (combination-fun call) defined-here asserted-type)))
              (nil (fun-type-p type) :exit-if-null)
              (annotation (and info
                               (fun-info-annotation info)))
@@ -1047,7 +1049,9 @@ and no value was provided for it." name))))))))))
            call
            info
            nil
-           t))))
+           t
+           nil
+           type))))
   (values))
 
 ;;;; FIXME: Move to some other file.
