@@ -75,6 +75,11 @@
   (number-dispatch ((x float))
     ((single-float) (float-sign-bit x))
     ((double-float) (float-sign-bit x))))
+(defun float-sign-bit-set-p (x)
+  (declare (explicit-check))
+  (number-dispatch ((x float))
+    ((single-float) (float-sign-bit-set-p x))
+    ((double-float) (float-sign-bit-set-p x))))
 
 (declaim (inline float-digits float-radix))
 

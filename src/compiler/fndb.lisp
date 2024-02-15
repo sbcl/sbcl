@@ -417,6 +417,8 @@
   (movable foldable unsafely-flushable))
 (defknown float-sign-bit (float) bit
   (movable foldable unsafely-flushable))
+(defknown float-sign-bit-set-p (float) boolean
+  (movable foldable unsafely-flushable))
 ;;; This says "unsafely flushable" as if to imply that there is a possibility
 ;;; of signaling a condition in safe code, but in practice we can never trap
 ;;; on a NaN because the implementation uses foo-FLOAT-BITS instead of

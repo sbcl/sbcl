@@ -196,6 +196,12 @@
   #-64-bit `(logand (ash (double-float-high-bits x) -31) 1)
   #+64-bit `(ash (logand (double-float-bits x) most-positive-word) -63))
 
+(deftransform float-sign-bit-set-p ((x) (single-float) *)
+  `(logbitp 31 (single-float-bits x)))
+(deftransform float-sign-bit-set-p ((x) (double-float) *)
+  #-64-bit `(logbitp 31 (double-float-high-bits x))
+  #+64-bit `(logbitp 63 (double-float-bits x)))
+
 ;;; This doesn't deal with complex at the moment.
 (deftransform signum ((x) (number))
   (let* ((ctype (lvar-type x))
@@ -663,9 +669,9 @@
               (long-float   $-0L0))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
-             (and (floatp f) (zerop f) (= (float-sign-bit f) 1)))
+             (and (floatp f) (zerop f) (float-sign-bit-set-p f)))
            (fp-pos-zero-p (f)           ; Is F +0.0?
-             (and (floatp f) (zerop f) (= (float-sign-bit f) 0))))
+             (and (floatp f) (zerop f) (not (float-sign-bit-set-p f)))))
       (and (or (null domain-low)
                (and arg-lo (sb-xc:>= arg-lo-val domain-low)
                     (not (and (fp-pos-zero-p domain-low)

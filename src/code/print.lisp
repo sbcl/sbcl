@@ -1869,7 +1869,7 @@ variable: an unreadable object representing the error is printed instead.")
            (write-string (if (float-trapping-nan-p x) " trapping" " quiet") stream)
            (write-string " NaN" stream))))
     (t
-     (when (plusp (float-sign-bit x))
+     (when (float-sign-bit-set-p x)
        (write-char #\- stream))
      (cond
        ((zerop x)

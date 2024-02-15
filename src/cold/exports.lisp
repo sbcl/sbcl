@@ -2092,7 +2092,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "FLOAT-FORMAT-NAME"
            "FLOAT-FORMAT-MAX" "FLOAT-INT-EXPONENT"
            "FLOAT-INFINITY-OR-NAN-P"
-           "FLOAT-SIGN-BIT"
+           "FLOAT-SIGN-BIT" "FLOAT-SIGN-BIT-SET-P"
            "FLOATING-POINT-EXCEPTION" "FORM" "FORMAT-CONTROL"
            "*FREE-INTERRUPT-CONTEXT-INDEX*" "FUNCALLABLE-INSTANCE-P"
            "FSC-INSTANCE-HASH"

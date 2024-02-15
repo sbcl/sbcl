@@ -394,6 +394,9 @@
   (logand (ash (flonum-%bits float)
                (- (1- (float-format-bits (flonum-format float)))))
           1))
+(defun float-sign-bit-set-p (float)
+  (declare (type float float))
+  (= (float-sign-bit float) 1))
 
 (defun calculate-flonum-value (x &optional (nan-errorp t) &aux (bits (flonum-%bits x)))
   ;; Convert the bits of a target float to an object with which we can perform
@@ -583,14 +586,14 @@
 
 (defun xfloat-abs (x)
   (with-memoized-math-op (abs x)
-    (if (= (float-sign-bit x) 0) x (sb-xc:- x))))
+    (if (not (float-sign-bit-set-p x)) x (sb-xc:- x))))
 
 ;;; Signum should return -0 of the correct type for -0 input.
 ;;; We don't need it currently.
 (defun xfloat-signum (x)
   (if (zerop x)
       x
-      (coerce (if (= (float-sign-bit x) 1)
+      (coerce (if (float-sign-bit-set-p x)
                   -1
                   1)
               (flonum-format x))))
@@ -975,7 +978,7 @@
              ;; Need this case if the first arg is represented as bits
              (if (rationalp (car args))
                  (plusp (car args))
-                 (= (float-sign-bit (car args)) 0))) ; anything positive is >= 0
+                 (not (float-sign-bit-set-p (car args))))) ; anything positive is >= 0
             ((eql nargs 2)
              (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
                (:me a b)))
@@ -1001,7 +1004,7 @@
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
              (if (floatp (car args))
-                 (= (float-sign-bit (car args)) 1) ; anything negative is <= 0
+                 (float-sign-bit-set-p (car args)) ; anything negative is <= 0
                  (minusp (car args))))
             ((eql nargs 2)
              (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))

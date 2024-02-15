@@ -369,7 +369,7 @@
 
 (defun log2/double-float (x)
   (declare (type double-float x))
-  (if (= (float-sign-bit x) 1)
+  (if (float-sign-bit-set-p x)
       (complex (%log2 (- x)) (sb-xc:/ pi (log $2d0)))
       (%log2 x)))
 
@@ -439,7 +439,7 @@
          ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
          ;; Since this doesn't seem to be an implementation issue
          ;; I (pw) take the Kahan result.
-         (if (= (float-sign-bit number) 1) ; MINUSP
+         (if (float-sign-bit-set-p number)
              (complex (log (- number)) (coerce pi '(dispatch-type number)))
              (coerce (%log (coerce number 'double-float))
                      '(dispatch-type number))))
@@ -593,7 +593,7 @@
                         (values double-float))
                (if (zerop x)
                    (if (zerop y)
-                       (if (= (float-sign-bit x) 0) ; PLUSP
+                       (if (not (float-sign-bit-set-p x))
                            y
                            (float-sign y pi))
                        (float-sign y (sb-xc:/ pi 2)))
