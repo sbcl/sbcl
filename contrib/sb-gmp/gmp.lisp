@@ -959,7 +959,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-/ x y)))
 
 (defun gmp-intexp (base power)
-  (declare (inline mpz-mul-2exp mpz-pow))
+  (declare (inline mpz-mul-2exp mpz-pow)
+           (optimize (sb-c:verify-arg-count 0)))
   (cond
     ((or (and (integerp base)
               (< (abs power) 1000)
