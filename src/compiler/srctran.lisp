@@ -462,6 +462,13 @@
               (delay-ir1-transform node :ir1-phases)
               `(not (zerop (logand x y)))))))))
 
+(defun logbitp-to-minusp-p (index integer)
+  (let* ((int (type-approximate-interval (lvar-type integer)))
+         (length (max (integer-length (interval-low int))
+                      (integer-length (interval-high int))))
+         (index-int (type-approximate-interval (lvar-type index))))
+    (>= (interval-low index-int) length)))
+
 (deftransform logbitp ((index integer) * * :node node)
   (let ((integer-type (lvar-type integer))
         (integer-value (and (constant-lvar-p integer)
@@ -473,9 +480,11 @@
           ((csubtypep integer-type (specifier-type '(or word
                                                      sb-vm:signed-word)))
            (delay-ir1-transform node :ir1-phases)
-           `(if (>= index ,sb-vm:n-word-bits)
-                (minusp integer)
-                (logtest integer (ash 1 (truly-the (integer 0 (,sb-vm:n-word-bits)) index)))))
+           (if (logbitp-to-minusp-p index integer)
+               `(minusp integer)
+               `(if (>= index ,sb-vm:n-word-bits)
+                    (minusp integer)
+                    (logtest integer (ash 1 (truly-the (integer 0 (,sb-vm:n-word-bits)) index))))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
                           (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
