@@ -2444,8 +2444,18 @@
                                                   (append (make-list min-args :initial-element 't)
                                                           '(&rest t))))
                             (lexenv-policy (node-lexenv call))
-                            :mv-call))))))
-
+                            :mv-call)))
+      (let ((name (lvar-fun-name (basic-combination-fun call) t))
+            (policy (lexenv-policy (node-lexenv call))))
+        (map-combination-args-and-types
+         (lambda (arg type lvars &optional annotation)
+           (when (apply-type-annotation name arg type
+                                        lvars policy annotation)
+             (reoptimize-lvar arg)))
+         call
+         nil
+         nil
+         t)))))
 
 (defun ir1-optimize-mv-call (node)
   (let* ((fun (basic-combination-fun node))
