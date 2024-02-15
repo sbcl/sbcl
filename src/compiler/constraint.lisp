@@ -307,7 +307,7 @@
                              (if position
                                  (1+ position)
                                  0))))))
-              (values))))
+              conset-1)))
     (defconsetop conset-union bit-ior)
     (defconsetop conset-intersection bit-and)
     (defconsetop conset-difference bit-andc2)))
@@ -1430,38 +1430,47 @@
 
 ;;; Join the constraints coming from the predecessors of BLOCK on
 ;;; every constrained variable into the constraint set IN.
-(defun join-type-constraints (in block &optional equality-only)
+(defun join-type-constraints (in block &optional equality-only predecessor-outs)
   (let ((vars '())
         (equality-vars)
         (predecessors (block-pred block)))
-    (dolist (pred predecessors)
-      (let ((out (block-out-for-successor pred block)))
-        (when out
-          (do-conset-elements (con out)
-            (let ((kind  (constraint-kind con))
-                  (y     (constraint-y con))
-                  (not-p (constraint-not-p con)))
-              (when (and (not equality-only)
-                         (or (member kind '(typep < >))
-                             (and (eq kind 'eql) (or (not not-p)
-                                                     (constant-p y)))
-                             (and (eq kind '=) (and (numeric-type-p y)
-                                                    (not not-p)))))
-                (pushnew (constraint-x con) vars))
-              (when (and (eq kind 'equality)
-                         (/= (equality-constraint-amount con) 0))
-                (pushnew (constraint-x con) equality-vars)
-                (when (lambda-var/vector-length-p y)
-                  (pushnew y equality-vars)))))
-          (return))))
+    (flet ((find-vars (out)
+             (do-conset-elements (con out)
+               (let ((kind  (constraint-kind con))
+                     (y     (constraint-y con))
+                     (not-p (constraint-not-p con)))
+                 (when (and (not equality-only)
+                            (or (member kind '(typep < >))
+                                (and (eq kind 'eql) (or (not not-p)
+                                                        (constant-p y)))
+                                (and (eq kind '=) (and (numeric-type-p y)
+                                                       (not not-p)))))
+                   (pushnew (constraint-x con) vars))
+                 (when (and (eq kind 'equality)
+                            (/= (equality-constraint-amount con) 0))
+                   (pushnew (constraint-x con) equality-vars)
+                   (when (lambda-var/vector-length-p y)
+                     (pushnew y equality-vars)))))))
+      (if predecessor-outs
+          (find-vars (car predecessor-outs))
+          (dolist (pred predecessors)
+            (let ((out (block-out-for-successor pred block)))
+              (when out
+                (find-vars out)
+                (return))))))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
-        (dolist (pred (block-pred block))
-          (let ((out (block-out-for-successor pred block)))
-            (when out
-              (setq in-var-type
-                    (type-union in-var-type
-                                (type-from-constraints var out *universal-type*))))))
+        (flet ((compute-type (out)
+                 (setq in-var-type
+                       (type-union in-var-type
+                                   (type-from-constraints var out *universal-type*)))))
+          (if predecessor-outs
+              (dolist (out predecessor-outs)
+                (compute-type out))
+              (dolist (pred predecessors)
+                (let ((out (block-out-for-successor pred block)))
+                  (when out
+                    (compute-type out))))))
 
         (when (type-for-constraints-p in-var-type)
           ;; Remove the existing constraints to avoid joining them again later.
@@ -1480,9 +1489,11 @@
   (let ((in nil)
         (bind (block-start-node block)))
     (cond
+      ;; Use constraints from the local calls to this function
       ((and (bind-p bind)
             (memq (functional-kind (bind-lambda bind)) '(nil :assignment :optional :cleanup)))
-       (let ((fun (bind-lambda bind)))
+       (let ((fun (bind-lambda bind))
+             (outs))
          (loop for ref in (lambda-refs fun)
                for call = (node-dest ref)
                for call-in = (and call
@@ -1490,7 +1501,10 @@
                when call-in
                do (if in
                       (conset-intersection in call-in)
-                      (setf in (copy-conset call-in))))))
+                      (setf in (copy-conset call-in)))
+                  (push call-in outs))
+         (when (rest outs)
+           (join-type-constraints in block (not join-types-p) outs))))
       (t
        (dolist (pred (block-pred block))
          ;; If OUT has not been calculated, assume it to be the universal
