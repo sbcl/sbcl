@@ -1753,7 +1753,8 @@
             combination
             :info info
             :unknown-keys-fun
-            (lambda ()
+            (lambda (lvars)
+              (declare (ignore lvars))
               (return-from constant-fold-call-p)))
            t)
           (t
@@ -2454,7 +2455,14 @@
                                         lvars policy annotation)
              (reoptimize-lvar arg)))
          call
-         :defined-here t)))))
+         :defined-here t
+         :unknown-keys-fun (lambda (lvars)
+                             (dolist (lvar lvars)
+                               (unless (types-equal-or-intersect (lvar-type lvar)
+                                                                 (specifier-type 'symbol))
+                                 (setf (basic-combination-kind call) :error)
+                                 (compiler-warn "Argument of type ~s cannot be used as a keyword."
+                                                (type-specifier (lvar-type lvar)))))))))))
 
 (defun ir1-optimize-mv-call (node)
   (let* ((fun (basic-combination-fun node))

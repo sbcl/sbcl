@@ -974,7 +974,7 @@ and no value was provided for it." name))))))))))
               (call lvar (key-info-type key) (key-annotation name)))))
         (when (and unknown-keys-fun
                    unknown-keys)
-          (funcall unknown-keys-fun))))))
+          (funcall unknown-keys-fun unknown-keys))))))
 
 (defun assert-array-index-lvar-type (lvar type policy)
   (let ((internal-lvar (make-lvar))

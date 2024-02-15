@@ -110,7 +110,7 @@
                      ((eq key-value
                           :allow-other-keys))
                      (t
-                      (setf unknown t))))
+                      (push key unknown))))
       unknown)))
 
 ;;; Turn constant LVARs in keyword arg positions to constants so that
