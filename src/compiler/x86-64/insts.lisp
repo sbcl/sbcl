@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(conditional-opcode negate-condition
+  (import '(negate-condition
             plausible-signed-imm32-operand-p
             ea-p ea-base ea-index size-nbyte alias-p
             ea ea-disp rip-relative-ea) "SB-VM")
@@ -319,6 +319,7 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-xmmreg/mem)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx +conditions+
   ;; The first element in each row is the one we disassemble as.
   ;; Always prefer the one without a negation in it if there is a choice.
@@ -339,6 +340,8 @@
     (:le . 14) (:ng . 14)
     (:g . 15) (:nle . 15))
   #'equal)
+(defun encoded-condition (condition)
+  (cdr (assoc condition +conditions+ :test #'eq))))
 (defconstant-eqx +condition-name-vec+
   (let ((vec (make-array 16 :initial-element nil)))
     (dolist (cond +conditions+ vec)
@@ -363,10 +366,8 @@
 
 (define-arg-type condition-code :printer +condition-name-vec+)
 
-(defun conditional-opcode (condition)
-  (cdr (assoc condition +conditions+ :test #'eq)))
 (defun negate-condition (name)
-  (aref +condition-name-vec+ (logxor 1 (conditional-opcode name))))
+  (aref +condition-name-vec+ (logxor 1 (encoded-condition name))))
 
 ;;;; disassembler instruction formats
 
@@ -2121,7 +2122,7 @@
         (where
           (cond ((fixup-p where)
                  (emit-bytes segment #x0F
-                             (dpb (conditional-opcode cond)
+                             (dpb (encoded-condition cond)
                                   (byte 4 0)
                                   #b10000000))
                  (emit-relative-fixup segment where))
@@ -2135,7 +2136,7 @@
                                    (+ posn 2))))
                       (when (byte-disp-p chooser where disp 4)
                         (emit-byte segment
-                                   (dpb (conditional-opcode cond)
+                                   (dpb (encoded-condition cond)
                                         (byte 4 0)
                                         #b01110000))
                         (emit-byte-displacement-backpatch segment where)
@@ -2143,7 +2144,7 @@
                   (lambda (segment posn)
                     (let ((disp (- (label-position where) (+ posn 6))))
                       (emit-bytes segment #x0F
-                                  (dpb (conditional-opcode cond)
+                                  (dpb (encoded-condition cond)
                                        (byte 4 0)
                                        #b10000000))
                       (emit-signed-dword segment disp)))))))
@@ -2216,7 +2217,7 @@
      (aver (neq size :byte))
      (emit-prefixes segment src dst size))
    (emit-byte segment #x0F)
-   (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
+   (emit-byte segment (dpb (encoded-condition cond) (byte 4 0) #b01000000))
    (emit-ea segment src dst)))
 
 ;;;; conditional byte set
@@ -2226,7 +2227,7 @@
   (:emitter
    (emit-prefixes segment (sized-thing dst :byte) nil :byte)
    (emit-byte segment #x0F)
-   (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b10010000))
+   (emit-byte segment (dpb (encoded-condition cond) (byte 4 0) #b10010000))
    (emit-ea segment dst #b000)))
 
 ;;;; enter/leave
@@ -3585,36 +3586,56 @@
       (delete-stmt next)
       stmt)))
 
+;;; Return :TAKEN if taking the conditional branch COND1 implies that COND2's
+;;; branch will be taken, or :NOT-TAKEN if COND2 will fallthrough,
+;;; or NIL it can't be determined.
+(defun branch-branch-implication (cond1 cond2)
+  (macrolet ((conditions (symbol1 symbol2)
+               `(and (eql ,(encoded-condition symbol1) cond1)
+                     (eql ,(encoded-condition symbol2) cond2))))
+    (cond ((or (eq cond1 cond2) (eq cond2 :always))
+           ;;  conditional to same condition  -> jump to target of 2nd jump
+           ;;  conditional to :ALWAYS         -> jump to target of 2nd jump
+           ;;   (this includes "always" to "always" either way you look at it)
+           :taken)
+          ((and (fixnump cond1) (fixnump cond2) (eq (logxor cond1 1) cond2))
+           ;; A conditional jump to the negation of that condition
+           ;; goes to the instruction after the 2nd jump.
+           :not-taken)
+          ;; I manually examined a sampling of calls to this function
+          ;; and did not notice other opportunities to return non-NIL
+          ((conditions :a :eq) :not-taken) ; above to equal
+          ((conditions :a :ne) :taken) ; above to not-equal
+          (t nil))))
+
 ;;; Possible enhancement: it should be possible to eliminate more jumps-to-jumps
 ;;; by knowing something about implication of one condition upon another, e.g.
 ;;; either JC or JZ jumping to JBE would take the second jump, since JBE is (CF=1 or ZF=1).
 (defun sb-assem::perform-jump-to-jump-elimination (starting-stmt label->stmt-map)
   (flet ((jmp-cond (stmt)
            (if (cdr (stmt-operands stmt))
-               (conditional-opcode (car (stmt-operands stmt)))
+               (encoded-condition (car (stmt-operands stmt)))
                :always))
          (jmp-target (stmt)
-           (car (last (stmt-operands stmt)))))
+           ;; could be an effective address (only if not a conditional jump)
+           (let ((maybe-label (car (last (stmt-operands stmt)))))
+             (and (label-p maybe-label) maybe-label))))
     (do ((stmt starting-stmt (stmt-next stmt)))
         ((null stmt))
       (when (eq (stmt-mnemonic stmt) 'jmp)
-        (let* ((to-label (car (last (stmt-operands stmt))))
+        (let* ((to-label (jmp-target stmt))
                (to-stmt (gethash to-label label->stmt-map)))
-          (when (and to-stmt (eq (stmt-mnemonic to-stmt) 'jmp))
-            (let ((cond1 (jmp-cond stmt))
-                  (cond2 (jmp-cond to-stmt)))
-              (cond ((or (eq cond1 cond2) (eq cond2 :alwys))
-                     ;;  conditional to same condition  -> jump to target of 2nd jump
-                     ;;  conditional to :ALWAYS         -> jump to target of 2nd jump
-                     ;;   (this includes "always" to "always" either way you look at it)
-                     (setf (car (last (stmt-operands stmt))) (jmp-target to-stmt)))
-                    ((and (fixnump cond1) (fixnump cond2) (eq (logxor cond1 1) cond2))
-                     ;; A conditional jump to the negation of that condition
-                     ;; goes to the instruction after the 2nd jump.
-                     (let* ((fallthrough (stmt-next to-stmt))
-                            (label ; the statement might already be labeled
-                             (or (first (ensure-list (stmt-labels fallthrough)))
-                                 (let ((label (gen-label))) ; maake a new label
-                                   (setf (gethash label label->stmt-map) fallthrough)
-                                   (add-stmt-labels fallthrough label)))))
-                       (setf (car (last (stmt-operands stmt))) label)))))))))))
+          (case (and to-stmt
+                     (eq (stmt-mnemonic to-stmt) 'jmp)
+                     (jmp-target to-stmt)
+                     (branch-branch-implication (jmp-cond stmt) (jmp-cond to-stmt)))
+            (:taken
+             (setf (car (last (stmt-operands stmt))) (jmp-target to-stmt)))
+            (:not-taken
+             (let* ((fallthrough (stmt-next to-stmt))
+                    (label ; the statement might already be labeled
+                     (or (first (ensure-list (stmt-labels fallthrough)))
+                         (let ((label (gen-label))) ; maake a new label
+                           (setf (gethash label label->stmt-map) fallthrough)
+                           (add-stmt-labels fallthrough label)))))
+               (setf (car (last (stmt-operands stmt))) label)))))))))
