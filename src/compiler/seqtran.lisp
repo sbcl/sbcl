@@ -2867,7 +2867,7 @@
                             t)))) ; do require minimal
                  (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
                  (keyspace-size (if minimal n pow2size))
-                 (domain (make-array keyspace-size))
+                 (domain (sb-xc:make-array keyspace-size :initial-element 0))
                  (range
                   (cond ((eq fun-name 'position)
                          (sb-xc:make-array keyspace-size
@@ -2880,7 +2880,7 @@
                         ;; if ALISTP=T then use a single array of cons cells,
                         ;; which the user wants (or seems to)
                         ((eq alistp t) domain)
-                        (t (make-array keyspace-size))))
+                        (t (sb-xc:make-array keyspace-size))))
                  (phashfun (sb-c::compile-perfect-hash lambda hashes)))
         (when certainp
           (when conditional
@@ -2918,9 +2918,8 @@
                ;; can produce garbage out, so we have to bounds-check it.
                ;; Otherwise, with a non-minimal hash function, the table size is
                ;; exactly right for the number of bits of output of the function
-               (hit-expr (if minimal
-                             `(and (< phash ,n) (eq ,key-expr item))
-                             `(eq ,key-expr item))))
+               (test-expr `(eq ,key-expr item))
+               (hit-expr (if minimal `(and (< phash ,n) ,test-expr) test-expr)))
           (note-perfect-hash-used
            `(,fun-name ,conditional ,items)
            `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
