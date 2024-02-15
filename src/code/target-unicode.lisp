@@ -1926,7 +1926,18 @@ Otherwise, returns NIL."
   ;;            (with-open-file (f "output/ucd/confusables.lisp-expr") (read f)))
   ;; Maybe we should filter CDR pair here, though it would leave extra keys in the map
   ;; which seems to cause no immediate harm.
-  (flet ((lookup (character)
+  (flet ((unpack-3-codepoints (codepoints)
+           (declare (type (signed-byte 63) codepoints))
+           (cond ((< codepoints (ash 1 21))
+                  (list (code-char codepoints)))
+                 ((< codepoints (ash 1 (* 21 2)))
+                  (list (code-char (ldb (byte 21 0) codepoints))
+                        (code-char (ldb (byte 21 21) codepoints))))
+                 (t
+                  (list (code-char (ldb (byte 21 0) codepoints))
+                        (code-char (ldb (byte 21 21) codepoints))
+                        (code-char (ldb (byte 21 (* 21 2)) codepoints))))))
+         (lookup (character)
            (find-in-perfect-hashmap
             character "confusables" t
             (lambda (pair &aux (x (cdr pair)))
@@ -1942,8 +1953,7 @@ Otherwise, returns NIL."
             do (cond ((not deconfused)
                       (push (string char) result))
                      ((integerp deconfused)
-                      (push (sb-impl::unpack-3-codepoints deconfused)
-                            result))
+                      (push (unpack-3-codepoints deconfused) result))
                      (t
                       (push deconfused result))))
       (apply #'concatenate 'string (nreverse result)))))
