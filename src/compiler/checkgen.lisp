@@ -199,10 +199,10 @@
   (declare (type cast cast))
   (let ((lvar (node-lvar cast)))
     (multiple-value-bind (dest lvar) (and lvar (immediately-used-let-dest lvar cast))
-      (cond ((and (combination-p dest)
-                  (or (not (combination-fun-info dest))
+      (cond ((and (basic-combination-p dest)
+                  (or (not (basic-combination-fun-info dest))
                       ;; fixed-args functions do not check their arguments.
-                      (not (ir1-attributep (fun-info-attributes (combination-fun-info dest))
+                      (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))
                                            fixed-args
                                            always-translatable)))
                   ;; The theory is that the type assertion is from a declaration on the
@@ -225,12 +225,12 @@
                   ;; no destination. Perhaps we should mark cases inserted by
                   ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
                   ;; deemed unreachable?
-                  (cond ((and (lvar-fun-is (combination-fun dest)
+                  (cond ((and (lvar-fun-is (basic-combination-fun dest)
                                            '(hairy-data-vector-set/check-bounds
                                              hairy-data-vector-ref/check-bounds
                                              hairy-data-vector-ref
                                              hairy-data-vector-set))
-                              (eq (car (combination-args dest)) lvar)
+                              (eq (car (basic-combination-args dest)) lvar)
                               (type= (specifier-type 'vector)
                                      (single-value-type (cast-type-to-check cast))))
                          (change-full-call dest
@@ -238,12 +238,12 @@
                                                    hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
                                                    hairy-data-vector-ref vector-hairy-data-vector-ref
                                                    hairy-data-vector-set vector-hairy-data-vector-set)
-                                                 (lvar-fun-name (combination-fun dest) t))))
+                                                 (lvar-fun-name (basic-combination-fun dest) t))))
                         #+(or arm64 x86-64)
-                        ((lvar-fun-is (combination-fun dest) '(values-list)))
+                        ((lvar-fun-is (basic-combination-fun dest) '(values-list)))
                         ;; Not great
-                        ((lvar-fun-is (combination-fun dest) '(%%primitive))
-                         (destructuring-bind (vop &rest args) (combination-args dest)
+                        ((lvar-fun-is (basic-combination-fun dest) '(%%primitive))
+                         (destructuring-bind (vop &rest args) (basic-combination-args dest)
                            (and (constant-lvar-p vop)
                                 (let ((name (vop-info-name (lvar-value vop))))
                                   (or (and (memq name '(sb-vm::overflow+t
@@ -253,7 +253,7 @@
                                       (and (memq name '(sb-vm::overflow-t-y))
                                            (eq lvar (cadr args))))))))
                         ((and (policy dest (= debug 3))
-                              (let ((leaf (nth-value 2 (lvar-fun-type (combination-fun dest)))))
+                              (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
                                 (and leaf
                                      (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
                          nil)

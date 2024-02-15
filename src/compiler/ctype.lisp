@@ -905,21 +905,31 @@ and no value was provided for it." name))))))))))
                      :returns (fun-type-returns type))
       type))
 
+
+(defun single-value-args (call)
+  (let ((args (basic-combination-args call)))
+   (if (mv-combination-p call)
+       (loop for arg in args
+             while (type-single-value-p (lvar-derived-type arg))
+             collect arg)
+       args)))
+
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
 (defun map-combination-args-and-types (fun call &optional info
                                                           unknown-keys-fun
                                                           defined-here
                                                           asserted-type
                                                           type)
-  (declare (type function fun) (type combination call))
+  (declare (type function fun)
+           (type basic-combination call))
   (binding* ((type (or type
-                       (lvar-fun-type (combination-fun call) defined-here asserted-type)))
+                       (lvar-fun-type (basic-combination-fun call) defined-here asserted-type)))
              (nil (fun-type-p type) :exit-if-null)
              (annotation (and info
                               (fun-info-annotation info)))
+             (args (single-value-args call))
              ((arg-lvars unknown-keys)
-              (resolve-key-args (combination-args call) type))
-             (args (combination-args call))
+              (resolve-key-args args type))
              (i -1))
     (flet ((positional-annotation ()
              (and annotation

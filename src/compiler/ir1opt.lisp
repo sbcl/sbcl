@@ -271,8 +271,7 @@
 (defun lvar-externally-checkable-type (lvar)
   (declare (type lvar lvar))
   (let ((dest (lvar-dest lvar)))
-    (when (combination-p dest)
-      ;; TODO: MV-COMBINATION
+    (when (basic-combination-p dest)
       (when (call-full-like-p dest)
         (let ((info (and (eq (basic-combination-kind dest) :known)
                          (basic-combination-fun-info dest))))
