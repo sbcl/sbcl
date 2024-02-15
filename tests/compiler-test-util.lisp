@@ -53,7 +53,9 @@
                   (*print-pretty* nil))
               (sb-c:dis code s)))))
     (loop for line in (test-util:split-string disassembly #\newline)
-          when (search expect line) collect line)))
+          when (and (search expect line)
+                    (not (search "; Origin" line)))
+          collect line)))
 
 (defun inspect-ir (form fun &rest checked-compile-args)
   (let ((*compile-component-hook* fun))
