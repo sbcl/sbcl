@@ -963,7 +963,7 @@
               (return))
             nil))))
      combination
-     info)
+     :info info)
     t))
 
 (defun flushable-combination-p (call)

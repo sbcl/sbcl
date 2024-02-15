@@ -286,7 +286,7 @@
                    (return-from lvar-externally-checkable-type
                      (coerce-to-values type))))
                dest
-               nil nil t t)))))
+               :defined-here t :asserted-type t)))))
     *wild-type*))
 
 ;;;; interface routines used by optimizers
@@ -1121,7 +1121,7 @@
                do
                (setf (combination-kind combination) :error)
                (return-from check-proper-sequences))))
-     combination info)))
+     combination :info info)))
 
 ;;; Do IR1 optimizations on a COMBINATION node.
 (defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
@@ -1751,7 +1751,8 @@
                           (constant-lvar-ignore-types-p arg))
                 (return-from constant-fold-call-p)))
             combination
-            info
+            :info info
+            :unknown-keys-fun
             (lambda ()
               (return-from constant-fold-call-p)))
            t)
@@ -2453,9 +2454,7 @@
                                         lvars policy annotation)
              (reoptimize-lvar arg)))
          call
-         nil
-         nil
-         t)))))
+         :defined-here t)))))
 
 (defun ir1-optimize-mv-call (node)
   (let* ((fun (basic-combination-fun node))

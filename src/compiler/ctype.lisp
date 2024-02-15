@@ -915,11 +915,11 @@ and no value was provided for it." name))))))))))
        args)))
 
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
-(defun map-combination-args-and-types (fun call &optional info
-                                                          unknown-keys-fun
-                                                          defined-here
-                                                          asserted-type
-                                                          type)
+(defun map-combination-args-and-types (fun call &key info
+                                                     unknown-keys-fun
+                                                     defined-here
+                                                     asserted-type
+                                                     type)
   (declare (type function fun)
            (type basic-combination call))
   (binding* ((type (or type
@@ -1057,11 +1057,9 @@ and no value was provided for it." name))))))))))
                     (not trusted))
                (reoptimize-lvar arg)))
            call
-           info
-           nil
-           t
-           nil
-           type))))
+           :info info
+           :defined-here t
+           :type type))))
   (values))
 
 ;;;; FIXME: Move to some other file.
