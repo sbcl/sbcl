@@ -142,6 +142,77 @@
 (defconstant-eqx +character-name-huffman-tree+ '#.(charname-tree-maker)
   #'equal)
 
+(sb-ext:defglobal *base-char-name-alist*
+  ;; Note: The *** markers here indicate character names which are
+  ;; required by the ANSI specification of #'CHAR-NAME. For the others,
+  ;; we prefer the ASCII standard name.
+  ;; Note 2: names in parenthese are omitted from the special cases of NAME-CHAR
+  ;; as the name is present in "ucd1-names.lisp-expr" and will be found via that.
+  ;; The indicated names will need to be reinstated if we drop Unicode 1 names.
+  '((#x00 "Nul" ("Null") "^@")
+    (#x01 "Soh" "^a")
+    (#x02 "Stx" "^b")
+    (#x03 "Etx" "^c")
+    (#x04 "Eot" "^d")
+    (#x05 "Enq" "^e")
+    (#x06 "Ack" "^f")
+    ;; Don't alias to Bell, another Unicode character has that name.
+    (#x07 "Bel" "^g")
+    (#x08 ("Backspace") "^h" "Bs") ; *** See Note above
+    (#x09 "Tab" "^i" "Ht") ; *** See Note above
+    (#x0A "Newline" "Linefeed" "^j" "Lf" "Nl") ; *** See Note above
+    (#x0B "Vt" "^k")
+    (#x0C "Page" "^l" "Form" "Formfeed" "Ff" "Np") ; *** See Note above
+    (#x0D "Return" "^m" "Cr") ; *** See Note above
+    (#x0E "So" "^n")
+    (#x0F "Si" "^o")
+    (#x10 "Dle" "^p")
+    (#x11 "Dc1" "^q")
+    (#x12 "Dc2" "^r")
+    (#x13 "Dc3" "^s")
+    (#x14 "Dc4" "^t")
+    (#x15 "Nak" "^u")
+    (#x16 "Syn" "^v")
+    (#x17 "Etb" "^w")
+    (#x18 "Can" "^x")
+    (#x19 "Em" "^y")
+    (#x1A "Sub" "^z")
+    (#x1B "Esc" ("Escape") "^[" "Altmode" "Alt")
+    (#x1C "Fs" "^\\")
+    (#x1D "Gs" "^]")
+    (#x1E "Rs" "^^")
+    (#x1F "Us" "^_")
+    (#x20 ("Space") "Sp") ; *** See Note above
+    (#x7f "Rubout" ("Delete") "Del") ; *** See Note above
+    (#x82 "Break-Permitted")
+    (#x83 "No-Break-Permitted")
+    (#x85 "Next-Line")
+    (#x86 "Start-Selected-Area")
+    (#x87 "End-Selected-Area")
+    (#x88 "Character-Tabulation-Set")
+    (#x89 "Character-Tabulation-With-Justification")
+    (#x8A "Line-Tabulation-Set")
+    (#x8B "Partial-Line-Forward")
+    (#x8C "Partial-Line-Backward")
+    (#x8D "Reverse-Linefeed")
+    (#x8E "Single-Shift-Two")
+    (#x8F "Single-Shift-Three")
+    (#x90 "Device-Control-String")
+    (#x91 "Private-Use-One")
+    (#x92 "Private-Use-Two")
+    (#x93 "Set-Transmit-State")
+    (#x94 "Cancel-Character")
+    (#x95 "Message-Waiting")
+    (#x96 "Start-Guarded-Area")
+    (#x97 "End-Guarded-Area")
+    (#x98 "Start-String")
+    (#x9A "Single-Character-Introducer")
+    (#x9B "Control-Sequence-Introducer")
+    (#x9C "String-Terminator")
+    (#x9D "Operating-System-Command")
+    (#x9E "Privacy-Message")
+    (#x9F "Application-Program-Command")))
+
 ;;; This macro contains an unsightly KLUDGE - possibly having to do with support of
 ;;; Unicode 1.0 char names but I'm not certain - and the fact that we don't Huffman-encode
 ;;; *BASE-CHAR-NAME-ALIST*. The uncertainty is that my failing example was from ucd1-names
