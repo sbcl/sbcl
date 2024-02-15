@@ -4216,6 +4216,10 @@
              ,val
              ,(abs val)))))
 
+(deftransform expt ((x y) ((or rational (complex rational)) integer) * :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(sb-kernel::intexp x y))
+
 (macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    *)

@@ -115,6 +115,7 @@
 ;;; a positive integer. Values of power are calculated as positive
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
+  (declare (explicit-check))
   (cond ((eql base 1)
          base)
         ((eql base -1)
@@ -146,10 +147,12 @@
         ((eql base 2)
          (ash 1 power))
         (t
-         (do ((nextn (ash power -1) (ash power -1))
-              (total (if (oddp power) base 1)
-                     (if (oddp power) (* base total) total)))
-             ((zerop nextn) total)
+         (do* ((base base)
+               (power power)
+               (nextn (ash power -1) (ash power -1))
+               (total (if (oddp power) base 1)
+                      (if (oddp power) (* base total) total)))
+              ((zerop nextn) total)
            (setq base (* base base))
            (setq power nextn)))))
 
