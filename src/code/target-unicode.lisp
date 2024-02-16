@@ -255,46 +255,57 @@
               (push (cons codepoint (huffman-encode name +character-name-huffman-tree+))
                     alist)))
           database-name)
-         (let* ((max-codepoint (reduce #'max alist :key #'car))
-                (bits (make-array (- (1+ max-codepoint) direct-map-end)
-                                  :element-type 'bit :initial-element 0))
-                (sparse-pairs
-                 (remove-if (lambda (pair) (< (car pair) direct-map-end))
-                            alist))
-                (hashes (map '(array (unsigned-byte 32) (*)) #'car sparse-pairs))
-                (lexpr (cached-perfect-hash-lambda hashes))
-                (hashfn (sb-c::compile-perfect-hash lexpr hashes))
-                (result (make-array (+ direct-map-end (length sparse-pairs))
-                                    :initial-element nil)))
-           (dolist (pair alist)
-             (let ((cp (car pair)))
-               (if (< cp direct-map-end)
-                   (setf (svref result cp) (cdr pair))
-                   (let ((hash (funcall hashfn cp)))
-                     (setf (svref result (+ hash direct-map-end)) (cdr pair)
-                           (sbit bits (- cp direct-map-end)) 1)))))
-           `(let* ((char-code (char-code character))
-                   (h-code ; the Huffman-encoded name (usually)
-                    (cond ((< char-code ,direct-map-end)
-                           (svref ,result char-code)) ; could be NIL
-                          ;; This discards the keys (the characters themselves).
-                          ;; We ascertain that CHAR-CODE exists in the set via a bitmap.
-                          ((and (<= char-code ,max-codepoint)
-                                (not (zerop (sbit ,bits (- char-code ,direct-map-end)))))
-                           (aref ,result (+ (,lexpr char-code) ,direct-map-end))))))
-              (cond ((integerp h-code)
-                     (huffman-decode +character-name-huffman-tree+ h-code result))
-                    ((and result (stringp h-code))
-                     ;; KLUDGE/FIXME - see comments at top
-                     (replace result h-code)
-                     (length h-code))
-                    (t
-                     h-code)))))))
+         (binding*
+             ((max-codepoint (reduce #'max alist :key #'car))
+              (bits (make-array (- (1+ max-codepoint) direct-map-end)
+                                :element-type 'bit :initial-element 0))
+              (sparse-pairs
+               (remove-if (lambda (pair) (< (car pair) direct-map-end)) alist))
+              (hashes (map '(array (unsigned-byte 32) (*)) #'car sparse-pairs))
+              (lexpr (cached-perfect-hash-lambda hashes))
+              (hashfn (sb-c::compile-perfect-hash lexpr hashes))
+              ((data xref)
+               (pack-bit-strings (mapcan (lambda (pair)
+                                           (if (integerp (cdr pair)) (list (cdr pair))))
+                                         alist))))
+           ;; Every integer that represents an h-code gets replaced by a different
+           ;; integer representing an index into the densely packed h-codes.
+           (loop for index across xref for pair in alist
+                 do (rplacd pair index))
+           (let ((direct-map (make-array direct-map-end :initial-element nil))
+                 (indirect-map (make-array (length sparse-pairs)
+                                           :element-type '(unsigned-byte 32))))
+             (dolist (pair alist)
+               (let ((cp (car pair)))
+                 (if (< cp direct-map-end)
+                     (setf (svref direct-map cp) (cdr pair))
+                     (let ((hash (funcall hashfn cp)))
+                       (setf (aref indirect-map hash) (cdr pair)
+                             (sbit bits (- cp direct-map-end)) 1)))))
+             `(let* ((char-code (char-code character))
+                     (bitstream-index
+                      (cond ((< char-code ,direct-map-end)
+                             (svref ,direct-map char-code))
+                            ;; This discards the keys (the characters themselves).
+                            ;; We ascertain that CHAR-CODE exists in the set via a bitmap.
+                            ((and (<= char-code ,max-codepoint)
+                                  (= 1 (sbit ,bits (- char-code ,direct-map-end))))
+                             (aref ,indirect-map (,lexpr char-code))))))
+                (cond ((integerp bitstream-index)
+                       (let ((start (ldb (byte 23 9) bitstream-index))
+                             (nbits (ldb (byte 9 0) bitstream-index)))
+                         (huffman-decode ,data start nbits
+                                         +character-name-huffman-tree+ result)))
+                      ((and result (stringp bitstream-index))
+                       ;; KLUDGE/FIXME - see comments at top
+                       (replace result bitstream-index)
+                       (length bitstream-index))
+                      (t
+                       bitstream-index))))))))
 (defun unicode-1-char->name (character result)
   (char->name "ucd1-names" nil 32))
 (defun unicode-char->name (character result)
-  (char->name "ucd-names" *base-char-name-alist*
-               #-sb-unicode 32 #+sb-unicode #x800)))
+  (char->name "ucd-names" *base-char-name-alist* #xA0)))
 
 (defun unicode-1-name (character)
   "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct

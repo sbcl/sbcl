@@ -88,6 +88,37 @@
       (loop for char across string
          do (encode nil char tree))
       code)))
+
+;;; Given a list of integers (usually bignums) return a bit-vector holding the
+;;; concatenation of all the bits of those integers end-to-end, and a vector of
+;;; (UNSIGNED-BYTE 32) indicating the starting bit and length of each integer.
+;;; The space savings is approximately as follows for a 64-bit word size -
+;;; * the widetag of each bignum is esentially useless information.
+;;; * the payload length never needs more than 1 byte, wasting 6 bytes.
+;;; * half the time there is a padding word for alignment.
+;;; * on average half the bits of the last bignum digit are wasted.
+;;; * the pointers take 1 word each.
+;;; The resulting simple-bit-vector and UB32 vector can go in read-only space.
+(defun pack-bit-strings (inputs)
+  ;; Each N as supplied uses its highest 1 bit to convey the length of the
+  ;; bit stream. Drop that bit from the data as stored.
+  (let* ((indices (make-array (length inputs) :element-type '(unsigned-byte 32)))
+         (total-nbits (loop for n in inputs sum (1- (integer-length n))))
+         (bits (make-array total-nbits :element-type 'bit))
+         (input-index 0)
+         (bit-index 0))
+    (dolist (n inputs (values bits indices))
+      (let ((nbits (1- (integer-length n))))
+        ;; If we need more than 23 bits to store the maximum output pointer,
+        ;; INDICES could easily be turned into a UB32 vector with a separate
+        ;; UB8 vector to indicate the length. One array is adequate for now.
+        (setf (aref indices input-index)
+              (logior (ash (the (unsigned-byte 23) bit-index) 9)
+                      (the (unsigned-byte 9) nbits)))
+        (dotimes (i nbits)
+          (setf (sbit bits (+ bit-index i)) (if (logbitp i n) 1 0)))
+        (incf bit-index nbits)
+        (incf input-index)))))
 ) ; end EVAL-WHEN
 
 ;; actually 88 (for now), but leave some wiggle room
@@ -105,26 +136,26 @@
      (prog1 ,form
        (sb-ext:atomic-push ,varname *name->char-buffers*))))
 
-(defun huffman-decode (tree code output)
+(defun huffman-decode (bits start nbits tree output)
   (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
-           (integer code))
-  ;; The highest 1 bit acts only to demarcate the end of the encoding.
-  ;; Therefore the number of data bits in the encoding is 1 fewer than that.
-  (let ((nbits (1- (integer-length code)))
-        (bufpos longest-unicode-char-name))
-    (declare (type (mod 500) nbits)) ; the longest encoding is 385 bits for now
+           (simple-bit-vector bits)
+           (index start)
+           ((mod 512) nbits))
+  (let ((bufpos longest-unicode-char-name)
+        (pointer (+ start nbits)))
+    (declare (index pointer))
     (with-name->char-buffer (buffer)
       (labels ((choose (branch)
                  (destructuring-bind (left right) (cdr branch)
-                   (if (logbitp (decf nbits) code) right left)))
+                   (if (= (sbit bits (decf pointer)) 1) right left)))
                (decode (branch)
                  (when (zerop nbits)
-                   (error "Invalid Huffman-code: ~S" code))
+                   (error "Invalid Huffman-code: ~S" (subseq bits start (+ start nbits))))
                  (let ((next (choose branch)))
                    (cond ((consp next)
                           (decode next))
                          (t
-                          (when (> nbits 1) (decode tree))
+                          (when (> pointer start) (decode tree))
                           (setf (char buffer (decf bufpos))
                                 (char (the (simple-base-string 1) next) 0)))))))
         (decode tree)
