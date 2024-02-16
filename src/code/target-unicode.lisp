@@ -445,7 +445,8 @@ name is that string, if one exists. Otherwise, NIL is returned."
   ;; like "UBAD" ("accidental hex")? I sure as hell hope it can't happen.
   (let* ((string (string name))
          (len (length string)))
-    (when (zerop len) (return-from name-char nil))
+    (when (< len 2) ; there are no length 1 (or 0) names
+      (return-from name-char nil))
     (when (char-equal (char string 0) #\U)
       (let ((start (if (and (>= len 2) (char= (char string 1) #\+)) 2 1)))
         ;; To prevent whitespace or +/- sign, just check DIGIT-CHAR-P on the next char.
@@ -462,21 +463,13 @@ name is that string, if one exists. Otherwise, NIL is returned."
       ;; The unicode lists need a final mix with improved avalanche behavior.
       (or (let ((name-hash (ldb (byte 32 0) psxhash)))
             (try-base-char))
-          (let ((name-hash (psxhash-to-name-hash psxhash string))
-                (name-buffer
-                 ;; After git rev 8b606d636cc1 we have no feature indicating
-                 ;; support for DX strings but this is close enough.
-                 (or #-c-stack-is-control-stack (sb-ext:atomic-pop *name->char-buffers*)
-                     (make-array longest-unicode-char-name
-                                 :element-type 'base-char))))
-            (declare (dynamic-extent name-buffer))
-            ;; Look in ucd-names first, since there are overlaps with ucd1-names,
-            ;; and we always want to return the new codepoint that a name finds,
-            ;; not the old, in the case of a conflict.
-            (prog1 (or (try-unicode "ucd-names" unicode-char->name)
-                       (try-unicode "ucd1-names" unicode-1-char->name))
-              #-c-stack-is-control-stack
-              (sb-ext:atomic-push name-buffer *name->char-buffers*))))))))
+          (let ((name-hash (psxhash-to-name-hash psxhash string)))
+            (with-name->char-buffer (name-buffer)
+              ;; Look in ucd-names first, since there are overlaps with ucd1-names,
+              ;; and we always want to return the new codepoint that a name finds,
+              ;; not the old, in the case of a conflict.
+              (or (try-unicode "ucd-names" unicode-char->name)
+                  (try-unicode "ucd1-names" unicode-1-char->name)))))))))
 
 #+sb-unicode
 (macrolet ((lookup (arg)

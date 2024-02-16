@@ -62,50 +62,7 @@
                        (finish-tree (huffman-pair-right tree)))
                  (huffman-node-key tree))))
     (finish-tree (merge-table (huffman-weights corpus)))))
-) ; end EVAL-WHEN
 
-;; actually 88 (for now), but leave some wiggle room
-(defconstant longest-unicode-char-name 96)
-;;; The :ALL-CHAR-NAMES test in character.pure.lisp shows that this decoder
-;;; is faster than and much less consy than the old one.
-;;; (time (...)) old way
-;;;   0.540 seconds of real time
-;;;  741,593,840 bytes consed
-;;; new way
-;;;   0.128 seconds of real time
-;;;  13,414,128 bytes consed
-
-(defun huffman-decode (tree code output)
-  (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
-           (integer code))
-  ;; The highest 1 bit acts only to demarcate the end of the encoding.
-  ;; Therefore the number of data bits in the encoding is 1 fewer than that.
-  (let ((nbits (1- (integer-length code)))
-        (buffer (make-array longest-unicode-char-name :element-type 'base-char))
-        (bufpos longest-unicode-char-name))
-   (declare (dynamic-extent buffer))
-   (declare (type (mod 500) nbits)) ; the longest encoding is 385 bits for now
-   (labels ((choose (branch)
-              (destructuring-bind (left right) (cdr branch)
-                (if (logbitp (decf nbits) code) right left)))
-            (decode (branch)
-              (when (zerop nbits)
-                (error "Invalid Huffman-code: ~S" code))
-              (let ((next (choose branch)))
-                 (cond ((consp next)
-                        (decode next))
-                       (t
-                        (when (> nbits 1) (decode tree))
-                        (setf (char buffer (decf bufpos))
-                              (char (the (simple-base-string 1) next) 0)))))))
-     (decode tree)
-     (cond (output
-            (replace output buffer :start2 bufpos)
-            (- (length output) bufpos)) ; return number of significant chars
-           (t
-            (subseq buffer bufpos))))))
-
-(eval-when (:compile-toplevel :execute)
 (defun huffman-match (char node)
   (if (consp node)
       (find char (the string (car node)) :test #'equal)
@@ -132,3 +89,47 @@
          do (encode nil char tree))
       code)))
 ) ; end EVAL-WHEN
+
+;; actually 88 (for now), but leave some wiggle room
+(defconstant longest-unicode-char-name 96)
+
+(defmacro with-name->char-buffer ((varname) form)
+  ;; After git rev 8b606d636cc1 we have no feature indicating
+  ;; support for DX strings but this is close enough.
+  #+c-stack-is-control-stack
+  `(dx-let ((,varname (make-array longest-unicode-char-name :element-type 'base-char)))
+     ,form)
+  #-c-stack-is-control-stack
+  `(let ((,varname (or (sb-ext:atomic-pop *name->char-buffers*)
+                       (make-array longest-unicode-char-name :element-type 'base-char))))
+     (prog1 ,form
+       (sb-ext:atomic-push ,varname *name->char-buffers*))))
+
+(defun huffman-decode (tree code output)
+  (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
+           (integer code))
+  ;; The highest 1 bit acts only to demarcate the end of the encoding.
+  ;; Therefore the number of data bits in the encoding is 1 fewer than that.
+  (let ((nbits (1- (integer-length code)))
+        (bufpos longest-unicode-char-name))
+    (declare (type (mod 500) nbits)) ; the longest encoding is 385 bits for now
+    (with-name->char-buffer (buffer)
+      (labels ((choose (branch)
+                 (destructuring-bind (left right) (cdr branch)
+                   (if (logbitp (decf nbits) code) right left)))
+               (decode (branch)
+                 (when (zerop nbits)
+                   (error "Invalid Huffman-code: ~S" code))
+                 (let ((next (choose branch)))
+                   (cond ((consp next)
+                          (decode next))
+                         (t
+                          (when (> nbits 1) (decode tree))
+                          (setf (char buffer (decf bufpos))
+                                (char (the (simple-base-string 1) next) 0)))))))
+        (decode tree)
+        (cond (output
+               (replace output buffer :start2 bufpos)
+               (- (length output) bufpos)) ; return number of significant chars
+              (t
+               (subseq buffer bufpos)))))))
