@@ -1437,7 +1437,13 @@
          ref-y
          (equal (block-succ x) (block-succ y))
          (eq (ref-lvar ref-x) (ref-lvar ref-y))
-         (eq (ref-leaf ref-x) (ref-leaf ref-y))
+         (let ((leaf-x (ref-leaf ref-x))
+               (leaf-y (ref-leaf ref-y)))
+           (or (eq leaf-x leaf-y)
+               (and (constant-p leaf-x)
+                    (constant-p leaf-y)
+                    (eq (constant-value leaf-x)
+                        (constant-value leaf-y)))))
          (eq (node-enclosing-cleanup ref-x)
              (node-enclosing-cleanup ref-y)))))
 
