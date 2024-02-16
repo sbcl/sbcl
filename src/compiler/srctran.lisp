@@ -2794,6 +2794,16 @@
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
 
+(deftransform digit-char-p ((char &optional (radix 10))
+                            ((or base-char
+                                 #+(and (not sb-xc-host) sb-unicode) (character-set ((0 . 1632))))
+                             &optional (integer 2 10))
+                            *
+                            :important nil)
+  `(let ((digit (- (char-code char) (char-code #\0))))
+     (if (< -1 digit radix)
+         digit)))
+
 (defun signum-derive-type-aux (type)
   (cond ((eq type (specifier-type 'ratio))
          (specifier-type '(or (eql 1) (eql -1))))
