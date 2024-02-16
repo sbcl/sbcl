@@ -6848,3 +6848,62 @@
     (def range< 1 -1)
     (def range<<= 1 0)
     (def range<=< 0 -1)))
+
+;;; Do something when comparing the same value to multiple things.
+;;; For now it compares integers that differ by only one bit,
+;;; which is useful for case-insensitive comparison of ASCII characters.
+(defun or-eq-transform (op a b node)
+  (unless (delay-ir1-optimizer node :ir1-phases)
+    (let ((if (node-dest node)))
+      (when (and (if-p if)
+                 (immediately-used-p (node-lvar node) node t))
+        (let ((else (next-node (if-alternative if) :type :non-ref
+                                                   :single-predecessor t)))
+          (when (and (combination-p else)
+                     (eq (combination-kind else) :known)) ;; no notinline
+            (let ((op2 (combination-fun-debug-name else))
+                  after-else
+                  characterp)
+              (when (eq op2 op)
+                (destructuring-bind (a2 b2) (combination-args else)
+                  (when (and (same-leaf-ref-p a a2)
+                             (constant-lvar-p b)
+                             (constant-lvar-p b2)
+                             (if-p (setf after-else (next-node else)))
+                             (eq (if-consequent if)
+                                 (if-consequent after-else))
+                             (or (csubtypep (lvar-type a) (specifier-type 'fixnum))
+                                 (and (csubtypep (lvar-type a) (specifier-type 'character))
+                                      (setf characterp t))))
+                    (let ((c1 (lvar-value b))
+                          (c2 (lvar-value b2)))
+
+                      (when (and (if characterp
+                                     (and (characterp c1)
+                                          (characterp c2)
+                                          (setf c1 (char-code c1)
+                                                c2 (char-code c2)))
+                                     (and (fixnump c1)
+                                          (fixnump c2)))
+                                 (= (logcount (logxor c1 c2)) 1))
+                        (setf (if-alternative if)
+                              (if-alternative after-else))
+                        (kill-if-branch-1 if (if-test if)
+                                          (node-block if)
+                                          (if-consequent if))
+                        (transform-call else
+                                        `(lambda (a b)
+                                           (declare (ignore b))
+                                           (eq (logandc2 ,(if characterp
+                                                              '(char-code a)
+                                                              'a)
+                                                         ,(logxor c1 c2))
+                                               ,(min c1 c2)))
+                                        'or-eq-transform)))))))))))))
+
+#-(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
+(defoptimizer (eq optimizer) ((a b) node)
+  (or-eq-transform 'eq a b node))
+
+(defoptimizer (char= optimizer) ((a b) node)
+  (or-eq-transform 'char= a b node))
