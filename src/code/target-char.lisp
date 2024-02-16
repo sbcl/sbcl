@@ -17,12 +17,6 @@
 (declaim (maybe-inline upper-case-p lower-case-p both-case-p
                        digit-char-p))
 
-(declaim (inline pack-3-codepoints))
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun pack-3-codepoints (first &optional (second 0) (third 0))
-    (declare (type (unsigned-byte 21) first second third))
-    (sb-c::mask-signed-field 63 (logior first (ash second 21) (ash third 42)))))
-
 (declaim (inline clear-flag))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun clear-flag (bit integer)

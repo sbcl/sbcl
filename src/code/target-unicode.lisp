@@ -1697,6 +1697,12 @@ it defaults to 80 characters"
             (if (and (< phash ,n) (eql (aref ,domain phash) k))
                 (svref ,range phash))))))
 
+(declaim (inline pack-3-codepoints))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun pack-3-codepoints (first &optional (second 0) (third 0))
+    (declare (type (unsigned-byte 21) first second third))
+    (sb-c::mask-signed-field 63 (logior first (ash second 21) (ash third 42)))))
+
 (defun collation-key (string start end)
   (let (char1
         (char2 (code-char 0))
