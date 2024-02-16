@@ -6,6 +6,7 @@ jobs:
   build:
 
     runs-on: ${{ matrix.arch == 'arm64' && 'macos-14' || 'macOS-latest' }}
+    timeout-minutes: 60
     strategy: 
       matrix:
         arch: [arm64, x86-64]
