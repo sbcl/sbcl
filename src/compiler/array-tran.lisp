@@ -251,7 +251,7 @@
                                ((test fixnum))
                                ((test bit))
                                ((csubtypep (array-type-specialized-element-type (leaf-type constant))
-                                           (specifier-type '(or float complex character)))
+                                           (specifier-type '(or float complex base-char)))
                                 (return)))))
                          (loop for i below (array-total-size array)
                                for elt = (row-major-aref array i)
@@ -269,6 +269,9 @@
                                              (specifier-type 'vector))
                                             (array
                                              (specifier-type 'array))
+                                            #+sb-unicode
+                                            (base-char
+                                             (specifier-type 'base-char))
                                             (character
                                              (specifier-type 'character))
                                             (symbol
