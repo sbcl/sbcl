@@ -919,10 +919,6 @@
   ;; implementation of log1p.
   (let ((t0 #-long-float (make-double-float #x3fe6a09e #x667f3bcd)
             #+long-float (error "(/ (sqrt 2l0) 2)"))
-        ;; KLUDGE: if repeatable fasls start failing under some weird
-        ;; xc host, this 1.2d0 might be a good place to examine: while
-        ;; it _should_ be the same in all vaguely-IEEE754 hosts, 1.2
-        ;; is not exactly representable, so something could go wrong.
         (t1 $1.2d0)
         (t2 $3d0)
         (ln2 #-long-float (make-double-float #x3fe62e42 #xfefa39ef)

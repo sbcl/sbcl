@@ -173,51 +173,16 @@
       (setf (flonum-%value flonum) value))
     flonum))
 
+(defun make-single-float (bits)
+  (declare (type (signed-byte 32) bits))
+  (make-flonum bits 'single-float))
+
+(defun make-double-float (hi lo)
+  (declare (type (signed-byte 32) hi)
+           (type (unsigned-byte 32) lo))
+  (make-flonum (logior (ash hi 32) lo) 'double-float))
+
 (defvar *floating-point-number-buffer* (make-array 100 :element-type 'character))
-(defun sb-cold::read-target-float (stream char)
-  (let ((buffer *floating-point-number-buffer*)
-        (index -1))
-    (loop (setq char (read-char stream))
-          (cond ((or (digit-char-p char)
-                     (member char '(#\+ #\- #\. #\E #\S #\F #\D #\L) :test #'char-equal))
-                 (setf (aref buffer (incf index)) char))
-                (t
-                 (unread-char char stream)
-                 (return))))
-    (when *read-suppress*
-      (return-from sb-cold::read-target-float nil))
-    (let* ((string (subseq buffer 0 (1+ index)))
-           (marker-pos
-            (position-if (lambda (x)
-                           (member x '(#\E #\S #\F #\D #\L) :test #'char-equal))
-                         string))
-           (exp-marker (if (and marker-pos
-                                (char-not-equal (char string marker-pos) #\E))
-                           (char-upcase (char string marker-pos))
-                           (ecase cl:*read-default-float-format*
-                            ((cl:single-float cl:short-float) #\F)
-                            ((cl:double-float cl:long-float)  #\D))))
-           (significand (if marker-pos (subseq string 0 marker-pos) string))
-           (format (ecase exp-marker
-                    ((#\F #\S) 'single-float)
-                    ((#\D #\L) 'double-float))))
-      ;; Since we don't know whether the host will parse -0.0 as negative,
-      ;; we can't just parse and then always negate, because that might negate
-      ;; twice if the host does support it. So explicitly look for -0 string.
-      (if (or (string= significand "-0.0")
-              (string= significand "-.0")
-              (and (or (string= significand "-0") (string= significand "-0."))
-                   (or marker-pos (error "~S has integer syntax" string))))
-          (ecase format
-            (single-float (make-flonum :minus-zero 'single-float))
-            (double-float (make-flonum :minus-zero 'double-float)))
-          (make-flonum (let ((sb-cold::*choke-on-host-irrationals* nil))
-                         (if marker-pos  ; change it, in case it was #\E
-                             (setf (char string marker-pos) exp-marker)
-                             (setq string (concatenate 'string string (list exp-marker #\0))))
-                         (read-from-string string))
-                       format)))))
-) ; end EVAL-WHEN
 
 (defun float-format-bits (format)
   (ecase format
@@ -240,37 +205,45 @@
   ;; backends, this check should confined to the scenarios where the host's
   ;; precision is at least as much as the target's precision.
   #+host-quirks-sbcl
-  (let ((fun (car key))
-        (args (cdr key)))
+  (let* ((fun (car key))
+         (args (cdr key))
+         (host-fun (intern (string fun) "CL")))
     (flet ((native-flonum-value (x &aux (bits (flonum-%bits x)))
              (ecase (flonum-format x)
                (single-float (host-sb-kernel:make-single-float bits))
                (double-float (host-sb-kernel:make-double-float
                               (ash bits -32) (ldb (byte 32 0) bits))))))
-      (let ((authoritative-answer
-              (multiple-value-list
-               (host-sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
-                 (apply (intern (string fun) "CL")
-                        (mapcar (lambda (x)
-                                  (etypecase x
-                                    (float (native-flonum-value x))
-                                    (rational x)
-                                    (symbol (intern (string x) "CL"))))
-                                (ensure-list args)))))))
-        (unless (equal authoritative-answer
-                       (mapcar (lambda (value)
-                                 (if (floatp value)
-                                     (native-flonum-value value)
-                                     value))
-                               values))
-          (#+sb-devel-xfloat cerror #+sb-devel-xfloat "Ignore"
-           #-sb-devel-xfloat format #-sb-devel-xfloat t
-           "~&//CROSS-FLOAT DISCREPANCY!
+      (multiple-value-bind (sb-cold::*choke-on-host-irrationals* cl:*read-default-float-format*)
+          (if (eql host-fun 'cl:read-from-string)
+              (values nil (car args))
+              (values sb-cold::*choke-on-host-irrationals* cl:*read-default-float-format*))
+        (when (eql host-fun 'cl:read-from-string)
+          (setf args (cdr args)))
+        (let* ((authoritative-answer
+                 (multiple-value-list
+                  (host-sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
+                    (apply host-fun
+                           (mapcar (lambda (x)
+                                     (etypecase x
+                                       (float (native-flonum-value x))
+                                       (rational x)
+                                       (string x)
+                                       (symbol (intern (string x) "CL"))))
+                                   (ensure-list args)))))))
+          (unless (equal authoritative-answer
+                         (mapcar (lambda (value)
+                                   (if (floatp value)
+                                       (native-flonum-value value)
+                                       value))
+                                 values))
+            (#+sb-devel-xfloat cerror #+sb-devel-xfloat "Ignore"
+             #-sb-devel-xfloat format #-sb-devel-xfloat t
+             "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
-                  key values
-                  (when (cl:floatp authoritative-answer)
-                    (get-float-bits authoritative-answer))
-                  authoritative-answer)))))
+             key values
+             (when (cl:floatp authoritative-answer)
+               (get-float-bits authoritative-answer))
+             authoritative-answer))))))
   (setf (gethash key table) (if (singleton-p values) (car values) (cons '&values values))))
 
 (defun parse-xfloat-math-file (stream table mode)
@@ -375,6 +348,68 @@
                (values-list (rest answer))
                answer)
            (multiple-value-call #'record-math-op cache-key (progn ,@calculation))))))
+
+(defun sb-cold::read-target-float (stream char)
+  (let ((buffer *floating-point-number-buffer*)
+        (index -1)
+        string)
+    (loop (setq char (read-char stream))
+          (cond ((or (digit-char-p char)
+                     (member char '(#\+ #\- #\. #\D #\E #\F #\L #\S) :test #'char-equal))
+                 (setf (aref buffer (incf index)) char))
+                (t
+                 (unread-char char stream)
+                 (return))))
+    (when *read-suppress*
+      (return-from sb-cold::read-target-float nil))
+    (setf string (subseq buffer 0 (1+ index)))
+    (multiple-value-bind (flonum nchars)
+        (with-memoized-math-op (read-from-string (list *read-default-float-format* string))
+          (let* ((marker-pos
+                   (position-if (lambda (x)
+                                  (member x '(#\E #\S #\F #\D #\L) :test #'char-equal))
+                                string))
+                 (exp-marker (if (and marker-pos
+                                      (char-not-equal (char string marker-pos) #\E))
+                                 (char-upcase (char string marker-pos))
+                                 (ecase cl:*read-default-float-format*
+                                   ((cl:single-float cl:short-float) #\F)
+                                   ((cl:double-float cl:long-float)  #\D))))
+                 (significand (if marker-pos (subseq string 0 marker-pos) string))
+                 (dot-pos (position #\. significand))
+                 (integer (if (eql dot-pos 0) 0 (parse-integer significand :start 0 :end dot-pos)))
+                 (fraction (if (and dot-pos (cl:> (length significand) (1+ dot-pos)))
+                               (cl:/ (parse-integer significand :start (1+ dot-pos))
+                                     (cl:expt 10 (cl:- (length significand) (1+ dot-pos))))
+                               0))
+                 (exponent (if marker-pos
+                               (parse-integer string :start (1+ marker-pos))
+                               0))
+                 (rational (cl:* (if (char= (char string 0) #\-)
+                                     (cl:- integer fraction)
+                                     (cl:+ integer fraction))
+                                 (cl:expt 10 exponent)))
+                 (format (ecase exp-marker
+                           ((#\F #\S) 'single-float)
+                           ((#\D #\L) 'double-float))))
+            ;; Since we are working with rationals, we must special-case
+            ;; negative zero (which does not have a natural rational
+            ;; representation: explicitly look for -0 string.
+            (if (or (string= significand "-0.0")
+                    (string= significand "-.0")
+                    (and (or (string= significand "-0") (string= significand "-0."))
+                         (or marker-pos (error "~S has integer syntax" string))))
+                (ecase format
+                  (single-float (values (make-flonum :minus-zero 'single-float) (length string)))
+                  (double-float (values (make-flonum :minus-zero 'double-float) (length string))))
+                (let ((result
+                        (ecase format
+                          (single-float (make-flonum (%single-bits-from-rational rational) 'single-float))
+                          (double-float (make-flonum (%double-bits-from-rational rational) 'double-float)))))
+                  (values result (length string))))))
+      (declare (ignore nchars))
+      flonum)))
+) ; EVAL-WHEN
 
 ;;; REAL and IMAG are either host integers (therefore EQL-comparable)
 ;;; or if not, have already been made EQ-comparable by hashing.
@@ -781,15 +816,6 @@
 (defun sb-vm::sign-extend (x size)
   (if (logbitp (1- size) x) (cl:dpb x (cl:byte size 0) -1) x))
 
-(defun make-single-float (bits)
-  (declare (type (signed-byte 32) bits))
-  (make-flonum bits 'single-float))
-
-(defun make-double-float (hi lo)
-  (declare (type (signed-byte 32) hi)
-           (type (unsigned-byte 32) lo))
-  (make-flonum (logior (ash hi 32) lo) 'double-float))
-
 ;;; This is the preferred constructor for 64-bit machines
 (defun %make-double-float (bits)
   (declare (type (signed-byte 64) bits))
@@ -806,29 +832,15 @@
 (defun float-infinity-or-nan-p (x)
   (or (float-infinity-p x) (float-nan-p x)))
 
-(eval-when (:compile-toplevel :execute) (setq sb-cold::*choke-on-host-irrationals* nil))
+(defconstant most-positive-single-float $+3.40282347F38)
+(defconstant most-negative-single-float $-3.40282347F38)
 
-;;; These use "#." so that they are dumped as literals rather than having to
-;;; call read-from-string at load-time (and failing) due to the reader intercept.
-;;      #define __FLT_MAX__ 3.40282347e+38F
-(defconstant most-positive-single-float
-  #.(make-flonum (read-from-string "+3.40282347F38") 'single-float))
-(defconstant most-negative-single-float
-  #.(make-flonum (read-from-string "-3.40282347F38") 'single-float))
-
-;;      #define __DBL_MAX__ 1.7976931348623157e+308
-(defconstant most-positive-double-float
-  #.(make-flonum (read-from-string "+1.7976931348623157D308") 'double-float))
-(defconstant most-negative-double-float
-  #.(make-flonum (read-from-string "-1.7976931348623157D308") 'double-float))
+(defconstant most-positive-double-float $+1.7976931348623157D308)
+(defconstant most-negative-double-float $-1.7976931348623157D308)
 
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
-(defconstant pi
-  #.(make-flonum (read-from-string "3.14159265358979323846264338327950288419716939937511L0")
-                 'double-float))
-
-(eval-when (:compile-toplevel :execute) (setq sb-cold::*choke-on-host-irrationals* t))
+(defconstant pi $3.14159265358979323846264338327950288419716939937511L0)
 
 ;;; These two constants are used in 'type'
 (defconstant most-positive-long-float most-positive-double-float)
@@ -1048,11 +1060,14 @@
   (format stream ":DEFAULT~%(~%")
   (labels ((classify (x)
              (cond ((symbolp x) 0)
-                   ((rationalp x) 1)
-                   ((single-float-p x) 2)
-                   ((double-float-p x) 3)
+                   ((stringp x) 1)
+                   ((rationalp x) 2)
+                   ((single-float-p x) 3)
+                   ((double-float-p x) 4)
                    (t (error "Unclassifiable arg ~S" x))))
            (spelling-of (expr)
+             (when (stringp expr)
+               (return-from spelling-of (write-to-string expr :pretty nil :escape t)))
              ;; MUST not write package prefixes !
              ;; e.g. avoid writing a line like (COERCE (-33619991 SB-XC:DOUBLE-FLOAT) ...)
              (let ((hex (write-to-string expr :pretty nil :base 16 :radix t :escape nil))
@@ -1075,14 +1090,23 @@
                               (b-class (classify b)))
                           (when (< a-class b-class) (return-from lessp t))
                           (when (> a-class b-class) (return-from lessp nil)))
-                        (when (symbolp a) ; this case is for the 2nd arg of COERCE
-                          (return-from lessp (string< a b)))
-                        ;; This might have to be enhanced to compare complex
-                        ;; numbers by their realpart and imagpart eventually.
-                        (let ((a-val (if (floatp a) (flonum-%bits a) a))
-                              (b-val (if (floatp b) (flonum-%bits b) b)))
-                          (when (< a-val b-val) (return-from lessp t))
-                          (when (> a-val b-val) (return-from lessp nil))))
+                        (typecase a
+                          ;; this case is for the 2nd arg of COERCE
+                          ;; and the 1st (pseudo-)arg of
+                          ;; READ-FROM-STRING
+                          (symbol (unless (string= a b)
+                                    (return-from lessp (string< a b))))
+                          ;; this case is for the 2nd arg of
+                          ;; READ-FROM-STRING
+                          (string (unless (string= a b)
+                                    (return-from lessp (string< a b))))
+                          (t
+                           ;; This might have to be enhanced to compare complex
+                           ;; numbers by their realpart and imagpart eventually.
+                           (let ((a-val (if (floatp a) (flonum-%bits a) a))
+                                 (b-val (if (floatp b) (flonum-%bits b) b)))
+                             (when (< a-val b-val) (return-from lessp t))
+                             (when (> a-val b-val) (return-from lessp nil))))))
                (bug "Unreachable"))))
     ;; Record each <fun,args> combination to STREAM
     ;; Though all symbols we print, such as SINGLE-FLOAT, are accessible
