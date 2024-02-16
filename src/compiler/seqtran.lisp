@@ -2677,9 +2677,47 @@
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t vector t t t function function)
                               *
-                              :policy (> speed space))
+                              :node node)
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
+  (unless
+      (or (policy node (> speed space))
+          ;; These have compact inline expansion
+          (and (or (not key)
+                   (lvar-fun-is key '(identity)))
+               (and (constant-lvar-p start)
+                    (eql (lvar-value start) 0))
+               (and (constant-lvar-p end)
+                    (null (lvar-value end)))
+               (csubtypep (lvar-type sequence) (specifier-type 'simple-array))
+               (let ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+                     (test (lvar-fun-name* test))
+                     (item (lvar-type item)))
+                 (when (neq element-type *wild-type*)
+                   (case (type-specifier element-type)
+                     ((double-float single-float)
+                      (and (csubtypep item element-type)
+                           (memq test '(= eql equal equalp))))
+                     ((t)
+                      (eq test 'eq))
+                     (character
+                      (or (memq test '(eq eql equal))
+                          (and (csubtypep item element-type)
+                               (eq test 'char=))
+                          (and (or (csubtypep item (specifier-type 'base-char))
+                                   (and (constant-lvar-p sequence)
+                                        (every (lambda (x) (typep x 'base-char))
+                                               (lvar-value sequence))))
+                               (eq test 'char-equal))))
+                     (base-char
+                      (or (memq test '(eq eql equal))
+                          (and (csubtypep item (specifier-type 'character))
+                               (memq test '(char= char-equal)))))
+                     (t
+                      (and (csubtypep element-type (specifier-type 'integer))
+                           (csubtypep item element-type)
+                           (memq test '(eq eql equal equalp =)))))))))
+    (give-up-ir1-transform))
   '(%find-position-vector-macro item sequence
     from-end start end key test))
 
