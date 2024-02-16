@@ -849,9 +849,10 @@
                 (do ((cons x (cdr cons)))
                     ((atom cons)
                      (contains-irrational cons))
-                  (when (contains-irrational (car cons))
-                    (return t))))
-               (simple-vector (some #'contains-irrational x))
+                  (let ((car (contains-irrational (car cons))))
+                    (when car (return car)))))
+               (simple-vector (find-if #'contains-irrational x))
+               ((or cl:complex cl:float) x)
                ;; We use package literals -- see e.g. SANE-PACKAGE - which
                ;; must be treated as opaque, but COMMAs should not be opaque.
                ;; There are also a few uses of "#.(find-layout)".
@@ -871,9 +872,7 @@
                     ;; (primordial-extensions get compiled before 'backq' is installed)
                     (sb-kernel:do-instance-tagged-slot (i x)
                       (when (contains-irrational (sb-kernel:%instance-ref x i))
-                        (return-from contains-irrational t))))))
-               ((or cl:complex cl:float)
-                x)))
+                        (return-from contains-irrational x))))))))
            (reader-intercept (f &optional stream (errp t) errval recursive)
              (let* ((form (funcall f stream errp errval recursive))
                     (bad-atom (and (not recursive) ; avoid checking inner forms
