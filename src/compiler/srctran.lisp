@@ -4331,7 +4331,7 @@
 ;;;; character operations
 
 (deftransform char-equal ((a b) (base-char base-char) *
-                          :policy (> speed space))
+                          :policy (>= speed space))
   "open code"
   '(let* ((ac (char-code a))
           (bc (char-code b))
@@ -4344,6 +4344,30 @@
                  (and (> sum 415) (< sum 461))
                  #-sb-unicode
                  (and (> sum 463) (< sum 477))))))))
+
+#+sb-unicode
+(deftransform char-equal ((a b) (base-char character) *
+                          :policy (>= speed space))
+  "open code"
+  '(let* ((ac (char-code a))
+          (bc (char-code b))
+          (sum (logxor ac bc)))
+     (or (zerop sum)
+         (when (eql sum #x20)
+           (let ((sum (+ ac bc)))
+             (and (> sum 161) (< sum 213)))))))
+
+#+sb-unicode
+(deftransform char-equal ((a b) (character base-char) *
+                          :policy (>= speed space))
+  "open code"
+  '(let* ((ac (char-code a))
+          (bc (char-code b))
+          (sum (logxor ac bc)))
+     (or (zerop sum)
+         (when (eql sum #x20)
+           (let ((sum (+ ac bc)))
+             (and (> sum 161) (< sum 213)))))))
 
 (defun transform-constant-char-equal (a b &optional (op 'char=))
   (let ((char (lvar-value b)))
