@@ -2833,12 +2833,16 @@
 
 (defun char<-constraints (char1 char2)
   (multiple-value-bind (min2 max2) (character-set-range char2)
-    (values (list 'typep char1 (specifier-type `(character-set ((0 . ,(1- max2))))))
+    (values (list 'typep char1 (if (zerop max2)
+                                   *empty-type*
+                                   (specifier-type `(character-set ((0 . ,(1- max2)))))))
             (list 'typep char1 (specifier-type `(character-set ((,min2 . #.(1- char-code-limit)))))))))
 
 (defun char>-constraints (char1 char2)
   (multiple-value-bind (min2 max2) (character-set-range char2)
-    (values (list 'typep char1 (specifier-type `(character-set ((,(1+ min2) . #.(1- char-code-limit))))))
+    (values (list 'typep char1 (if (= min2 (1- char-code-limit))
+                                   *empty-type*
+                                   (specifier-type `(character-set ((,(1+ min2) . #.(1- char-code-limit)))))))
             (list 'typep char1 (specifier-type `(character-set ((0 . ,max2))))))))
 
 (defoptimizer (char< constraint-propagate-if)

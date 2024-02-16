@@ -211,3 +211,17 @@
      (declare ((or (eql 5) (eql 10)) b))
      (typep (code-char b) 'base-char))
    (member t)))
+
+(with-test (:name :char<-out-of-range)
+  (assert-type
+   (lambda (c)
+     (when (char> c (code-char (1- char-code-limit)))
+       c))
+   null)
+  (assert-type
+   (lambda (c)
+     (when (char< c (code-char 0))
+       c))
+   null))
+
+
