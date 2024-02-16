@@ -317,6 +317,16 @@
     (assert (= (length (remove-duplicates pvals)) 1))
     (assert (> (first pvals) 0))))
 
+(with-test (:name (:log :same-base-different-precision)
+                  :fails-on :sbcl)
+  (let ((twos (list 2 2.0f0 2.0d0 #c(2.0f0 0.0f0) #c(2.0d0 0.0d0))))
+    (let ((result (loop for number in twos
+                        append (loop for base in twos
+                                     for result = (log number base)
+                                     if (/= (realpart result) 1)
+                                     collect (list number base result)))))
+      (assert (null result)))))
+
 ;; Bug reported by Eric Marsden on July 15 2009. The compiler
 ;; used not to constant fold calls with arguments of type
 ;; (EQL foo).

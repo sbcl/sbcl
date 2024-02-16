@@ -748,12 +748,6 @@
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
   (with-memoized-math-op (log (cons number (if base-p (list base))))
-    ;; Now this is intriguing:
-    ;; * (log 2d0 2s0) => 0.9999999972521647d0
-    ;; * (log 2s0 2d0) => 1.0000000027478353d0
-    ;; but
-    ;; * (log 2d0 2d0) => 1.0d0
-    ;; * (log 2s0 2s0) => 1.0
     (let ((format (pick-result-format number (if base-p base 0))))
       (if (zerop number)
           (make-flonum :-infinity (if (eq format 'rational)
