@@ -2804,6 +2804,21 @@
      (if (< -1 digit radix)
          digit)))
 
+(deftransform digit-char-p ((char radix)
+                            ((or base-char
+                                 #+(and (not sb-xc-host) sb-unicode) (character-set ((0 . 1632))))
+                             (constant-arg (integer 11)))
+                            *
+                            :important nil)
+  `(let* ((code (char-code char))
+          (digit (- code (char-code #\0))))
+     (if (< -1 digit 10)
+         digit
+         (let ((weight (- (logior #x20 code) ;; downcase
+                          (char-code #\a))))
+           (if (< -1 weight (- radix 10))
+               (+ weight 10))))))
+
 (defun character-set-range (lvar)
   (if (constant-lvar-p lvar)
       (let ((code (char-code (lvar-value lvar))))
