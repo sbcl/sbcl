@@ -272,7 +272,9 @@
            ;; integer representing an index into the densely packed h-codes.
            (loop for index across xref for pair in alist
                  do (rplacd pair index))
-           (let ((direct-map (make-array direct-map-end :initial-element nil))
+           (let ((direct-map
+                  (when (plusp direct-map-end)
+                    (make-array direct-map-end :initial-element nil)))
                  (indirect-map (make-array (length sparse-pairs)
                                            :element-type '(unsigned-byte 32))))
              (dolist (pair alist)
@@ -284,8 +286,9 @@
                              (sbit bits (- cp direct-map-end)) 1)))))
              `(let* ((char-code (char-code character))
                      (bitstream-index
-                      (cond ((< char-code ,direct-map-end)
-                             (svref ,direct-map char-code))
+                      (cond ,@(when (plusp direct-map-end)
+                                `(((< char-code ,direct-map-end)
+                                   (svref ,direct-map char-code))))
                             ;; This discards the keys (the characters themselves).
                             ;; We ascertain that CHAR-CODE exists in the set via a bitmap.
                             ((and (<= char-code ,max-codepoint)
@@ -296,14 +299,15 @@
                              (nbits (ldb (byte 9 0) bitstream-index)))
                          (huffman-decode ,data start nbits
                                          +character-name-huffman-tree+ result)))
-                      ((and result (stringp bitstream-index))
-                       ;; KLUDGE/FIXME - see comments at top
-                       (replace result bitstream-index)
-                       (length bitstream-index))
+                      ,@(when (plusp direct-map-end)
+                          `(((and result (stringp bitstream-index))
+                             ;; KLUDGE/FIXME - see comments at top
+                             (replace result bitstream-index)
+                             (length bitstream-index))))
                       (t
                        bitstream-index))))))))
 (defun unicode-1-char->name (character result)
-  (char->name "ucd1-names" nil 32))
+  (char->name "ucd1-names" nil 0))
 (defun unicode-char->name (character result)
   (char->name "ucd-names" *base-char-name-alist* #xA0)))
 

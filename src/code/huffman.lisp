@@ -109,9 +109,14 @@
          (bit-index 0))
     (dolist (n inputs (values bits indices))
       (let ((nbits (1- (integer-length n))))
+        ;; I anticipate that some Unicode update could cause overflow of the
+        ;; 23-bit index field. (The 9-bit length should be OK for a while
         ;; If we need more than 23 bits to store the maximum output pointer,
         ;; INDICES could easily be turned into a UB32 vector with a separate
         ;; UB8 vector to indicate the length. One array is adequate for now.
+        ;; Another possibility: round the starting bit number to even, and store
+        ;; the index as half its actual value. At most this wastes 1 bit per char.
+        ;; But the actual length in bits is stored as-is
         (setf (aref indices input-index)
               (logior (ash (the (unsigned-byte 23) bit-index) 9)
                       (the (unsigned-byte 9) nbits)))
