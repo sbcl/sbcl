@@ -32,28 +32,39 @@
 (defstruct (target-num (:constructor nil)))
 (defstruct (float (:include target-num)
                   (:conc-name "FLONUM-")
-                  (:constructor %make-flonum (%bits format))
+                  (:constructor nil)
                   (:predicate floatp))
   ;; the bits are canonical as regards hash-consing
-  (%bits nil :type integer :read-only t)
+  (%bits (error "unspecified %BITS") :type integer :read-only t)
   ;; the numerical value is used for computation.
   ;; values that might not be exposed in the host use a symbol instead.
   (%value nil :type (or null cl:float (member :+infinity :-infinity :minus-zero)))
   ;; SHORT-FLOAT and LONG-FLOAT are not choices here,
   ;; since we're trying to exactly model the supported target float formats.
   (format nil :type (member single-float double-float) :read-only t))
+(defstruct (single-float (:include float
+                                   (format 'single-float)
+                                   (%bits (error "unspecified %BITS") :type (signed-byte 32)))
+                         (:conc-name "%SINGLE-FLONUM-")
+                         (:constructor %make-single-flonum (%bits))
+                         (:predicate single-float-p)))
+(defstruct (double-float (:include float
+                                   (format 'double-float)
+                                   (%bits (error "unspecifier %BITS") :type (signed-byte 64)))
+                         (:conc-name "%DOUBLE-FLONUM-")
+                         (:constructor %make-double-flonum (%bits))
+                         (:predicate double-float-p)))
+(defun %make-flonum (bits format)
+  (ecase format
+    ((single-float) (%make-single-flonum bits))
+    ((double-float) (%make-double-flonum bits))))
 
 (deftype real () '(or cl:rational float))
 (declaim (inline realp))
 (defun realp (x) (cl:typep x 'real))
 
-(declaim (inline single-float-p double-float-p long-float-p))
-(defun single-float-p (x) (and (floatp x) (eq (flonum-format x) 'single-float)))
-(defun double-float-p (x) (and (floatp x) (eq (flonum-format x) 'double-float)))
+(declaim (inline long-float-p))
 (defun long-float-p   (x) (double-float-p x))
-
-(deftype single-float () '(satisfies single-float-p))
-(deftype double-float () '(satisfies double-float-p))
 (deftype long-float   () '(satisfies long-float-p))
 
 ;;; This is used not only for (COMPLEX FLOAT) but also (COMPLEX RATIONAL)
