@@ -6899,7 +6899,8 @@
                                                               'a)
                                                          ,(logxor c1 c2))
                                                ,(min c1 c2)))
-                                        'or-eq-transform)))))))))))))
+                                        'or-eq-transform)
+                        t))))))))))))
 
 #-(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
 (defoptimizer (eq optimizer) ((a b) node)

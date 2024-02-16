@@ -2496,24 +2496,39 @@ is :ANY, the function name is not checked."
                (ref-p y-use)
                (eq (ref-leaf x-use) (ref-leaf y-use))
                (or (constant-reference-p x-use)
-                   (refs-unchanged-p x-use y-use)))
+                   (refs-unchanged-p x-use y-use)
+                   (refs-unchanged-p y-use x-use)))
       y-use)))
 
 (defun refs-unchanged-p (ref1 ref2)
   (block nil
     (let ((node ref1))
-      (tagbody
-       :next
-         (let ((ctran (node-next node)))
-           (when ctran
-             (setf node (ctran-next ctran))
-             (if (eq node ref2)
-                 (return t)
-                 (typecase node
-                   (ref
-                    (go :next))
-                   (cast
-                    (go :next))))))))))
+      (let (ctran)
+        (tagbody
+         :next
+           (setf ctran (node-prev node))
+           (setf node (ctran-use ctran))
+         :next-node
+           (when (eq node ref2)
+             (return t))
+           (typecase node
+             (ref)
+             (cast)
+             (enclose)
+             (cif)
+             (combination
+              (unless (flushable-combination-p node)
+                (return)))
+             (null
+              (let ((pred (block-pred (ctran-block ctran))))
+                (when (cdr pred)
+                  (return))
+                (setf node (block-last (car pred)))
+                (go :next-node)))
+             (t
+              (return)))
+           (go :next))))))
+
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different
