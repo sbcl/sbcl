@@ -2804,6 +2804,44 @@
      (if (< -1 digit radix)
          digit)))
 
+(defun character-set-range (lvar)
+  (if (constant-lvar-p lvar)
+      (let ((code (char-code (lvar-value lvar))))
+        (values code code))
+      (let ((type (lvar-type lvar)))
+        (if (typep type 'character-set-type)
+            (loop for (lo . hi) in (character-set-type-pairs type)
+                  minimize lo into min
+                  maximize hi into max
+                  finally (return (values min max)))
+            (values 0 (1- char-code-limit))))))
+
+(defun char<-constraints (char1 char2)
+  (multiple-value-bind (min2 max2) (character-set-range char2)
+    (values (list 'typep char1 (specifier-type `(character-set ((0 . ,(1- max2))))))
+            (list 'typep char1 (specifier-type `(character-set ((,min2 . #.(1- char-code-limit)))))))))
+
+(defun char>-constraints (char1 char2)
+  (multiple-value-bind (min2 max2) (character-set-range char2)
+    (values (list 'typep char1 (specifier-type `(character-set ((,(1+ min2) . #.(1- char-code-limit))))))
+            (list 'typep char1 (specifier-type `(character-set ((0 . ,max2))))))))
+
+(defoptimizer (char< constraint-propagate-if)
+    ((char1 char2))
+  (multiple-value-bind (if1 then1)
+      (char<-constraints char1 char2)
+    (multiple-value-bind (if2 then2)
+        (char>-constraints char2 char1)
+      (values nil nil (list if1 if2) (list then1 then2)))))
+
+(defoptimizer (char> constraint-propagate-if)
+    ((char1 char2))
+  (multiple-value-bind (if1 then1)
+      (char>-constraints char1 char2)
+    (multiple-value-bind (if2 then2)
+        (char<-constraints char2 char1)
+      (values nil nil (list if1 if2) (list then1 then2)))))
+
 (defun signum-derive-type-aux (type)
   (cond ((eq type (specifier-type 'ratio))
          (specifier-type '(or (eql 1) (eql -1))))

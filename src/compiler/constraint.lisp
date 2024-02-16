@@ -676,10 +676,14 @@
                       (destructuring-bind (kind x y &optional not-p)
                           constraint
                         (when (and kind x y)
-                          (add-test-constraint quick-p
-                                               kind x y
-                                               not-p constraints
-                                               target))))
+                          (let ((x (if (lvar-p x)
+                                       (ok-lvar-lambda-var x constraints)
+                                       x)))
+                            (when x
+                              (add-test-constraint quick-p
+                                                   kind x y
+                                                   not-p constraints
+                                                   target))))))
                 triples)))
     (when (eq (combination-kind use) :known)
       (binding* ((info (combination-fun-info use) :exit-if-null)
