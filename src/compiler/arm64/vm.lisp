@@ -413,6 +413,7 @@
         sb-arm64-asm::fixnum-add-sub-immediate-p
         sb-arm64-asm::encode-logical-immediate
         sb-arm64-asm::fixnum-encode-logical-immediate
+        fixnum-encode-logical-immediate-ignore-tag
         bic-encode-immediate
         bic-fixnum-encode-immediate
         logical-immediate-or-word-mask
