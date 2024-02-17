@@ -682,9 +682,10 @@
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8 total-copied)))
   #+(and sb-unicode 64-bit little-endian)
-  (setf total-copied
-        (copy-utf8-bytes-to-character-string requested total-copied
-                                             start buffer (fd-stream-ibuf stream)))
+  (let ((new-total (copy-utf8-bytes-to-character-string requested total-copied
+                                                        start buffer (fd-stream-ibuf stream))))
+    (fill sbuffer 1 :start (+ start total-copied) :end (+ start new-total))
+    (setf total-copied new-total))
   (do ()
       (())
     (let* ((ibuf (fd-stream-ibuf stream))

@@ -12,6 +12,9 @@ changes relative to sbcl-2.4.1:
     the mathematically precise answer.
   * bug fix: LOG on ratios very near 1 with numerator or denominator being
     near a power of 2 will use log1p and so will lose less precision.
+  * bug fix: the utf-8 external format with Unix line-endings updates its
+    character size information when taking the fast path for a buffer of ascii
+    characters.  (lp#2054169, reported by John Carroll)
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the
