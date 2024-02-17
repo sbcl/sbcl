@@ -227,6 +227,7 @@
            (let ((*print-readably* nil)
                  (*current-level-in-print* 0)
                  (*standard-output* (make-string-output-stream))
+                 (*print-pretty* t)
                  (*in-trace* t))
              (case (trace-info-report info)
                (trace
