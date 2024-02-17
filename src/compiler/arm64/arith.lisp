@@ -145,6 +145,12 @@
   (and (fixnump x)
        (encode-logical-immediate (bic-mask (fixnumize x)))))
 
+(defun fixnum-encode-logical-immediate-ignore-tag (integer)
+  (and (fixnump integer)
+       (let ((f (fixnumize integer)))
+         (or (encode-logical-immediate f)
+             (encode-logical-immediate (logior f fixnum-tag-mask))))))
+
 (defmacro define-binop (translate untagged-penalty op
                         &key
                           (constant-test 'encode-logical-immediate)
@@ -206,7 +212,12 @@
   :negative-op sub)
 (define-binop - 4 sub :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
   :negative-op add)
-(define-binop logand 2 and)
+(define-binop logand 2 and
+  :constant-fixnum-test fixnum-encode-logical-immediate-ignore-tag
+  :constant-transform (lambda (x)
+                        (if (encode-logical-immediate x)
+                            x
+                            (logior x fixnum-tag-mask))))
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
@@ -1244,7 +1255,11 @@
                                 (inst tst (load-immediate-word tmp-tn y)
                                       (asr x n-fixnum-tag-bits)))))
                        y)))
-            (if (encode-logical-immediate y)
+            (if (or (encode-logical-immediate y)
+                    (and (sc-is x any-reg)
+                         (let ((masked (logior y fixnum-tag-mask)))
+                           (and (encode-logical-immediate masked)
+                                (setf y masked)))))
                 (inst tst x y)
                 (inst tst x (load-immediate-word tmp-tn y))))))))
 
