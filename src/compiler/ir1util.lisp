@@ -2521,7 +2521,8 @@ is :ANY, the function name is not checked."
                 (return)))
              (null
               (let ((pred (block-pred (ctran-block ctran))))
-                (when (cdr pred)
+                (when (or (null pred)
+                          (cdr pred))
                   (return))
                 (setf node (block-last (car pred)))
                 (go :next-node)))
