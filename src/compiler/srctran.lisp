@@ -6950,15 +6950,19 @@
                           (kill-if-branch-1 if (if-test if)
                                             (node-block if)
                                             (if-consequent if))
-                          (transform-call next-node
-                                          `(lambda (a b)
-                                             (declare (ignore b))
-                                             (eq (logandc2 ,(if characterp
-                                                                '(char-code a)
-                                                                'a)
-                                                           ,(logxor c1 c2))
-                                                 ,(min c1 c2)))
-                                          'or-eq-transform)
+                          (let ((min (min c1 c2))
+                                (value (if characterp
+                                           '(char-code a)
+                                           'a)))
+                            (transform-call next-node
+                                            `(lambda (a b)
+                                               (declare (ignore b))
+                                               ,(if (zerop min)
+                                                    `(not (logtest ,value (lognot ,(logxor c1 c2))))
+                                                    `(eq (logandc2 ,value
+                                                                   ,(logxor c1 c2))
+                                                         ,min)))
+                                            'or-eq-transform))
                           t)))))))))))
 
 
