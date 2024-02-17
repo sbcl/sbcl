@@ -2706,7 +2706,8 @@
                 (sb-kernel:lexenv (sb-c::lexenv-vars x))
                 (broadcast-stream (broadcast-stream-streams x))
                 (t :none))))))
-    ;; There should be no #<layout> referenced directly from the code header.
+    ;; There should be no #<layout> referenced directly from the code header
+    ;; (which implies that no type-check occurs when accessing a structure instance).
     ;; There is of course a vector of layouts in there to compare against.
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:layout)))
     ;; The function had better work.

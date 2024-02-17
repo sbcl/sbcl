@@ -293,8 +293,8 @@
           `(lambda (x)
              ,(sb-impl:expand-symbol-case
                'x
-               '(((or (eql s 'a) (eql s 'b) (eql s 'c) (eql s 'd)) nil :foo)
-                 ((or (eql s 'e) (eql s 'f) (eql s '|a|)) nil :bar))
+               '(((or (eql s 'a) (eql s 'b) (eql s 'c) (eql s 'd)) :foo)
+                 ((or (eql s 'e) (eql s 'f) (eql s '|a|)) :bar))
                '(a b c d e f |a|)
                nil
                'wonky-hash 1)))))
@@ -308,8 +308,8 @@
           `(lambda (x)
              ,(sb-impl:expand-symbol-case
                'x
-               '(((or (eql s 'f) (eql s 'e) (eql s 'd) (eql s 'c)) nil :foo)
-                 ((or (eql s 'b) (eql s 'a) (eql s '|d|)) nil :bar))
+               '(((or (eql s 'f) (eql s 'e) (eql s 'd) (eql s 'c)) :foo)
+                 ((or (eql s 'b) (eql s 'a) (eql s '|d|)) :bar))
                '(a b c d e f |d|)
                nil
                'wonky-hash 1)))))

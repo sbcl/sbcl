@@ -1066,7 +1066,7 @@ symbol-case giving up: case=((V U) (F))
 ;;; into a dispatch based on layout-clos-hash.
 ;;; The decision to use a hash-based lookup should depend on the number of types
 ;;; matched, but if there are a lot of types matched all rooted at a common
-;;; ancestor, it is not beneficial.
+;;; ancestor, it may not be as beneficial.
 ;;;
 ;;; The expansion currently works only with sealed classoids.
 ;;; Making it work with unsealed classoids isn't too tough.
@@ -1134,12 +1134,12 @@ symbol-case giving up: case=((V U) (F))
            (case (sb-kernel::%typecase-index ,layout-lists ,temp ,all-sealed)
              ,@(loop for i from 1 for clause in normal-clauses
                      collect `(,i
-                                   ;; CLAUSE is ((TYPEP #:G 'a-type) NIL . forms)
+                                   ;; CLAUSE is ((TYPEP #:G 'a-type) . forms)
                                    (sb-c::%type-constraint ,temp ,(third (car clause)))
-                                   ,@(cddr clause)))
+                                   ,@(cdr clause)))
              (0 ,@(if errorp
                           `((etypecase-failure ,temp ',type-specs))
-                          (cddr default)))))))))
+                          (cdr default)))))))))
 
 
 ;;; Turn a case over symbols into a case over their hashes.
@@ -1182,8 +1182,6 @@ symbol-case giving up: case=((V U) (F))
             (mapcar
              (lambda (clause)
                (destructuring-bind (antecedent . consequent) clause
-                 (aver (typep consequent '(cons (eql nil))))
-                 (pop consequent) ; strip the NIL that CASE-BODY inserts
                  (when (typep antecedent '(cons (eql eql)))
                    (setq antecedent `(or ,antecedent)))
                  (flet ((extract-key (form) ; (EQL #:gN (QUOTE foo)) -> FOO
@@ -1285,7 +1283,7 @@ symbol-case giving up: case=((V U) (F))
                             ;; ECASE that gets inlined many times over.
                             `(ecase-failure
                               ,symbol ,(coerce keys 'simple-vector))
-                            `(progn ,@(cddr default)))))))))
+                            `(progn ,@(cdr default)))))))))
 
         ;; Reset the bins, try it the long way
         (fill bins nil)
@@ -1402,7 +1400,7 @@ symbol-case giving up: case=((V U) (F))
                    (progn ,@(cdar clauses))
                    ,(if errorp
                         `(ecase-failure ,symbol ,(coerce keys 'simple-vector))
-                        `(progn ,@(cddr default)))))))
+                        `(progn ,@(cdr default)))))))
 
         ;; Produce a COND only if the backend supports the multiway branch vop.
         #+(or x86 x86-64)
@@ -1436,27 +1434,20 @@ symbol-case giving up: case=((V U) (F))
                              (t (unreachable)))))))
                ,@(if errorp
                      `((ecase-failure ,symbol ,(coerce keys 'simple-vector)))
-                     (cddr default)))))))))
+                     (cdr default)))))))))
 
 ;;; CASE-BODY returns code for all the standard "case" macros. NAME is
-;;; the macro name, and KEYFORM is the thing to case on. MULTI-P
-;;; indicates whether a branch may fire off a list of keys; otherwise,
-;;; a key that is a list is interpreted in some way as a single key.
-;;; When MULTI-P, TEST is applied to the value of KEYFORM and each key
-;;; for a given branch; otherwise, TEST is applied to the value of
-;;; KEYFORM and the entire first element, instead of each part, of the
-;;; case branch. When ERRORP, no OTHERWISE-CLAUSEs are recognized,
-;;; and an ERROR form is generated where control falls off the end
-;;; of the ordinary clauses. When PROCEEDP, it is an error to
-;;; omit ERRORP, and the ERROR form generated is executed within a
-;;; RESTART-CASE allowing KEYFORM to be set and retested.
+;;; the macro name, and KEYFORM is the thing to case on.
+;;; When ERRORP, no OTHERWISE-CLAUSEs are recognized,
+;;; and an ERROR or CERROR form is generated where control falls off the end
+;;; of the ordinary clauses.
 
 ;;; Note the absence of EVAL-WHEN here. The cross-compiler calls this function
 ;;; and gets the compiled code that the host produced in make-host-1.
 ;;; If recompiled, you do not want an interpreted definition that might come
 ;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
-(defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
-  (unless (or cases (not needcasesp))
+(defun case-body (name keyform cases test errorp)
+  (unless (or cases (not errorp))
     (warn "no clauses in ~S" name))
   (let ((keyform-value (gensym))
         (clauses ())
@@ -1481,70 +1472,52 @@ symbol-case giving up: case=((V U) (F))
           (with-current-source-form (cases)
             (error "~S -- bad clause in ~S" case name)))
         (with-current-source-form (case)
+          ;; https://sourceforge.net/p/sbcl/mailman/message/11863996/ contains discussion
+          ;; of whether to warn when seeing OTHERWISE in a normal-clause position, but
+          ;; it is in fact an error: "In the case of case, the symbols t and otherwise
+          ;; MAY NOT be used as the keys designator."
           (destructuring-bind (keyoid &rest forms) case
+            (when (null forms)
+              (setq forms '(nil)))
             (cond (;; an OTHERWISE-CLAUSE
-                   ;;
-                   ;; By the way... The old code here tried gave
-                   ;; STYLE-WARNINGs for normal-clauses which looked as
-                   ;; though they might've been intended to be
-                   ;; otherwise-clauses. As Tony Martinez reported on
-                   ;; sbcl-devel 2004-11-09 there are sometimes good
-                   ;; reasons to write clauses like that; and as I noticed
-                   ;; when trying to understand the old code so I could
-                   ;; understand his patch, trying to guess which clauses
-                   ;; don't have good reasons is fundamentally kind of a
-                   ;; mess. SBCL does issue style warnings rather
-                   ;; enthusiastically, and I have often justified that by
-                   ;; arguing that we're doing that to detect issues which
-                   ;; are tedious for programmers to detect for by
-                   ;; proofreading (like small typoes in long symbol
-                   ;; names, or duplicate function definitions in large
-                   ;; files). This doesn't seem to be an issue like that,
-                   ;; and I can't think of a comparably good justification
-                   ;; for giving STYLE-WARNINGs for legal code here, so
-                   ;; now we just hope the programmer knows what he's
-                   ;; doing. -- WHN 2004-11-20
                    (and (not errorp) ; possible only in CASE or TYPECASE,
                                         ; not in [EC]CASE or [EC]TYPECASE
-                        (memq keyoid '(t otherwise))
-                        (null (cdr cases)))
-                   ;; The NIL has a reason for being here: Without it, COND
-                   ;; will return the value of the test form if FORMS is NIL.
-                   (push `(t nil ,@forms) clauses))
-                  ((and multi-p (listp keyoid))
-                   (setf keys (nconc (reverse keyoid) keys))
-                   (check-clause keyoid)
-                   (push `((or ,@(mapcar (lambda (key)
-                                           `(,test ,keyform-value ',key))
-                                         keyoid))
-                           nil
-                           ,@forms)
-                         clauses))
-                  (t
-                   (when (and (eq name 'case)
-                              (cdr cases)
-                              (memq keyoid '(t otherwise)))
-                     (error 'simple-reference-error
-                            :format-control
+                        (memq keyoid '(t otherwise)))
+                   (cond ((null (cdr cases))
+                          (push `(t ,@forms) clauses))
+                         ((eq name 'case)
+                          (error 'simple-reference-error
+                                 :format-control
                             "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
                            designator only in the final otherwise-clause, not in a ~
                            normal-clause. Use (~S) instead, or move the clause to the ~
                            correct position.~:@>"
                             :format-arguments (list 'case case keyoid keyoid)
-                            :references `((:ansi-cl :macro case))))
+                            :references `((:ansi-cl :macro case))))))
+                  ((and (listp keyoid) (eq test 'eql))
+                   (setf keys (nconc (reverse keyoid) keys))
+                   (check-clause keyoid)
+                   ;; This inserts an unreachable clause if KEYOID is NIL, but
+                   ;; FORMS could contain a side-effectful LOAD-TIME-VALUE.
+                   (push `(,(if keyoid
+                                `(or ,@(mapcar (lambda (key)
+                                                 `(,test ,keyform-value ',key))
+                                               keyoid)))
+                           ,@forms)
+                         clauses))
+                  (t
                    (push keyoid keys)
                    (check-clause (list keyoid))
-                   (push `((,test ,keyform-value ',keyoid)
-                           nil
-                           ,@forms)
+                   (push `((,test ,keyform-value ',keyoid) ,@forms)
                          clauses)))))))
     (setq keys
           (nreverse (mapcon (lambda (tail)
                               (unless (member (car tail) (cdr tail))
                                 (list (car tail))))
                             keys)))
-    (case-body-aux name keyform keyform-value clauses keys errorp proceedp
-                   `(,(if multi-p 'member 'or) ,@keys))))
+    (case-body-aux name keyform keyform-value clauses keys errorp
+                   ;; Construct a type specifier
+                   `(,(if (eq test 'eql) 'member 'or) ,@keys))))
 
 ;;; CASE-BODY-AUX provides the expansion once CASE-BODY has groveled
 ;;; all the cases. Note: it is not necessary that the resulting code
@@ -1554,8 +1527,8 @@ symbol-case giving up: case=((V U) (F))
 ;;; causes to be generated at the top of any function using the case
 ;;; macros, regardless of whether they are needed.
 (defun case-body-aux (name keyform keyform-value clauses keys
-                      errorp proceedp expected-type)
-  (when proceedp ; CCASE or CTYPECASE
+                      errorp expected-type)
+  (when (eq errorp 'cerror) ; CCASE or CTYPECASE
     (return-from case-body-aux
       ;; It is not a requirement to evaluate subforms of KEYFORM once only, but it often
       ;; reduces code size to do so, as the update form will take advantage of typechecks
@@ -1656,38 +1629,38 @@ symbol-case giving up: case=((V U) (F))
   "CASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If a singleton key is T then the clause is a default clause."
-  (case-body 'case keyform cases t 'eql nil nil nil))
+  (case-body 'case keyform cases 'eql nil))
 
 (sb-xc:defmacro ccase (keyform &body cases)
   "CCASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then a correctable error is
   signalled."
-  (case-body 'ccase keyform cases t 'eql t t t))
+  (case-body 'ccase keyform cases 'eql 'cerror))
 
 (sb-xc:defmacro ecase (keyform &body cases)
   "ECASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then an error is signalled."
-  (case-body 'ecase keyform cases t 'eql t nil t))
+  (case-body 'ecase keyform cases 'eql 'error))
 
 (sb-xc:defmacro typecase (keyform &body cases)
   "TYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true."
-  (case-body 'typecase keyform cases nil 'typep nil nil nil))
+  (case-body 'typecase keyform cases 'typep nil))
 
 (sb-xc:defmacro ctypecase (keyform &body cases)
   "CTYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then a correctable error is signalled."
-  (case-body 'ctypecase keyform cases nil 'typep t t t))
+  (case-body 'ctypecase keyform cases 'typep 'cerror))
 
 (sb-xc:defmacro etypecase (keyform &body cases)
   "ETYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then an error is signalled."
-  (case-body 'etypecase keyform cases nil 'typep t nil t))
+  (case-body 'etypecase keyform cases 'typep 'error))
 
 ;;; Compile a version of BODY for all TYPES, and dispatch to the
 ;;; correct one based on the value of VAR. This was originally used
