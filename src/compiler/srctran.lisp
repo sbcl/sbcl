@@ -6906,15 +6906,21 @@
                                        (= (1+ a) next)))
                   (let ((min (car constants))
                         (max (car (last constants))))
+                    (setf (combination-args node) nil)
+                    (flush-dest b)
                     (loop for ((node . if) next) on chain
+                          for (a2 b2) = (combination-args node)
                           do
                           (cond (next
                                  (kill-if-branch-1 if (if-test if)
                                                    (node-block if)
-                                                   (if-consequent if)))
+                                                   (if-consequent if))
+                                 (flush-combination node))
                                 (t
+                                 (setf (lvar-dest a) node)
                                  (setf (combination-args node)
-                                       (list a b))
+                                       (list a b2))
+                                 (flush-dest a2)
                                  (transform-call node
                                                  `(lambda (a b)
                                                     (declare (ignore b))
@@ -6935,7 +6941,6 @@
                   (pop chain)
                   (destructuring-bind (a b) (combination-args node)
                     (destructuring-bind (a2 b2) (combination-args next-node)
-                      (declare (ignore a2))
                       (let ((c1 (lvar-value b))
                             (c2 (lvar-value b2)))
                         (when (and (if characterp
@@ -6952,8 +6957,13 @@
                           (kill-if-branch-1 if (if-test if)
                                             (node-block if)
                                             (if-consequent if))
+                          (setf (combination-args node) nil)
+                          (flush-combination node)
+                          (setf (lvar-dest a) next-node)
                           (setf (combination-args next-node)
-                                (list a b))
+                                (list a b2))
+                          (flush-dest a2)
+                          (flush-dest b)
                           (let ((min (min c1 c2))
                                 (value (if characterp
                                            '(char-code a)
@@ -6966,8 +6976,10 @@
                                                     `(eq (logandc2 ,value
                                                                    ,(logxor c1 c2))
                                                          ,min)))
-                                            'or-eq-transform))
-                          t)))))))))))
+                                            'or-eq-transform)))))))
+            (unless (node-prev node)
+              ;; Don't proceed optimizing this node
+              t)))))))
 
 
 (defoptimizer (eq optimizer) ((a b) node)
