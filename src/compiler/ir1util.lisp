@@ -2496,8 +2496,9 @@ is :ANY, the function name is not checked."
                (ref-p y-use)
                (eq (ref-leaf x-use) (ref-leaf y-use))
                (or (constant-reference-p x-use)
-                   (refs-unchanged-p x-use y-use)
-                   (refs-unchanged-p y-use x-use)))
+                   (and (lambda-var-p (ref-leaf x-use))
+                        (refs-unchanged-p x-use y-use)
+                        (refs-unchanged-p y-use x-use))))
       y-use)))
 
 (defun refs-unchanged-p (ref1 ref2)
