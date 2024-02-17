@@ -401,3 +401,11 @@
 (with-test (:name :macro-with-dotted-list)
   (let ((expansion (macroexpand '(macro-with-dotted-list . 1))))
     (assert (equal expansion 1))))
+
+(with-test (:name :typecase)
+  (assert
+   (equal (loop for x in '(a 1 1.4 "c")
+                collect (typecase x
+                          (t :good)
+                          (otherwise :bad)))
+          '(:good :good :good :good))))

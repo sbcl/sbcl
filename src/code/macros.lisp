@@ -1454,7 +1454,7 @@ symbol-case giving up: case=((V U) (F))
         (keys ())
         (keys-seen (make-hash-table :test #'eql)))
     (do* ((cases cases (cdr cases))
-          (case (car cases) (car cases))
+          (clause (car cases) (car cases))
           (case-position 1 (1+ case-position)))
          ((null cases) nil)
       (flet ((check-clause (case-keys)
@@ -1464,25 +1464,28 @@ symbol-case giving up: case=((V U) (F))
                        (warn 'duplicate-case-key-warning
                              :key k
                              :case-kind name
-                             :occurrences `(,existing (,case-position (,case))))))
-               (let ((record (list case-position (list case))))
+                             :occurrences `(,existing (,case-position (,clause))))))
+               (let ((record (list case-position (list clause))))
                  (dolist (k case-keys)
                    (setf (gethash k keys-seen) record)))))
-        (unless (list-of-length-at-least-p case 1)
+        (unless (list-of-length-at-least-p clause 1)
           (with-current-source-form (cases)
-            (error "~S -- bad clause in ~S" case name)))
-        (with-current-source-form (case)
+            (error "~S -- bad clause in ~S" clause name)))
+        (with-current-source-form (clause)
           ;; https://sourceforge.net/p/sbcl/mailman/message/11863996/ contains discussion
           ;; of whether to warn when seeing OTHERWISE in a normal-clause position, but
           ;; it is in fact an error: "In the case of case, the symbols t and otherwise
           ;; MAY NOT be used as the keys designator."
-          (destructuring-bind (keyoid &rest forms) case
+          (destructuring-bind (keyoid &rest forms) clause
             (when (null forms)
               (setq forms '(nil)))
             (cond (;; an OTHERWISE-CLAUSE
                    (and (not errorp) ; possible only in CASE or TYPECASE,
                                         ; not in [EC]CASE or [EC]TYPECASE
-                        (memq keyoid '(t otherwise)))
+                        (or (eq keyoid 'otherwise)
+                            ;; T in CASE heads an otherwise-clause, but in TYPECASE it's
+                            ;; merely a plain old type specifier - why wouldn't it be?
+                            (and (eq keyoid 't) (eq test 'eql))))
                    (cond ((null (cdr cases))
                           (push `(t ,@forms) clauses))
                          ((eq name 'case)
@@ -1492,7 +1495,17 @@ symbol-case giving up: case=((V U) (F))
                            designator only in the final otherwise-clause, not in a ~
                            normal-clause. Use (~S) instead, or move the clause to the ~
                            correct position.~:@>"
-                            :format-arguments (list 'case case keyoid keyoid)
+                            :format-arguments (list 'case clause keyoid keyoid)
+                            :references `((:ansi-cl :macro case))))
+                         (t
+                          ;; OTHERWISE is a redundant bit of the behavior of TYPECASE
+                          ;; since T is the universal type. OTHERWISE could not legally
+                          ;; be DEFTYPEed so this _must_ be a misplaced clause.
+                          (error 'simple-reference-error
+                                     :format-control
+                            "~@<~IBad ~S clause:~:@_  ~S~:@_~S is allowed only in the final clause. ~
+                           Use T instead, or move the clause to the correct position.~:@>"
+                            :format-arguments (list 'typecase clause keyoid)
                             :references `((:ansi-cl :macro case))))))
                   ((and (listp keyoid) (eq test 'eql))
                    (setf keys (nconc (reverse keyoid) keys))
