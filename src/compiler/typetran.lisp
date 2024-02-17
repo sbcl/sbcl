@@ -402,17 +402,14 @@
               `(and (typep ,object ',base)
                     ,(transform-numeric-bound-test object type base)))))
       (:complex
-       `(and (complexp ,object)
-             ,(once-only ((n-real `(realpart (truly-the complex ,object)))
-                          (n-imag `(imagpart (truly-the complex ,object))))
-                `(progn
-                   ,n-imag ; ignorable
-                   (and (typep ,n-real ',base)
-                        ,@(when (eq class 'integer)
-                            `((typep ,n-imag ',base)))
-                        ,(transform-numeric-bound-test n-real type base)
-                        ,(transform-numeric-bound-test n-imag type
-                                                       base)))))))))
+       (let ((part-type (second (type-specifier type))))
+         `(and (typep ,object '(complex ,(case base
+                                           ((double-float single-float rational) base)
+                                           (t (if (eq class 'integer)
+                                                  'rational
+                                                  '*)))))
+               (typep (realpart ,object) ',part-type)
+               (typep (imagpart ,object) ',part-type)))))))
 
 ;;; Do the source transformation for a test of a hairy type.
 ;;; SATISFIES is converted into the obvious. Otherwise, we convert
