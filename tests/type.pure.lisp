@@ -887,3 +887,17 @@
    (("") nil)
    ((t) t)
    ((nil) nil)))
+
+(with-test (:name :union-integer-complex)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x '(or (integer 36757953510256822604)
+                 (complex fixnum))))
+   ((-1) nil)
+   ((36757953510256822603) nil)
+   ((36757953510256822604) t)
+   ((36757953510256822605) t)
+   ((#C(1d0 1d0)) nil)
+   ((#C(1 1)) t)
+   ((#C(1 #.(expt 2 300))) nil)))

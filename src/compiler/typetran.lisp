@@ -579,8 +579,8 @@
               ;; don't test a range.
               ;; (and subtype-of-integer (not (integer x y)))
               (destructuring-bind (b a) types
-                (and (eq (numeric-type-class a) 'integer)
-                     (eq (numeric-type-class b) 'integer)
+                (and (integer-type-p a)
+                     (integer-type-p b)
                      (flet ((check (a b)
                               (let* ((a-hi (numeric-type-high a))
                                      (a-lo (numeric-type-low a))
@@ -611,8 +611,8 @@
               ;; (or (integer * fixnum-x) (integer fixnum-y))
               ;; only check for bignump and not its value.
               (destructuring-bind (b a) types
-                (and (eq (numeric-type-class a) 'integer)
-                     (eq (numeric-type-class b) 'integer)
+                (and (integer-type-p a)
+                     (integer-type-p b)
                      (flet ((check (a b)
                               (let* ((a-hi (numeric-type-high a))
                                      (a-lo (numeric-type-low a))
