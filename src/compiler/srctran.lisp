@@ -6883,7 +6883,7 @@
 
 ;;; Do something when comparing the same value to multiple things.
 (defun or-eq-transform (op a b node)
-  (declare (ignore b))
+  (declare (ignorable b))
   (unless (delay-ir1-optimizer node :ir1-phases)
     (let ((characterp (csubtypep (lvar-type a) (specifier-type 'character))))
       (when (or characterp
@@ -6908,17 +6908,20 @@
                         (max (car (last constants))))
                     (loop for ((node . if) next) on chain
                           do
-                          (if next
-                              (kill-if-branch-1 if (if-test if)
-                                                (node-block if)
-                                                (if-consequent if))
-                              (transform-call node
-                                              `(lambda (a b)
-                                                 (declare (ignore b))
-                                                 (range<= ,min ,(if characterp
-                                                                    '(char-code a)
-                                                                    'a) ,max))
-                                              'or-eq-transform)))
+                          (cond (next
+                                 (kill-if-branch-1 if (if-test if)
+                                                   (node-block if)
+                                                   (if-consequent if)))
+                                (t
+                                 (setf (combination-args node)
+                                       (list a b))
+                                 (transform-call node
+                                                 `(lambda (a b)
+                                                    (declare (ignore b))
+                                                    (range<= ,min ,(if characterp
+                                                                       '(char-code a)
+                                                                       'a) ,max))
+                                                 'or-eq-transform))))
                     (return-from or-eq-transform t)))))
             #+(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
             (when (>= (length chain) 4)
@@ -6931,7 +6934,6 @@
                   do
                   (pop chain)
                   (destructuring-bind (a b) (combination-args node)
-                    (declare (ignore a))
                     (destructuring-bind (a2 b2) (combination-args next-node)
                       (declare (ignore a2))
                       (let ((c1 (lvar-value b))
@@ -6950,6 +6952,8 @@
                           (kill-if-branch-1 if (if-test if)
                                             (node-block if)
                                             (if-consequent if))
+                          (setf (combination-args next-node)
+                                (list a b))
                           (let ((min (min c1 c2))
                                 (value (if characterp
                                            '(char-code a)

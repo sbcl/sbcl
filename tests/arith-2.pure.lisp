@@ -433,3 +433,15 @@
    ((-3) 1)
    ((3) 2)
    ((1) 2)))
+
+(with-test (:name :or-chain-types)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (declare ((integer -1 1) b))
+      (case b
+        ((-1 0) 0)
+        (t 1)))
+   ((-1) 0)
+   ((0) 0)
+   ((1) 1)))
