@@ -836,6 +836,16 @@
                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
                          (:translate logtest)
                          (:temporary (:scs (,sc) :to (:result 0)) test)
+                         ,@(case suffix
+                             (-c/unsigned
+                              `((:arg-types unsigned-num
+                                            (:constant (and (unsigned-byte 16) (not (integer 0 0)))))))
+                             (-c/signed
+                              `((:arg-types signed-num
+                                            (:constant (and (unsigned-byte 16) (not (integer 0 0)))))))
+                             (-c/fixnum
+                              `((:arg-types tagged-num
+                                            (:constant (and (unsigned-byte 14) (not (integer 0 0))))))))
                          (:generator ,cost
                           ;; We could be a lot more sophisticated here and
                           ;; check for possibilities with ANDIS..
