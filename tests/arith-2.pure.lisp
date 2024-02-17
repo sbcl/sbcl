@@ -422,3 +422,14 @@
                (optimize speed))
       (the (signed-byte 8) (aref a 0)))
    :allow-notes nil))
+
+(with-test (:name :or-chain)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (declare (fixnum b))
+      (case b ((0 -3) 1) (t 2)))
+   ((0) 1)
+   ((-3) 1)
+   ((3) 2)
+   ((1) 2)))

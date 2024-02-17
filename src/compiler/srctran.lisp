@@ -6892,7 +6892,7 @@
                                                 #'characterp
                                                 #'fixnump))))
           (when (cdr chain)
-            ;; Transform contiguous ranges into range<=. 
+            ;; Transform contiguous ranges into range<=.
             (when-vop-existsp (:translate range<)
               (let ((constants
                       (sort (loop for (node) in chain
@@ -6943,7 +6943,9 @@
                                                   c2 (char-code c2)))
                                        (and (fixnump c1)
                                             (fixnump c2)))
-                                   (= (logcount (logxor c1 c2)) 1))
+                                   (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
+                                           (ash c2 (- sb-vm:n-word-bits)))
+                                        (= (logcount (logxor c1 c2)) 1)))
                           (pop chain)
                           (kill-if-branch-1 if (if-test if)
                                             (node-block if)
