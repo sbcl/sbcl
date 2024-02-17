@@ -1506,7 +1506,7 @@ symbol-case giving up: case=((V U) (F))
                             "~@<~IBad ~S clause:~:@_  ~S~:@_~S is allowed only in the final clause. ~
                            Use T instead, or move the clause to the correct position.~:@>"
                             :format-arguments (list 'typecase clause keyoid)
-                            :references `((:ansi-cl :macro case))))))
+                            :references `((:ansi-cl :macro typecase))))))
                   ((and (listp keyoid) (eq test 'eql))
                    (setf keys (nconc (reverse keyoid) keys))
                    (check-clause keyoid)
