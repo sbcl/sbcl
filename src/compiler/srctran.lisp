@@ -6856,33 +6856,32 @@
 (defun find-or-chain (node op constant-test)
   (let (chain)
     (labels ((chain (node)
-               (let ((if (node-dest node)))
-                 (when (and (if-p if)
-                            (immediately-used-p (node-lvar node) node t))
-                   (destructuring-bind (a b) (combination-args node)
-                     (when (and (constant-lvar-p b)
-                                (funcall constant-test (lvar-value b)))
-                       (push (cons node if) chain)
-
-                       (let ((else (next-node (if-alternative if) :type :non-ref
-                                                                  :single-predecessor t)))
-                         (when (and (combination-p else)
-                                    (eq (combination-kind else) :known)) ;; no notinline
-                           (let ((op2 (combination-fun-debug-name else))
-                                 after-else)
-                             (when (eq op2 op)
-                               (let ((a2 (car (combination-args else))))
-                                 (when (and (same-leaf-ref-p a a2)
-                                            (if-p (setf after-else (next-node else)))
-                                            (eq (if-consequent if)
-                                                (if-consequent after-else)))
-                                   (chain else)))))))))))))
+               (unless (combination-or-chain-computed node)
+                 (let ((if (node-dest node)))
+                   (when (and (if-p if)
+                              (immediately-used-p (node-lvar node) node t))
+                     (destructuring-bind (a b) (combination-args node)
+                       (when (and (constant-lvar-p b)
+                                  (funcall constant-test (lvar-value b)))
+                         (push (cons node if) chain)
+                         (setf (combination-or-chain-computed node) t)
+                         (let ((else (next-node (if-alternative if) :type :non-ref
+                                                                    :single-predecessor t)))
+                           (when (and (combination-p else)
+                                      (eq (combination-kind else) :known)) ;; no notinline
+                             (let ((op2 (combination-fun-debug-name else))
+                                   after-else)
+                               (when (eq op2 op)
+                                 (let ((a2 (car (combination-args else))))
+                                   (when (and (same-leaf-ref-p a a2)
+                                              (if-p (setf after-else (next-node else)))
+                                              (eq (if-consequent if)
+                                                  (if-consequent after-else)))
+                                     (chain else))))))))))))))
       (chain node)
       (nreverse chain))))
 
 ;;; Do something when comparing the same value to multiple things.
-;;; For now it compares integers that differ by only one bit,
-;;; which is useful for case-insensitive comparison of ASCII characters.
 (defun or-eq-transform (op a b node)
   (declare (ignore b))
   (unless (delay-ir1-optimizer node :ir1-phases)
@@ -6893,6 +6892,40 @@
                                                 #'characterp
                                                 #'fixnump))))
           (when (cdr chain)
+            ;; Transform contiguous ranges into range<=. 
+            (when-vop-existsp (:translate range<)
+              (let ((constants
+                      (sort (loop for (node) in chain
+                                  for (nil b) = (combination-args node)
+                                  collect (if characterp
+                                              (char-code (lvar-value b))
+                                              (lvar-value b)))
+                            #'<)))
+                (when (loop for (a next) on constants
+                            always (or (not next)
+                                       (= (1+ a) next)))
+                  (let ((min (car constants))
+                        (max (car (last constants))))
+                    (loop for ((node . if) next) on chain
+                          do
+                          (if next
+                              (kill-if-branch-1 if (if-test if)
+                                                (node-block if)
+                                                (if-consequent if))
+                              (transform-call node
+                                              `(lambda (a b)
+                                                 (declare (ignore b))
+                                                 (range<= ,min ,(if characterp
+                                                                    '(char-code a)
+                                                                    'a) ,max))
+                                              'or-eq-transform)))
+                    (return-from or-eq-transform t)))))
+            #+(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
+            (when (>= (length chain) 4)
+              (return-from or-eq-transform))
+
+            ;; Comparing integers that differ by only one bit,
+            ;; which is useful for case-insensitive comparison of ASCII characters.
             (loop for ((node . if) (next-node . next-if)) = chain
                   while next-node
                   do
@@ -6926,7 +6959,7 @@
                                           'or-eq-transform)
                           t)))))))))))
 
-#-(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
+
 (defoptimizer (eq optimizer) ((a b) node)
   (or-eq-transform 'eq a b node))
 
