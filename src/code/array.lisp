@@ -1869,7 +1869,9 @@ function to be removed without further warning."
        (defmacro ,dispatch-name (&rest args)
          (aver (symbolp (first args)))
          (let ((tag (gensym "TAG")))
-           `(funcall
+           `(,',(if (find '&rest params)
+                    'apply
+                    'funcall)
              (truly-the function
                (let ((,tag 0))
                  (when (%other-pointer-p ,(first args))

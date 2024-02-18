@@ -1523,7 +1523,7 @@ many elements are copied."
 
 ;;; seqtran can generate code which accesses the array of specialized
 ;;; functions, so we need the array for this, not a jump table.
-(!define-array-dispatch :call vector-map-into (data start end fun sequences)
+(!define-array-dispatch :call vector-map-into (data start end fun &rest sequences)
     ((declare (ignore fun sequences))
      (unless (zerop (- end start))
        (sb-c::%type-check-error/c data 'nil-array-accessed-error nil))
@@ -1543,7 +1543,6 @@ many elements are copied."
         (setf (aref data index) (apply fun args))
         (incf index)))
     index))
-
 ;;; Uses the machinery of (MAP NIL ...). For non-vectors we avoid
 ;;; computing the length of the result sequence since we can detect
 ;;; the end during mapping (if MAP even gets that far).

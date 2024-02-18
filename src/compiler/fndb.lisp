@@ -652,7 +652,7 @@
                   (intern (concatenate 'string "VECTOR-MAP-INTO/"
                                        (string (sb-vm:saetp-primitive-type-name info)))
                           :sb-impl))
-    (simple-array index index function list)
+    (simple-array index index function &rest t)
     index
     (call no-verify-arg-count))
 
