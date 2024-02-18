@@ -1215,8 +1215,11 @@
                       ;; monotonically growing variables without a
                       ;; starting point which will propagate new
                       ;; constraints for each increment.
-                      (pushnew ref *blocks-to-terminate*)))))))
-    (when (lambda-var-sets leaf)
+                      (pushnew ref *blocks-to-terminate*))))))))
+  (let ((leaf (ref-leaf ref))) ;; may have been changed above
+    (when (and (lambda-var-p leaf)
+               (lambda-var-sets leaf)
+               (lambda-var-constraints leaf))
       (block nil
         (do-conset-constraints-intersection (con (in
                                                   (lambda-var-value-id-constraints leaf)))

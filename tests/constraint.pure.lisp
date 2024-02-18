@@ -1206,3 +1206,14 @@
       (logxor (unwind-protect a (setq a 7)) a))
   ((0) 7)
   ((7) 0)))
+
+(with-test (:name :set-vars-equal-leaf-change)
+
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (declare (integer b))
+      (let ((c 1))
+        (decf c (shiftf b b))))
+   ((3) -2)
+   ((-4) 5)))
