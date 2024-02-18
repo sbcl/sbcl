@@ -1038,5 +1038,11 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
+(#(3CEB35C3 6C16ABD3 AC25889A E8DC3557)
+ "(EQ EQL EQUAL CHAR=)"
+ "(  (>> val 30) )")
+(#(3CEB35C3 6C16ABD3 8D437217 AC25889A E8DC3557)
+ "(EQ EQL EQUAL CHAR= CHAR-EQUAL)"
+ "(  (& (+ val (>> val 23)) 7))")
 )
 ;; EOF

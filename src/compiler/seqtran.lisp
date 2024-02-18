@@ -2701,18 +2701,14 @@
                      ((t)
                       (eq test 'eq))
                      (character
-                      (or (memq test '(eq eql equal))
-                          (and (csubtypep item element-type)
-                               (eq test 'char=))
-                          (and (or (csubtypep item (specifier-type 'base-char))
+                      (or (memq test '(eq eql equal char=))
+                          (and (eq test 'char-equal)
+                               (or (csubtypep item (specifier-type 'base-char))
                                    (and (constant-lvar-p sequence)
                                         (every (lambda (x) (typep x 'base-char))
-                                               (lvar-value sequence))))
-                               (eq test 'char-equal))))
+                                               (lvar-value sequence)))))))
                      (base-char
-                      (or (memq test '(eq eql equal))
-                          (and (csubtypep item (specifier-type 'character))
-                               (memq test '(char= char-equal)))))
+                      (memq test '(eq eql equal char= char-equal)))
                      (t
                       (and (csubtypep element-type (specifier-type 'integer))
                            (csubtypep item element-type)
