@@ -1272,7 +1272,10 @@
                when (and (lambda-var-p var)
                          (lambda-var-sets var)
                          (lambda-var-constraints var))
-               do (conset-add-constraint gen 'var-value var 1 nil))))
+               do (do-conset-constraints-intersection (con (gen
+                                                            (lambda-var-value-id-constraints var)))
+                    (conset-delete con gen))
+                  (conset-add-constraint gen 'var-value var 1 nil))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
@@ -1319,8 +1322,7 @@
          (add-eq-constraint var (set-value node) gen)
          (when (node-lvar node)
            (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))
-         (when (lambda-var-constraints var)
-          (conset-add-constraint gen 'var-value var (set-id node) nil))))
+         (conset-add-constraint gen 'var-value var (set-id node) nil)))
       (combination
        (case (combination-kind node)
          (:known
@@ -1534,7 +1536,8 @@
     (flet ((join (out)
              (do-conset-constraints-intersection (con (out
                                                        (lambda-var-value-id-constraints var)))
-               (setf mask (logior mask (constraint-y con))))))
+               (setf mask (logior mask (constraint-y con)))
+               (return-from join))))
       (if predecessor-outs
           (mapc #'join predecessor-outs)
           (loop for pred in pred
@@ -1542,8 +1545,10 @@
                 (let ((out (block-out-for-successor pred block)))
                   (when out
                     (join out))))))
+    (do-conset-constraints-intersection (con (in
+                                              (lambda-var-value-id-constraints var)))
+      (conset-delete con in))
     (conset-add-constraint in 'var-value var mask nil)))
-
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil)
