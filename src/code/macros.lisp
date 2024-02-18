@@ -1451,6 +1451,7 @@ symbol-case giving up: case=((V U) (F))
     (warn "no clauses in ~S" name))
   (let ((keyform-value (gensym))
         (clauses ())
+        (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
         (keys ())
         (keys-seen (make-hash-table :test #'eql)))
     (do* ((cases specified-clauses (cdr cases))
@@ -1478,9 +1479,7 @@ symbol-case giving up: case=((V U) (F))
           ;; MAY NOT be used as the keys designator."
           ;; T in CASE heads an otherwise-clause, but in TYPECASE it's either a plain
           ;; type specifier OR it is the otherwise-clause. They're equivalent, but
-          ;; EXPAND-STRUCT-TYPECASE has a certain expectation of how the normal and otherwise
-          ;; clauses look. I need to have CASE-BODY-AUX receive normal and otherwise
-          ;; clauses as separate args to clean up this ugliness.
+          ;; EXPAND-STRUCT-TYPECASE has a fixed expectation re. normal and otherwise clause
           (destructuring-bind (keyoid &rest forms) clause
             (when (null forms)
               (setq forms '(nil)))
@@ -1531,10 +1530,27 @@ symbol-case giving up: case=((V U) (F))
                          (setq errorp :none)
                          (style-warn "T clause in ~S makes subsequent clauses unreachable:~%~S"
                                      name specified-clauses)))
+                   (when case-clauses ; try the TYPECASE into CASE reduction
+                     (let ((typespec (ignore-errors (typexpand keyoid))))
+                       (cond ((typep typespec '(cons (eql member) (satisfies proper-list-p)))
+                              (push (cons (cdr typespec) forms) case-clauses))
+                             ((and (eq typespec t) (not (cdr cases))) ; one more KLUDGE
+                              (push clause case-clauses))
+                             (t
+                              (setq case-clauses nil)))))
                    (push keyoid keys)
                    (check-clause (list keyoid))
                    (push `((,test ,keyform-value ',keyoid) ,@forms)
                          clauses)))))))
+    ;; [EC]CASE has an advantage over [EC]TYPECASE in that we readily notice when
+    ;; the expansion can use symbol-hash to pick the clause.
+    (when case-clauses
+      (return-from case-body
+        `(,(case name (etypecase 'ecase) (ctypecase 'ccase) (t 'case))
+           ,keyform
+          ,@(cdr (reverse case-clauses)) ; 1st elt was a boolean flag
+          ,@(when (eq (caar clauses) t) (list (car clauses))))))
+
     (setq keys
           (nreverse (mapcon (lambda (tail)
                               (unless (member (car tail) (cdr tail))
@@ -1542,21 +1558,25 @@ symbol-case giving up: case=((V U) (F))
                             keys)))
     (when (eq errorp :none)
       (setq errorp nil))
-    (case-body-aux name keyform keyform-value clauses keys errorp
-                   ;; Construct a type specifier
-                   `(,(if (eq test 'eql) 'member 'or) ,@keys))))
 
-;;; CASE-BODY-AUX provides the expansion once CASE-BODY has groveled
-;;; all the cases. Note: it is not necessary that the resulting code
-;;; signal case-failure conditions, but that's what KMP's prototype
-;;; code did. We call CASE-BODY-ERROR, because of how closures are
-;;; compiled. RESTART-CASE has forms with closures that the compiler
-;;; causes to be generated at the top of any function using the case
-;;; macros, regardless of whether they are needed.
-(defun case-body-aux (name keyform keyform-value clauses keys
-                      errorp expected-type)
-  (when (eq errorp 'cerror) ; CCASE or CTYPECASE
-    (return-from case-body-aux
+    (unless (eq errorp 'cerror)
+      ;; try expanding [E]CASE using a jump table
+      (when (and (eq test 'eql) (every #'symbolp keys))
+        (awhen (expand-symbol-case keyform clauses keys errorp 'sxhash)
+          (return-from case-body it)))
+      ;; try expanding [E]TYPECASE using a jump table
+      (when (and (eq test 'typep) (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq))
+        (let* ((default (if (eq (caar clauses) 't) (car clauses)))
+               (normal-clauses (reverse (if default (cdr clauses) clauses))))
+          (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
+                                         default errorp)
+            (return-from case-body it)))))
+
+    ;; This list should get reversed sooner, but EXPAND-SYMBOL-CASE wants a backwards order
+    (setq clauses (nreverse clauses))
+
+    (let ((expected-type `(,(if (eq test 'eql) 'member 'or) ,@keys)))
+     (if (eq errorp 'cerror) ; CCASE or CTYPECASE
       ;; It is not a requirement to evaluate subforms of KEYFORM once only, but it often
       ;; reduces code size to do so, as the update form will take advantage of typechecks
       ;; already performed. (Nor is it _required_ to re-evaluate subforms)
@@ -1567,71 +1587,19 @@ symbol-case giving up: case=((V U) (F))
                  ((vars vals stores writer reader) (get-setf-expansion keyform)))
         `(let* ,(mapcar #'list vars vals)
            (named-let ,switch ((,keyform-value ,reader))
-             (cond ,@(nreverse clauses)
-                   (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))))
-  (let ((implement-as name)
-        (original-keys keys))
-    (when (member name '(typecase etypecase))
-      ;; Bypass all TYPEP handling if every clause of [E]TYPECASE is a MEMBER type.
-      ;; More importantly, try to use the fancy expansion for symbols as keys.
-      (let* ((default (if (eq (caar clauses) 't) (car clauses)))
-             (normal-clauses (reverse (if default (cdr clauses) clauses)))
-             (new-clauses))
-        (collect ((new-keys))
-          (dolist (clause normal-clauses)
-            ;; clause is ((TYPEP #:x (QUOTE <sometype>)) NIL forms*)
-            (destructuring-bind ((typep thing type-expr) . consequent) clause
-              (declare (ignore thing))
-              (unless (and (typep type-expr '(cons (eql quote) (cons t null)))
-                           (eq typep 'typep))
-                (bug "TYPECASE expander glitch"))
-              (let* ((spec (second type-expr))
-                     (clause-keys
-                      ;; TODO: call TYPEXPAND to find more situations where
-                      ;; TYPECASE could be optimized into CASE over symbols.
-                      (case (if (listp spec) (car spec))
-                        (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
-                        (member (when (proper-list-p (cdr spec)) (cdr spec)))
-                        (t :fail))))
-                (cond ((eq clause-keys :fail)
-                       (setq new-clauses :fail))
-                      ((neq new-clauses :fail)
-                       (dolist (key clause-keys)
-                         (unless (member key (new-keys))
-                           (new-keys key)))
-                       (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x))
-                                                  clause-keys))
-                                   consequent)
-                             new-clauses))))))
-          (acond ((neq new-clauses :fail)
-                  ;; all TYPECASE clauses were convertible to CASE clauses
-                  (setq clauses (if default (cons default new-clauses) new-clauses)
-                        keys (new-keys)
-                        implement-as 'case))
-                 ((and (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
-                       (expand-struct-typecase keyform keyform-value normal-clauses keys
-                                          default errorp))
-                  (return-from case-body-aux it))))))
-
-    ;; Efficiently expanding CASE over symbols depends on CASE over integers being
-    ;; translated as a jump table. If it's not - as on most backends - then we use
-    ;; the customary expansion as a series of IF tests.
-    ;; Production code rarely uses CCASE, and the expansion differs such that
-    ;; it doesn't seem worth the effort to handle it as a jump table.
-    (when (and (member implement-as '(case ecase)) (every #'symbolp keys))
-      (awhen (expand-symbol-case keyform clauses keys errorp 'sxhash)
-        (return-from case-body-aux it)))
+             (cond ,@clauses
+                   (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))
 
     `(let ((,keyform-value ,keyform))
        (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
-       (cond ,@(nreverse clauses)
+       (cond ,@clauses
              ,@(when errorp
                  `((t ,(ecase name
                          (etypecase
                           `(etypecase-failure
-                            ,keyform-value ,(etypecase-error-spec original-keys)))
+                            ,keyform-value ,(etypecase-error-spec keys)))
                          (ecase
-                          `(ecase-failure ,keyform-value ',original-keys))))))))))
+                          `(ecase-failure ,keyform-value ',keys))))))))))))
 
 ;;; ETYPECASE over clauses that form a "simpler" type specifier should use that,
 ;;; e.g. partitions of INTEGER:

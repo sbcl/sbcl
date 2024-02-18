@@ -350,12 +350,28 @@
   (assert (uses-symbol-hash-p
            (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2))))))
 
+(deftype zook () '(member :a :b :c))
+;; TYPECASE should become CASE when it can, even if the resulting CASE
+;; will not expand using symbol-hash.
 (with-test (:name :typecase-to-case)
-  (let ((expansion
-         (macroexpand-1 '(typecase x
-                          ((member a b c) 1)
-                          ((member d e f) 2)))))
-    (assert (uses-symbol-hash-p expansion))))
+  ;; TYPECASE without a final T clause
+  (assert (equal (macroexpand-1 '(typecase x ((eql z) 1) ((member 2 3) hi) (zook :z)))
+                 '(case x ((z) 1) ((2 3) hi) ((:a :b :c) :z))))
+  ;; with final T
+  (assert (equal (macroexpand-1 '(typecase x ((eql z) 1) ((member 2 3) hi) (zook :z) (t 'def)))
+                 '(case x ((z) 1) ((2 3) hi) ((:a :b :c) :z) (t 'def))))
+  ;; with final OTHERWISE
+  (assert (equal (macroexpand-1 '(typecase x
+                                  ((eql z) 1) ((member 2 3) hi) (zook :z) (otherwise 'def)))
+                 '(case x ((z) 1) ((2 3) hi) ((:a :b :c) :z) (t 'def))))
+
+  ;; ETYPECASE without final T
+  (assert (equal (macroexpand-1 '(etypecase x ((eql z) 1) ((member 2 3) hi) (zook :z)))
+                 '(ecase x ((z) 1) ((2 3) hi) ((:a :b :c) :z))))
+  ;; and with
+  (assert (equal (macroexpand-1 '(etypecase x ((eql z) 1) ((member 2 3) hi) (zook :z) (t 'def)))
+                 '(ecase x ((z) 1) ((2 3) hi) ((:a :b :c) :z) (t 'def)))))
+
 
 (with-test (:name :symbol-case-default-form)
   (let ((f (checked-compile
