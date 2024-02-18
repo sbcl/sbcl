@@ -1486,7 +1486,7 @@
                    (when (lambda-var/vector-length-p y)
                      (pushnew y equality-vars)))
                  (when (eq kind 'var-value)
-                   (pushnew (constraint-x con) var-values))))))
+                   (push (constraint-x con) var-values))))))
       (if predecessor-outs
           (find-vars (car predecessor-outs))
           (dolist (pred predecessors)
