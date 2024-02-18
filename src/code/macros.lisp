@@ -1542,11 +1542,14 @@ symbol-case giving up: case=((V U) (F))
                    (check-clause (list keyoid))
                    (push `((,test ,keyform-value ',keyoid) ,@forms)
                          clauses)))))))
+    (when (eq errorp :none)
+      (setq errorp nil))
+
     ;; [EC]CASE has an advantage over [EC]TYPECASE in that we readily notice when
     ;; the expansion can use symbol-hash to pick the clause.
     (when case-clauses
       (return-from case-body
-        `(,(case name (etypecase 'ecase) (ctypecase 'ccase) (t 'case))
+        `(,(cond ((not errorp) 'case) ((eq name 'ctypecase) 'ccase) (t 'ecase))
            ,keyform
           ,@(cdr (reverse case-clauses)) ; 1st elt was a boolean flag
           ,@(when (eq (caar clauses) t) (list (car clauses))))))
@@ -1556,8 +1559,6 @@ symbol-case giving up: case=((V U) (F))
                               (unless (member (car tail) (cdr tail))
                                 (list (car tail))))
                             keys)))
-    (when (eq errorp :none)
-      (setq errorp nil))
 
     (unless (eq errorp 'cerror)
       ;; try expanding [E]CASE using a jump table

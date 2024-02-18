@@ -370,8 +370,13 @@
                  '(ecase x ((z) 1) ((2 3) hi) ((:a :b :c) :z))))
   ;; and with
   (assert (equal (macroexpand-1 '(etypecase x ((eql z) 1) ((member 2 3) hi) (zook :z) (t 'def)))
-                 '(ecase x ((z) 1) ((2 3) hi) ((:a :b :c) :z) (t 'def)))))
+                 '(case x ((z) 1) ((2 3) hi) ((:a :b :c) :z) (t 'def)))))
 
+(with-test (:name :cypecase-never-err)
+  (assert (eq (let ((x 1)) (ctypecase x (t 'a))) 'a)))
+
+(with-test (:name :typecase-t-shadows-rest)
+  (assert-signal (macroexpand-1 '(typecase x (atom 1) (t 2) (cons 3))) warning))
 
 (with-test (:name :symbol-case-default-form)
   (let ((f (checked-compile
@@ -419,6 +424,7 @@
     (assert (equal expansion 1))))
 
 (with-test (:name :typecase)
+  (declare (muffle-conditions style-warning))
   (assert
    (equal (loop for x in '(a 1 1.4 "c")
                 collect (typecase x
