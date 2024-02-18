@@ -1080,7 +1080,7 @@ symbol-case giving up: case=((V U) (F))
 (defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp)
   (let* ((n (length type-specs))
          (n-base-types 0)
-         (layout-lists (make-array  n))
+         (layout-lists (make-array n))
          (exhaustive-list) ; of classoids
          (all-sealed t))
     (labels
@@ -1476,6 +1476,11 @@ symbol-case giving up: case=((V U) (F))
           ;; of whether to warn when seeing OTHERWISE in a normal-clause position, but
           ;; it is in fact an error: "In the case of case, the symbols t and otherwise
           ;; MAY NOT be used as the keys designator."
+          ;; T in CASE heads an otherwise-clause, but in TYPECASE it's either a plain
+          ;; type specifier OR it is the otherwise-clause. They're equivalent, but
+          ;; EXPAND-STRUCT-TYPECASE has a certain expectation of how the normal and otherwise
+          ;; clauses look. I need to have CASE-BODY-AUX receive normal and otherwise
+          ;; clauses as separate args to clean up this ugliness.
           (destructuring-bind (keyoid &rest forms) clause
             (when (null forms)
               (setq forms '(nil)))
@@ -1483,9 +1488,7 @@ symbol-case giving up: case=((V U) (F))
                    (and (not errorp) ; possible only in CASE or TYPECASE,
                                         ; not in [EC]CASE or [EC]TYPECASE
                         (or (eq keyoid 'otherwise)
-                            ;; T in CASE heads an otherwise-clause, but in TYPECASE it's
-                            ;; merely a plain old type specifier - why wouldn't it be?
-                            (and (eq keyoid 't) (eq test 'eql))))
+                            (and (eq keyoid 't) (or (eq test 'eql) (not (cdr cases))))))
                    (cond ((null (cdr cases))
                           (push `(t ,@forms) clauses))
                          ((eq name 'case)
@@ -1573,6 +1576,8 @@ symbol-case giving up: case=((V U) (F))
                 (bug "TYPECASE expander glitch"))
               (let* ((spec (second type-expr))
                      (clause-keys
+                      ;; TODO: call TYPEXPAND to find more situations where
+                      ;; TYPECASE could be optimized into CASE over symbols.
                       (case (if (listp spec) (car spec))
                         (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
                         (member (when (proper-list-p (cdr spec)) (cdr spec)))

@@ -409,3 +409,7 @@
                           (t :good)
                           (otherwise :bad)))
           '(:good :good :good :good))))
+
+(with-test (:name :typecase-nonfinal-otherwise-errs)
+  (assert-error
+   (macroexpand-1 '(typecase x (cons 1) (otherwise 2) (t 3)))))
