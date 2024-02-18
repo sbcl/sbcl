@@ -1193,3 +1193,16 @@
        (b)
        (b)))
    integer))
+
+(with-test (:name :set-vars-equal)
+  (assert-type
+   (lambda (a)
+     (incf a 10)
+     (eq a (progn (loop repeat a do (print 20)) a)))
+   (eql t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (logxor (unwind-protect a (setq a 7)) a))
+  ((0) 7)
+  ((7) 0)))

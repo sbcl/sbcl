@@ -1386,9 +1386,11 @@
   (ctype-constraints nil :type (or null hash-table))
   (eq-constraints    nil :type (or null hash-table))
   ;; sorted sets of constraints we like to iterate over
-  (eql-var-constraints     nil :type (or null (array t 1)))
-  (inheritable-constraints nil :type (or null (array t 1)))
-  (equality-constraints    nil :type (or null (array t 1)))
+  (eql-var-constraints     nil :type (or null (vector t)))
+  (inheritable-constraints nil :type (or null (vector t)))
+  (equality-constraints    nil :type (or null (vector t)))
+
+  (value-id-constraints    nil :type (or null (vector t)))
 
   source-form)
 (defprinter (lambda-var :identity t)
@@ -1430,7 +1432,10 @@
   ;; The leaf referenced.
   (leaf nil :type leaf)
   ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
-  (%source-name (missing-arg) :type symbol :read-only t))
+  (%source-name (missing-arg) :type symbol :read-only t)
+  ;; After constraints two refs with same mask refer to the same value
+  ;; when a lambda-var has sets.
+  (var-id-mask -1 :type integer))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
@@ -1464,7 +1469,9 @@
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
-  (value (missing-arg) :type lvar))
+  (value (missing-arg) :type lvar)
+  ;; For constraints
+  (id 0 :type integer))
 (defprinter (cset :conc-name set- :identity t)
   var
   (value :prin1 (lvar-uses value)))

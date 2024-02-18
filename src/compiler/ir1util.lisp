@@ -2496,42 +2496,14 @@ is :ANY, the function name is not checked."
                (ref-p y-use)
                (eq (ref-leaf x-use) (ref-leaf y-use))
                (or (constant-reference-p x-use)
-                   (and (lambda-var-p (ref-leaf x-use))
-                        (or (refs-unchanged-p x-use y-use)
-                            (refs-unchanged-p y-use x-use)))))
+                   (refs-unchanged-p x-use y-use)))
       y-use)))
 
 (defun refs-unchanged-p (ref1 ref2)
-  (block nil
-    (let ((node ref1))
-      (let (ctran)
-        (tagbody
-         :next
-           (setf ctran (node-prev node))
-           (setf node (ctran-use ctran))
-         :next-node
-           (when (eq node ref2)
-             (return t))
-           (typecase node
-             (ref)
-             (cast)
-             (enclose)
-             (cif)
-             (combination
-              (unless (flushable-combination-p node)
-                (return)))
-             (null
-              (let* ((block (ctran-block ctran))
-                     (pred (block-pred block)))
-                (when (or (null pred)
-                          (cdr pred)
-                          (not (only-harmless-cleanups (car pred) block)))
-                  (return))
-                (setf node (block-last (car pred)))
-                (go :next-node)))
-             (t
-              (return)))
-           (go :next))))))
+  (let ((mask (ref-var-id-mask ref1)))
+    (and (> mask 0)
+         (eq mask
+             (ref-var-id-mask ref2)))))
 
 
 ;;; Return true if VAR would have to be closed over if environment
