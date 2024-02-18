@@ -1446,14 +1446,14 @@ symbol-case giving up: case=((V U) (F))
 ;;; and gets the compiled code that the host produced in make-host-1.
 ;;; If recompiled, you do not want an interpreted definition that might come
 ;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
-(defun case-body (name keyform cases test errorp)
-  (unless (or cases (not errorp))
+(defun case-body (name keyform specified-clauses test errorp)
+  (unless (or specified-clauses (not errorp))
     (warn "no clauses in ~S" name))
   (let ((keyform-value (gensym))
         (clauses ())
         (keys ())
         (keys-seen (make-hash-table :test #'eql)))
-    (do* ((cases cases (cdr cases))
+    (do* ((cases specified-clauses (cdr cases))
           (clause (car cases) (car cases))
           (case-position 1 (1+ case-position)))
          ((null cases) nil)
@@ -1522,6 +1522,15 @@ symbol-case giving up: case=((V U) (F))
                            ,@forms)
                          clauses))
                   (t
+                   (when (and (eq test 'typep) (eq keyoid t))
+                     ;; - if ERRORP is nil and there are more clauses, this shadows them,
+                     ;;   which seems suspicious and worth style-warning for.
+                     ;; - if ERRORP is non-nil, though this isn't technically an "otherwise"
+                     ;;   clause, in acts just like one.
+                     (if errorp
+                         (setq errorp :none)
+                         (style-warn "T clause in ~S makes subsequent clauses unreachable:~%~S"
+                                     name specified-clauses)))
                    (push keyoid keys)
                    (check-clause (list keyoid))
                    (push `((,test ,keyform-value ',keyoid) ,@forms)
@@ -1531,6 +1540,8 @@ symbol-case giving up: case=((V U) (F))
                               (unless (member (car tail) (cdr tail))
                                 (list (car tail))))
                             keys)))
+    (when (eq errorp :none)
+      (setq errorp nil))
     (case-body-aux name keyform keyform-value clauses keys errorp
                    ;; Construct a type specifier
                    `(,(if (eq test 'eql) 'member 'or) ,@keys))))

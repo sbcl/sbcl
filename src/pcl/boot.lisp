@@ -1185,8 +1185,8 @@ bootstrapping.
                    `(,type
                      (,function-name
                       proto-generic-function proto-method specializer))))
-               '(specializer symbol t class-eq-specializer eql-specializer
-                 structure-class system-class class)))))
+               '(specializer symbol t #|class-eq-specializer eql-specializer
+                 structure-class system-class class|#)))))
     (delegations)))
 
 (unless (fboundp 'specializer-type-specifier)
