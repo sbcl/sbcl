@@ -1570,18 +1570,35 @@ many elements are copied."
       (list
        (let ((node result-sequence))
          (declare (type list node))
-         (map-into-lambda sequences (&rest args)
-           (declare (dynamic-extent args))
-           (cond ((null node)
-                  (return-from map-into result-sequence))
-                 ((not (listp (cdr node)))
-                  (error 'simple-type-error
-                         :format-control "~a is not a proper list"
-                         :format-arguments (list result-sequence)
-                         :expected-type 'list
-                         :datum result-sequence)))
-           (setf (car node) (apply really-fun args))
-           (setf node (cdr node)))))
+         (if (and (= (length sequences) 1)
+                  (eq result-sequence (car sequences)))
+             (let ((list result-sequence))
+               (loop (typecase list
+                       (cons
+                        (setf (car list)
+                              (funcall really-fun (car list))))
+                       (null
+                        (return))
+                       (t
+                        (error 'simple-type-error
+                               :format-control "~a is not a proper list"
+                               :format-arguments (list result-sequence)
+                               :expected-type 'list
+                               :datum result-sequence)))
+                     (pop list))
+               result-sequence)
+             (map-into-lambda sequences (&rest args)
+               (declare (dynamic-extent args))
+               (cond ((null node)
+                      (return-from map-into result-sequence))
+                     ((not (listp (cdr node)))
+                      (error 'simple-type-error
+                             :format-control "~a is not a proper list"
+                             :format-arguments (list result-sequence)
+                             :expected-type 'list
+                             :datum result-sequence)))
+               (setf (car node) (apply really-fun args))
+               (setf node (cdr node))))))
       (sequence
        (multiple-value-bind (iter limit from-end step endp elt set)
            (sb-sequence:make-sequence-iterator result-sequence)
