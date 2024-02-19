@@ -1487,18 +1487,31 @@
                    (pushnew (constraint-x con) vars))
                  (when (and (eq kind 'equality)
                             (/= (equality-constraint-amount con) 0))
-                   (pushnew (constraint-x con) equality-vars)
+                   (pushnew (constraint-x con) equality-vars :test #'eq)
                    (when (lambda-var/vector-length-p y)
                      (pushnew y equality-vars)))
                  (when (eq kind 'var-value)
-                   (push (constraint-x con) var-values))))))
-      (if predecessor-outs
-          (find-vars (car predecessor-outs))
-          (dolist (pred predecessors)
-            (let ((out (block-out-for-successor pred block)))
-              (when out
-                (find-vars out)
-                (return))))))
+                   (push (constraint-x con) var-values)))))
+           (find-var-values (out)
+             (do-conset-elements (con out)
+               (when (eq (constraint-kind con) 'var-value)
+                 (pushnew (constraint-x con) var-values :test #'eq)))))
+      (cond (predecessor-outs
+             (find-vars (car predecessor-outs))
+             ;; KLUDGE: var-values may not be on all predecessors
+             (mapc #'find-var-values (cdr predecessor-outs)))
+            (t
+             (loop for (pred . rest) on predecessors
+                   do
+                   (let ((out (block-out-for-successor pred block)))
+                     (when out
+                       (find-vars out)
+                       (loop for pred in rest
+                             do
+                             (let ((out (block-out-for-successor pred block)))
+                               (when out
+                                 (find-var-values out))))
+                       (return)))))))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
         (flet ((compute-type (out)
@@ -1550,6 +1563,8 @@
                     (join out))))))
     (do-conset-constraints-intersection (con (in
                                               (lambda-var-value-id-constraints var)))
+      (when (= (constraint-y con) mask)
+        (return-from join-var-value-constraints))
       (conset-delete con in))
     (conset-add-constraint in 'var-value var mask nil)))
 

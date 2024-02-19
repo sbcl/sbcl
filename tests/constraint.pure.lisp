@@ -1208,7 +1208,6 @@
   ((7) 0)))
 
 (with-test (:name :set-vars-equal-leaf-change)
-
   (checked-compile-and-assert
    ()
    `(lambda (b)
@@ -1217,3 +1216,15 @@
         (decf c (shiftf b b))))
    ((3) -2)
    ((-4) 5)))
+
+(with-test (:name :all-var-values)
+  (checked-compile
+   `(lambda (c)
+      (declare (optimize (safety 0)))
+      (loop for lv3 below 1
+            do
+            (loop for lv4 below 3
+                  sum (progv nil nil
+                        (setq c 1000)))
+            (unless (eq  lv3 -1)
+              (the integer (catch 'ct4 16385)))))))
