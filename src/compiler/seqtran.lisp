@@ -380,9 +380,10 @@
              (let ((saetp (find-saetp-by-ctype (array-type-specialized-element-type result-type))))
                (unless saetp
                  (give-up-ir1-transform "Uknown upgraded array element type of the result"))
-               `(progn (apply #',(mapper-from-typecode (sb-vm:saetp-typecode saetp))
-                              result 0 (length result) (%coerce-callable-to-fun fun) seqs)
-                       result)))
+               `(lambda (result fun ,@seqs-names)
+                  (,(mapper-from-typecode (sb-vm:saetp-typecode saetp))
+                   result 0 (length result) (%coerce-callable-to-fun fun) ,@seqs-names)
+                  result)))
             (t
              (%give-up))))))
 

@@ -1557,58 +1557,57 @@ many elements are copied."
 ;;; safety is turned off for vectors and lists but kept for generic
 ;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
-  (declare (dynamic-extent function))
+  (declare (dynamic-extent function)
+           (explicit-check))
   (let ((really-fun (%coerce-callable-to-fun function)))
-    (etypecase result-sequence
-      (vector
-       (with-array-data ((data result-sequence) (start) (end)
-                         ;; MAP-INTO ignores fill pointer when mapping
-                         :check-fill-pointer nil)
-         (let ((new-end (vector-map-into data start end really-fun sequences)))
-           (when (array-has-fill-pointer-p result-sequence)
-             (setf (fill-pointer result-sequence) (- new-end start))))))
-      (list
-       (let ((node result-sequence))
-         (declare (type list node))
-         (if (and (= (length sequences) 1)
-                  (eq result-sequence (car sequences)))
-             (let ((list result-sequence))
-               (loop (typecase list
-                       (cons
-                        (setf (car list)
-                              (funcall really-fun (car list))))
-                       (null
-                        (return))
-                       (t
-                        (error 'simple-type-error
-                               :format-control "~a is not a proper list"
-                               :format-arguments (list result-sequence)
-                               :expected-type 'list
-                               :datum result-sequence)))
-                     (pop list))
-               result-sequence)
-             (map-into-lambda sequences (&rest args)
-               (declare (dynamic-extent args))
-               (cond ((null node)
-                      (return-from map-into result-sequence))
-                     ((not (listp (cdr node)))
-                      (error 'simple-type-error
-                             :format-control "~a is not a proper list"
-                             :format-arguments (list result-sequence)
-                             :expected-type 'list
-                             :datum result-sequence)))
-               (setf (car node) (apply really-fun args))
-               (setf node (cdr node))))))
-      (sequence
-       (multiple-value-bind (iter limit from-end step endp elt set)
-           (sb-sequence:make-sequence-iterator result-sequence)
-         (declare (ignore elt) (type function step endp set))
-         (map-into-lambda sequences (&rest args)
-           (declare (dynamic-extent args) (optimize speed))
-           (when (funcall endp result-sequence iter limit from-end)
-             (return-from map-into result-sequence))
-           (funcall set (apply really-fun args) result-sequence iter)
-           (setf iter (funcall step result-sequence iter from-end)))))))
+    (block nil
+      (etypecase result-sequence
+        (vector
+         (with-array-data ((data result-sequence) (start) (end)
+                           ;; MAP-INTO ignores fill pointer when mapping
+                           :check-fill-pointer nil)
+           (let ((new-end (truly-the index (vector-map-into data start end really-fun sequences))))
+             (when (array-has-fill-pointer-p result-sequence)
+               (setf (%array-fill-pointer result-sequence)
+                     (truly-the index (- new-end start)))))))
+        (list
+         (let ((node result-sequence))
+           (flet ((not-proper ()
+                    (error 'simple-type-error
+                           :format-control "~a is not a proper list"
+                           :format-arguments (list result-sequence)
+                           :expected-type 'list
+                           :datum result-sequence)))
+             (if (and (= (length sequences) 1)
+                      (eq result-sequence (car sequences)))
+                 (let ((list result-sequence))
+                   (loop (typecase list
+                           (null
+                            (return))
+                           (cons
+                            (setf (car list)
+                                  (funcall really-fun (car list))))
+                           (t
+                            (not-proper)))
+                         (pop list)))
+                 (map-into-lambda sequences (&rest args)
+                   (declare (dynamic-extent args))
+                   (cond ((null node)
+                          (return))
+                         ((atom node)
+                          (not-proper)))
+                   (setf (car node) (apply really-fun args))
+                   (setf node (cdr node)))))))
+        (sequence
+         (multiple-value-bind (iter limit from-end step endp elt set)
+             (sb-sequence:make-sequence-iterator result-sequence)
+           (declare (ignore elt) (type function step endp set))
+           (map-into-lambda sequences (&rest args)
+             (declare (dynamic-extent args) (optimize speed))
+             (when (funcall endp result-sequence iter limit from-end)
+               (return))
+             (funcall set (apply really-fun args) result-sequence iter)
+             (setf iter (funcall step result-sequence iter from-end))))))))
   result-sequence)
 
 ;;;; REDUCE
