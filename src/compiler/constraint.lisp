@@ -53,6 +53,7 @@
 (declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
 (defvar *blocks-to-terminate*)
+(defvar *set-vars*)
 
 (defstruct (vector-length-constraint
             (:constructor make-vector-length-constraint (var))
@@ -1442,6 +1443,7 @@
                            (not (closure-var-p var)))
                    (setf (lambda-var-constraints var) (make-conset))
                    (when (lambda-var-sets var)
+                     (push var *set-vars*)
                      (setf (lambda-var-value-id-constraints var)
                            (make-array (length (lambda-var-sets var))
                                        :fill-pointer 0
@@ -1492,25 +1494,34 @@
                      (pushnew y equality-vars)))
                  (when (eq kind 'var-value)
                    (push (constraint-x con) var-values)))))
-           (find-var-values (out)
-             (do-conset-elements (con out)
-               (when (eq (constraint-kind con) 'var-value)
-                 (pushnew (constraint-x con) var-values :test #'eq)))))
+           (find-var-values (var out)
+             (do-conset-constraints-intersection (con (out
+                                                       (lambda-var-value-id-constraints var)))
+               (declare (ignore con))
+               (push var var-values)
+               (return-from find-var-values))))
       (cond (predecessor-outs
              (find-vars (car predecessor-outs))
              ;; KLUDGE: var-values may not be on all predecessors
-             (mapc #'find-var-values (cdr predecessor-outs)))
+             (loop for var in *set-vars*
+                   unless (memq var var-values)
+                   do
+                   (loop for out in (cdr predecessor-outs)
+                         do (find-var-values var out))))
             (t
              (loop for (pred . rest) on predecessors
                    do
                    (let ((out (block-out-for-successor pred block)))
                      (when out
                        (find-vars out)
-                       (loop for pred in rest
+                       (loop for var in *set-vars*
+                             unless (memq var var-values)
                              do
-                             (let ((out (block-out-for-successor pred block)))
-                               (when out
-                                 (find-var-values out))))
+                             (loop for pred in rest
+                                   do
+                                   (let ((out (block-out-for-successor pred block)))
+                                     (when out
+                                       (find-var-values var out)))))
                        (return)))))))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
@@ -1700,19 +1711,20 @@
 
 (defun constraint-propagate (component)
   (declare (type component component))
-  (init-var-constraints component)
-  ;; Previous results can confuse propagation and may loop forever
-  (do-blocks (block component)
-    (setf (block-out block) nil)
-    (let ((last (block-last block)))
-      (when (if-p last)
-        (setf (if-alternative-constraints last) nil)
-        (setf (if-consequent-constraints last) nil))))
-  (setf (block-out (component-head component)) (make-conset))
-  (let (*blocks-to-terminate*)
-    (dolist (block (find-and-propagate-constraints component))
-      (unless (block-delete-p block)
-        (use-result-constraints block)))
-    (loop for node in *blocks-to-terminate*
-          do (maybe-terminate-block node nil)))
+  (let (*set-vars*)
+    (init-var-constraints component)
+    ;; Previous results can confuse propagation and may loop forever
+    (do-blocks (block component)
+      (setf (block-out block) nil)
+      (let ((last (block-last block)))
+        (when (if-p last)
+          (setf (if-alternative-constraints last) nil)
+          (setf (if-consequent-constraints last) nil))))
+    (setf (block-out (component-head component)) (make-conset))
+    (let (*blocks-to-terminate*)
+      (dolist (block (find-and-propagate-constraints component))
+        (unless (block-delete-p block)
+          (use-result-constraints block)))
+      (loop for node in *blocks-to-terminate*
+            do (maybe-terminate-block node nil))))
   (values))
