@@ -387,6 +387,28 @@
             (t
              (%give-up))))))
 
+(deftransform map-into ((result fun &rest sequences)
+                        (list &rest t)
+                        * :policy (>= speed space))
+  (if sequences
+      (let ((seqs-names (make-gensym-list (length sequences))))
+        `(lambda (result fun ,@seqs-names)
+           (let ((node result))
+             (block nil
+               (%map nil (lambda (,@seqs-names)
+                           (when (endp node)
+                             (return))
+                           (setf (car node) (funcall fun ,@seqs-names))
+                           (setf node (cdr node)))
+                     ,@seqs-names))
+             result)))
+      `(let ((node result))
+         (loop (when (endp node)
+                 (return))
+               (setf (car node) (funcall fun))
+               (setf node (cdr node)))
+         result)))
+
 
 ;;; FIXME: once the confusion over doing transforms with known-complex
 ;;; arrays is over, we should also transform the calls to (AND (ARRAY
