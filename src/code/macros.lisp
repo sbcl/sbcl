@@ -1446,16 +1446,18 @@ symbol-case giving up: case=((V U) (F))
 ;;; and gets the compiled code that the host produced in make-host-1.
 ;;; If recompiled, you do not want an interpreted definition that might come
 ;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
-(defun case-body (name keyform specified-clauses test errorp)
-  (unless (or specified-clauses (not errorp))
-    (warn "no clauses in ~S" name))
-  (let ((keyform-value (gensym))
-        (clauses ())
-        (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
-        (keys ())
-        (keys-seen (make-hash-table :test #'eql)))
+(defun case-body (whole lexenv test errorp
+                  &aux (keyform-value (gensym))
+                       (clauses ())
+                       (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
+                       (keys))
+  (declare (ignore lexenv)) ; for future use, i.e. testing CONSTANTP on all result forms
+  (destructuring-bind (name keyform &rest specified-clauses) whole
+    (unless (or (cdr whole) (not errorp))
+      (warn "no clauses in ~S" name))
     (do* ((cases specified-clauses (cdr cases))
           (clause (car cases) (car cases))
+          (keys-seen (make-hash-table :test #'eql))
           (case-position 1 (1+ case-position)))
          ((null cases) nil)
       (flet ((check-clause (case-keys)
@@ -1623,42 +1625,48 @@ symbol-case giving up: case=((V U) (F))
             (return-from etypecase-error-spec `',unparsed))))))
   `',types)
 
-(sb-xc:defmacro case (keyform &body cases)
+(sb-xc:defmacro case (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "CASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If a singleton key is T then the clause is a default clause."
-  (case-body 'case keyform cases 'eql nil))
+  (case-body form env 'eql nil))
 
-(sb-xc:defmacro ccase (keyform &body cases)
+(sb-xc:defmacro ccase (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "CCASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then a correctable error is
   signalled."
-  (case-body 'ccase keyform cases 'eql 'cerror))
+  (case-body form env 'eql 'cerror))
 
-(sb-xc:defmacro ecase (keyform &body cases)
+(sb-xc:defmacro ecase (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "ECASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then an error is signalled."
-  (case-body 'ecase keyform cases 'eql 'error))
+  (case-body form env 'eql 'error))
 
-(sb-xc:defmacro typecase (keyform &body cases)
+(sb-xc:defmacro typecase (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "TYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true."
-  (case-body 'typecase keyform cases 'typep nil))
+  (case-body form env 'typep nil))
 
-(sb-xc:defmacro ctypecase (keyform &body cases)
+(sb-xc:defmacro ctypecase (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "CTYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then a correctable error is signalled."
-  (case-body 'ctypecase keyform cases 'typep 'cerror))
+  (case-body form env 'typep 'cerror))
 
-(sb-xc:defmacro etypecase (keyform &body cases)
+(sb-xc:defmacro etypecase (&whole form &environment env &rest r)
+  (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))
   "ETYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then an error is signalled."
-  (case-body 'etypecase keyform cases 'typep 'error))
+  (case-body form env 'typep 'error))
 
 ;;; Compile a version of BODY for all TYPES, and dispatch to the
 ;;; correct one based on the value of VAR. This was originally used
