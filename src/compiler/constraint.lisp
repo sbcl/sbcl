@@ -211,6 +211,7 @@
       (%conset-grow conset new-size))
     (values))
 
+  (declaim (inline conset-member))
   (defun conset-member (constraint conset)
     (let ((number (%constraint-number constraint))
           (vector (conset-vector conset)))
@@ -473,9 +474,14 @@
                 ,@body))
          (when ,constraints
            (let ((,min (conset-min ,conset))
-                 (,max (conset-max ,conset)))
-             (loop for constraint across ,constraints
-                   do (let ((number (constraint-number (the constraint constraint))))
+                 (,max (conset-max ,conset))
+                 (vector #-sb-xc-host (truly-the simple-vector (%array-data ,constraints))
+                          #+sb-xc-host ,constraints))
+             #-sb-xc-host
+             (declare (optimize (insert-array-bounds-checks 0)))
+             (loop for i below (length ,constraints)
+                   for constraint = (aref vector i)
+                   do (let ((number (truly-the index (constraint-number (truly-the constraint constraint)))))
                         (when (and (<= ,min number)
                                    (< number ,max)
                                    (conset-member constraint ,conset))
