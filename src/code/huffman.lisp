@@ -135,11 +135,24 @@
   #+c-stack-is-control-stack
   `(dx-let ((,varname (make-array longest-unicode-char-name :element-type 'base-char)))
      ,form)
+
   #-c-stack-is-control-stack
-  `(let ((,varname (or (sb-ext:atomic-pop *name->char-buffers*)
-                       (make-array longest-unicode-char-name :element-type 'base-char))))
-     (prog1 ,form
-       (sb-ext:atomic-push ,varname *name->char-buffers*))))
+  (sb-c::if-vop-existsp (:named sb-vm::allocate-vector-on-number-stack)
+     (let ((nsp (gensym "NSP")))
+       `(let ((,nsp (sb-sys:%primitive sb-c:current-nsp)))
+          (sb-c::restoring-nsp ,nsp
+                               (let ((,varname (sb-ext:truly-the
+                                                (simple-base-string ,longest-unicode-char-name)
+                                                (sb-sys:%primitive sb-vm::allocate-vector-on-number-stack
+                                                                   sb-vm:simple-base-string-widetag
+                                                                   longest-unicode-char-name
+                                                                   (1+ (/ longest-unicode-char-name
+                                                                          (/ sb-vm:n-word-bits sb-vm:n-byte-bits)))))))
+                                 ,form))))
+     `(let ((,varname (or (sb-ext:atomic-pop *name->char-buffers*)
+                          (make-array longest-unicode-char-name :element-type 'base-char))))
+        (prog1 ,form
+          (sb-ext:atomic-push ,varname *name->char-buffers*)))))
 
 (defun huffman-decode (bits start nbits tree output)
   (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)

@@ -70,3 +70,31 @@
   (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
   (inst cmp temp words)
   (inst b :lt LOOP))
+
+(define-assembly-routine (allocate-vector-on-number-stack
+                          (:policy :fast-safe)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+    ((:arg type any-reg r0-offset)
+     (:arg length any-reg r1-offset)
+     (:arg words any-reg r2-offset)
+     (:res result descriptor-reg r0-offset)
+
+     (:temp temp non-descriptor-reg nl0-offset))
+  (inst lsr temp type n-fixnum-tag-bits)
+  (inst lsl words words (- word-shift n-fixnum-tag-bits))
+  (inst add words words (* (1+ vector-data-offset) n-word-bytes))
+  (inst and words words (bic-mask lowtag-mask)) ; double-word align
+
+  (inst sub nsp-tn nsp-tn (extend words :lsl 0)) ;; to make go to SP instead of ZR.
+  (inst mov-sp tmp-tn nsp-tn)
+  (inst add result tmp-tn other-pointer-lowtag)
+
+  ;; Zero fill
+  (inst add words tmp-tn words)
+  LOOP
+  (inst stp zr-tn zr-tn (@ words (- (* n-word-bytes 2)) :pre-index))
+  (inst cmp words tmp-tn)
+  (inst b :gt LOOP)
+  (inst stp temp length (@ tmp-tn)))
