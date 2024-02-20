@@ -23,29 +23,32 @@
 ;;; a "#." so that the defining form remains toplevel.
 ;;; If called with OPTIMISTIC = T then we're trying to return NIL or T
 ;;; from the VOP-EXISTSP macroexpander, and if NIL then we decide later.
-#-(and sb-xc (not sb-devel))
-(progn
-  (defvar *vop-not-existsp* nil)
+#-sb-xc
+(defvar *vop-not-existsp* nil)
   ;;; This function is invoked after compiling the cross-compiler
   ;;; before quitting the image, and when loading it from compiled fasls
   ;;; (because toplevel forms might use %VOP-EXISTSP at any time).
-  (defun %vop-existsp (name query &optional optimistic)
-    (declare (notinline info fun-info-templates))
-    (let ((answer
-           (not (null (ecase query
-                        (:named
-                         (gethash name *backend-template-names*))
-                        (:translate
-                         (let ((info (info :function :info name)))
-                           (when info
-                             (fun-info-templates info)))))))))
-      ;; Negatives won't be stored in the journal in optimistic mode.
-      (when (and (not answer) (not optimistic))
-        (pushnew (cons name query) *vop-not-existsp* :test 'equal))
-      answer))
-  (defun check-vop-existence-correctness ()
-    (dolist (entry *vop-not-existsp*)
-      (assert (not (%vop-existsp (car entry) (cdr entry)))))))
+(defun %vop-existsp (name query &optional optimistic)
+  (declare (notinline info fun-info-templates)
+           #+sb-xc (ignore optimistic))
+  (let ((answer
+          (not (null (ecase query
+                       (:named
+                        (gethash name *backend-template-names*))
+                       (:translate
+                        (let ((info (info :function :info name)))
+                          (when info
+                            (fun-info-templates info)))))))))
+    ;; Negatives won't be stored in the journal in optimistic mode.
+    #-sb-xc
+    (when (and (not answer) (not optimistic))
+      (pushnew (cons name query) *vop-not-existsp* :test 'equal))
+    answer))
+
+#-sb-xc
+(defun check-vop-existence-correctness ()
+  (dolist (entry *vop-not-existsp*)
+    (assert (not (%vop-existsp (car entry) (cdr entry))))))
 
 (defmacro vop-existsp (query name)
   #+sb-xc-host
