@@ -1481,8 +1481,7 @@ is replaced with replacement."
     (handler-case (progn
                     (terpri)
                     (terpri)
-                    ;; (do-conset-elements (con (block-in block))
-                    ;;   (print-constraint con kind))
+                    ;(print-conset (block-in block) kind)
                     (print-nodes block)
                     (let ((last (block-last block)))
                       (cond ((if-p last)

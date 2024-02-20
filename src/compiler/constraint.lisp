@@ -182,6 +182,10 @@
     (min 0 :type fixnum)
     (max 0 :type fixnum))
 
+  #+sb-devel
+  (defprinter (conset)
+    vector)
+
   (defun conset-empty (conset)
     (or (= (conset-min conset) (conset-max conset))
         (not (find 1 (conset-vector conset)
@@ -1447,17 +1451,18 @@
                             (lambda-var-no-constraints var))
                   (when (or (null (lambda-var-sets var))
                             (not (closure-var-p var)))
-                    (setf (lambda-var-constraints var) (make-conset))
-                    (when (lambda-var-sets var)
-                      (setf (lambda-var-value-id-constraints var)
-                            (make-array (length (lambda-var-sets var))
-                                        :fill-pointer 0
-                                        :adjustable t))
-                      (loop for set in (lambda-var-sets var)
-                            for id = 2 then (ash id 1)
-                            do (setf (set-id set) id))
-                      ;; join-type-constraints needs to find a var-value on any branch.
-                      (conset-add-constraint head-out 'var-value var 0 nil)))))))
+                    (setf (lambda-var-constraints var) (make-conset))))
+                (when (and (lambda-var-constraints var)
+                           (lambda-var-sets var))
+                  (setf (lambda-var-value-id-constraints var)
+                        (make-array (length (lambda-var-sets var))
+                                    :fill-pointer 0
+                                    :adjustable t))
+                  (loop for set in (lambda-var-sets var)
+                        for id = 2 then (ash id 1)
+                        do (setf (set-id set) id))
+                  ;; join-type-constraints needs to find a var-value on any branch.
+                  (conset-add-constraint head-out 'var-value var 0 nil)))))
        (frob fun)
        (dolist (let (lambda-lets fun))
          (frob let))))))
