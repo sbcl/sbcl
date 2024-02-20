@@ -1834,6 +1834,11 @@ bootstrapping.
     (load-defmethod-internal class name quals specls
                              ll initargs source-location)))
 
+(define-condition find-method-length-mismatch
+    (reference-condition simple-error)
+  ()
+  (:default-initargs :references '((:ansi-cl :function find-method))))
+
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
                   initargs source-location)

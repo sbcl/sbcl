@@ -249,11 +249,6 @@
       (add-method generic-function new)
       new)))
 
-(define-condition find-method-length-mismatch
-    (reference-condition simple-error)
-  ()
-  (:default-initargs :references '((:ansi-cl :function find-method))))
-
 (defun real-get-method (generic-function qualifiers specializers
                         &optional (errorp t)
                                   always-check-specializers)
