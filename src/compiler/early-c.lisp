@@ -111,12 +111,11 @@
                           :element-type 'bit :initial-element 0))
         (f #-sb-xc-host (compile nil lambda)
            #+sb-xc-host
-           ;; Remove the DECLARE:
-           ;;   (declare (optimize (safety 0) (sb-c:store-source-form 0)))
-           (let ((third (third lambda)))
-             (assert (eq (car third) 'declare))
-             (let ((new `(lambda ,(second lambda) ,@(cdddr lambda))))
-               (compile nil new)))))
+           ;; Remove OPTIMIZE decls. Expressions passed to this function are largely
+           ;; boilerplate that never match random stuff like (LET ((OPTIMIZE ...)))
+           (compile nil (subst-if '(optimize)
+                                  (lambda (x) (typep x '(cons (eql optimize) (not null))))
+                                  lambda))))
     (loop for input across test-inputs
           do (let ((h (funcall f input)))
                (unless (zerop (bit seen h))
