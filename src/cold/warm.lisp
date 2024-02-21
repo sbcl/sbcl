@@ -109,8 +109,8 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                                 result))
                     (actual (multiple-value-list (apply fun (sb-int:ensure-list args)))))
                 (unless (equalp actual result)
-                  (#+sb-devel cerror #+sb-devel ""
-                   #-sb-devel format #-sb-devel t
+                  (#+sb-devel-xfloat cerror #+sb-devel-xfloat ""
+                   #-sb-devel-xfloat format #-sb-devel-xfloat t
                    "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
                    expr actual))))))))))
 

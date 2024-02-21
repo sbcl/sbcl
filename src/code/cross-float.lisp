@@ -263,8 +263,8 @@
                                      (native-flonum-value value)
                                      value))
                                values))
-          (#+sb-devel cerror #+sb-devel "Ignore"
-           #-sb-devel format #-sb-devel t
+          (#+sb-devel-xfloat cerror #+sb-devel-xfloat "Ignore"
+           #-sb-devel-xfloat format #-sb-devel-xfloat t
            "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
                   key values
