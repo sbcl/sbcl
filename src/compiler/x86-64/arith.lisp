@@ -3752,6 +3752,9 @@
                                     (values (fixnumize lo) (fixnumize hi))
                                     (values lo hi))
                               (cond
+                                ((= lo hi)
+                                 (inst cmp x (imm flo))
+                                 (change-vop-flags vop '(:e)))
                                 ((sb-c::interval-high<=n int hi)
                                  (change-vop-flags vop '(:ge))
                                  (inst cmp x (imm flo)))

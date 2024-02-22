@@ -445,3 +445,34 @@
    ((-1) 0)
    ((0) 0)
    ((1) 1)))
+
+(with-test (:name :or-chain-types)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (declare ((integer -1 1) b))
+      (case b
+        ((-1 0) 0)
+        (t 1)))
+   ((-1) 0)
+   ((0) 0)
+   ((1) 1)))
+
+(with-test (:name :range<=-same)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a c)
+      (declare (type fixnum a))
+      (let ((v7 (if c
+                    4611686018427387904
+                    -6)))
+        (if (> v7 a)
+            a
+            (if (<= a v7)
+                0
+                a))))
+    ((-21308853990870717 nil) -21308853990870717)
+    ((-21308853990870717 t) -21308853990870717)
+    ((-6 nil) 0)
+    ((-6 t) -6)
+    ((-3 nil) -3)))
