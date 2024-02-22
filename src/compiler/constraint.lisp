@@ -1228,8 +1228,7 @@
                       (pushnew ref *blocks-to-terminate*))))))))
   (let ((leaf (ref-leaf ref))) ;; may have been changed above
     (when (and (lambda-var-p leaf)
-               (lambda-var-sets leaf)
-               (lambda-var-constraints leaf))
+               (lambda-var-value-id-constraints leaf))
       (block nil
         (do-conset-constraints-intersection (con (in
                                                   (lambda-var-value-id-constraints leaf)))
@@ -1283,8 +1282,7 @@
             (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))
          (loop for var in (lambda-vars fun)
                when (and (lambda-var-p var)
-                         (lambda-var-sets var)
-                         (lambda-var-constraints var))
+                         (lambda-var-value-id-constraints var))
                do (do-conset-constraints-intersection (con (gen
                                                             (lambda-var-value-id-constraints var)))
                     (conset-delete con gen))
