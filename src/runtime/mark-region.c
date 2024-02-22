@@ -1041,14 +1041,11 @@ static void CPU_SPLIT scavenge_root_gens_worker(void) {
           case SIMPLE_VECTOR_WIDETAG:
           case WEAK_POINTER_WIDETAG: {
             /* Scavenge a page of a vector. */
-            if (page_starts_contiguous_block_p(i))
-              /* This page has the start of a large vector, and later pages
-               * will be part of this vector. */
-              source_object = (lispobj*)page_address(i);
-            /* The only time that page_address + page_words_used actually
-             * demarcates the end of a (sole) object on the page, with this
-             * heap layout. */
-            generation_index_t gen = page_table[i].gen;
+            source_object = (lispobj*)(page_address(i) - page_scan_start_offset(i));
+            dirty_generation_source = page_table[i].gen;
+            /* page_address(i) + page_words_used(i) only demarcates
+             * the end of a (sole) object on the page with this heap
+             * layout when the object is large. */
             lispobj *limit = (lispobj*)page_address(i) + page_words_used(i);
             lispobj *start = (lispobj*)page_address(i);
             for (int j = 0, card = addr_to_card_index(start);
@@ -1057,7 +1054,7 @@ static void CPU_SPLIT scavenge_root_gens_worker(void) {
               if (card_dirtyp(card)) {
                 lispobj *card_end = start + WORDS_PER_CARD;
                 lispobj *end = (limit < card_end) ? limit : card_end;
-                dirty_generation_source = gen, dirty = 0;
+                dirty = 0;
                 for (lispobj *p = start; p < end; p++)
                   mark(*p, p, SOURCE_NORMAL);
                 update_card_mark(card, dirty);
