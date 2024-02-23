@@ -4403,3 +4403,11 @@
     ((#'identity .0) (condition 'type-error))
     ((#'identity 1) 1)
     ((#'identity (expt 2 1000)) (condition 'type-error))))
+
+(with-test (:name :pop-values-unused)
+  (checked-compile-and-assert
+   ()
+   `(lambda (j l r)
+      (declare ((function (fixnum &rest t)) j))
+      (apply j l r))
+   ((#'+ 1 '(2)) 3)))

@@ -3222,10 +3222,12 @@ is :ANY, the function name is not checked."
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
                                           (let ((path (lvar-annotation-source-path annotation)))
-                                            (list
-                                             (if (eq (car path) 'original-source-start)
-                                                 (find-original-source path)
-                                                 (car path))))
+                                            (if (eq (car path) 'detail)
+                                                (second path)
+                                                (list
+                                                 (if (eq (car path) 'original-source-start)
+                                                     (find-original-source path)
+                                                     (car path)))))
                                           :condition condition))
           ((consp uses)
            (let ((condition (case condition

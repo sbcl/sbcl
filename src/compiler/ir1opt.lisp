@@ -2447,22 +2447,28 @@
                                                           '(&rest t))))
                             (lexenv-policy (node-lexenv call))
                             :mv-call)))
-      (let ((name (lvar-fun-name (basic-combination-fun call) t))
-            (policy (lexenv-policy (node-lexenv call))))
-        (map-combination-args-and-types
-         (lambda (arg type lvars &optional annotation)
-           (when (apply-type-annotation name arg type
-                                        lvars policy annotation)
-             (reoptimize-lvar arg)))
-         call
-         :defined-here t
-         :unknown-keys-fun (lambda (lvars)
-                             (dolist (lvar lvars)
-                               (unless (types-equal-or-intersect (lvar-type lvar)
-                                                                 (specifier-type 'symbol))
-                                 (setf (basic-combination-kind call) :error)
-                                 (compiler-warn "Argument of type ~s cannot be used as a keyword."
-                                                (type-specifier (lvar-type lvar)))))))))))
+      (map-combination-args-and-types
+       (lambda (arg type lvars &optional annotation)
+         (declare (ignore lvars annotation))
+         ;; This disturbs the order of stack pushes
+         ;; (when (apply-type-annotation name arg type
+         ;;                              lvars policy annotation)
+         ;;   (reoptimize-lvar arg))
+         (add-annotation arg
+                         (make-lvar-type-annotation :type type
+                                                    :source-path
+                                                    (list 'detail
+                                                          (lvar-all-sources arg)
+                                                          (node-source-path call)))))
+       call
+       :defined-here t
+       :unknown-keys-fun (lambda (lvars)
+                           (dolist (lvar lvars)
+                             (unless (types-equal-or-intersect (lvar-type lvar)
+                                                               (specifier-type 'symbol))
+                               (setf (basic-combination-kind call) :error)
+                               (compiler-warn "Argument of type ~s cannot be used as a keyword."
+                                              (type-specifier (lvar-type lvar))))))))))
 
 (defun ir1-optimize-mv-call (node)
   (let* ((fun (basic-combination-fun node))
