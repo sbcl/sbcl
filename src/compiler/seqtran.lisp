@@ -2969,31 +2969,36 @@
         ;; TRULY-THE around PHASH is warranted when CERTAINP because while the compiler can
         ;; derive the type of the final LOGAND, it's a complete mystery to it that the range
         ;; of the perfect hash is smaller than 2^N.
-        (let* ((key-expr (let ((key `(svref ,domain phash)))
-                           (if (eq alistp t)
-                               `(,(if (eq fun-name 'assoc) 'car 'cdr) ,key)
-                               key)))
-               ;; An unexpected symbol-hash fed into a minimal perfect hash function
-               ;; can produce garbage out, so we have to bounds-check it.
-               ;; Otherwise, with a non-minimal hash function, the table size is
-               ;; exactly right for the number of bits of output of the function
-               (test-expr `(eq ,key-expr item))
-               (hit-expr (if minimal `(and (< phash ,n) ,test-expr) test-expr)))
-          (note-perfect-hash-used
-           `(,fun-name ,conditional ,items)
-           `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
+        (note-perfect-hash-used
+         `(,fun-name ,conditional ,items)
+         `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
                                         ; return a _NAME_ hash in 32 bits, with a different
                                         ; vop to obtain pseudo-random stable hash bits,
                                         ; stored as two halves of the SYMBOL-HASH slot.
                             #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
                             #-x86-64 (if (symbolp item) (symbol-name-hash item) 0)))
-                   (phash (,lambda hash)))
-              ,(if certainp
-                   `(aref ,range (truly-the (mod ,n) phash))
-                   `(if ,hit-expr
-                        ,(cond (conditional) ; return whatever this expression is
-                               ((eq fun-name 'find) 'item)
-                               (t `(aref ,range phash))))))))))))
+                 (phash (,lambda hash)))
+            ,(if certainp
+                 `(aref ,range (truly-the (mod ,n) phash))
+                 (let* ((key-expr (if (eq alistp t)
+                                      `(,(if (eq fun-name 'assoc) 'car 'cdr) key)
+                                      'key))
+                        (expr `(let ((key (svref ,domain phash)))
+                                 (if (eq ,key-expr item)
+                                     ,(cond (conditional) ; return whatever this expression is
+                                            ((eq fun-name 'find) 'item)
+                                            ((eq range domain)
+                                             'key)
+                                            (t
+                                             `(aref ,range phash)))))))
+                   ;; An unexpected symbol-hash fed into a minimal perfect hash function
+                   ;; can produce garbage out, so we have to bounds-check it.
+                   ;; Otherwise, with a non-minimal hash function, the table size is
+                   ;; exactly right for the number of bits of output of the function
+                   (if minimal
+                       `(if (< phash ,n)
+                            ,expr)
+                       expr)))))))))
 
 (macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
