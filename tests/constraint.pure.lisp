@@ -1194,6 +1194,7 @@
        (b)))
    integer))
 
+#+var-value-constraints
 (with-test (:name :set-vars-equal)
   (assert-type
    (lambda (a)

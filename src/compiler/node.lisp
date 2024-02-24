@@ -1390,6 +1390,7 @@
   (inheritable-constraints nil :type (or null (vector t)))
   (equality-constraints    nil :type (or null (vector t)))
 
+  #+var-value-constraints
   (value-id-constraints    nil :type (or null (vector t)))
 
   source-form)
@@ -1435,6 +1436,7 @@
   (%source-name (missing-arg) :type symbol :read-only t)
   ;; After constraints two refs with same mask refer to the same value
   ;; when a lambda-var has sets.
+  #+var-value-constraints
   (var-id-mask -1 :type integer))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
@@ -1471,6 +1473,7 @@
   ;; LVAR for the value form
   (value (missing-arg) :type lvar)
   ;; For constraints
+  #+var-value-constraints
   (id 0 :type integer))
 (defprinter (cset :conc-name set- :identity t)
   var

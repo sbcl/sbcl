@@ -2499,6 +2499,24 @@ is :ANY, the function name is not checked."
                    (refs-unchanged-p x-use y-use)))
       y-use)))
 
+#-var-value-constraints
+(defun refs-unchanged-p (ref1 ref2)
+  (block nil
+    (let ((node ref1))
+      (tagbody
+       :next
+         (let ((ctran (node-next node)))
+           (when ctran
+             (setf node (ctran-next ctran))
+             (if (eq node ref2)
+                 (return t)
+                 (typecase node
+                   (ref
+                    (go :next))
+                   (cast
+                    (go :next))))))))))
+
+#+var-value-constraints
 (defun refs-unchanged-p (ref1 ref2)
   (let ((mask (ref-var-id-mask ref1)))
     (and (> mask 0)

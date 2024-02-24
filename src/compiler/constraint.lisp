@@ -60,7 +60,7 @@
   (var nil :type lambda-var :read-only t))
 
 (deftype constraint-y () '(or ctype lvar lambda-var constant
-                           vector-length-constraint integer))
+                           vector-length-constraint #+var-value-constraints integer))
 
 (defstruct (constraint
             (:include sset-element)
@@ -85,7 +85,7 @@
   ;; VAR-VALUE
   ;;     for tracking set lambda-var values.
   (kind nil :type (member typep < > = >= <= eql equality
-                          var-value))
+                          #+ nil var-value))
   ;; The operands to the relation.
   (x nil :type (or lambda-var vector-length-constraint))
   (y nil :type constraint-y)
@@ -343,6 +343,7 @@
          (let ((cache (gethash y it)))
            (declare (type list cache))
            (if not-p (cdr cache) (car cache)))))
+    #+var-value-constraints
     (integer
      (find y (lambda-var-value-id-constraints x) :key #'constraint-y))))
 
@@ -395,6 +396,7 @@
                          (ensure-vec (lambda-var-inheritable-constraints x))
                          (ensure-vec (lambda-var-eql-var-constraints x)))))
             (vector-push-extend con vec)))))
+      #+var-value-constraints
       (integer
        (vector-push-extend con (lambda-var-value-id-constraints x)))))
   nil)
@@ -1226,6 +1228,7 @@
                       ;; starting point which will propagate new
                       ;; constraints for each increment.
                       (pushnew ref *blocks-to-terminate*))))))))
+  #+var-value-constraints
   (let ((leaf (ref-leaf ref))) ;; may have been changed above
     (when (and (lambda-var-p leaf)
                (lambda-var-value-id-constraints leaf))
@@ -1280,6 +1283,7 @@
                      (add-var-result-constraints var val gen)))
            (:mv-let
             (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))
+         #+var-value-constraints
          (loop for var in (lambda-vars fun)
                when (and (lambda-var-p var)
                          (lambda-var-value-id-constraints var))
@@ -1333,6 +1337,7 @@
          (add-eq-constraint var (set-value node) gen)
          (when (node-lvar node)
            (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))
+         #+var-value-constraints
          (conset-add-constraint gen 'var-value var (set-id node) nil)))
       (combination
        (case (combination-kind node)
@@ -1441,7 +1446,8 @@
 ;;; hoping that vars stop being closed over or lose their sets.
 (defun init-var-constraints (component)
   (declare (type component component))
-  (let ((head-out (block-out (component-head component))))
+  (let (#+var-value-constraints
+        (head-out (block-out (component-head component))))
    (dolist (fun (component-lambdas component))
      (flet ((frob (x)
               (dolist (var (lambda-vars x))
@@ -1450,6 +1456,7 @@
                   (when (or (null (lambda-var-sets var))
                             (not (closure-var-p var)))
                     (setf (lambda-var-constraints var) (make-conset))))
+                #+var-value-constraints
                 (when (and (lambda-var-constraints var)
                            (lambda-var-sets var))
                   (setf (lambda-var-value-id-constraints var)
@@ -1484,6 +1491,7 @@
   (let ((vars '())
         (equality-vars)
         (predecessors (block-pred block))
+        #+var-value-constraints
         (var-values))
     (flet ((find-vars (out)
              (do-conset-elements (con out)
@@ -1502,12 +1510,13 @@
                    (pushnew (constraint-x con) equality-vars :test #'eq)
                    (when (lambda-var/vector-length-p y)
                      (pushnew y equality-vars)))
+                 #+var-value-constraints
                  (when (eq kind 'var-value)
                    (push (constraint-x con) var-values))))))
       (cond (predecessor-outs
              (find-vars (car predecessor-outs)))
             (t
-             (loop for (pred . rest) on predecessors
+             (loop for pred in predecessors
                    do
                    (let ((out (block-out-for-successor pred block)))
                      (when out
@@ -1539,6 +1548,7 @@
                          in))))
     (dolist (var equality-vars)
       (join-equality-constraints var block in))
+    #+var-value-constraints
     (dolist (var var-values)
       (join-var-value-constraints var block in predecessor-outs))))
 
@@ -1547,6 +1557,7 @@
 ;;; Each CSET resets all constraints, including VAR-VALUE, and adds a constraint with its bit-mask.
 ;;; Multiple predecessors OR their masks into a single integer.
 ;;; When two refs have the same mask then their values are unchanged.
+#+var-value-constraints
 (defun join-var-value-constraints (var block in predecessor-outs)
   (do-conset-constraints-intersection (con (in
                                             (lambda-var-value-id-constraints var)))
