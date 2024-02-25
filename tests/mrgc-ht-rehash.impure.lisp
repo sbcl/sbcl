@@ -23,10 +23,10 @@
       ;; but might fail sooner.
       (compile-file "../src/pcl/walk")
       ;; Expect to fail before this count is reached
-      (if (> (hash-table-count (get-table holder)) 1000000) (return)))))
+      (if (> (hash-table-count (get-table holder)) 2000000) (return)))))
 ;(compile 'run-biggybiggy) ; use the interpreter. It conses more, which helps actually
-#-sbcl (run-biggybiggy)
-;;; Until the bug is fixed, we expect to see (approximately):
+
+;;; Prior to the fix we would see (approximately):
 ;;;    Trial 28: so far have 144677 keys
 ;;;    ; compiling file "../src/pcl/walk.lisp" (written 28 JAN 2024 02:35:17 PM):
 ;;;    Verifying hashtables
@@ -35,9 +35,5 @@
 ;;;     index=0 key=4714a next=0
 ;;;    fatal error encountered in SBCL pid 3350552 tid 3350552:
 ;;;    ht should be marked for rehash
-;;; Putting a WITH-TEST made this fail only after 100 trials.
-;;; That's kinda annoying slow. So unfortunately we can't enable this test.
-;;; And it needed 178 trials to fail under parallel-exec.
-#+nil
-(test-util:with-test (:name :fail-to-rehash :fails-on :sbcl)
+(test-util:with-test (:name :fail-to-rehash :skipped-on (not :slow))
   (run-biggybiggy))
