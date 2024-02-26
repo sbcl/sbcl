@@ -94,3 +94,12 @@
       ;; DATA are in a specialized vector. The perfect hash generator would
       ;; never use a signed-byte vector, so this has to be the data vector.
       (assert (typep data-vector `(simple-array (signed-byte 16) (*)))))))
+
+(with-test (:name :unoptimized-bad-code) ; lp#2054857
+  (flet ((try (expr)
+           (let ((f (compile nil `(lambda (a b)
+                                    (declare (muffle-conditions warning))
+                                    ,expr))))
+             (assert-error (funcall f 1 'z)))))
+    (try '(cdr a (assoc b '((x) (y) (z)))))
+    (try '(cdr (assoc b '((x) (y) (z))) 1))))
