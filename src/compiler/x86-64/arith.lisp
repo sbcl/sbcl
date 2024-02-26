@@ -2658,30 +2658,37 @@
 ;;; E1:       25FE0F0000       AND EAX, 4094
 ;;; E6:       4885C0           TEST RAX, RAX
 ;;; E9:       74C9             JEQ L2
-;;; Normally we define a spectrum of vops to handle {unsigned,signed,any}-reg and
-;;; constant/non-constant operands. That's often unnecessary. Certainly for this vop.
 (define-vop (logbitp fast-safe-arith-op)
   (:translate logbitp)
   (:conditional :c)
-  (:args (bit :scs (signed-reg signed-stack unsigned-reg unsigned-stack
-                    any-reg control-stack))
+  (:args (bit :scs (signed-reg unsigned-reg))
          ;; CONSTANT here is to allow integers exceeding a fixnum which get NIL
          ;; from IMMEDIATE-CONSTANT-SC. This is only an issue for vops which don't
          ;; take a codegen info for the constant.
          ;; IMMEDIATE is always allowed and pertains to fixnum-sized constants.
          (int :scs (constant signed-reg signed-stack unsigned-reg unsigned-stack)
               :load-if nil))
+  (:arg-refs bit-ref)
   (:arg-types untagged-num untagged-num)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (when (sc-is int constant immediate) (setq int (tn-value int)))
     ;; Force INT to be a RIP-relative operand if it is a constant.
-    (let ((word (if (integerp int) (register-inline-constant :qword int) int))
-          (bit (cond ((sc-is bit signed-reg unsigned-reg) bit)
-                     (t (inst mov :dword temp bit)
-                        (when (sc-is bit any-reg control-stack)
-                          (inst shr :dword temp n-fixnum-tag-bits))
-                        temp))))
+    (let ((word (if (integerp int) (register-inline-constant :qword int) int)))
+      (unless (csubtypep (tn-ref-type bit-ref) (specifier-type '(integer 0 63)))
+        (cond ((if (integerp int)
+                   (typep int 'signed-word)
+                   (sc-is word signed-reg signed-stack))
+               (inst mov temp 63)
+               (inst cmp bit temp)
+
+               (inst cmov :na temp bit)
+               (setf bit temp))
+              (t
+               (zeroize temp)
+               (inst cmp bit 63)
+               (inst cmov :na temp word)
+               (setf word temp))))
       (inst bt word bit))))
 
 (define-vop (logbitp/c fast-safe-arith-op)

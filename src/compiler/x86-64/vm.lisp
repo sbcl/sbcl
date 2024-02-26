@@ -608,8 +608,8 @@
           (values :default nil))))
       (logbitp
        (if (and (or
-                 (valid-funtype '((mod 64) word) '*)
-                 (valid-funtype '((mod 64) signed-word) '*))
+                 (valid-funtype '(word word) '*)
+                 (valid-funtype '(word signed-word) '*))
                 (destructuring-bind (index integer) (sb-c::basic-combination-args node)
                   (not (sb-c::logbitp-to-minusp-p index integer))))
            (values :direct nil)
