@@ -629,12 +629,13 @@
            (inst lsl result number amount)))
         (positive
          (inst cmp amount n-word-bits)
-         (inst csinv temp amount zr-tn :lo)
          (ecase variant
-           (:signed (inst asr result number temp))
+           (:signed
+            (inst csinv temp amount zr-tn :lo)
+            (inst asr result number temp))
            (:unsigned
             (inst csel result number zr-tn :lo)
-            (inst lsr result result temp))))
+            (inst lsr result result amount))))
         (t
          (inst cmp amount 0)
          (inst csneg temp amount amount :ge)
