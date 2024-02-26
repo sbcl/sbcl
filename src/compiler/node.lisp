@@ -1389,11 +1389,8 @@
   (eql-var-constraints     nil :type (or null (vector t)))
   (inheritable-constraints nil :type (or null (vector t)))
   (equality-constraints    nil :type (or null (vector t)))
-
-  #+var-value-constraints
-  (value-id-constraints    nil :type (or null (vector t)))
-
   source-form)
+
 (defprinter (lambda-var :identity t)
   %source-name
   (type :test (not (eq type *universal-type*)))
@@ -1434,10 +1431,9 @@
   (leaf nil :type leaf)
   ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
   (%source-name (missing-arg) :type symbol :read-only t)
-  ;; After constraints two refs with same mask refer to the same value
-  ;; when a lambda-var has sets.
-  #+var-value-constraints
-  (var-id-mask -1 :type integer))
+  ;; An integer added by constraint-propagate to all REFs that have the
+  ;; same value when referencing a lambda-var with sets.
+  (same-refs nil :type (or null fixnum)))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
@@ -1471,10 +1467,7 @@
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
-  (value (missing-arg) :type lvar)
-  ;; For constraints
-  #+var-value-constraints
-  (id 0 :type integer))
+  (value (missing-arg) :type lvar))
 (defprinter (cset :conc-name set- :identity t)
   var
   (value :prin1 (lvar-uses value)))

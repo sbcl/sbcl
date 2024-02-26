@@ -2398,7 +2398,8 @@ is :ANY, the function name is not checked."
     (push ref (leaf-refs leaf))
     (update-lvar-dependencies leaf ref)
     (delete-ref ref)
-    (setf (ref-leaf ref) leaf)
+    (setf (ref-leaf ref) leaf
+          (ref-same-refs ref) nil)
     (setf (leaf-ever-used leaf) t)
     (let* ((ltype (leaf-type leaf))
            (vltype (make-single-value-type ltype)))
@@ -2499,29 +2500,11 @@ is :ANY, the function name is not checked."
                    (refs-unchanged-p x-use y-use)))
       y-use)))
 
-#-var-value-constraints
 (defun refs-unchanged-p (ref1 ref2)
-  (block nil
-    (let ((node ref1))
-      (tagbody
-       :next
-         (let ((ctran (node-next node)))
-           (when ctran
-             (setf node (ctran-next ctran))
-             (if (eq node ref2)
-                 (return t)
-                 (typecase node
-                   (ref
-                    (go :next))
-                   (cast
-                    (go :next))))))))))
-
-#+var-value-constraints
-(defun refs-unchanged-p (ref1 ref2)
-  (let ((mask (ref-var-id-mask ref1)))
-    (and (> mask 0)
-         (eq mask
-             (ref-var-id-mask ref2)))))
+  (let ((same (ref-same-refs ref1)))
+    (and same
+         (eql same
+              (ref-same-refs ref2)))))
 
 
 ;;; Return true if VAR would have to be closed over if environment

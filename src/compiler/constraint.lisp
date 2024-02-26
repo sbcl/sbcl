@@ -60,7 +60,7 @@
   (var nil :type lambda-var :read-only t))
 
 (deftype constraint-y () '(or ctype lvar lambda-var constant
-                           vector-length-constraint #+var-value-constraints integer))
+                           vector-length-constraint))
 
 (defstruct (constraint
             (:include sset-element)
@@ -82,10 +82,7 @@
   ;;
   ;; EQUALITY
   ;;     Relations between two variables.
-  ;; VAR-VALUE
-  ;;     for tracking set lambda-var values.
-  (kind nil :type (member typep < > = >= <= eql equality
-                          #+ nil var-value))
+  (kind nil :type (member typep < > = >= <= eql equality))
   ;; The operands to the relation.
   (x nil :type (or lambda-var vector-length-constraint))
   (y nil :type constraint-y)
@@ -342,10 +339,7 @@
        (awhen (lambda-var-eq-constraints x)
          (let ((cache (gethash y it)))
            (declare (type list cache))
-           (if not-p (cdr cache) (car cache)))))
-    #+var-value-constraints
-    (integer
-     (find y (lambda-var-value-id-constraints x) :key #'constraint-y))))
+           (if not-p (cdr cache) (car cache)))))))
 
 ;;; The most common operations on consets are iterating through the constraints
 ;;; that are related to a certain variable in a given conset.  Storing the
@@ -395,10 +389,7 @@
           (let ((vec (if (constraint-not-p con)
                          (ensure-vec (lambda-var-inheritable-constraints x))
                          (ensure-vec (lambda-var-eql-var-constraints x)))))
-            (vector-push-extend con vec)))))
-      #+var-value-constraints
-      (integer
-       (vector-push-extend con (lambda-var-value-id-constraints x)))))
+            (vector-push-extend con vec)))))))
   nil)
 
 ;;; Return a constraint for the specified arguments. We only create a
@@ -1191,6 +1182,7 @@
              (let ((type (type-after-comparison kind not-p res y)))
                (when type
                  (setf res type))))))))
+
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))
@@ -1228,16 +1220,25 @@
                       ;; starting point which will propagate new
                       ;; constraints for each increment.
                       (pushnew ref *blocks-to-terminate*))))))))
-  #+var-value-constraints
+  ;; Find unchanged eql refs to a set variable.
   (let ((leaf (ref-leaf ref))) ;; may have been changed above
     (when (and (lambda-var-p leaf)
-               (lambda-var-value-id-constraints leaf))
-      (block nil
-        (do-conset-constraints-intersection (con (in
-                                                  (lambda-var-value-id-constraints leaf)))
-          (setf (ref-var-id-mask ref) (constraint-y con))
-          (reoptimize-node ref)
-          (return)))))
+               (lambda-var-sets leaf))
+      (let (mark
+            (eq (lambda-var-eq-constraints leaf)))
+        (when eq
+          (loop for index from 0
+                for other-ref in (leaf-refs leaf)
+                unless (eq other-ref ref)
+                do (let ((constraint (gethash (ref-lvar other-ref) eq)))
+                     (when (and constraint
+                                (conset-member constraint in))
+                       (unless mark
+                         (setf mark index)
+                         (setf (ref-same-refs ref) mark))
+                       (setf (ref-same-refs other-ref) mark)))))
+        (when mark
+          (reoptimize-node ref)))))
   (values))
 
 ;;;; Flow analysis
@@ -1282,15 +1283,7 @@
                      (maybe-add-eql-var-var-constraint var val gen)
                      (add-var-result-constraints var val gen)))
            (:mv-let
-            (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))
-         #+var-value-constraints
-         (loop for var in (lambda-vars fun)
-               when (and (lambda-var-p var)
-                         (lambda-var-value-id-constraints var))
-               do (do-conset-constraints-intersection (con (gen
-                                                            (lambda-var-value-id-constraints var)))
-                    (conset-delete con gen))
-                  (conset-add-constraint gen 'var-value var 1 nil))))
+            (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
@@ -1336,9 +1329,7 @@
            (maybe-add-eql-var-var-constraint var (set-value node) gen))
          (add-eq-constraint var (set-value node) gen)
          (when (node-lvar node)
-           (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))
-         #+var-value-constraints
-         (conset-add-constraint gen 'var-value var (set-id node) nil)))
+           (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))))
       (combination
        (case (combination-kind node)
          (:known
@@ -1446,31 +1437,21 @@
 ;;; hoping that vars stop being closed over or lose their sets.
 (defun init-var-constraints (component)
   (declare (type component component))
-  (let (#+var-value-constraints
-        (head-out (block-out (component-head component))))
-   (dolist (fun (component-lambdas component))
-     (flet ((frob (x)
-              (dolist (var (lambda-vars x))
-                (unless (or (lambda-var-constraints var)
-                            (lambda-var-no-constraints var))
-                  (when (or (null (lambda-var-sets var))
-                            (not (closure-var-p var)))
-                    (setf (lambda-var-constraints var) (make-conset))))
-                #+var-value-constraints
+  (dolist (fun (component-lambdas component))
+    (flet ((frob (x)
+             (dolist (var (lambda-vars x))
+               (unless (or (lambda-var-constraints var)
+                           (lambda-var-no-constraints var))
+                 (when (or (null (lambda-var-sets var))
+                           (not (closure-var-p var)))
+                   (setf (lambda-var-constraints var) (make-conset))))
                 (when (and (lambda-var-constraints var)
                            (lambda-var-sets var))
-                  (setf (lambda-var-value-id-constraints var)
-                        (make-array (length (lambda-var-sets var))
-                                    :fill-pointer 0
-                                    :adjustable t))
-                  (loop for set in (lambda-var-sets var)
-                        for id = 2 then (ash id 1)
-                        do (setf (set-id set) id))
-                  ;; join-type-constraints needs to find a var-value on any branch.
-                  (conset-add-constraint head-out 'var-value var 0 nil)))))
-       (frob fun)
-       (dolist (let (lambda-lets fun))
-         (frob let))))))
+                  (loop for ref in (lambda-var-refs var)
+                        do (setf (ref-same-refs ref) nil))))))
+      (frob fun)
+      (dolist (let (lambda-lets fun))
+        (frob let)))))
 
 ;;; Return the constraints that flow from PRED to SUCC. This is
 ;;; BLOCK-OUT unless PRED ends with an IF and test constraints were
@@ -1490,9 +1471,7 @@
 (defun join-type-constraints (in block &optional equality-only predecessor-outs)
   (let ((vars '())
         (equality-vars)
-        (predecessors (block-pred block))
-        #+var-value-constraints
-        (var-values))
+        (predecessors (block-pred block)))
     (flet ((find-vars (out)
              (do-conset-elements (con out)
                (let ((kind  (constraint-kind con))
@@ -1509,10 +1488,7 @@
                             (/= (equality-constraint-amount con) 0))
                    (pushnew (constraint-x con) equality-vars :test #'eq)
                    (when (lambda-var/vector-length-p y)
-                     (pushnew y equality-vars)))
-                 #+var-value-constraints
-                 (when (eq kind 'var-value)
-                   (push (constraint-x con) var-values))))))
+                     (pushnew y equality-vars)))))))
       (cond (predecessor-outs
              (find-vars (car predecessor-outs)))
             (t
@@ -1547,38 +1523,7 @@
                                                     nil)
                          in))))
     (dolist (var equality-vars)
-      (join-equality-constraints var block in))
-    #+var-value-constraints
-    (dolist (var var-values)
-      (join-var-value-constraints var block in predecessor-outs))))
-
-;;; Equal REFs to set variables are tracked by assigning each CSET a single-bit mask starting from 2,
-;;; the BIND mask is 1.
-;;; Each CSET resets all constraints, including VAR-VALUE, and adds a constraint with its bit-mask.
-;;; Multiple predecessors OR their masks into a single integer.
-;;; When two refs have the same mask then their values are unchanged.
-#+var-value-constraints
-(defun join-var-value-constraints (var block in predecessor-outs)
-  (do-conset-constraints-intersection (con (in
-                                            (lambda-var-value-id-constraints var)))
-    (declare (ignore con))
-    ;; It's already in
-    (return-from join-var-value-constraints))
-  (let ((mask 0)
-        (pred (block-pred block)))
-    (flet ((join (out)
-             (do-conset-constraints-intersection (con (out
-                                                       (lambda-var-value-id-constraints var)))
-               (setf mask (logior mask (constraint-y con)))
-               (return-from join))))
-      (if predecessor-outs
-          (mapc #'join predecessor-outs)
-          (loop for pred in pred
-                do
-                (let ((out (block-out-for-successor pred block)))
-                  (when out
-                    (join out))))))
-    (conset-add-constraint in 'var-value var mask nil)))
+      (join-equality-constraints var block in))))
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil)
@@ -1714,6 +1659,7 @@
   (declare (type component component))
   (setf (block-out (component-head component)) (make-conset))
   (init-var-constraints component)
+  ;(print-all-blocks component)
   ;; Previous results can confuse propagation and may loop forever
   (do-blocks (block component)
     (setf (block-out block) nil)
