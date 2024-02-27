@@ -15,6 +15,25 @@ changes relative to sbcl-2.4.1:
   * bug fix: the utf-8 external format with Unix line-endings updates its
     character size information when taking the fast path for a buffer of ascii
     characters.  (lp#2054169, reported by John Carroll)
+  * bug fix: don't print the contents of a possibly no-longer-valid
+    dynamic-extent cons in PRINT-OBJECT method for THREAD objects.
+    (lp#2026195, reported by Jake Connor)
+  * bug fix: place external entry points for functions consistently before any
+    local functions.  (lp#2051169, reported by Fedorov Alexander)
+  * bug fix: remove unactionable optimization notes for backquoted forms and
+    ordinary calls to APPEND at high speed.  (lp#2051401, reported by Robert
+    Brown)
+  * bug fix: infinite loop in COPY-SEQ on zero-length arrays of element-type
+    NIL.  (lp#2051759, reported by Devon Sean McCullough)
+  * bug fix: fix compilation of non-top-level struct constructors.
+    (lp#2052329, reported by Robert Poitras)
+  * bug fixes in SB-SIMD:
+    ** improve bounds checking in SB-SIMD.  (lp#2012010, reported by Patrick
+       Poitras)
+    ** fix SB-SIMD AVX f64.4-reverse (lp#2012986, thanks to Ari Projansky)
+    ** fix SB-SIMD shuffles on AVX and SSE2 (lp#2012990, reported by Ari
+       Projansky)
+    ** fix lifetimes in sse+xmm0 VOPs (lp#2015329, reported by Ari Projansky)
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the
