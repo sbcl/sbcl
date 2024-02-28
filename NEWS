@@ -34,6 +34,15 @@ changes relative to sbcl-2.4.1:
     ** fix SB-SIMD shuffles on AVX and SSE2 (lp#2012990, reported by Ari
        Projansky)
     ** fix lifetimes in sse+xmm0 VOPs (lp#2015329, reported by Ari Projansky)
+  * optimization: a number of internal tables, particularly those related to
+    Unicode support have been converted to use perfect hash mechanisms,
+    improving both speed and space.
+  * optimization: FIND, POSITION, ASSOC and RASSOC with constant sequence
+    arguments containing symbols as keys are compiled to perfect hash lookups.
+  * optimization: the compiler runs a jump-to-jump elimination pass on x86-64.
+  * system integrity: compiling the system itself on x86-64/linux now produces
+    bitwise-identical cross-compiled fasls whether the build host is cmucl,
+    ccl, clisp or sbcl itself.
 
 changes in sbcl-2.4.1 relative to sbcl-2.4.0:
   * enhancement: compact instance headers are partially supported with the
