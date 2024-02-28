@@ -412,7 +412,7 @@ Examples:
         ;; Binding *IN-A-FINALIZER* prevents recursive run-pending-finalizers
         ;; if #-sb-thread. #+sb-thread probably doesn't require it.
         (handler-case (let ((*in-a-finalizer* t)) (funcall fun))
-          (error (c) (warn "Error calling finalizer ~S:~%  ~S" fun c)))))))
+          (error (c) (warn "Error calling finalizer ~S:~%  ~A" fun c)))))))
 
 #+sb-thread (define-alien-variable finalizer-thread-runflag int)
 ;;; Drain the queue of finalizers and return when empty.
