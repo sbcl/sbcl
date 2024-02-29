@@ -4128,9 +4128,13 @@ III. initially undefined function references (alphabetically):
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
       ;; from XC-STRICT-CL.
-      (do-external-symbols (symbol (find-package "XC-STRICT-CL"))
-        (cold-intern (intern (symbol-name symbol) *cl-package*)
-                     :access :external))
+      (let (symbols)
+        (do-external-symbols (symbol (find-package "XC-STRICT-CL"))
+          (push symbol symbols))
+        (setf symbols (sort symbols #'string<))
+        (dolist (symbol symbols)
+          (cold-intern (intern (symbol-name symbol) *cl-package*)
+                       :access :external)))
 
       ;; Make LOGICALLY-READONLYIZE no longer a no-op
       (setf (symbol-function 'logically-readonlyize)
