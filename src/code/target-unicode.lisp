@@ -53,10 +53,7 @@
   (defvar *phash-cache-file-pathname*
     (lisp-expr-file-pathname "tools-for-build/unicode-phash"))
   (defvar *phash-cache-file-contents* nil)
-  (defun cached-perfect-hash-lambda (keys)
-    (when (<= (length keys) 300) ; don't bother with the cache
-      (return-from cached-perfect-hash-lambda
-        (sb-c:make-perfect-hash-lambda keys)))
+  (defun perfect-hash-lambda (keys comment &key (cache (> (length keys) 300)))
     (unless *phash-cache-file-contents*
       (let ((ht (make-hash-table :test 'equalp)))
         (setf *phash-cache-file-contents* ht)
@@ -70,9 +67,11 @@
     (or (gethash keys *phash-cache-file-contents*)
         (let ((start (get-internal-real-time))
               (answer (sb-c:make-perfect-hash-lambda keys)))
-          (format *debug-io* "~&Computed perfect hash of ~D keys: ~F sec~%"
+          (format *debug-io* "~&Computed perfect hash of ~D keys: ~F sec (~S)~%"
                   (length keys)
-                  (/ (- (get-internal-real-time) start) internal-time-units-per-second))
+                  (/ (- (get-internal-real-time) start) internal-time-units-per-second)
+                  comment)
+          (when cache
           ;; If you want to recreate the whole cache file from scratch, you need to
           ;; initialize a 0-length file, because this won't write to a nonexistent file,
           ;; which avoids attempting to write into a read-only source tree.
@@ -83,7 +82,14 @@
                   (*package* (find-package "SB-C")) ; suppresses SB-C: prefixes
                   (*print-pretty* t) (*print-right-margin* 200)
                   (*print-lines* nil) (*print-length* nil))
-              (when stream (format stream "~X~%~S~%" keys answer))))
+              (when stream
+                ;; N-FIXNUM-BITS is irrelevant at the moment. It's only a remark
+                ;; and not part of the primary key to a cache entry.
+                ;; Notice that NAME->CHAR uses PSXHASH which is affected by word size,
+                ;; so we don't cache its perfect hash lambda.
+                (format stream ";; ~A: ~D keys, n-fixnum-bits=~D~%~X~%~S~%"
+                        comment (length keys) sb-vm:n-fixnum-bits
+                        keys answer)))))
           answer))))
 
 (defmacro find-in-perfect-hashmap (x filename value-type value-getter)
@@ -98,7 +104,7 @@
         (return-from find-in-perfect-hashmap
           `(cdr (assoc (char-code ,x) ',new)))))
     (let* ((mapped-chars (coerce (mapcar 'car pairs) '(array (unsigned-byte 32) (*))))
-           (lexpr (cached-perfect-hash-lambda mapped-chars))
+           (lexpr (perfect-hash-lambda mapped-chars filename))
            ;; We need the lexpr at compile-time to build the key/value arrays
            ;; and run-time of course, where the expression is stuffed in as
            ;; a form headed by LAMBDA.
@@ -249,12 +255,13 @@
               (alist (mapcar (lambda (x &aux (name (second x)))
                                (cons (first x) (if (listp name) (car name) name)))
                              small-alist)))
-         (call-with-name-db-entries
-          (lambda (codepoint name)
-            (unless (assoc codepoint small-alist)
-              (push (cons codepoint (huffman-encode name +character-name-huffman-tree+))
-                    alist)))
-          database-name)
+         (collect ((more))
+           (call-with-name-db-entries
+            (lambda (codepoint name)
+              (unless (assoc codepoint small-alist)
+                (more (cons codepoint (huffman-encode name +character-name-huffman-tree+)))))
+            database-name)
+           (setf alist (nconc alist (more))))
          (binding*
              ((max-codepoint (reduce #'max alist :key #'car))
               (bits (make-array (- (1+ max-codepoint) direct-map-end)
@@ -262,7 +269,7 @@
               (sparse-pairs
                (remove-if (lambda (pair) (< (car pair) direct-map-end)) alist))
               (hashes (map '(array (unsigned-byte 32) (*)) #'car sparse-pairs))
-              (lexpr (cached-perfect-hash-lambda hashes))
+              (lexpr (perfect-hash-lambda hashes database-name))
               (hashfn (sb-c::compile-perfect-hash lexpr hashes))
               ((data xref)
                (pack-bit-strings (mapcan (lambda (pair)
@@ -270,8 +277,9 @@
                                          alist))))
            ;; Every integer that represents an h-code gets replaced by a different
            ;; integer representing an index into the densely packed h-codes.
-           (loop for index across xref for pair in alist
-                 do (rplacd pair index))
+           (loop with i = -1 for pair in alist
+                 when (integerp (cdr pair))
+                 do (rplacd pair (aref xref (incf i))))
            (let ((direct-map
                   (when (plusp direct-map-end)
                     (make-array direct-map-end :initial-element nil)))
@@ -409,7 +417,9 @@ is only included for backwards compatibility."
                                :initial-contents
                                (loop for k being each hash-key of ht collect k)
                                :element-type '(unsigned-byte 32)))
-           (lexpr (sb-c:make-perfect-hash-lambda hashes))
+           ;; DO NOT CACHE! I prefer not to maintain different cache entries
+           ;; for 32 vs. 64 bit unless we absolutely have to.
+           (lexpr (perfect-hash-lambda hashes file :cache nil))
            (hashfn (sb-c::compile-perfect-hash lexpr hashes))
            ;; this could be shrunk to a UB8 array with each codepoint taking 3 octets
            ;; but it would at best save only about 46kb
@@ -427,28 +437,30 @@ is only included for backwards compatibility."
 (macrolet ((try-base-char ()
              (flet ((string-prehash (s) (ldb (byte 32 0) (psxhash s))))
                (let* ((alist (mapcar (lambda (line)
-                                       (cons (code-char (car line))
+                                       (cons (car line)
                                              (remove-if-not #'stringp (cdr line))))
                                      *base-char-name-alist*))
                       (hashes (mapcan (lambda (x) (mapcar #'string-prehash x)) alist)))
                  (or (= (length (remove-duplicates hashes)) (length hashes))
                      (error "can't perfectly hash *base-char-name-alist*"))
                  (setq hashes (coerce hashes '(array (unsigned-byte 32) (*))))
-                 (let* ((lexpr (sb-c:make-perfect-hash-lambda hashes)) ; don't cache
+                 (let* ((lexpr (perfect-hash-lambda hashes "base-char-name" :cache nil))
                         (hashfn (sb-c::compile-perfect-hash lexpr hashes))
                         (bins (make-array (length hashes) :initial-element nil)))
-                   ;; This is less efficient than could be, because it maps a perfect hash
-                   ;; to a list of the names to test even though we know which should match.
+                   ;; This is essentially an optimizer for an expression resembling
+                   ;;   (cdr (assoc x '(("nul" . #\nul) ...) :test 'string-equal)
+                   ;; which is theoreticaly in the realm of what the ASSOC transform
+                   ;; could do, if it could accept a :TEST of STRING= or STRING-EQUAL.
                    (dolist (list alist)
                      (dolist (name (cdr list))
                        (let ((index (funcall hashfn (string-prehash name))))
                          (aver (null (aref bins index)))
-                         (setf (aref bins index) list))))
+                         (setf (aref bins index) (cons name (code-char (car list)))))))
                    `(let ((index (,lexpr name-hash)))
                       (when (< index ,(length bins))
                         (let ((candidate (svref ,bins index)))
-                          (when (member string (cdr candidate) :test #'string-equal)
-                            (car candidate)))))))))
+                          (when (string-equal (car candidate) string)
+                            (cdr candidate)))))))))
            (try-unicode (file charname-decoder)
              (ucd-name->char-expander (lisp-expr-file-pathname file)
                                       charname-decoder 'name-buffer)))
@@ -492,7 +504,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
                     (hashes (map '(array (unsigned-byte 32) (*))
                                  (lambda (x) (ldb (byte 32 0) (car x)))
                                  data))
-                    (lexpr (cached-perfect-hash-lambda hashes))
+                    (lexpr (perfect-hash-lambda hashes "comp"))
                     (phashfun (sb-c::compile-perfect-hash lexpr hashes))
                     (n (length hashes))
                     (domain (make-array n :element-type (or #+x86-64 'fixnum t)))
@@ -1679,7 +1691,7 @@ it defaults to 80 characters"
            (mixfun (compile nil `(lambda (x &aux (k (the ,key-type (car x))))
                                    ,mix-expr)))
            (hash-array (map '(array (unsigned-byte 32) (*)) mixfun data))
-           (lexpr (cached-perfect-hash-lambda hash-array))
+           (lexpr (perfect-hash-lambda hash-array "collation"))
            (phashfun (sb-c::compile-perfect-hash lexpr hash-array))
            ;; N will just be (LENGTH DATA) when the hash is minimal-perfect
            (n (1+ (loop for pair across data
