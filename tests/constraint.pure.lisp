@@ -1228,3 +1228,17 @@
                         (setq c 1000)))
             (unless (eq  lv3 -1)
               (the integer (catch 'ct4 16385)))))))
+
+(with-test (:name :cons-cells)
+  (assert-type
+   (lambda (x)
+     (if (car x)
+         (consp x)
+         t))
+   (eql t))
+  (assert-type
+   (lambda (x)
+     (if (car x)
+         nil
+         (consp x)))
+   boolean))

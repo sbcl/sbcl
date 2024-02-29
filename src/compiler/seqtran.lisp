@@ -3512,3 +3512,9 @@
                                        (interval<n n-int (length list)))))
                       (setf type (type-union (specifier-type 'null) type))))
             type)))
+
+(defoptimizer (car constraint-propagate-if) ((list))
+  (values list (specifier-type 'cons) nil nil t))
+
+(setf (fun-info-constraint-propagate-if (fun-info-or-lose 'cdr))
+      #'car-constraint-propagate-if-optimizer)
