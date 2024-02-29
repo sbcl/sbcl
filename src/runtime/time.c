@@ -20,31 +20,37 @@
 
 int get_timezone(time_t when, unsigned int *dst)
 {
-    struct tm ltm, gtm;
-    int sw;
+    struct tm ltm;
 
 #ifdef LISP_FEATURE_WIN32
     /* No _r versions on Windows, but the API documentation also
      * doesn't warn them about being non-reentrant... So here's
-     * hoping they actually are -- once Windows grows threads
-     * this better be checked, though.
+     * hoping they actually are.
      *
      * The Windows versions also don't support times before the
      * epoch, so we kludge it. */
     if (when < 0)
         when = 0;
     ltm = *localtime(&when);
-    gtm = *gmtime(&when);
+    struct tm gtm = *gmtime(&when);
 #else
-    ltm = *localtime_r(&when, &ltm);
-    gtm = *gmtime_r(&when, &gtm);
+    localtime_r(&when, &ltm);
 #endif
+    *dst = ltm.tm_isdst;
 
-    sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
+#if defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_BSD)
+    return -(int)ltm.tm_gmtoff;
+#else
+#ifndef LISP_FEATURE_WIN32
+    struct tm gtm;
+    gmtime_r(&when, &gtm);
+#endif
+    int sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
     if ((gtm.tm_wday + 1) % 7 == ltm.tm_wday)
         sw -= 24*3600;
     else if (gtm.tm_wday == (ltm.tm_wday + 1) % 7)
         sw += 24*3600;
-    *dst = ltm.tm_isdst;
     return sw;
+#endif
+
 }
