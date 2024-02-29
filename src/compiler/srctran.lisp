@@ -4623,6 +4623,7 @@
                     (not (and (csubtypep int-x (specifier-type 'integer))
                               (csubtypep int-y (specifier-type 'integer))))))
              (both-intersect-p 'array)
+             (both-intersect-p 'character)
              (both-intersect-p 'cons)
              (both-intersect-p 'pathname)
              (both-intersect-p 'instance)

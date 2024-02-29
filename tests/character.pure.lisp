@@ -225,3 +225,11 @@
    null))
 
 
+(with-test (:name :equalp-to-eql)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (character a))
+      (equalp a (the (or null character) b)))
+   ((#\a #\A) t)
+   ((#\a #\b) nil)))
