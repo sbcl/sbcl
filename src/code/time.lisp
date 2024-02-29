@@ -84,7 +84,6 @@ Includes both \"system\" and \"user\" time."
 (defconstant quarter-days-per-century 146097)
 (defconstant november-17-1858 678882)
 (defconstant weekday-november-17-1858 2)
-(defconstant unix-to-universal-time 2208988800)
 
 (defun get-universal-time ()
   "Return a single integer for the current time of day in universal time

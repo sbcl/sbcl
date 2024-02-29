@@ -392,7 +392,19 @@
                                (truename (file-info-truename file-info)))))
                         (if (pathnamep pathname) pathname))
                       file-info))
-      :created (file-info-write-date file-info)
+      :created
+      #+sb-xc-host (file-info-write-date file-info)
+      #-sb-xc-host (let ((source-date-epoch (posix-getenv "SOURCE_DATE_EPOCH"))
+                         (file-write-date (file-info-write-date file-info)))
+                     (if source-date-epoch
+                         (multiple-value-bind (val end)
+                             (parse-integer source-date-epoch :junk-allowed t)
+                           (if (and (= end (length source-date-epoch))
+                                    (and val file-write-date)
+                                    (< (+ val unix-to-universal-time) file-write-date))
+                               (+ val unix-to-universal-time)
+                               file-write-date))
+                         file-write-date))
       :start-positions (coerce-to-smallest-eltype
                         (file-info-positions file-info))
      (if function

@@ -3264,6 +3264,7 @@ possibly temporarily, because it might be used internally.")
 
            "FORMAT-DECODED-TIME"
            "FORMAT-UNIVERSAL-TIME"
+           "UNIX-TO-UNIVERSAL-TIME"
 
             ;; used for FORMAT tilde paren
 

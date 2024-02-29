@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.2:
+  * enhancement: when dumping debug information to fasl files, the system
+    respects the SOURCE_DATE_EPOCH environment variable (if set) as the latest
+    timestamp to be used.
+
 changes in sbcl-2.4.2 relative to sbcl-2.4.1:
   * bug fix: restore the ability to inherit from both SEQUENCE and
     SB-MOP:FUNCALLABLE-STANDARD-OBJECT.  (lp#2050088, reported by Christophe

@@ -23,3 +23,5 @@
   #-64-bit 1000    ; milliseconds
   "The number of internal time units that fit into a second. See
 GET-INTERNAL-REAL-TIME and GET-INTERNAL-RUN-TIME.")
+
+(defconstant unix-to-universal-time 2208988800)
