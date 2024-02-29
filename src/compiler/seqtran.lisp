@@ -2737,6 +2737,8 @@
                            (csubtypep item element-type)
                            (memq test '(eq eql equal equalp =)))))))))
     (give-up-ir1-transform))
+  ;; Delay to prefer the string and bit-vector transforms
+  (delay-ir1-transform node :constraint)
   '(%find-position-vector-macro item sequence
     from-end start end key test))
 

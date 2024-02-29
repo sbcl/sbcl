@@ -811,3 +811,9 @@
    (((make-array 5 :element-type nil))
     3 :test (lambda (s n)
               (= (car n) (length (car s)))))))
+
+(with-test (:name :use-%bit-pos-fwd/1)
+  (assert (equal  (ctu:ir1-named-calls `(lambda (x)
+                                          (declare (optimize speed))
+                                          (find 1 (the simple-bit-vector x))))
+                  '(SB-KERNEL:%BIT-POS-FWD/1))))
