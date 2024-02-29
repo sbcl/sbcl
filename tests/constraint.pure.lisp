@@ -1241,4 +1241,16 @@
      (if (car x)
          nil
          (consp x)))
-   boolean))
+   boolean)
+  (assert-type
+   (lambda (x)
+     (if (> (car x) 1)
+         (consp x)
+         t))
+   (eql t))
+  (assert-type
+   (lambda (x)
+     (if (> (car x) 1)
+         t
+         (consp x)))
+   (eql t)))
