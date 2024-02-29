@@ -802,7 +802,7 @@ if [ `uname` = "SunOS" ] ; then
   # use /usr/xpg4/bin/id instead of /usr/bin/id
   PATH=/usr/xpg4/bin:$PATH
 fi
-echo '"'`hostname`-`id -un`-`date +%Y-%m-%d-%H-%M-%S`'"' > output/build-id.inc
+echo '"'${HOSTNAME:-`hostname`}-`id -un`-`date -r NEWS +%Y-%m-%d-%H-%M-%S`'"' > output/build-id.inc
 
 if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo //setting up host configuration
