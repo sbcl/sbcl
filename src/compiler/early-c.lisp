@@ -111,11 +111,23 @@
                           :element-type 'bit :initial-element 0))
         (f #-sb-xc-host (compile nil lambda)
            #+sb-xc-host
-           ;; Remove OPTIMIZE decls. Expressions passed to this function are largely
-           ;; boilerplate that never match random stuff like (LET ((OPTIMIZE ...)))
-           (compile nil (subst-if '(optimize)
-                                  (lambda (x) (typep x '(cons (eql optimize) (not null))))
-                                  lambda))))
+           (destructuring-bind (head lambda-list . body) lambda
+             (aver (eq head 'lambda))
+             (multiple-value-bind (forms decls) (parse-body body nil)
+               (declare (ignore decls))
+               ;; Give the host a definition for SB-C::UINT32-MODULARLY and remove _all_
+               ;; OPTIMIZE decls hidden within. We don't need to pedantically correctly
+               ;; code-walk here, because hash expressions are largely boilerplate that
+               ;; will not confusingly match forms such as (LET ((OPTIMIZE ...))).
+               (let ((new-body
+                      `(macrolet ((uint32-modularly (&whole form &rest exprs)
+                                    (declare (ignore exprs))
+                                    (funcall (sb-xc:macro-function 'sb-c::uint32-modularly)
+                                             form nil)))
+                         ,@(subst-if '(optimize)
+                                     (lambda (x) (typep x '(cons (eql optimize) (not null))))
+                                     forms))))
+                 (compile nil `(lambda ,lambda-list ,new-body)))))))
     (loop for input across test-inputs
           do (let ((h (funcall f input)))
                (unless (zerop (bit seen h))

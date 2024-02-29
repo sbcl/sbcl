@@ -180,29 +180,57 @@
                (with-standard-io-syntax
                  (let ((*package* #.(find-package "SB-C")))
                    (read-from-string string)))))
-    (labels ((containsp (e op)
-               (if (consp e)
-                   (or (containsp (car e) op) (containsp (cdr e) op))
-                   (eq e op))))
-     (values
-      `(lambda (val)
-         (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
-         (declare (type (unsigned-byte 32) val))
-         ;; Remove the macros that aren't used, it helps with visual inspection
-         ;; of the result. However, one macro can't call another since CONTAINSP
-         ;; doesn't understand macros.
-         (macrolet ,(remove-if-not
-                     (lambda (m) (containsp expr (car m)))
-                     '((& (a b) `(logand ,a ,b)) ; purposely look more C-like
-                       (^ (&rest r) `(logxor ,@r)) ;  (for debugging)
-                       (u32+ (a b) `(logand (+ ,a ,b) #xFFFFFFFF))
-                       (u32- (a) `(logand (- ,a) #xFFFFFFFF))
-                       (^= (a b) `(setq ,a (logxor ,a ,b)))
-                       (+= (a b) `(setq ,a (logand (+ ,a ,b) #xFFFFFFFF)))
-                       (<< (n c) `(logand (ash ,n ,c) #xFFFFFFFF))
-                       (>> (n c) `(ash ,n (- ,c)))))
-           ;; We generate _really_ crappy code for 32-bit math on 64-bit machines.
-           ;; I think the steps are sufficiently trivial that a single vop could choose
-           ;; how to translate the arbitrary s-expression
-           ,@expr))
-      string))))
+    (let ((tables))
+      ;; Hoist the constants into symbol-macrolets rather than LETs
+      ;; because my work-in-progress 32-bit-modular-arithmetic optimizer
+      ;; needs them that way. Stop if we see the binding of A or B.
+      (dotimes (i 2)
+        (unless (typep expr '(cons (cons (eql let))))
+          (return))
+        (destructuring-bind (bindings . body) (cdar expr)
+          (aver (singleton-p bindings))
+          (unless (member (caar bindings) '(tab scramble)) (return))
+          (setf tables (append tables bindings))
+          (setq expr body)))
+      (let* ((result-type `(mod ,(power-of-two-ceiling (length array))))
+             (calc `(the ,result-type (uint32-modularly ,@expr))))
+        (values `(lambda (val)
+                   (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
+                   (declare (type (unsigned-byte 32) val))
+                   ,(if tables `(symbol-macrolet ,tables ,calc) calc))
+                string)))))
+
+;;; I have work-in-progress which causes the compiler to emit unsigned-word operations
+;;; with a dword operand size on x86-64, which avoids insertion of ANDs that mask
+;;; fixnum-represented 32-bit numbers to a 33 physical-bits, as the compiler would
+;;; otherwise choose, as it is biased to favoring ANY-REG storage class.
+(sb-xc:defmacro uint32-modularly (&body exprs &environment env)
+  (declare (ignore env)) ; might need to this detect compiled vs interpreted code
+  (let ((uint-max #xFFFFFFFF))
+    ;; Replace C-ish operators with Lisp functions.
+    (labels
+        ((u32+ (a b) `(logand (+ ,a ,b) ,UINT-MAX))
+         (u32- (a) `(logand (- ,a) ,UINT-MAX))
+         (<< (n c) `(logand (ash ,n ,c) ,UINT-MAX))
+         (>> (n c) `(ash ,n ,(- c)))
+         (rewrite (expr)
+           ;; Naive code-walking is OK here. Forms shaped like calls are calls.
+           (when (atom expr)
+             (return-from rewrite expr))
+           (let ((subst
+                  (case (car expr)
+                    (^=   '(logxor))
+                    (+=   '(u32+))
+                    (&    'logand)
+                    (^    'logxor)
+                    (u32+ #'u32+)
+                    (u32- #'u32-)
+                    (<<   #'<<)
+                    (>>   #'>>)
+                    (t (return-from rewrite (mapcar #'rewrite expr))))))
+             (rewrite
+              (cond ((functionp subst) (apply subst (cdr expr)))
+                    ((listp subst) ; becomes SETQ
+                     `(setq ,(cadr expr) (,(car subst) ,(cadr expr) ,(caddr expr))))
+                    (t (cons subst (cdr expr)))))))) ; simply a name change
+      `(progn ,@(rewrite exprs)))))
