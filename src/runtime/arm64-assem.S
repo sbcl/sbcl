@@ -117,7 +117,12 @@ GNAME(call_into_lisp):
 
 	// Start by finding NIL.
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+#ifdef LISP_FEATURE_DARWIN
+        adrp    reg_NULL, _STATIC_SPACE_START@PAGE
+        ldr     reg_NULL, [reg_NULL, _STATIC_SPACE_START@PAGEOFF]
+#else
         ldr     reg_NULL, STATIC_SPACE_START
+#endif
         add     reg_NULL, reg_NULL, #NIL_VALUE_OFFSET
 #else
 	ldr	reg_NULL, =NIL
