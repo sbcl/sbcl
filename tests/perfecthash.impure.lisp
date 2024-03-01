@@ -612,6 +612,7 @@ After:
 |#
 
 ;;;
+#-x86-64
 (defun test-all (filename &optional print)
   (let ((tests (with-open-file (f filename)
                  (let ((*read-base* 16)) (read f))))
