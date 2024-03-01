@@ -71,8 +71,8 @@
            (inspect-ir
             lambda-expression
             (lambda (component)
-              (do-blocks (block component)
-                (do-nodes (node nil block)
+              (sb-c::do-blocks (block component)
+                (sb-c::do-nodes (node nil block)
                   (when (and (sb-c::basic-combination-p node)
                              (if full
                                  (eq (sb-c::basic-combination-info node) :full)
@@ -92,8 +92,8 @@
            (inspect-ir
             lambda-expression
             (lambda (component)
-              (do-blocks (block component)
-                (do-nodes (node nil block)
+              (sb-c::do-blocks (block component)
+                (sb-c::do-nodes (node nil block)
                   (when (and (sb-c::basic-combination-p node)
                              (eq (sb-c::basic-combination-info node) :full))
                     (let ((filtered
@@ -220,8 +220,8 @@
     (inspect-ir
      lambda-expression
      (lambda (component)
-       (do-blocks (block component)
-         (do-nodes (node nil block)
+       (sb-c::do-blocks (block component)
+         (sb-c::do-nodes (node nil block)
            (when (and (sb-c::basic-combination-p node)
                       (eq (sb-c::basic-combination-info node) :full)
                       (equal (sb-c::combination-fun-debug-name node)

@@ -56,7 +56,7 @@
     (inspect-ir
      form
      (lambda (component)
-       (sb-c:do-ir2-blocks (block component)
+       (sb-c::do-ir2-blocks (block component)
          (do ((vop (sb-c::ir2-block-start-vop block)
                    (sb-c:vop-next vop)))
              ((null vop))
