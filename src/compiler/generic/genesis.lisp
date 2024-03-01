@@ -1579,7 +1579,7 @@ core and return a descriptor to it."
                    :doc-string (if (and docstring #-sb-doc nil)
                                    (string-literal-to-core docstring)
                                    *nil-descriptor*)))
-    (push (cons name (mapcar 'sb-xc:package-name use-list)) *package-graph*)
+    (push (cons name (sort (mapcar 'sb-xc:package-name use-list) #'string<)) *package-graph*)
     ;; COLD-INTERN AVERs that the package has an ID, so delay writing
     ;; the shadowing-symbols until the package is ready.
     (write-slots cold-package
