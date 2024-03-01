@@ -80,8 +80,10 @@
            (pathname (definition-source-pathname source)))
       ;; the full pathname isn't important
       (values (equalp (pathname-name pathname) "TEST")
-              (= (definition-source-file-write-date source)
-                 (file-write-date pathname))
+              (or (= (definition-source-file-write-date source)
+                     (file-write-date pathname))
+                  ;; this env var can cause the preceding = comparison to fail.
+                  (not (null (sb-ext:posix-getenv "SOURCE_DATE_EPOCH"))))
               (or (equal (getf plist :test-outer)
                          "OUT")
                   plist)))
