@@ -697,7 +697,7 @@
   (let ((vector (coerce attribute-names 'vector))
         (constructor (symbolicate name "-ATTRIBUTES"))
         (test-name (symbolicate name "-ATTRIBUTEP")))
-    `(progn
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
        (defmacro ,constructor (&rest attribute-names)
          "Automagically generated boolean attribute creation function.
   See !DEF-BOOLEAN-ATTRIBUTE."

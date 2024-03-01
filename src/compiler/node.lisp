@@ -472,7 +472,7 @@
   (next nil :type (or null cblock))
   (prev nil :type (or null cblock))
   ;; This block's attributes: see above.
-  (flags (block-attributes reoptimize flush-p type-check)
+  (flags #.(block-attributes reoptimize flush-p type-check)
          :type attributes)
   ;; in constraint propagation: list of LAMBDA-VARs killed in this block
   ;; in copy propagation: list of killed TNs
@@ -1070,7 +1070,7 @@
   ;;
   ;;    :ZOMBIE
   ;;    Effectless [MV-]LET; has no BIND node.
-  (kind (functional-kind-attributes nil) :type attributes)
+  (kind #.(functional-kind-attributes nil) :type attributes)
   ;; Is this a function that some external entity (e.g. the fasl dumper)
   ;; refers to, so that even when it appears to have no references, it
   ;; shouldn't be deleted? In the old days (before
@@ -1397,8 +1397,7 @@
   constant)
 
 (defstruct (lambda-var (:include basic-var) (:copier nil))
-  (flags (lambda-var-attributes)
-         :type attributes)
+  (flags #.(lambda-var-attributes) :type attributes)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
   ;; building a lambda during IR1 conversion.
   (home nil :type (or null clambda))
