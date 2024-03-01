@@ -508,3 +508,139 @@
     #.(intern (format nil "ASH-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")
     :untagged #.sb-vm:n-machine-word-bits nil))
 
+;;; Take a perfect hash expression using {+,-,^,&,<<,>>} and convert it to a simple
+;;; register-based intermediate language ("IL") that is suspiciously similar to x86-64 asm.
+;;; The IL can be lowered to real asm by a vop which prefixes all its instructions
+;;; with :DWORD.  See CALC-PHASH in src/compiler/x86-64/arith.
+;;; TABLES should be an alist specify the values of TAB and SCRAMBLE
+;;; as output by MAKE-PERFECT-HASH-LAMBDA.
+#+x86-64 ; should be: 64-bit
+(progn
+(export '(phash-convert-to-2-operand-code phash-renumber-temps))
+(defun phash-convert-to-2-operand-code (expr tables &aux (temp-counter 0) temps statements)
+  (labels ((scan-for-shr (x)
+             (typecase x
+               ((eql val) (values 1 0)) ; no right-shift is like a right-shift of 0
+               (atom (values 0 nil))
+               ((cons (eql >>) (cons (eql val)))
+                (let ((n (caddr x)))
+                  (aver (fixnump n)) ; shift amount is constant
+                  (values 1 n)))
+               (t (let ((tot 0) (min 32))
+                    (dolist (cell x (values tot min))
+                      (multiple-value-bind (count local-min) (scan-for-shr cell)
+                        (incf tot count)
+                        (setf min (min (or local-min 32) min)))))))))
+    ;; If all uses of the argument are right-shifted, compute the smallest right-shift
+    ;; and do it once, decreasing all other shift amounts.
+    (multiple-value-bind (n-shifts preshift) (scan-for-shr expr)
+      (cond ((and (plusp preshift) (> n-shifts 1))
+             (setq expr
+                   (named-let decrease-shift ((x expr))
+                     (typecase x
+                       (atom x)
+                       ((cons (eql >>) (cons (eql val)))
+                        (let ((n (- (caddr x) preshift)))
+                          (if (= n 0) 'val `(>> val ,n))))
+                       (t (mapcar #'decrease-shift x))))))
+            (t
+             (setq preshift 0)))
+      ;; Untag the fixnum and then maybe right-shift some more.
+      (push `(>>= val ,(+ preshift sb-vm:n-fixnum-tag-bits)) expr)))
+  (labels ((emit (statement)
+             (push statement statements))
+           (move (dest source)
+             (unless (eq dest source)
+               (emit `(mov ,dest ,source))))
+           (new-temp ()
+             (let ((temp (intern (format nil "v~D" (incf temp-counter)))))
+               (push temp temps)
+               temp))
+           (select-instruction (op)
+             (ecase op
+               (& 'and)
+               ((+ u32+ +=) 'add)
+               ((- u32-) 'sub)
+               (<< 'shl)
+               ((>> >>=) 'shr)
+               ((^ ^=) 'xor)
+               (aref 'aref)))
+           (commutativep (inst) (member inst '(add and xor)))
+           (convert-list (list) ; like PROGN
+             (let ((car (convert (car list))))
+               (acond ((cdr list) (convert-list it))
+                      (t car))))
+           (convert (expr)
+             (case (car expr)
+               ((let) ; there will be exactly one binding
+                (destructuring-bind (((name value)) . body) (cdr expr)
+                  (aver (member name '(val a b)))
+                  (convert-operand value name)
+                  (convert-list body)))
+               (t
+                (convert-arith expr))))
+           (convert-operand (x &optional name)
+             (cond ((cadr (assoc x tables :test 'eq)))
+                   ((typep x '(or symbol fixnum array)) x)
+                   (t (convert-arith x name))))
+           (convert-arith (expr &optional name &aux (operator (car expr)))
+             (case operator
+               ((^= += >>=)
+                (destructuring-bind (varname operand) (cdr expr)
+                  (let ((operand (convert-operand operand)))
+                    (emit `(,(select-instruction operator) ,varname ,operand)))))
+               (t
+                (when (and (member operator '(+ ^)) (= (length (cdr expr)) 3))
+                  ;; left-associate
+                  (destructuring-bind (first second third) (cdr expr)
+                    (return-from convert-arith
+                      (convert-arith `(,operator (,operator ,first ,second) ,third) name))))
+                (multiple-value-bind (first second)
+                    (if (eq operator 'u32-) ; always unary
+                        (destructuring-bind (operand) (cdr expr) operand)
+                        (destructuring-bind (first second) (cdr expr) ; binary
+                          (values first second)))
+                  (let* ((first (convert-operand first name))
+                         (second (if second (convert-operand second)))
+                         (inst (select-instruction operator))
+                         (result (cond (name)
+                                       ((memq first temps) first)
+                                       ((and (memq second temps) (commutativep inst))
+                                        (rotatef first second)
+                                        first)
+                                       (t (new-temp)))))
+                    (move result first)
+                    (emit (if second `(,inst ,result ,second) `(neg ,result)))
+                    result))))))
+    (convert `(let ((val arg)) ,@expr)))
+  (values (reverse (coerce statements 'vector))
+          temp-counter))
+
+(defun phash-renumber-temps (statements)
+  (let ((var-map (make-array 5 :initial-element 0))
+        (temps #(t0 t1 t2 t3 t4 t5))
+        (temps-used 0))
+    (flet ((pick-temp (statement operand-index r/w)
+             (let* ((var (nth (1+ operand-index) statement))
+                    (temp (position var var-map :test #'eq)))
+               (unless temp
+                 (aver r/w)
+                 (let ((claimed (position 0 var-map)))
+                   (aver claimed) ; mustn't run out of temps
+                   (setf (aref var-map claimed) var
+                         temps-used (max temps-used (1+ claimed))
+                         temp claimed)))
+               (setf (nth (1+ operand-index) statement) (svref temps temp))
+               temp))
+           (is-dead-after (symbol start)
+             (loop for i from start below (length statements)
+                   never (find symbol (aref statements i)))))
+      (loop for i below (length statements)
+            do (let* ((statement (svref statements i))
+                      (source-operand (third statement)))
+                 (pick-temp statement 0 t)
+                 (when (typep source-operand '(and symbol (not null)))
+                   (let ((temp (pick-temp statement 1 nil)))
+                     (when (is-dead-after source-operand (1+ i))
+                       (setf (aref var-map temp) 0))))))) ; kill
+    (values statements temps-used))))

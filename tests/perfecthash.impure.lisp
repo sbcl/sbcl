@@ -530,3 +530,142 @@
          (lambda (sb-c:make-perfect-hash-lambda input))
          (fun (compile nil lambda)))
     (test-perfect-hashfun fun input)))
+
+;;; The 32-bit code generator is supposed to emit fewer and smaller instructions
+;;; than the compiler would, particularly when TAB and SCRAMBLE arrays are needed.
+;;; But sometimes it emits worse code, so I'm not ready to say it's usable.
+#|
+Good example:
+(LET ((B (& (>> VAL 8) 7)))
+  (LET ((A (>> (<< VAL 5) 29)))
+    (^ A (AREF TAB B))))
+Before:
+; Size: 59 bytes. Origin: #x5515E416
+; 16:       8BDA             MOV EBX, EDX
+; 18:       C1EB08           SHR EBX, 8
+; 1B:       83E30E           AND EBX, 14
+; 1E:       488BCA           MOV RCX, RDX
+; 21:       48C1E105         SHL RCX, 5
+; 25:       48230DC4FFFFFF   AND RCX, [RIP-60]                ; [#x5515E3F0] = #x1FFFFFFFE
+; 2C:       48C1F91D         SAR RCX, 29
+; 30:       4883E1FE         AND RCX, -2
+; 34:       488BD3           MOV RDX, RBX
+; 37:       48D1FA           SAR RDX, 1
+; 3A:       488B059FFFFFFF   MOV RAX, [RIP-97]                ; #(0 11 8 1 ...)
+; 41:       0FB6441001       MOVZX EAX, BYTE PTR [RAX+RDX+1]
+; 46:       D1E0             SHL EAX, 1
+; 48:       488BD1           MOV RDX, RCX
+; 4B:       4831C2           XOR RDX, RAX
+After:
+; Size: 43 bytes. Origin: #x55170C86
+; 86:       488BC2           MOV RAX, RDX
+; 89:       48D1E8           SHR RAX, 1
+; 8C:       8BC8             MOV ECX, EAX
+; 8E:       C1E908           SHR ECX, 8
+; 91:       83E107           AND ECX, 7
+; 94:       8BD8             MOV EBX, EAX
+; 96:       C1E305           SHL EBX, 5
+; 99:       C1EB1D           SHR EBX, 29
+; 9C:       488B05BDFFFFFF   MOV RAX, [RIP-67]                ; #(0 11 8 1 ...)
+; A3:       0FB6440801       MOVZX EAX, BYTE PTR [RAX+RCX+1]
+; A8:       31D8             XOR EAX, EBX
+; AA:       488D1400         LEA RDX, [RAX+RAX]
+
+Tolerable example: (& (+ (>> VAL 13) (>> VAL 24)) 7)
+Before:
+; Size: 28 bytes. Origin: #x5516B676
+; 76:       488BCA           MOV RCX, RDX
+; 79:       48C1F90D         SAR RCX, 13
+; 7D:       4883E1FE         AND RCX, -2
+; 81:       48C1FA18         SAR RDX, 24
+; 85:       4883E2FE         AND RDX, -2
+; 89:       4801CA           ADD RDX, RCX
+; 8C:       83E20E           AND EDX, 14
+After:
+; Size: 24 bytes. Origin: #x5516B706
+; 06:       488BC2           MOV RAX, RDX
+; 09:       48C1E80E         SHR RAX, 14
+; 0D:       8BC8             MOV ECX, EAX
+; 0F:       C1E90B           SHR ECX, 11
+; 12:       01C1             ADD ECX, EAX
+; 14:       83E107           AND ECX, 7
+; 17:       488D1409         LEA RDX, [RCX+RCX]
+
+Bad example: (& (- VAL (>> VAL 23)) 7)
+Before:
+; Size: 20 bytes. Origin: #x55178AA6
+; A6:       488BCA           MOV RCX, RDX
+; A9:       48C1F917         SAR RCX, 23
+; AD:       4883E1FE         AND RCX, -2
+; B1:       4829CA           SUB RDX, RCX
+; B4:       83E20E           AND EDX, 14
+After:
+; Size: 25 bytes. Origin: #x55178B36
+; 36:       488BC2           MOV RAX, RDX
+; 39:       48D1E8           SHR RAX, 1
+; 3C:       8BC8             MOV ECX, EAX
+; 3E:       C1E917           SHR ECX, 23
+; 41:       8BD8             MOV EBX, EAX
+; 43:       29CB             SUB EBX, ECX
+; 45:       83E307           AND EBX, 7
+; 48:       488D141B         LEA RDX, [RBX+RBX]
+|#
+
+;;;
+(defun test-all (filename &optional print)
+  (let ((tests (with-open-file (f filename)
+                 (let ((*read-base* 16)) (read f))))
+        (max-n-temps 0))
+    (dolist (testcase tests)
+      (let* ((inputs (coerce (car testcase) '(array (unsigned-byte 32) (*))))
+             (lambda (sb-c:make-perfect-hash-lambda inputs))
+             (tables)
+             (maybe-tables (fifth lambda))
+             (calc))
+        (when print
+          (format t "~A~%" lambda))
+        (cond ((eq (car maybe-tables) 'symbol-macrolet)
+               (setq tables (cadr maybe-tables))
+               (setq calc (cdr (third (third maybe-tables)))))
+              (t
+               (setq calc (cdr (third maybe-tables)))))
+        (multiple-value-bind (steps n-temps)
+            (sb-c:phash-renumber-temps
+             (sb-c:phash-convert-to-2-operand-code calc tables))
+          (setq max-n-temps (max n-temps max-n-temps))
+          (when print
+            (let ((*print-readably* t))
+              (format t "tables=~X~%calc=~A~%n-temps=~D~%steps=~A~%"
+                      tables calc n-temps steps)))
+          (let ((f (sb-c::compile-perfect-hash lambda inputs))
+                (g (compile nil
+                    `(lambda (x)
+                       (declare (optimize (safety 0) (debug 0)))
+                       (sb-vm::calc-phash x ,n-temps ,steps)))))
+            (when print
+              (format t "~&DEFAULT COMPILE:~%")
+              (disassemble f)
+              (format t "~&32-BIT MODULAR ARITH COMPILE:~%")
+              (disassemble g)
+              (terpri))
+            (flet ((try (input)
+                     (unless (eql (funcall f input) (funcall g input))
+                       (error "functions disagree on ~X: ~X ~X"
+                              input
+                              (funcall f input)
+                              (funcall g input)))))
+            (map nil #'try inputs)
+            ;; Test the behavior on random inputs
+            (let ((rs (make-random-state t)))
+              (dotimes (i 50)
+                (try (random (ash 1 32) rs)))))))))
+    (format t "maximum temps used: ~D~%" max-n-temps)
+    max-n-temps))
+
+(with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) :interpreter))
+  (dolist (file '("../xperfecthash30.lisp-expr"
+                  "../xperfecthash63.lisp-expr"
+                  "../xperfecthash61.lisp-expr"))
+    ;; all the simple expressions needed when cross-compiling
+    ;; can be emitted using at most 3 temps
+    (assert (= (test-all file) 3))))

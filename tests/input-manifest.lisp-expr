@@ -79,7 +79,11 @@
   "tests/package-test-5.lisp"
   "tests/package-test-6.lisp"
   "tests/package-test-7.lisp")
- ("perfecthash.impure.lisp" "tools-for-build/unicode-phash.lisp-expr")
+ ("perfecthash.impure.lisp"
+  "tools-for-build/unicode-phash.lisp-expr"
+  "../xperfecthash30.lisp-expr"
+  "../xperfecthash63.lisp-expr"
+  "../xperfecthash61.lisp-expr")
  ("redblack.pure.lisp" "tests/bbtree-test-util.lisp" "src/code/redblack.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"

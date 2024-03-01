@@ -3958,3 +3958,59 @@
     (if (logbitp 0 new)
         (inst bts res posn)
         (inst btr res posn))))
+
+(defknown calc-phash ((unsigned-byte 32) (integer 1 5) simple-vector)
+  (unsigned-byte 32) (flushable always-translatable))
+
+(define-vop ()
+  (:translate calc-phash)
+  (:args (arg :scs (any-reg) :target temp0))
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info n-temps steps)
+  (:ignore n-temps)
+  ;; TODO: add :UNUSED-IF based on the value in N-TEMPS
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0))
+              temp0 temp1 temp2 temp3 temp4)
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 3
+    (aver (eq (cadr (svref steps 0)) 'sb-c::t0))
+    (move temp0 arg) ; should be a NOP
+    (flet ((tn-from-metasyntactic-var (var)
+             (ecase var
+               (sb-c::t0 temp0)
+               (sb-c::t1 temp1)
+               (sb-c::t2 temp2)
+               (sb-c::t3 temp3)
+               (sb-c::t4 temp4))))
+      (loop for i from 0 below (length steps)
+            do
+        (let* ((step (svref steps i))
+               (dest (tn-from-metasyntactic-var (second step)))
+               (source (third step))
+               (source-tn
+                (etypecase source
+                  ((or null fixnum) source)
+                  (symbol (tn-from-metasyntactic-var source))
+                  (array
+                   ;; haven't finished UB16 yet
+                   (aver (typep source '(array (unsigned-byte 8))))
+                   (emit-constant source)))))
+          (cond ((not source) ; unary op
+                 (inst* (car step) :dword dest))
+                ((eq (car step) 'aref)
+                 (let ((disp (- (ash vector-data-offset word-shift)
+                                other-pointer-lowtag))) ; complicated way of computing 1
+                   ;; FIXME: scale is wrong if TAB is UB16 array
+                   (inst movzx '(:byte :dword) dest (ea disp dest source-tn 1))))
+                ((arrayp source) (inst mov dest source-tn)) ; 64-bit move
+                ((eq i 0)
+                 ;; fixnum-untagging MOV is 64-bit to avoid losing 1 bit,
+                 ;; unless I can show that the expression doesn't care about bit 31
+                 (inst* (car step) dest source-tn))
+                (t
+                 (inst* (car step) :dword dest source-tn)))))
+      (let* ((step (svref steps (1- (length steps))))
+             (tn (tn-from-metasyntactic-var (second step))))
+        (inst lea res (ea tn tn)))))) ; move the result and re-tag it
