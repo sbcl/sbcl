@@ -104,8 +104,7 @@
                                    (= preserve-single-use-debug-variables 0)))
                               ;; arguments of local functions have hidden write
                               (not (and (lambda-var-p leaf)
-                                        (memq (functional-kind (lambda-var-home leaf))
-                                                   '(nil :optional)))))))
+                                        (functional-kind-eq (lambda-var-home leaf) nil optional))))))
                        arg-tn)))))))
 
 (defun reads-within-block-p (tn block)

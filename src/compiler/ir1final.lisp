@@ -459,10 +459,10 @@
 (defun ir1-finalize (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
-    (case (functional-kind fun)
-      (:external
+    (functional-kind-case fun
+      (external
        (finalize-xep-definition fun))
-      ((nil :toplevel)
+      ((nil toplevel)
        (setf (leaf-type fun) (definition-type fun)))))
 
   (maphash #'note-failed-optimization

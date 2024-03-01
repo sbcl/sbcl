@@ -312,12 +312,12 @@
 
 (defun compiled-debug-fun-ctor (kind)
   (ecase kind
-    (:optional #'make-compiled-debug-fun-optional)
+    (#.(functional-kind-attributes optional) #'make-compiled-debug-fun-optional)
     (:more #'make-compiled-debug-fun-more)
-    (:external #'make-compiled-debug-fun-external)
-    (:toplevel #'make-compiled-debug-fun-toplevel)
-    (:cleanup #'make-compiled-debug-fun-cleanup)
-    ((nil) #'make-compiled-debug-fun)))
+    (#.(functional-kind-attributes external) #'make-compiled-debug-fun-external)
+    (#.(functional-kind-attributes toplevel) #'make-compiled-debug-fun-toplevel)
+    (#.(functional-kind-attributes cleanup) #'make-compiled-debug-fun-cleanup)
+    (#.(functional-kind-attributes nil) #'make-compiled-debug-fun)))
 
 (defun compiled-debug-fun-kind (debug-fun)
   (etypecase debug-fun

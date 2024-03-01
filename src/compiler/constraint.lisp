@@ -1271,8 +1271,8 @@
     (typecase node
       (bind
        (let ((fun (bind-lambda node)))
-         (case (functional-kind fun)
-           (:let
+         (functional-kind-case fun
+           (let
             (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
                   for var in (lambda-vars fun)
                   and val in (combination-args call)
@@ -1282,7 +1282,7 @@
                          (conset-add-constraint gen 'typep var type nil)))
                      (maybe-add-eql-var-var-constraint var val gen)
                      (add-var-result-constraints var val gen)))
-           (:mv-let
+           (mv-let
             (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
       (ref
        (when (ok-ref-lambda-var node)
@@ -1357,7 +1357,7 @@
           (let ((fun (combination-lambda node))
                 (call-in (combination-constraints-in node)))
 
-            (when (and (memq (functional-kind fun) '(nil :assignment :optional :cleanup))
+            (when (and (functional-kind-eq fun nil assignment optional cleanup)
                        (not (and call-in
                                  (conset= call-in gen))))
               (setf (combination-constraints-in node)
@@ -1531,7 +1531,7 @@
     (cond
       ;; Use constraints from the local calls to this function
       ((and (bind-p bind)
-            (memq (functional-kind (bind-lambda bind)) '(nil :assignment :optional :cleanup)))
+            (functional-kind-eq (bind-lambda bind) nil assignment optional cleanup))
        (let ((fun (bind-lambda bind))
              (outs))
          (loop for ref in (lambda-refs fun)
@@ -1580,7 +1580,7 @@
             (bind (block-start-node block))
             fun)
         (if (and (bind-p bind)
-                 (memq (functional-kind (setf fun (bind-lambda bind))) '(nil :assignment :optional :cleanup)))
+                 (functional-kind-eq (setf fun (bind-lambda bind)) nil assignment optional cleanup))
             (loop for ref in (lambda-refs fun)
                   for call = (node-dest ref)
                   for call-block = (and call

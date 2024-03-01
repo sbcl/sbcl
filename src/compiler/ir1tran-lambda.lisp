@@ -285,7 +285,7 @@
 (defun register-entry-point (entry dispatcher)
   (declare (type clambda entry)
            (type optional-dispatch dispatcher))
-  (setf (functional-kind entry) :optional)
+  (setf (functional-kind entry) (functional-kind-attributes optional))
   (setf (leaf-ever-used entry) t)
   (setf (lambda-optional-dispatch entry) dispatcher)
   entry)
@@ -392,7 +392,7 @@
     (let ((name (or debug-name source-name)))
       (if (or force
               supplied-p-p ; this entry will be of kind NIL
-              (and (lambda-p ep) (eq (lambda-kind ep) nil)))
+              (and (lambda-p ep) (functional-kind-eq ep nil)))
           (convert-optional-entry ep
                                   default-vars default-vals
                                   (if supplied-p (list default nil) (list default))

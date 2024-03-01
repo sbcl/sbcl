@@ -449,7 +449,7 @@
                                      lvar (combination-args dest))))
                            (format nil "~:[A possible~;The~] binding of ~S"
                                    (and (lvar-has-single-use-p lvar)
-                                        (eq (functional-kind lambda) :let))
+                                        (functional-kind-eq lambda let))
                                    (leaf-source-name (elt (lambda-vars lambda)
                                                           pos)))))))
             (cond ((and (ref-p use) (constant-p (ref-leaf use)))

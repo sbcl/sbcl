@@ -108,8 +108,8 @@
 
 (defun optional-leaf-p (leaf)
   (let ((home (lambda-var-home leaf)))
-    (case (functional-kind home)
-      (:external
+    (functional-kind-case home
+      (external
        (let ((entry (lambda-entry-fun home)))
          (when (optional-dispatch-p entry)
            (let ((pos (position leaf (lambda-vars home))))
@@ -122,8 +122,8 @@
 ;;; optional is alive at that point.
 (defun optional-processed (leaf)
   (let ((home (lambda-var-home leaf)))
-    (case (functional-kind home)
-      (:external
+    (functional-kind-case home
+      (external
        (let ((entry (lambda-entry-fun home)))
          (if (and (optional-dispatch-p entry)
                   *local-call-context*)
@@ -617,7 +617,7 @@
           (i 0)
           (buffer (make-array 0 :fill-pointer 0 :adjustable t))
           ;; XEPs don't have any useful variables
-          (minimal (eq (functional-kind fun) :external)))
+          (minimal (functional-kind-eq fun external)))
       (declare (type index i))
       (loop for (name var . tn) in sorted
             do
@@ -716,15 +716,17 @@
          (dispatch (lambda-optional-dispatch fun))
          (main-p (and dispatch
                       (eq fun (optional-dispatch-main-entry dispatch))))
-         (kind (if main-p nil (functional-kind fun)))
+         (kind (if main-p
+                   (functional-kind-attributes nil)
+                   (functional-kind fun)))
          (name (leaf-debug-name fun))
          (name (if (consp name)
                    (case (car name)
                      ((xep tl-xep)
-                      (aver (eq kind :external))
+                      (aver (eql kind (functional-kind-attributes external)))
                       (second name))
                      (&optional-processor
-                      (setf kind :optional)
+                      (setf kind (functional-kind-attributes optional))
                       (second name))
                      (&more-processor
                       (setf kind :more)

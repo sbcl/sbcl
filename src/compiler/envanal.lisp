@@ -29,7 +29,7 @@
 (defun environment-analyze (component)
   (declare (type component component))
   (aver (every (lambda (x)
-                 (eq (functional-kind x) :deleted))
+                 (functional-kind-eq x deleted))
                (component-new-functionals component)))
   (setf (component-new-functionals component) ())
   (dolist (fun (component-lambdas component))
@@ -40,7 +40,7 @@
   (find-non-local-exits component)
   ;; Close over closures.
   (dolist (fun (component-lambdas component))
-    (when (and (eq (functional-kind fun) :external)
+    (when (and (functional-kind-eq fun external)
                (environment-closure (lambda-environment fun)))
       (let ((enclose-env (get-node-environment (xep-enclose fun))))
         (dolist (ref (leaf-refs fun))
@@ -54,10 +54,10 @@
   (dolist (fun (component-lambdas component))
     (when (null (leaf-refs fun))
       (let ((kind (functional-kind fun)))
-        (unless (or (eq kind :toplevel)
+        (unless (or (eql kind (functional-kind-attributes toplevel))
                     (functional-has-external-references-p fun))
-          (aver (member kind '(:optional :cleanup :escape)))
-          (setf (functional-kind fun) nil)
+          (aver (logtest kind (functional-kind-attributes optional cleanup escape)))
+          (setf (functional-kind fun) (functional-kind-attributes nil))
           (delete-functional fun)))))
 
   (values))
@@ -151,7 +151,7 @@
 ;;; CLAMBDAs that need checking.
 (defun determine-lambda-var-and-nlx-extent (component)
   (dolist (fun (component-lambdas component))
-    (when (and (eq (functional-kind fun) :external)
+    (when (and (functional-kind-eq fun external)
                ;; We treat DYNAMIC-EXTENT declarations on functions as
                ;; trusted assertions that none of the values closed
                ;; over survive the extent of the function.
@@ -255,7 +255,7 @@
            (setq info (exit-nlx-info exit))
            (aver info)))
     (close-over info (node-environment exit) env)
-    (when (eq (functional-kind exit-fun) :escape)
+    (when (functional-kind-eq exit-fun escape)
       (mapc (lambda (x)
               (setf (node-derived-type x) *wild-type*))
             (leaf-refs exit-fun))
@@ -450,7 +450,7 @@
                 (t
                  (setf (lvar-dynamic-extent lvar) nil)))))))
   (dolist (lambda (component-lambdas component))
-    (let ((fun (if (eq (lambda-kind lambda) :optional)
+    (let ((fun (if (functional-kind-eq lambda optional)
                    (lambda-optional-dispatch lambda)
                    lambda)))
       (when (leaf-dynamic-extent fun)

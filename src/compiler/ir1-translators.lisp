@@ -1336,7 +1336,7 @@ to TAG."
                    (return-from ,tag (%unknown-values)))
                 :debug-name (debug-name 'escape-fun tag))))
         (ctran (make-ctran)))
-    (setf (functional-kind fun) :escape)
+    (setf (functional-kind fun) (functional-kind-attributes escape))
     (enclose start ctran (list fun))
     (reference-leaf ctran next result fun)))
 
@@ -1348,7 +1348,7 @@ to TAG."
   ;; (SETF FOO) here?
   (let ((fun (lexenv-find name funs)))
     (aver (lambda-p fun))
-    (setf (functional-kind fun) :cleanup)
+    (setf (functional-kind fun) (functional-kind-attributes cleanup))
     (reference-leaf start next result fun)))
 
 (def-ir1-translator catch ((tag &body body) start next result)

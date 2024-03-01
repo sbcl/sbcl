@@ -52,7 +52,7 @@
                ;; XEP, isn't a local function or a lambda) record xref
                ;; information for it. Otherwise recurse on the
                ;; home-lambdas of all references to the functional.
-               (when (eq (functional-kind functional) :external)
+               (when (functional-kind-eq functional external)
                  (let ((entry (functional-entry-fun functional)))
                    (when entry
                      (let ((name (functional-debug-name entry)))
@@ -65,7 +65,7 @@
                  (push functional seen)
                  (dolist (ref (functional-refs functional))
                    (handle-functional (node-home-lambda ref))))))
-      (unless (or (eq :deleted (functional-kind functional))
+      (unless (or (functional-kind-eq functional deleted)
                   ;; If the block came from an inlined global
                   ;; function, ignore it.
                   (and (functional-inline-expanded functional)

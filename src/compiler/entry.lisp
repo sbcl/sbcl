@@ -124,12 +124,12 @@ missing MAKE-LOAD-FORM methods?")
 (defun replace-toplevel-xeps (component)
   (let ((res nil))
     (dolist (lambda (component-lambdas component))
-      (case (functional-kind lambda)
-        (:external
+      (functional-kind-case lambda
+        (external
          (unless (lambda-has-external-references-p lambda)
            (let* ((ef (functional-entry-fun lambda))
                   (new (make-functional
-                        :kind :toplevel-xep
+                        :kind (functional-kind-attributes toplevel-xep)
                         :info (leaf-info lambda)
                         :%source-name (functional-%source-name ef)
                         :%debug-name (functional-%debug-name ef)
@@ -138,7 +138,7 @@ missing MAKE-LOAD-FORM methods?")
                   (closure (and
                             ;; It may have been deleted due to none of
                             ;; the optional entries reaching it.
-                            (neq (functional-kind main-entry) :deleted)
+                            (not (functional-kind-eq main-entry deleted))
                             (environment-closure (lambda-environment main-entry)))))
              (dolist (ref (leaf-refs lambda))
                (let ((ref-component (node-component ref)))
@@ -151,6 +151,6 @@ missing MAKE-LOAD-FORM methods?")
                         (push ref (leaf-refs new))
                         (setf (leaf-refs lambda)
                               (delq1 ref (leaf-refs lambda))))))))))
-        (:toplevel
+        (toplevel
          (setq res t))))
     res))

@@ -547,7 +547,7 @@
                  :debug-name (debug-name 'top-level-form #+sb-xc-host nil #-sb-xc-host form))))
       (setf (functional-entry-fun res) res
             (functional-arg-documentation res) ()
-            (functional-kind res) :toplevel)
+            (functional-kind res) (functional-kind-attributes toplevel))
       res)))
 
 ;;; This function is called on freshly read forms to record the
@@ -662,7 +662,7 @@
 ;;;
 ;;; FUNCTIONAL is returned.
 (defun maybe-reanalyze-functional (functional)
-  (aver (not (eql (functional-kind functional) :deleted))) ; bug 148
+  (aver (not (functional-kind-eq functional deleted))) ; bug 148
   (aver-live-component *current-component*)
   ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
   ;; no-op
@@ -683,11 +683,10 @@
                         (neq (defined-fun-inlinep leaf) 'notinline)
                         (defined-fun-same-block-p leaf)
                         (let ((functional (defined-fun-functional leaf)))
-                          (when (and functional (not (functional-kind functional)))
+                          (when (and functional (functional-kind-eq functional nil))
                             (maybe-reanalyze-functional functional))))
                    (when (and (functional-p leaf)
-                              (memq (functional-kind leaf)
-                                    '(nil :optional)))
+                              (functional-kind-eq leaf nil optional))
                      (maybe-reanalyze-functional leaf))
                    leaf))
          (ref (make-ref leaf name)))

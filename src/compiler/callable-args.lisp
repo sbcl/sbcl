@@ -199,7 +199,7 @@
                               (t
                                (global-var-defined-type leaf)))))
          (entry-fun (if (and (functional-p leaf)
-                             (eq (functional-kind leaf) :external))
+                             (functional-kind-eq leaf external))
                         (functional-entry-fun leaf)
                         leaf))
          (lvar-type (cond ((and defined-type
@@ -210,7 +210,7 @@
                            (functional-type entry-fun))
                           ((and (not (fun-type-p lvar-type))
                                 (lambda-p entry-fun)
-                                (null (lambda-kind entry-fun))
+                                (functional-kind-eq entry-fun nil)
                                 (lambda-tail-set entry-fun))
                            (make-fun-type :wild-args t
                                           :returns
@@ -239,7 +239,7 @@
                                      (symbol
                                       value))))
                                 ((and (lambda-p leaf)
-                                      (eq (lambda-kind leaf) :external))
+                                      (functional-kind-eq leaf external))
                                  (leaf-debug-name (lambda-entry-fun leaf)))
                                 (t
                                  (leaf-debug-name leaf))))
@@ -271,8 +271,7 @@
           (and (not (memq (leaf-where-from leaf) '(:defined-here :declared-verify)))
                (not (and (functional-p leaf)
                          (or (lambda-p leaf)
-                             (member (functional-kind leaf)
-                                     '(:toplevel-xep)))))
+                             (functional-kind-eq leaf toplevel-xep))))
                (or (not fun-name)
                    (not (info :function :info fun-name)))))
       soft

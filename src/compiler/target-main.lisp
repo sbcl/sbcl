@@ -35,7 +35,7 @@
                                     :debug-name (debug-name 'tl-xep debug-name-tail))))
       (when name
         (assert-new-definition xep fun))
-      (setf (functional-kind xep) :external
+      (setf (functional-kind xep) (functional-kind-attributes external)
             (functional-entry-fun xep) fun
             (functional-entry-fun fun) xep
             (component-reanalyze component) t

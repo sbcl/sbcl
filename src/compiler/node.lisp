@@ -927,14 +927,53 @@
   (functional :test functional))
 
 ;;;; function stuff
+(!def-boolean-attribute functional-kind
+  nil optional deleted external toplevel
+  escape cleanup let mv-let assignment
+  zombie toplevel-xep)
+
+(defmacro functional-kind-eq (functional &rest kinds)
+  `(,(if (cdr kinds)
+         'logtest
+         'eql)
+    (functional-kind ,functional)
+    (functional-kind-attributes ,@kinds)))
+
+(defmacro functional-kind-ecase (functional &body cases)
+  (let ((kind (gensym)))
+    `(let ((,kind (functional-kind ,functional)))
+       (cond
+         ,@(loop for (case* . forms) in cases
+                 for case = (ensure-list case*)
+                 collect
+                 `((,(if (singleton-p case)
+                         'eql
+                         'logtest) ,kind (functional-kind-attributes ,@case))
+                   ,@forms))
+         (t (error "Unhandled functional-kind ~a"
+                   (decode-functional-kind-attributes ,kind)))))))
+
+(defmacro functional-kind-case (functional &body cases)
+  (let ((kind (gensym)))
+    `(let ((,kind (functional-kind ,functional)))
+       (cond
+         ,@(loop for (case* . forms) in cases
+                 for case = (ensure-list case*)
+                 collect
+                 (if (eq case* t)
+                     `(t ,@forms)
+                     `((,(if (singleton-p case)
+                             'eql
+                             'logtest) ,kind (functional-kind-attributes ,@case))
+                       ,@forms)))))))
 
 ;;; We default the WHERE-FROM and TYPE slots to :DEFINED and FUNCTION.
 ;;; We don't normally manipulate function types for defined functions,
 ;;; but if someone wants to know, an approximation is there.
 (defstruct (functional (:include leaf
-                                 (%source-name '.anonymous.)
-                                 (where-from :defined)
-                                 (type (specifier-type 'function)))
+                        (%source-name '.anonymous.)
+                        (where-from :defined)
+                        (type (specifier-type 'function)))
                        (:copier nil))
   ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
   ;;
@@ -969,8 +1008,8 @@
   ;;   %SOURCE-NAME=FOO (or maybe .ANONYMOUS.?)
   ;;   %DEBUG-NAME=(MACRO-FUNCTION FOO)
   (%debug-name nil
-               :type (or null (not (satisfies legal-fun-name-p)))
-               :read-only t)
+   :type (or null (not (satisfies legal-fun-name-p)))
+   :read-only t)
   ;; some information about how this function is used. These values
   ;; are meaningful:
   ;;
@@ -1031,9 +1070,7 @@
   ;;
   ;;    :ZOMBIE
   ;;    Effectless [MV-]LET; has no BIND node.
-  (kind nil :type (member nil :optional :deleted :external :toplevel
-                          :escape :cleanup :let :mv-let :assignment
-                          :zombie :toplevel-xep))
+  (kind (functional-kind-attributes nil) :type attributes)
   ;; Is this a function that some external entity (e.g. the fasl dumper)
   ;; refers to, so that even when it appears to have no references, it
   ;; shouldn't be deleted? In the old days (before
@@ -1112,18 +1149,16 @@
 
 ;;; Is FUNCTIONAL LET-converted? (where we're indifferent to whether
 ;;; it returns one value or multiple values)
-(defun functional-letlike-p (functional)
-  (member (functional-kind functional)
-          '(:let :mv-let)))
+(defmacro functional-letlike-p (functional)
+  `(functional-kind-eq ,functional let mv-let))
 
 ;;; Is FUNCTIONAL sorta LET-converted? (where even an :ASSIGNMENT counts)
 ;;;
 ;;; FIXME: I (WHN) don't understand this one well enough to give a good
 ;;; definition or even a good function name, it's just a literal copy
 ;;; of a CMU CL idiom. Does anyone have a better name or explanation?
-(defun functional-somewhat-letlike-p (functional)
-  (or (functional-letlike-p functional)
-      (eql (functional-kind functional) :assignment)))
+(defmacro functional-somewhat-letlike-p (functional)
+  `(functional-kind-eq ,functional let mv-let assignment))
 
 ;;; FUNCTIONAL name operations
 (defun functional-debug-name (functional)
@@ -1201,7 +1236,7 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  kind
+  (kind :princ (decode-functional-kind-attributes kind))
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))
@@ -1219,7 +1254,7 @@
 ;;; :TOPLEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
 ;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
 (defun lambda-toplevelish-p (clambda)
-  (or (eql (lambda-kind clambda) :toplevel)
+  (or (functional-kind-eq clambda toplevel)
       (lambda-has-external-references-p clambda)))
 (defun component-toplevelish-p (component)
   (member (component-kind component)

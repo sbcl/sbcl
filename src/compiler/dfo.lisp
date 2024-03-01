@@ -23,7 +23,7 @@
   (let ((start-node (block-start-node ep)))
     (if (bind-p start-node)
         (let ((fun (bind-lambda start-node)))
-          (or (eq (functional-kind fun) :toplevel)
+          (or (functional-kind-eq fun toplevel)
               (lambda-has-external-references-p fun)
               (let ((component (block-component ep)))
                 (some (lambda (ref)
@@ -34,7 +34,7 @@
                              (or (block-flag (node-block ref))
                                  (not (eq (node-component ref) component)))))
                       (leaf-refs fun)))
-              (and (eq (functional-kind fun) :optional)
+              (and (functional-kind-eq fun optional)
                    (flet ((reachable-p (fun)
                             (some (lambda (ref)
                                     (and (not (node-to-be-deleted-p ref))
@@ -136,8 +136,8 @@
             fun)
         (when (and (combination-p last)
                    (eq (combination-kind last) :local)
-                   (memq (functional-kind (setf fun (combination-lambda last)))
-                         '(nil :assignment :optional :cleanup)))
+                   (functional-kind-eq (setf fun (combination-lambda last))
+                                       nil assignment optional cleanup))
           (find-dfo-aux (lambda-block fun) head component)))
 
       (remove-from-dfo block)
@@ -164,7 +164,7 @@
 (defun scavenge-home-dependency-graph (block component)
   (declare (type cblock block) (type component component))
   (let ((home-lambda (block-home-lambda block)))
-    (if (eq (functional-kind home-lambda) :deleted)
+    (if (functional-kind-eq home-lambda deleted)
         component
         (let ((home-component (lambda-component home-lambda)))
           (cond ((eq (component-kind home-component) :initial)
@@ -226,11 +226,11 @@
       (let* ((home (node-home-lambda ref))
              (home-kind (functional-kind home))
              (home-externally-visible-p
-               (or (eq home-kind :toplevel)
+               (or (eql home-kind (functional-kind-attributes toplevel))
                    (functional-has-external-references-p home))))
         (unless (or (and home-externally-visible-p
-                         (eq (functional-kind fun) :external))
-                    (eq home-kind :deleted))
+                         (functional-kind-eq fun external))
+                    (eql home-kind (functional-kind-attributes deleted)))
           (res home))))
     (res)))
 
@@ -272,7 +272,7 @@
 ;;; already be one.
 (defun dfo-scavenge-dependency-graph (clambda component)
   (declare (type clambda clambda) (type component component))
-  (aver (not (eql (lambda-kind clambda) :deleted)))
+  (aver (not (functional-kind-eq clambda deleted)))
   (let* ((bind-block (node-block (lambda-bind clambda)))
          (old-lambda-component (block-component bind-block))
          (return (lambda-return clambda)))
@@ -302,8 +302,8 @@
                          (dfo-scavenge-dependency-graph (lambda-home clambda)
                                                         res)))
                  (scavenge-possibly-deleted-lambda (clambda)
-                   (unless (or (eql (lambda-kind clambda) :deleted)
-                               (eql (lambda-kind (lambda-home clambda)) :deleted))
+                   (unless (or (functional-kind-eq clambda deleted)
+                               (functional-kind-eq (lambda-home clambda) deleted))
                      (scavenge-lambda clambda)))
                  ;; Scavenge call relationship.
                  (scavenge-call (called-lambda)
@@ -333,7 +333,7 @@
               (clambda (scavenge-call cc))
               (lambda-var (scavenge-closure-var cc))
               (entry (scavenge-entry cc))))
-          (when (eq (lambda-kind clambda) :external)
+          (when (functional-kind-eq clambda external)
             (mapc #'scavenge-call (find-reference-funs clambda))))
         ;; Voila.
         res)))))
@@ -342,7 +342,7 @@
 ;;; its ENTRIES.
 (defun has-xep-or-nlx (clambda)
   (declare (type clambda clambda))
-  (or (eq (functional-kind clambda) :external)
+  (or (functional-kind-eq clambda external)
       (let ((entries (lambda-entries clambda)))
         (and entries
              (find-if #'entry-exits entries)))))
@@ -361,7 +361,7 @@
       (unless (eq (block-next (component-head component))
                   (component-tail component))
         (let* ((funs (component-lambdas component))
-               (has-top (find :toplevel funs :key #'functional-kind))
+               (has-top (find (functional-kind-attributes toplevel) funs :key #'functional-kind))
                (has-external-references
                  (some #'functional-has-external-references-p funs)))
           (cond (;; The FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P concept
@@ -412,9 +412,8 @@
       (dolist (initial-component (mapcar #'lambda-component top-level-lambdas))
         (unless (eq (component-kind initial-component) :deleted)
           (dolist (component-lambda (component-lambdas initial-component))
-            (aver (member (functional-kind component-lambda)
-                          '(:optional :external :toplevel nil :escape
-                            :cleanup)))
+            (aver (functional-kind-eq component-lambda
+                                      optional external toplevel nil escape cleanup))
             (let ((res (dfo-scavenge-dependency-graph component-lambda
                                                       new)))
               (when (eq res new)
@@ -442,7 +441,7 @@
   (declare (type clambda result-lambda lambda))
 
   ;; Delete the lambda, and combine the LETs and entries.
-  (setf (functional-kind lambda) :deleted)
+  (setf (functional-kind lambda) (functional-kind-attributes deleted))
   (dolist (let (lambda-lets lambda))
     (setf (lambda-home let) result-lambda)
     (setf (lambda-environment let) (lambda-environment result-lambda))

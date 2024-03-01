@@ -673,9 +673,9 @@ necessary, since type inference may take arbitrarily long to converge.")
   (dolist (fun (component-lambdas component) (delete-component component))
     (when (functional-has-external-references-p fun)
       (return))
-    (case (functional-kind fun)
-      (:toplevel (return))
-      (:external
+    (functional-kind-case fun
+      (toplevel (return))
+      (external
        (unless (every (lambda (ref)
                         (eq (node-component ref) component))
                       (leaf-refs fun))

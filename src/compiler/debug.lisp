@@ -131,7 +131,7 @@
   (declare (type functional x))
   (when (gethash x *seen-funs*)
     (barf "~S was seen more than once." x))
-  (unless (eq (functional-kind x) :deleted)
+  (unless (functional-kind-eq x deleted)
     (setf (gethash x *seen-funs*) t)))
 
 ;;; Check that the specified function has been seen.
@@ -144,26 +144,26 @@
 ;;; In an OPTIONAL-DISPATCH, check that the entry points were seen. If
 ;;; the function is deleted, ignore it.
 (defun check-fun-stuff (functional)
-  (ecase (functional-kind functional)
-    (:external
+  (functional-kind-case functional
+    (external
      (let ((fun (functional-entry-fun functional)))
        (check-fun-reached fun functional)
-       (when (functional-kind fun)
+       (unless (functional-kind-eq fun nil)
          (barf "The function for XEP ~S has kind." functional))
        (unless (eq (functional-entry-fun fun) functional)
          (barf "bad back-pointer in function for XEP ~S" functional))))
-    ((:let :mv-let :assignment) ; i.e. SOMEWHAT-LETLIKE-P
+    ((let mv-let assignment)            ; i.e. SOMEWHAT-LETLIKE-P
      (check-fun-reached (lambda-home functional) functional)
      (when (functional-entry-fun functional)
        (barf "The LET ~S has entry function." functional))
      (unless (member functional (lambda-lets (lambda-home functional)))
        (barf "The LET ~S is not in LETs for HOME." functional))
-     (unless (eq (functional-kind functional) :assignment)
+     (unless (functional-kind-eq functional assignment)
        (when (rest (leaf-refs functional))
          (barf "The LET ~S has multiple references." functional)))
      (when (lambda-lets functional)
        (barf "LETs in a LET: ~S" functional)))
-    (:optional
+    (optional
      (when (functional-entry-fun functional)
        (barf ":OPTIONAL ~S has an ENTRY-FUN." functional))
      (let ((ef (lambda-optional-dispatch functional)))
@@ -176,27 +176,26 @@
                    (eq functional (optional-dispatch-main-entry ef)))
          (barf ":OPTIONAL ~S is not an e-p for its OPTIONAL-DISPATCH ~S."
                functional ef))))
-    (:toplevel
+    (toplevel
      (unless (eq (functional-entry-fun functional) functional)
        (barf "The ENTRY-FUN in ~S isn't a self-pointer." functional)))
-    ((nil :escape :cleanup)
+    ((nil escape cleanup)
      (let ((ef (functional-entry-fun functional)))
        (when ef
          (check-fun-reached ef functional)
-         (unless (eq (functional-kind ef) :external)
+         (unless (functional-kind-eq ef external)
            (barf "The ENTRY-FUN in ~S isn't an XEP: ~S." functional ef)))))
-    (:deleted
+    (deleted
      (return-from check-fun-stuff)))
 
-  (case (functional-kind functional)
-    ((nil :optional :external :toplevel :escape :cleanup)
-     (when (lambda-p functional)
-       (dolist (fun (lambda-lets functional))
-         (unless (eq (lambda-home fun) functional)
-           (barf "The home in ~S is not ~S." fun functional))
-         (check-fun-reached fun functional))
-       (unless (eq (lambda-home functional) functional)
-         (barf "home not self-pointer in ~S" functional)))))
+  (when (functional-kind-eq functional nil optional external toplevel escape cleanup)
+    (when (lambda-p functional)
+      (dolist (fun (lambda-lets functional))
+        (unless (eq (lambda-home fun) functional)
+          (barf "The home in ~S is not ~S." fun functional))
+        (check-fun-reached fun functional))
+      (unless (eq (lambda-home functional) functional)
+        (barf "home not self-pointer in ~S" functional))))
 
   (etypecase functional
     (clambda
@@ -226,7 +225,7 @@
     (dolist (new-fun (component-new-functionals c))
       (observe-functional new-fun))
     (dolist (fun (component-lambdas c))
-      (when (eq (functional-kind fun) :external)
+      (when (functional-kind-eq fun external)
         (let ((ef (functional-entry-fun fun)))
           (when (optional-dispatch-p ef)
             (observe-functional ef))))
@@ -238,7 +237,7 @@
     (dolist (new-fun (component-new-functionals c))
       (check-fun-stuff new-fun))
     (dolist (fun (component-lambdas c))
-      (when (eq (functional-kind fun) :deleted)
+      (when (functional-kind-eq fun deleted)
         (barf "deleted lambda ~S in Lambdas for ~S" fun c))
       (check-fun-stuff fun)
       (dolist (let (lambda-lets fun))
@@ -304,7 +303,7 @@
       (barf "bad predecessor link ~S in ~S" pred block)))
 
   (let* ((fun (block-home-lambda block))
-         (fun-deleted (eq (functional-kind fun) :deleted))
+         (fun-deleted (functional-kind-eq fun deleted))
          (this-ctran (block-start block))
          (last (block-last block)))
     (unless fun-deleted
@@ -391,7 +390,7 @@
        (unless (member (if-alternative last) succ)
          (barf "The ALTERNATIVE for ~S isn't in SUCC for ~S." last block)))
       (creturn
-       (unless (if (eq (functional-kind (return-lambda last)) :deleted)
+       (unless (if (functional-kind-eq (return-lambda last) deleted)
                    (null succ)
                    (and (= (length succ) 1)
                         (eq (first succ)
@@ -428,7 +427,7 @@
     (ref
      (let ((leaf (ref-leaf node)))
        (when (functional-p leaf)
-         (if (eq (functional-kind leaf) :toplevel-xep)
+         (if (functional-kind-eq leaf toplevel-xep)
              (unless (component-toplevelish-p (block-component (node-block node)))
                (barf ":TOPLEVEL-XEP ref in non-top-level component: ~S"
                      node))
@@ -444,7 +443,7 @@
            (unless (lambda-p fun)
              (barf "function ~S in a local mv-combination ~S is not local"
                    fun node))
-           (unless (eq (functional-kind fun) :mv-let)
+           (unless (functional-kind-eq fun mv-let)
              (barf "function ~S in a local mv-combination ~S is not of kind :MV-LET"
                    fun node)))))
      (dolist (arg (basic-combination-args node))
@@ -938,8 +937,8 @@
                  (functional-debug-name leaf))
              (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))
     (functional
-     (case (functional-kind leaf)
-       (:toplevel-xep
+     (functional-kind-case leaf
+       (toplevel-xep
         (format stream "TL-XEP ~S" (entry-info-name (leaf-info leaf))))
        (t
         (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))))
@@ -1042,8 +1041,9 @@
           (bind
            (write-string "bind ")
            (print-leaf (bind-lambda node))
-           (when (functional-kind (bind-lambda node))
-             (format t " ~S ~S" :kind (functional-kind (bind-lambda node)))))
+           (unless (functional-kind-eq (bind-lambda node) nil)
+             (format t " ~S ~S" :kind (decode-functional-kind-attributes
+                                       (functional-kind (bind-lambda node))))))
           (creturn
            (write-string "return ")
            (print-lvar (return-result node))

@@ -449,7 +449,7 @@
                   (null (block-pred block)))
               (delete-block-lazily block)
               (setq block (clean-component component block)))
-             ((eq (functional-kind (block-home-lambda block)) :deleted)
+             ((functional-kind-eq (block-home-lambda block) deleted)
               ;; Preserve the BLOCK-SUCC invariant that almost every block has
               ;; one successor (and a block with DELETE-P set is an acceptable
               ;; exception).
@@ -676,12 +676,12 @@
     (collect ((use-union *empty-type* values-type-union))
       (do-uses (use result)
         (let ((use-home (node-home-lambda use)))
-          (cond ((or (eq (functional-kind use-home) :deleted)
+          (cond ((or (functional-kind-eq use-home deleted)
                      (block-delete-p (node-block use))))
                 ((not (and (basic-combination-p use)
                            (eq (basic-combination-kind use) :local)))
                  (use-union (node-derived-type use)))
-                ((or (eq (functional-kind (combination-lambda use)) :deleted)
+                ((or (functional-kind-eq (combination-lambda use) deleted)
                      (block-delete-p (lambda-block (combination-lambda use)))))
                 (t
                  (aver (eq (lambda-tail-set use-home)
@@ -886,7 +886,7 @@
                 (var (ref-leaf ref)))
            (when (and (lambda-var-p var)
                       (not (lambda-var-specvar var))
-                      (eq (lambda-kind (lambda-var-home var)) :let)
+                      (functional-kind-eq (lambda-var-home var) let)
                       (let-var-immediately-used-p ref var test)
                       ;; Rely on constraint propagation to determine
                       ;; that the var with the value of NIL is never
@@ -952,7 +952,7 @@
                    (bind (make-bind))
                    (vars (butlast all-vars))
                    (lambda (make-clambda :vars vars
-                                        :kind :let
+                                        :kind (functional-kind-attributes let)
                                         :bind bind
                                         :home (lambda-home original-lambda)
                                         :%source-name 'split
@@ -1152,7 +1152,7 @@
       (ecase kind
         (:local
          (let ((fun (combination-lambda node)))
-           (if (eq (functional-kind fun) :let)
+           (if (functional-kind-eq fun let)
                (propagate-let-args node fun)
                (propagate-local-call-args node fun))))
         (:error
@@ -1233,7 +1233,7 @@
               (dest (when (lvar-p lvar) (lvar-dest lvar)))
               (lambda (when (return-p dest) (return-lambda dest))))
          (and (lambda-p lambda)
-              (eq :external (lambda-kind lambda))))))
+              (functional-kind-eq lambda external)))))
 
 ;;; If NODE doesn't return (i.e. return type is NIL), then terminate
 ;;; the block there, and link it to the component tail.
@@ -1357,7 +1357,7 @@
            (cond ((or (not fun)
                       ;; It has already been processed by locall,
                       ;; inline again.
-                      (functional-kind fun))
+                      (not (functional-kind-eq fun nil)))
                   (when (eq (car *current-path*) 'original-source-start)
                     (setf (ctran-source-path (node-prev call)) *current-path*))
                   ;; Convert.
@@ -1452,7 +1452,7 @@
        (let ((fun (combination-lambda call)))
          (or (maybe-let-convert fun)
              (maybe-convert-to-assignment fun))
-         (unless (member (functional-kind fun) '(:let :assignment :deleted))
+         (unless (functional-kind-eq fun let assignment deleted)
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
@@ -2068,7 +2068,7 @@
   (let ((var (set-var node)))
     (when (and (lambda-var-p var) (leaf-refs var))
       (let ((home (lambda-var-home var)))
-        (when (eq (functional-kind home) :let)
+        (when (functional-kind-eq home let)
           (let* ((initial-value (let-var-initial-value var))
                  (initial-type (lvar-type initial-value)))
             (setf (lvar-reoptimize initial-value) nil)
@@ -2217,7 +2217,7 @@
     (unlink-node call)
     (unlink-node bind)
     (setf (lambda-bind fun) nil))
-  (setf (functional-kind fun) :zombie)
+  (setf (functional-kind fun) (functional-kind-attributes zombie))
   (let ((home (lambda-home fun)))
     (setf (lambda-lets home) (delq1 fun (lambda-lets home))))
   (values))
@@ -2309,7 +2309,7 @@
   (declare (type combination call) (type clambda fun))
   (unless (functional-entry-fun fun)
     (if (and (lambda-optional-dispatch fun)
-             (neq (functional-kind (lambda-optional-dispatch fun)) :deleted))
+             (not (functional-kind-eq (lambda-optional-dispatch fun) deleted)))
         ;; We can still make sure &REST is known to be a list.
         (loop for var in (lambda-vars fun)
               do (let ((info (lambda-var-arg-info var)))
@@ -2390,7 +2390,7 @@
              (setf (lvar-reoptimize fun) nil)
              (or (maybe-let-convert lambda)
                  (maybe-convert-to-assignment lambda)))
-           (cond ((neq (functional-kind lambda) :mv-let)
+           (cond ((not (functional-kind-eq lambda mv-let))
                   (loop for arg in (basic-combination-args node)
                         do
                         (setf (lvar-reoptimize arg) nil)))
@@ -2629,7 +2629,7 @@
                                                 1
                                                 nvars)
                                      collect (make-lvar new-call))))
-               (setf (functional-kind fun) :let)
+               (setf (functional-kind fun) (functional-kind-attributes let))
                (setf (combination-kind new-call) :local)
                (setf (combination-args new-call) new-lvars)
                (setf (lvar-dest fun-lvar) new-call)
