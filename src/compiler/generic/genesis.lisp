@@ -1782,7 +1782,14 @@ core and return a descriptor to it."
         (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
         #+relocatable-static-space
         (write-wordindexed des (+ 1 sb-vm::symbol-unused-slot) nil-val)
-        (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
+        ;; write the CAR of nil-as-cons. Also for 32-bit, set the hash to the normal hash
+        ;; for the symbol-name.
+        #+64-bit (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
+        #-64-bit (progn (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) nil-val)
+                        (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot)
+                                           (make-fixnum-descriptor
+                                            (sb-impl::calc-symbol-name-hash "NIL" 3))))
+        ;;
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
         #+ppc64

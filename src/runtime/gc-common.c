@@ -812,14 +812,14 @@ static lispobj trans_boxed(lispobj object) {
 static sword_t scav_symbol(lispobj *where,
                            __attribute__((unused)) lispobj header) {
     struct symbol* s = (void*)where;
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
+#ifdef LISP_FEATURE_64_BIT
     scavenge(&s->value, 3); // value, fdefn, info
     lispobj name = decode_symbol_name(s->name);
     lispobj new = name;
     scavenge(&new, 1);
     if (new != name) set_symbol_name(s, new);
 #else
-    scavenge(&s->value, 4); // value, fdefn, info, name
+    scavenge(&s->fdefn, 4); // fdefn, value, info, name
 #endif
     return ALIGN_UP(SYMBOL_SIZE, 2);
 }

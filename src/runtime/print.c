@@ -491,7 +491,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 
 lispobj symbol_function(struct symbol* symbol)
 {
-    if (symbol->fdefn) return FDEFN(symbol->fdefn)->fun;
+    if (symbol->fdefn && symbol->fdefn != NIL) return FDEFN(symbol->fdefn)->fun;
     return NIL;
 }
 

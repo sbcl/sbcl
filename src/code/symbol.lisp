@@ -75,7 +75,9 @@ distinct from the global value. Can also be SETF."
 ;; object sought (having an exceptional hash) until it has been found.
 (defun calc-symbol-name-hash (string length)
   (declare (simple-string string) (index length))
-  (if (and (= length 3)
+  (cond
+    #+64-bit
+    ((and (= length 3)
            (locally
             ;; SXHASH-SUBSTRING is unsafe, so this is too. but do we know that
             ;; length is ok, or is it an accident that it can scan too far?
@@ -85,10 +87,11 @@ distinct from the global value. Can also be SETF."
               (and (char= (schar string 0) #\N)
                    (char= (schar string 1) #\I)
                    (char= (schar string 2) #\L)))))
-      (sxhash nil) ; transformed
+      (sxhash nil)) ; transformed
+    (t
       ;; flip the bits so that a symbol hashes differently from its print name
       (logxor (%sxhash-simple-substring string 0 length)
-              most-positive-fixnum)))
+              most-positive-fixnum))))
 
 ;;; Return the function binding of SYMBOL or NIL if not fboundp.
 ;;; Don't strip encapsulations.

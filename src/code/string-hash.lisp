@@ -82,14 +82,19 @@
 (defun symbol-name-hash (symbol) ; emulate our slot reader
   (let ((name (symbol-name symbol)))
     (calc-symbol-name-hash name (length name))))
+;; OMFG other than src/code/symbol being a :NOT-HOST file, why is this repeated?
+;; Could this not be the One Definition ?
 (defun calc-symbol-name-hash (string length)
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
   (aver (= length (length string)))
-  (if (string= string "NIL") ; :NIL must hash the same as NIL
+  (cond
+    #+64-bit
+    ((string= string "NIL") ; :NIL must hash the same as NIL
       ;; out-of-order with defconstant nil-value
-      (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits))
-      (logxor (%sxhash-simple-string string) most-positive-fixnum)))
+      (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
+    (t
+      (logxor (%sxhash-simple-string string) most-positive-fixnum))))
 (defun sb-xc:sxhash (obj)
   (let ((answer
          (etypecase obj ; croak on anything but these

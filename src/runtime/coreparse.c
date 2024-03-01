@@ -429,13 +429,17 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             }
             continue;
         case SYMBOL_WIDETAG:
-            { // Copied from scav_symbol() in gc-common
+            { // Modeled on scav_symbol() in gc-common
             struct symbol* s = (void*)where;
+#ifdef LISP_FEATURE_64_BIT
             adjust_pointers(&s->value, 3, adj); // value, fdefn, info
             lispobj name = decode_symbol_name(s->name);
             lispobj adjusted_name = adjust_word(adj, name);
             // writeback the name if it changed
             if (adjusted_name != name) FIXUP(set_symbol_name(s, adjusted_name), &s->name);
+#else
+            adjust_pointers(&s->fdefn, 4, adj); // fdefn, value, info, name
+#endif
             }
             continue;
         case FDEFN_WIDETAG:

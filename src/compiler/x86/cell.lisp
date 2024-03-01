@@ -214,13 +214,7 @@
   (:result-types positive-fixnum)
   (:arg-refs args)
   (:generator 2
-    ;; The symbol-hash slot of NIL holds NIL because it is also the
-    ;; car slot, so we have to strip off the two low bits to make sure
-    ;; it is a fixnum.  The lowtag selection magic that is required to
-    ;; ensure this is explained in the comment in objdef.lisp
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (unless (not-nil-tn-ref-p args)
-      (inst and res (lognot #b11)))))
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)))
 
 ;;;; fdefinition (FDEFN) objects
 

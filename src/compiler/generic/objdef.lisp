@@ -365,6 +365,7 @@ during backtrace.
 
 ;;;; symbols
 
+#+64-bit
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-widetag
                                  :alloc-trans %%make-symbol
@@ -420,15 +421,31 @@ during backtrace.
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
+  (name :init :arg)
   #+relocatable-static-space
+  (hash :set-trans %set-symbol-hash))
+
+#-64-bit
+(define-primitive-object (symbol :lowtag other-pointer-lowtag
+                                 :widetag symbol-widetag
+                                 :alloc-trans %%make-symbol
+                                 :type symbol)
+  ;; As described in the comments above for #+64-bit, the first two slots of SYMBOL
+  ;; have to work for NIL-as-cons, so they have to be NIL and NIL, which have to
+  ;; also be the correct value when reading the slot of NIL-as-symbol.
+  (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
+  (value :init :unbound :set-trans %set-symbol-global-value :set-known ())
+  (info :ref-trans symbol-%info :ref-known (flushable)
+        :cas-trans sb-impl::cas-symbol-%info
+        :type (or instance list)
+        :init :null)
+  (name :init :arg :ref-trans symbol-name)
+  ;; The remaining slots can be ignored by GC
   (hash :set-trans %set-symbol-hash)
-  #-compact-symbol
   (package-id :type index ; actually 16 bits. (Could go in the header)
               :ref-trans symbol-package-id
               :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
-  ;; 64-bit put the tls-index in the header word.
   ;; For the 32-bit architectures, reading this slot as a descriptor
   ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
   ;; so there's a transform on SYMBOL-TLS-INDEX to make it sane.
@@ -438,7 +455,7 @@ during backtrace.
   ;; * (sb-vm:hexdump nil)
   ;;   1100008: 0110000B = NIL ; looks like NIL's TLS index is 0x110
   ;;   110000C: 0110000B = NIL
-  #+(and sb-thread (not 64-bit))
+  #+sb-thread
   (tls-index :type (and fixnum unsigned-byte) ; too generous still?
              :ref-known (flushable)
              :ref-trans %symbol-tls-index))

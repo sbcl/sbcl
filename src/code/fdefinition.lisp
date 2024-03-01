@@ -104,14 +104,18 @@
                   symbol))
           (t def))))
 
+(defglobal *fdefn-of-nil* 0) ; God help you if you access this damn thing
 (declaim (ftype (sfunction (t) fdefn) find-or-create-fdefn))
 (defun find-or-create-fdefn (name)
   (cond
     ((symbolp name)
      (let ((fdefn (sb-vm::%symbol-fdefn name)))
-       (if (eql fdefn 0)
+       (if (or (eq fdefn nil) (eq fdefn 0))
            (let* ((new (make-fdefn name))
-                  (actual (sb-vm::cas-symbol-fdefn name 0 new)))
+                  (actual
+                   (if name
+                       (sb-vm::cas-symbol-fdefn name 0 new)
+                       (cas *fdefn-of-nil* 0 new))))
              (if (eql actual 0) new (the fdefn actual)))
            fdefn)))
     ((find-fdefn name))
