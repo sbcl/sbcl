@@ -3,24 +3,19 @@
 ;;; The perfect hash generator can process any set of UB32 values.
 ;;; For example:
 #|
-(sb-c:make-perfect-hash-lambda
+(make-perfect-hash-lambda
   (map '(array (unsigned-byte 32) 1) (lambda (x) (ldb (byte 32 0) (sxhash x)))
        '(a b c d e f g h i j k l m n o p)))
  =>
-(LAMBDA (ARG &AUX (VAL (TRULY-THE (UNSIGNED-BYTE 32) ARG)))
-  (DECLARE (OPTIMIZE (SAFETY 0) (SB-C:STORE-SOURCE-FORM 0)))
-  (MACROLET ((& (A B)
-               `(LOGAND ,A ,B))
-             (^ (A B)
-               `(LOGXOR ,A ,B))
-             (<< (N C)
-               `(LOGAND (ASH ,N ,C) 4294967295))
-             (>> (N C)
-               `(ASH ,N (- ,C))))
-    (LET ((TAB #(0 12 11 13 0 0 12 1)))
-      (LET ((B (& (>> VAL 13) 7)))
-        (LET ((A (>> (<< VAL 5) 29)))
-(^ A (AREF TAB B)))))))
+(LAMBDA (VAL)
+  (DECLARE (OPTIMIZE (SAFETY 0) (DEBUG 0) (STORE-SOURCE-FORM 0)))
+  (DECLARE (TYPE (UNSIGNED-BYTE 32) VAL))
+  (SYMBOL-MACROLET ((TAB #(0 12 11 13 0 0 12 1)))
+    (THE (MOD 16)
+         (UINT32-MODULARLY
+           (LET ((B (& (>> VAL 13) 7)))
+             (LET ((A (>> (<< VAL 5) 29)))
+               (^ A (AREF TAB B))))))))
 |#
 
 (with-test (:name :minimal-vs-non-minimal)
@@ -257,20 +252,14 @@
 
 (defun find-tables (expression)
   (let (tab scramble)
-    (sb-int:named-let recurse ((x expression))
-      (when (consp x)
-        (cond ((eq (car x) 'let)
-               (let* ((bindings (second x))
-                      (binding (first bindings))
-                      (var (first binding)))
-                 (cond ((string= var "SCRAMBLE")
-                        (setq scramble (second binding)))
-                       ((string= var "TAB")
-                        (setq tab (second binding)))))
-               (recurse (cddr x)))
-              (t
-               (recurse (car x))
-               (recurse (cdr x))))))
+    (let ((fifth (fifth expression)))
+      (assert (typep fifth '(cons (member symbol-macrolet the))))
+      (when (eq (car fifth) 'symbol-macrolet)
+        (let ((bindings (second fifth)))
+          (dolist (binding bindings)
+            (let ((var (first binding)))
+              (cond ((string= var "SCRAMBLE") (setq scramble (second binding)))
+                    ((string= var "TAB") (setq tab (second binding)))))))))
     (values scramble tab)))
 
 (defun random-subset (random-state keys n)
@@ -658,12 +647,12 @@ After:
             (map nil #'try inputs)
             ;; Test the behavior on random inputs
             (let ((rs (make-random-state t)))
-              (dotimes (i 50)
+              (dotimes (i 100)
                 (try (random (ash 1 32) rs)))))))))
     (format t "maximum temps used: ~D~%" max-n-temps)
     max-n-temps))
 
-(with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) :interpreter))
+(with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) (:not :slow) :interpreter))
   (dolist (file '("../xperfecthash30.lisp-expr"
                   "../xperfecthash63.lisp-expr"
                   "../xperfecthash61.lisp-expr"))
