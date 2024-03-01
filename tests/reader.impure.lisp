@@ -190,12 +190,7 @@
     (assert (eq (find-package :cl) (test "cl:no-such-sym")))))
 
 ;; lp# 1012335 - also tested by 'READ-BOX above
-(handler-bind ((condition #'continue))
-    (defun nil (stream char) (declare (ignore stream char)) 'foo!))
 (with-test (:name :set-macro-char-lazy-coerce-to-fun)
-  (set-macro-character #\$ #'nil) ; #'NIL is a function
-  (assert (eq (read-from-string "$") 'foo!))
-
   (make-dispatch-macro-character #\$)
   (assert (set-dispatch-macro-character #\$ #\( 'read-metavar))
   (assert (eq (get-dispatch-macro-character #\$ #\() 'read-metavar))
