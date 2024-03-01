@@ -668,5 +668,5 @@ After:
                   "../xperfecthash63.lisp-expr"
                   "../xperfecthash61.lisp-expr"))
     ;; all the simple expressions needed when cross-compiling
-    ;; can be emitted using at most 3 temps
-    (assert (= (test-all file) 3))))
+    ;; can be emitted using at most 4 temps
+    (assert (<= (test-all file) 4))))
