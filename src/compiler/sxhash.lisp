@@ -140,8 +140,14 @@
 (intern "SCRAMBLE" "SB-C")
 (intern "TAB" "SB-C")
 
-;;; To use this macro during cross-compilation we will have to emulate
-;;; generate_perfhash_sexpr using a file, similar to xfloat-math.
+(defun ub32-collection-uniquep (array)
+  (declare (type (simple-array (unsigned-byte 32) (*)) array))
+  (let ((dedup (alloc-xset)))
+    (dovector (x array t)
+      (when (xset-member-p x dedup)
+        (return-from ub32-collection-uniquep nil))
+      (add-to-xset x dedup))))
+
 ;;; MINIMAL (the default) returns a a function that returns an output
 ;;; in the range 0..N-1 for N possible symbols. If non-minimal, the output
 ;;; range is the power-of-2-ceiling of N.
@@ -158,10 +164,8 @@
   (declare (ignorable objects minimal fast))
   (when (< (length array) 3) ; one or two keys - why are you doing this?
     (return-from make-perfect-hash-lambda))
-  (let ((dedup (alloc-xset)))
-    (dovector (x array)
-      (when (xset-member-p x dedup) (return-from make-perfect-hash-lambda))
-      (add-to-xset x dedup)))
+  (unless (ub32-collection-uniquep array)
+    (return-from make-perfect-hash-lambda))
   ;; no dups present
   (let* ((string
           #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array objects)

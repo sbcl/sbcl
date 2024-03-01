@@ -729,13 +729,30 @@
                            blocks-to-delete)))
          (setq vop (ir2-block-start-vop else-block)))))))
 
-;;; There could be a backend-aware aspect to the decision about whether to
-;;; convert to a jump table.
-(defun can-encode-jump-table-p (min max)
-  (declare (ignorable min max))
-  #+(or ppc ppc64) (and (typep (sb-vm:fixnumize min) '(signed-byte 16))
-                        (typep (sb-vm:fixnumize (- max min)) '(signed-byte 16)))
-  #+(or x86 x86-64) t)
+;;; Return T if KEYS are all of a type that is _directly_ amenable to being
+;;; the branch selector in the multiway branch vop, and are within a sufficiently
+;;; dense range that the resulting table of assembler labels would be reasonably full.
+;;; Finally, ensure that any operand encoding restrictions would be adhered to.
+(defun suitable-jump-table-keys-p (keys)
+  (cond ((every #'fixnump keys))
+        ((every #'characterp keys) (setq keys (mapcar #'char-code keys)))
+        (t (return-from suitable-jump-table-keys-p nil)))
+  ;; There could be a backend-aware aspect to the decision about whether to
+  ;; convert to a jump table.
+  (flet ((can-encode (min max)
+           (declare (ignorable min max))
+           #+(or ppc ppc64)
+           (and (typep (sb-vm:fixnumize min) '(signed-byte 16))
+                (typep (sb-vm:fixnumize (- max min)) '(signed-byte 16)))
+           #+(or x86 x86-64) t))
+    (let* ((min (reduce #'min keys))
+           (max (reduce #'max keys))
+           (table-size (1+ (- max min)))
+           (size-limit (* (length keys) 2)))
+      ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
+      ;; for 4 entries, which is excessive.
+      (and (<= table-size size-limit)
+           (can-encode min max)))))
 
 ;;; Decide whether CHAIN can be implemented as a multiway branch.
 ;;; As a further enhancement, it would be nice if we could factor out the
@@ -750,22 +767,9 @@
     ;; Convert to multiway only if at least 4 key comparisons would be needed.
     (unless (>= (length choices) 4)
       (return-from should-use-jump-table-p nil))
-    (let ((values (mapcar #'car choices)))
-      (cond ((every #'fixnump values)) ; ok
-            ((every #'characterp values)
-             (setq values (mapcar #'char-code values)))
-            (t
-             (return-from should-use-jump-table-p nil)))
-      (let* ((min (reduce #'min values))
-             (max (reduce #'max values))
-             (table-size (1+ (- max min )))
-             (size-limit (* (length values) 2)))
-        ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
-        ;; for 4 entries, which is excessive.
-        (when (and (<= table-size size-limit)
-                   (can-encode-jump-table-p min max))
-          ;; Return the new choices
-          (cons choices (cdr chain)))))))
+    (when (suitable-jump-table-keys-p (mapcar #'car choices))
+      ;; Return the new choices
+      (cons choices (cdr chain)))))
 
 (defun convert-if-else-chains (component)
   (do-ir2-blocks (2block component)
