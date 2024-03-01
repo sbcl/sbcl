@@ -412,6 +412,12 @@ Please check that all strings which were not recognizable to the compiler
                        (sb-impl::package-external-symbol-count x)
                        (sb-impl::package-internal-symbol-count x)))
                (sort (list-all-packages) #'string< :key 'package-name))))
+  #-sb-devel
+  ;; Remove inline expansions
+  (do-symbols (symbol #.(find-package "SB-C"))
+    (when (equal (symbol-package symbol) #.(find-package "SB-C"))
+      (sb-int:clear-info :function :inlining-data symbol)
+      (sb-int:clear-info :function :inlinep symbol)))
   (sb-impl::shake-packages
    ;; Development mode: retain all symbols with any system-related properties
    #+sb-devel
