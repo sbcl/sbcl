@@ -734,6 +734,8 @@
 ;;; dense range that the resulting table of assembler labels would be reasonably full.
 ;;; Finally, ensure that any operand encoding restrictions would be adhered to.
 (defun suitable-jump-table-keys-p (keys)
+  (unless keys
+    (return-from suitable-jump-table-keys-p nil))
   (cond ((every #'fixnump keys))
         ((every #'characterp keys) (setq keys (mapcar #'char-code keys)))
         (t (return-from suitable-jump-table-keys-p nil)))
@@ -748,11 +750,35 @@
     (let* ((min (reduce #'min keys))
            (max (reduce #'max keys))
            (table-size (1+ (- max min)))
+           ;; TOOD: this size could be reduced now. For spread-out fixnum keys,
+           ;; we'll use a perfect hash, making the table exactly sized.
+           ;; So the situation where low load factor is beneficial are few.
            (size-limit (* (length keys) 2)))
       ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
       ;; for 4 entries, which is excessive.
       (and (<= table-size size-limit)
            (can-encode min max)))))
+
+;;; FIXME: notwithstanding the above function being used by the CASE macroexpander,
+;;; something is definitely still going wrong in how it co-operates with
+;;; IR2 optimization, because the following functions have very different codegen.
+;;; In each example, the CASE macro expands using a perfect hash, expecting to dispatch
+;;; via multiway branch. But only examples 1 and 3 do. I think we're incorrectly
+;;; counting the number of ways the table would branch. Printing inserted into
+;;; SHOULD-USE-JUMP-TABLE-P indicated the wrong number in (LENGTH CHOICES).
+;;;
+;;; Example 1: this shows that 4 keys suffices to get a jump table
+;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) (:d 'hey))) ; 4-entry jump table
+;;; Example 2: this seems to think there are not at least 4 ways?
+;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e f) :feep))) ; No table
+;;; Example 3: why does this one work?
+;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e f g) :feep))) ; 7-entry table
+;;; Example 4: super weird because no matter how you count - clauses or jump table lines -
+;;;            there are at _least_ 4 ways, which we established above to be adequate.
+;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e) :feep) ((f g) 'wat))) ; No table
+;;;
+;;; In light of this failing, could we insert something lexical (i.e. in LEXENV)
+;;; to force the decision to use a jump table when IR2 gets around to this?
 
 ;;; Decide whether CHAIN can be implemented as a multiway branch.
 ;;; As a further enhancement, it would be nice if we could factor out the

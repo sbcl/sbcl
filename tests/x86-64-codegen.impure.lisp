@@ -520,8 +520,8 @@
          (lines (split-string
                  (with-output-to-string (s) (disassemble f :stream s))
                  #\newline)))
-    ;; Aside from ECASE failure, there are no other JMPs
-    (assert (= (count-assembly-labels lines) 1))))
+    ;; There is not a conditional branch per symbol
+    (assert (= (count-assembly-labels lines) 2))))
 
 ;;; Assert that the ECASE-FAILURE vop emits a trap and that we don't call ERROR
 ;;; (cutting down on the code size for each ECASE)

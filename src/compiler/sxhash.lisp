@@ -238,3 +238,21 @@
                      `(setq ,(cadr expr) (,(car subst) ,(cadr expr) ,(caddr expr))))
                     (t (cons subst (cdr expr)))))))) ; simply a name change
       `(progn ,@(rewrite exprs)))))
+
+;;; The CASE macro can use this predicate to decide whether to expand in a way
+;;; that selects a clause via a perfect hash versus the customary expansion
+;;; as a sequence of IFs.
+(defun perfectly-hashable (objects)
+  (flet ((hash (x)
+           (cond ((fixnump x) (ldb (byte 32 0) x))
+                 ((symbolp x) (ldb (byte 32 0) (symbol-name-hash x)))
+                 ((characterp x) (char-code x)))))
+    (let* ((n (length objects))
+           (hashes (make-array n :element-type '(unsigned-byte 32))))
+      (loop for o in objects
+            for i from 0
+            do (let ((h (hash o)))
+                 (if h
+                     (setf (aref hashes i) h)
+                     (return-from perfectly-hashable nil))))
+      (make-perfect-hash-lambda hashes objects))))
