@@ -5,7 +5,7 @@
 (import 'sb-lockless::(+hash-nbits+ %node-next
                        get-next node-hash
                        so-head so-bins so-key so-data so-count
-                       so-key-node-p dummy-node-p
+                       so-key-node-p
                        so-insert so-delete so-find so-find/string so-maplist
                        make-so-map/string make-so-set/string make-so-map/addr
                        make-marked-ref))
@@ -13,6 +13,8 @@
 ;;; Make sure no promotions occur so that objects will be movable
 ;;; throughout these tests.
 (setf (generation-number-of-gcs-before-promotion 0) 1000000)
+
+(defun dummy-node-p (node) (evenp (node-hash node)))
 
 ;;; Show all nodes including dummies.
 (defun show-list (solist)

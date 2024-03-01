@@ -11,6 +11,9 @@
 
 (enable-test-parallelism)
 
+#-sb-devel
+(invoke-restart 'run-tests::skip-file)
+
 (import '(sb-c::combination-fun-debug-name
           sb-c::combination-fun-source-name
           sb-c::*compile-component-hook*

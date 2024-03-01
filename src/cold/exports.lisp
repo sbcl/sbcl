@@ -1484,11 +1484,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "+CODE-COVERAGE-UNMARKED+"
            ;; for SB-INTROSPECT
 
-           "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"
-
-           "DO-BLOCKS" "DO-BLOCKS-BACKWARDS"
-           "DO-NODES" "DO-NODES-BACKWARDS"
-           "DO-IR2-BLOCKS"))
+           "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"))
 
 (defpackage* "SB-REGALLOC"
   (:documentation "private: implementation of the compiler's register allocator")

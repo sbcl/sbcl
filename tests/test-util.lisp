@@ -181,47 +181,48 @@
 (defun run-test (test-function name fails-on
                  &aux (start-time (get-internal-real-time)))
   (start-test)
-  (let (#+sb-thread (threads (sb-thread:list-all-threads))
-        (*threads-to-join* nil)
-        (*threads-to-kill* nil))
-    (handler-bind ((error (lambda (error)
-                            (if (expected-failure-p fails-on)
-                                (fail-test :expected-failure name error)
-                                (fail-test :unexpected-failure name error))
-                            (return-from run-test)))
-                   (timeout (lambda (error)
+  (catch 'skip-test
+    (let (#+sb-thread (threads (sb-thread:list-all-threads))
+          (*threads-to-join* nil)
+          (*threads-to-kill* nil))
+      (handler-bind ((error (lambda (error)
                               (if (expected-failure-p fails-on)
-                                  (fail-test :expected-failure name error t)
-                                  (fail-test :unexpected-failure name error t))
-                              (return-from run-test))))
-      ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-      (log-msg/non-pretty *trace-output* "Running ~S" name)
-      (funcall test-function)
-      #+sb-thread
-      (let ((any-leftover nil))
-        (dolist (thread *threads-to-join*)
-          (ignore-errors (sb-thread:join-thread thread)))
-        (dolist (thread *threads-to-kill*)
-          (ignore-errors (sb-thread:terminate-thread thread)))
-        (setf threads (union (union *threads-to-kill*
-                                    *threads-to-join*)
-                             threads))
-        (dolist (thread (sb-thread:list-all-threads))
-          (unless (or (not (sb-thread:thread-alive-p thread))
-                      (eql (the sb-thread:thread thread)
-                           sb-thread:*current-thread*)
-                      (member thread threads)
-                      (sb-thread:thread-ephemeral-p thread))
-            (setf any-leftover thread)
-            #-win32
-            (ignore-errors (sb-thread:terminate-thread thread))))
-        (when any-leftover
-          (fail-test :leftover-thread name any-leftover)
-          (return-from run-test)))
-      (if (expected-failure-p fails-on)
-          (fail-test :unexpected-success name nil)
-          ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-          (log-msg/non-pretty *trace-output* "Success ~S" name))))
+                                  (fail-test :expected-failure name error)
+                                  (fail-test :unexpected-failure name error))
+                              (return-from run-test)))
+                     (timeout (lambda (error)
+                                (if (expected-failure-p fails-on)
+                                    (fail-test :expected-failure name error t)
+                                    (fail-test :unexpected-failure name error t))
+                                (return-from run-test))))
+        ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+        (log-msg/non-pretty *trace-output* "Running ~S" name)
+        (funcall test-function)
+        #+sb-thread
+        (let ((any-leftover nil))
+          (dolist (thread *threads-to-join*)
+            (ignore-errors (sb-thread:join-thread thread)))
+          (dolist (thread *threads-to-kill*)
+            (ignore-errors (sb-thread:terminate-thread thread)))
+          (setf threads (union (union *threads-to-kill*
+                                      *threads-to-join*)
+                               threads))
+          (dolist (thread (sb-thread:list-all-threads))
+            (unless (or (not (sb-thread:thread-alive-p thread))
+                        (eql (the sb-thread:thread thread)
+                             sb-thread:*current-thread*)
+                        (member thread threads)
+                        (sb-thread:thread-ephemeral-p thread))
+              (setf any-leftover thread)
+              #-win32
+              (ignore-errors (sb-thread:terminate-thread thread))))
+          (when any-leftover
+            (fail-test :leftover-thread name any-leftover)
+            (return-from run-test)))
+        (if (expected-failure-p fails-on)
+            (fail-test :unexpected-success name nil)
+            ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+            (log-msg/non-pretty *trace-output* "Success ~S" name)))))
   (record-test-elapsed-time name start-time))
 
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
