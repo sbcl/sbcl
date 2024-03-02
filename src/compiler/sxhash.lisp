@@ -123,15 +123,45 @@
 
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
-(deftransform sxhash ((x) (single-float)) '#.(sb-impl::sxhash-single-float-xform 'x))
+(deftransform sxhash ((x) (single-float)) '#.(sxhash-single-float-xform 'x))
 
 ;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
 ;;; simple.
-(deftransform sxhash ((x) (fixnum)) '#.(sb-impl::sxhash-fixnum-xform 'x))
+(deftransform sxhash ((x) (fixnum)) '#.(sxhash-fixnum-xform 'x))
 
-(deftransform sxhash ((x) (double-float)) '#.(sb-impl::sxhash-double-float-xform 'x))
+(deftransform sxhash ((x) (double-float)) '#.(sxhash-double-float-xform 'x))
 
-;; All symbols have a precomputed hash.
+;;; All symbols have a precomputed hash.
+;;; Here are the behaviors I plan on implementing:
+;;; 32-bit:
+;;;   * SYMBOL-NAME-HASH, SYMBOL-HASH, and (SXHASH sym) are all the same.
+;;;
+;;; x86-64 (initially, then others as I am able):
+;;;   * SYMBOL-HASH returns 40 significant bits, the low 8 being pseudorandom
+;;;   * SYMBOL-NAME-HASH returns 32 significant bits
+;;;   * (SXHASH sym) uses the name hash mixed with itself
+;;; Given only 32 bits of name-based hash, we will have call MIX to make it appear that
+;;; the values of SXHASH are "well distributed within the range of non-negative fixnums"
+;;; (per CLHS) even though it doesn't add any more entropy to do that.
+;;;
+;;; not-x86-64 (until I do them):
+;;;   * SYMBOL-HASH returns all hash bits, but no bits are pseudorandom
+;;;   * SYMBOL-NAME-HASH returns the low 32 bits
+;;;   * (SXHASH sym) returns symbol-hash
+;;;
+;;; The use-cases are as follows:
+;;; - SYMBOL-HASH is for hash-tables, for XSET membership testing (which abhors collisions),
+;;;   for mapping slot names to slot indices in PCL, and/or anything else wanting an opaque
+;;;   pseudorandom value. There is literally no reason that symbols spelled the same must
+;;;   hash to the same numerical value in most situations.
+;;;
+;;; - SYMBOL-NAME-HASH is for compile-time computation of hash-based lookup tables since it
+;;;   deterministic, and meets the CLHS requirement for SXHASH, and has at most 32 significant
+;;;   bits for feeding into the Jenkins perfect hash generator.
+;;;
+;;; - SXHASH is required by the language to have behavior that precludes randomizing the
+;;;   hash, and encourages using all the range of positive fixnums.
+;;;
 (deftransform sxhash ((x) (symbol)) `(symbol-hash x))
 
 (deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)

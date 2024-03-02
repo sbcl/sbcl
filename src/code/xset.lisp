@@ -250,8 +250,7 @@
                    ;; on STRING= symbols - though SYMBOL-HASH does too at the moment).
                    ;; and SXHASH is better than EQL-HASH for (OR CHARACTER NUMBER)
                    ;; though either is technically an acceptable hash function on those types.
-                   #-sb-xc-host (if (symbolp e) (symbol-hash e) (sb-xc:sxhash e))
-                   #+sb-xc-host (sb-xc:sxhash e)))
+                   (if (symbolp e) (symbol-hash e) (sb-xc:sxhash e))))
             ;; If stable hashes were never assigned, then the set must contain
             ;; only these object types. There are some other objects (INSTANCE e.g.) that
             ;; could have non-address-based EQL-hashes but they don't really appear
@@ -301,7 +300,7 @@
                         #+sb-xc-host
                         (multiple-value-bind (hashval addr)
                             (if (sb-xc:typep elt '(or symbol character number))
-                                (values (sb-xc:sxhash elt) nil)
+                                (values (symbol-name-hash elt) nil)
                                 (values 4 ; chosen by algorithm of https://xkcd.com/221/
                                         t)) ; yes, it's address-based
                           (if addr (get-stable-hash-cell elt) hashval))))

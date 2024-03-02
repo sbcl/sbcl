@@ -67,7 +67,7 @@
   (declare (layout wrapper))
   (let* ((hash (if name
                    ;; Named functions have a predictable hash
-                   (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
+                   (mix (sxhash name) (symbol-hash :generic-function)) ; arb. constant
                    (sb-kernel::quasi-random-address-based-hash
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
                     most-positive-fixnum)))

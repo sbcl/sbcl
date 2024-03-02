@@ -219,6 +219,7 @@
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/{arch}/vm" :c-headers)
 
+ ("src/code/cross-sxhash" :c-headers :not-target)
  ("src/code/alieneval" :c-headers)
  ;; This is generated automatically by grovel_headers.c, i.e. it's not
  ;; under source control.

@@ -2557,7 +2557,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "MAKE-STATIC-CLASSOID"
            "%MAKE-SYMBOL"
            "%FUNCALLABLE-INSTANCE-FUN"
-           "SYMBOL-HASH" "SYMBOL-NAME-HASH" "HASH-AS-IF-SYMBOL-NAME"
+           "SYMBOL-HASH" "HASH-AS-IF-SYMBOL-NAME"
            "SYMBOL-%INFO" "SYMBOL-DBINFO" "%INFO-REF"
            "%SYMBOL-FUNCTION"
            "SYMBOL-PACKAGE-ID" "%SYMBOL-PACKAGE"
@@ -3001,6 +3001,7 @@ possibly temporarily, because it might be used internally.")
            "MIX" "MIXF" "WORD-MIX"
            "MURMUR-HASH-WORD/FIXNUM"
            "MURMUR-HASH-WORD/+FIXNUM"
+           "SYMBOL-NAME-HASH"
 
             ;; Macroexpansion that doesn't touch special forms
 

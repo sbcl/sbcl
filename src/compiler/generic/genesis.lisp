@@ -1155,7 +1155,7 @@ core and return a descriptor to it."
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+))
              (hash (make-fixnum-descriptor
-                    (sb-impl::calc-symbol-name-hash name (length name)))))
+                    (sb-c::calc-symbol-name-hash name (length name)))))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
@@ -1788,7 +1788,7 @@ core and return a descriptor to it."
         #-64-bit (progn (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) nil-val)
                         (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot)
                                            (make-fixnum-descriptor
-                                            (sb-impl::calc-symbol-name-hash "NIL" 3))))
+                                            (sb-c::calc-symbol-name-hash "NIL" 3))))
         ;;
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)

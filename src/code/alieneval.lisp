@@ -178,7 +178,7 @@
             `((declaim (inline ,constructor))
               (defun ,constructor (&key ,@constructor-args)
                 (let ((hash ,(logior (ash (alien-type-class-name->id name) type-hash-nbits)
-                                     (ldb (byte type-hash-nbits 0) (sb-xc:sxhash name)))))
+                                     (ldb (byte type-hash-nbits 0) (symbol-name-hash name)))))
                   (,allocator hash ,@allocator-args)))))))))
 
 (defmacro define-alien-type-method ((class method) lambda-list &rest body)
@@ -621,7 +621,7 @@
            ;; * SIGNED is true if and only if the minimum value is negative
            ;; * OFFSET is based on the minimum value if and only if the
            ;;   inverse map is stored as is a vector
-       `(let ((h (sb-xc:sxhash name)))
+       `(let ((h (symbol-name-hash name)))
           (dolist (elt (alien-enum-type-from result))
             ;; Mix by hand since our SXHASH has a cutoff on length, not to
             ;; mention that this potentially runs on either the host or the target,
@@ -1031,7 +1031,7 @@
            (hash-sym (symbol)
              ;; Since ALIEN-TYPE literals are reconstructed via load-forms that involve
              ;; the constructor, host object hashes don't have to be target-compatible.
-             #+sb-xc-host (sb-xc:sxhash symbol)
+             #+sb-xc-host (symbol-name-hash symbol)
              ;; This mixes in package-id when hashing field names.
              ;; The reason is that if you have 100 different packages each defining
              ;; (STRUCT FOO (WORD0 INT) (WORD1 INT)), then without a better hash
@@ -1040,8 +1040,9 @@
              ;; a symbol. It's not important because at worst, you miss in the hashset.
              ;; We can't perfectly hash-cons record types anyway.
              ;; (Detecting isomorphism between possibly cyclic objects is hard)
+             ;; Question: should this just use SYMBOL-HASH instead?
              #-sb-xc-host (mix (sb-kernel:symbol-package-id symbol)
-                               (sb-xc:sxhash symbol))))
+                               (symbol-name-hash symbol))))
     (mix (hash-sym (alien-record-type-name r))
          (hash-fields (alien-record-type-fields r)))))
 (defun alien-record-type-equiv (a b)
@@ -1493,13 +1494,15 @@
                ((alien-value mem-block) 0)
                (pointer '(if to (alien-type-hash to) #xBAD))
                (c-string ; Don't need ALIEN-POINTER-TYPE-TO as it's invariant
-                (mix* (sb-xc:sxhash element-type) (sb-xc:sxhash external-format)
-                      (sb-xc:sxhash not-null)))
+                (mix* (sb-kernel:symbol-hash element-type)
+                      (sb-kernel:symbol-hash external-format)
+                      (sb-kernel:symbol-hash not-null)))
                ((integer boolean) '(if signed 1 0))
                (array `(let ((h (alien-type-hash element-type)))
                          (dolist (dim dimensions h) (setf h (mix dim h)))))
                (fun (mix* (alien-type-hash result-type) (hash-alien-type-list arg-types)
-                          (sb-xc:sxhash varargs) (sb-xc:sxhash convention)))
+                          (sb-xc:sxhash varargs)
+                          (sb-kernel:symbol-hash convention)))
                (values '(hash-alien-type-list values))))))
        (collect ((forms) (globals))
          (dolist (list *hashset-defining-forms*

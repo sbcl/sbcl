@@ -754,43 +754,14 @@
 ;;; to make a large difference in the maximum probe sequence length.
 (defmacro type-hash-final-mix (val) `(murmur-hash-word/+fixnum ,val))
 
-;;; The fallback hashing functions might rely on the host's SXHASH but always
-;;; return an SB-XC:FIXNUM result so that we can call our MIX on the value.
-;;; It turns out that we have to largely reimplement numeric hashing because
-;;; some hosts produce sufficiently poor hashes that our type hashsets would explode
-;;; in size due to so many collisions were we to use the host's SXHASH.
-#+sb-xc-host
-(progn
-(defun number-hash (x) ; this does *not* have to match SB-IMPL::NUMBER-SXHASH
-  (etypecase x
-    (integer
-     (if (typep x 'sb-xc:fixnum)
-         (sb-xc:sxhash x)
-         ;; mix target-fixnum-sized chunks
-         (let ((nbits (1+ (integer-length x))) (h #xbbbb) (pos 0))
-           (dotimes (i (ceiling nbits sb-vm:n-positive-fixnum-bits) h)
-             (let ((chunk (ldb (byte sb-vm:n-positive-fixnum-bits pos) x)))
-               (setf h (mix (number-hash chunk) h)))
-             (incf pos sb-vm:n-positive-fixnum-bits)))))
-    (ratio (mix (number-hash (numerator x)) (number-hash (denominator x))))
-    (single-float (number-hash (single-float-bits x)))
-    (double-float (mix (number-hash (double-float-low-bits x))
-                       (number-hash (double-float-high-bits x))))))
-(defun fallback-hash (x)
-  ;; This is used on a HAIRY specifier which could be an UNKNOWN (just a symbol), or a SATISFIES.
-  (etypecase x
-    (symbol
-     ;; There is no reason at all that two distinct symbols should hash the same when their
-     ;; names are STRING= so really we want something better than SXHASH, but it'll do.
-     (sb-xc:sxhash x))
-    (cons (if (eq (car x) 'satisfies)
-              (sb-xc:sxhash (cadr x)) ; it's good enough
-              (error "please no: ~S" x))))))
-
 #-sb-xc-host
 (progn
-  (defmacro number-hash (x) `(sb-impl::number-sxhash ,x))
-  (defmacro fallback-hash (x) `(sxhash ,x)))
+  (defmacro sb-c::number-hash (x) `(sb-impl::number-sxhash ,x))
+  ;; This is used on a HAIRY specifier which could be an UNKNOWN (just a symbol), or a SATISFIES.
+  ;; There is no reason at all that two distinct symbols should hash the same when their
+  ;; names are STRING= so really we want something better than SXHASH, but it does noeed to
+  ;; recurse on lists.
+  (defmacro sb-c::fallback-hash (x) `(sxhash ,x)))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
@@ -898,7 +869,7 @@
   ;; is that apparently we'll store _illegal_ type specifiers in a hairy-type.
   ;; There's an example in the regression test named
   ;;  :single-warning-for-single-undefined-type
-  (specifier nil :type t :test equal :hasher fallback-hash))
+  (specifier nil :type t :test equal :hasher sb-c::fallback-hash))
 
 (macrolet ((hash-fp-zeros (x) ; order-insensitive
              `(let ((h 0))
@@ -1108,7 +1079,7 @@
                       (if (listp x)
                           (if x (values #x55AA55 (car x)) (return 0))
                           (values 0 x))
-                    (logxor h (number-hash v))))))
+                    (logxor h (sb-c::number-hash v))))))
            (numbound-eql (a b)
              ;; Determine whether the 'low' and 'high' slots of two NUMERIC-TYPE instances
              ;; are "the same". It is a stricter test than in the SIMPLE-= method, because
@@ -1178,7 +1149,7 @@
 (defun key-info-hash (x)
   (declare (optimize (safety 0)))
   (murmur-hash-word/+fixnum
-   (mix (type-hash-value (key-info-type x)) (sb-xc:sxhash (key-info-name x)))))
+   (mix (type-hash-value (key-info-type x)) (symbol-hash (key-info-name x)))))
 
 (defun hash-key-info-set (set) ; order-insensitive
   (declare (optimize (safety 0)))

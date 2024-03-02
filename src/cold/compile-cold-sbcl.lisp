@@ -188,7 +188,7 @@
                                    :if-exists :supersede :if-does-not-exist :create)
     (format stream ";;; SXHASH test data~%(~%")
     (let ((seen (make-hash-table)))
-      (dolist (pair sb-impl::*sxhash-crosscheck*)
+      (dolist (pair sb-c::*sxhash-crosscheck*)
         (let ((prev (gethash (car pair) seen)))
           (if prev
               (assert (= prev (cdr pair))) ; be self-consistent at least
