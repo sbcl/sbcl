@@ -26,7 +26,7 @@
      (flet ((add (lvar type)
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
-                  (conset-add-constraint-to-eql consequent 'typep var type nil)))))
+                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
        (cond ((csubtypep constraint (specifier-type 'integer))
               (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
                     (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
@@ -63,7 +63,7 @@
      (flet ((add (lvar type)
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
-                  (conset-add-constraint-to-eql consequent 'typep var type nil)))))
+                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
        (cond ((csubtypep constraint (specifier-type 'integer))
               (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
                     (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
@@ -106,7 +106,7 @@
      (flet ((add (lvar type)
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
-                  (conset-add-constraint-to-eql consequent 'typep var type nil)))))
+                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
        (let* ((complex-p (or (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))
                              (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))))
               ;; complex rationals multiplied by 0 will produce an integer 0.
@@ -153,7 +153,7 @@
      (unless (types-equal-or-intersect constraint (specifier-type 'null))
        (let ((var (ok-lvar-lambda-var x gen)))
          (when var
-           (conset-add-constraint-to-eql consequent 'typep var (specifier-type '(not null)) nil)))))))
+           (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null)) nil consequent)))))))
 
 (setf (fun-info-constraint-propagate-back (fun-info-or-lose 'cdr)) #'car-constraint-propagate-back-optimizer)
 
@@ -169,10 +169,10 @@
         (when (and (constant-p constraint)
                    (eql (constant-value constraint) 0)
                    alternative)
-          (conset-add-constraint-to-eql alternative 'typep var (specifier-type '(and integer (not (eql 0)))) nil)))
+          (conset-add-constraint-to-eql gen 'typep var (specifier-type '(and integer (not (eql 0)))) nil alternative)))
        (>
         (when (csubtypep (lvar-type constraint) (specifier-type '(integer 0)))
-          (conset-add-constraint-to-eql consequent 'typep var (specifier-type '(integer 1)) nil)))))))
+          (conset-add-constraint-to-eql gen 'typep var (specifier-type '(integer 1)) nil consequent)))))))
 
 (defoptimizer (%negate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
@@ -185,8 +185,8 @@
                     (numberp (interval-high range)))
            (let ((var (ok-lvar-lambda-var x gen)))
              (when var
-               (conset-add-constraint-to-eql consequent 'typep var (specifier-type `(rational (,(- (interval-high range)))))
-                                             nil)))))))))
+               (conset-add-constraint-to-eql gen 'typep var (specifier-type `(rational (,(- (interval-high range)))))
+                                             nil consequent)))))))))
 
 (defoptimizer (char-code constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value))
@@ -205,31 +205,34 @@
                  (<
                   (when (and (numberp high)
                              (< high (1- char-code-limit)))
-                    (conset-add-constraint-to-eql consequent 'typep var
+                    (conset-add-constraint-to-eql gen 'typep var
                                                   (if (<= high 0)
                                                       *empty-type*
                                                       (specifier-type `(character-set ((0 . ,(1- high))))))
-                                                  nil))
+                                                  nil
+                                                  consequent))
                   (when (and alternative
                              (numberp low)
                              (> low 0))
-                    (conset-add-constraint-to-eql alternative 'typep var
+                    (conset-add-constraint-to-eql gen 'typep var
                                                   (specifier-type `(character-set ((,low . #.(1- char-code-limit)))))
-                                                  nil)))
+                                                  nil
+                                                  alternative)))
                  (>
                   (when (and (numberp low)
                              (> low 0))
-                    (conset-add-constraint-to-eql consequent 'typep var
+                    (conset-add-constraint-to-eql gen 'typep var
                                                   (if (>= low (1- char-code-limit))
                                                       *empty-type*
                                                       (specifier-type `(character-set ((,(1+ low) . #.(1- char-code-limit))))))
-                                                  nil))
+                                                  nil
+                                                  consequent))
                   (when (and alternative
                              (numberp high)
                              (< high (1- char-code-limit)))
-                    (conset-add-constraint-to-eql alternative 'typep var
+                    (conset-add-constraint-to-eql gen 'typep var
                                                   (specifier-type `(character-set ((0 . ,high))))
-                                                  nil)))
+                                                  nil alternative)))
                  (eq
                   (let ((low (if (numberp low)
                                  low
@@ -239,6 +242,6 @@
                                   (1- char-code-limit))))
                     (when (and (> low 0)
                                (< high (1- char-code-limit)))
-                        (conset-add-constraint-to-eql consequent 'typep var
-                                                      (specifier-type `(character-set ((,low . ,high))))
-                                                      nil)))))))))))))
+                      (let ((type (specifier-type `(character-set ((,low . ,high))))))
+                        (conset-add-constraint-to-eql gen 'typep var type nil consequent)
+                        (conset-add-constraint-to-eql gen 'typep var type t alternative))))))))))))))
