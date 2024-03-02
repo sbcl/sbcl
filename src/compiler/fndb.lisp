@@ -182,10 +182,10 @@
 (defknown symbol-name (symbol) simple-string (movable foldable flushable))
 (defknown make-symbol (string) symbol (flushable))
 ;; %make-symbol is the internal API, but the primitive object allocator
-;; is %%make-symbol, because when immobile space feature is present,
+;; is %alloc-symbol, because when immobile space feature is present,
 ;; we dispatch to either the C allocator or the Lisp allocator.
 (defknown %make-symbol (fixnum simple-string) symbol (flushable))
-(defknown sb-vm::%%make-symbol (simple-string) symbol (flushable))
+(defknown sb-vm::%alloc-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or package null) (flushable))

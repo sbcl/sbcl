@@ -114,7 +114,7 @@
                         aligned-nwords
                         header))))
 
-(defun make-immobile-symbol (name)
+(defun %alloc-immobile-symbol (name)
   (let ((symbol (truly-the symbol
                  (or #+x86-64 (%primitive !fast-alloc-immobile-symbol)
                      (alloc-immobile-fixedobj

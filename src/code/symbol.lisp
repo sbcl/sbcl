@@ -337,7 +337,7 @@ distinct from the global value. Can also be SETF."
     package))
 
 ;;; MAKE-SYMBOL is the external API, %MAKE-SYMBOL is the internal function receiving
-;;; a known simple-string, and %%MAKE-SYMBOL is the primitive constructor.
+;;; a known simple-string, and %ALLOC-SYMBOL is the primitive constructor.
 (defun make-symbol (string)
   "Make and return a new symbol with the STRING as its print name."
   (declare (type string string))
@@ -393,21 +393,21 @@ distinct from the global value. Can also be SETF."
        (symbol
          (truly-the symbol
           ;; If no immobile-space, easy: all symbols go in dynamic-space
-          #-immobile-space (sb-vm::%%make-symbol name)
+          #-immobile-space (sb-vm::%alloc-symbol name)
           ;; If #+immobile-symbols, then uninterned symbols go in dynamic space, but
           ;; interned symbols go in immobile space. Good luck IMPORTing an uninterned symbol-
           ;; it'll work at least superficially, but if used as a code constant, the symbol's
           ;; address may violate the assumption that it's an imm32 operand.
           #+immobile-symbols
-          (if (eql kind 0) (sb-vm::%%make-symbol name) (sb-vm::make-immobile-symbol name))
+          (if (eql kind 0) (sb-vm::%alloc-symbol name) (sb-vm::make-immobile-symbol name))
           #+(and immobile-space (not immobile-symbols))
           (if (or (eql kind 1) ; keyword
                   (and (eql kind 2) ; random interned symbol
                        (plusp (length name))
                        (char= (char name 0) #\*)
                        (char= (char name (1- (length name))) #\*)))
-              (sb-vm::make-immobile-symbol name)
-              (sb-vm::%%make-symbol name)))))
+              (sb-vm::%alloc-immobile-symbol name)
+              (sb-vm::%alloc-symbol name)))))
     (%set-symbol-hash symbol (calc-symbol-name-hash name (length name)))
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.

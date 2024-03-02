@@ -1175,7 +1175,7 @@
 ;;; * (time (f 500000))
 ;;; Evaluation took: 0.004 seconds of real time
 ;;; Immobile-space:
-;;; * (defun f (n) (dotimes (i n) (sb-vm::make-immobile-symbol "b")))
+;;; * (defun f (n) (dotimes (i n) (sb-vm::%alloc-immobile-symbol "b")))
 ;;; Evaluation took: 0.043 seconds of real time
 ;;; With vop:  0.028 seconds of real time
 

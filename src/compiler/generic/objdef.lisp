@@ -368,7 +368,7 @@ during backtrace.
 #+64-bit
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-widetag
-                                 :alloc-trans %%make-symbol
+                                 :alloc-trans %alloc-symbol
                                  :type symbol)
 
   ;; Beware when changing this definition.  NIL-the-symbol is defined
@@ -428,7 +428,7 @@ during backtrace.
 #-64-bit
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-widetag
-                                 :alloc-trans %%make-symbol
+                                 :alloc-trans %alloc-symbol
                                  :type symbol)
   ;; As described in the comments above for #+64-bit, the first two slots of SYMBOL
   ;; have to work for NIL-as-cons, so they have to be NIL and NIL, which have to
