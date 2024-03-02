@@ -310,6 +310,7 @@ used to specify the oldest generation guaranteed to be collected."
   ;; removes duplicate entries.
   (scrub-power-cache)
   (setf sb-unicode::*name->char-buffers* nil)
+  (setf sb-c::*phash-lambda-cache* nil)
   ;; Clear caches depending on the generation being collected.
   (cond ((eql 0 gen)
          ;; Drop strings because the hash is pointer-hash

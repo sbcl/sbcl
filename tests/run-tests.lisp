@@ -222,6 +222,7 @@
     `(sb-c::*code-serialno*
       sb-c::*compile-elapsed-time*
       sb-c::*compile-file-elapsed-time*
+      sb-c::*phash-lambda-cache*
       sb-impl::**finalizer-store**
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*

@@ -178,6 +178,7 @@
         (return-from ub32-collection-uniquep nil))
       (add-to-xset x dedup))))
 
+(defglobal *phash-lambda-cache* nil)
 ;;; MINIMAL (the default) returns a a function that returns an output
 ;;; in the range 0..N-1 for N possible symbols. If non-minimal, the output
 ;;; range is the power-of-2-ceiling of N.
@@ -189,31 +190,48 @@
 ;;; and it might run slower! In no way does it say anything about the speed
 ;;; of the generated function. So you pretty much don't want to supply it.
 ;;; Indeed one should avoid passing either optional arg to this function.
-(defun make-perfect-hash-lambda (array &optional objects (minimal t) (fast nil))
+(defun make-perfect-hash-lambda (array &optional objects
+                                       (minimal t) (fast nil) (cacheable t))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
-  (declare (ignorable objects minimal fast))
+  (declare (ignorable objects minimal fast cacheable))
   (when (< (length array) 3) ; one or two keys - why are you doing this?
     (return-from make-perfect-hash-lambda))
   (unless (ub32-collection-uniquep array)
     (return-from make-perfect-hash-lambda))
   ;; no dups present
-  (let* ((string
-          #+sb-xc-host (sb-cold::emulate-generate-perfect-hash-sexpr array objects)
+  (let* ((returned-string) ; this is solely for some regression tests
+         (expr
+          #+sb-xc-host
+          (let ((string (sb-cold::emulate-generate-perfect-hash-sexpr array objects)))
+            (setq returned-string string)
+            ;; don't rebind anything except *PACKAGE* for read-from-string,
+            ;; especially as we need to keep our #\A charmacro
+            (let ((*package* #.(find-package "SB-C"))) (read-from-string string)))
           #-sb-xc-host
-          (sb-unix::newcharstar-string
-           (sb-sys:with-pinned-objects (array)
-             (alien-funcall (extern-alien
+          (let* ((digest (reduce #'logxor array))
+                 (cache-key (cons digest array))
+                 (cache *phash-lambda-cache*))
+            (unless cache
+              ;; A race that clobbers the global is benign. At worst it discards
+              ;; work done some in another thread to cache something.
+              (setf cache (make-hash-table :test 'equalp :synchronized t)
+                    *phash-lambda-cache* cache))
+            (or (gethash cache-key cache)
+                (let* ((string
+                        (sb-unix::newcharstar-string
+                         (sb-sys:with-pinned-objects (array)
+                           (alien-funcall
+                            (extern-alien
                              "lisp_perfhash_with_options"
                              (function (* char) int system-area-pointer int))
                             (logior (if minimal 1 0) (if fast 2 0))
                             (sb-sys:vector-sap array) (length array)))))
-         (expr #+sb-xc-host ; don't rebind anything except *PACKAGE*
-               ;; especially as we need to keep our #\A charmacro
-               (let ((*package* #.(find-package "SB-C"))) (read-from-string string))
-               #-sb-xc-host
-               (with-standard-io-syntax
-                 (let ((*package* #.(find-package "SB-C")))
-                   (read-from-string string)))))
+                       (expr (with-standard-io-syntax
+                                 (let ((*package* #.(find-package "SB-C")))
+                                   (read-from-string string)))))
+                  (when cacheable (setf (gethash cache-key cache) expr))
+                  (setf returned-string string)
+                  expr)))))
     (let ((tables))
       ;; Hoist the constants into symbol-macrolets rather than LETs
       ;; because my work-in-progress 32-bit-modular-arithmetic optimizer
@@ -232,7 +250,7 @@
                    (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
                    (declare (type (unsigned-byte 32) val))
                    ,(if tables `(symbol-macrolet ,tables ,calc) calc))
-                string)))))
+                returned-string)))))
 
 ;;; I have work-in-progress which causes the compiler to emit unsigned-word operations
 ;;; with a dword operand size on x86-64, which avoids insertion of ANDs that mask
