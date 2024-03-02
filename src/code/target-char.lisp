@@ -272,24 +272,18 @@ strings and symbols of length 1."
 
 ;;;; predicates
 
-(defmacro std-char-code-p (cc) `(or (< 31 ,cc 127) (= ,cc 10)))
 (defun standard-char-p (char)
-  "The argument must be a character object. STANDARD-CHAR-P returns true if the
+  "The argument must be a character object. STANDARD-CHAR-P returns T if the
 argument is a standard character -- one of the 95 ASCII printing characters or
 <return>."
   (let ((n (char-code char)))
-    ;; returning CHAR for true is fine, and it's already in a register,
-    ;; but the compiler can't infer BASE-CHAR from the constraint on N,
-    ;; so we have to force it.
-    (if (std-char-code-p n) (truly-the base-char char) nil)))
+    (or (< 31 n 127)
+        (= n 10))))
 
-(defun %standard-char-p (thing) ; why is this symbol in SB-SYS: ? that's very random.
+(defun %standard-char-p (thing)
   "Return T if and only if THING is a standard-char. Differs from
 STANDARD-CHAR-P in that THING doesn't have to be a character."
-  ;; This predicate must return a strict boolean, not a generalized boolean
-  (and (characterp thing)
-       (let ((n (char-code thing)))
-         (if (std-char-code-p n) t nil))))
+  (and (characterp thing) (standard-char-p thing)))
 
 (defun graphic-char-p (char)
   "The argument must be a character object. GRAPHIC-CHAR-P returns T if the

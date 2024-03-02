@@ -507,11 +507,9 @@
 (defknown random-state-p (t) boolean (movable foldable flushable))
 
 ;;;; from the "Characters" chapter:
-(defknown (graphic-char-p alpha-char-p
-                           upper-case-p lower-case-p both-case-p alphanumericp)
+(defknown (graphic-char-p alpha-char-p standard-char-p
+           upper-case-p lower-case-p both-case-p alphanumericp)
   (character) boolean (movable foldable flushable))
-(defknown (standard-char-p)
-  (character) (or null base-char) (movable foldable flushable))
 
 (defknown digit-char-p (character &optional (integer 2 36))
   (or (integer 0 35) null) (movable foldable flushable))
