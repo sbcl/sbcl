@@ -1254,3 +1254,11 @@
          t
          (consp x)))
    (eql t)))
+
+(with-test (:name :char-code)
+  (assert-type
+   (lambda (x)
+     (let ((n (char-code x)))
+       (when (or (< 31 n 127) (= n 10))
+         x)))
+   (or null standard-char)))

@@ -187,3 +187,58 @@
              (when var
                (conset-add-constraint-to-eql consequent 'typep var (specifier-type `(rational (,(- (interval-high range)))))
                                              nil)))))))))
+
+(defoptimizer (char-code constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value))
+  (case kind
+    ((< > eq)
+     (when (csubtypep (lvar-type constraint) (specifier-type 'rational))
+       (let ((range (type-approximate-interval (lvar-type constraint))))
+         (when (and range
+                    (numberp (interval-high range)))
+           (let ((var (ok-lvar-lambda-var x gen))
+                 (low (interval-low range))
+                 (high (interval-high range)))
+             (when var
+               (interval-high range)
+               (case kind
+                 (<
+                  (when (and (numberp high)
+                             (< high (1- char-code-limit)))
+                    (conset-add-constraint-to-eql consequent 'typep var
+                                                  (if (<= high 0)
+                                                      *empty-type*
+                                                      (specifier-type `(character-set ((0 . ,(1- high))))))
+                                                  nil))
+                  (when (and alternative
+                             (numberp low)
+                             (> low 0))
+                    (conset-add-constraint-to-eql alternative 'typep var
+                                                  (specifier-type `(character-set ((,low . #.(1- char-code-limit)))))
+                                                  nil)))
+                 (>
+                  (when (and (numberp low)
+                             (> low 0))
+                    (conset-add-constraint-to-eql consequent 'typep var
+                                                  (if (>= low (1- char-code-limit))
+                                                      *empty-type*
+                                                      (specifier-type `(character-set ((,(1+ low) . #.(1- char-code-limit))))))
+                                                  nil))
+                  (when (and alternative
+                             (numberp high)
+                             (< high (1- char-code-limit)))
+                    (conset-add-constraint-to-eql alternative 'typep var
+                                                  (specifier-type `(character-set ((0 . ,high))))
+                                                  nil)))
+                 (eq
+                  (let ((low (if (numberp low)
+                                 low
+                                 0))
+                        (high (if (numberp high)
+                                  high
+                                  (1- char-code-limit))))
+                    (when (and (> low 0)
+                               (< high (1- char-code-limit)))
+                        (conset-add-constraint-to-eql consequent 'typep var
+                                                      (specifier-type `(character-set ((,low . ,high))))
+                                                      nil)))))))))))))
