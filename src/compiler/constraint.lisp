@@ -1227,14 +1227,13 @@
       (let (mark
             (eq (lambda-var-eq-constraints leaf)))
         (when eq
-          (loop for index from 0
-                for other-ref in (leaf-refs leaf)
+          (loop for other-ref in (leaf-refs leaf)
                 unless (eq other-ref ref)
                 do (let ((constraint (gethash (ref-lvar other-ref) eq)))
                      (when (and constraint
                                 (conset-member constraint in))
                        (unless mark
-                         (setf mark index)
+                         (setf mark (list 0))
                          (setf (ref-same-refs ref) mark))
                        (setf (ref-same-refs other-ref) mark)))))
         (when mark

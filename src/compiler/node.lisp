@@ -1465,9 +1465,9 @@
   (leaf nil :type leaf)
   ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
   (%source-name (missing-arg) :type symbol :read-only t)
-  ;; An integer added by constraint-propagate to all REFs that have the
+  ;; An cons added by constraint-propagate to all REFs that have the
   ;; same value when referencing a lambda-var with sets.
-  (same-refs nil :type (or null fixnum)))
+  (same-refs nil :type (or null cons)))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)

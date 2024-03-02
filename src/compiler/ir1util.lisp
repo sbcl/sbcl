@@ -2503,8 +2503,8 @@ is :ANY, the function name is not checked."
 (defun refs-unchanged-p (ref1 ref2)
   (let ((same (ref-same-refs ref1)))
     (and same
-         (eql same
-              (ref-same-refs ref2)))))
+         (eq same
+             (ref-same-refs ref2)))))
 
 
 ;;; Return true if VAR would have to be closed over if environment
