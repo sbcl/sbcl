@@ -420,42 +420,32 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:arg-refs args)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    ;; The symbol-hash slot of NIL holds NIL because it is also the
-    ;; car slot, so we have to zero the fixnum tag bit(s) to make sure
-    ;; it is a fixnum.  The lowtag selection magic that is required to
-    ;; ensure this is explained in the comment in objdef.lisp
-    (unless (not-nil-tn-ref-p args)
-      (inst and res (lognot fixnum-tag-mask)))))
+    (inst shr res 24))) ; shift out 3 bytes
 
 (eval-when (:compile-toplevel)
   ;; assumption: any object can be read 1 word past its base pointer
-  (assert (= sb-vm:symbol-hash-slot 1)))
+  (assert (= sb-vm:symbol-hash-slot 1))
+  ;; also: whatever pointer tag a non-immediate object has, we can subtract
+  ;; 3 without reading any byte outside of the object.
+  (aver (= (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)
+           -3))) ; 3 is the smallest pointer tag
 
-(define-vop (hash-as-if-symbol-name)
+(define-vop (symbol-name-hash)
   (:policy :fast-safe)
-  (:translate hash-as-if-symbol-name)
-  (:args (object :scs (descriptor-reg)))
-  ;; arg can not target the temp because they both have to be live
-  ;; in order that the tagged pointer not disappear.
-  ;; But temp and output could be in the same register.
-  (:temporary (:sc unsigned-reg :to (:result 0)) base-ptr)
-  (:results (res :scs (any-reg)))
+  ;; identical translations believe it or not
+  (:translate symbol-name-hash hash-as-if-symbol-name)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:generator 4
-    (inst mov base-ptr object)
-    (inst and base-ptr (lognot lowtag-mask))
-    (inst mov res (ea n-word-bytes base-ptr)) ; 1 word beyond the header
-    ;; This will be more efficient after I align the 32 bits that we want to grab
-    ;; for the name hash into the upper 4 bytes so that we don't have to refer
-    ;; to a mask that isn't expressible in an immediate operand.
-    (inst and res
-          (register-inline-constant
-           :qword (ash #xFFFFFFFF n-fixnum-tag-bits)))))
+  (:generator 1
+    ;; NIL gets 0 for its name hash since its upper 4 address bytes are 0
+    (inst mov :dword res
+          (ea (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)
+              symbol))))
 
 (aver (= sb-impl::package-id-bits 16))
 (define-vop ()

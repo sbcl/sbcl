@@ -560,9 +560,13 @@
                           (disassemble f :stream string))
                         #\newline)))
 
-(with-test (:name :peephole-optimizations-1)
+(with-test (:name :peephole-optimizations-1 :skipped-on :sbcl)
   ;; The test does not check that both the load and the shift
-  ;; have been sized as :dword instead of :qword, but it should.
+  ;; have been sized as :dword instead of :qword, but it should
+  ;; FIXME: this test was supposed to assert that
+  ;; "AND r, -2 ; AND r, n" combines the two ANDs into one,
+  ;; but there is no longer an AND in the symbol-hash vop
+  ;; so I need to find a different test case.
   (let ((f '(lambda (x)
              ;; eliminate arg count check, type check
              (declare (optimize speed (safety 0)))
@@ -573,6 +577,8 @@
       (assert (= (count-assembly-lines instcombined)
                  (- (count-assembly-lines unoptimized) 1)))))
 
+  ;; Likewise this was "AND RDX, -2 ; SAR RDX, 2 ; AND RDX, -2 ; AND RDX, 62"
+  ;; becoming "SHR EDX, 2 ; AND EDX, 62"
   (let ((f '(lambda (x)
              ;; eliminate arg count check, type check
              (declare (optimize speed (safety 0)))

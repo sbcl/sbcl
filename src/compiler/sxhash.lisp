@@ -162,11 +162,12 @@
 ;;; - SXHASH is required by the language to have behavior that precludes randomizing the
 ;;;   hash, and encourages using all the range of positive fixnums.
 ;;;
-(deftransform sxhash ((x) (symbol)) `(symbol-hash x))
+(deftransform sxhash ((x) (symbol)) '#.(sxhash-symbol-xform 'x))
 
 (deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)
   `(symbol-name-hash object))
 
+#-salted-symbol-hash
 (define-source-transform symbol-name-hash (s) `(ldb (byte 32 0) (symbol-hash ,s)))
 
 (intern "SCRAMBLE" "SB-C")

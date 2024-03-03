@@ -56,19 +56,24 @@
                      ;; hash.impure.lisp)
                      #.(logandc1 1193941380939624010 most-positive-fixnum))
              most-positive-fixnum)))
+
+(defun sxhash-symbol-xform (s)
+  #+salted-symbol-hash `(let ((h (symbol-name-hash ,s))) (sb-int:mix h h))
+  #-salted-symbol-hash `(symbol-hash ,s))
 ) ; end EVAL-WHEN
 
 (defun calc-symbol-name-hash (string length)
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
   (assert (= length (length string)))
-  (cond
-    #+64-bit
-    ((string= string "NIL") ; :NIL must hash the same as NIL
-      ;; out-of-order with defconstant nil-value
-      (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
-    (t
-      (logxor (%sxhash-simple-string string) most-positive-fixnum))))
+  (cond #+64-bit
+        ((string= string "NIL") ; :NIL must hash the same as NIL
+         #+x86-64 0 ; return the high 4 bytes in NIL's car slot
+         #-x86-64
+         ;; out-of-order with defconstant nil-value
+         (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
+        (t
+         (logxor (%sxhash-simple-string string) most-positive-fixnum))))
 
 ;;; This is merely a slot-reader in real life, but since cross-compiling
 ;;; doesn't have a slot, simply recompute the answer as if it were stored.
@@ -100,7 +105,6 @@
     ;;    one way or another based on the type of the dimension.
     ;; 2. Exactly the same thing occurs with alien-type :BITS and :ALIGNMENT
     ;;    which are either NIL or int, as is alien-fun-type :VARARGS
-    ;;    which
     ;; But in stark contrast, XSET-ELTS-HASH avoids calling SXHASH on symbols
     ;; because SXHASH is not the best hasher for that purpose, like say an XSET
     ;; that contains 100 symbols all of whose print names are the same.
@@ -108,7 +112,7 @@
       (unless (member s '("*" "NIL" "UNSPECIFIED") :test 'string=)
         (error "don't call SB-XC:SXHASH on ~S" obj))
       ;; !PACKAGE-COLD-INIT will cross-check this hash
-      (return-from sb-xc:sxhash (calc-symbol-name-hash s (length s)))))
+      (return-from sb-xc:sxhash #.(sxhash-symbol-xform 'obj))))
   (let ((answer
          (etypecase obj ; croak on anything but these
            (sb-xc:fixnum #.(sxhash-fixnum-xform 'obj))

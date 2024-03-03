@@ -1154,10 +1154,14 @@ core and return a descriptor to it."
              (pkg-id (if cold-package
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+))
-             (hash (make-fixnum-descriptor
-                    (sb-c::calc-symbol-name-hash name (length name)))))
+             (hash (sb-c::calc-symbol-name-hash name (length name))))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
-        (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
+        (if (member :salted-symbol-hash sb-xc:*features*)
+            ;; Store the low 4 bytes of hash into the high 4 bytes of the slot
+            (write-wordindexed/raw symbol sb-vm:symbol-hash-slot
+                                   (logand (ash hash 32) most-positive-word))
+            (write-wordindexed symbol sb-vm:symbol-hash-slot
+                               (make-fixnum-descriptor hash)))
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
         #+compact-symbol
         (write-wordindexed/raw symbol sb-vm:symbol-name-slot

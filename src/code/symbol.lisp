@@ -87,7 +87,7 @@ distinct from the global value. Can also be SETF."
               (and (char= (schar string 0) #\N)
                    (char= (schar string 1) #\I)
                    (char= (schar string 2) #\L)))))
-      (sxhash nil)) ; transformed
+     #.(symbol-hash 'nil)) ; utilize the host's function
     (t
       ;; flip the bits so that a symbol hashes differently from its print name
       (logxor (%sxhash-simple-substring string 0 length)
@@ -390,6 +390,7 @@ distinct from the global value. Can also be SETF."
                    ;; Readonly space is physically unwritable. Don't touch it.
                    (not (read-only-space-obj-p name)))
           (logior-array-flags name sb-vm:+vector-shareable+))) ; Set "logically read-only" bit
+       (name-hash (calc-symbol-name-hash name (length name)))
        (symbol
          (truly-the symbol
           ;; If no immobile-space, easy: all symbols go in dynamic-space
@@ -408,7 +409,14 @@ distinct from the global value. Can also be SETF."
                        (char= (char name (1- (length name))) #\*)))
               (sb-vm::%alloc-immobile-symbol name)
               (sb-vm::%alloc-symbol name)))))
-    (%set-symbol-hash symbol (calc-symbol-name-hash name (length name)))
+    #+salted-symbol-hash
+    (let* ((salt (murmur3-fmix-word (mix (get-lisp-obj-address symbol) name-hash)))
+           (hash (logior (logand (ash name-hash 32) most-positive-word)
+                         (mask-field (byte 8 24) salt))))
+      ;; %SET-SYMBOL-HASH wants a unsigned fixnum, which HASH is not.
+      (%primitive sb-vm::set-slot symbol (%make-lisp-obj hash)
+                  'make-symbol sb-vm:symbol-hash-slot sb-vm:other-pointer-lowtag))
+    #-salted-symbol-hash (%set-symbol-hash symbol name-hash)
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.
     #-compact-symbol (%set-symbol-package symbol nil)

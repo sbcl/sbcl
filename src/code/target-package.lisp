@@ -1997,10 +1997,13 @@ PACKAGE."
            ;; type decl is critical here - can't invoke a hairy aref routine yet
            (dovector (symbol (the simple-vector symbols))
              (when symbol ; skip NIL because of its magic-ness
-               (let* ((stored-hash (symbol-hash symbol))
-                      (name (symbol-name symbol))
+               (let* ((name (symbol-name symbol))
                       (computed-hash (calc-symbol-name-hash name (length name))))
-                 (aver (= stored-hash computed-hash)))))))
+                 #+salted-symbol-hash
+                 (aver (= (symbol-name-hash symbol)
+                          (logand computed-hash +symname-hash-mask+)))
+                 #-salted-symbol-hash
+                 (aver (= (symbol-hash symbol) computed-hash)))))))
     (check-hash-slot (car *!initial-symbols*)) ; uninterned symbols
     (dolist (spec specs)
       (check-hash-slot (second spec))

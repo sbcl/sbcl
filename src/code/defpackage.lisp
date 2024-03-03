@@ -821,7 +821,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            (when (functionp reciprocals)
              (return-from metrics (values 1 1 1))) ; 1 probe max+avg, 100% load
            (flet ((probe-seq-len (symbol)
-                    (let* ((name-hash (sxhash symbol))
+                    (let* ((name-hash (symbol-name-hash symbol))
                            (index (symbol-table-hash 1 name-hash nslots))
                            (h2 (symbol-table-hash 2 name-hash nslots))
                            (nprobes 1))
