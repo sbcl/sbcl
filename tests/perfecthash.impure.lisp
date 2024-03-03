@@ -668,3 +668,24 @@ After:
     ;; all the simple expressions needed when cross-compiling
     ;; can be emitted using at most 4 temps
     (assert (<= (test-all file) 4))))
+
+(defvar *bug-2055794-test-form*
+  '(case x
+    ((#\g 5) 1)
+    ((#\} #\j #\y #\$) 2)
+    ((#\- #\|) 3)
+    ((#\X) 4)
+    ((0 7 4 #\% 3) 5)
+    ((#\{) 6)
+    ((#\l) 7)
+    (t 'dropthru)))
+
+(defun bug-2055794-tester (x) #.*bug-2055794-test-form*)
+
+(with-test (:name :lp-2055794)
+  (dolist (clause (butlast (cddr *bug-2055794-test-form*)))
+    (dolist (key (car clause))
+      (let ((answer (bug-2055794-tester key)))
+        (assert (eq answer (second clause))))))
+  (dolist (key '(foo bar baz))
+    (assert (eq (bug-2055794-tester key) 'dropthru))))

@@ -220,21 +220,30 @@
               (setf cache (make-hash-table :test 'equalp :synchronized t)
                     *phash-lambda-cache* cache))
             (or (gethash cache-key cache)
-                (let* ((string
-                        (sb-unix::newcharstar-string
-                         (sb-sys:with-pinned-objects (array)
-                           (alien-funcall
-                            (extern-alien
-                             "lisp_perfhash_with_options"
-                             (function (* char) int system-area-pointer int))
-                            (logior (if minimal 1 0) (if fast 2 0))
-                            (sb-sys:vector-sap array) (length array)))))
-                       (expr (with-standard-io-syntax
-                                 (let ((*package* #.(find-package "SB-C")))
-                                   (read-from-string string)))))
-                  (when cacheable (setf (gethash cache-key cache) expr))
-                  (setf returned-string string)
-                  expr)))))
+                (flet ((findit (minimal)
+                         (sb-unix::newcharstar-string
+                          (sb-sys:with-pinned-objects (array)
+                            (alien-funcall
+                             (extern-alien
+                              "lisp_perfhash_with_options"
+                              (function (* char) int system-area-pointer int))
+                             (logior (if minimal 1 0) (if fast 2 0))
+                             (sb-sys:vector-sap array) (length array))))))
+                  (let ((string (findit minimal)))
+                    (when (and (not string)
+                               (= (length array) (power-of-two-ceiling (length array)))
+                               minimal)
+                      ;; Possibly try again as non-minimal because it's equivalent on 2^N keys.
+                      ;; This should NOT be needed but it works around a deficiency
+                      ;; in C which I am not smart enough to fix.
+                      (when (null (setq string (findit nil)))
+                        (return-from make-perfect-hash-lambda nil)))
+                    (let ((expr (with-standard-io-syntax
+                                    (let ((*package* #.(find-package "SB-C")))
+                                      (read-from-string string)))))
+                      (when cacheable (setf (gethash cache-key cache) expr))
+                      (setf returned-string string)
+                      expr)))))))
     (let ((tables))
       ;; Hoist the constants into symbol-macrolets rather than LETs
       ;; because my work-in-progress 32-bit-modular-arithmetic optimizer
