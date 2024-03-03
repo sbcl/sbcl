@@ -22,7 +22,7 @@
   (let* ((symbols (sb-impl::symtbl-cells (sb-impl::package-internal-symbols
                                           (find-package "SB-WALKER"))))
          (hashes (map '(simple-array (unsigned-byte 32) (*))
-                      (lambda (x) (ldb (byte 32 0) (sxhash x)))
+                      #'sb-kernel::symbol-name-hash
                       symbols))
          (n (length hashes))
          (expr1 (sb-c:make-perfect-hash-lambda hashes :dummy t nil nil))
@@ -48,7 +48,7 @@
              (etypecase key
                ((unsigned-byte 32) (funcall fun key))
                (symbol
-                (funcall fun (ldb (byte 32 0) (sb-kernel:symbol-hash key)))))))
+                (funcall fun (sb-kernel::symbol-name-hash key))))))
         (when print (format t "~s -> ~d~%" key hash))
         ;; Can't exceed N-1, and can't repeat
         (when (or (>= hash n) (aref seen hash))
@@ -222,10 +222,18 @@
 (defun generate-perfect-hashfun (symbols)
   (let ((hashes
          (map '(simple-array (unsigned-byte 32) (*))
-              (lambda (x) (ldb (byte 32 0) (sb-kernel:symbol-hash x)))
+              #'sb-kernel::symbol-name-hash
               symbols)))
-    ;; if symbols hash the same, we have a real problem
-    (assert (= (length (remove-duplicates hashes)) (length hashes)))
+    ;; if symbols hash the same, we can't test the generator on this package
+    (unless (= (length (remove-duplicates hashes)) (length hashes))
+      ;; diagnose it
+      (let ((ht (make-hash-table :test 'equal)))
+        (loop for s in symbols for h across hashes do (push s (gethash h ht)))
+        (format t "~&Collisions:~%")
+        (sb-int:dohash ((h symbols) ht)
+          (when (cdr symbols)
+            (format t "~x = ~S~%" h symbols))))
+      (return-from generate-perfect-hashfun (values nil nil)))
     (let ((expr (sb-c:make-perfect-hash-lambda hashes)))
       #+nil
       (let ((*package* (find-package "SB-IMPL"))
@@ -247,7 +255,8 @@
           (format t " ~D" (length symbols))
           (force-output)
           (let ((f (generate-perfect-hashfun symbols)))
-            (test-perfect-hashfun f symbols))))))
+            (when f
+              (test-perfect-hashfun f symbols)))))))
   (terpri))
 
 (defun find-tables (expression)
