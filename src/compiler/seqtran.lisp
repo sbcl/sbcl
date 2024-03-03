@@ -2903,7 +2903,7 @@
                 (let* ((pair (car list)) (key (cdr pair)))
                   (unless (gethash key map)
                     (setf (gethash key map) (if (eq alistp t) pair (car pair))))))))))
-    (flet ((hash (key) (ldb (byte 32 0) (symbol-name-hash key))))
+    (flet () ; XXX: reindent from here down
       ;; Sort to avoid sensitivity to the hash-table iteration order when cross-compiling.
       ;; Not necessary for the target but not worth a #+/- either.
       ;; TODO: rather than sorting, compute KEYS from the originally-specified ITEMS after
@@ -2911,7 +2911,7 @@
       ;; there is not really a good sort order on a mixture of those, though I suppose
       ;; we could sort by the hash, since that has to be unique or the transform fails.
       (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
-                 (hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
+                 (hashes (map '(simple-array (unsigned-byte 32) (*)) #'symbol-name-hash keys))
                  (n (length hashes))
                  (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
                  (pow2size (power-of-two-ceiling n))
@@ -2949,7 +2949,7 @@
             (return-from try-perfect-find/position-map conditional))
           (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
             (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
-        (maphash (lambda (key val &aux (phash (funcall phashfun (hash key))))
+        (maphash (lambda (key val &aux (phash (funcall phashfun (symbol-name-hash key))))
                    (cond ((eq alistp t)
                           (setf (aref domain phash) val)) ; VAL is the (key . val) pair
                          (t
@@ -2973,12 +2973,8 @@
         ;; of the perfect hash is smaller than 2^N.
         (note-perfect-hash-used
          `(,fun-name ,conditional ,items)
-         `(let* ((hash (ldb (byte 32 0) ; TODO: remove LDB after I change all the vops to
-                                        ; return a _NAME_ hash in 32 bits, with a different
-                                        ; vop to obtain pseudo-random stable hash bits,
-                                        ; stored as two halves of the SYMBOL-HASH slot.
-                            #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
-                            #-x86-64 (if (symbolp item) (symbol-name-hash item) 0)))
+         `(let* ((hash #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
+                       #-x86-64 (if (symbolp item) (symbol-name-hash item) 0))
                  (phash (,lambda hash)))
             ,(if certainp
                  `(aref ,range (truly-the (mod ,n) phash))

@@ -399,7 +399,7 @@ distinct from the global value. Can also be SETF."
           ;; it'll work at least superficially, but if used as a code constant, the symbol's
           ;; address may violate the assumption that it's an imm32 operand.
           #+immobile-symbols
-          (if (eql kind 0) (sb-vm::%alloc-symbol name) (sb-vm::make-immobile-symbol name))
+          (if (eql kind 0) (sb-vm::%alloc-symbol name) (sb-vm::%alloc-immobile-symbol name))
           #+(and immobile-space (not immobile-symbols))
           (if (or (eql kind 1) ; keyword
                   (and (eql kind 2) ; random interned symbol
@@ -689,3 +689,5 @@ distinct from the global value. Can also be SETF."
 ) ; end MACROLET
 
 #+sb-thread (defun symbol-tls-index (x) (symbol-tls-index x)) ; necessary stub
+
+(defun symbol-name-hash (symbol) (symbol-name-hash symbol)) ; transformed

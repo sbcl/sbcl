@@ -72,15 +72,24 @@
 
 ;;; This is merely a slot-reader in real life, but since cross-compiling
 ;;; doesn't have a slot, simply recompute the answer as if it were stored.
-(defun symbol-name-hash (symbol)
+;;; This hash contains *MORE* significant bits than SYMBOL-NAME-HASH.
+;;; %MAKE-SYMBOL will (eventually) stuff in some pseudo-random bits.
+;;; However, for cross-compiling, it's OK to forgo randomizing, because
+;;; we don't have many (if any) STRING= symbols that would benefit from
+;;; having distinct hashes.
+(defun symbol-hash (symbol)
   (let ((name (symbol-name symbol)))
     (calc-symbol-name-hash name (length name))))
 
-;;; This is also just a slot-reader (well, eventually but I'm not done)
-;;; with one byte of pseudo-randomness ORed in. However, for cross-compiling,
-;;; it's OK to forgo randomizing because we don't have many (if any) STRING=
-;;; symbols that we place into xsets.
-(defun symbol-hash (symbol) (symbol-name-hash symbol))
+;;; This is also theoretically a slot-reader which for 32-bit is identical
+;;; to symbol-hash, or 64-bit is a zero-extending 4-byte load that grabs
+;;; only 32 bits.
+(defun symbol-name-hash (symbol)
+  (ldb (byte 32 0) (symbol-hash symbol)))
+
+(defun hash-as-if-symbol-name (x)
+  (aver (symbolp x))
+  (symbol-name-hash x))
 
 (defvar *sxhash-crosscheck* nil)
 (defun sb-xc:sxhash (obj)

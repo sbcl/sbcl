@@ -947,10 +947,6 @@ invoked. In that case it will store into PLACE and start over."
                           `((etypecase-failure ,temp ',type-specs))
                           (cdr default)))))))))
 
-;; TODO: mask out pseudo-random bits from SYMBOL-HASH (when I implement that).
-;; Or it will be a vop that extracts a half-lisp-word-sized quantity.
-(sb-xc:defmacro symbol-name-hash (s) `(symbol-hash ,s))
-
 (defun expand-hash-case (normal-clauses key-lists constants default errorp keyform phash-lexpr)
   (let* ((keys (apply #'append key-lists))
          (temp '#1=#:key) ; GENSYM considered harmful
@@ -965,11 +961,9 @@ invoked. In that case it will store into PLACE and start over."
          (object-hash
           `(cond ,@(when (some #'symbolp keys)
                      ;; Expressable as (vop-existsp :translate hash-as-if-symbol-name) maybe ?
-                     #+x86-64
-                     `(((pointerp #1#) (ldb (byte 32 0) (hash-as-if-symbol-name #1#))))
-                     #-x86-64
-                     `(((,(if (member nil keys) 'symbolp 'non-null-symbol-p) #1#)
-                        (ldb (byte 32 0) (symbol-name-hash #1#)))))
+                     #+x86-64 `(((pointerp #1#) (hash-as-if-symbol-name #1#)))
+                     #-x86-64 `(((,(if (member nil keys) 'symbolp 'non-null-symbol-p) #1#)
+                                 (symbol-name-hash #1#))))
                  ,@(when (some #'fixnump keys) '(((fixnump #1#) (ldb (byte 32 0) #1#))))
                  ,@(when (some #'characterp keys) '(((characterp #1#) (char-code #1#))))
                  (t 0))) ; semi-arbitrary

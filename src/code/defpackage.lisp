@@ -647,7 +647,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
   (let* ((string (truly-the simple-string
                             (stringify-string-designator string-designator)))
          (length (length string))
-         (hash (calc-symbol-name-hash string length))
+         (hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+))
          (result (list nil)))
     (do-packages (p) ; FIXME: should not acquire package-names lock
       (add-to-bag-if-found (package-internal-symbols p) string length hash result)
@@ -715,7 +715,8 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
       (flet ((find-all-in-table (table)
                (if (and core-purified-p (not (symtbl-modified table)))
                    (dolist (candidate candidates)
-                     (let* ((hash (the hash-code (car candidate)))
+                     (let* ((hash (logand (the hash-code (car candidate))
+                                          +symname-hash-mask+))
                             (string (the simple-string (cdr candidate)))
                             (length (length string)))
                        (add-to-bag-if-found table string length hash result)))
@@ -754,7 +755,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
              (return-from rehash)) ; already hashed
            (let* ((cells (cdr cells))
                   (hashes (map '(simple-array (unsigned-byte 32) (*))
-                               (lambda (symbol) (ldb (byte 32 0) (symbol-hash symbol)))
+                               #'symbol-name-hash
                                (remove-if-not #'symbolp cells)))
                   (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
              (unless hash-expr
@@ -763,7 +764,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                    (new-cells (make-array (length hashes) :initial-element 0)))
                (dovector (s cells)
                  (when (symbolp s)
-                   (let ((hash (funcall fun (ldb (byte 32 0) (symbol-hash s)))))
+                   (let ((hash (funcall fun (symbol-name-hash s))))
                      (aver (eq (svref new-cells hash) 0))
                      (setf (svref new-cells hash) s))))
                (setf (symtbl-%cells table) (cons fun new-cells)

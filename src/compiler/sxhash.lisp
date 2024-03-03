@@ -165,7 +165,9 @@
 (deftransform sxhash ((x) (symbol)) `(symbol-hash x))
 
 (deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)
-  `(symbol-hash object))
+  `(symbol-name-hash object))
+
+(define-source-transform symbol-name-hash (s) `(ldb (byte 32 0) (symbol-hash ,s)))
 
 (intern "SCRAMBLE" "SB-C")
 (intern "TAB" "SB-C")
@@ -293,7 +295,7 @@
 (defun perfectly-hashable (objects)
   (flet ((hash (x)
            (cond ((fixnump x) (ldb (byte 32 0) x))
-                 ((symbolp x) (ldb (byte 32 0) (symbol-name-hash x)))
+                 ((symbolp x) (symbol-name-hash x))
                  ((characterp x) (char-code x)))))
     (let* ((n (length objects))
            (hashes (make-array n :element-type '(unsigned-byte 32))))

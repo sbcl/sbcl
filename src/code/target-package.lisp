@@ -1166,11 +1166,12 @@ Experimental: interface subject to change."
 ;;; Find where the symbol named STRING is stored in TABLE.
 ;;; INDEX-VAR is bound to the vector index if found, or -1 if not.
 ;;; LENGTH bounds the string, and NAME-HASH should be precomputed by
-;;; calling CALC-SYMBOL-NAME-HASH.
+;;; calling CALC-SYMBOL-NAME-HASH and chopping to 32 bits
 ;;; If the symbol is found, then FORMS are executed; otherwise not.
 (defmacro with-symbol (((symbol-var &optional index-var) table
                         string length name-hash) &body forms)
-  (let ((lookup `(%lookup-symbol ,table ,string ,length ,name-hash)))
+  (let ((lookup `(%lookup-symbol ,table ,string ,length
+                                 (the symbol-name-hash ,name-hash))))
     `(,@(if index-var
             `(multiple-value-bind (,symbol-var ,index-var) ,lookup)
             `(let ((,symbol-var ,lookup))))
@@ -1215,10 +1216,10 @@ Experimental: interface subject to change."
                (vec (truly-the simple-vector (cdr cells)))
                (len (length vec)))
           (when (functionp magic)
-            (let ((perfect-hash (funcall magic (ldb (byte 32 0) name-hash))))
+            (let ((perfect-hash (funcall magic name-hash)))
               (when (< perfect-hash len)
                 (let ((symbol (truly-the symbol (svref vec perfect-hash))))
-                  (when (and (eql (symbol-hash symbol) name-hash)
+                  (when (and (eql (symbol-name-hash symbol) name-hash)
                              (string= (symbol-name symbol) string :end2 name-length))
                     (return-from try (values symbol perfect-hash))))))
             (return-from try (values 0 -1)))
@@ -1257,7 +1258,7 @@ Experimental: interface subject to change."
                (vec (truly-the simple-vector (cdr cells)))
                (len (length vec)))
           (when (functionp magic)
-            (let ((perfect-hash (funcall magic (ldb (byte 32 0) name-hash))))
+            (let ((perfect-hash (funcall magic name-hash)))
               (return-from try
                 (and (< perfect-hash len) (eq (svref vec perfect-hash) symbol)))))
           (let* ((reciprocals magic)
@@ -1314,10 +1315,11 @@ Experimental: interface subject to change."
 
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols.
+(defconstant +symname-hash-mask+ #xFFFFFFFF) ; 32 bits
 (defun %find-symbol (string length package)
   (declare (simple-string string)
            (type index length))
-  (let ((hash (calc-symbol-name-hash string length)))
+  (let ((hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+)))
     (declare (hash-code hash))
     (with-symbol ((symbol) (package-internal-symbols package) string length hash)
       (return-from %find-symbol (values symbol :internal)))
@@ -1462,7 +1464,7 @@ Experimental: interface subject to change."
 (defun find-external-symbol (string package)
   (declare (simple-string string))
   (let* ((length (length string))
-         (hash (calc-symbol-name-hash string length)))
+         (hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+)))
     (declare (type index length) (hash-code hash))
     (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from find-external-symbol symbol)))
@@ -1995,7 +1997,7 @@ PACKAGE."
            ;; type decl is critical here - can't invoke a hairy aref routine yet
            (dovector (symbol (the simple-vector symbols))
              (when symbol ; skip NIL because of its magic-ness
-               (let* ((stored-hash (symbol-name-hash symbol))
+               (let* ((stored-hash (symbol-hash symbol))
                       (name (symbol-name symbol))
                       (computed-hash (calc-symbol-name-hash name (length name))))
                  (aver (= stored-hash computed-hash)))))))

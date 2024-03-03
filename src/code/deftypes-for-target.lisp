@@ -191,6 +191,7 @@
 ;;; an extra AND operation, which is pretty much effectless in as much as
 ;;; the hash code is masked down to a much smaller value anyway.
 (sb-xc:deftype hash-code () `(integer 0 ,most-positive-fixnum))
+(sb-xc:deftype symbol-name-hash () #+64-bit '(unsigned-byte 32) #-64-bit 'hash-code)
 
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away

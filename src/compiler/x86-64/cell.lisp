@@ -450,7 +450,12 @@
     (inst mov base-ptr object)
     (inst and base-ptr (lognot lowtag-mask))
     (inst mov res (ea n-word-bytes base-ptr)) ; 1 word beyond the header
-    (inst and res (lognot fixnum-tag-mask))))
+    ;; This will be more efficient after I align the 32 bits that we want to grab
+    ;; for the name hash into the upper 4 bytes so that we don't have to refer
+    ;; to a mask that isn't expressible in an immediate operand.
+    (inst and res
+          (register-inline-constant
+           :qword (ash #xFFFFFFFF n-fixnum-tag-bits)))))
 
 (aver (= sb-impl::package-id-bits 16))
 (define-vop ()

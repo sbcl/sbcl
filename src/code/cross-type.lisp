@@ -374,9 +374,6 @@
 (defun pointerp (x)
   (aver (or (symbolp x) (fixnump x)))
   (symbolp x))
-(defun hash-as-if-symbol-name (x)
-  (aver (symbolp x))
-  (symbol-name-hash x))
 ;; Use of non-ASCII during build occurs no sooner than make-target-2,
 ;; therefore _every_ character satisfies BASE-CHAR-P prior to that.
 #+sb-unicode (defun base-char-p (x) (characterp x))
