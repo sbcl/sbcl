@@ -32,8 +32,6 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
          (then-block (ctran-starts-block then-ctran))
          (else-ctran (make-ctran))
          (else-block (ctran-starts-block else-ctran))
-         (maybe-instrument *instrument-if-for-code-coverage*)
-         (*instrument-if-for-code-coverage* t)
          (node (make-if :test pred-lvar
                         :consequent then-block
                         :alternative else-block)))
@@ -54,16 +52,43 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
       (link-blocks start-block else-block))
 
     (let ((path (best-sub-source-path test)))
-      (ir1-convert (if (and path maybe-instrument)
+      (ir1-convert (if path
                        (let ((*current-path* path))
                          (instrument-coverage then-ctran :then test))
                        then-ctran)
                    next result then)
-      (ir1-convert (if (and path maybe-instrument)
+      (ir1-convert (if path
                        (let ((*current-path* path))
                          (instrument-coverage else-ctran :else test))
                        else-ctran)
                    next result else))))
+
+;;; Like (if ,form t nil) but without coverage and without inserting
+;;; leafs coming from %funcall into *current-path*
+(defun wrap-predicate (start next result form var)
+  (let* ((pred-ctran (make-ctran))
+         (pred-lvar (make-lvar))
+         (then-ctran (make-ctran))
+         (then-block (ctran-starts-block then-ctran))
+         (else-ctran (make-ctran))
+         (else-block (ctran-starts-block else-ctran))
+         (node (make-if :test pred-lvar
+                        :consequent then-block
+                        :alternative else-block)))
+    (setf (lvar-dest pred-lvar) node)
+    (ir1-convert-combination-checking-type start pred-ctran pred-lvar form var)
+    (link-node-to-previous-ctran node pred-ctran)
+
+    (let ((start-block (ctran-block pred-ctran)))
+      (setf (block-last start-block) node)
+      (ctran-starts-block next)
+
+      (link-blocks start-block then-block)
+      (link-blocks start-block else-block))
+    (let ((*current-path* (cons t *current-path*)))
+      (reference-constant then-ctran next result t))
+    (let ((*current-path* (cons nil *current-path*)))
+      (reference-constant else-ctran next result nil))))
 
 ;;; To get even remotely sensible results for branch coverage
 ;;; tracking, we need good source paths. If the macroexpansions
@@ -722,7 +747,7 @@ be a lambda expression."
               (ecase operator
                 (function (find-or-convert-fun-leaf definition start))
                 (global-function (values (find-global-fun definition t) start)))
-            (ir1-convert start next result `(,leaf ,@args))))
+            (ir1-convert-common-functoid start next result `(,leaf ,@args) leaf)))
         (let ((ctran (make-ctran))
               (fun-lvar (make-lvar)))
           (ir1-convert start ctran fun-lvar `(the function ,function))

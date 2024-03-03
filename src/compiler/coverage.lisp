@@ -22,9 +22,9 @@
   ;; We don't actually use FORM for anything, it's just convenient to
   ;; have around when debugging the instrumentation.
   (declare (ignore form))
-  (if (and metadata
-           (policy *lexenv* (> store-coverage-data 0))
-           *allow-instrumenting*)
+  (if (and *allow-instrumenting*
+           metadata
+           (policy *lexenv* (> store-coverage-data 0)))
       (let ((path (source-path-original-source *current-path*)))
         (when mode
           (push mode path))

@@ -41,6 +41,8 @@
 
 (defvar *transforming* 0)
 (defvar *inlining* 0)
+(declaim (type fixnum *transforming* *inlining*)
+         #-sb-xc-host (always-bound *transforming* *inlining*))
 
 (defun ensure-source-path (form)
   (flet ((level> (value kind)
@@ -53,27 +55,12 @@
         (cond ((level> *transforming* 'transformed)
                ;; Don't hide all the transformed paths, since we might want
                ;; to look at the final form for error reporting.
-               (list* (simplify-source-path-form form)
-                      'transformed *transforming* *current-path*))
+               (list* form 'transformed *transforming* *current-path*))
               ;; Avoids notes about inlined code leaking out
               ((level> *inlining* 'inlined)
-               (list* (simplify-source-path-form form)
-                      'inlined *inlining* *current-path*))
+               (list* form 'inlined *inlining* *current-path*))
               (t
-               (cons (simplify-source-path-form form)
-                     *current-path*))))))
-
-(defun simplify-source-path-form (form)
-  (if (consp form)
-      (let ((op (car form)))
-        ;; In the compiler functions can be directly represented
-        ;; by leaves. Having leaves in the source path is pretty
-        ;; hard on the poor user, however, so replace with the
-        ;; source-name when possible.
-        (if (and (leaf-p op) (leaf-has-source-name-p op))
-            (cons (leaf-source-name op) (cdr form))
-            form))
-      form))
+               (cons form *current-path*))))))
 
 (defun note-source-path (form &rest arguments)
   (when (source-form-has-path-p form)
@@ -1074,11 +1061,6 @@
                                            (proper-list form)
                                            var))))))
 
-
-;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE
-;;; attribute, don't generate any branch coverage instrumentation for it.
-(defvar *instrument-if-for-code-coverage* t)
-
 ;;; If the function has the PREDICATE attribute, and the RESULT's DEST
 ;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
 ;;; predicate always appears in a conditional context.
@@ -1094,8 +1076,7 @@
     (if (and info
              (ir1-attributep (fun-info-attributes info) predicate)
              (not (if-p (and result (lvar-dest result)))))
-        (let ((*instrument-if-for-code-coverage* nil))
-          (ir1-convert start next result `(if ,form t nil)))
+        (wrap-predicate start next result form var)
         (ir1-convert-combination-checking-type start next result form var))))
 
 ;;; Actually really convert a global function call that we are allowed
