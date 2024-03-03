@@ -1694,20 +1694,23 @@
       (unless (or (memq 'transformed *current-path*)
                   (memq 'inlined *current-path*))
         (setf (ctran-source-path (node-prev call)) *current-path*))
-      (let* ((*transforming* (1+ *transforming*))
-             (new-fun (ir1-convert-inline-lambda
-                       res
-                       :debug-name (debug-name 'transform-for source-name)))
-             (type (node-derived-type call))
-             (ref (lvar-use (combination-fun call))))
-        (change-ref-leaf ref new-fun)
-        (setf (combination-kind call) :full)
-        ;; Don't lose the original derived type
-        (let ((return (lambda-return (main-entry new-fun))))
-          (when return
-            (do-uses (node (return-result
-                            (lambda-return (main-entry new-fun))))
-              (derive-node-type node type))))))
+      (multiple-value-bind (res new-args) (transform-&args res call)
+        (let* ((*transforming* (1+ *transforming*))
+               (new-fun (ir1-convert-inline-lambda
+                         res
+                         :debug-name (debug-name 'transform-for source-name)))
+               (type (node-derived-type call))
+               (ref (lvar-use (combination-fun call))))
+          (when new-args
+            (setf (combination-args call) new-args))
+          (change-ref-leaf ref new-fun)
+          (setf (combination-kind call) :full)
+          ;; Don't lose the original derived type
+          (let ((return (lambda-return (main-entry new-fun))))
+            (when return
+              (do-uses (node (return-result
+                              (lambda-return (main-entry new-fun))))
+                (derive-node-type node type)))))))
     ;; Must be done outside of WITH-COMPONENT-LAST-BLOCK
     ;; otherwise REMOVE-FROM-DFO might remove that block
     ;; but new code still will get attached to it.
@@ -1717,6 +1720,69 @@
     ;; newly converted code gets to better types sooner.
     (setf (node-reoptimize call) nil)
     (ir1-optimize-combination call)))
+
+;;; Remove &key and &optional args,
+;;; which would normally be done by convert-more-call but after
+;;; generating arg-parsing entry points which are discarded.
+(defun transform-&args (lambda call)
+  (let ((lambda-list (cadr lambda)))
+    (when (loop for p in lambda-list
+                thereis (memq p '(&optional &key)))
+      (flet ((ensure-car (x)
+               (if (consp x)
+                   (car x)
+                   x))
+             (ensure-cadr (x)
+               (if (consp x)
+                   (cadr x)
+                   x)))
+        (multiple-value-bind (llks required optional rest/more keys aux)
+            (parse-lambda-list lambda-list)
+          (declare (ignore llks))
+          (unless rest/more
+            (let ((args (combination-args call))
+                  (new-args)
+                  (new-ll required))
+              (loop for p in required
+                    do (push (pop args) new-args))
+              (let (new-optional)
+                (loop while (and args optional)
+                      do
+                      (let ((opt (pop optional)))
+                        (push (pop args) new-args)
+                        (push (ensure-car opt) new-optional)))
+                (setf new-ll (append new-ll new-optional))
+                (when optional
+                  (setf aux (append optional aux))))
+              (let (new-keys)
+                (loop for (key* value) on args by #'cddr
+                      for key = (lvar-value key*)
+                      for param = (find key keys :key (lambda (x)
+                                                        (ensure-car (ensure-car x)))
+                                                 :test #'string=)
+                      do (flush-dest key*)
+                      if param
+                      do (push value new-args)
+                         (push (ensure-cadr (ensure-car param)) new-keys)
+                         (setf keys (remove param keys :test #'eq))
+                      else
+                      do (flush-dest value))
+                ;; default left-over values
+                (when keys
+                  (setf aux (nconc (loop for key in keys
+                                         collect (if (consp key)
+                                                     (list (ensure-cadr (car key))
+                                                           (cadr key))
+                                                     key))
+                                   aux)))
+                (setf new-ll (nconc new-ll (nreverse new-keys)
+                                    (and aux
+                                         (list* '&aux aux))))
+                (return-from transform-&args
+                  (values `(,(car lambda) ,new-ll
+                            ,@(cddr lambda))
+                          (nreverse new-args)))))))))
+    (values lambda nil)))
 
 (defun constant-fold-arg-p (name)
   (typecase name
