@@ -63,33 +63,6 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                        else-ctran)
                    next result else))))
 
-;;; Like (if ,form t nil) but without coverage and without inserting
-;;; leafs coming from %funcall into *current-path*
-(defun wrap-predicate (start next result form var)
-  (let* ((pred-ctran (make-ctran))
-         (pred-lvar (make-lvar))
-         (then-ctran (make-ctran))
-         (then-block (ctran-starts-block then-ctran))
-         (else-ctran (make-ctran))
-         (else-block (ctran-starts-block else-ctran))
-         (node (make-if :test pred-lvar
-                        :consequent then-block
-                        :alternative else-block)))
-    (setf (lvar-dest pred-lvar) node)
-    (ir1-convert-combination-checking-type start pred-ctran pred-lvar form var)
-    (link-node-to-previous-ctran node pred-ctran)
-
-    (let ((start-block (ctran-block pred-ctran)))
-      (setf (block-last start-block) node)
-      (ctran-starts-block next)
-
-      (link-blocks start-block then-block)
-      (link-blocks start-block else-block))
-    (let ((*current-path* (cons t *current-path*)))
-      (reference-constant then-ctran next result t))
-    (let ((*current-path* (cons nil *current-path*)))
-      (reference-constant else-ctran next result nil))))
-
 ;;; To get even remotely sensible results for branch coverage
 ;;; tracking, we need good source paths. If the macroexpansions
 ;;; interfere enough the TEST of the conditional doesn't actually have
