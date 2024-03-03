@@ -2552,13 +2552,6 @@
                             :allow-style-warnings t)))
     (assert (eq (funcall f 2) :good))))
 
-(with-test (:name :symbol-case-as-jump-table
-                  :skipped-on (not (or :x86 :x86-64)))
-  ;; Assert that a prototypical example of (CASE symbol ...)
-  ;; was converted to a jump table.
-  (let ((c (sb-kernel:fun-code-header #'sb-debug::parse-trace-options)))
-    (assert (>= (sb-kernel:code-jump-table-words c) 14))))
-
 (with-test (:name :modular-arith-type-derivers
                   :fails-on :ppc64)
   (let ((f (checked-compile

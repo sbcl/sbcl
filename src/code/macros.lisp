@@ -1147,7 +1147,8 @@ invoked. In that case it will store into PLACE and start over."
                                 (list (car tail))))
                             keys)))
 
-    (unless (eq errorp 'cerror)
+    ;; Try hash-based dispatch only if expanding for the compiler
+    (when (and (neq errorp 'cerror) (typep lexenv 'lexenv))
       (let* ((default (if (eq (caar clauses) 't) (car clauses)))
              (normal-clauses (reverse (if default (cdr clauses) clauses))))
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
