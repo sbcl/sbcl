@@ -1162,32 +1162,34 @@ invoked. In that case it will store into PLACE and start over."
                     (not (sb-c::suitable-jump-table-keys-p keys))
                     (should-attempt-hash-based-case-dispatch keys))
                (binding*
-                   ((lexpr (sb-c::perfectly-hashable keys) :exit-if-null)
-                    (constants
+                   ((constants
                      (when (every (lambda (clause) (constantp `(progn ,@(cdr clause)) lexenv))
                                   normal-clauses)
                        ;; TODO: use specialized vector if possible
                        (map 'simple-vector
                             (lambda (clause)
                               (constant-form-value `(progn ,@(cdr clause)) lexenv))
-                            normal-clauses))))
-                 (when (or constants (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq))
-                   ;; Put each group of keys into canonical form: no intra-clause duplicates
-                   ;; and no key shadowed by an earlier clause. TBH we should do this always.
-                   ;; Re-scan the original clauses to extract unique keys rather than parsing
-                   ;; the clauses built up that contain EQL calls.
-                   (let ((seen (alloc-xset))
-                         (key-lists nil))
-                     (dolist (clause (if default (butlast specified-clauses) specified-clauses))
-                       (push (mapcan (lambda (key)
-                                       (unless (xset-member-p key seen)
-                                         (add-to-xset key seen)
-                                         (list key)))
-                                     (ensure-list (car clause)))
-                             key-lists))
-                     (return-from case-body
-                       (expand-hash-case normal-clauses (nreverse key-lists) constants
-                                         default errorp keyform lexpr))))))
+                            normal-clauses)))
+                    (lexpr (and (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
+                                    constants)
+                                (sb-c::perfectly-hashable keys))
+                           :exit-if-null))
+                 ;; Put each group of keys into canonical form: no intra-clause duplicates
+                 ;; and no key shadowed by an earlier clause. TBH we should do this always.
+                 ;; Re-scan the original clauses to extract unique keys rather than parsing
+                 ;; the clauses built up that contain EQL calls.
+                 (let ((seen (alloc-xset))
+                       (key-lists nil))
+                   (dolist (clause (if default (butlast specified-clauses) specified-clauses))
+                     (push (mapcan (lambda (key)
+                                     (unless (xset-member-p key seen)
+                                       (add-to-xset key seen)
+                                       (list key)))
+                                   (ensure-list (car clause)))
+                           key-lists))
+                   (return-from case-body
+                     (expand-hash-case normal-clauses (nreverse key-lists) constants
+                                       default errorp keyform lexpr)))))
               ((and (eq test 'typep)
                     (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq))
                (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
