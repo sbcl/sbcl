@@ -319,7 +319,7 @@
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
           (push :compact-symbol sb-xc:*features*))
-        (when (target-featurep :64-bit)
+        (when (and (target-featurep :64-bit) (not (eq arch :arm64)))
           ;; Considering that a single config file governs rv32 and rv64, I don't
           ;; know how to make this properly configurable. In theory, 32-bit builds could
           ;; have a salted hash (gaining 3 bits by making the hash slot raw), but
