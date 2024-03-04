@@ -15,4 +15,3 @@
 :executable-funinstances
 :unbind-in-unwind
 :no-continue-unwind
-:salted-symbol-hash
