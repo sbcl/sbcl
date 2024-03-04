@@ -1796,17 +1796,6 @@ core and return a descriptor to it."
         ;;
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
-        #+ppc64
-        (progn
-          ;; We don't usually create an FDEFN for NIL, however on PP64 there is one
-          ;; made now. Due to unique lowtagging on that architectures, it doesn't magically
-          ;; work to access slots of NIL as a symbol the way the vops expect.
-          ;; There are hacks in the symbol slot reading vops, but not the writing vops,
-          ;; because nothing should write to slots of NIL. The sole exception would be that
-          ;; if someone tries to funcall NIL there can be an undefined tramp,
-          ;; so we make one here without adding complications to the lisp side.
-          (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) (ensure-cold-fdefn nil))
-          (remhash nil *cold-fdefn-objects*))
         #+compact-symbol
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
                                (encode-symbol-name sb-impl::+package-id-lisp+ name))
