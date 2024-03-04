@@ -272,23 +272,49 @@
     (inst b? (if not-p :eq :ne) target)
     OUT))
 
+;;; The lowtag arrangement for ppc64 does *NOT* permit accessing
+;;; slots of NIL as a symbol. Therefore since it has to be special-cased
+;;; there's no reason that NIL couldn't always have had a wired hash.
+;;; It doesn't depend on 4 bytes of NIL's address being 0.
 (define-vop (symbol-hash)
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:arg-refs args)
   (:generator 4
     (when (not-nil-tn-ref-p args)
       (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+      (inst srdi res res 24) ; shift out 3 bytes
       (return-from symbol-hash))
     (inst cmpld symbol null-tn)
     (inst beq NULL)
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst srdi res res 24) ; shift out 3 bytes
     (inst b DONE)
     NULL
-    (inst addi res null-tn (- (logand sb-vm:nil-value sb-vm:fixnum-tag-mask)))
+    (inst li res 0) ; the salt may as well have been zero
+    DONE))
+(define-vop (symbol-name-hash)
+  (:policy :fast-safe)
+  (:translate symbol-name-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:arg-refs args)
+  (:generator 4
+    (when (not-nil-tn-ref-p args)
+      (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+      (inst srdi res res 32) ; shift out 4 bytes
+      (return-from symbol-name-hash))
+    (inst cmpld symbol null-tn)
+    (inst beq NULL)
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst srdi res res 32) ; shift out 4 bytes
+    (inst b DONE)
+    NULL
+    (inst li res 0)
     DONE))
 
 ;;;; Fdefinition (fdefn) objects.

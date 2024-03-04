@@ -68,8 +68,8 @@
   (assert (= length (length string)))
   (cond #+64-bit
         ((string= string "NIL") ; :NIL must hash the same as NIL
-         #+x86-64 0 ; return the high 4 bytes in NIL's car slot
-         #-x86-64
+         #+salted-symbol-hash 0 ; return the high 4 bytes in NIL's car slot
+         #-salted-symbol-hash
          ;; out-of-order with defconstant nil-value
          (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
         (t

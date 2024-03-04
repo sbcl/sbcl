@@ -3,3 +3,4 @@
 :64-bit :untagged-fdefns :sb-thread :soft-card-marks
 :gencgc
 :compare-and-swap-vops :alien-callbacks
+:salted-symbol-hash
