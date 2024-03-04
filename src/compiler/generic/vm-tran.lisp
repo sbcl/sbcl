@@ -449,42 +449,43 @@
 ;;; of the last word to be operated on, so they are effectively
 ;;; in an indeterminate state which is why equality testing, COUNT,
 ;;; and FIND have to ignore them.
-(deftransform bit-op->word-op ((bit-array-1 bit-array-2 result-bit-array)
-                               (simple-bit-vector simple-bit-vector simple-bit-vector)
-                               *
-                               :node node :defun-only t :info wordfun)
-  `(let ((length (vector-length result-bit-array)))
-     ,@(unless (policy node (zerop safety))
-         `((unless (= length
-                      ,@(unless (same-leaf-ref-p bit-array-1 result-bit-array)
-                          '((vector-length bit-array-1)))
-                      (vector-length bit-array-2))
-             (error "Argument and/or result bit arrays are not the same length:~
+(defun make-bit-op->word-op-transform (wordfun)
+  (deftransform bit-op->word-op ((bit-array-1 bit-array-2 result-bit-array)
+                                 (simple-bit-vector simple-bit-vector simple-bit-vector)
+                                 *
+                                 :node node :defun-only lambda)
+    `(let ((length (vector-length result-bit-array)))
+       ,@(unless (policy node (zerop safety))
+           `((unless (= length
+                        ,@(unless (same-leaf-ref-p bit-array-1 result-bit-array)
+                            '((vector-length bit-array-1)))
+                        (vector-length bit-array-2))
+               (error "Argument and/or result bit arrays are not the same length:~
                          ~%  ~S~%  ~S  ~%  ~S"
-                    bit-array-1 bit-array-2 result-bit-array))))
-     (dotimes (index (ceiling length sb-vm:n-word-bits))
-       (declare (optimize (speed 3) (safety 0)) (type index index))
-       (setf (%vector-raw-bits result-bit-array index)
-             (,wordfun (%vector-raw-bits bit-array-1 index)
-                       (%vector-raw-bits bit-array-2 index))))
-     result-bit-array))
+                      bit-array-1 bit-array-2 result-bit-array))))
+       (dotimes (index (ceiling length sb-vm:n-word-bits))
+         (declare (optimize (speed 3) (safety 0)) (type index index))
+         (setf (%vector-raw-bits result-bit-array index)
+               (,wordfun (%vector-raw-bits bit-array-1 index)
+                         (%vector-raw-bits bit-array-2 index))))
+       result-bit-array)))
 
 (flet ((policy-test (node) (policy node (>= speed space))))
-(macrolet ((def (bitfun wordfun)
-             `(%deftransform ',bitfun #'policy-test
-                             '(function (simple-bit-vector simple-bit-vector simple-bit-vector)
-                                        *)
-                             (cons #'bit-op->word-op ',wordfun))))
- (def bit-and word-logical-and)
- (def bit-ior word-logical-or)
- (def bit-xor word-logical-xor)
- (def bit-eqv word-logical-eqv)
- (def bit-nand word-logical-nand)
- (def bit-nor word-logical-nor)
- (def bit-andc1 word-logical-andc1)
- (def bit-andc2 word-logical-andc2)
- (def bit-orc1 word-logical-orc1)
- (def bit-orc2 word-logical-orc2)))
+  (macrolet ((def (bitfun wordfun)
+               `(%deftransform ',bitfun #'policy-test
+                               '(function (simple-bit-vector simple-bit-vector simple-bit-vector)
+                                 *)
+                               (make-bit-op->word-op-transform ',wordfun))))
+    (def bit-and word-logical-and)
+    (def bit-ior word-logical-or)
+    (def bit-xor word-logical-xor)
+    (def bit-eqv word-logical-eqv)
+    (def bit-nand word-logical-nand)
+    (def bit-nor word-logical-nor)
+    (def bit-andc1 word-logical-andc1)
+    (def bit-andc2 word-logical-andc2)
+    (def bit-orc1 word-logical-orc1)
+    (def bit-orc2 word-logical-orc2)))
 
 (deftransform bit-not
               ((bit-array result-bit-array)

@@ -1609,39 +1609,40 @@
 ;;; restrictive, but they do catch common cases, like allocating a (* 2
 ;;; N)-size buffer and blitting in the old N-size buffer in.
 
-(deftransform transform-bash-copy ((src src-offset dst dst-offset length)
-                                   * *
-                                   :defun-only t :info  n-bits-per-elem)
-  (declare (ignore src dst length))
-  (binding* ((n-elems-per-word (truncate sb-vm:n-word-bits n-bits-per-elem))
-             ((src-word src-elt) (truncate (lvar-value src-offset) n-elems-per-word))
-             ((dst-word dst-elt) (truncate (lvar-value dst-offset) n-elems-per-word)))
-    ;; Avoid non-word aligned copies.
-    (unless (and (zerop src-elt) (zerop dst-elt))
-      (give-up-ir1-transform))
-    ;; Avoid copies where we would have to insert code for
-    ;; determining the direction of copying.
-    (unless (= src-word dst-word)
-      (give-up-ir1-transform))
-    `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word)))
-           (extra (mod length ,n-elems-per-word)))
-       (declare (type index end))
-       ;; Handle any bits at the end.
-       (unless (zerop extra)
-         ;; MASK selects just the bits that we want from the ending word of
-         ;; the source array. The number of bits to shift out is
-         ;;   (- n-word-bits (* extra n-bits-per-elem))
-         ;; which is equal mod n-word-bits to the expression below.
-         (let ((mask (shift-towards-start
-                      most-positive-word (* extra ,(- n-bits-per-elem)))))
-           (%set-vector-raw-bits
-            dst end (logior (logand (%vector-raw-bits src end) mask)
-                            (logandc2 (%vector-raw-bits dst end) mask)))))
-       ;; Copy from the end to save a register.
-       (do ((i (1- end) (1- i)))
-           ((< i ,src-word))
-         (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
-       (values))))
+(defun make-bash-copy-transform (n-bits-per-elem)
+  (deftransform transform-bash-copy ((src src-offset dst dst-offset length)
+                                     * *
+                                     :defun-only lambda)
+    (declare (ignore src dst length))
+    (binding* ((n-elems-per-word (truncate sb-vm:n-word-bits n-bits-per-elem))
+               ((src-word src-elt) (truncate (lvar-value src-offset) n-elems-per-word))
+               ((dst-word dst-elt) (truncate (lvar-value dst-offset) n-elems-per-word)))
+      ;; Avoid non-word aligned copies.
+      (unless (and (zerop src-elt) (zerop dst-elt))
+        (give-up-ir1-transform))
+      ;; Avoid copies where we would have to insert code for
+      ;; determining the direction of copying.
+      (unless (= src-word dst-word)
+        (give-up-ir1-transform))
+      `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word)))
+             (extra (mod length ,n-elems-per-word)))
+         (declare (type index end))
+         ;; Handle any bits at the end.
+         (unless (zerop extra)
+           ;; MASK selects just the bits that we want from the ending word of
+           ;; the source array. The number of bits to shift out is
+           ;;   (- n-word-bits (* extra n-bits-per-elem))
+           ;; which is equal mod n-word-bits to the expression below.
+           (let ((mask (shift-towards-start
+                        most-positive-word (* extra ,(- n-bits-per-elem)))))
+             (%set-vector-raw-bits
+              dst end (logior (logand (%vector-raw-bits src end) mask)
+                              (logandc2 (%vector-raw-bits dst end) mask)))))
+         ;; Copy from the end to save a register.
+         (do ((i (1- end) (1- i)))
+             ((< i ,src-word))
+           (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
+         (values)))))
 
 ;;; Detect misuse with sb-devel. "Misuse" means mismatched array element types
 #-sb-devel
@@ -1651,7 +1652,7 @@
                         '(function ((simple-unboxed-array (*)) (constant-arg index)
                                     (simple-unboxed-array (*)) (constant-arg index)
                                     index) *)
-                        (cons #'transform-bash-copy i))
+                        (make-bash-copy-transform i))
       until (= i sb-vm:n-word-bits))
 
 ;;; We expand copy loops inline in SUBSEQ and COPY-SEQ if we're copying

@@ -1512,7 +1512,7 @@
   (declare (type combination node) (type transform transform))
   (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (let* ((type (transform-type transform))
-         (fun (transform-%fun transform))
+         (fun (transform-function transform))
          (constrained (fun-type-p type))
          (table (component-failed-optimizations *component-being-compiled*))
          (flame (case (transform-important transform)
@@ -1526,9 +1526,7 @@
                (valid-fun-use node type))
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
-                 (let ((new-form (if (listp fun) ; the deftransform had :INFO
-                                     (funcall (car fun) node (cdr fun))
-                                     (funcall fun node)))
+                 (let ((new-form (funcall fun node))
                        (fun-name (combination-fun-source-name node)))
                    (when (show-transform-p show fun-name)
                      (show-transform "ir" fun-name new-form node))
