@@ -1508,21 +1508,21 @@
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE
-(defun assemble-sections (asmstream simple-fun-labels segment)
-  (let* ((n-entries (length simple-fun-labels))
+(defun assemble-sections (asmstream entries segment)
+  (let* ((n-entries (length entries))
          (trailer-len (* (+ n-entries 1) 4))
          (end-text (gen-label))
          (combined
            (append-sections
-             (append-sections (asmstream-data-section asmstream)
-                              (asmstream-code-section asmstream))
-             (let ((section (asmstream-elsewhere-section asmstream)))
-               (emit section
-                     end-text
-                     `(.align 2)
-                     `(.skip ,trailer-len)
-                     `(.align ,sb-vm:n-lowtag-bits))
-               section)))
+            (append-sections (asmstream-data-section asmstream)
+                             (asmstream-code-section asmstream))
+            (let ((section (asmstream-elsewhere-section asmstream)))
+              (emit section
+                    end-text
+                    `(.align 2)
+                    `(.skip ,trailer-len)
+                    `(.align ,sb-vm:n-lowtag-bits))
+              section)))
          (fun-offsets)
          (octets (segment-buffer (%assemble segment combined)))
          (index (length octets)))
@@ -1559,8 +1559,8 @@
         ;;  ... simple-fun-2 | simple-fun-1 | simple-fun-0
         ;; And because we use PUSH, we collect them in forward order
         ;; which is the correct thing to return.
-        (dolist (label simple-fun-labels)
-          (let ((val (label-position label)))
+        (dolist (entry entries)
+          (let ((val (label-position (sb-c::entry-info-offset entry))))
             (push val fun-offsets)
             (setf (sap-ref-32 sap index) val)
             (incf index 4)))))

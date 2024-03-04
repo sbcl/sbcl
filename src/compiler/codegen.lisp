@@ -343,7 +343,7 @@
       (multiple-value-bind (segment text-length fixup-notes fun-table)
           (assemble-sections
            asmstream
-           (mapcar #'entry-info-offset (ir2-component-entries ir2-component))
+           (ir2-component-entries ir2-component)
            (make-segment :header-skew skew
                          :run-scheduler (default-segment-run-scheduler)))
         (values segment text-length fun-table
