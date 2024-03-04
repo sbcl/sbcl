@@ -204,17 +204,6 @@
     (inst cmp (object-slot-ea object symbol-value-slot
                                        other-pointer-lowtag)
           unbound-marker-widetag)))
-
-
-(define-vop (symbol-hash)
-  (:policy :fast-safe)
-  (:translate symbol-hash)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:arg-refs args)
-  (:generator 2
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)))
 
 ;;;; fdefinition (FDEFN) objects
 

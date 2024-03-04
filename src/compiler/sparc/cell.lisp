@@ -76,16 +76,6 @@
   (:policy :fast)
   (:translate symbol-value))
 
-(define-vop (symbol-hash)
-  (:policy :fast-safe)
-  (:translate symbol-hash)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:arg-refs args)
-  (:generator 2
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)))
-
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)

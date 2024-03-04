@@ -441,7 +441,7 @@ during backtrace.
         :init :null)
   (name :init :arg :ref-trans symbol-name)
   ;; The remaining slots can be ignored by GC
-  (hash :set-trans %set-symbol-hash)
+  (hash :set-trans %set-symbol-hash :ref-trans symbol-hash)
   (package-id :type index ; actually 16 bits. (Could go in the header)
               :ref-trans symbol-package-id
               :set-trans sb-impl::set-symbol-package-id :set-known ())

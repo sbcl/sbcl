@@ -197,6 +197,7 @@
 (define-vop (fast-symbol-global-value fast-symbol-value)
   (:translate symbol-global-value))
 
+#+64-bit
 (define-vop (symbol-hash)
   (:policy :fast-safe)
   (:translate symbol-hash)
