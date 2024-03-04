@@ -813,7 +813,13 @@ static sword_t scav_symbol(lispobj *where,
                            __attribute__((unused)) lispobj header) {
     struct symbol* s = (void*)where;
 #ifdef LISP_FEATURE_64_BIT
-    scavenge(&s->value, 3); // value, fdefn, info
+    /* The first 4 slots of a symbol are all boxed words, but vary in meaning
+     * based on #+relocatable-static-space. Scanning the hash is harmless - though
+     * unnecessary - at present, since it is of descriptor nature, be it fixnum,
+     * or NIL in the case of NIL. Though there is little or no benefit to gaining
+     * 1 bit, we could make hash a raw slot in which case we'd have to use care
+     * to avoid reading it. trace-object.inc uses three separate operations */
+    scavenge(where + 1, 4);
     lispobj name = decode_symbol_name(s->name);
     lispobj new = name;
     scavenge(&new, 1);

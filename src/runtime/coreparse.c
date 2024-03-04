@@ -432,7 +432,7 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             { // Modeled on scav_symbol() in gc-common
             struct symbol* s = (void*)where;
 #ifdef LISP_FEATURE_64_BIT
-            adjust_pointers(&s->value, 3, adj); // value, fdefn, info
+            adjust_pointers(where + 1, 4, adj);
             lispobj name = decode_symbol_name(s->name);
             lispobj adjusted_name = adjust_word(adj, name);
             // writeback the name if it changed

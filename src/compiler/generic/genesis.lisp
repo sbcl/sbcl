@@ -1144,6 +1144,14 @@ core and return a descriptor to it."
   (logior #+compact-symbol (ash package-id sb-impl::symbol-name-bits)
           (descriptor-bits name)))
 
+(defun assign-symbol-hash (descriptor wordindex name)
+  (let ((hash (sb-c::calc-symbol-name-hash name (length name))))
+    (if (member :64-bit sb-xc:*features*)
+        ;; Low 4 bytes to high 4 bytes of slot, plus maybe randomize 1 byte (not yet)
+        (write-wordindexed/raw descriptor wordindex
+                               (logand (ash hash 32) most-positive-word))
+        (write-wordindexed descriptor wordindex (make-fixnum-descriptor hash)))))
+
 ;;; Allocate (and initialize) a symbol.
 ;;; Even though all symbols are the same size now, I still envision the possibility
 ;;; of reducing gensyms to 4 words, though I'm not sure what to do if information
@@ -1155,15 +1163,9 @@ core and return a descriptor to it."
       (let* ((cold-name (string-literal-to-core name))
              (pkg-id (if cold-package
                          (descriptor-fixnum (read-slot cold-package :id))
-                         sb-impl::+package-id-none+))
-             (hash (sb-c::calc-symbol-name-hash name (length name))))
+                         sb-impl::+package-id-none+)))
+        (assign-symbol-hash symbol sb-vm:symbol-hash-slot name)
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
-        (if (member :salted-symbol-hash sb-xc:*features*)
-            ;; Store the low 4 bytes of hash into the high 4 bytes of the slot
-            (write-wordindexed/raw symbol sb-vm:symbol-hash-slot
-                                   (logand (ash hash 32) most-positive-word))
-            (write-wordindexed symbol sb-vm:symbol-hash-slot
-                               (make-fixnum-descriptor hash)))
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
         (write-wordindexed/raw symbol sb-vm:symbol-name-slot
                                (encode-symbol-name pkg-id cold-name))
@@ -1782,17 +1784,15 @@ core and return a descriptor to it."
         ;; The header-word for NIL "as a symbol" contains a length + widetag.
         (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
                                                                   sb-vm:symbol-widetag))
-        (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
-        #+relocatable-static-space
-        (write-wordindexed des (+ 1 sb-vm::symbol-unused-slot) nil-val)
-        ;; write the CAR of nil-as-cons. Also for 32-bit, set the hash to the normal hash
-        ;; for the symbol-name.
-        #+64-bit (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
-        #-64-bit (progn (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) nil-val)
-                        (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot)
-                                           (make-fixnum-descriptor
-                                            (sb-c::calc-symbol-name-hash "NIL" 3))))
-        ;;
+        ;; Write the CAR and CDR of nil-as-cons
+        (let* ((nil-cons-base-addr (- sb-vm:nil-value sb-vm:list-pointer-lowtag))
+               (nil-cons-car-offs (- nil-cons-base-addr (gspace-byte-address *static*)))
+               (nil-cons-cdr-offs (+ nil-cons-car-offs sb-vm:n-word-bytes)))
+          (setf (bvref-word (descriptor-mem des) nil-cons-car-offs) sb-vm:nil-value
+                (bvref-word (descriptor-mem des) nil-cons-cdr-offs) sb-vm:nil-value))
+        ;; Assign HASH if and only if NIL's hash is address-insensitive
+        #+(or relocatable-static-space (not 64-bit))
+        (assign-symbol-hash des (+ 1 sb-vm:symbol-hash-slot) "NIL")
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
                                (encode-symbol-name sb-impl::+package-id-lisp+ name))))

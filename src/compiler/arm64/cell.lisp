@@ -216,17 +216,16 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:arg-refs args)
-  (:results (res :scs (any-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    ;; The symbol-hash slot of NIL holds NIL because it is also the
-    ;; car slot, so we have to strip off the fixnum-tag-mask to make sure
-    ;; it is a fixnum.  The lowtag selection magic that is required to
-    ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (unless (not-nil-tn-ref-p args)
-      (inst and res res (bic-mask fixnum-tag-mask)))))
+    (inst lsr res res 24))) ; shift out 3 bytes
+(define-vop (symbol-name-hash symbol-hash)
+  (:translate symbol-name-hash)
+  (:generator 1 ; ASSUMPTION: little-endian
+    (inst ldr (32-bit-reg res)
+          (@ symbol (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)))))
 
 (define-vop ()
   (:args (symbol :scs (descriptor-reg)))
