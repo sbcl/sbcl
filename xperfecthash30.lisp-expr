@@ -2242,5 +2242,8 @@
   (let ((b (& (>> val 2) #xf)))
    (let ((a (>> (<< val 25) 28)))
     (^ a (aref tab b))))))")
+(#(DB99C7F 10BC32E6 14FC2DF6 1BB8AC21 1FAF10CA)
+ "(:TYPE :FUNCTION :IMPORTANT :POLICY :ALLOW-OTHER-KEYS)"
+ "(  (& (^ (>> val 4) (>> val 5)) 7))")
 )
 ;; EOF
