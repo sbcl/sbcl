@@ -19,6 +19,11 @@ obj/xbuild/arm64-darwin/xc.core: $(DEPS1)
 obj/xbuild/arm64-darwin.core: obj/xbuild/arm64-darwin/xc.core
 	$(SBCL) $(ARGS) arm64-darwin < $(SCRIPT2)
 
+obj/xbuild/arm64-reloc/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) arm64-reloc arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :RELOCATABLE-STATIC-SPACE)" < $(SCRIPT1)
+obj/xbuild/arm64-reloc.core: obj/xbuild/arm64-reloc/xc.core
+	$(SBCL) $(ARGS) arm64-reloc < $(SCRIPT2)
+
 obj/xbuild/mips/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) mips mips "(:UNIX :LINUX :ELF :LARGEFILE :LITTLE-ENDIAN)" < $(SCRIPT1)
 obj/xbuild/mips.core: obj/xbuild/mips/xc.core

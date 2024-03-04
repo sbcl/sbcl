@@ -33,7 +33,8 @@
 (defparameter *all-configurations*
   '(("arm"    ("arm" :little-endian :largefile))
     ("arm64"  ("arm64" :little-endian :sb-thread)
-              ("arm64-darwin" :darwin :bsd :unix :mach-o :little-endian :sb-thread :darwin-jit))
+              ("arm64-darwin" :darwin :bsd :unix :mach-o :little-endian :sb-thread :darwin-jit)
+              ("arm64-reloc"  :little-endian :sb-thread :relocatable-static-space))
     ("mips"   ("mips" :largefile :little-endian))
     ("ppc"    ("ppc" :big-endian)
               ("ppc-thread" :big-endian :sb-thread))
