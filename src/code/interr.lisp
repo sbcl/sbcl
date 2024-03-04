@@ -454,7 +454,8 @@
                 :format-arguments (list nbytes address value pc))))))
 
 (deferr failed-aver-error (form)
-  (bug "~@<failed AVER: ~2I~_~S~:>" form))
+  (declare (notinline sb-impl::%failed-aver))
+  (sb-impl::%failed-aver form))
 (deferr unreachable-error ()
   (bug "Unreachable code reached"))
 

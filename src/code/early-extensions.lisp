@@ -885,6 +885,7 @@ NOTE: This interface is experimental and subject to change."
   ;; Don't hold on to symbols, helping shake-packages.
   (labels ((replace-symbols (expr)
              (typecase expr
+               (null expr)
                (symbol
                 (symbol-name expr))
                (cons
@@ -896,7 +897,7 @@ NOTE: This interface is experimental and subject to change."
        (%failed-aver ',(replace-symbols expr)))))
 
 (defun %failed-aver (expr)
-  (bug "~@<failed AVER: ~2I~_~S~:>" expr))
+  (bug "~@<failed AVER: ~2I~_~A~:>" expr))
 
 (defun bug (format-control &rest format-arguments)
   (error 'bug
