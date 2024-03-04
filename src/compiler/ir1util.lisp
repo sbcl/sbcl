@@ -2376,6 +2376,10 @@ is :ANY, the function name is not checked."
   (values))
 
 (defun replace-combination-with-constant (constant combination)
+  (when (producing-fasl-file)
+    (handler-case (maybe-emit-make-load-forms constant)
+      ((or compiler-error error) ()
+        (return-from replace-combination-with-constant))))
   (with-ir1-environment-from-node combination
     (let* ((lvar (node-lvar combination))
            (prev (node-prev combination))
@@ -2383,10 +2387,11 @@ is :ANY, the function name is not checked."
       (%delete-lvar-use combination)
       (setf (ctran-next prev) nil)
       (setf (node-prev combination) nil)
-      (reference-constant prev intermediate-ctran lvar constant)
+      (reference-constant prev intermediate-ctran lvar constant nil)
       (link-node-to-previous-ctran combination intermediate-ctran)
       (reoptimize-lvar lvar)
-      (flush-combination combination))))
+      (flush-combination combination)
+      t)))
 
 
 ;;;; leaf hackery

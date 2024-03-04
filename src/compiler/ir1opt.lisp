@@ -1881,8 +1881,7 @@
       (when (type-single-value-p type)
         (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
           (when single-p
-            (replace-combination-with-constant value call)
-            t))))))
+            (replace-combination-with-constant value call)))))))
 
 ;;;; local call optimization
 
