@@ -1140,7 +1140,9 @@ core and return a descriptor to it."
 
 (defvar *cold-symbol-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
 (defun encode-symbol-name (package-id name)
-  (logior (ash package-id sb-impl::symbol-name-bits) (descriptor-bits name)))
+  (declare (ignorable package-id))
+  (logior #+compact-symbol (ash package-id sb-impl::symbol-name-bits)
+          (descriptor-bits name)))
 
 ;;; Allocate (and initialize) a symbol.
 ;;; Even though all symbols are the same size now, I still envision the possibility
@@ -1163,13 +1165,10 @@ core and return a descriptor to it."
             (write-wordindexed symbol sb-vm:symbol-hash-slot
                                (make-fixnum-descriptor hash)))
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
-        #+compact-symbol
         (write-wordindexed/raw symbol sb-vm:symbol-name-slot
                                (encode-symbol-name pkg-id cold-name))
-        #-compact-symbol
-        (progn (write-wordindexed symbol sb-vm:symbol-package-id-slot
-                                  (make-fixnum-descriptor pkg-id))
-               (write-wordindexed symbol sb-vm:symbol-name-slot cold-name))))
+        #-compact-symbol (write-wordindexed symbol sb-vm:symbol-package-id-slot
+                                            (make-fixnum-descriptor pkg-id))))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1795,11 +1794,8 @@ core and return a descriptor to it."
                                             (sb-c::calc-symbol-name-hash "NIL" 3))))
         ;;
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-        (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
-        #+compact-symbol
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
-                               (encode-symbol-name sb-impl::+package-id-lisp+ name))
-        #-compact-symbol (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
+                               (encode-symbol-name sb-impl::+package-id-lisp+ name))))
     nil))
 
 ;;; Since the initial symbols must be allocated before we can intern
