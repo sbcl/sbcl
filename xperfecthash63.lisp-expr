@@ -2709,5 +2709,8 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(0 3ABB4966 7F853C99 C0014833)
+ "(NIL :INHERITED :EXTERNAL :INTERNAL)"
+ "(  (& val 3) )")
 )
 ;; EOF

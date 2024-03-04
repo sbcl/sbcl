@@ -1033,11 +1033,13 @@ invoked. In that case it will store into PLACE and start over."
 ;;; If recompiled, you do not want an interpreted definition that might come
 ;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
 (defun case-body (whole lexenv test errorp
-                  &aux (keyform-value (gensym))
-                       (clauses ())
+                  &aux (clauses ())
                        (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
                        (keys))
-  (destructuring-bind (name keyform &rest specified-clauses) whole
+  (destructuring-bind (name keyform &rest specified-clauses
+                       &aux (keyform-value
+                             (if (symbolp keyform) (copy-symbol keyform) (gensym))))
+      whole
     (unless (or (cdr whole) (not errorp))
       (warn "no clauses in ~S" name))
     (do* ((cases specified-clauses (cdr cases))
@@ -1055,7 +1057,10 @@ invoked. In that case it will store into PLACE and start over."
                              :occurrences `(,existing (,case-position (,clause))))))
                (let ((record (list case-position (list clause))))
                  (dolist (k case-keys)
-                   (setf (gethash k keys-seen) record)))))
+                   (setf (gethash k keys-seen) record))))
+             (testify (k)
+               `(,test ,keyform-value
+                       ,(if (and (eq test 'eql) (self-evaluating-p k)) k `',k))))
         (unless (list-of-length-at-least-p clause 1)
           (with-current-source-form (cases)
             (error "~S -- bad clause in ~S" clause name)))
@@ -1097,14 +1102,14 @@ invoked. In that case it will store into PLACE and start over."
                             :format-arguments (list 'typecase clause keyoid)
                             :references `((:ansi-cl :macro typecase))))))
                   ((and (listp keyoid) (eq test 'eql))
-                   (setf keys (nconc (reverse keyoid) keys))
+                   (unless (proper-list-p keyoid) ; REVERSE would err with unclear message
+                     (error "~S is not a proper list" keyoid))
                    (check-clause keyoid)
+                   (setf keys (nconc (reverse keyoid) keys))
                    ;; This inserts an unreachable clause if KEYOID is NIL, but
                    ;; FORMS could contain a side-effectful LOAD-TIME-VALUE.
-                   (push `(,(if keyoid
-                                `(or ,@(mapcar (lambda (key)
-                                                 `(,test ,keyform-value ',key))
-                                               keyoid)))
+                   (push `(,(cond ((cdr keyoid) `(or ,@(mapcar #'testify keyoid)))
+                                  (keyoid (testify (car keyoid))))
                            ,@forms)
                          clauses))
                   (t
@@ -1127,8 +1132,7 @@ invoked. In that case it will store into PLACE and start over."
                               (setq case-clauses nil)))))
                    (push keyoid keys)
                    (check-clause (list keyoid))
-                   (push `((,test ,keyform-value ',keyoid) ,@forms)
-                         clauses)))))))
+                   (push `(,(testify keyoid) ,@forms) clauses)))))))
     (when (eq errorp :none)
       (setq errorp nil))
 
