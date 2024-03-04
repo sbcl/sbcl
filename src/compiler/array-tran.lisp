@@ -1675,6 +1675,14 @@
 (deftransform length ((vector) (vector))
   '(vector-length vector))
 
+(deftransform length ((vector) ((or null vector)) * :important nil)
+  (unless (and (types-equal-or-intersect (lvar-type vector) (specifier-type 'null))
+               (types-equal-or-intersect (lvar-type vector) (specifier-type 'vector)))
+    (give-up-ir1-transform))
+  `(if vector
+       (vector-length vector)
+       0))
+
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
