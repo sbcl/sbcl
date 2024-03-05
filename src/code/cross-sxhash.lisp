@@ -151,3 +151,17 @@
     (cons (if (eq (car x) 'satisfies)
               (fallback-hash (cadr x)) ; it's good enough
               (error "please no: ~S" x)))))
+
+;;; This is only for XSETs.
+(defun sb-impl::eql-hash (obj)
+  (cond ((symbolp obj)
+         ;; The target uses SYMBOL-HASH which is better (on 64-bit at least)
+         ;; but symbol-name-hash is good enough for cross-compiling.
+         (values (symbol-name-hash obj) nil))
+        ((sb-xc:typep obj '(or number character))
+         ;; Numbers parse into NUMERIC-TYPE (except for signed zeros).
+         ;; Character parse into CHARACTER-SET-TYPE.
+         (bug "Huh - Why does an XSET contain ~S?" obj))
+        (t ; use the algorithm of https://xkcd.com/221/
+         ;; This case is hit maybe a few dozen times in cross-compiling.
+         (values 4 t))))

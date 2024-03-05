@@ -227,38 +227,25 @@
 )
 
 ;;; Produce a hash that helps decide whether two xsets could be considered equivalent
-;;; as order-insensitive sets comparing elements by EQL. This shouldn't use EQL-HASH
-;;; because the intent is that it be useful for both host and target. SXHASH is fine
-;;; for SYMBOL, NUMBER, and CHARACTER since EQL and EQUAL are the the same
-;;; (SXHASH being the hash function for EQUAL). The target can include STRUCTURE-OBJECT
-;;; because we have stable hashes that do not depend on the slots. But it's no good
-;;; to mix in STRING, BIT-VECTOR, CONS, or other type where SXHASH reads the contents.
-;;; Use modular addition since it is commutative and associative, and the low bits
-;;; come out the same no matter the order of operations.
+;;; as order-insensitive sets comparing elements by EQL.
 (defun xset-elts-hash (xset)
+  #-sb-xc-host (declare (notinline sb-impl::eql-hash)) ; forward ref
   (let* ((c (xset-count xset))
          (h (mix c c)))
     (declare (sb-xc:fixnum h))
-    ;; Rather than masking each intermediate result to MOST-POSITIVE-FIXNUM,
-    ;; allow bits to rollover into the sign bit
+    ;; Use modular addition as the hash mixer since it is commutative and associative,
+    ;; and the low bits come out the same no matter the order of operations.
     (let ((hashes (xset-extra xset)))
       (if (simple-vector-p hashes)
           (dovector (x hashes)
             (setq h (plus-mod-fixnum h (truly-the sb-xc:fixnum (if (listp x) (cdr x) x)))))
-          (flet ((elt-hash (e)
-                   ;; SYMBOL-HASH is better than SXHASH for symbols (because SXHASH collides
-                   ;; if STRING=), and SXHASH is better than EQL-HASH for (OR CHARACTER NUMBER)
-                   ;; though either is technically an acceptable hash function on those types.
-                   (if (symbolp e) (symbol-hash e) (sb-xc:sxhash e))))
-            ;; If stable hashes were never assigned, then the set must contain
-            ;; only these object types. There are some other objects (INSTANCE e.g.) that
-            ;; could have non-address-based EQL-hashes but they don't really appear
-            ;; in MEMBER types often enough to matter. (And in fact we'd have to use
-            ;; something other than EQL-hash)
-            (map-xset (lambda (x)
-                        (aver (typep x '(or symbol number character)))
-                        (setq h (plus-mod-fixnum (elt-hash x) h)))
-                      xset))))
+          ;; If stable hashes were never assigned, then the set contains
+          ;; a restricted type of element, which we AVER below
+          (map-xset (lambda (x)
+                      (aver (typep x '(or symbol number character)))
+                      (setq h (plus-mod-fixnum (truly-the fixnum (sb-impl::eql-hash x))
+                                               h)))
+                    xset)))
     ;; Now mix the bits thoroughly and then mask to a positive fixnum.
     ;; I think this does not need to be compatible between host and target.
     ;; But I'm trying to make it compatible anyway because I'm not 100% sure
@@ -280,30 +267,22 @@
 (defun xset-generate-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
   #-sb-xc-host (declare (notinline sb-impl::eql-hash) ; forward ref
                         (sb-c::tlab :system))
-  (flet ((get-stable-hash-cell (obj)
-           (let ((cell (gethash obj hashmap)))
-             (cond (cell
-                    (incf (car cell))
-                    cell)
-                   (t
-                    (setf (gethash obj hashmap) (cons 1 (ctype-random))))))))
-    (let ((hashes (make-array (xset-count xset)))
-          (index -1))
-      (map-xset (lambda (elt)
+  (let ((hashes (make-array (xset-count xset)))
+        (index -1))
+    (dx-flet ((assign-hash (x)
+                (multiple-value-bind (h address-based) (sb-impl::eql-hash x)
                   (setf (aref hashes (incf index))
-                        #-sb-xc-host
-                        (multiple-value-bind (hashval addr) (sb-impl::eql-hash elt)
-                          ;; EQL-HASH does _nothing_ to fixnums. Hash-tables perturb the hash
-                          ;; in PREFUZZ-HASH, so too should we mix bits some more here.
-                          (if addr (get-stable-hash-cell elt) (murmur-hash-word/fixnum hashval)))
-                        #+sb-xc-host
-                        (multiple-value-bind (hashval addr)
-                            (if (sb-xc:typep elt '(or symbol character number))
-                                (values (symbol-name-hash elt) nil)
-                                (values 4 ; chosen by algorithm of https://xkcd.com/221/
-                                        t)) ; yes, it's address-based
-                          (if addr (get-stable-hash-cell elt) hashval))))
-                xset)
+                        ;; EQL-HASH does not hash fixnums well. Hash-tables
+                        ;; use PREFUZZ-HASH, so this should do something similar.
+                        (acond ((not address-based)
+                                (#+sb-xc-host progn
+                                 #-sb-xc-host murmur-hash-word/fixnum h))
+                               ((gethash x hashmap)
+                                (incf (car it)) ; bump refcount
+                                it)
+                               (t ; new entry with refcount = 1
+                                (setf (gethash x hashmap) (cons 1 (ctype-random)))))))))
+      (map-xset #'assign-hash xset)
       (setf (xset-extra xset) hashes)))
   xset)
 (defun xset-delete-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
