@@ -647,7 +647,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
   (let* ((string (truly-the simple-string
                             (stringify-string-designator string-designator)))
          (length (length string))
-         (hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+))
+         (hash (calc-symbol-name-hash string length))
          (result (list nil)))
     (do-packages (p) ; FIXME: should not acquire package-names lock
       (add-to-bag-if-found (package-internal-symbols p) string length hash result)
@@ -715,8 +715,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
       (flet ((find-all-in-table (table)
                (if (and core-purified-p (not (symtbl-modified table)))
                    (dolist (candidate candidates)
-                     (let* ((hash (logand (the hash-code (car candidate))
-                                          +symname-hash-mask+))
+                     (let* ((hash (the hash-code (car candidate)))
                             (string (the simple-string (cdr candidate)))
                             (length (length string)))
                        (add-to-bag-if-found table string length hash result)))

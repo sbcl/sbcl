@@ -1315,11 +1315,10 @@ Experimental: interface subject to change."
 
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols.
-(defconstant +symname-hash-mask+ #xFFFFFFFF) ; 32 bits
 (defun %find-symbol (string length package)
   (declare (simple-string string)
            (type index length))
-  (let ((hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+)))
+  (let ((hash (calc-symbol-name-hash string length)))
     (declare (hash-code hash))
     (with-symbol ((symbol) (package-internal-symbols package) string length hash)
       (return-from %find-symbol (values symbol :internal)))
@@ -1464,7 +1463,7 @@ Experimental: interface subject to change."
 (defun find-external-symbol (string package)
   (declare (simple-string string))
   (let* ((length (length string))
-         (hash (logand (calc-symbol-name-hash string length) +symname-hash-mask+)))
+         (hash (calc-symbol-name-hash string length)))
     (declare (type index length) (hash-code hash))
     (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from find-external-symbol symbol)))
@@ -1999,11 +1998,7 @@ PACKAGE."
              (when symbol ; skip NIL because of its magic-ness
                (let* ((name (symbol-name symbol))
                       (computed-hash (calc-symbol-name-hash name (length name))))
-                 #+salted-symbol-hash
-                 (aver (= (symbol-name-hash symbol)
-                          (logand computed-hash +symname-hash-mask+)))
-                 #-salted-symbol-hash
-                 (aver (= (symbol-hash symbol) computed-hash)))))))
+                 (aver (= (symbol-name-hash symbol) computed-hash)))))))
     (check-hash-slot (car *!initial-symbols*)) ; uninterned symbols
     (dolist (spec specs)
       (check-hash-slot (second spec))

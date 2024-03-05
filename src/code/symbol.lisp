@@ -76,6 +76,7 @@ distinct from the global value. Can also be SETF."
 (defun calc-symbol-name-hash (string length)
   (declare (simple-string string) (index length))
   (cond
+    ;; first case is only needed if NIL's hash is unusual, but it's OK either way
     #+64-bit
     ((and (= length 3)
            (locally
@@ -89,9 +90,11 @@ distinct from the global value. Can also be SETF."
                    (char= (schar string 2) #\L)))))
      #.(symbol-hash 'nil)) ; utilize the host's function
     (t
-      ;; flip the bits so that a symbol hashes differently from its print name
-      (logxor (%sxhash-simple-substring string 0 length)
-              most-positive-fixnum))))
+     ;; Flip the bits so that a symbol hashes differently from its print name,
+     ;; and extract the lesser of 32 or N-POSITIVE-FIXNUM-BITS significant bits.
+     (ldb (byte 32 0)
+          (logxor (%sxhash-simple-substring string 0 length)
+                  most-positive-fixnum)))))
 
 ;;; Return the function binding of SYMBOL or NIL if not fboundp.
 ;;; Don't strip encapsulations.
@@ -410,9 +413,9 @@ distinct from the global value. Can also be SETF."
               (sb-vm::%alloc-immobile-symbol name)
               (sb-vm::%alloc-symbol name)))))
     #+salted-symbol-hash
-    (let* ((salt (murmur3-fmix-word (mix (get-lisp-obj-address symbol) name-hash)))
-           (hash (logior (logand (ash name-hash 32) most-positive-word)
-                         (mask-field (byte 8 24) salt))))
+    (let* ((salt (murmur-hash-word/fixnum
+                  (word-mix name-hash (get-lisp-obj-address symbol))))
+           (hash (logior (ash name-hash 32) (mask-field symbol-hash-prng-byte salt))))
       ;; %SET-SYMBOL-HASH wants a unsigned fixnum, which HASH is not.
       (%primitive sb-vm::set-slot symbol (%make-lisp-obj hash)
                   'make-symbol sb-vm:symbol-hash-slot sb-vm:other-pointer-lowtag))

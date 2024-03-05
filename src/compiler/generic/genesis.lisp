@@ -1145,12 +1145,17 @@ core and return a descriptor to it."
           (descriptor-bits name)))
 
 (defun assign-symbol-hash (descriptor wordindex name)
-  (let ((hash (sb-c::calc-symbol-name-hash name (length name))))
-    (if (member :64-bit sb-xc:*features*)
-        ;; Low 4 bytes to high 4 bytes of slot, plus maybe randomize 1 byte (not yet)
-        (write-wordindexed/raw descriptor wordindex
-                               (logand (ash hash 32) most-positive-word))
-        (write-wordindexed descriptor wordindex (make-fixnum-descriptor hash)))))
+  ;; "why not just call sb-c::symbol-name-hash?" you ask? because: no symbol.
+  (let ((name-hash (sb-c::calc-symbol-name-hash name (length name))))
+    #+64-bit
+    ;; Low 4 bytes to high 4 bytes of slot, plus salt the hash any way you want
+    ;; as long as the build is reproducible.
+    (let* ((salt (sb-impl::murmur3-fmix-word (descriptor-bits descriptor)))
+           (hash (logior (ash name-hash 32)
+                         (mask-field sb-impl::symbol-hash-prng-byte salt))))
+      (write-wordindexed/raw descriptor wordindex hash))
+    #-64-bit
+    (write-wordindexed descriptor wordindex (make-fixnum-descriptor name-hash))))
 
 ;;; Allocate (and initialize) a symbol.
 ;;; Even though all symbols are the same size now, I still envision the possibility

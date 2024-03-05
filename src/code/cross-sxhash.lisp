@@ -72,7 +72,8 @@
          ;; out-of-order with defconstant nil-value
          (ldb (byte 32 32) (sb-vm::get-nil-taggedptr)))
         (t
-         (logxor (%sxhash-simple-string string) most-positive-fixnum))))
+         (ldb (byte 32 0) ; discard high bits for 64-bit builds
+              (logxor (%sxhash-simple-string string) most-positive-fixnum)))))
 
 ;;; This is merely a slot-reader in real life, but since cross-compiling
 ;;; doesn't have a slot, simply recompute the answer as if it were stored.

@@ -286,22 +286,18 @@
   (:generator 4
     (when (not-nil-tn-ref-p args)
       (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-      (inst srdi res res 24) ; shift out 3 bytes
+      (inst srdi res res n-symbol-hash-discard-bits)
       (return-from symbol-hash))
     (inst cmpld symbol null-tn)
     (inst beq NULL)
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst srdi res res 24) ; shift out 3 bytes
+    (inst srdi res res n-symbol-hash-discard-bits)
     (inst b DONE)
     NULL
     (inst li res 0) ; the salt may as well have been zero
     DONE))
-(define-vop (symbol-name-hash)
-  (:policy :fast-safe)
+(define-vop (symbol-name-hash symbol-hash)
   (:translate symbol-name-hash)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
   (:arg-refs args)
   (:generator 4
     (when (not-nil-tn-ref-p args)

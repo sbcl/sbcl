@@ -113,7 +113,7 @@
 
 (defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
-(defknown sb-impl::calc-symbol-name-hash (simple-string index) hash-code ())
+(defknown sb-impl::calc-symbol-name-hash (simple-string index) symbol-name-hash ())
 
 (defknown (symbol-hash) (symbol) hash-code (flushable movable))
 (defknown (symbol-name-hash) (symbol) symbol-name-hash (flushable movable))

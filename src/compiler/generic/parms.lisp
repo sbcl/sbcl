@@ -417,5 +417,15 @@
 (defconstant double-float-digits 53)
 )
 
+;;; Reserve some bits of SYMBOL-HASH slot for future use
+#+64-bit
+(progn (defconstant n-symbol-hash-prng-bits 10) ; how many to randomize
+       (defconstant n-symbol-hash-discard-bits
+         (let ((precision (+ 32 n-symbol-hash-prng-bits))) ; total N bits
+           (- 64 precision)))
+       (defconstant-eqx sb-impl::symbol-hash-prng-byte
+         (byte n-symbol-hash-prng-bits (- 32 n-symbol-hash-prng-bits))
+         #'equal))
+
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)

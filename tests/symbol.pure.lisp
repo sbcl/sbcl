@@ -72,3 +72,43 @@
    '(lambda (vars vals)
      (progv vars vals))
    ((nil nil) nil)))
+
+(defun summarize-colliding-hashes (print)
+  ;; Collisions on SYMBOL-HASH aren't errors, merely unfortunate.
+  ;; The printed output is nifty because it shows e.g.
+  ;; -  of the 25 distinct symbols named "ARGS", only 2 collide on hash
+  ;; -  20 symbols named "RESULT", 2 collide, etc.
+  (let ((ht (make-hash-table :test 'equal))
+        (n-homograph-sets 0)
+        (n-well-hashed-sets 0))
+    ;; map string -> set of symbols whose print name is that string
+    (do-all-symbols (s)
+      (pushnew s (gethash (string s) ht)))
+    (sb-int:dohash ((string symbols) ht)
+      (when (cdr symbols)
+        (incf n-homograph-sets)
+        (let ((hashes (mapcar #'sb-kernel:symbol-hash symbols))
+              (alist))
+          (cond ((= (length (remove-duplicates hashes)) (length symbols))
+                 (incf n-well-hashed-sets))
+                (print
+                 ;; Start by binning symbols by their hash.
+                 (dolist (s symbols)
+                   (let* ((h (sb-kernel:symbol-hash s))
+                          (cell (assoc h alist)))
+                     (if cell
+                         (push s (cdr cell))
+                         (push (list h s) alist))))
+                 (format t "Collisions on ~S (~D same-named symbols):~%"
+                         string (length symbols))
+                 ;; Only print bins having > 1 symbol
+                 (dolist (cell alist)
+                   (when (cddr cell)
+                     (format t "  ~x ~s~%" (car cell) (cdr cell)))))))))
+    (format t "~D sets of symbols spelled the same, ~D well-hashed~%"
+            n-homograph-sets n-well-hashed-sets)
+    ;; The result is a "score", the nearer to 1 the better.
+    (/ n-well-hashed-sets n-homograph-sets)))
+
+(with-test (:name :hashing-improvements :skipped-on (not :64-bit))
+  (assert (> (summarize-colliding-hashes nil) .95)))

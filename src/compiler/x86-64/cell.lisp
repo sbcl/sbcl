@@ -424,7 +424,7 @@
   (:result-types positive-fixnum)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst shr res 24))) ; shift out 3 bytes
+    (inst shr res n-symbol-hash-discard-bits)))
 
 (eval-when (:compile-toplevel)
   ;; assumption: any object can be read 1 word past its base pointer
@@ -434,13 +434,9 @@
   (aver (= (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)
            -3))) ; 3 is the smallest pointer tag
 
-(define-vop (symbol-name-hash)
-  (:policy :fast-safe)
+(define-vop (symbol-name-hash symbol-hash)
   ;; identical translations believe it or not
   (:translate symbol-name-hash hash-as-if-symbol-name)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
   (:generator 1
     ;; NIL gets 0 for its name hash since its upper 4 address bytes are 0
     (inst mov :dword res

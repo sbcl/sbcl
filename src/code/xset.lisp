@@ -247,8 +247,7 @@
             (setq h (plus-mod-fixnum h (truly-the sb-xc:fixnum (if (listp x) (cdr x) x)))))
           (flet ((elt-hash (e)
                    ;; SYMBOL-HASH is better than SXHASH for symbols (because SXHASH collides
-                   ;; on STRING= symbols - though SYMBOL-HASH does too at the moment).
-                   ;; and SXHASH is better than EQL-HASH for (OR CHARACTER NUMBER)
+                   ;; if STRING=), and SXHASH is better than EQL-HASH for (OR CHARACTER NUMBER)
                    ;; though either is technically an acceptable hash function on those types.
                    (if (symbolp e) (symbol-hash e) (sb-xc:sxhash e))))
             ;; If stable hashes were never assigned, then the set must contain

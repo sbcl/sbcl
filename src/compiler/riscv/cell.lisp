@@ -207,7 +207,7 @@
   (:result-types positive-fixnum)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst srli res res 24))) ; shift out 3 bytes
+    (inst srli res res n-symbol-hash-discard-bits)))
 (define-vop (symbol-name-hash symbol-hash)
   (:translate symbol-name-hash)
   (:generator 1
