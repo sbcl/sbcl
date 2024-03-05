@@ -1523,7 +1523,7 @@
     (cond ((and policy-test
                 (not (funcall policy-test node))))
           ((or (not constrained)
-               (valid-fun-use node type))
+               (valid-transform-fun node type #'csubtypep #'values-subtypep))
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
                  (let ((new-form (funcall fun node))
@@ -1552,10 +1552,9 @@
                (:delayed
                 t))))
           ((and flame
-                (valid-fun-use node
-                               type
-                               :argument-test #'types-equal-or-intersect
-                               :result-test #'values-types-equal-or-intersect))
+                (valid-transform-fun node type
+                                     #'types-equal-or-intersect
+                                     #'values-types-equal-or-intersect))
            (record-optimization-failure node transform type)
            t)
           (t

@@ -424,15 +424,23 @@
             do (push rest result)))
     (nreverse result)))
 
-(defun report-arg-count-mismatch (callee caller type arg-count
+(defun report-arg-count-mismatch (fun caller type arg-count
                                   condition-type
-                                  &key lossage-fun)
+                                  &optional lossage-fun)
   (flet ((lose (format-control &rest format-args)
            (if lossage-fun
                (apply lossage-fun format-control format-args)
                (warn condition-type :format-control format-control
                                     :format-arguments format-args))
-           t))
+           t)
+         (callee ()
+           (nth-value 1 (lvar-fun-type fun)))
+         (caller ()
+           (or caller
+               (loop for annotation in (lvar-annotations fun)
+                     when (typep annotation 'lvar-function-designator-annotation)
+                     do (setf *compiler-error-context* annotation)
+                        (return (lvar-function-designator-annotation-caller annotation))))))
     (multiple-value-bind (min max optional) (fun-type-arg-limits type)
       (or
        (cond
@@ -442,19 +450,19 @@
           (when (/= arg-count min)
             (lose
              "The function ~S is called~@[ by ~S~] with ~R argument~:P, but wants exactly ~R."
-             callee caller
+             (callee) (caller)
              arg-count min)))
          ((< arg-count min)
           (lose
            "The function ~S is called~@[ by ~S~] with ~R argument~:P, but wants at least ~R."
-           callee caller
+           (callee) (caller)
            arg-count min))
          ((not max)
           nil)
          ((> arg-count max)
           (lose
            "The function ~S called~@[ by ~S~] with ~R argument~:P, but wants at most ~R."
-           callee caller
+           (callee) (caller)
            arg-count max)))
        (let ((positional (fun-type-positional-count type)))
          (when (and (fun-type-keyp type)
@@ -462,7 +470,7 @@
                     (oddp (- arg-count positional)))
            (lose
             "The function ~s is called with odd number of keyword arguments."
-            callee)))))))
+            (callee))))))))
 
 (defun disable-arg-count-checking (leaf type arg-count)
   (when (lambda-p leaf)
@@ -507,7 +515,7 @@
                                      'type-warning)))
                   (caller (lvar-function-designator-annotation-caller annotation))
                   (arg-count (length args)))
-             (or (report-arg-count-mismatch name caller
+             (or (report-arg-count-mismatch lvar caller
                                             type
                                             arg-count
                                             condition)
