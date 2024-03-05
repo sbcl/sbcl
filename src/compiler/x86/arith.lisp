@@ -1223,48 +1223,41 @@ constant shift greater than word length")))
                                                          'y))))))))
   (define-logtest-vops))
 
-(defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable always-translatable))
-
-;;; only for constant folding within the compiler
-(defun %logbitp (integer index)
-  (logbitp index integer))
-
 ;;; too much work to do the non-constant case (maybe?)
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
-  (:translate %logbitp)
+  (:translate logbitp)
   (:conditional :c)
-  (:arg-types tagged-num (:constant (integer 0 29)))
+  (:arg-types (:constant (integer 0 29)) tagged-num)
   (:generator 4
     (inst bt x (+ y n-fixnum-tag-bits))))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg signed-stack))
-         (y :scs (signed-reg)))
-  (:translate %logbitp)
+  (:args (y :scs (signed-reg))
+         (x :scs (signed-reg signed-stack)))
+  (:translate logbitp)
   (:conditional :c)
   (:generator 6
     (inst bt x y)))
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
-  (:translate %logbitp)
+  (:translate logbitp)
   (:conditional :c)
-  (:arg-types signed-num (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 0 31)) signed-num)
   (:generator 5
     (inst bt x y)))
 
 (define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg unsigned-stack))
-         (y :scs (unsigned-reg)))
-  (:translate %logbitp)
+  (:args (y :scs (unsigned-reg))
+         (x :scs (unsigned-reg unsigned-stack)))
+  (:translate logbitp)
   (:conditional :c)
   (:generator 6
     (inst bt x y)))
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
-  (:translate %logbitp)
+  (:translate logbitp)
   (:conditional :c)
-  (:arg-types unsigned-num (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 0 31)) unsigned-num)
   (:generator 5
     (inst bt x y)))
 
