@@ -1146,65 +1146,79 @@
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
   (declare (type interval top bot))
-  (flet ((bound-div (x y y-low-p)
-           ;; Compute x/y
-           (cond ((null y)
-                  ;; Divide by infinity means result is 0. However,
-                  ;; we need to watch out for the sign of the result,
-                  ;; to correctly handle signed zeros. We also need
-                  ;; to watch out for positive or negative infinity.
-                  (cond ((floatp (type-bound-number x))
-                         (if y-low-p
-                             (sb-xc:- (float-sign (type-bound-number x) $0.0))
-                             (float-sign (type-bound-number x) $0.0)))
-                        ((and integer
-                             (not (interval-contains-p 0 top)))
-                         '(0))
-                        (t
-                         0)))
-                 ((zerop (type-bound-number y))
-                  (if integer
-                      x
-                      ;; Divide by zero means result is infinity
-                      nil))
-                 ((and (numberp x) (zerop x))
-                  ;; Zero divided by anything is zero, but don't lose the sign
-                  (sb-xc:/ x (signum (type-bound-number y))))
-                 (t
-                  (bound-binop sb-xc:/ x y)))))
-    (let ((top-range (interval-range-info top))
-          (bot-range (interval-range-info bot)))
-      (cond ((null bot-range)
-             (if integer
-                 (destructuring-bind (bot- bot+) (interval-split 0 bot t t)
-                   (let ((r- (interval-div top bot- integer))
-                         (r+ (interval-div top bot+ integer)))
-                     (or (interval-merge-pair r- r+)
-                         (list r- r+))))
-                 ;; The denominator contains zero, so anything goes!
-                 (make-interval)))
-            ((eq bot-range '-)
-             ;; Denominator is negative so flip the sign, compute the
-             ;; result, and flip it back.
-             (interval-neg (interval-div top (interval-neg bot) integer)))
-            ((null top-range)
-             ;; Split top into two positive and negative parts, and
-             ;; divide each separately
-             (destructuring-bind (top- top+) (interval-split 0 top t t)
-               (or (interval-merge-pair (interval-div top- bot integer)
-                                        (interval-div top+ bot integer))
-                   (make-interval))))
-            ((eq top-range '-)
-             ;; Top is negative so flip the sign, divide, and flip the
-             ;; sign of the result.
-             (interval-neg (interval-div (interval-neg top) bot integer)))
-            ((and (eq top-range '+) (eq bot-range '+))
-             ;; the easy case
-             (make-interval
-              :low (bound-div (interval-low top) (interval-high bot) t)
-              :high (bound-div (interval-high top) (interval-low bot) nil)))
-            (t
-             (bug "excluded case in INTERVAL-DIV"))))))
+  (labels ((interval-div (top bot)
+             (flet ((bound-div (x y y-low-p)
+                      ;; Compute x/y
+                      (cond ((null y)
+                             ;; Divide by infinity means result is 0. However,
+                             ;; we need to watch out for the sign of the result,
+                             ;; to correctly handle signed zeros. We also need
+                             ;; to watch out for positive or negative infinity.
+                             (cond ((floatp (type-bound-number x))
+                                    (if y-low-p
+                                        (sb-xc:- (float-sign (type-bound-number x) $0.0))
+                                        (float-sign (type-bound-number x) $0.0)))
+                                   ((and integer
+                                         (not (interval-contains-p 0 top)))
+                                    '(0))
+                                   (t
+                                    0)))
+                            ((zerop (type-bound-number y))
+                             (if integer
+                                 x
+                                 ;; Divide by zero means result is infinity
+                                 nil))
+                            ((and (numberp x) (zerop x))
+                             ;; Zero divided by anything is zero, but don't lose the sign
+                             (sb-xc:/ x (signum (type-bound-number y))))
+                            (t
+                             (bound-binop sb-xc:/ x y)))))
+               (let ((top-range (interval-range-info top))
+                     (bot-range (interval-range-info bot)))
+                 (cond ((null bot-range)
+                        (if integer
+                            (destructuring-bind (bot- bot+) (interval-split 0 bot t t)
+                              (let ((r- (interval-div top bot-))
+                                    (r+ (interval-div top bot+)))
+                                (or (interval-merge-pair r- r+)
+                                    (list r- r+))))
+                            ;; The denominator contains zero, so anything goes!
+                            (make-interval)))
+                       ((eq bot-range '-)
+                        ;; Denominator is negative so flip the sign, compute the
+                        ;; result, and flip it back.
+                        (interval-neg (interval-div top (interval-neg bot))))
+                       ((null top-range)
+                        ;; Split top into two positive and negative parts, and
+                        ;; divide each separately
+                        (destructuring-bind (top- top+) (interval-split 0 top t t)
+                          (or (interval-merge-pair (interval-div top- bot)
+                                                   (interval-div top+ bot))
+                              (make-interval))))
+                       ((eq top-range '-)
+                        ;; Top is negative so flip the sign, divide, and flip the
+                        ;; sign of the result.
+                        (interval-neg (interval-div (interval-neg top) bot)))
+                       ((and (eq top-range '+) (eq bot-range '+))
+                        ;; the easy case
+                        (make-interval
+                         :low (bound-div (interval-low top) (interval-high bot) t)
+                         :high (bound-div (interval-high top) (interval-low bot) nil)))
+                       (t
+                        (bug "excluded case in INTERVAL-DIV")))))))
+    (let ((interval (interval-div top bot)))
+      (if (consp interval)
+          interval
+          (let ((low (interval-low interval))
+                (high (interval-high interval)))
+            (if (and (integerp low)
+                     (not (eql low 0))
+                     (eql low high))
+                ;; Don't return constants, as it will produce an error when divided by 0.
+                (if (plusp low)
+                    (make-interval :low '(0) :high low)
+                    (make-interval :low low :high '(0)))
+                interval))))))
 
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the

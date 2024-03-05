@@ -476,3 +476,19 @@
     ((-6 nil) 0)
     ((-6 t) -6)
     ((-3 nil) -3)))
+
+(with-test (:name :/-folding)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (declare (bit a))
+         (/ 1 a))
+    ((1) 1)
+    ((0) (condition 'division-by-zero)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (declare (bit a))
+         (= (/ 5 a) 5))
+    ((1) t)
+    ((0) (condition 'division-by-zero))))
