@@ -676,31 +676,21 @@
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
 
-(defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable always-translatable))
-
-;;; For constant folding
-(defun %logbitp (integer index)
-  (logbitp index integer))
-
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
-  (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types tagged-num (:constant (integer 0 29)))
+  (:arg-types (:constant (integer 0 29)) tagged-num)
   (:generator 4
     (inst tst x (ash 1 (+ y n-fixnum-tag-bits)))))
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
-  (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types signed-num (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 0 31)) signed-num)
   (:generator 5
     (inst tst x (ash 1 y))))
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
-  (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types unsigned-num (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 0 31)) unsigned-num)
   (:generator 5
     (inst tst x (ash 1 y))))
 

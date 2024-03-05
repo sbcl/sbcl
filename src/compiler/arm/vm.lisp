@@ -305,8 +305,7 @@
          ((or (valid-funtype '((constant-arg (integer 0 29)) fixnum) '*)
               (valid-funtype '((constant-arg (integer 0 31)) (signed-byte 32)) '*)
               (valid-funtype '((constant-arg (integer 0 31)) (unsigned-byte 32)) '*))
-          (values :transform '(lambda (index integer)
-                               (%logbitp integer index))))
+          (values :direct nil))
          (t (values :default nil))))
       (t (values :default nil)))))
 
