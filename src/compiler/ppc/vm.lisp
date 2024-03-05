@@ -354,8 +354,7 @@
          ((or (valid-funtype '((constant-arg (integer 0 29)) fixnum) '*)
               (valid-funtype '((constant-arg (integer 0 31)) (signed-byte 32)) '*)
               (valid-funtype '((constant-arg (integer 0 31)) (unsigned-byte 32)) '*))
-          (values :transform '(lambda (index integer)
-                               (%logbitp integer index))))
+          (values :direct nil))
          (t (values :default nil))))
       ;; FIXME: can handle MIN and MAX here
       (%ldb
@@ -373,8 +372,7 @@
          (if (or (validp 'fixnum 29)
                  (validp '(signed-byte 32) 32)
                  (validp '(unsigned-byte 32) 32))
-             (values :transform '(lambda (size posn integer)
-                                  (%%ldb integer size posn)))
+             (values :direct nil)
              (values :default nil))))
       (t (values :default nil)))))
 

@@ -673,17 +673,10 @@
 
 ;;;; %LDB
 
-(defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
-  (movable foldable flushable always-translatable))
-
-;;; only for constant folding within the compiler
-(defun %%ldb (integer size posn)
-  (%ldb size posn integer))
-
 (define-vop (ldb-c/fixnum)
-  (:translate %%ldb)
+  (:translate %ldb)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:arg-types (:constant (integer 1 29)) (:constant (integer 0 29)) tagged-num)
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
@@ -707,9 +700,9 @@
                (- 31 n-fixnum-tag-bits)))))))
 
 (define-vop (ldb-c/signed)
-  (:translate %%ldb)
+  (:translate %ldb)
   (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (integer 1 29)) (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 1 29)) (:constant (integer 0 31)) signed-num)
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
@@ -721,9 +714,9 @@
           (- 31 n-fixnum-tag-bits))))
 
 (define-vop (ldb-c/unsigned)
-  (:translate %%ldb)
+  (:translate %ldb)
   (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (integer 1 29)) (:constant (integer 0 31)))
+  (:arg-types (:constant (integer 1 29)) (:constant (integer 0 31)) unsigned-num)
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
@@ -857,19 +850,12 @@
                           (inst b? (if not-p :eq :ne) target)))))))
   (define-logtest-vops))
 
-(defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable always-translatable))
-
-;;; only for constant folding within the compiler
-(defun %logbitp (integer index)
-  (logbitp index integer))
-
 ;;; We only handle the constant cases because those are the only ones
 ;;; guaranteed to make it past COMBINATION-IMPLEMENTATION-STYLE.
 ;;;  --njf, 06-02-2006
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
-  (:translate %logbitp)
-  (:arg-types tagged-num (:constant (integer 0 29)))
+  (:translate logbitp)
+  (:arg-types (:constant (integer 0 29)) tagged-num)
   (:temporary (:scs (any-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 14)
@@ -878,8 +864,8 @@
     (inst b? (if not-p :eq :ne) target)))
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
-  (:translate %logbitp)
-  (:arg-types signed-num (:constant (integer 0 31)))
+  (:translate logbitp)
+  (:arg-types (:constant (integer 0 31)) signed-num)
   (:temporary (:scs (signed-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 16)
@@ -888,8 +874,8 @@
     (inst b? (if not-p :eq :ne) target)))
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
-  (:translate %logbitp)
-  (:arg-types unsigned-num (:constant (integer 0 31)))
+  (:translate logbitp)
+  (:arg-types (:constant (integer 0 31)) unsigned-num)
   (:temporary (:scs (unsigned-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 16)
