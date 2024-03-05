@@ -107,3 +107,7 @@
          (error "Called (SETF WEAK-VECTOR-REF) on ~S ~S ~S" new v i))
        (defun sb-int:weak-vector-len (v)
          (error "Called WEAK-VECTOR-LEN on ~S" v)))
+
+(defmacro sb-xc:defconstant (&rest args)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (cl:defconstant ,@args)))

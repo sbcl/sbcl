@@ -77,12 +77,7 @@
 ;;; speeding up these important operations.
 
 ;;; the size of a stream in-buffer
-;;;
-;;; This constant it is used in a read-time-eval, and some implementations
-;;; draw a sharp distinction between a constant being known only to
-;;; the file-compiler during compilation, and known also to the evaluator.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +ansi-stream-in-buffer-length+ 512))
+(defconstant +ansi-stream-in-buffer-length+ 512)
 
 (deftype ansi-stream-in-buffer ()
   `(simple-array (unsigned-byte 8) (,+ansi-stream-in-buffer-length+)))

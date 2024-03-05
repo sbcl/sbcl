@@ -34,19 +34,18 @@
   (the internal-time
        (values (truncate (* seconds internal-time-units-per-second)))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute) ; for "#."
 (defconstant safe-internal-seconds-limit
-    ;; Dropping one bit to ensure that
-    ;;
-    ;;  (let ((seconds (the (integer 0 #.safe-internal-seconds-limit) ...)))
-    ;;    (truncate (* 1000 (float seconds 1.0f0))))
-    ;;
-    ;; doesn't go beyond the INTERNAL-TIME range due to rounding
-    ;; errors.
+  ;; Dropping one bit to ensure that
+  ;;
+  ;;  (let ((seconds (the (integer 0 #.safe-internal-seconds-limit) ...)))
+  ;;    (truncate (* 1000 (float seconds 1.0f0))))
+  ;;
+  ;; doesn't go beyond the INTERNAL-TIME range due to rounding
+  ;; errors.
   ;; #. is needed to make the value constant per se as opposed to
   ;; constant by decree, otherwise genesis runs into a problem.
   #.(floor (ash 1 (1- sb-kernel::internal-time-bits))
-           internal-time-units-per-second)))
+           internal-time-units-per-second))
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)

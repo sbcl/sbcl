@@ -37,8 +37,7 @@
 ;;; be used.
 ;;; This is only enabled for certain build configurations that need
 ;;; a scratch register in various random places.
-#-ubsan (eval-when (:compile-toplevel :load-toplevel :execute)
-          (defconstant global-temp-reg nil))
+#-ubsan (defconstant global-temp-reg nil)
 #+ubsan (progn (define-symbol-macro temp-reg-tn r11-tn)
                (defconstant global-temp-reg 11))
 
@@ -89,11 +88,7 @@
 
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
-             `(eval-when (:compile-toplevel :load-toplevel :execute)
-                    ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
-                    ;; (in the same file) depends on compile-time evaluation
-                    ;; of the DEFCONSTANT. -- AL 20010224
-                (defconstant ,(symbolicate name "-OFFSET") ,offset)))
+             `(defconstant ,(symbolicate name "-OFFSET") ,offset))
            (defregset (name &rest regs)
              ;; FIXME: this would be DEFCONSTANT-EQX were it not
              ;; for all the style-warnings about earmuffs on a constant.
@@ -108,9 +103,7 @@
            (define-gprs (want-offsets offsets-list names array)
              `(progn
                 (defconstant-eqx ,names ,array #'equalp)
-                ;; We need the constants evaluable because of the DEFGLOBAL
-                ;; which is needed because of forms such as #.*qword-regs*
-                (eval-when (:compile-toplevel :load-toplevel :execute)
+                (progn
                   ,@(when want-offsets
                       (let ((i -1))
                         (map 'list

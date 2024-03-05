@@ -109,9 +109,7 @@
 
 ;; Using 6 bits per packed field, 5 infos can be described in a 30-bit fixnum,
 ;; or 10 in a fixnum on 64-bit machines (regardless of n-fixnum-tag-bits).
-;; The eval-when seems to be necessary for building with CCL as host.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +infos-per-word+ (floor sb-vm:n-fixnum-bits info-number-bits)))
+(defconstant +infos-per-word+ (floor sb-vm:n-fixnum-bits info-number-bits))
 
 ;; Descriptors are target fixnums
 (deftype info-descriptor () `(signed-byte ,sb-vm:n-fixnum-bits))

@@ -222,12 +222,11 @@
 (sb-xc:defmacro pack-ht-flags-kind (x) `(ash ,x 4))
 (defmacro ht-flags-kind (flags) `(ldb (byte 2 4) ,flags))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant default-rehash-size $1.5)
-  ;; Don't raise this number to 8 - if you do it'll increase the memory
-  ;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
-  ;; padding slots.  This is a "perfect" minimal size.
-  (defconstant +min-hash-table-size+ 7))
+(defconstant default-rehash-size $1.5)
+;; Don't raise this number to 8 - if you do it'll increase the memory
+;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
+;; padding slots.  This is a "perfect" minimal size.
+(defconstant +min-hash-table-size+ 7)
 
 (sb-xc:defmacro make-system-hash-table (&key test synchronized weakness)
   (multiple-value-bind (kind args)

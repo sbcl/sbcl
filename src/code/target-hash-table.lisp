@@ -281,8 +281,7 @@ Examples:
 ;;; The smallest table holds 14 items distributed among 16 buckets.
 ;;; So we allocate 14 k/v pairs = 28 cells + 3 overhead = 31 cells,
 ;;; and at maximum load the table will have a load factor of 87.5%
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant kv-pairs-overhead-slots 3))
+(defconstant kv-pairs-overhead-slots 3)
 (defconstant bad-next-value #xfefefefe)
 ;;; This constant is referenced via its name in cold load, so it needs to
 ;;; be evaluable in the host.

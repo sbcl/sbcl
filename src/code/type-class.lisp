@@ -261,11 +261,10 @@
 ;;; NOTE: we _do_ use the sign bit, leaving us 25 pseudorandom bits, but
 ;;; the 2 bits of least significance are NOT pseudorandom, so it's best
 ;;; not to use them directly in the hash index.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant ctype-hash-size  30)  ; all significant bits, for the slot type specifier
-  (defconstant ctype-PRNG-nbits 25)  ; from pseudorandom number generator
-  (defconstant ctype-contains-unknown #b01)
-  (defconstant ctype-contains-hairy   #b10)) ; any hairy type, including UNKNOWN
+(defconstant ctype-hash-size  30)  ; all significant bits, for the slot type specifier
+(defconstant ctype-PRNG-nbits 25)  ; from pseudorandom number generator
+(defconstant ctype-contains-unknown #b01)
+(defconstant ctype-contains-hairy   #b10) ; any hairy type, including UNKNOWN
 (defconstant +ctype-flag-mask+ #b11)
 (defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
 

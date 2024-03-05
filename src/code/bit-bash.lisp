@@ -34,11 +34,10 @@
 
 ;;; the actual bashers and common uses of same
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant min-bytes-c-call-threshold
-    ;; mostly just guessing here
-    #+(or x86 x86-64 ppc ppc64) 128
-    #-(or x86 x86-64 ppc ppc64) 256))
+(defconstant min-bytes-c-call-threshold
+  ;; mostly just guessing here
+  #+(or x86 x86-64 ppc ppc64) 128
+  #-(or x86 x86-64 ppc ppc64) 256)
 
 (defmacro verify-src/dst-bits-per-elt (source destination expect-bits-per-element)
   (declare (ignorable source destination expect-bits-per-element))

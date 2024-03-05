@@ -61,9 +61,7 @@
 ;;;; Graham (evidently not considering the abstraction "vector" to be
 ;;;; such a simple thing:-)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +smallvec-length+
-    (expt 2 16)))
+(defconstant +smallvec-length+ (expt 2 16))
 
 ;;; an element of a BIGVEC -- a vector small enough that we have
 ;;; a good chance of it being portable to other Common Lisps

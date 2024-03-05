@@ -995,9 +995,8 @@
 ;;; - the number of bytes to allocate should be a fixnum
 ;;; - type-checking can use use efficient bit-masking approach
 ;;;   to combine the fixnum + range test into one instruction
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant make-list-limit
-    (ash most-positive-fixnum (- (+ sb-vm:word-shift 1)))))
+(defconstant make-list-limit
+  (ash most-positive-fixnum (- (+ sb-vm:word-shift 1))))
 (defknown make-list ((integer 0 #.make-list-limit) &key (:initial-element t)) list
   (movable flushable))
 (defknown %make-list ((integer 0 #.make-list-limit) t) list

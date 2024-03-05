@@ -43,8 +43,7 @@
   (equality   nil :type function :read-only t))
 
 ;; NODE-HASH is a fixnum. Negatives probably don't do the right thing
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits))
+(defconstant +hash-nbits+ sb-vm:n-positive-fixnum-bits)
 ;;; The more bins there are, the more dummy nodes.
 ;;; Dummy nodes constitute extra space overhead.
 (defparameter *desired-elts-per-bin* 4)

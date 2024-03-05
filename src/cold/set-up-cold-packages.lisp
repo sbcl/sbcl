@@ -283,7 +283,9 @@
     "UPGRADED-ARRAY-ELEMENT-TYPE"
     "UPGRADED-COMPLEX-PART-TYPE"
     "WITH-COMPILATION-UNIT"
-    ))
+
+    ;; Add eval-when to it
+    "DEFCONSTANT"))
 
 ;;; A symbol in the "dual personality" list refers to the symbol in CL unless
 ;;; package-prefixed with SB-XC:.  The main reason for not putting these

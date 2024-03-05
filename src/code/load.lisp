@@ -378,9 +378,8 @@
 
 ;;;; the FOP database
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; The bottom 5 bits of the opcodes above 128 encode an implicit operand.
-  (defconstant n-ordinary-fops 128))
+;; The bottom 5 bits of the opcodes above 128 encode an implicit operand.
+(defconstant n-ordinary-fops 128)
 
 ;;; a vector indexed by a FaslOP that yields a function which performs
 ;;; the operation. Most functions take 0 arguments - they only manipulate

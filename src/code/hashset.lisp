@@ -88,8 +88,7 @@
      (if (simple-vector-p v) (svref v i) (weak-vector-ref v i))))
 
 ;;; The last few elements in the cell vector are metadata.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant hs-storage-trailer-cells 3))
+(defconstant hs-storage-trailer-cells 3)
 (defmacro hs-cells-capacity (v)
   `(truly-the index (- (hs-cells-len ,v) ,hs-storage-trailer-cells)))
 (defmacro hs-cells-mask (v)

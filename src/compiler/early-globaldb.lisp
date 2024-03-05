@@ -80,10 +80,7 @@
 
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
-;;; CLISP, and maybe others, need EVAL-WHEN because without it, the constant
-;;; is not seen by the "#." expression a few lines down.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant info-number-bits 6))
+(defconstant info-number-bits 6)
 (deftype info-number () `(unsigned-byte ,info-number-bits))
 
 ;;; A map from info-number to its META-INFO object.

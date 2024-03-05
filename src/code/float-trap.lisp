@@ -177,8 +177,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
 
 ;;; SIGFPE code to floating-point error
 #-win32
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant-eqx +sigfpe-code-error-alist+
+(defconstant-eqx +sigfpe-code-error-alist+
     `((,sb-unix::fpe-intovf . floating-point-overflow)
       (,sb-unix::fpe-intdiv . division-by-zero)
       (,sb-unix::fpe-fltdiv . division-by-zero)
@@ -187,7 +186,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
       (,sb-unix::fpe-fltres . floating-point-inexact)
       (,sb-unix::fpe-fltinv . floating-point-invalid-operation)
       (,sb-unix::fpe-fltsub . floating-point-exception))
-    #'equal))
+  #'equal)
 
 ;;; Signal the appropriate condition when we get a floating-point error.
 #-win32
