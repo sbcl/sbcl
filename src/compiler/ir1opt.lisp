@@ -1201,16 +1201,12 @@
            (let ((optimizer (fun-info-optimizer info)))
              (unless (and optimizer (funcall optimizer node))
                ;; First give the VM a peek at the call
-               (multiple-value-bind (style transform)
+               (multiple-value-bind (style)
                    (combination-implementation-style node)
                  (ecase style
                    (:direct
                     ;; The VM knows how to handle this.
                     )
-                   (:transform
-                    ;; The VM mostly knows how to handle this.  We need
-                    ;; to massage the call slightly, though.
-                    (transform-call node transform (combination-fun-source-name node)))
                    ((:default :maybe)
                     ;; Let transforms have a crack at it.
                     (dolist (x (fun-info-transforms info))
