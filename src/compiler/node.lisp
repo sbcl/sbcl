@@ -1423,6 +1423,7 @@
   (eql-var-constraints     nil :type (or null (vector t)))
   (inheritable-constraints nil :type (or null (vector t)))
   (equality-constraints    nil :type (or null (vector t)))
+  (equality-constraints-hash nil :type (or null hash-table))
   source-form)
 
 (defprinter (lambda-var :identity t)
