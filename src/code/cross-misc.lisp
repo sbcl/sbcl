@@ -269,6 +269,12 @@
 
 (in-package "SB-KERNEL")
 
+(define-symbol-macro *gc-epoch* 0)
+(deftype weak-vector () nil)
+(defun weak-vector-p (x) (declare (ignore x)) nil)
+(defun sb-thread:make-mutex (&key name) (list :mock-mutex name))
+(deftype sb-thread:mutex () '(cons (eql :mock-mutex)))
+
 ;;; These functions are required to emulate SBCL kernel functions
 ;;; in a vanilla ANSI Common Lisp cross-compilation host.
 ;;; The emulation doesn't need to be efficient, since it's needed
@@ -353,6 +359,8 @@
 ;;;; Variables which have meaning only to the cross-compiler, defined here
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
 (in-package "SB-C")
+
+(defun allocate-weak-vector (n) (make-array (the integer n)))
 
 ;;; For macro lambdas that are processed by the host
 (declaim (declaration top-level-form))
