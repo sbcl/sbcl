@@ -937,7 +937,8 @@
                                                    (let ((widetag (%other-pointer-widetag data)))
                                                      (if (eq widetag ,typecode)
                                                          (return t)
-                                                         (unless (>= widetag sb-vm:complex-vector-widetag)
+                                                         (unless (or (eq widetag sb-vm:simple-array-widetag)
+                                                                     (>= widetag sb-vm:complex-vector-widetag))
                                                            (return nil)))))))))))
                               t
                               t)
@@ -952,7 +953,9 @@
                                                    (let ((widetag (%other-pointer-widetag data)))
                                                      (if (eq widetag ,typecode)
                                                          (return t)
-                                                         (unless (>= widetag sb-vm:complex-vector-widetag)
+                                                         (unless (or
+                                                                  (eq widetag sb-vm:simple-array-widetag)
+                                                                  (>= widetag sb-vm:complex-vector-widetag))
                                                            (return nil)))))))))))
                               t))))))))))
 
