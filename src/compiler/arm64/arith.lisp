@@ -1240,6 +1240,7 @@
   (:variant-cost 6))
 
 (deftransform logtest ((x y) (:or ((signed-word signed-word) *)
+                                  ((word word) *)
                                   ((signed-word word) *)
                                   ((word signed-word) *)) * :vop t)
   t)

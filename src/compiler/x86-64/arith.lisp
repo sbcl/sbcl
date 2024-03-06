@@ -2554,21 +2554,26 @@
                (inst test :byte `(,x . :high-byte) (ash y -8))
                (inst test size x y))))))
 
+(deftransform logtest ((x y) (:or ((signed-word signed-word) *)
+                                  ((word word) *))
+                       * :vop t)
+  t)
+
 (macrolet ((define-logtest-vops ()
              `(progn
-               ,@(loop for suffix in '(/fixnum -c/fixnum
-                                       /signed -c/signed
-                                       /unsigned -c/unsigned)
-                       for cost in '(4 3 6 5 6 5)
-                       collect
-                       `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
-                                     ,(symbolicate "FAST-CONDITIONAL" suffix))
-                         (:translate logtest)
-                         (:conditional :ne)
-                         (:generator ,cost
-                          (emit-optimized-test-inst x
-                           ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                           temp nil)))))))
+                ,@(loop for suffix in '(/fixnum -c/fixnum
+                                        /signed -c/signed
+                                        /unsigned -c/unsigned)
+                        for cost in '(4 3 6 5 6 5)
+                        collect
+                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
+                           (:translate logtest)
+                           (:conditional :ne)
+                           (:generator ,cost
+                             (emit-optimized-test-inst x
+                               ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
+                               temp nil)))))))
   (define-logtest-vops))
 
 ;;; This works for tagged or untagged values, but the vop optimizer
@@ -2652,6 +2657,10 @@
       (cons #'vop-optimize-fast-logtest-c/fixnum-optimizer 'sb-c::select-representations))
 (setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/unsigned))
       (cons #'vop-optimize-fast-logtest-c/fixnum-optimizer 'sb-c::select-representations))
+
+(deftransform logbitp ((index integer) (:or ((signed-word signed-word) *)
+                                  ((word word) *)) * :vop t)
+  (not (sb-c::logbitp-to-minusp-p index integer))t)
 
 ;;; TODO: The TEST instruction preceding this JEQ is entirely superfluous
 ;;; and can be removed with a vop optimizer:
@@ -3900,6 +3909,17 @@
   (def range<=< nil t)
 
   (def check-range<= nil nil t))
+
+(deftransform %dpb ((new size posn integer) (:or ((word
+                                                   (constant-arg integer)
+                                                   (constant-arg (integer 1 1))
+                                                   word) *)
+                                                 ((signed-word
+                                                   (constant-arg integer)
+                                                   (constant-arg (integer 1 1))
+                                                   signed-word) *)) *
+                    :vop t)
+  (not (constant-lvar-p posn)))
 
 (define-vop (dpb-c/fixnum)
   (:translate %dpb)

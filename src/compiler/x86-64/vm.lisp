@@ -583,55 +583,8 @@
 (defconstant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
 (defun combination-implementation-style (node)
-  (declare (type sb-c::combination node))
-  (flet ((valid-funtype (args result)
-           (sb-c::valid-fun-use node
-                                (sb-c::specifier-type
-                                 `(function ,args ,result)))))
-    (case (sb-c::combination-fun-source-name node)
-      (logtest
-       (cond
-         ((or (valid-funtype '(fixnum fixnum) '*)
-              ;; todo: nothing prevents this from testing an unsigned word against
-              ;; a signed word, except for the mess of VOPs it would demand
-              (valid-funtype '((signed-byte 64) (signed-byte 64)) '*)
-              (valid-funtype '((unsigned-byte 64) (unsigned-byte 64)) '*))
-          (values :maybe nil))
-         (t
-          (values :default nil))))
-      (logbitp
-       (if (and (or
-                 (valid-funtype '(word word) '*)
-                 (valid-funtype '(word signed-word) '*))
-                (destructuring-bind (index integer) (sb-c::basic-combination-args node)
-                  (not (sb-c::logbitp-to-minusp-p index integer))))
-           (values :direct nil)
-           (values :default nil)))
-      (truncate
-       (destructuring-bind (n &optional d) (sb-c::basic-combination-args node)
-         (if (and d
-                  (constant-lvar-p d)
-                  (power-of-two-p (lvar-value d))
-                  (and (csubtypep (sb-c::lvar-type n) (specifier-type 'signed-word))
-                       (not (csubtypep (sb-c::lvar-type n) (specifier-type 'word)))))
-             (values :maybe nil)
-             (values :default nil))))
-      (%dpb
-       (flet ((validp (type result-type)
-                (valid-funtype `((constant-arg integer)
-                                 (constant-arg (integer 1 1))
-                                 ,type
-                                 ,type)
-                               result-type)))
-         (if (and (or (validp 'signed-word 'signed-word)
-                      (validp 'word 'word))
-                  (not (destructuring-bind (new size posn integer) (sb-c::basic-combination-args node)
-                         (declare (ignore new size integer))
-                         (constant-lvar-p posn))))
-             (values :direct nil)
-             (values :default nil))))
-      (t
-       (values :default nil)))))
+  (declare (ignore node))
+  (values :default nil))
 
 (defvar *register-names* +qword-register-names+)
 
