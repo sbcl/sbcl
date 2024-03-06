@@ -4054,6 +4054,16 @@
       (give-up-ir1-transform))
     'x))
 
+(deftransform logand ((x y) (t (constant-arg integer)) word
+                      :node node :important nil)
+  ;; Reduce constant width
+  (let* ((high (interval-high (type-approximate-interval (single-value-type (node-asserted-type node)))))
+         (mask (lvar-value y))
+         (cut (ldb (byte (integer-length high) 0) mask)))
+    (if (= cut mask)
+        (give-up-ir1-transform)
+        `(logand x ,cut))))
+
 (deftransform logandc2 ((x y) ((constant-arg (eql -1)) t) *)
   `(lognot y))
 
