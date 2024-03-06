@@ -950,7 +950,23 @@ invoked. In that case it will store into PLACE and start over."
 (defun expand-hash-case (normal-clauses key-lists constants default errorp keyform phash-lexpr)
   (let* ((keys (apply #'append key-lists))
          (temp '#1=#:key) ; GENSYM considered harmful
-         (object-hash (sb-c::prehash-for-perfect-hash keys temp))
+         ;; Produce an expression which yields a 32-bit integer from the object. It is then
+         ;; fed into the perfect hash calculation. There is potential for micro-optimization,
+         ;; for example, let's say the key set includes only symbols and characters.
+         ;; Clearly we have to call SYMBOLP (or some variant) to dereference the symbol.
+         ;; But if that's says false, then whatever object we have, we don't really care
+         ;; whether CHARACTERP is true So a "simpler" expression to produce a unique integer
+         ;; would be (ASH (GET-LISP-OBJ-ADDRESS OBJ) -32) which is "random" for other inputs
+         ;; but does something reasonable on characters.
+         (object-hash
+          `(cond ,@(when (some #'symbolp keys)
+                     ;; Expressable as (vop-existsp :translate hash-as-if-symbol-name) maybe ?
+                     #+x86-64 `(((pointerp #1#) (hash-as-if-symbol-name #1#)))
+                     #-x86-64 `(((,(if (member nil keys) 'symbolp 'non-null-symbol-p) #1#)
+                                 (symbol-name-hash #1#))))
+                 ,@(when (some #'fixnump keys) '(((fixnump #1#) (ldb (byte 32 0) #1#))))
+                 ,@(when (some #'characterp keys) '(((characterp #1#) (char-code #1#))))
+                 (t 0))) ; semi-arbitrary
          (hashfn
           (sb-c::compile-perfect-hash
            `(lambda (,temp) (,phash-lexpr ,object-hash))
