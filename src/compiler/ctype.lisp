@@ -1024,7 +1024,7 @@ and no value was provided for it." name))))))))))
 
 (defun apply-type-annotation (fun-name arg type lvars policy &optional annotation context)
   (case (car annotation)
-    (function-designator
+    ((function function-designator)
      (assert-function-designator fun-name lvars arg (cdr annotation) policy)
      t)
     (t

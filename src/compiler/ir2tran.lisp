@@ -1408,9 +1408,7 @@
 
 ;;;; entering functions
 (defun xep-verify-arg-count (node block fun arg-count-location)
-  (when (and (policy fun (plusp verify-arg-count))
-             ;; this property will be absent in most cases
-             (getf (functional-plist fun) 'verify-arg-count t))
+  (when (policy fun (plusp verify-arg-count))
     (let* ((ef (functional-entry-fun fun))
            (optional (optional-dispatch-p ef))
            (min (and optional

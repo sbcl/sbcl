@@ -149,7 +149,9 @@
           (loop for (n kind . annotation) in (fun-type-annotation-positional annotation)
                 when (memq kind '(function function-designator))
                 do
-                (call (nth n arg-lvars) annotation))
+                (let ((arg (nth n arg-lvars)))
+                  (when arg
+                   (call arg annotation))))
           (loop with keys = (nthcdr (fun-type-positional-count type)
                                     arg-lvars)
                 for (key (kind . annotation)) on (fun-type-annotation-key annotation) by #'cddr
