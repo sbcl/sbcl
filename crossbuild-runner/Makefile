@@ -85,7 +85,7 @@ obj/xbuild/x86-64.core: obj/xbuild/x86-64/xc.core
 	$(SBCL) $(ARGS) x86-64 < $(SCRIPT2)
 
 obj/xbuild/x86-64-linux/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86-64-linux x86-64 "(:LINUX :UNIX :ELF :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86-64-linux x86-64 "(:LINUX :UNIX :ELF :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 (NOT :SB-EVAL) :SB-FASTEVAL)" < $(SCRIPT1)
 obj/xbuild/x86-64-linux.core: obj/xbuild/x86-64-linux/xc.core
 	$(SBCL) $(ARGS) x86-64-linux < $(SCRIPT2)
 
