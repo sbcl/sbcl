@@ -2916,17 +2916,10 @@
                  (n (length hashes))
                  (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
                  (pow2size (power-of-two-ceiling n))
-                 ;; For {FIND,POSITION,MEMBER} or a synthetic alist, a non-minimal hash
-                 ;; might avoid a few math operations at the cost of a few wasted cells.
-                 ;; If it's a "real" alist, there's a question of what to put in the empty
-                 ;; slots so that a CAR/CDR operation is valid, because it has to be a cons.
-                 (minimal
-                  (if (eq alistp t)
-                      t ; require minimal
-                      (let ((waste (- pow2size n)))
-                        (if (<= waste 3) ; arbitrary. Should it be a percentage of N maybe?
-                            nil   ; do not require minimal
-                            t)))) ; do require minimal
+                 ;; FIXME: I messed up the minimal/non-minimal thing that was
+                 ;; trying to simplify the calculation at the expense of a few extra cells.
+                 ;; Minimal will always be right.
+                 (minimal t)
                  (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
                  (keyspace-size (if minimal n pow2size))
                  (domain (sb-xc:make-array keyspace-size :initial-element 0))

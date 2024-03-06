@@ -689,3 +689,9 @@ After:
         (assert (eq answer (second clause))))))
   (dolist (key '(foo bar baz))
     (assert (eq (bug-2055794-tester key) 'dropthru))))
+
+(defun f340 (p1)
+  (position p1 '(string #:g4389630 #:|AABb|)))
+(compile 'f340)
+(with-test (:name :lp-2056341)
+  (assert (eq (f340 0) nil)))
