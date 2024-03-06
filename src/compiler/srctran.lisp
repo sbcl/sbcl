@@ -441,26 +441,21 @@
 ;;; on the argument types), but we make it a regular transform so that
 ;;; the VM has a chance to see the bare LOGTEST and potentiall choose
 ;;; to implement it differently.  --njf, 06-02-2006
-;;;
-;;; Other transforms may be useful even with direct LOGTEST VOPs; let
-;;; them fire (including the type-directed constant folding below), but
-;;; disable the inlining rewrite in such cases. -- PK, 2013-05-20
 (deftransform logtest ((x y) * * :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(not (zerop (logand x y))))
+
+(defoptimizer (logtest derive-type) ((x y))
   (let ((type (two-arg-derive-type x y
                                    #'logand-derive-type-aux
                                    #'logand)))
     (when type
-     (multiple-value-bind (typep definitely)
-         (ctypep 0 type)
-       (cond ((and (not typep) definitely)
-              t)
-             ((type= type (specifier-type '(eql 0)))
-              nil)
-             ((neq :default (combination-implementation-style node))
-              (give-up-ir1-transform))
-             (t
-              (delay-ir1-transform node :ir1-phases)
-              `(not (zerop (logand x y)))))))))
+      (multiple-value-bind (typep definitely)
+          (ctypep 0 type)
+        (cond ((and (not typep) definitely)
+               (specifier-type '(eql t)))
+              ((type= type (specifier-type '(eql 0)))
+               (specifier-type '(eql nil))))))))
 
 (defun logbitp-to-minusp-p (index integer)
   (let* ((int (type-approximate-interval (lvar-type integer)))
@@ -3138,7 +3133,8 @@
           (t
            (give-up-ir1-transform)))))
 
-(deftransform %dpb ((new size posn int) * word :node node)
+(deftransform %dpb ((new size posn int) (:or (* word)
+                                             (* sb-vm:signed-word)) * :node node)
   "convert to inline logical operations"
   (delay-ir1-transform node :ir1-phases)
   (or (and (constant-lvar-p size)
@@ -3155,30 +3151,8 @@
          (logior (ash (logand new mask) posn)
                  (logandc2 int (ash mask posn))))))
 
-(deftransform %dpb ((new size posn int) * sb-vm:signed-word :node node)
-  "convert to inline logical operations"
-  (delay-ir1-transform node :ir1-phases)
-  (or (and (constant-lvar-p size)
-           (constant-lvar-p new)
-           (let* ((size (lvar-value size))
-                  (new (ldb (byte size 0) (lvar-value new))))
-             (cond ((zerop new)
-                    `(logandc2 int
-                               (ash (ldb (byte size 0) -1) posn)))
-                   ((= (logcount new) size)
-                    `(logior int
-                             (ash new posn))))))
-      `(let ((mask (ldb (byte size 0) -1)))
-         (logior (ash (logand new mask) posn)
-                 (logandc2 int (ash mask posn))))))
-
-(deftransform %deposit-field ((new size posn int) * word)
-  "convert to inline logical operations"
-  `(let ((mask (ash (ldb (byte size 0) -1) posn)))
-     (logior (logand new mask)
-             (logand int (lognot mask)))))
-
-(deftransform %deposit-field ((new size posn int) * sb-vm:signed-word)
+(deftransform %deposit-field ((new size posn int) (:or (* word)
+                                                       (* sb-vm:signed-word)))
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
@@ -3776,11 +3750,11 @@
                      (values-specifier-type '(values integer unsigned-byte &optional)))
                (erase-lvar-type result)
                `(values
-                 ;; transform again for
-                 ;; COMBINATION-IMPLEMENTATION-STYLE to trigger
                  (values (truncate x y))
                  (logand x ,mask)))
-              ((neq :default (combination-implementation-style node))
+              ((when-vop-existsp (:named sb-vm::truncate/signed-power-of-two)
+                 (and (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
+                      (not (csubtypep (lvar-type x) (specifier-type 'word)))))
                (give-up-ir1-transform))
               (t
                `(if (minusp x)

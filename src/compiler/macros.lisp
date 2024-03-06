@@ -293,10 +293,14 @@
 ;;;               :SLIGHTLY, then print a note if SPEED>INHIBIT-WARNINGS.
 ;;;               T,         then print a note if SPEED>=INHIBIT-WARNINGS.
 ;;;             :SLIGHTLY is the default.
+;;;   :VOP
+;;;           - insert it at the front, stop other transforms from firing
+;;;             if the function returns T.
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                                     (result-type '*)
                               &key result policy node defun-only
-                                   (important :slightly))
+                                   (important :slightly)
+                                   vop)
                         &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
   (when defun-only
@@ -321,25 +325,32 @@
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
                   (block ,(fun-name-block-name name)
-                    (multiple-value-bind (,n-lambda ,n-decls)
-                        (progn ,@body)
-                      (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
-                          ,n-lambda
-                          `(lambda ,',lambda-list
-                             (declare (ignorable ,@',vars))
-                             ,@,n-decls
-                             ,,n-lambda)))))))
+                    ,(if vop
+                         `(throw 'give-up-ir1-transform
+                            (values (if (progn ,@body)
+                                        :none
+                                        :failure)))
+                         `(multiple-value-bind (,n-lambda ,n-decls)
+                             (progn ,@body)
+                           (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
+                               ,n-lambda
+                               `(lambda ,',lambda-list
+                                  (declare (ignorable ,@',vars))
+                                  ,@,n-decls
+                                  ,,n-lambda))))))))
           (cond
             ((not defun-only)
              `(let ((fun (named-lambda (deftransform ,name) ,@stuff)))
-                ,@(loop for types in (if (typep arg-types '(cons (eql :or)))
-                                         (cdr arg-types)
-                                         (list arg-types))
+                ,@(loop for (types result-type) in (if (typep arg-types '(cons (eql :or)))
+                                                       (cdr arg-types)
+                                                       (list (list arg-types result-type)))
                         collect `(%deftransform ',name
                                                 ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
                                                 '(function ,types ,result-type)
                                                 fun
-                                                ,important))))
+                                                ,(if vop
+                                                     :vop
+                                                     important)))))
             ((eq defun-only 'lambda)
              `(named-lambda ,name ,@stuff))
             (defun-only

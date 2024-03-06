@@ -453,14 +453,14 @@
 ;;; do it for any rational that has a precise representation as a
 ;;; float (such as 0).
 (macrolet ((frob (op &optional complex)
-             `(deftransform ,op ((x y) (:or (,(if complex
-                                                  '(complex single-float)
-                                                  'single-float)
-                                             rational)
-                                            (,(if complex
-                                                  '(complex double-float)
-                                                  'double-float)
-                                             rational)) *)
+             `(deftransform ,op ((x y) (:or ((,(if complex
+                                                   '(complex single-float)
+                                                   'single-float)
+                                              rational) *)
+                                            ((,(if complex
+                                                   '(complex double-float)
+                                                   'double-float)
+                                              rational) *)))
                 "open-code FLOAT to RATIONAL comparison"
                 (unless (constant-lvar-p y)
                   (give-up-ir1-transform
@@ -472,11 +472,11 @@
                                   'double-float)
                           (values most-negative-single-float most-positive-single-float
                                   'single-float))
-                      (unless (and (sb-xc:<= low val high)
-                                   (eql (rational (coerce val type)) val))
-                        (give-up-ir1-transform
-                         "~S doesn't have a precise float representation."
-                         val))))
+                    (unless (and (sb-xc:<= low val high)
+                                 (eql (rational (coerce val type)) val))
+                      (give-up-ir1-transform
+                       "~S doesn't have a precise float representation."
+                       val))))
                 `(,',op x (float y ,',(if complex
                                           '(realpart x)
                                           'x))))))
