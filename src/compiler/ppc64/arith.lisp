@@ -470,6 +470,17 @@
     (inst popcntd res arg)))
 
 ;;;; %LDB
+#+nil
+(deftransform %ldb ((size posn integer) (:or (((constant-arg (integer 1 #.(1- n-word-bits)))
+                                               (constant-arg integer)
+                                               word) unsigned-byte)
+                                             (((constant-arg (integer 1 #.(1- n-word-bits)))
+                                               (constant-arg integer)
+                                               signed-word) unsigned-byte)) *
+                    :vop t)
+  (<= (+ (sb-c:lvar-value size)
+         (sb-c:lvar-value posn))
+      n-word-bits))
 
 #+nil
 (define-vop (ldb-c/fixnum)
@@ -640,6 +651,11 @@
   (:arg-types unsigned-num (:constant (unsigned-byte 16)))
   (:info target not-p y))
 
+#+nil
+(deftransform logtest ((x y) (:or ((signed-word signed-word) *)
+                                  ((word word) *)) * :vop t)
+  t)
+
 (macrolet ((define-logtest-vops ()
              `(progn
                ,@(loop for suffix in '(/fixnum -c/fixnum
@@ -674,6 +690,11 @@
                                `(inst and. test x y))
                           (inst b? (if not-p :eq :ne) target)))))))
   (define-logtest-vops))
+
+#+nil
+(deftransform logbitp ((x y) (:or (((constant-arg (mod #.n-word-bits)) signed-word) *)
+                                  (((constant-arg (mod #.n-word-bits)) word) *)) * :vop t)
+  t)
 
 ;;; We only handle the constant cases because those are the only ones
 ;;; guaranteed to make it past COMBINATION-IMPLEMENTATION-STYLE.
