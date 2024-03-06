@@ -1205,23 +1205,32 @@ constant shift greater than word length")))
   (:arg-types unsigned-num (:constant (unsigned-byte 32)))
   (:info y))
 
+(deftransform logtest ((x y) (:or ((signed-word signed-word) *)
+                                  ((word word) *))
+                       * :vop t)
+  t)
+
 (macrolet ((define-logtest-vops ()
              `(progn
-               ,@(loop for suffix in '(/fixnum -c/fixnum
-                                       /signed -c/signed
-                                       /unsigned -c/unsigned)
-                       for cost in '(4 3 6 5 6 5)
-                       collect
-                       `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
-                                     ,(symbolicate "FAST-CONDITIONAL" suffix))
-                         (:translate logtest)
-                         (:conditional :ne)
-                         (:generator ,cost
-                          (emit-optimized-test-inst x
-                                                    ,(if (eq suffix '-c/fixnum)
-                                                         '(fixnumize y)
-                                                         'y))))))))
+                ,@(loop for suffix in '(/fixnum -c/fixnum
+                                        /signed -c/signed
+                                        /unsigned -c/unsigned)
+                        for cost in '(4 3 6 5 6 5)
+                        collect
+                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
+                           (:translate logtest)
+                           (:conditional :ne)
+                           (:generator ,cost
+                             (emit-optimized-test-inst x
+                               ,(if (eq suffix '-c/fixnum)
+                                    '(fixnumize y)
+                                    'y))))))))
   (define-logtest-vops))
+
+(deftransform logbitp ((x y) (:or (((mod #.n-word-bits) signed-word) *)
+                                  (((mod #.n-word-bits) word) *)) * :vop t)
+  t)
 
 ;;; too much work to do the non-constant case (maybe?)
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
