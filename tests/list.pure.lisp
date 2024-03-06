@@ -285,7 +285,12 @@
     ;; on the symbol-hash, so we don't care what it is.
     (assert (= (length constants) 2))
     (dolist (vector constants)
-      (assert (typep vector '(simple-vector 8)))
+      ;; Allow this to pass with either a minimal-perfect-hash
+      ;; or a non-minimal perfect hash.
+      (assert (or (typep vector '(simple-vector 7))
+                  (typep vector '(simple-vector 8))))
+      ;; The salient point is that the vector doesn't store cons cells
+      ;; because we've unzipped the alist.
       (assert (every #'atom vector)))))
 
 ;;;; member-if & assoc-if & rassoc-if
