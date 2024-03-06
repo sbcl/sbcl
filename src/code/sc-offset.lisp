@@ -38,35 +38,26 @@
 
 (declaim (ftype (sfunction (sc-number sb-vm:sc-offset) sc+offset)
                 make-sc+offset))
+(assert (and (= (length +sc+offset-offset-bytes+) 1)
+             (= (length +sc+offset-scn-bytes+) 2)
+             (= (byte-position (car +sc+offset-scn-bytes+)) 0)))
 (defun make-sc+offset (sc-number offset)
-  (let ((result 0))
-    (flet ((add-bits (bytes source)
-             (loop for byte in bytes
-                for size = (byte-size byte)
-                with i = 0
-                do
-                  (setf result (dpb (ldb (byte size i) source) byte result))
-                  (incf i size))))
-      (add-bits +sc+offset-scn-bytes+ sc-number)
-      (add-bits +sc+offset-offset-bytes+ offset))
-    result))
+  (dpb (ash sc-number (- (byte-size (car +sc+offset-scn-bytes+))))
+       (cadr +sc+offset-scn-bytes+)
+       (logior (ash offset (byte-position (car +sc+offset-offset-bytes+)))
+               (logand sc-number (ldb (car +sc+offset-scn-bytes+) -1)))))
 
 (declaim (ftype (sfunction (sc+offset) sc-number)
                 sc+offset-scn)
          (ftype (sfunction (sc+offset) sb-vm:sc-offset)
                 sc+offset-offset))
-(flet ((extract-bits (bytes source)
-         (loop with result = 0
-            for byte in bytes
-            for size = (byte-size byte)
-            with i = 0
-            do
-              (setf result (dpb (ldb byte source) (byte size i) result))
-              (incf i size)
-            finally (return result))))
+(defun sc+offset-scn (sc+offset)
+  (truly-the sc-number
+             (dpb (ldb (cadr +sc+offset-scn-bytes+) sc+offset)
+                  (byte (+ (byte-position (cadr +sc+offset-scn-bytes+))
+                           (byte-size (cadr +sc+offset-scn-bytes+)))
+                        (byte-size (car +sc+offset-scn-bytes+)))
+                  sc+offset)))
 
-  (defun sc+offset-scn (sc+offset)
-    (extract-bits +sc+offset-scn-bytes+ sc+offset))
-
-  (defun sc+offset-offset (sc+offset)
-    (extract-bits +sc+offset-offset-bytes+ sc+offset)))
+(defun sc+offset-offset (sc+offset)
+  (ldb (car +sc+offset-offset-bytes+) sc+offset))
