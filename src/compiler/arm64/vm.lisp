@@ -314,9 +314,6 @@
                  ((double-reg complex-single-reg) "D")
                  (complex-double-reg "Q"))
                offset)))))
-(defun combination-implementation-style (node)
-  (declare (ignore node))
-  (values :default nil))
 
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))

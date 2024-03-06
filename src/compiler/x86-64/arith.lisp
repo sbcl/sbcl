@@ -2660,7 +2660,7 @@
 
 (deftransform logbitp ((index integer) (:or ((signed-word signed-word) *)
                                   ((word word) *)) * :vop t)
-  (not (sb-c::logbitp-to-minusp-p index integer))t)
+  (not (sb-c::logbitp-to-minusp-p index integer)))
 
 ;;; TODO: The TEST instruction preceding this JEQ is entirely superfluous
 ;;; and can be removed with a vop optimizer:

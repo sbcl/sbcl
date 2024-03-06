@@ -285,10 +285,6 @@
       (immediate-constant "Immed")
       (float-registers (format nil "F~D" offset)))))
 
-(defun combination-implementation-style (node)
-  (declare (ignore node))
-  (values :default nil))
-
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
   nil)

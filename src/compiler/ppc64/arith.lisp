@@ -696,9 +696,6 @@
                                   (((constant-arg (mod #.n-word-bits)) word) *)) * :vop t)
   t)
 
-;;; We only handle the constant cases because those are the only ones
-;;; guaranteed to make it past COMBINATION-IMPLEMENTATION-STYLE.
-;;;  --njf, 06-02-2006
 #+nil (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:translate logbitp)
   (:arg-types (:constant (integer 0 29)) tagged-num)

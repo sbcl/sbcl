@@ -1200,27 +1200,18 @@
 
            (let ((optimizer (fun-info-optimizer info)))
              (unless (and optimizer (funcall optimizer node))
-               ;; First give the VM a peek at the call
-               (multiple-value-bind (style)
-                   (combination-implementation-style node)
-                 (ecase style
-                   (:direct
-                    ;; The VM knows how to handle this.
-                    )
-                   ((:default :maybe)
-                    ;; Let transforms have a crack at it.
-                    (dolist (x (fun-info-transforms info))
-                      (when (eq show :all)
-                        (let* ((lvar (basic-combination-fun node))
-                               (fname (lvar-fun-name lvar t)))
-                          (format *trace-output*
-                                  "~&trying transform ~s for ~s"
-                                  (transform-type x) fname)))
-                      (unless (ir1-transform node x show)
-                        (when (eq show :all)
-                          (format *trace-output*
-                                  "~&quitting because IR1-TRANSFORM result was NIL"))
-                        (return)))))))))))))
+               (dolist (x (fun-info-transforms info))
+                 (when (eq show :all)
+                   (let* ((lvar (basic-combination-fun node))
+                          (fname (lvar-fun-name lvar t)))
+                     (format *trace-output*
+                             "~&trying transform ~s for ~s"
+                             (transform-type x) fname)))
+                 (unless (ir1-transform node x show)
+                   (when (eq show :all)
+                     (format *trace-output*
+                             "~&quitting because IR1-TRANSFORM result was NIL"))
+                   (return))))))))))
   (values))
 
 (defun xep-tail-combination-p (node)

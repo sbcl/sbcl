@@ -195,31 +195,6 @@ To do this, extend ALLOCATE-VECTOR with ALLOW-JUNK argument, and when
 stack allocating don't zero if it is true -- and probably ALLOW-JUNK iff
 the vector is a specialized one (cannot have pointers.)
 --------------------------------------------------------------------------------
-#29
-Python is overly zealous when converting high-level CL functions, such
-as MIN/MAX, LOGBITP, and LOGTEST, to low-level CL functions.  Reducing
-Python's aggressiveness would make it easier to effect changes such as
-
-x86-64:
-* direct MIN/MAX on {SINGLE,DOUBLE}-FLOATs ({MIN,MAX}S{S,D})
-
-x86-64:
-* direct LOGBITP on word-sized integers and fixnums (BT + JC)
-
-x86{,-64}/PPC:
-* branch-free MIN/MAX on word-sized integers and fixnums (floats could
-  be handled too, modulo safety considerations on the PPC)
-
-x86-64:
-* efficient LOGTESTs on word-sized integers and fixnums (TEST)
-
-etc., etc.
-
-(The framework for this has been implemented as of 0.9.9.18; see the
-vm-support-routine COMBINATION-IMPLEMENTATION-STYLE and its use in
-src/compiler/ir1opt.lisp, IR1-OPTIMIZE-COMBINATION.  The above
-optimizations are left as an exercise for the reader.)
---------------------------------------------------------------------------------
 #31
 The typecheck generated for a declaration like (integer 0 45) on x86 looks
 like:

@@ -93,7 +93,6 @@
 ;;; from vm.lisp
 ;;; immediate-constant-sc
 ;;; location-print-name
-;;; combination-implementation-style
 ;;; convert-conditional-move-p
 ;;; boxed-immediate-sc-p
 

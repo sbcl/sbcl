@@ -582,10 +582,6 @@
 (defconstant nargs-offset rcx-offset)
 (defconstant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
-(defun combination-implementation-style (node)
-  (declare (ignore node))
-  (values :default nil))
-
 (defvar *register-names* +qword-register-names+)
 
 ;;; See WRITE-FUNINSTANCE-PROLOGUE in x86-64-vm.

@@ -446,7 +446,3 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
       (noise (symbol-name (sc-name sc))))))
-
-(defun combination-implementation-style (node)
-  (declare (ignore node))
-  (values :default nil))
