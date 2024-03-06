@@ -165,7 +165,8 @@
   (def fun-code-header)
   (def symbol-package-id)
   (def symbol-hash)
-  #+x86-64 (def hash-as-if-symbol-name)
+  (sb-c::when-vop-existsp (:translate hash-as-if-symbol-name)
+    (def hash-as-if-symbol-name))
   (def symbol-%info) ; primitive reader always needs a stub
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
