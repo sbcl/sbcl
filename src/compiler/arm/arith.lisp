@@ -651,6 +651,10 @@
   (:arg-types * (:constant (signed-byte 9)))
   (:variant-cost 6))
 
+(deftransform logtest ((x y) (:or ((signed-word signed-word) *)
+                                  ((word word) *)) * :vop t)
+  t)
+
 (macrolet ((define-logtest-vops ()
              `(progn
                 ,@(loop for suffix in '(/fixnum -c/fixnum
@@ -675,6 +679,10 @@
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
+
+(deftransform logbitp ((x y) (:or (((constant-arg (mod #.n-word-bits)) signed-word) *)
+                                  (((constant-arg (mod #.n-word-bits)) word) *)) * :vop t)
+  t)
 
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:conditional :ne)

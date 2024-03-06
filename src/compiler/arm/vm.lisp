@@ -286,28 +286,8 @@
       (float-registers (format nil "F~D" offset)))))
 
 (defun combination-implementation-style (node)
-  (flet ((valid-funtype (args result)
-           (sb-c::valid-fun-use node
-                                (sb-c::specifier-type
-                                 `(function ,args ,result)))))
-    (case (sb-c::combination-fun-source-name node)
-      (logtest
-       (cond
-         ((valid-funtype '(fixnum fixnum) '*)
-          (values :maybe nil))
-         ((valid-funtype '((signed-byte 32) (signed-byte 32)) '*)
-          (values :maybe nil))
-         ((valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*)
-          (values :maybe nil))
-         (t (values :default nil))))
-      (logbitp
-       (cond
-         ((or (valid-funtype '((constant-arg (integer 0 29)) fixnum) '*)
-              (valid-funtype '((constant-arg (integer 0 31)) (signed-byte 32)) '*)
-              (valid-funtype '((constant-arg (integer 0 31)) (unsigned-byte 32)) '*))
-          (values :direct nil))
-         (t (values :default nil))))
-      (t (values :default nil)))))
+  (declare (ignore node))
+  (values :default nil))
 
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
