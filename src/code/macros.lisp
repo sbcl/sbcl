@@ -998,7 +998,7 @@ invoked. In that case it will store into PLACE and start over."
        ;; EQL reduces to EQ for all object this expanders accepts as keys
        (if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
            ,(if constants
-                (let ((all-equal (not (find (aref result-vector 0) result-vector :test-not #'eql))))
+                (let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
                   (if all-equal
                       `',(aref result-vector 0)
                       `(aref ,result-vector h)))
