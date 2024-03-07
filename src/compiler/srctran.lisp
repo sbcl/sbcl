@@ -6966,21 +6966,18 @@
                                                                  ,(reduce (lambda (x y) (logior x (ash 1 (- y min))))
                                                                           constants :initial-value 0)))))))))
                     (return-from or-eq-transform t)))
+
                 (labels ((%one-bit-diff-p (c1 c2)
                            (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
                                    (ash c2 (- sb-vm:n-word-bits)))
                                 (= (logcount (logxor c1 c2)) 1)))
                          (one-bit-diff-p (c1 c2)
                            (or (%one-bit-diff-p c1 c2)
-                               ;; If x=2*y for a single-bit x
-                               ;; subtracting y will either produce 0
-                               ;; or y, which is a single set bit
-                               ;; which can be masked off to produce
-                               ;; 0.
+                               ;; If the difference is a single bit
+                               ;; then it can be masked off and compared to 0.
                                (let ((c1 (min c1 c2))
                                      (c2 (max c1 c2)))
-                                 (and (= (logcount c2) 1)
-                                      (= c2 (* c1 2)))))))
+                                 (= (logcount (- c2 c1)) 1)))))
                   ;; Comparing integers that differ by only one bit,
                   ;; which is useful for case-insensitive comparison of ASCII characters.
                   (loop for ((node . if) (next-node . next-if)) = chain
@@ -7011,6 +7008,7 @@
                                 (flush-dest a2)
                                 (flush-dest b)
                                 (let ((min (min c1 c2))
+                                      (max (max c1 c2))
                                       (value (if characterp
                                                  '(char-code a)
                                                  'a)))
@@ -7024,8 +7022,8 @@
                                                                                 ,(logxor c1 c2))
                                                                       ,min)))
                                                             (t
-                                                             `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- a ,min))
-                                                                            (lognot ,min))))))
+                                                             `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
+                                                                            (lognot ,(- max min)))))))
                                                   'or-eq-transform))))))))))
             (unless (node-prev node)
               ;; Don't proceed optimizing this node
