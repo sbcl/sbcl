@@ -48,8 +48,8 @@
                              `((equality-constraint-amount ,con)))
                       (equality-constraint-not-p ,con))))))))
 
-(defun find-equality-constraint (operator amount x y y-key not-p)
-  (let ((constraints (lambda-var-equality-constraints-hash x)))
+(defun find-equality-constraint (operator amount x x-var y y-key not-p)
+  (let ((constraints (lambda-var-equality-constraints-hash x-var)))
     (when constraints
       (let ((constraints (gethash y-key constraints)))
         (if (typep y-key 'sb-kernel::type-class)
@@ -57,11 +57,14 @@
                   when (and (eq (equality-constraint-operator con) operator)
                             (eq (constraint-not-p con) not-p)
                             (eql (equality-constraint-amount con) amount)
+                            (vector-constraint-eq-p (constraint-x con) x)
                             (type= (constraint-y con) y))
                   return con)
             (loop for con in constraints
                   when (and (eq (equality-constraint-operator con) operator)
                             (eq (constraint-not-p con) not-p)
+                            (vector-constraint-eq-p (constraint-x con) x)
+                            (vector-constraint-eq-p (constraint-y con) y)
                             (eql (equality-constraint-amount con) amount))
                   return con))))))
 
@@ -78,7 +81,7 @@
                       (vector-length-constraint-var y))
                      (t
                       y))))
-    (or (find-equality-constraint operator amount x-var y cache-key not-p)
+    (or (find-equality-constraint operator amount x x-var y cache-key not-p)
         (let ((new (make-equality-constraint (length *constraint-universe*)
                                              operator
                                              x y not-p

@@ -1268,3 +1268,14 @@
      (when (standard-char-p x)
        x))
    (or null standard-char)))
+
+(with-test (:name :vector-length-alias)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (or (typep x '(integer 3 3))
+             (typep x '(simple-array character (3)))))
+    ((3) t)
+    (("000") t)
+    ((6) nil)
+    (("") nil)))
