@@ -3239,6 +3239,7 @@ possibly temporarily, because it might be used internally.")
             ;; symbol-hacking idioms
 
            "GENSYMIFY" "GENSYMIFY*" "KEYWORDICATE" "SYMBOLICATE"
+           "SYMBOLICATE!"
            "INTERNED-SYMBOL-P" "PACKAGE-SYMBOLICATE"
            "LOGICALLY-READONLYIZE"
 

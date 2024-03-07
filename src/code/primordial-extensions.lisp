@@ -95,14 +95,17 @@
       (gensym)))
 
 (eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
-(labels ((symbol-concat (package &rest things)
+(labels ((symbol-concat (package ignore-lock &rest things)
            (dx-let ((strings (make-array (length things)))
                     (length 0)
                     (only-base-chars t))
              ;; This loop is nearly like DO-REST-ARG
              ;; but it works on the host too.
              (loop for index from 0 below (length things)
-                   do (let* ((s (string (nth index things)))
+                   do (let* ((thing (nth index things))
+                             (s (if (integerp thing)
+                                    (write-to-string thing :base 10 :radix nil :pretty nil)
+                                    (string thing)))
                              (l (length s)))
                         (setf (svref strings index) s)
                         (incf length l)
@@ -122,7 +125,8 @@
                  (setq name (make-array length :element-type elt-type)))
                (dotimes (index (length things)
                                (if package
-                                   (values (%intern name length package elt-type nil))
+                                   (values (%intern name length package elt-type
+                                                    ignore-lock))
                                    (make-symbol name)))
                  (let ((s (svref strings index)))
                    (replace name s :start1 start)
@@ -135,19 +139,26 @@
   ;; Concatenate together the names of some strings and symbols,
   ;; producing a symbol in the current package.
   (defun symbolicate (&rest things)
-    (apply #'symbol-concat (sane-package) things))
-  ;; SYMBOLICATE in given package.
+    (apply #'symbol-concat (sane-package) nil things))
+  ;; "bang" means intern even if the specified package is locked.
+  ;; Obviously it takes a package, so it doesn't need PACKAGE- in its name.
+  ;; The main use is to create interned temp vars. It really seems like there
+  ;; ought to be a single package into which all such vars go,
+  ;; avoiding any interning in locked packages.
+  (defun symbolicate! (package &rest things)
+    (apply #'symbol-concat (find-package package) t things))
+  ;; SYMBOLICATE in given package respecting package-lock.
   (defun package-symbolicate (package &rest things)
-    (apply #'symbol-concat (find-package package) things))
+    (apply #'symbol-concat (find-package package) nil things))
   ;; like SYMBOLICATE, but producing keywords
   (defun keywordicate (&rest things)
-    (apply #'symbol-concat *keyword-package* things))
+    (apply #'symbol-concat *keyword-package* nil things))
   ;; like the above, but producing an uninterned symbol.
   ;; [we already have GENSYMIFY, and naming this GENSYMICATE for
   ;; consistency with the above would not be particularly enlightening
   ;; as to how it isn't just GENSYMIFY]
   (defun gensymify* (&rest things)
-    (apply #'symbol-concat nil things))))
+    (apply #'symbol-concat nil nil things))))
 
 ;;; Access *PACKAGE* in a way which lets us recover when someone has
 ;;; done something silly like (SETF *PACKAGE* :CL-USER) in unsafe code.

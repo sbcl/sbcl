@@ -1647,7 +1647,7 @@
 ;;; Detect misuse with sb-devel. "Misuse" means mismatched array element types
 #-sb-devel
 (loop for i = 1 then (* i 2)
-      do (%deftransform (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
+      do (%deftransform (package-symbolicate "SB-KERNEL" "UB" i "-BASH-COPY")
                         nil
                         '(function ((simple-unboxed-array (*)) (constant-arg index)
                                     (simple-unboxed-array (*)) (constant-arg index)

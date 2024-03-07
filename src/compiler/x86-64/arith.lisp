@@ -2223,7 +2223,7 @@
 ;;;
 (macrolet
     ((define-fastrem (bits opsize
-                           &aux (name (symbolicate "FASTREM-" (write-to-string bits))))
+                           &aux (name (symbolicate "FASTREM-" bits)))
        `(define-vop (,name)
           (:translate ,name)
           (:policy :fast-safe)

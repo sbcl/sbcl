@@ -35,10 +35,10 @@
                   `(defstruct (big (:predicate nil))
                      (first t)
                      ,@(loop for i below sb-vm:n-word-bits
-                             collect `(,(sb-int:symbolicate "RAW" (write-to-string i))
+                             collect `(,(sb-int:symbolicate "RAW" i)
                                         0 :type cl:double-float))
                      ,@(loop for i below 5
-                             collect `(,(sb-int:symbolicate "MORE" (write-to-string i)) nil)))))
+                             collect `(,(sb-int:symbolicate "MORE" i) nil)))))
           (print '(in-package "STRUCT") src)
           (print `(eval-when (:compile-toplevel) ,defstruct) src) ; for compiling a type-check
           (print `(defun bigp (x) (typep x 'big)) src)

@@ -450,8 +450,7 @@
   (labels ((tempvars (n)
              (if (plusp n)
                  (cons (package-symbolicate
-                        #.(find-package "SB-DISASSEM")
-                        ".T" (write-to-string (incf *!temp-var-counter*)))
+                        #.(find-package "SB-DISASSEM") ".T" (incf *!temp-var-counter*))
                        (tempvars (1- n))))))
     (let* ((arg-cell (assq arg funstate))
            (rendering-temps (cdr (assq rendering (cdr arg-cell))))

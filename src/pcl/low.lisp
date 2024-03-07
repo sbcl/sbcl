@@ -61,21 +61,12 @@
 
 ;;; Symbol contruction utilities
 (defun pkg-format-symbol (package format-string &rest format-arguments)
-  (without-package-locks
-   (intern (possibly-base-stringize
-            (apply #'format nil format-string format-arguments))
-           package)))
+  ;; It's unclear to me why ignoring package locks here is a good thing.
+  (symbolicate! package (apply #'format nil format-string format-arguments)))
 ;; Like the preceding, but always use PCL package, and override the package lock
 ;; in a more elegant way than using WITHOUT-PACKAGE-LOCKS.
-(defun pcl-format-symbol (format-string &rest format-arguments)
-  (let ((string (possibly-base-stringize
-                 (let ((*package* *keyword-package*))
-                   (apply #'format nil format-string format-arguments)))))
-    ;; Is there any way this can actually NOT be of type base-char?
-    (sb-impl::%intern string (length string) #.(find-package "SB-PCL")
-                      (if (simple-base-string-p string) 'base-char 'character)
-                      t ; ignore lock
-                      nil))) ; no inheritance. Does it matter?
+(defun pcl-symbolicate (&rest things)
+  (apply #'symbolicate! #.(find-package "SB-PCL") things))
 
 (defun condition-type-p (type)
   (and (symbolp type)

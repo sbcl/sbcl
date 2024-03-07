@@ -159,7 +159,7 @@
                          (convert-to-system-type type2))))))))
 
 (defun make-class-symbol (class-name)
-  (pcl-format-symbol "*THE-CLASS-~A*" (symbol-name class-name)))
+  (pcl-symbolicate "*THE-CLASS-" class-name "*"))
 
 (defvar *standard-method-combination*)
 (defvar *or-method-combination*)

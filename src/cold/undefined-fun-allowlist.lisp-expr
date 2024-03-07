@@ -172,6 +172,7 @@
   sb-int:keywordicate
   sb-int:package-symbolicate
   sb-int:symbolicate
+  sb-int:symbolicate!
   sb-kernel::preinform-compiler-about-accessors
   sb-kernel::preinform-compiler-about-slot-functions
   ;; the next four could probably be removed by replacing a lexical

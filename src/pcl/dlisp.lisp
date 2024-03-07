@@ -34,14 +34,14 @@
 
 (defun dfun-arg-symbol (arg-number)
   (or (nth arg-number *dfun-arg-symbols*)
-      (pcl-format-symbol ".ARG~A." arg-number)))
+      (pcl-symbolicate ".ARG" arg-number ".")))
 
 (declaim (list *slot-vector-symbols*))
 (define-load-time-global *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
 
 (defun slot-vector-symbol (arg-number)
   (or (nth arg-number *slot-vector-symbols*)
-      (pcl-format-symbol ".SLOTS~A." arg-number)))
+      (pcl-symbolicate ".SLOTS" arg-number ".")))
 
 (declaim (inline make-dfun-required-args))
 (defun make-dfun-required-args (count)
@@ -368,7 +368,7 @@
          (wrapper-bindings (mapcan (lambda (arg mt)
                                      (unless (eq mt t)
                                        (incf index)
-                                       `((,(pcl-format-symbol "WRAPPER-~D" index)
+                                       `((,(pcl-symbolicate "WRAPPER-" index)
                                           ,(emit-fetch-wrapper
                                             mt arg miss-tag (pop slot-vars))))))
                                    args metatypes))

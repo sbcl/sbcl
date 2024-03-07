@@ -22,14 +22,14 @@
 (macrolet ((defbiggy ()
              `(defstruct biggy
                 ,@(loop for i from 1 to 64
-                        collect `(,(sb-int:symbolicate "SLOT" (write-to-string i))
+                        collect `(,(sb-int:symbolicate "SLOT" i)
                                   0 :type ,(if (= i 64) 'sb-ext:word t))))))
   (defbiggy))
 
 (macrolet ((def-100slots ()
              `(defstruct 100slots
                ,@(loop for i from 0 repeat 100
-                    collect `(,(sb-int:symbolicate "SLOT" (write-to-string i))
+                    collect `(,(sb-int:symbolicate "SLOT" i)
                               ,(format nil "This is ~D" i))))))
   (def-100slots))
 
@@ -165,7 +165,7 @@
 (macrolet ((def ()
              `(defstruct foo-lotsaslots
                 ,@(loop for i below 100 collect
-                        `(,(sb-int:symbolicate "S" (write-to-string i))
+                        `(,(sb-int:symbolicate "S" i)
                           0 :type ,(if (oddp i) 'sb-ext:word 't))))))
   (def))
 

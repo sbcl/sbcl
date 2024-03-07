@@ -930,7 +930,7 @@
   (assert (eql n (funcall fun nil))))
 
 (macrolet ((def (n f1 f2 f3)
-             (let ((name (sb-int:package-symbolicate "DX-FLET-TEST." (write-to-string n))))
+             (let ((name (sb-int:package-symbolicate "DX-FLET-TEST." n)))
                `(progn
                   (defun-with-dx ,name (s)
                     (flet ((f (x)

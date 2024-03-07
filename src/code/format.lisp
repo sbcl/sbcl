@@ -454,12 +454,8 @@
         ,*default-format-error-control-string*
         ,(or offset *default-format-error-offset*))
       (let ((symbol
-             (without-package-locks
-                 (package-symbolicate
-                  #.(find-package "SB-FORMAT")
-                  "FORMAT-ARG"
-                  (write-to-string (incf *format-gensym-counter*)
-                                   :pretty nil :base 10 :radix nil)))))
+             (symbolicate! #.(find-package "SB-FORMAT")
+                           "FORMAT-ARG" (incf *format-gensym-counter*))))
         (push (cons symbol (or offset *default-format-error-offset*))
               *simple-args*)
         symbol)))

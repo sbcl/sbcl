@@ -505,8 +505,7 @@
   (destructuring-bind (class-arg &rest args) (cdr form)
     (flet (;; Return the name of parameter number I of a constructor
            ;; function.
-           (parameter-name (i)
-             (pcl-format-symbol ".P~D." i))
+           (parameter-name (i) (pcl-symbolicate ".P" i "."))
            ;; Check if CLASS-ARG is a constant symbol.  Give up if
            ;; not.
            (constant-class-p ()
@@ -996,8 +995,8 @@
                (unless (initializedp location)
                  (setf (aref slot-vector location)
                        (list kind val type slotd))))
-             (default-init-var-name (i) (pcl-format-symbol ".D~D." i))
-             (location-var-name (i) (pcl-format-symbol ".L~D." i)))
+             (default-init-var-name (i) (pcl-symbolicate ".D" i "."))
+             (location-var-name (i) (pcl-symbolicate ".L" i ".")))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr

@@ -603,12 +603,10 @@
         ;;  1. it was using a :dword move where it should have used a :qword
         ;;  2. it was emitting constants as bignums instead of inline raw constants
         (macrolet ((test (signedp nbits newval
-                          &aux (ref (symbolicate
-                                     (if signedp "SIGNED-" "")
-                                     "SAP-REF-"
-                                     (write-to-string nbits)))
-                                     (init (if signedp -1
-                                               (ldb (byte nbits 0) most-positive-word))))
+                          &aux (ref (symbolicate (if signedp "SIGNED-" "")
+                                                 "SAP-REF-" nbits))
+                               (init (if signedp -1
+                                         (ldb (byte nbits 0) most-positive-word))))
                      `(progn
                         ;; (format t "Testing ~a with initial bits ~x~%" ',ref ,init)
                         (setf (,ref sap 0) ,init)

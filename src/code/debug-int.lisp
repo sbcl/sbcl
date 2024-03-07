@@ -1898,10 +1898,9 @@ register."
   (let* ((len (length vars))
          (width (length (format nil "~W" (1- len)))))
     (dotimes (i len)
-      (without-package-locks
-        (setf (compiled-debug-var-symbol (svref vars i))
-              (intern (format nil "ARG-~V,'0D" width i)
-                      #.(find-package "SB-DEBUG")))))))
+      (setf (compiled-debug-var-symbol (svref vars i))
+            (symbolicate! #.(find-package "SB-DEBUG") "ARG-"
+                          (format nil "~V,'0D" width i))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector

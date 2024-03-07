@@ -202,9 +202,6 @@
   (or (find-package string)
       (error "Cross-compiler bug: no package named ~S" string)))
 
-(defmacro without-package-locks (&body body)
-  `(progn ,@body))
-
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)
   (declare (ignore kind format))

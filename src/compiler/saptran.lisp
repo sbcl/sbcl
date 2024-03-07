@@ -131,7 +131,7 @@
 (macrolet ((def (alias value-type)
              (let* ((str (string alias))
                     (prefix (subseq str 0 (- (length str) 4))) ; remove -WORD
-                    (fun (symbolicate prefix (write-to-string sb-vm:n-word-bits))))
+                    (fun (symbolicate prefix sb-vm:n-word-bits)))
              `(progn
                 (defknown ,alias (system-area-pointer fixnum) ,value-type (flushable))
                 (defknown (setf ,alias) (,value-type system-area-pointer fixnum)
