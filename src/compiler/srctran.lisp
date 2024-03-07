@@ -6893,91 +6893,140 @@
                                                 #'characterp
                                                 #'fixnump))))
           (when (cdr chain)
-            ;; Transform contiguous ranges into range<=.
-            (when-vop-existsp (:translate range<)
-              (let ((constants
-                      (sort (loop for (node) in chain
-                                  for (nil b) = (combination-args node)
-                                  collect (if characterp
-                                              (char-code (lvar-value b))
-                                              (lvar-value b)))
-                            #'<)))
-                (when (loop for (a next) on constants
-                            always (or (not next)
-                                       (= (1+ a) next)))
-                  (let ((min (car constants))
-                        (max (car (last constants))))
-                    (setf (combination-args node) nil)
-                    (flush-dest b)
-                    (loop for ((node . if) next) on chain
-                          for (a2 b2) = (combination-args node)
-                          do
-                          (cond (next
-                                 (kill-if-branch-1 if (if-test if)
-                                                   (node-block if)
-                                                   (if-consequent if))
-                                 (flush-combination node))
-                                (t
-                                 (setf (lvar-dest a) node)
-                                 (setf (combination-args node)
-                                       (list a b2))
-                                 (flush-dest a2)
-                                 (transform-call node
-                                                 `(lambda (a b)
-                                                    (declare (ignore b))
-                                                    (range<= ,min ,(if characterp
-                                                                       '(char-code a)
-                                                                       'a) ,max))
-                                                 'or-eq-transform))))
-                    (return-from or-eq-transform t)))))
-            #+(or ppc ppc64 x86 x86-64) ;; breaks jump-tables
-            (when (>= (length chain) 4)
-              (return-from or-eq-transform))
-
-            ;; Comparing integers that differ by only one bit,
-            ;; which is useful for case-insensitive comparison of ASCII characters.
-            (loop for ((node . if) (next-node . next-if)) = chain
-                  while next-node
-                  do
-                  (pop chain)
-                  (destructuring-bind (a b) (combination-args node)
-                    (destructuring-bind (a2 b2) (combination-args next-node)
-                      (let ((c1 (lvar-value b))
-                            (c2 (lvar-value b2)))
-                        (when (and (if characterp
-                                       (and (characterp c1)
-                                            (characterp c2)
-                                            (setf c1 (char-code c1)
-                                                  c2 (char-code c2)))
-                                       (and (fixnump c1)
-                                            (fixnump c2)))
-                                   (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
-                                           (ash c2 (- sb-vm:n-word-bits)))
-                                        (= (logcount (logxor c1 c2)) 1)))
-                          (pop chain)
-                          (kill-if-branch-1 if (if-test if)
-                                            (node-block if)
-                                            (if-consequent if))
-                          (setf (combination-args node) nil)
-                          (flush-combination node)
-                          (setf (lvar-dest a) next-node)
-                          (setf (combination-args next-node)
-                                (list a b2))
-                          (flush-dest a2)
-                          (flush-dest b)
-                          (let ((min (min c1 c2))
-                                (value (if characterp
-                                           '(char-code a)
-                                           'a)))
-                            (transform-call next-node
-                                            `(lambda (a b)
-                                               (declare (ignore b))
-                                               ,(if (zerop min)
-                                                    `(not (logtest ,value (lognot ,(logxor c1 c2))))
-                                                    `(eq (logandc2 ,value
-                                                                   ,(logxor c1 c2))
-                                                         ,min)))
-                                            'or-eq-transform)))))))
+            (let ((constants (loop for (node) in chain
+                                   for (nil b) = (combination-args node)
+                                   collect (if characterp
+                                               (char-code (lvar-value b))
+                                               (lvar-value b)))))
+              (flet ((replace-chain (form)
+                       (setf (combination-args node) nil)
+                       (flush-dest b)
+                       (loop for ((node . if) next) on chain
+                             for (a2 b2) = (combination-args node)
+                             do
+                             (cond (next
+                                    (kill-if-branch-1 if (if-test if)
+                                                      (node-block if)
+                                                      (if-consequent if))
+                                    (flush-combination node))
+                                   (t
+                                    (setf (lvar-dest a) node)
+                                    (setf (combination-args node)
+                                          (list a b2))
+                                    (flush-dest a2)
+                                    (transform-call node
+                                                    form
+                                                    'or-eq-transform))))))
+                ;; Transform contiguous ranges into range<=.
+                (when (or (vop-existsp :translate range<)
+                          (> (length constants) 2))
+                  (setf constants (sort constants #'<))
+                  (when (loop for (a next) on constants
+                              always (or (not next)
+                                         (= (1+ a) next)))
+                    (let ((min (car constants))
+                          (max (car (last constants))))
+                      (replace-chain `(lambda (a b)
+                                        (declare (ignore b))
+                                        (<= ,min ,(if characterp
+                                                      '(char-code a)
+                                                      'a)
+                                            ,max)))
+                      (return-from or-eq-transform t))))
+                #+ (or ppc ppc64 x86 x86-64) ;; breaks jump-tables
+                (when (>= (length chain) 4)
+                  (return-from or-eq-transform))
+                ;; Turn into a bit mask
+                (let (min max)
+                  (when (and (> (length constants) 2)
+                             (loop for c in constants
+                                   always (>= c 0) ;; negative numbers can be handled too
+                                   maximize c into max*
+                                   minimize c into min*
+                                   finally (setf max max*
+                                                 min min*))
+                             (< (- max min) sb-vm:n-word-bits)
+                             (equal constants
+                                    (remove-duplicates constants)))
+                    (replace-chain `(lambda (a b)
+                                      (declare (ignore b))
+                                      (let ((a ,(if characterp
+                                                    '(char-code a)
+                                                    'a)))
+                                        ,(cond ((< max sb-vm:n-word-bits)
+                                                `(and (<= 0 a ,max)
+                                                      (logbitp (truly-the (integer 0 ,max) a)
+                                                               ,(reduce (lambda (x y) (logior x (ash 1 y)))
+                                                                        constants :initial-value 0))))
+                                               (t
+                                                (decf max min)
+                                                `(let ((a (- a ,min)))
+                                                   (and (<= 0 a ,max)
+                                                        (logbitp (truly-the (integer 0 ,max) a)
+                                                                 ,(reduce (lambda (x y) (logior x (ash 1 (- y min))))
+                                                                          constants :initial-value 0)))))))))
+                    (return-from or-eq-transform t)))
+                (labels ((%one-bit-diff-p (c1 c2)
+                           (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
+                                   (ash c2 (- sb-vm:n-word-bits)))
+                                (= (logcount (logxor c1 c2)) 1)))
+                         (one-bit-diff-p (c1 c2)
+                           (or (%one-bit-diff-p c1 c2)
+                               ;; If x=2*y for a single-bit x
+                               ;; subtracting y will either produce 0
+                               ;; or y, which is a single set bit
+                               ;; which can be masked off to produce
+                               ;; 0.
+                               (let ((c1 (min c1 c2))
+                                     (c2 (max c1 c2)))
+                                 (and (= (logcount c2) 1)
+                                      (= c2 (* c1 2)))))))
+                  ;; Comparing integers that differ by only one bit,
+                  ;; which is useful for case-insensitive comparison of ASCII characters.
+                  (loop for ((node . if) (next-node . next-if)) = chain
+                        while next-node
+                        do
+                        (pop chain)
+                        (destructuring-bind (a b) (combination-args node)
+                          (destructuring-bind (a2 b2) (combination-args next-node)
+                            (let ((c1 (lvar-value b))
+                                  (c2 (lvar-value b2)))
+                              (when (and (if characterp
+                                             (and (characterp c1)
+                                                  (characterp c2)
+                                                  (setf c1 (char-code c1)
+                                                        c2 (char-code c2)))
+                                             (and (fixnump c1)
+                                                  (fixnump c2)))
+                                         (one-bit-diff-p c1 c2))
+                                (pop chain)
+                                (kill-if-branch-1 if (if-test if)
+                                                  (node-block if)
+                                                  (if-consequent if))
+                                (setf (combination-args node) nil)
+                                (flush-combination node)
+                                (setf (lvar-dest a) next-node)
+                                (setf (combination-args next-node)
+                                      (list a b2))
+                                (flush-dest a2)
+                                (flush-dest b)
+                                (let ((min (min c1 c2))
+                                      (value (if characterp
+                                                 '(char-code a)
+                                                 'a)))
+                                  (transform-call next-node
+                                                  `(lambda (a b)
+                                                     (declare (ignore b))
+                                                     ,(cond ((%one-bit-diff-p c1 c2)
+                                                             (if (zerop min)
+                                                                 `(not (logtest ,value (lognot ,(logxor c1 c2))))
+                                                                 `(eq (logandc2 ,value
+                                                                                ,(logxor c1 c2))
+                                                                      ,min)))
+                                                            (t
+                                                             `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- a ,min))
+                                                                            (lognot ,min))))))
+                                                  'or-eq-transform))))))))))
             (unless (node-prev node)
               ;; Don't proceed optimizing this node
               t)))))))
