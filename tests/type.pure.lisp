@@ -901,3 +901,20 @@
    ((#C(1d0 1d0)) nil)
    ((#C(1 1)) t)
    ((#C(1 #.(expt 2 300))) nil)))
+
+(with-test (:name :structure-typep-fold)
+  (assert-type
+   (lambda (a b)
+     (declare (character a))
+       (sb-c::structure-typep a b))
+   null)
+  (assert-type
+   (lambda (a)
+     (declare (hash-table a))
+     (sb-c::structure-typep a #.(sb-kernel:find-layout 'condition)))
+   null)
+  (assert-type
+   (lambda (a)
+     (declare (pathname a))
+     (sb-c::structure-typep a #.(sb-kernel:find-layout 'pathname)))
+   (eql t)))
