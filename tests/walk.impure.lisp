@@ -1053,3 +1053,13 @@ Form: C   Context: EVAL; lexically bound
 
 (test-util:with-test (:name :inlined-defun)
   (eval '(defmethod inlined-defun () (defun inlined-fun ()))))
+
+(test-util:with-test (:name :symbol-macrolet-declarations)
+  (test-util:checked-compile
+   `(lambda ()
+      (defmethod ,(gensym) (obj)
+        (declare (optimize speed))
+        (symbol-macrolet ((x (slot-value obj 'x)))
+          (declare (fixnum x))
+          (incf x 1))))
+   :allow-notes nil))
