@@ -1258,6 +1258,5 @@
 (push '("SB-FORMAT"
         def-format-directive def-complex-format-directive
         def-format-interpreter def-complex-format-interpreter
-        interpret-bind-defaults interpret-format-integer next-arg
-        %set-format-directive-expander)
+        interpret-bind-defaults interpret-format-integer next-arg)
       *!removable-symbols*)

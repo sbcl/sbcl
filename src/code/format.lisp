@@ -496,9 +496,11 @@
 ;;;; format directive machinery
 
 (defmacro def-complex-format-directive (char lambda-list &body body)
-  (let ((defun-name (intern (format nil
-                                    "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
-                                    char)))
+  ;; Assert that it isn't lowercase
+  (let ((code (sb-xc:char-code char)))
+    (when (<= (sb-xc:char-code #\a) code (sb-xc:char-code #\z))
+      (error "Come on, use uppercase why don't you?")))
+  (let ((defun-name (symbolicate char "-FORMAT-DIRECTIVE-EXPANDER"))
         (directive (gensym "DIRECTIVE"))
         (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
     `(progn
@@ -511,7 +513,9 @@
                    ,@body))
                `((declare (ignore ,directive ,directives))
                  ,@body)))
-       (%set-format-directive-expander ,char #',defun-name))))
+       (setf (aref *format-directive-expanders* ,(sb-xc:char-code char))
+             #',defun-name)
+       ',defun-name)))
 
 (defmacro def-format-directive (char lambda-list &body body)
   (let ((directives (gensym "DIRECTIVES"))
@@ -527,11 +531,6 @@
        ,@declarations
        (values (progn ,@body-without-decls)
                ,directives))))
-
-(defun %set-format-directive-expander (char fn)
-  (let ((code (char-code (char-upcase char))))
-    (setf (aref *format-directive-expanders* code) fn))
-  char)
 
 (defun find-directive (directives kind stop-at-semi)
   (if directives
@@ -1103,9 +1102,9 @@
 ;;;; format directives and support functions for justification
 
 (defconstant-eqx !illegal-inside-justification
-  (mapcar (lambda (x) (directive-bits (parse-directive x 0 nil)))
-          '("~:>" "~:@>"
-            "~:T" "~:@T"))
+    '#.(mapcar (lambda (x) (directive-bits (parse-directive x 0 nil)))
+               '("~:>" "~:@>"
+                 "~:T" "~:@T"))
   #'equal)
 
 ;;; Reject ~W, ~_, ~I and certain other specific values of modifier+character.

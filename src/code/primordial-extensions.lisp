@@ -54,12 +54,11 @@
 ;;; Incidentally, this is essentially the same operator which
 ;;; _On Lisp_ calls WITH-GENSYMS.
 (defmacro with-unique-names (symbols &body body)
-  (declare (notinline every)) ; because we can't inline ALPHA-CHAR-P
   `(let ,(mapcar (lambda (symbol)
                    (let* ((symbol-name (symbol-name symbol))
-                          (stem (if (every #'alpha-char-p symbol-name)
-                                    symbol-name
-                                    (string (gensymify* symbol-name "-")))))
+                          (stem (if (find #\- symbol-name)
+                                    (string (gensymify* symbol-name "-"))
+                                    symbol-name)))
                      `(,symbol (gensym ,stem))))
                  symbols)
      ,@body))
