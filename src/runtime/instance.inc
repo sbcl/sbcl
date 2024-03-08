@@ -143,3 +143,7 @@ struct classoid {
     lispobj layout;
     /* more slots */
 };
+
+#define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
+#define KV_PAIRS_REHASH(kvv) kvv[1]
+unsigned prefuzz_ht_hash(lispobj);

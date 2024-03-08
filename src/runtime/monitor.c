@@ -40,6 +40,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
 #include "genesis/unwind-block.h"
+#include "genesis/hash-table.h"
 #include "gc.h"
 #include "../../tlsf-bsd/tlsf/tlsf.h"
 extern void* tlsf_control;
@@ -117,8 +118,6 @@ static void maybe_show_contents(__attribute__((unused)) char *legend,
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
 #include <errno.h>
 struct filewriter { long total; int fd; bool verbose; };
-
-
 
 static void checked_write(char *section, struct filewriter* writer, void* buf, long nbytes)
 {
@@ -279,7 +278,7 @@ void save_gc_crashdump(char *pathname,
 
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
-static cmd print_context_cmd, pte_cmd, search_cmd;
+static cmd print_context_cmd, pte_cmd, search_cmd, hashtable_cmd;
 static cmd backtrace_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
 
@@ -470,6 +469,7 @@ static struct cmd {
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
+    {"hashtable", "Dump a hashtable in detail.", hashtable_cmd},
     {"layouts", "Dump LAYOUT instances.", layouts_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
@@ -621,6 +621,75 @@ print_cmd(char **ptr)
 {
     lispobj obj;
     if (parse_lispobj(ptr, &obj)) print(obj);
+    return 0;
+}
+
+int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
+                          __attribute__((unused)) FILE* file)
+{
+    int errors = 0;
+#ifdef LISP_FEATURE_64_BIT
+    char *kinds[4] = {"EQ","EQL","EQUAL","EQUALP"};
+    lispobj* data = VECTOR(ht->pairs)->data;
+    uint32_t* hvdata = ht->hash_vector != NIL ?
+      (uint32_t*)VECTOR(ht->hash_vector)->data : 0;
+    struct vector* iv = VECTOR(ht->index_vector);
+    uint32_t* ivdata = (void*)iv->data;
+    uint32_t* nvdata = (void*)VECTOR(ht->next_vector)->data;
+    unsigned ivmask = vector_len(iv) - 1;
+    int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
+    if (file)
+        fprintf(file,
+                "Table %p Kind=%d=%s Weak=%d Count=%d HWM=%d rehash=%d\n",
+                ht, hashtable_kind(ht), kinds[hashtable_kind(ht)],
+                hashtable_weakp(ht)?1:0,
+                (int)fixnum_value(ht->_count), hwm, (int)data[1]);
+    int j;
+    for (j = 1; j <= hwm; j++) {
+        lispobj key = data[2*j];
+        lispobj val = data[2*j+1];
+        if (header_widetag(key) == UNBOUND_MARKER_WIDETAG ||
+            header_widetag(val) == UNBOUND_MARKER_WIDETAG) {
+            if (file) fprintf(file, "[%4d] %12lx %16lx\n", j, key, val);
+            continue;
+        }
+        uint32_t h;
+        if (hvdata && hvdata[j] != 0xFFFFFFFF) {
+            h = hvdata[j];
+            // print the as-stored hash
+            if (file)
+                fprintf(file, "[%4d] %12lx %16lx  %08x %4x (",
+                        j, key, val, h, h & ivmask);
+        } else {
+            // print the hash and then fuzzed hash;
+            lispobj h0 = funcall1(ht->hash_fun, key);
+            h = prefuzz_ht_hash(h0);
+            if (file)
+                fprintf(file, "[%4d] %12lx %16lx %016lx %08x %4x (", j,
+                        key, val, fixnum_value(h0), h, h & ivmask);
+        }
+        // show the chain
+        unsigned cell = ivdata[h & ivmask];
+        while (cell) {
+            if (file) fprintf(file, "%d", cell);
+            lispobj matchp = funcall2(ht->test_fun, key, data[cell*2]);
+            if (matchp != NIL) { if (file) fprintf(file, "\u2713"); break; }
+            if ((cell = nvdata[cell]) != 0 && file) putc(' ', file);
+        }
+        if (!cell) ++errors;
+        if (file) fprintf(file, cell ? ")\n" : ") *\n");
+    }
+#endif
+    return errors;
+}
+static int hashtable_cmd(char **ptr)
+{
+    lispobj obj;
+    if (parse_lispobj(ptr, &obj)) {
+        int errors = verify_lisp_hashtable((void*)native_pointer(obj),
+                                           stdout);
+        if (errors) fprintf(stderr, "Errors: %d\n", errors);
+    }
     return 0;
 }
 

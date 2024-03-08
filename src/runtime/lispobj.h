@@ -269,7 +269,4 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
       flag_VectorWeak << ARRAY_FLAGS_POSITION;
 }
 
-#define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
-#define KV_PAIRS_REHASH(kvv) kvv[1]
-
 #endif

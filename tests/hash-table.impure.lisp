@@ -242,3 +242,19 @@
                    (assert (= (hash-table-count subclasses)
                               (funcall f subclasses))))))
              (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't)))))
+
+(defun verify-table (ht)
+  (sb-sys:without-gcing
+   (alien-funcall (extern-alien "verify_lisp_hashtable"
+                                (function int unsigned unsigned))
+                  (- (sb-kernel:get-lisp-obj-address ht) 3)
+                  0)))
+
+(with-test (:name :verify-hash-table-hashing :skipped-on (:not :x86-64))
+  (let ((tables (sb-vm:list-allocated-objects :all :test #'hash-table-p)))
+    (dolist (table tables (format t "::: Examined ~D tables~%" (length tables)))
+      (let ((errors (verify-table table)))
+        (unless (zerop errors)
+          (if (/= 0 (svref (sb-impl::hash-table-pairs table) 1))
+              (format t "~S wants rehash~%" table)
+              (error "~S should be marked for rehash" table)))))))

@@ -168,6 +168,7 @@
      (eq-hash key))))
 
 (declaim (inline prefuzz-hash))
+(export 'prefuzz-hash) ; for regression tests
 (defun prefuzz-hash (hash)
   ;; We're using power of two tables which obviously are very
   ;; sensitive to the exact values of the low bits in the hash
