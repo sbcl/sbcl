@@ -1211,7 +1211,7 @@
 
 ;;; FIXNUM is assumed to be non-zero and the result of the shift should be a bignum
 (defun bignum-ashift-left-fixnum (fixnum count)
-  (declare (fixnum count)
+  (declare ((and unsigned-byte fixnum) count)
            (fixnum fixnum))
   (multiple-value-bind (right-zero-digits remaining)
       (truncate count digit-size)
