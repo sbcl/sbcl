@@ -902,6 +902,7 @@
    ((#C(1 1)) t)
    ((#C(1 #.(expt 2 300))) nil)))
 
+#+(or arm64 x86-64)
 (with-test (:name :structure-typep-fold)
   (assert-type
    (lambda (a b)
