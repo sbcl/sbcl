@@ -546,6 +546,9 @@ echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WIT
 case "$sbcl_arch" in
     x86-64) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
 esac
+case "$sbcl_os" in
+    linux) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-perf" ;;
+esac
 
 echo //setting up OS-dependent information
 
