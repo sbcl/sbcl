@@ -1211,7 +1211,7 @@
 
 ;;; FIXNUM is assumed to be non-zero and the result of the shift should be a bignum
 (defun bignum-ashift-left-fixnum (fixnum count)
-  (declare (bignum-length count)
+  (declare (fixnum count)
            (fixnum fixnum))
   (multiple-value-bind (right-zero-digits remaining)
       (truncate count digit-size)
@@ -1227,13 +1227,15 @@
                             (/= left-half -1)
                             (/= left-half 0)))
            (length (+ right-zero-digits
-                      (if left-half-p 2 1)))
-           (result (alloc-zeroing-below length right-zero-digits)))
-      (setf (%bignum-ref result right-zero-digits) right-half)
-      (when left-half-p
-        (setf (%bignum-ref result (1+ right-zero-digits))
-              (ldb (byte digit-size 0) left-half)))
-      result)))
+                      (if left-half-p 2 1))))
+      (when (> length sb-kernel:maximum-bignum-length)
+        (error "can't represent result of left shift"))
+      (let ((result (alloc-zeroing-below length right-zero-digits)))
+        (setf (%bignum-ref result right-zero-digits) right-half)
+        (when left-half-p
+          (setf (%bignum-ref result (1+ right-zero-digits))
+                (ldb (byte digit-size 0) left-half)))
+        result))))
 
 ;;;; relational operators
 
