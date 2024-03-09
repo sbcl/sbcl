@@ -3397,7 +3397,7 @@ static void verify_hash_table_if_possible(struct hash_table* ht, bool fix_bad)
         }
         return;
     }
-    verify_hash_table(ht, fix_bad);
+    maybe_fix_hash_table(ht, fix_bad);
 }
 
 static uword_t verify_tables_in_range(lispobj* start, lispobj* end, uword_t fix_bad)

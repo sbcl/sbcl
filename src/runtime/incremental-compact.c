@@ -18,6 +18,7 @@
 #include "genesis/closure.h"
 #include "genesis/gc-tables.h"
 #include "genesis/symbol.h"
+#include "genesis/instance.h"
 
 /* The fix_slots loop does less work per pointer, so we
  * prefetch further than we do in the tracing loop. */
@@ -210,6 +211,8 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
        * hurt much. */
       /* TODO: should "rehash a hash table" be part of the source type? */
       struct vector* kv_vector = (struct vector*)source;
+      // Is it possible that this needs to be sync_fetch_and_or, or are we
+      // definitely single-threaded here?
       KV_PAIRS_REHASH(kv_vector->data) |= make_fixnum(1);
     }
     break;
