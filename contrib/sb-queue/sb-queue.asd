@@ -12,5 +12,4 @@
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-queue"
-  :depends-on ("sb-concurrency")
   :components ((:file "package")))

@@ -3,7 +3,6 @@
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-simple-streams"
-  :depends-on ("sb-bsd-sockets" "sb-posix")
   :components ((:file "package")
                (:file "fndb")
                (:file "iodefs" :depends-on ("package"))

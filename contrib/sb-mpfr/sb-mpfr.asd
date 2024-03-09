@@ -5,5 +5,4 @@
   :version "0.1"
   :description "bignum float calculations for SBCL using the MPFR library"
   :serial t
-  :depends-on ("sb-gmp")
   :components ((:file "mpfr")))

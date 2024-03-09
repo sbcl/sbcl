@@ -15,8 +15,7 @@
   :maintainer "Pierre R. Mai <pmai@pmsf.de>"
   :licence "CC0"
   :version "2.0.4"
-  :depends-on (#+sbcl "sb-rotate-byte"
-               #-(or :cmu :sbcl
+  :depends-on (#-(or :cmu :sbcl
                      (and :lispworks (not :lispworks4))
                      :ccl :allegro)
                "flexi-streams")
