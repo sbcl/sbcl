@@ -168,12 +168,10 @@
 ;;; This hash function on sb-vm:word returns a fixnum, does not cons,
 ;;; and has better avalanche behavior then SXHASH - changing any one input bit
 ;;; should affect each bit of output with equal chance.
-#-sb-xc-host
-(progn
 (declaim (inline murmur-hash-word/fixnum)) ; don't want to cons the word to pass in
 (defun murmur-hash-word/fixnum (x) ; result may be positive or negative
   (%make-lisp-obj (logandc2 (murmur3-fmix-word (truly-the sb-vm:word x))
-                            sb-vm:fixnum-tag-mask))))
+                            sb-vm:fixnum-tag-mask)))
 ;;; Similar, but the sign bit is always 0
 (declaim (inline murmur-hash-word/+fixnum))
 (defun murmur-hash-word/+fixnum (x)

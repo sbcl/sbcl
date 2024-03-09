@@ -165,3 +165,37 @@
         (t ; use the algorithm of https://xkcd.com/221/
          ;; This case is hit maybe a few dozen times in cross-compiling.
          (values 4 t))))
+
+(defun %make-lisp-obj (bits) ; Cast BITS (a representation) to fixnum
+  (declare (type sb-vm:word bits))
+  (flet ((sign-extend (int size) ; borrowed from disassem.lisp
+           (if (logbitp (1- size) int)
+               (dpb int (byte size 0) -1)
+               int)))
+    (if (= (logand bits sb-vm:fixnum-tag-mask) 0)
+        (sign-extend (ash bits (- sb-vm:n-fixnum-tag-bits)) sb-vm:n-fixnum-bits)
+        (bug "%MAKE-LISP-OBJ can only make fixnums"))))
+
+;;; Every architecture needs this portable replacement for +-modfx.
+;;; Some, but not all, define +-modfx in cross-modular.
+;;; We need this available sooner than that because type-classes needs it
+;;; to compute a hash of a list of things order-insensitively.
+(defun plus-mod-fixnum (a b)
+  (declare (type sb-xc:fixnum a b))
+  (labels ((representation (x) (mask-to-word (ash x sb-vm:n-fixnum-tag-bits)))
+           (mask-to-word (x) (ldb (byte sb-vm:n-word-bits 0) x)))
+    (%make-lisp-obj (mask-to-word (+ (representation a) (representation b))))))
+
+;; Assume 2 fixnum tag bits:
+;;      significant bits      tag
+;;   #b01111...11111111111111  00
+;; + #b0                    1  00
+;;   ------------------------
+;; = #b10000...00000000000000  00
+(assert (= (plus-mod-fixnum sb-xc:most-positive-fixnum 1)
+           sb-xc:most-negative-fixnum))
+;; etc
+(assert (= (plus-mod-fixnum sb-xc:most-negative-fixnum sb-xc:most-negative-fixnum)
+           0))
+(assert (= (plus-mod-fixnum -1 most-negative-fixnum)
+           sb-xc:most-positive-fixnum))

@@ -54,35 +54,14 @@
         (assert (sb-int:xset= union1 union2))))))
 
 (with-test (:name :xset-dedup-list-to-hash)
- (compile nil
-  '(lambda (p1)
-    (declare (type
-            (or
-             (or
-              (and
-               (or symbol t)
-               (or
-                (and
-                 (or
-                  (or symbol (member p standard-char-p f -))
-                  (vector *))
-                 (or
-                  (and (or (member structure-class - #:g15490820) list)
-                       (or list (member #:g15490821 - atan)))
-                  (or
-                   (member #:g15490817 #("a") char-name #:g15490818
-                           #:g15490819)
-                   (or array
-                       (member interactive-stream-p #:g15490816
-                               multiple-value-bind nil u)))))
-                (and (or (cons (array * (9)) t) list)
-                     (or
-                      (eql
-                       (53391669 -44590101
-                        (#\b "081uw~" -52809.280758190354d0)))
-                      (array * 1)))))
-              (or (member d y :b byte-position i echo-stream-output-stream)
-                  (member z w #:g15490815 nil g q t)))
-             (or character (member #\1 -50073916617313)))
-            p1))
-    p1)))
+  (let ((x (sb-int:alloc-xset)))
+    (dotimes (i 20)
+      (sb-int:add-to-xset i x))
+    (assert (listp (sb-kernel::xset-data x)))
+    (dotimes (i 20)
+      (sb-int:add-to-xset i x))
+    ;; didn't upgrade to a hash-table
+    (assert (listp (sb-kernel::xset-data x)))
+    (sb-kernel::xset-generate-stable-hashes x)
+    ;; doesn't affect representation of DATA slot
+    (assert (listp (sb-kernel::xset-data x)))))

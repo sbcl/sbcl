@@ -195,36 +195,8 @@
             xset)
   t)
 
-#-sb-xc-host (defmacro plus-mod-fixnum (a b) `(sb-vm::+-modfx ,a ,b))
-
-;;; Every architecture needs this portable replacement for +-modfx.
-;;; Some, but not all, define +-modfx in cross-modular.
-;;; We need this available sooner than that because type-classes needs it
-;;; to compute a hash of a list of things order-insensitively.
-#+sb-xc-host
-(progn
-(defun plus-mod-fixnum (a b)
-  (declare (type sb-xc:fixnum a b))
-  (let* ((mask (ldb (byte sb-vm:n-fixnum-bits 0) -1))
-         (result (logand (+ (logand a mask) (logand b mask)) mask)))
-    (if (logbitp sb-vm:n-positive-fixnum-bits result) ; then it's negative
-        (dpb result (byte sb-vm:n-fixnum-bits 0) -1)
-        result)))
-
-;; Assume 2 fixnum tag bits:
-;;      significant bits      tag
-;;   #b01111...11111111111111  00
-;; + #b0                    1  00
-;;   ------------------------
-;; = #b10000...00000000000000  00
-(assert (= (plus-mod-fixnum sb-xc:most-positive-fixnum 1)
-           sb-xc:most-negative-fixnum))
-;; etc
-(assert (= (plus-mod-fixnum sb-xc:most-negative-fixnum sb-xc:most-negative-fixnum)
-           0))
-(assert (= (plus-mod-fixnum -1 most-negative-fixnum)
-           sb-xc:most-positive-fixnum))
-)
+(defmacro plus-mod-fixnum (a b)
+  `(#+sb-xc-host sb-c::plus-mod-fixnum #-sb-xc-host  sb-vm::+-modfx ,a ,b))
 
 ;;; Produce a hash that helps decide whether two xsets could be considered equivalent
 ;;; as order-insensitive sets comparing elements by EQL.
@@ -272,11 +244,9 @@
     (dx-flet ((assign-hash (x)
                 (multiple-value-bind (h address-based) (sb-impl::eql-hash x)
                   (setf (aref hashes (incf index))
-                        ;; EQL-HASH does not hash fixnums well. Hash-tables
-                        ;; use PREFUZZ-HASH, so this should do something similar.
                         (acond ((not address-based)
-                                (#+sb-xc-host progn
-                                 #-sb-xc-host murmur-hash-word/fixnum h))
+                                ;; EQL-HASH does not hash fixnums well enough
+                                (murmur-hash-word/fixnum h))
                                ((gethash x hashmap)
                                 (incf (car it)) ; bump refcount
                                 it)
