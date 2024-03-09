@@ -67,19 +67,19 @@
 ;;; Checks that the element is not in the set yet.
 (defun add-to-xset (elt xset)
   (let ((data (xset-data xset)))
-    (if (listp data)
-        (let ((size (xset-extra xset)))
-          (if (< size +xset-list-size-limit+)
-              (unless (member elt data :test #'eql)
-                (setf (xset-extra xset) (1+ size)
-                      (xset-data xset) (cons elt data)))
-              (let ((table (make-hash-table :size (* 2 size) :test #'eql)))
-                (setf (gethash elt table) t)
-                (dolist (x data)
-                  (setf (gethash x table) t))
-                (setf (xset-extra xset) 0 ; looks nice to clear it
-                      (xset-data xset) table))))
-        (setf (gethash elt data) t))))
+    (cond ((not (listp data)) (setf (gethash elt data) t))
+          ((member elt data)) ; ignore
+          ((< (xset-extra xset) +xset-list-size-limit+)
+           (setf (xset-extra xset) (1+ (xset-extra xset))
+                 (xset-data xset) (cons elt data)))
+          (t
+           (let ((table (make-hash-table :size 36))) ; arb
+             (setf (gethash elt table) t)
+             (dolist (x data)
+               (setf (gethash x table) t))
+             (setf (xset-extra xset) 0 ; looks nice to clear it
+                   (xset-data xset) table)))))
+  xset)
 
 (defun xset-member-p (elt xset)
   (let ((data (xset-data xset)))
@@ -175,21 +175,13 @@
     (let ((data1 (xset-data xset1))
           (data2 (xset-data xset2)))
       (if (listp data1)
-          (if (listp data2)
-              (return-from xset= (subsetp data1 data2))
-              (dolist (e data1)
-                (unless (gethash e data2)
-                  (return-from xset= nil))))
-          (if (listp data2)
-              (dolist (e data2)
-                (unless (gethash e data1)
-                  (return-from xset= nil)))
-              (maphash
-               (lambda (k v)
-                 (declare (ignore v))
-                 (unless (gethash k data2)
-                   (return-from xset= nil)))
-               data1))))
+          (return-from xset= (subsetp data1 data2))
+          (maphash
+           (lambda (k v)
+             (declare (ignore v))
+             (unless (gethash k data2)
+               (return-from xset= nil)))
+           data1)))
     t))
 
 (declaim (inline xset-empty-p))
