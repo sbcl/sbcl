@@ -26,7 +26,7 @@
 
 (in-package "SB-KERNEL")
 
-(defstruct (xset (:constructor alloc-xset)
+(defstruct (xset (:constructor alloc-xset ())
                  (:constructor !new-xset (data extra))
                  (:copier nil)
                  (:predicate nil))
@@ -175,13 +175,21 @@
     (let ((data1 (xset-data xset1))
           (data2 (xset-data xset2)))
       (if (listp data1)
-          (return-from xset= (subsetp data1 data2))
-          (maphash
-           (lambda (k v)
-             (declare (ignore v))
-             (unless (gethash k data2)
-               (return-from xset= nil)))
-           data1)))
+          (if (listp data2)
+              (return-from xset= (subsetp data1 data2))
+              (dolist (e data1)
+                (unless (gethash e data2)
+                  (return-from xset= nil))))
+          (if (listp data2)
+              (dolist (e data2)
+                (unless (gethash e data1)
+                  (return-from xset= nil)))
+              (maphash
+               (lambda (k v)
+                 (declare (ignore v))
+                 (unless (gethash k data2)
+                   (return-from xset= nil)))
+               data1))))
     t))
 
 (declaim (inline xset-empty-p))
