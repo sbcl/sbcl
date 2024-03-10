@@ -292,10 +292,11 @@
 (defmacro with-environment-vars ((symbols end) env &body body)
   `(awhen (env-symbols ,env)
      (let ((,symbols (truly-the simple-vector (if (listp it) (cdr it) it)))
-           (,end #+ubsan (if (listp it) (car it) (sb-c::vector-length it))
-                 #-ubsan (locally (declare (optimize (safety 0))) (car it))))
+           (,end #+(or ubsan ppc64) (if (listp it) (car it) (sb-c::vector-length it))
+                 #-(or ubsan ppc64) (locally (declare (optimize (safety 0))) (car it))))
        (declare (index-or-minus-1 ,end))
        ,@body)))
+#-ppc64
 (eval-when (:compile-toplevel)
   ;; Assert that the claims made in the above comment remain true.
   (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
