@@ -126,8 +126,13 @@
   ;; in range and not repeated.
   (let ((seen (make-array (power-of-two-ceiling (length test-inputs))
                           :element-type 'bit :initial-element 0))
-        (f #-sb-xc-host
-           (let ((*compile-to-memory-space* :dynamic)) (compile nil lambda))
+        (f #-sb-xc-host ; use fasteval if possible
+           (cond #+sb-fasteval
+                 ((< (length test-inputs) 100) ; interpreting is faster
+                  (let ((*evaluator-mode* :interpret))
+                    (eval lambda)))
+                 (t (let ((*compile-to-memory-space* :dynamic))
+                      (compile nil lambda))))
            #+sb-xc-host
            (destructuring-bind (head lambda-list . body) lambda
              (aver (eq head 'lambda))

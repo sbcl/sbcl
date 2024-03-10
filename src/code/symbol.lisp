@@ -702,3 +702,5 @@ distinct from the global value. Can also be SETF."
 #+sb-thread (defun symbol-tls-index (x) (symbol-tls-index x)) ; necessary stub
 
 (defun symbol-name-hash (symbol) (symbol-name-hash symbol)) ; transformed
+(sb-c::when-vop-existsp (:translate hash-as-if-symbol-name)
+  (defun hash-as-if-symbol-name (x) (hash-as-if-symbol-name x))) ; transformed

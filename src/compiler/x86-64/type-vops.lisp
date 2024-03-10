@@ -302,6 +302,7 @@
   (:generator 3
     (if (location= temp value) (inst sub :dword value 3) (inst lea :dword temp (ea -3 value)))
     (inst test :byte temp #b11)))
+#-sb-xc-host (defun pointerp (x) (pointerp x)) ; stub needed ASAP in cold-init
 
 ;; A fixnum or single-digit bignum satisfies signed-byte-64-p
 (define-vop (signed-byte-64-p pointerp)

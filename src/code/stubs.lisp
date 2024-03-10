@@ -111,7 +111,6 @@
   (def %caller-pc ())
   (def %code-debug-info)
   (def sb-vm::%code-fixups)
-  #+x86-64 (def pointerp)
   (def sb-bignum:%bignum-length)
 
   ;; instances
@@ -165,7 +164,6 @@
   (def fun-code-header)
   (def symbol-package-id)
   (def symbol-hash)
-  #+x86-64 (def hash-as-if-symbol-name)
   (def symbol-%info) ; primitive reader always needs a stub
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
