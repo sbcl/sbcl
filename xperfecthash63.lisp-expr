@@ -2940,5 +2940,8 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
+(#(12C4811C 50B431CB 834BCA78 8F6A8805 934E6A73 A1148EC6 E8DC3557 F987A176)
+ "(TYPEP EQL < > <= >= = SET)"
+ "(  (& (- val (>> val 28)) 7))")
 )
 ;; EOF
