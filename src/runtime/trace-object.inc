@@ -43,11 +43,16 @@ static void USING_LAYOUT(lispobj layout, lispobj* where, int nslots)
     // Apart from the allowance for untagged pointers in lockfree list nodes,
     // this contains almost none of the special cases that gencgc does.
     if (!layout) return;
-    // FIXME: this can't work as intended if #+compact-instance-header is enabled
-    // because the source field is not a full word. You'll crash or not depending
-    // on whether you need to write back the pointer.
-    // (It gets a compile-time "incompatible pointer type" warning, so that's good)
+#if !(defined LISP_FEATURE_MARK_REGION_GC && defined LISP_FEATURE_COMPACT_INSTANCE_HEADER)
+  /* FIXME: pmrgc's incremental-compact has a problem here because the layout is a half-sized
+   * pointer and compaction doesn't know how to write it back to the object header.
+   * But (luckily?) we can only enable compact-instance and mark-region if #+permgen
+   * in which case layouts are traced as roots and never GCable.
+   * Any other feature combo needs this. As things are we're OK because the one other use of
+   * trace-object.inc is from fullcgc which is not used with mark-region. However, it does mean
+   * we could not use trace-object.inc to perform the path finding steps in traceroot */
     ACTION(layout, &layout_of(where), SOURCE_NORMAL);
+#endif
     if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
         struct list_node* node = (void*)where;
         lispobj next = node->_node_next;
