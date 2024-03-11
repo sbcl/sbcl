@@ -82,7 +82,10 @@
   ;;
   ;; EQUALITY
   ;;     Relations between two variables.
-  (kind nil :type (member typep < > = >= <= eql equality))
+  ;;
+  ;; SET
+  ;;    A set indicating that the initial binding is not in effect.
+  (kind nil :type (member typep < > = >= <= eql equality set))
   ;; The operands to the relation.
   (x nil :type (or lambda-var vector-length-constraint))
   (y nil :type constraint-y)
@@ -1131,7 +1134,8 @@
         (not-numeric (alloc-xset))
         (not-fpz nil)
         (not-res *empty-type*)
-        (leaf (ref-leaf ref)))
+        (leaf (ref-leaf ref))
+        set)
     (declare (type lambda-var leaf))
     (flet ((note-not (x)
              (if (fp-zero-p x)
@@ -1181,8 +1185,11 @@
             ((< > <= >= =)
              (let ((type (type-after-comparison kind not-p res y)))
                (when type
-                 (setf res type))))))))
-
+                 (setf res type))))
+            (set
+             (setf set t))))))
+    (unless set
+      (setf (lambda-var-unused-initial-value leaf) nil))
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))
@@ -1319,6 +1326,7 @@
          (unless (policy node (> compilation-speed speed))
            (maybe-add-eql-var-var-constraint var (set-value node) gen))
          (add-eq-constraint var (set-value node) gen)
+         (conset-add-constraint gen 'set var var nil)
          (when (node-lvar node)
            (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))))
       (combination
@@ -1436,10 +1444,15 @@
                  (when (or (null (lambda-var-sets var))
                            (not (closure-var-p var)))
                    (setf (lambda-var-constraints var) (make-conset))))
-                (when (and (lambda-var-constraints var)
-                           (lambda-var-sets var))
-                  (loop for ref in (lambda-var-refs var)
-                        do (setf (ref-same-refs ref) nil))))))
+               (when (and (lambda-var-constraints var)
+                          (lambda-var-sets var))
+                 (when (block-type-check (lambda-block fun))
+                   ;; This is optimistic, make sure it's going to be
+                   ;; processed.
+                   (setf (lambda-var-unused-initial-value var) t))
+                 (loop for ref in (lambda-var-refs var)
+
+                       do (setf (ref-same-refs ref) nil))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
         (frob let)))))

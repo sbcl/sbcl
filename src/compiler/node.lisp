@@ -1394,7 +1394,8 @@
   ;; Do not propagate constraints for this var
   no-constraints
   ;; Does it hold a constant that should't be destructively modified
-  constant)
+  constant
+  unused-initial-value)
 
 (defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags #.(lambda-var-attributes) :type attributes)
@@ -1447,6 +1448,8 @@
   `(lambda-var-attributep (lambda-var-flags ,var) no-constraints))
 (defmacro lambda-var-constant (var)
   `(lambda-var-attributep (lambda-var-flags ,var) constant))
+(defmacro lambda-var-unused-initial-value (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) unused-initial-value))
 
 
 ;;;; basic node types

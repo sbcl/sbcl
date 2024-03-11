@@ -58,7 +58,7 @@
         (if (and let-p
                  (not debug-variable-p)
                  (not (lambda-var-indirect var))
-                 (var-unused-before-sets-p var))
+                 (lambda-var-unused-initial-value var))
             (let* ((type (loop with union
                                for set in (lambda-var-sets var)
                                for type = (lvar-type (set-value set))
