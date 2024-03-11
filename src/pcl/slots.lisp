@@ -84,43 +84,29 @@
 
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
-(macrolet
-    ((fast-get-dsd-bits-by-name ()
-       ;; This macro is unhygienic, freely referencing MAP and SLOT-NAME
-       ;; from STRUCTURE-SLOT-VALUE or SLOT-VALUE.
-       `(let* ((shift (truly-the (integer 0 31) (svref map 0)))
-               (mask (truly-the (unsigned-byte 32) (svref map 1)))
-               (c (truly-the (unsigned-byte 32) (svref map 2)))
-               (hash (logand (ash (symbol-hash (truly-the symbol slot-name)) (- shift))
-                             mask))
-               (n-cells
-                (truly-the (unsigned-byte 32)
-                           (ash (- (length map) sb-kernel::fast-slot-table-fixed-cells)
-                                -1)))
-               ;; Cribbed from SYMBOL-TABLE-HASH in src/code/target-package
-               (bin (+ (sb-vm::fastrem-32 hash c n-cells)
-                       sb-kernel::fast-slot-table-fixed-cells))
-               (entry (svref map bin)))
-          (cond ((eq entry slot-name)
-                 (svref map (+ bin n-cells))) ; skip over the fixed portion
-                ((eql entry 0) nil)
-                (t
-                 (let ((v (truly-the simple-vector entry)))
-                   ;; try to find slot-name in the collision vector
-                   (dotimes (i (length v))
-                     (when (eq (svref v i) slot-name)
-                       (let ((indices (svref map (+ bin n-cells))))
-                         (return (svref (truly-the simple-vector indices) i)))))))))))
-
 ;;; Structure-slot-value is usually faster than our litle chunks of code that are
 ;;; automatically cobbled together for SLOT-VALUE on an unknown type but constant slot name.
 ;;; While the global generic for a specific slot might only need to invoke a type-check,
 ;;; the dispatch function is not faster than this, if even as fast.
+;;; If "flexible" defstructs (multiple inheritance, standard-object ancestors) are ever
+;;; brought to life, this might be inadmissible. Probably we would not store the
+;;; fast map in such situations.
 (defun structure-slot-value (instance slot-name)
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((layout (%instance-layout (truly-the structure-object instance)))
-         (map (the simple-vector (sb-kernel::layout-struct-slot-map layout)))
-         (bits (fast-get-dsd-bits-by-name)))
+         (mapper (sb-kernel::layout-slot-mapper layout))
+         (bits (cond ((functionp mapper)
+                      ;; Something earlier has asserted that SLOT-NAME is a symbol
+                      ;; so SYMBOL-HASH won't croak on it.
+                      (funcall mapper slot-name))
+                     ((simple-vector-p mapper)
+                      (let ((nsymbols (ash (length mapper) -1)))
+                        (dotimes (i nsymbols)
+                          (declare (index i))
+                          (when (eq (svref mapper i) slot-name)
+                            (return (svref mapper
+                                           (truly-the index (+ i nsymbols)))))))))))
+
     (if bits
         (let ((raw-type (logand (truly-the fixnum bits) sb-vm:dsd-raw-type-mask))
               (index (truly-the index (ash bits (- sb-vm:dsd-index-shift)))))
@@ -136,7 +122,6 @@
         ;; not found, take the slow path
         (locally (declare (notinline slot-value))
           (slot-value instance slot-name)))))
-) ; end MACROLET
 
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 ;;; It would be nifty if this could utilize the LAYOUT-STRUCT-SLOT-MAP

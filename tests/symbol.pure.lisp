@@ -79,6 +79,7 @@
   ;; -  of the 25 distinct symbols named "ARGS", only 2 collide on hash
   ;; -  20 symbols named "RESULT", 2 collide, etc.
   (let ((ht (make-hash-table :test 'equal))
+        (result)
         (n-homograph-sets 0)
         (n-well-hashed-sets 0))
     ;; map string -> set of symbols whose print name is that string
@@ -87,9 +88,12 @@
     (sb-int:dohash ((string symbols) ht)
       (when (cdr symbols)
         (incf n-homograph-sets)
-        (let ((hashes (mapcar #'sb-kernel:symbol-hash symbols))
-              (alist))
-          (cond ((= (length (remove-duplicates hashes)) (length symbols))
+        (let* ((hashes (mapcar #'sb-kernel:symbol-hash symbols))
+               (dedup (remove-duplicates hashes))
+               (alist))
+          (when (< (length dedup) (length symbols))
+            (push symbols result))
+          (cond ((= (length dedup) (length symbols))
                  (incf n-well-hashed-sets))
                 (print
                  ;; Start by binning symbols by their hash.
@@ -105,10 +109,46 @@
                  (dolist (cell alist)
                    (when (cddr cell)
                      (format t "  ~x ~s~%" (car cell) (cdr cell)))))))))
-    (format t "~D sets of symbols spelled the same, ~D well-hashed~%"
-            n-homograph-sets n-well-hashed-sets)
-    ;; The result is a "score", the nearer to 1 the better.
-    (/ n-well-hashed-sets n-homograph-sets)))
+    (when print
+      (format t "~D sets of symbols spelled the same, ~D well-hashed~%"
+              n-homograph-sets n-well-hashed-sets))
+    ;; The primary result is a "score", the nearer to 1 the better.
+    ;; The secondary result is a list of all sets with collisions
+    (values (/ n-well-hashed-sets n-homograph-sets)
+            result)))
 
 (with-test (:name :hashing-improvements :skipped-on (not :64-bit))
   (assert (> (summarize-colliding-hashes nil) .95)))
+
+(with-test (:name :fast-slot-name-mapper-small)
+  ;; The XSET type has only2 slots, does not get a compiled function
+  ;; as its slot mapper. Test that STRUCTURE-SLOT-VALUE is ok with that.
+  (assert (vectorp (sb-kernel::layout-slot-mapper (sb-kernel:find-layout 'sb-int:xset))))
+  (let ((x (sb-int:alloc-xset)))
+    (sb-int:add-to-xset #\A x)
+    (assert (equal (sb-pcl::structure-slot-value x 'sb-kernel::data) '(#\A)))))
+
+(with-test (:name :fast-slot-name-mapper-big)
+  (let ((collision-sets
+         #+salted-symbol-hash ; equivalently #+64-bit
+          (nth-value 1 (summarize-colliding-hashes nil))
+         ;; Require at least 4 different sets of colliding symbols,
+         ;; Needless to say, this hashes horribly, with some sets
+         ;; having 20 element per bucket.
+         #-salted-symbol-hash (list (find-all-symbols "X")
+                                    (find-all-symbols "Y")
+                                    (find-all-symbols "RESULT") ; lots of these
+                                    (find-all-symbols "ARGS")))
+        (alist)
+        (arb-value 0))
+    (dolist (set collision-sets)
+      (dolist (symbol set)
+        (push (cons symbol (incf arb-value)) alist)))
+    ;; the mapper shouldn't be a simple-vector
+    (let ((function
+           (the function (sb-kernel::make-hash-based-slot-mapper alist))))
+      ;; now try it
+      (dolist (pair alist)
+        (let* ((key (car pair))
+               (computed (funcall function key)))
+          (assert (eql computed (cdr pair))))))))

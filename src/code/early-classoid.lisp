@@ -261,7 +261,10 @@
   ;; if the defstruct was compiled in a policy of SPEED 3.
   (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
   ;; Information for the quicker variant of SLOT-VALUE on STRUCTURE-OBJECT
-  (struct-slot-map nil)
+  ;; INSTANCE uses at most 14 bits in the primitive object header for the payload
+  ;; length, so the function can't actually return all of the INDEX type.
+  (slot-mapper nil :type (or (sfunction (symbol) (or index null))
+                             simple-vector null))
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.

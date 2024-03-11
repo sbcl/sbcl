@@ -736,6 +736,7 @@
           ((eq (car (truly-the list probe)) slot-name)
            (cdr probe)))))
 
+;;; TODO: this should just be a call to MAKE-HASH-BASED-SLOT-MAPPER.
 (defun make-slot-table (class slots &optional bootstrap)
   (unless slots
     ;; *** If changing this empty table value to something else,

@@ -547,82 +547,84 @@
              (setq prev flags)))
          (format t "  ~a~%" layout)))))
 
-(defconstant fast-slot-table-fixed-cells 3)
+(defun choose-smallest-element-type (seq &key (key #'identity))
+  (cond ((every (lambda (x) (typep (funcall key x) '(unsigned-byte 16))) seq)
+         '(unsigned-byte 16))
+        ((every (lambda (x) (typep (funcall key x) '(unsigned-byte 32))) seq)
+         '(unsigned-byte 32))
+        (t
+         't)))
 
-;;; Optimizations to speed up slot-value on structure-object
-;;;  1. try to generate fewer collisions in the symbol -> index map
-;;;  2. use the fastrem-32 algorithm to compute FLOOR
-;;;  3. specialized function which doesn't check slot-unbound or whether the
-;;;     slot has :CLASS allocation (which it can't)
-;;; If "flexible" defstructs (multiple inheritance, standard-object ancestors) are ever
-;;; brought to life, these might be inadmissible. Probably we would not store the
-;;; fast map in such situations.
-(defun best-slot-map-parameters (names)
-  (let* ((raw-hashes (mapcar (lambda (x) (symbol-hash (the symbol x))) names))
-         (n-names (length names))
-         (n-cells (logior n-names 1)) ; round to odd if not already
-         ;; remember the best N-COLLISIONS N-CELLS MASK C
-         (best))
-    (declare (type (unsigned-byte 32) n-cells))
-    ;; Unlike with package symbol tables, a slot table has a fixed set of symbols.
-    ;; Therefore we can try to produce the best hashing for that particular set.
-    (loop ; over increasing value of N-CELLS
-     (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params n-cells)
-       (loop for shift from 0 to 31
-             do
-             (let* ((indices
-                     (mapcar (lambda (hash)
-                               (let ((masked-hash (logand (ash hash (- shift)) mask)))
-                                 (sb-vm::fastrem-32 masked-hash c n-cells)))
-                             raw-hashes))
-                    (badness (- n-names (length (remove-duplicates indices)))))
-               (when (= badness 0)
-                 (return-from best-slot-map-parameters
-                   (list 0 n-cells shift mask c)))
-               (when (or (not best) (< badness (car best)))
-                 (setf best
-                       (list badness n-cells shift mask c))))))
-     (when (> n-cells (* 2 n-names))
-       (return best))
-     (incf n-cells 2))))
-
-;; The result is a vector:
-;;  #(SHIFT MASK C symbol .. symbol ... index .. index ...)
-;; The length of the vector implies the divisor.
+;;; Return a compiled function that maps keys to values based on SLOTS (an alist)
+;;; where keys are symbols. Though structure slots are stringlike (dups by STRING=
+;;; are disallowed), STANDARD-OBJECT has no such prohibition, so this employs SYMBOL-HASH
+;;; rather than SYMBOL-NAME-HASH to better distinguish slots whose symbol-names match.
+;;; We then attempt to perfectly hash the symbol-hashes.
+;;;
+;;; For 64-bit, SYMBOL-HASH contains excess precision, so it has to be cut down.
+;;; Technically we should pick which bits to feed into the perfect hash generator
+;;; but initially we assume that the low 32 bits are always ok, and that the need
+;;; for collision resolution is so infrequent that rather than resolving it by
+;;; chosing different input bits, the lambda expression wrapped around the
+;;; perfect hash should resolve collisions via another alist.
+(defun make-hash-based-slot-mapper (slots)
+  (flet ((hash (s) (ldb (byte 32 0) (symbol-hash s))))
+    (binding* ((symbols (map 'vector #'car slots))
+               (hashes (map '(simple-array (unsigned-byte 32) (*))
+                            #'hash symbols))
+               (unique-hashes (remove-duplicates hashes))
+               (nil
+                (when (< (length unique-hashes) 3)
+                  ;; Return a simple-vector, all symbols first, followed by all data
+                  (let* ((n (length symbols))
+                         (a (make-array (* n 2))))
+                    (loop for j from 0 for slot in slots
+                          do (setf (svref a j) (car slot)
+                                   (svref a (+ n j)) (cdr slot)))
+                    (return-from make-hash-based-slot-mapper a))))
+               ;; power-of-2 sizing generally results in fewer instructions
+               (lexpr (sb-c:make-perfect-hash-lambda unique-hashes nil))
+               (nbuckets (power-of-two-ceiling (length unique-hashes)))
+               ((body decls) (parse-body (cddr lexpr) nil))
+               (optimize-decl (pop decls)))
+      (aver (eq (caadr optimize-decl) 'optimize))
+      (aver (eq (caadar decls) 'type))
+      (let* ((buckets (make-array nbuckets :initial-element nil))
+             (phash-fun (sb-c::compile-perfect-hash lexpr unique-hashes))
+             (resultform
+              (cond ((= (length unique-hashes) (length hashes))
+                     (let* ((et (choose-smallest-element-type slots :key #'cdr))
+                            (data (make-array nbuckets :element-type et)))
+                       (fill buckets 0)
+                       (loop for (key . value) in slots
+                             do (let ((phash (funcall phash-fun (hash key))))
+                                  (aver (eql (svref buckets phash) 0))
+                                  (setf (svref buckets phash) key
+                                        (aref data phash) value)))
+                       `(if (eq (svref ,buckets h) symbol) (aref ,data h))))
+                    (t ; Collisions
+                     (dolist (pair slots)
+                       (let ((phash (funcall phash-fun (hash (car pair)))))
+                         (push pair (svref buckets phash))))
+                     `(dolist (choice (svref ,buckets h))
+                        (when (eq (car choice) symbol)
+                          (return (cdr choice))))))))
+        ;; Bypass COMPILE-PERFECT-HASH here, as it can elect not to actually
+        ;; call COMPILE, but instead make an interpreted function.
+        ;; We don't need the extra check for perfectness that it performs
+        ;; since the above bucketing already asserted that hashing worked.
+        (values (compile
+                 nil
+                 `(lambda (symbol) ; this resembles the ASSOC transform
+                    ,optimize-decl
+                    (let* ((sb-c::val (ldb (byte 32 0) (symbol-hash symbol)))
+                           (h (progn ,@body)))
+                      (if (< h ,nbuckets) ,resultform)))))))))
+;;; Return a compiled function which takes a symbol
+;;; and returns the DSD-BITS for the slot in DD of that name.
 (defun make-struct-slot-map (dd)
-  (destructuring-bind (n-cells shift mask c)
-      (cdr (best-slot-map-parameters
-            (mapcar 'dsd-name (dd-slots dd))))
-    (let ((map (make-array (+ (* n-cells 2) fast-slot-table-fixed-cells)
-                           :initial-element 0)))
-      (setf (aref map 0) shift
-            (aref map 1) mask
-            (aref map 2) c)
-      (fill map nil :start (+ fast-slot-table-fixed-cells n-cells))
-      (dolist (dsd (dd-slots dd) map)
-          (binding*
-           ((hash (symbol-hash (dsd-name dsd)))
-            (masked-hash (logand (ash hash (- shift)) mask))
-            (bin (truly-the index
-                            (+ (sb-vm::fastrem-32 masked-hash c n-cells)
-                               fast-slot-table-fixed-cells)))
-            (dsd-bits (dsd-bits dsd))
-            (name (dsd-name dsd))
-            ((key value)
-             (cond ((eql (svref map bin) 0) ; empty, just store the name and dsd-index
-                    (values name dsd-bits))
-                   ;; A bin with a collision is upgraded to a vector of the two entries
-                   ((symbolp (svref map bin))
-                    (values (vector (svref map bin) name)
-                            (vector (svref map (+ bin n-cells)) dsd-bits)))
-                   ;; Multiple collisions
-                   (t
-                    (values (concatenate 'vector (svref map bin) (list name))
-                            (concatenate 'vector
-                                         (svref map (+ bin n-cells))
-                                         (list dsd-bits)))))))
-           (setf (svref map bin) key
-                 (svref map (+ bin n-cells)) value))))))
-
+  (make-hash-based-slot-mapper
+   (mapcar (lambda (dsd) (cons (dsd-name dsd) (dsd-bits dsd)))
+           (dd-slots dd))))
 
 (/show0 "target-defstruct.lisp end of file")
