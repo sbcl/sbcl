@@ -2055,9 +2055,11 @@
             (null (array-type-complexp type))
             (neq element-ctype *wild-type*)
             (eql (length (array-type-dimensions type)) 1))
-       (let* ((bare-form
-                `(data-vector-ref array
-                                  (check-bound array (array-dimension array 0) index))))
+       (let* ((index (if (policy node (zerop insert-array-bounds-checks))
+                         `index
+                         `(check-bound array (vector-length array) index)))
+              (bare-form
+                `(data-vector-ref array ,index)))
          (if (type= declared-element-ctype element-ctype)
              bare-form
              `(the ,declared-element-ctype ,bare-form))))
@@ -2068,12 +2070,32 @@
 
 (deftransform (setf aref) ((new-value array index) (t t t) * :node node)
   (let* ((type (lvar-type array))
-         (declared-element-ctype (declared-array-element-type type)))
+         (declared-element-ctype (declared-array-element-type type))
+         (element-ctype (array-type-upgraded-element-type type))
+         (no-check (policy node (zerop insert-array-bounds-checks))))
     (truly-the-unwild
      declared-element-ctype
-     (if (policy node (zerop insert-array-bounds-checks))
-         `(hairy-data-vector-set array index ,(the-unwild declared-element-ctype 'new-value))
-         `(hairy-data-vector-set/check-bounds array index ,(the-unwild declared-element-ctype 'new-value))))))
+     (cond
+       ((and (array-type-p type)
+             (null (array-type-complexp type))
+             (neq element-ctype *wild-type*)
+             (eql (length (array-type-dimensions type)) 1))
+        (let ((element-type-specifier (type-specifier element-ctype))
+              (index (if no-check
+                         `index
+                         `(check-bound array (vector-length array) index))))
+          `(locally
+               (declare (type ,element-type-specifier new-value))
+             ,(if (type= element-ctype declared-element-ctype)
+                  `(progn (data-vector-set array ,index new-value)
+                          new-value)
+                  `(progn (data-vector-set array ,index
+                                           ,(the-unwild declared-element-ctype 'new-value))
+                          ,(truly-the-unwild declared-element-ctype 'new-value))))))
+       (no-check
+        `(hairy-data-vector-set array index ,(the-unwild declared-element-ctype 'new-value)))
+       (t
+        `(hairy-data-vector-set/check-bounds array index ,(the-unwild declared-element-ctype 'new-value)))))))
 
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
