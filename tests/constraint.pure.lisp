@@ -1279,3 +1279,28 @@
     (("000") t)
     ((6) nil)
     (("") nil)))
+
+(with-test (:name :eql-var-replacement)
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (declare (float x)
+                  ((simple-array double-float (*)) y))
+         (let ((d (aref y 0)))
+           (when (and (/= d 0)
+                      (eql d x))
+             x)))
+    ((1d0 (make-array 1 :element-type 'double-float :initial-element 1d0)) 1d0 :test #'equal)
+    ((1d0 (make-array 1 :element-type 'double-float :initial-element 0d0)) nil)
+    ((0d0 (make-array 1 :element-type 'double-float :initial-element 1d0)) nil)
+    ((0d0 (make-array 1 :element-type 'double-float :initial-element 0d0)) nil)))
+
+(with-test (:name :eql-var-initial-unused)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p1 p2 p3)
+         (declare (type (integer -5) p3))
+         (let ((n (the (integer 0) p3)))
+           (setq n (dpb p1 (byte p2 35) n))
+           n))
+    ((1 2 3) 34359738371)))

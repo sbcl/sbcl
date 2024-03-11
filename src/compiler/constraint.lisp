@@ -1169,19 +1169,12 @@
                              ;; constraints.
                              ((numeric-type-p other-type)
                               (add-to-xset (constant-value other) not-numeric))))
-                     (let ((leaf-type (leaf-type leaf)))
-                       (cond
-                         ((or (constant-p other)
-                              (and (leaf-refs other) ; protect from
-                                        ; deleted vars
-                                   (csubtypep other-type leaf-type)
-                                   (not (type= other-type leaf-type))
-                                   ;; Don't change to a LEAF not visible here.
-                                   (leaf-visible-from-node-p other ref)))
-                          (change-ref-leaf ref other)
-                          (when (constant-p other) (return)))
-                         (t
-                          (setq res (type-intersection res other-type)))))))))
+                     (cond
+                       ((constant-p other)
+                        (change-ref-leaf ref other)
+                        (return-from constrain-ref-type))
+                       (t
+                        (setq res (type-intersection res other-type))))))))
             ((< > <= >= =)
              (let ((type (type-after-comparison kind not-p res y)))
                (when type
@@ -1226,11 +1219,9 @@
                       ;; monotonically growing variables without a
                       ;; starting point which will propagate new
                       ;; constraints for each increment.
-                      (pushnew ref *blocks-to-terminate*))))))))
-  ;; Find unchanged eql refs to a set variable.
-  (let ((leaf (ref-leaf ref))) ;; may have been changed above
-    (when (and (lambda-var-p leaf)
-               (lambda-var-sets leaf))
+                      (pushnew ref *blocks-to-terminate*)))))))
+    ;; Find unchanged eql refs to a set variable.
+    (when (lambda-var-sets leaf)
       (let (mark
             (eq (lambda-var-eq-constraints leaf)))
         (when eq
@@ -1663,7 +1654,7 @@
   (declare (type component component))
   (setf (block-out (component-head component)) (make-conset))
   (init-var-constraints component)
-  ;(print-all-blocks component)
+
   ;; Previous results can confuse propagation and may loop forever
   (do-blocks (block component)
     (setf (block-out block) nil)
