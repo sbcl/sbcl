@@ -1579,5 +1579,46 @@
   (let ((b (& (>> val 5) #xf)))
    (let ((a (>> (<< val 31) 28)))
     (^ a (aref tab b))))))")
+(#(5361C23E 714D6B00 88BA357D 9094FA5E ABD78E01 B313FB62 BB01FF63 C0D75980 C572C849 D5F9BEF5 DE352140 E3708909 F279B4C6
+   F93DE6E0)
+ "#(((:TYPE SB-C::CDYNAMIC-EXTENT) (:TYPE SB-C::COMBINATION) (:TYPE SB-C::ENCLOSE) (:TYPE EXIT) (:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST) (:TYPE SB-C::MV-COMBINATION) (:TYPE SB-C::ENTRY) (:TYPE SB-C::CIF) (:TYPE SB-C::CRETURN)) ((:TYPE SB-C::REF)) ((:TYPE SB-C::CSET)) ((:TYPE BIND)))"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 4 11 0 12 8 2)))
+  (let ((b (& (>> val 8) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(3AE2E596 5361C23E 714D6B00 88BA357D 9094FA5E ABD78E01 B313FB62 BB01FF63 C572C849 D5F9BEF5 DE352140 F279B4C6)
+ "#(((:TYPE BIND) (:TYPE SB-C::REF)) ((:TYPE SB-C::CIF)) ((:TYPE SB-C::CSET)) ((:TYPE SB-C::CRETURN)) ((:TYPE EXIT)) ((:TYPE SB-C::COMBINATION) (:TYPE SB-C::MV-COMBINATION) (:TYPE SB-C::BASIC-COMBINATION)) ((:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)))"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 13 8 12 0 5 1)))
+  (let ((b (>> val 29)))
+   (let ((a (& val #x7)))
+    (^ a (aref tab b))))))")
+(#(3AE2E596 5361C23E 714D6B00 88BA357D 9094FA5E ABD78E01 B313FB62 BB01FF63 C0D75980 C572C849 D5F9BEF5 DE352140 E3708909
+   F279B4C6 F93DE6E0)
+ "#(((:TYPE SB-C::REF)) ((:TYPE SB-C::CIF)) ((:TYPE SB-C::COMBINATION) (:TYPE SB-C::MV-COMBINATION) (:TYPE SB-C::BASIC-COMBINATION)) ((:TYPE BIND)) ((:TYPE EXIT)) ((:TYPE SB-C::ENTRY)) ((:TYPE SB-C::CRETURN)) ((:TYPE SB-C::CSET)) ((:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)) ((:TYPE SB-C::ENCLOSE)) ((:TYPE SB-C::CDYNAMIC-EXTENT)))"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 0 2 8 8 5 13 7)))
+  (let ((b (& (>> val 8) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(5361C23E 714D6B00 88BA357D 9094FA5E ABD78E01 B313FB62 BB01FF63 D5F9BEF5 DE352140 F279B4C6)
+ "#(((:TYPE SB-C::REF)) ((:TYPE SB-C::COMBINATION)) ((:TYPE SB-C::CIF)) ((:TYPE SB-C::CRETURN)) ((:TYPE SB-C::MV-COMBINATION)) ((:TYPE EXIT)) ((:TYPE SB-C::CSET)) ((:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)))"
+ "((let ((tab #a((8) (unsigned-byte 8) 3 12 13 3 0 5 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(5361C23E 714D6B00 9094FA5E ABD78E01 B313FB62 D5F9BEF5 DE352140 F279B4C6)
+ "#(((:TYPE SB-C::REF)) ((:TYPE SB-C::COMBINATION)) ((:TYPE SB-C::MV-COMBINATION)) ((:TYPE EXIT)) ((:TYPE SB-C::CSET)) ((:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)))"
+ "(  (& (^ (>> val 7) (>> val 15)) 7))")
+(#(12C4811C 50B431CB 834BCA78 8F6A8805 934E6A73 A1148EC6 DC4D4F5D E8DC3557 F987A176)
+ "(SET SB-C::EQUALITY EQL <= >= = > < TYPEP)"
+ "((let ((tab #a((8) (unsigned-byte 8) 12 0 0 0 0 5 0 1)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(12C4811C 50B431CB 834BCA78 8F6A8805 934E6A73 A1148EC6 E8DC3557 F987A176)
+ "(TYPEP EQL < > <= >= = SET)"
+ "(  (& (- val (>> val 28)) 7))")
+(#(714D6B00 9094FA5E ABD78E01 B313FB62 C572C849 DE352140 F279B4C6)
+ "#(((:TYPE BIND)) ((:TYPE SB-C::REF)) ((:TYPE DELAY) (:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)) ((:TYPE SB-C::CSET)) ((:TYPE SB-C::COMBINATION)))"
+ "(  (& (+ (>> val 2) (>> val 21)) 7))")
 )
 ;; EOF
