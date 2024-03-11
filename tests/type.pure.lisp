@@ -919,3 +919,10 @@
      (declare (pathname a))
      (sb-c::structure-typep a #.(sb-kernel:find-layout 'pathname)))
    (eql t)))
+
+(with-test (:name :typep-vector-folding)
+  (assert-type
+   (lambda (p)
+     (declare (integer p))
+     (typep p '(vector t 1)))
+   null))
