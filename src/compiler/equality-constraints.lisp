@@ -616,6 +616,15 @@
                  (< (derive (integer * (0)))))))))))
   :give-up)
 
+(defoptimizer (%check-bound constraint-propagate) ((array dimension index) node gen)
+  (add-equality-constraint '< index dimension gen gen nil)
+  (let ((var (ok-lvar-lambda-var index gen))
+        (type (if (constant-lvar-p dimension)
+                  (specifier-type `(integer 0 (,(lvar-value dimension))))
+                  (specifier-type 'index))))
+    (when var
+      (list (list 'typep var type nil)))))
+
 (defoptimizer (%check-bound equality-constraint) ((array dimension index) node gen)
   (let ((array-var (ok-lvar-lambda-var array gen)))
     (when (and array-var

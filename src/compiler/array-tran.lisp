@@ -1767,17 +1767,21 @@
            (%array-fill-pointer ,vector-sym)
            (sb-vm::fill-pointer-error ,vector-sym)))))
 
-(deftransform check-bound ((array dimension index))
+(defun check-bound-code (array dimension index-var index)
   ;; %CHECK-BOUND will perform both bound and type checking when
   ;; necessary, delete the cast so that it doesn't get confused by
   ;; its derived type.
   (let ((use (principal-lvar-ref-use index)))
     (when (array-index-cast-p use)
       (delete-cast use)))
-  `(bound-cast array ,(if (constant-lvar-p dimension)
-                          (lvar-value dimension)
-                          'dimension)
-               index))
+  `(progn (%check-bound ,array ,dimension ,index-var)
+          ,index-var))
+
+(deftransform check-bound ((array dimension index))
+  (check-bound-code 'array (if (constant-lvar-p dimension)
+                               (lvar-value dimension)
+                               'dimension)
+                    'index index))
 
 (defun check-bound-empty-p (bound index)
   (let* ((bound-type (lvar-type bound))
@@ -2057,7 +2061,7 @@
             (eql (length (array-type-dimensions type)) 1))
        (let* ((index (if (policy node (zerop insert-array-bounds-checks))
                          `index
-                         `(check-bound array (vector-length array) index)))
+                         (check-bound-code 'array '(vector-length array) 'index index)))
               (bare-form
                 `(data-vector-ref array ,index)))
          (if (type= declared-element-ctype element-ctype)
@@ -2083,7 +2087,7 @@
         (let ((element-type-specifier (type-specifier element-ctype))
               (index (if no-check
                          `index
-                         `(check-bound array (vector-length array) index))))
+                         (check-bound-code 'array '(vector-length array) 'index index))))
           `(locally
                (declare (type ,element-type-specifier new-value))
              ,(if (type= element-ctype declared-element-ctype)
@@ -2111,7 +2115,7 @@
                    (not (csubtypep type (specifier-type 'simple-string))))
               (not (null (conservative-array-type-complexp type))))
       (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
-    `(hairy-data-vector-ref array (check-bound array (array-dimension array 0) index))))
+    `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-dimension array 0) 'index index))))
 
 (deftransform hairy-data-vector-set/check-bounds ((array index new-value))
   (let* ((type (lvar-type array))
@@ -2125,7 +2129,9 @@
                  (csubtypep (lvar-type new-value) (specifier-type '(not (or number character)))))
             `(hairy-data-vector-set/check-bounds (the simple-vector array) index new-value)
             (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
-        `(hairy-data-vector-set array (check-bound array (array-dimension array 0) index) new-value))))
+        `(hairy-data-vector-set array
+                                ,(check-bound-code 'array '(array-dimension array 0) 'index index)
+                                new-value))))
 
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
@@ -2133,10 +2139,10 @@
 ;;; array total size.
 (deftransform row-major-aref ((array index))
   `(hairy-data-vector-ref array
-                          (check-bound array (array-total-size array) index)))
+                          ,(check-bound-code 'array '(array-total-size array) 'index index)))
 (deftransform %set-row-major-aref ((array index new-value))
   `(hairy-data-vector-set array
-                          (check-bound array (array-total-size array) index)
+                          ,(check-bound-code 'array '(array-total-size array) 'index index)
                           new-value))
 
 ;;;; bit-vector array operation canonicalization

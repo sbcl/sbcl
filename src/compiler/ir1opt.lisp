@@ -644,9 +644,7 @@
                      (delq1 node (basic-var-sets var)))
                (unlink-node node))))
           (cast
-           (unless (or (cast-type-check node)
-                       (and (bound-cast-p node)
-                            (bound-cast-check node)))
+           (unless (cast-type-check node)
              (flush-dest (cast-value node))
              (unlink-node node)))))))
 
@@ -2820,11 +2818,6 @@
   (declare (type cast cast))
   (let ((value (cast-value cast))
         (lvar (cast-lvar cast)))
-    (when (and (bound-cast-p cast)
-               (bound-cast-check cast)
-               (not (node-deleted (bound-cast-check cast))))
-      (flush-combination (bound-cast-check cast))
-      (setf (bound-cast-check cast) nil))
     (unless (array-index-cast-p cast)
       ;; Normally the types are the same, as the cast gets its derived
       ;; type from the lvar, but it may get a different type when an
@@ -2843,22 +2836,9 @@
   #+sb-xc-host context
   #-sb-xc-host (source-to-string context))
 
-(defun may-delete-bound-cast (cast)
-  (when (bound-cast-check cast)
-    (when (constant-lvar-p (bound-cast-bound cast))
-      (setf (cast-asserted-type cast)
-            (specifier-type `(integer 0 (,(lvar-value (bound-cast-bound cast)))))
-            (bound-cast-derived cast) t))
-    (when (policy cast (= insert-array-bounds-checks 0))
-      (flush-combination (bound-cast-check cast))
-      (setf (bound-cast-check cast) nil)))
-  (bound-cast-derived cast))
-
 (defun may-delete-cast (cast)
   (typecase cast
     (delay nil)
-    (bound-cast
-     (may-delete-bound-cast cast))
     (t t)))
 
 (defun cast-mismatch-from-inlined-p (cast node)
@@ -2941,13 +2921,6 @@
       (derive-node-type cast int)
       (cond ((or (neq int *empty-type*)
                  (eq value-type *empty-type*)))
-            ;; No need to transform into an analog of
-            ;; %COMPILE-TIME-TYPE-ERROR, %CHECK-BOUND will signal at
-            ;; run-time and %CHECK-BOUND ir2-converter will signal at
-            ;; compile-time if it survives further stages of ir1
-            ;; optimization.
-            ((and (bound-cast-p cast)
-                  (bound-cast-check cast)))
             ((and (eq atype *empty-type*)
                   (basic-combination-p (lvar-uses value)))
              (insert-code cast `(nil-fun-returned-error ',(combination-fun-debug-name (lvar-uses value))))

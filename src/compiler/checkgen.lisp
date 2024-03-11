@@ -515,9 +515,8 @@
                        (casts node))))))
           (setf (block-type-check block) nil)))
       (dolist (cast (casts))
-        (unless (or (bound-cast-p cast)
-                    ;; Disabled by cast-externally-checkable-p of a different cast.
-                    (not (cast-type-check cast)))
+        ;; Disabled by cast-externally-checkable-p of a different cast.
+        (when (cast-type-check cast)
           (multiple-value-bind (check types) (cast-check-types cast)
             (ecase check
               (:simple

@@ -1653,22 +1653,6 @@
                    (type-to-check *wild-type*))
                   (:copier nil)))
 
-;;; A cast that always follows %check-bound and they are deleted together.
-;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.
-;;; IR1-OPTIMIZE-CAST handles propagation from BOUND to CAST-ASSERTED-TYPE
-;;; DELETE-CAST deletes BOUND-CAST-CHECK
-;;; GENERATE-TYPE-CHECKS ignores it, it never translates to a type check,
-;;; %CHECK-BOUND does all the checking.
-(defstruct (bound-cast (:include cast (%type-check nil))
-                       (:copier nil))
-  ;; %check-bound combination before the cast
-  (check (missing-arg) :type (or null combination))
-  ;; Tells whether the type information is in a state where it can be
-  ;; optimized away, i.e. when BOUND is a constant.
-  (derived nil :type boolean)
-  (array (missing-arg) :type lvar)
-  (bound (missing-arg) :type lvar))
-
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
 (defstruct (array-index-cast (:include cast) (:copier nil)))
 

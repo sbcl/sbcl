@@ -1295,15 +1295,7 @@
          (when (and var
                     (type-for-constraints-p atype))
            (conset-add-constraint-to-eql gen 'typep var atype nil))
-         (constraint-propagate-back lvar 'typep atype gen gen nil)
-         (when (and (bound-cast-p node)
-                    (bound-cast-check node)
-                    (not (node-deleted (bound-cast-check node))))
-           (let ((check-bound (bound-cast-check node)))
-             (destructuring-bind (array dim index)
-                 (combination-args check-bound)
-               (declare (ignore array))
-               (add-equality-constraint '< index dim gen gen nil))))))
+         (constraint-propagate-back lvar 'typep atype gen gen nil)))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
