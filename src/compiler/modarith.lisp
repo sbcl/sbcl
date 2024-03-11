@@ -620,7 +620,7 @@
   (let ((var-map (make-array 5 :initial-element 0))
         (temps #(t0 t1 t2 t3 t4 t5))
         (temps-used 0))
-    (flet ((pick-temp (statement operand-index r/w)
+    (flet ((assign-temp (statement operand-index r/w)
              (let* ((var (nth (1+ operand-index) statement))
                     (temp (position var var-map :test #'eq)))
                (unless temp
@@ -632,15 +632,21 @@
                          temp claimed)))
                (setf (nth (1+ operand-index) statement) (svref temps temp))
                temp))
-           (is-dead-after (symbol start)
+           (is-unused-after (symbol start)
              (loop for i from start below (length statements)
                    never (find symbol (aref statements i)))))
       (loop for i below (length statements)
             do (let* ((statement (svref statements i))
                       (source-operand (third statement)))
-                 (pick-temp statement 0 t)
+                 ;; Process the source register before the dest because doing that
+                 ;; might find that the source is unused after, and so the dest
+                 ;; can be the same, eliminating a move
                  (when (typep source-operand '(and symbol (not null)))
-                   (let ((temp (pick-temp statement 1 nil)))
-                     (when (is-dead-after source-operand (1+ i))
-                       (setf (aref var-map temp) 0))))))) ; kill
-    (values statements temps-used))))
+                   (let ((temp (assign-temp statement 1 nil)))
+                     (when (is-unused-after source-operand (1+ i))
+                       (setf (aref var-map temp) 0)))) ; kill
+                 (assign-temp statement 0 t)
+                 (when (and (eq (car statement) 'mov)
+                            (eq (cadr statement) (caddr statement)))
+                   (setf (svref statements i) nil)))))
+    (values (remove nil statements) temps-used))))

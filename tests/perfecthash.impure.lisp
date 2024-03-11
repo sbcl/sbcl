@@ -609,11 +609,25 @@ After:
 ; 48:       488D141B         LEA RDX, [RBX+RBX]
 |#
 
-;;;
+;;; Predict whether the compiler will generate better or worse code on its own
+;;; when compared to SB-VM::CALC-PHASH. Do this by counting the arithmetic
+;;; operations that require an extra instruction when performed on tagged words.
+;;; These are as follows:
+;;;   {<< U32+ U32- +=} - ANDed with (FIXNUMIZE UINT-MAX)
+;;;   {>>}              - ANDed with (LOGNOT FIXNUM-TAG-MASK)
+(defun phash-count-32-bit-modular-ops (expr &aux (count 0))
+  (sb-int:named-let recurse ((expr expr))
+    (cond ((listp expr)
+           (mapc #'recurse expr))
+          ((find expr '(sb-c::>> sb-c::<< sb-c::u32+ sb-c::u32- sb-c::+=))
+           (incf count))))
+  count)
+
 #+x86-64
 (defun test-all (filename &optional print)
   (let ((tests (with-open-file (f filename)
                  (let ((*read-base* 16)) (read f))))
+        (losses 0)
         (max-n-temps 0))
     (dolist (testcase tests)
       (let* ((inputs (coerce (car testcase) '(array (unsigned-byte 32) (*))))
@@ -636,17 +650,35 @@ After:
             (let ((*print-readably* t))
               (format t "tables=~X~%calc=~A~%n-temps=~D~%steps=~A~%"
                       tables calc n-temps steps)))
-          (let ((f (sb-c::compile-perfect-hash lambda inputs))
-                (g (compile nil
-                    `(lambda (x)
-                       (declare (optimize (safety 0) (debug 0)))
-                       (sb-vm::calc-phash x ,n-temps ,steps)))))
-            (when print
+          (let* ((f (compile nil lambda))
+                 (f-inst-model (get-simple-fun-instruction-model f))
+                 (g (compile nil
+                     `(lambda (x)
+                        (declare (optimize (safety 0) (debug 0)))
+                        (sb-vm::calc-phash x ,n-temps ,steps))))
+                 (g-inst-model (get-simple-fun-instruction-model g))
+                 (predicted-best
+                  (if (or tables (> (phash-count-32-bit-modular-ops calc) 1))
+                      'g ; predict that G is better
+                      'f)) ; predict that F is better
+                 (actual-best
+                  ;; If they're the same number of instructions, the tie counts
+                  ;; as a win for 32-bit math because code size is always smaller.
+                  ;; So F has to be strictly shorter to win.
+                  (if (< (length f-inst-model) (length g-inst-model))
+                      'f
+                      'g)))
+            (when (or print (not (eq predicted-best actual-best)))
               (format t "~&DEFAULT COMPILE:~%")
               (disassemble f)
               (format t "~&32-BIT MODULAR ARITH COMPILE:~%")
               (disassemble g)
-              (terpri))
+              (terpri)
+              (unless (eq predicted-best actual-best)
+                (error "Wrong prediction, expected ~S best for~%~S"
+                       predicted-best lambda)))
+            (when (eq actual-best 'f) ; my code loses
+              (incf losses))
             (flet ((try (input)
                      (unless (eql (funcall f input) (funcall g input))
                        (error "functions disagree on ~X: ~X ~X"
@@ -658,7 +690,10 @@ After:
             (let ((rs (make-random-state t)))
               (dotimes (i 100)
                 (try (random (ash 1 32) rs)))))))))
-    (format t "maximum temps used: ~D~%" max-n-temps)
+    (let* ((n-trials (length tests))
+           (wins (- n-trials losses)))
+      (format t "max temps: ~D, 32-bit modular vop wins ~d/~d times (~,,2F%)~%"
+              max-n-temps wins n-trials (/ wins n-trials)))
     max-n-temps))
 
 (with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) (:not :slow) :interpreter))

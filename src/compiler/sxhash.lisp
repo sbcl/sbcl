@@ -256,10 +256,21 @@
           (unless (member (caar bindings) '(tab scramble)) (return))
           (setf tables (append tables bindings))
           (setq expr body)))
+      ;; {>>,<<} can appear with a 2nd arg of 0. Remove them because
+      ;; the 32-bit expression evaluator vop won't.
+      (setq expr
+            (named-let recurse ((expr expr))
+              (cond ((listp expr)
+                     (if (and (member (first expr) '(>> <<)) (eql (third expr) 0))
+                         (recurse (second expr))
+                         (mapcar #'recurse expr)))
+                    (t
+                     expr))))
       (let* ((result-type `(mod ,(power-of-two-ceiling (length array))))
              (calc `(the ,result-type (uint32-modularly ,@expr))))
         (values `(lambda (val)
-                   (declare (optimize (safety 0) (debug 0) (sb-c:store-source-form 0)))
+                   (declare (optimize (safety 0) (speed 3) (debug 0)
+                                      (sb-c:store-source-form 0)))
                    (declare (type (unsigned-byte 32) val))
                    ,(if tables `(symbol-macrolet ,tables ,calc) calc))
                 returned-string)))))

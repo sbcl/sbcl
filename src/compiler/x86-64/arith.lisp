@@ -3988,15 +3988,21 @@
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info n-temps steps)
   (:ignore n-temps)
-  ;; TODO: add :UNUSED-IF based on the value in N-TEMPS
   (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0))
-              temp0 temp1 temp2 temp3 temp4)
+              temp0 temp1)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0)
+               :unused-if (< n-temps 3)) temp2)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0)
+               :unused-if (< n-temps 4)) temp3)
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to (:result 0)
+               :unused-if (< n-temps 4)) temp4)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:policy :fast-safe)
   (:generator 3
     (aver (eq (cadr (svref steps 0)) 'sb-c::t0))
-    (move temp0 arg) ; should be a NOP
+    ;; this should be a null move due to :target on arg
+    (move temp0 arg)
     (flet ((tn-from-metasyntactic-var (var)
              (ecase var
                (sb-c::t0 temp0)
@@ -4032,5 +4038,12 @@
                 (t
                  (inst* (car step) :dword dest source-tn)))))
       (let* ((step (svref steps (1- (length steps))))
-             (tn (tn-from-metasyntactic-var (second step))))
-        (inst lea res (ea tn tn)))))) ; move the result and re-tag it
+             (tn (tn-from-metasyntactic-var (second step)))
+             (operand-size :qword))
+        ;; If the last step is an AND leaving 31 or fewer significant bits,
+        ;; then cut the operand size to :DWORD
+        (when (and (eq (car step) 'and)
+                   (fixnump (third step))
+                   (<= (integer-length (third step)) 31))
+          (setq operand-size :dword))
+        (inst lea operand-size res (ea tn tn)))))) ; move the result and re-tag it
