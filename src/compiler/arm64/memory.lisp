@@ -13,10 +13,50 @@
 (in-package "SB-VM")
 
 (defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn allocator)
-  (when (or (eq value-tn-ref t)
-            (require-gengc-barrier-p object value-tn-ref value-tn allocator))
-    (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
-    (inst strb zr-tn (@ cardtable-tn temp))))
+  (multiple-value-bind (require #+debug-gc-barriers why-not)
+      (or (eq value-tn-ref t)
+          (require-gengc-barrier-p object value-tn-ref value-tn allocator))
+    (cond (require
+           (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
+           (inst strb zr-tn (@ cardtable-tn temp)))
+          #+debug-gc-barriers
+          (t
+           (labels ((encode (x)
+                      (cond ((integerp x)
+                             (inst mov temp (fixnumize x))
+                             temp)
+                            (t
+                             (sc-case x
+                               (constant
+                                (load-constant nil x temp)
+                                temp)
+                               (control-stack
+                                (load-stack-tn temp x)
+                                temp)
+                               (t
+                                x)))))
+                    (stack-push (x)
+                      x
+                      (inst str (encode x) (@ csp-tn n-word-bytes :post-index))))
+             (cond (value-tn
+                    (unless (sc-is value-tn immediate)
+                      (stack-push (if (eq why-not :consecutive)
+                                      zr-tn
+                                      55))
+                      (stack-push object)
+                      (stack-push value-tn)
+                      (invoke-asm-routine 'check-barrier temp)))
+                   (value-tn-ref
+                    (loop do
+                          (unless (sc-is (tn-ref-tn value-tn-ref) immediate)
+                            (stack-push (if (eq why-not :consecutive)
+                                            zr-tn
+                                            55))
+                            (stack-push object)
+                            (stack-push (tn-ref-tn value-tn-ref))
+                            (invoke-asm-routine 'check-barrier temp))
+                          (setf value-tn-ref (tn-ref-across value-tn-ref))
+                          while value-tn-ref))))))))
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
