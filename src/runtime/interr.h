@@ -21,6 +21,8 @@ extern void lose(char *fmt, ...)
 extern void tprintf(char *fmt, ...);
 extern int lose_on_corruption_p;
 extern void corruption_warning_and_maybe_lose(char *fmt, ...);
+extern void corruption_warning(char *fmt, ...);
+extern void maybe_lose();
 extern void enable_lossage_handler(void);
 extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);

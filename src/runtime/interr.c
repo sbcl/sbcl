@@ -178,18 +178,25 @@ void tprintf(char *fmt, ...)
 int lose_on_corruption_p = 0; // DO NOT CHANGE THIS TO 'bool'. (Naughty users think it's 4 bytes)
 
 void
-corruption_warning_and_maybe_lose(char *fmt, ...)
+corruption_warning(char *fmt, ...)
 {
     va_list ap;
-#ifndef LISP_FEATURE_WIN32
-    sigset_t oldset;
-    block_blockable_signals(&oldset);
-#endif
     fprintf(stderr, "CORRUPTION WARNING");
     va_start(ap, fmt);
     print_message(fmt, ap);
     va_end(ap);
     fprintf(stderr, "The integrity of this image is possibly compromised.\n");
+    fflush(stderr);
+
+}
+
+void
+maybe_lose()
+{
+#ifndef LISP_FEATURE_WIN32
+    sigset_t oldset;
+    block_blockable_signals(&oldset);
+#endif
     if (lose_on_corruption_p || gc_active_p) {
         fprintf(stderr, "Exiting.\n");
         fflush(stderr);
@@ -202,6 +209,18 @@ corruption_warning_and_maybe_lose(char *fmt, ...)
         thread_sigmask(SIG_SETMASK,&oldset,0);
 #endif
     }
+}
+
+
+void
+corruption_warning_and_maybe_lose(char *fmt, ...)
+{
+    va_list ap;
+    fprintf(stderr, "CORRUPTION WARNING");
+    va_start(ap, fmt);
+    print_message(fmt, ap);
+    va_end(ap);
+    maybe_lose();
 }
 
 void print_constant(os_context_t *context, int offset) {
