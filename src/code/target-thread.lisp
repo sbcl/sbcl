@@ -530,12 +530,12 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
        (unwind-protect
             (progn
               (setf (thread-waiting-for ,n-thread) ,new)
-              (barrier (:write))
+              (barrier (:memory))
               ,@forms)
          ;; Interrupt handlers and GC save and restore any
          ;; previous wait marks using WITHOUT-THREAD-WAITING-FOR
          (setf (thread-waiting-for ,n-thread) nil)
-         (barrier (:write))))))
+         (barrier (:memory))))))
 
 ;;;; Mutexes
 
@@ -600,7 +600,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
         (let ((chain (detect-deadlock origin 10)))
           (when (consp chain)
             (setf (thread-waiting-for self) nil)
-            (sb-thread:barrier (:write))
+            (sb-thread:barrier (:memory))
             (release-cas-lock **deadlock-lock**)
             (with-interrupts
               (error 'thread-deadlock
