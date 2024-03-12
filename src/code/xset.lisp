@@ -215,7 +215,7 @@
           ;; a restricted type of element, which we AVER below
           (map-xset (lambda (x)
                       (aver (typep x '(or symbol number character)))
-                      (setq h (plus-mod-fixnum (truly-the fixnum (sb-impl::eql-hash x))
+                      (setq h (plus-mod-fixnum (truly-the sb-xc:fixnum (sb-impl::eql-hash x))
                                                h)))
                     xset)))
     ;; Now mix the bits thoroughly and then mask to a positive fixnum.
