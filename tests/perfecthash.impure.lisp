@@ -624,85 +624,175 @@ After:
   count)
 
 #+x86-64
-(defun test-all (filename &optional print)
-  (let ((tests (with-open-file (f filename)
-                 (let ((*read-base* 16)) (read f))))
-        (losses 0)
-        (max-n-temps 0))
-    (dolist (testcase tests)
-      (let* ((inputs (coerce (car testcase) '(array (unsigned-byte 32) (*))))
-             (lambda (sb-c:make-perfect-hash-lambda inputs))
-             (tables)
-             (maybe-tables (fifth lambda))
-             (calc))
-        (when print
-          (format t "~A~%" lambda))
-        (cond ((eq (car maybe-tables) 'symbol-macrolet)
-               (setq tables (cadr maybe-tables))
-               (setq calc (cdr (third (third maybe-tables)))))
-              (t
-               (setq calc (cdr (third maybe-tables)))))
-        (multiple-value-bind (steps n-temps)
-            (sb-c:phash-renumber-temps
-             (sb-c:phash-convert-to-2-operand-code calc tables))
-          (setq max-n-temps (max n-temps max-n-temps))
-          (when print
-            (let ((*print-readably* t))
-              (format t "tables=~X~%calc=~A~%n-temps=~D~%steps=~A~%"
-                      tables calc n-temps steps)))
-          (let* ((f (compile nil lambda))
-                 (f-inst-model (get-simple-fun-instruction-model f))
-                 (g (compile nil
-                     `(lambda (x)
-                        (declare (optimize (safety 0) (debug 0)))
-                        (sb-vm::calc-phash x ,n-temps ,steps))))
-                 (g-inst-model (get-simple-fun-instruction-model g))
-                 (predicted-best
-                  (if (or tables (> (phash-count-32-bit-modular-ops calc) 1))
-                      'g ; predict that G is better
-                      'f)) ; predict that F is better
-                 (actual-best
-                  ;; If they're the same number of instructions, the tie counts
-                  ;; as a win for 32-bit math because code size is always smaller.
-                  ;; So F has to be strictly shorter to win.
-                  (if (< (length f-inst-model) (length g-inst-model))
-                      'f
-                      'g)))
-            (when (or print (not (eq predicted-best actual-best)))
-              (format t "~&DEFAULT COMPILE:~%")
-              (disassemble f)
-              (format t "~&32-BIT MODULAR ARITH COMPILE:~%")
-              (disassemble g)
-              (terpri)
-              (unless (eq predicted-best actual-best)
-                (error "Wrong prediction, expected ~S best for~%~S"
-                       predicted-best lambda)))
-            (when (eq actual-best 'f) ; my code loses
-              (incf losses))
-            (flet ((try (input)
-                     (unless (eql (funcall f input) (funcall g input))
-                       (error "functions disagree on ~X: ~X ~X"
-                              input
-                              (funcall f input)
-                              (funcall g input)))))
-            (map nil #'try inputs)
-            ;; Test the behavior on random inputs
-            (let ((rs (make-random-state t)))
-              (dotimes (i 100)
-                (try (random (ash 1 32) rs)))))))))
-    (let* ((n-trials (length tests))
-           (wins (- n-trials losses)))
-      (format t "max temps: ~D, 32-bit modular vop wins ~d/~d times (~,,2F%)~%"
-              max-n-temps wins n-trials (/ wins n-trials)))
-    max-n-temps))
+(defun test-uint32-arithmetic (lambda inputs print &optional (n-random-inputs 100))
+  ;; As ugly as it is to have all the FIFTH and THIRD here,
+  ;; it works because LAMBDA has a known shape which is always this
+  ;; possibly without symbol macros -
+  ;;  (LAMBDA (VAL)
+  ;;    (DECLARE (OPTIMIZE ...))
+  ;;    (DEC:ARE (TYPE ...))
+  ;;    (SYMBOL-MACROLET # (THE (MOD n) (UINT32-MODULARLY forms ...))))
+  ;;
+  (let ((tables)
+        (maybe-tables (fifth lambda))
+        (random-state (make-random-state t))
+        (calc))
+    (when print
+      (format t "~A~%" lambda))
+    (cond ((eq (car maybe-tables) 'symbol-macrolet)
+           (setq tables (cadr maybe-tables))
+           (setq calc (cdr (third (third maybe-tables)))))
+          (t
+           (setq calc (cdr (third maybe-tables)))))
+    (multiple-value-bind (steps n-temps)
+        (sb-c:phash-renumber-temps
+         (sb-c:phash-convert-to-2-operand-code calc tables))
+      (when print
+        (let ((*print-readably* t))
+          (format t "tables=~X~%calc=~A~%n-temps=~D~%steps=~A~%"
+                  tables calc n-temps steps)))
+      (let* ((f (compile nil lambda))
+             (f-inst-model (get-simple-fun-instruction-model f))
+             (g (compile nil
+                         `(lambda (x)
+                            (declare (optimize (safety 0) (debug 0)))
+                            (sb-vm::calc-phash x ,n-temps ,steps))))
+             (g-inst-model (get-simple-fun-instruction-model g))
+             (predicted-best
+              (if (or tables (> (phash-count-32-bit-modular-ops calc) 1))
+                  'g ; predict that G is better
+                  'f)) ; predict that F is better
+             (actual-best
+              ;; If they're the same number of instructions, the tie counts
+              ;; as a win for 32-bit math because code size is always smaller.
+              ;; So F has to be strictly shorter to win.
+              (if (< (length f-inst-model) (length g-inst-model))
+                  'f
+                  'g)))
+        (when (or print (not (eq predicted-best actual-best)))
+          (format t "~&DEFAULT COMPILE:~%")
+          (disassemble f)
+          (format t "~&32-BIT MODULAR ARITH COMPILE:~%")
+          (disassemble g)
+          (terpri)
+          (unless (eq predicted-best actual-best)
+            (error "Wrong prediction, expected ~S best for~%~S"
+                   predicted-best lambda)))
+        (flet ((try (input)
+                 (unless (eql (funcall f input) (funcall g input))
+                   (error "functions disagree on ~X: ~X ~X"
+                          input
+                          (funcall f input)
+                          (funcall g input)))))
+          (map nil #'try inputs)
+          ;; Test the behavior on random inputs
+          (dotimes (i n-random-inputs)
+            (try (random (ash 1 32) random-state))))
+        (values actual-best n-temps
+                ;; size delta
+                (- (primitive-object-size (sb-kernel:fun-code-header g))
+                   (primitive-object-size (sb-kernel:fun-code-header f)))
+                ;; instruction count delta
+                (- (length g-inst-model) (length f-inst-model)))))))
 
+;;; TODO: I think this test could be sped up by not calling the hash generator.
+;;; We already have the lambda expressions to try; the intent of the test is to
+;;; check the 32-bit codegen, not the hash generator.
 (with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) (:not :slow) :interpreter))
-  (dolist (file '("../xperfecthash30.lisp-expr"
-                  "../xperfecthash63.lisp-expr"
-                  "../xperfecthash61.lisp-expr"))
-    ;; all the simple expressions needed when cross-compiling
-    ;; can be emitted using at most 4 temps
-    (assert (<= (test-all file) 4))))
+  (flet ((test-file (filename)
+           (let ((tests (with-open-file (f filename)
+                          (let ((*read-base* 16)) (read f))))
+                 (wins 0))
+             (dolist (testcase tests)
+               (sb-int:binding*
+                   ((inputs (coerce (car testcase) '(array (unsigned-byte 32) (*))))
+                    (lambda (sb-c:make-perfect-hash-lambda inputs))
+                    ((winner n-temps) (test-uint32-arithmetic lambda inputs nil)))
+                   (assert (<= n-temps 3))
+                   (when (eq winner 'g)
+                     (incf wins))))
+             (let ((n-trials (length tests)))
+               (format t "32-bit modular vop wins ~d/~d times (~,,2F%)~%"
+                       wins n-trials (/ wins n-trials))))))
+    (mapc #'test-file
+          '("../xperfecthash30.lisp-expr"
+            "../xperfecthash63.lisp-expr"
+            "../xperfecthash61.lisp-expr"))))
+
+;;; Complicated expressions can be compiled much more concisely using the 32-bit modular
+;;; math vop because it removes instructions that mask intermediate results to
+;;; (FIXNUMIZE #xFFFFFFFF) or restore the fixnum tag following a right-shift.
+#|
+;;; Before:
+; Size: 130 bytes
+; 19:       48030DD0FFFFFF   ADD RCX, [RIP-48]                ; [#x10032D88F0] = #x17E57E524
+; 20:       48230DD1FFFFFF   AND RCX, [RIP-47]                ; [#x10032D88F8] = #x1FFFFFFFE
+; 27:       488BD9           MOV RBX, RCX
+; 2A:       48C1FB10         SAR RBX, 16
+; 2E:       4883E3FE         AND RBX, -2
+; 32:       4831D9           XOR RCX, RBX
+; 35:       488BD9           MOV RBX, RCX
+; 38:       48C1E308         SHL RBX, 8
+; 3C:       48231DB5FFFFFF   AND RBX, [RIP-75]                ; [#x10032D88F8] = #x1FFFFFFFE
+; 43:       4801D9           ADD RCX, RBX
+; 46:       48230DABFFFFFF   AND RCX, [RIP-85]                ; [#x10032D88F8] = #x1FFFFFFFE
+; 4D:       488BD9           MOV RBX, RCX
+; 50:       48C1FB04         SAR RBX, 4
+; 54:       4883E3FE         AND RBX, -2
+; 58:       4831D9           XOR RCX, RBX
+; 5B:       8BD9             MOV EBX, ECX
+; 5D:       C1EB08           SHR EBX, 8
+; 60:       81E3FE010000     AND EBX, 510
+; 66:       488BF1           MOV RSI, RCX
+; 69:       48C1E60D         SHL RSI, 13
+; 6D:       48233584FFFFFF   AND RSI, [RIP-124]               ; [#x10032D88F8] = #x1FFFFFFFE
+; 74:       488D1431         LEA RDX, [RCX+RSI]
+; 78:       48231579FFFFFF   AND RDX, [RIP-135]               ; [#x10032D88F8] = #x1FFFFFFFE
+; 7F:       48C1FA17         SAR RDX, 23
+; 83:       4883E2FE         AND RDX, -2
+; 87:       488B0552FFFFFF   MOV RAX, [RIP-174]               ; #(77 927 238 ...)
+; 8E:       0FB7441801       MOVZX EAX, WORD PTR [RAX+RBX+1]
+; 93:       D1E0             SHL EAX, 1
+; 95:       4831C2           XOR RDX, RAX
+;;; After:
+; Size: 69 bytes
+; 06:       48D1EA           SHR RDX, 1
+; 09:       81C292F22BBF     ADD EDX, -1087638894
+; 0F:       8BC2             MOV EAX, EDX
+; 11:       C1E810           SHR EAX, 16
+; 14:       31C2             XOR EDX, EAX
+; 16:       8BC2             MOV EAX, EDX
+; 18:       C1E008           SHL EAX, 8
+; 1B:       01C2             ADD EDX, EAX
+; 1D:       8BC2             MOV EAX, EDX
+; 1F:       C1E804           SHR EAX, 4
+; 22:       31C2             XOR EDX, EAX
+; 24:       8BC2             MOV EAX, EDX
+; 26:       C1E808           SHR EAX, 8
+; 29:       0FB6C0           MOVZX EAX, AL
+; 2C:       8BCA             MOV ECX, EDX
+; 2E:       C1E10D           SHL ECX, 13
+; 31:       01CA             ADD EDX, ECX
+; 33:       C1EA17           SHR EDX, 23
+; 36:       488B0DA3FFFFFF   MOV RCX, [RIP-93]                ; #(77 927 238 ...)
+; 3D:       0FB74C4101       MOVZX ECX, WORD PTR [RCX+RAX*2+1]
+; 42:       31D1             XOR ECX, EDX
+; 44:       488D1409         LEA RDX, [RCX+RCX]
+|#
+(with-test (:name :32-bit-codegen-big :skipped-on (:or (:not :x86-64) :interpreter))
+  (with-open-file (stream "../tools-for-build/unicode-phash.lisp-expr")
+    (loop
+     (let ((keys (let ((*read-base* 16)) (read stream nil))))
+       (unless keys
+         (return))
+       (let ((lexpr (let ((*package* (find-package "SB-C"))) (read stream))))
+         (multiple-value-bind (actual-best n-temps size-delta inst-count-delta)
+             (test-uint32-arithmetic lexpr keys nil 1000000)
+           (assert (eq actual-best 'g))
+           (assert (<=  n-temps 3))
+           (format t "delta=(~D bytes, ~D insts)~%"
+                   size-delta inst-count-delta)))))))
+
 
 (defvar *bug-2055794-test-form*
   '(case x
