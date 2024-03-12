@@ -204,6 +204,24 @@
     (inst cmp (object-slot-ea object symbol-value-slot
                                        other-pointer-lowtag)
           unbound-marker-widetag)))
+
+(define-vop (symbol-hash)
+  (:policy :fast-safe)
+  (:translate symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 2
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    ;; include the low 3 random bits but ensure res is a HASH-CODE
+    (inst and res (ldb (byte sb-vm:n-positive-fixnum-bits 0) -1))))
+
+(define-vop (symbol-name-hash symbol-hash)
+  (:translate symbol-name-hash)
+  (:generator 1
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    ;; shift out the low 3 random bits
+    (inst shr res 3)))
 
 ;;;; fdefinition (FDEFN) objects
 

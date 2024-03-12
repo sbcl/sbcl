@@ -58,8 +58,9 @@
              most-positive-fixnum)))
 
 (defun sxhash-symbol-xform (s)
-  #+salted-symbol-hash `(let ((h (symbol-name-hash ,s))) (sb-int:mix h h))
-  #-salted-symbol-hash `(symbol-hash ,s))
+  #-salted-symbol-hash `(symbol-hash ,s)
+  #+(and salted-symbol-hash 64-bit) `(let ((h (symbol-name-hash ,s))) (sb-int:mix h h))
+  #+(and salted-symbol-hash (not 64-bit)) `(symbol-name-hash ,s))
 ) ; end EVAL-WHEN
 
 (defun calc-symbol-name-hash (string length)

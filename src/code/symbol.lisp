@@ -412,14 +412,21 @@ distinct from the global value. Can also be SETF."
                        (char= (char name (1- (length name))) #\*)))
               (sb-vm::%alloc-immobile-symbol name)
               (sb-vm::%alloc-symbol name)))))
-    #+salted-symbol-hash
-    (let* ((salt (murmur-hash-word/fixnum
-                  (word-mix name-hash (get-lisp-obj-address symbol))))
-           (hash (logior (ash name-hash 32) (mask-field symbol-hash-prng-byte salt))))
-      ;; %SET-SYMBOL-HASH wants a unsigned fixnum, which HASH is not.
-      (%primitive sb-vm::set-slot symbol (%make-lisp-obj hash)
-                  'make-symbol sb-vm:symbol-hash-slot sb-vm:other-pointer-lowtag))
     #-salted-symbol-hash (%set-symbol-hash symbol name-hash)
+    #+salted-symbol-hash
+    (let ((salt (murmur-hash-word/fixnum
+                 (word-mix name-hash (get-lisp-obj-address symbol)))))
+      #+64-bit
+      (let ((hash (logior (ash name-hash 32) (mask-field symbol-hash-prng-byte salt))))
+        ;; %SET-SYMBOL-HASH wants a unsigned fixnum, which HASH is not.
+        (%primitive sb-vm::set-slot symbol (%make-lisp-obj hash)
+                    'make-symbol sb-vm:symbol-hash-slot sb-vm:other-pointer-lowtag))
+      #-64-bit
+      (with-pinned-objects (symbol) ; no vop sets the raw slot
+        (setf (sap-ref-32 (int-sap (get-lisp-obj-address symbol))
+                          (- (ash sb-vm:symbol-hash-slot sb-vm:word-shift)
+                             sb-vm:other-pointer-lowtag))
+              (logior (ash name-hash 3) (ldb (byte 3 0) salt)))))
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.
     #-compact-symbol (%set-symbol-package symbol nil)

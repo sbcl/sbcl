@@ -426,6 +426,7 @@
        (defconstant-eqx sb-impl::symbol-hash-prng-byte
          (byte n-symbol-hash-prng-bits (- 32 n-symbol-hash-prng-bits))
          #'equal))
+#-64-bit (defconstant-eqx sb-impl::symbol-hash-prng-byte (byte 3 0) #'equal)
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)

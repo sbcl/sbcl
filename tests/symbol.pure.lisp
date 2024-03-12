@@ -117,8 +117,13 @@
     (values (/ n-well-hashed-sets n-homograph-sets)
             result)))
 
-(with-test (:name :hashing-improvements :skipped-on (not :64-bit))
-  (assert (> (summarize-colliding-hashes nil) .95)))
+(with-test (:name :hashing-improvements :skipped-on (not :salted-symbol-hash))
+  ;; Roughly: For each set of symbols colliding on SXHASH at all, what fraction
+  ;; of those sets do NOT have any collisions on SYMBOL-HASH.
+  (let ((expectation
+         #+64-bit .95
+         #+x86 .70))
+    (assert (> (summarize-colliding-hashes nil) expectation))))
 
 (with-test (:name :fast-slot-name-mapper-small)
   ;; The XSET type has only2 slots, does not get a compiled function
@@ -130,7 +135,7 @@
 
 (with-test (:name :fast-slot-name-mapper-big)
   (let ((collision-sets
-         #+salted-symbol-hash ; equivalently #+64-bit
+         #+salted-symbol-hash
           (nth-value 1 (summarize-colliding-hashes nil))
          ;; Require at least 4 different sets of colliding symbols,
          ;; Needless to say, this hashes horribly, with some sets
