@@ -213,23 +213,22 @@
                 (setf (getf (leaf-info constant) nil)
                       (let ((array (constant-value constant)))
                         (or
+                         (and (zerop (array-total-size array))
+                              *empty-type*)
                          #-sb-xc-host
                          (flet ((int-min-max (array min max)
                                   (declare (optimize (insert-array-bounds-checks 0)))
                                   (with-array-data ((array array) (start) (end))
-                                    (let* ((min min)
-                                           (max max))
-                                      (cond ((= start end)
-                                             *wild-type*)
-                                            (t
-                                             (loop for i from start below end
-                                                   do
-                                                   (let ((elt (aref array i)))
-                                                     (when (> elt max)
-                                                       (setf max elt))
-                                                     (when (< elt min)
-                                                       (setf min elt))))
-                                             (make-numeric-type :class 'integer :low min :high max)))))))
+                                    (let ((min min)
+                                          (max max))
+                                      (loop for i from start below end
+                                            do
+                                            (let ((elt (aref array i)))
+                                              (when (> elt max)
+                                                (setf max elt))
+                                              (when (< elt min)
+                                                (setf min elt))))
+                                      (make-numeric-type :class 'integer :low min :high max)))))
                            (declare (inline int-min-max))
                            (macrolet ((test (type)
                                         (let ((ctype (specifier-type type)))
