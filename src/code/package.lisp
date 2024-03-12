@@ -147,6 +147,12 @@
 
 (defmacro package-lock (package) `(logbitp 0 (package-%bits ,package)))
 
+(defmacro without-package-locks (&body body)
+  "Ignores all runtime package lock violations during the execution of
+body. Body can begin with declarations."
+  `(let ((*ignored-package-locks* t))
+    ,@body))
+
 (defmacro with-loader-package-names (&body body)
   #+sb-xc-host
   `(progn ,@body)

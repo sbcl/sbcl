@@ -205,8 +205,8 @@
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)
   (declare (ignore kind format))
-  `(let ((.dummy. ,thing))
-     (declare (ignore .dummy.))
+  `(progn
+     ,thing
      ,@body))
 
 (defun program-assert-symbol-home-package-unlocked (context symbol control)
