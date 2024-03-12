@@ -567,7 +567,7 @@
 ;;; for collision resolution is so infrequent that rather than resolving it by
 ;;; chosing different input bits, the lambda expression wrapped around the
 ;;; perfect hash should resolve collisions via another alist.
-(defun make-hash-based-slot-mapper (slots)
+(defun make-hash-based-slot-mapper (slots lambda-name)
   (flet ((hash (s) (ldb (byte 32 0) (symbol-hash s))))
     (binding* ((symbols (map 'vector #'car slots))
                (hashes (map '(simple-array (unsigned-byte 32) (*))
@@ -615,7 +615,8 @@
         ;; since the above bucketing already asserted that hashing worked.
         (values (compile
                  nil
-                 `(lambda (symbol) ; this resembles the ASSOC transform
+                 ;; this resembles the ASSOC transform
+                 `(named-lambda ,lambda-name (symbol)
                     ,optimize-decl
                     (let* ((sb-c::val (ldb (byte 32 0) (symbol-hash symbol)))
                            (h (progn ,@body)))
@@ -625,6 +626,8 @@
 (defun make-struct-slot-map (dd)
   (make-hash-based-slot-mapper
    (mapcar (lambda (dsd) (cons (dsd-name dsd) (dsd-bits dsd)))
-           (dd-slots dd))))
+           (dd-slots dd))
+   ;; Prevent random junk like (lambda (symbol) in "very-long-name-why-why-why")
+   `(slot-mapper ,(dd-name dd))))
 
 (/show0 "target-defstruct.lisp end of file")

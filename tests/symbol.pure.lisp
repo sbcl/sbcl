@@ -151,7 +151,8 @@
         (push (cons symbol (incf arb-value)) alist)))
     ;; the mapper shouldn't be a simple-vector
     (let ((function
-           (the function (sb-kernel::make-hash-based-slot-mapper alist))))
+           (the function (sb-kernel::make-hash-based-slot-mapper
+                          alist "foo"))))
       ;; now try it
       (dolist (pair alist)
         (let* ((key (car pair))

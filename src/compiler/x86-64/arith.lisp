@@ -3979,9 +3979,14 @@
         (inst bts res posn)
         (inst btr res posn))))
 
-(defknown calc-phash ((unsigned-byte 32) (integer 1 5) simple-vector)
+(defknown calc-phash ((unsigned-byte 32) (integer 1 4) simple-vector)
   (unsigned-byte 32) (flushable always-translatable))
 
+;;; TODO: sometimes there's (LDB (BYTE 32 0) KEY) in front of the calculation
+;;; which we don't need, or rather, need but can be done in the vop basically
+;;; for free compared to referencing #x1FFFFFFFE as a code header constant.
+;;; Even if the initial untagging right-shift is required to use a :QWORD
+;;; operand size, it could be followed by a :DWORD mov into the same register.
 (define-vop ()
   (:translate calc-phash)
   (:args (arg :scs (any-reg) :target temp0))
@@ -4055,13 +4060,9 @@
                (inst* op dest src))
               (t
                (inst* op :dword dest src)))))
-    ;; Move result and re-tag. If the last step is an AND leaving 31 or fewer
-    ;; significant bits, then the operand size is :DWORD
+    ;; Move result and re-tag. Restrict the output to 31 significant bits,
+    ;; totally reasonable considering that you'd probably have to wait for
+    ;; days to produce a perfect hash function of 2 billion keys.
     (let* ((step (svref steps (1- (length steps))))
-           (tn (second step))
-           (size (if (and (eq (car step) 'and)
-                          (fixnump (third step))
-                          (<= (integer-length (third step)) 31))
-                     :dword
-                     :qword)))
-      (inst lea size res (ea tn tn)))))
+           (tn (second step)))
+      (inst lea :dword res (ea tn tn)))))

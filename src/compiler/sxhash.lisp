@@ -197,7 +197,8 @@
                                        (minimal t) (fast nil) (cacheable t))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
   (declare (ignorable objects minimal fast cacheable))
-  (when (< (length array) 3) ; one or two keys - why are you doing this?
+  (when (or (< (length array) 3) ; one or two keys - why are you doing this?
+            (>= (length array) (ash 1 31))) ; insanity if this many
     (return-from make-perfect-hash-lambda))
   (unless (ub32-collection-uniquep array)
     (return-from make-perfect-hash-lambda))
@@ -268,8 +269,13 @@
                      expr))))
       (let* ((result-type `(mod ,(power-of-two-ceiling (length array))))
              (calc `(the ,result-type (uint32-modularly ,@expr))))
+        ;; Noting that the output of Bob's perfect hash generator was originally
+        ;; intended to be compiled into C, and we've adapted it to Lisp,
+        ;; it is not necessary to insert array-bounds-checks
+        ;; even if users declaim that optimization quality to be 3.
         (values `(lambda (val)
                    (declare (optimize (safety 0) (speed 3) (debug 0)
+                                      (sb-c:insert-array-bounds-checks 0)
                                       (sb-c:store-source-form 0)))
                    (declare (type (unsigned-byte 32) val))
                    ,(if tables `(symbol-macrolet ,tables ,calc) calc))
