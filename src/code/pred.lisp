@@ -58,18 +58,18 @@
 ;;; These aren't so much "wrappers" as they are the actual installed DEFUNs.
 ;;; I supposed they "wrap" a vop or source-transform.
 (macrolet ((def-type-predicate-wrapper (pred)
-             (let* ((name (symbol-name pred))
-                    (stem (string-left-trim "%" (string-right-trim "P-" name)))
-                    (article (if (position (schar name 0) "AEIOU") "an" "a")))
-               `(defun ,pred (object)
-                  ;; Document the standardized predicates and not the internal ones.
-                  ,@(when (eql (sb-xc:symbol-package pred) *cl-package*)
+             `(defun ,pred (object)
+                ;; Document the standardized predicates and not the internal ones.
+                ,@(when (eq (sb-xc:symbol-package pred) *cl-package*)
+                    (let* ((name (symbol-name pred))
+                           (stem (string-left-trim "%" (string-right-trim "P-" name)))
+                           (article (if (position (schar name 0) "AEIOU") "an" "a")))
                       (list (format nil
                                     "Return true if OBJECT is ~A ~A, and NIL otherwise."
                                     article
-                                    stem)))
+                                    stem))))
                   ;; (falling through to low-level implementation)
-                  (,pred object)))))
+                (,pred object))))
   (def-type-predicate-wrapper array-header-p)
   (def-type-predicate-wrapper simple-array-header-p)
   (def-type-predicate-wrapper arrayp)
@@ -111,6 +111,8 @@
   #-(or x86 x86-64 arm64 riscv) (def-type-predicate-wrapper lra-p)
   (def-type-predicate-wrapper null)
   (def-type-predicate-wrapper numberp)
+  (sb-c::when-vop-existsp (:translate pointerp)
+    (def-type-predicate-wrapper pointerp))
   (def-type-predicate-wrapper rationalp)
   (def-type-predicate-wrapper ratiop)
   (def-type-predicate-wrapper realp)
