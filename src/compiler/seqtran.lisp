@@ -2831,6 +2831,43 @@
     (format t "~&;; NOTE: ~A~%-> ~A~%" description expr))
   expr)
 
+;;; Construct a form which computes a 32-bit hash given an object in ITEM (which
+;;; customarily is named literally 'ITEM) whose values should be - but might not be -
+;;; one of the objects in KEYS. If it is not, the expression's result should be
+;;; irrelevant. (Calling code has to do some kind of "hit" test)
+;;; The 32-bit hash is then fed into a perfect hash expression.
+;;; TODO:
+;;; 1. There is potential for more optimization.
+;;;    For example, let's say the key set includes only symbols and characters.
+;;;    Clearly we have to call SYMBOLP or some variant thereof prior to dereferencing
+;;;    the HASH slot of a symbol. For non-symbols, it doesn't really matter if the
+;;;    item is a character, so we could use (ASH (GET-LISP-OBJ-ADDRESS OBJ) -32)
+;;;    instead of doing CHARACTERP and CHAR-CODE. They come out the same, and for
+;;;    non-characters it doesn't matter what the result is.
+;;; 2. this should probably take a ":MISS" argument which is a block name to return
+;;;    from if the key type doesn't match any of the accepted types
+;;;    rather than returning 0.
+(defun prehash-for-perfect-hash (item keys)
+  (let (symbolp fixnump characterp)
+    (dolist (key keys)
+      (cond ((symbolp key) (setq symbolp t))
+            ((fixnump key) (setq fixnump t))
+            ((characterp key) (setq characterp t))))
+    (collect ((calc))
+      (when symbolp
+        (if (vop-existsp :translate hash-as-if-symbol-name)
+            (calc '((pointerp item) (hash-as-if-symbol-name item)))
+            ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
+            ;; which accepts NIL along with OTHER-POINTER objects.
+            (calc `((,(if (member nil keys) 'symbolp 'non-null-symbol-p) item)
+                    (symbol-name-hash item)))))
+      (when fixnump
+        (calc '((fixnump item) (ldb (byte 32 0) item))))
+      (when characterp
+        (calc '((characterp item) (char-code item))))
+      (let ((calc `(cond ,@(calc) (t 0))))
+        (if (eq item 'item) calc (subst item 'item calc))))))
+
 ;;; This tries to optimize for MEMBER directed to an IF node by not using a value vector.
 ;;; FIND directed to an IF is a little funny because if you find a NIL then it has to
 ;;; return NIL; but FIND does not use a value vector anyway, so there is nothing gained
@@ -2967,8 +3004,7 @@
         ;; of the perfect hash is smaller than 2^N.
         (note-perfect-hash-used
          `(,fun-name ,conditional ,items)
-         `(let* ((hash #+x86-64 (if (pointerp item) (hash-as-if-symbol-name item) 0)
-                       #-x86-64 (if (symbolp item) (symbol-name-hash item) 0))
+         `(let* ((hash ,(prehash-for-perfect-hash 'item keys))
                  (phash (,lambda hash)))
             ,(if certainp
                  `(aref ,range (truly-the (mod ,n) phash))
