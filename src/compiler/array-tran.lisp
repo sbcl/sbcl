@@ -275,9 +275,9 @@
                                             (character
                                              (specifier-type 'character))
                                             (symbol
-                                             (if symbols
-                                                 (add-to-xset elt symbols)
-                                                 (setf symbols (sb-kernel::!new-xset (list elt) 1)))
+                                             (unless symbols
+                                               (setf symbols (alloc-xset)))
+                                             (add-to-xset elt symbols)
                                              nil)
                                             (double-float
                                              (specifier-type 'double-float))
