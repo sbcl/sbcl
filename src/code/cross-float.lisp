@@ -357,7 +357,7 @@
                    (t expr))))
     (if (check expr) expr (recons expr))))
 
-(defmacro with-memoized-math-op ((name key-expr) calculation)
+(defmacro with-memoized-math-op ((name key-expr) &body calculation)
   (assert (symbolp name))
   ;; In theory I could make this so that only a cache miss has to call SANIFY-MATH-OP-ARGS
   ;; so that in the frequently-occuring cases we do not have to make an extra pass over
@@ -374,7 +374,7 @@
                     (eq (first answer) '&values))
                (values-list (rest answer))
                answer)
-           (multiple-value-call #'record-math-op cache-key ,calculation)))))
+           (multiple-value-call #'record-math-op cache-key (progn ,@calculation))))))
 
 ;;; REAL and IMAG are either host integers (therefore EQL-comparable)
 ;;; or if not, have already been made EQ-comparable by hashing.
