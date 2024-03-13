@@ -11,20 +11,18 @@
 
 (in-package "SB-VM")
 
+;;; Push a feature indicating whether ambiguous stack words pin what they see.
+(eval-when (:compile-toplevel :execute)
+  #+(or x86 x86-64) (pushnew :conservative-stack-scan sb-xc:*features*))
 (defmacro with-pinned-objects ((&rest objects) &body body)
-  #.(concatenate 'string
-  "Arrange with the garbage collector that the pages occupied by
-OBJECTS will not be moved in memory for the duration of BODY.
-Useful for e.g. foreign calls where another thread may trigger
-garbage collection."
-     #-generational "  This is currently implemented by disabling GC")
-  #-generational
-  `(progn ,@objects (,(if objects 'without-gcing 'progn) ,@body))
-  #+(and generational (not (or x86 x86-64)))
+  "Arrange with the garbage collector that OBJECTS will not be moved in memory
+for the duration of BODY.  Useful for e.g. foreign calls where another thread
+may trigger garbage collection."
+  #-conservative-stack-scan
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
      (declare (dynamic-extent *pinned-objects*))
      ,@body)
-  #+(and generational (or x86 x86-64))
+  #+conservative-stack-scan
   (if objects
       (let ((pins (make-gensym-list (length objects)))
             (wpo (gensym "WITH-PINNED-OBJECTS-THUNK")))
@@ -53,15 +51,16 @@ garbage collection."
       `(progn ,@body)))
 
 (defmacro with-pinned-object-iterator ((name) &body body)
-  #-generational
-  `(macrolet ((,name (arg) (declare (ignore arg)) nil)) ,@body)
-  #+(and generational (not (or x86 x86-64)))
+  #-conservative-stack-scan
   `(dx-let ((.cell. (cons nil *pinned-objects*)))
      (let ((*pinned-objects* .cell.))
        (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
-  #+(and generational (or x86 x86-64))
+  #+conservative-stack-scan
   `(dx-let ((.cell. (cons nil nil)))
      (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
+
+(eval-when (:compile-toplevel) ; don't need the feature after cross-compiling
+  (setq sb-xc:*features* (remove :conservative-stack-scan sb-xc:*features*)))
 
 ;;; Allow GC within the body, but pin (for some definition of "pin") all code.
 ;;; There are two different behaviors:
