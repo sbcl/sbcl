@@ -268,7 +268,7 @@
                     (t
                      expr))))
       (let* ((result-type `(mod ,(power-of-two-ceiling (length array))))
-             (calc `(the ,result-type (uint32-modularly ,@expr))))
+             (calc `(the ,result-type (uint32-modularly val ,@expr))))
         ;; Noting that the output of Bob's perfect hash generator was originally
         ;; intended to be compiled into C, and we've adapted it to Lisp,
         ;; it is not necessary to insert array-bounds-checks
@@ -285,8 +285,8 @@
 ;;; with a dword operand size on x86-64, which avoids insertion of ANDs that mask
 ;;; fixnum-represented 32-bit numbers to a 33 physical-bits, as the compiler would
 ;;; otherwise choose, as it is biased to favoring ANY-REG storage class.
-(sb-xc:defmacro uint32-modularly (&body exprs &environment env)
-  (declare (ignore env)) ; might need to this detect compiled vs interpreted code
+(sb-xc:defmacro uint32-modularly (input &body exprs &environment env)
+  (declare (ignore input env)) ; might use ENV to detect compiled vs interpreted code
   (let ((uint-max #xFFFFFFFF))
     ;; Replace C-ish operators with Lisp functions.
     (labels

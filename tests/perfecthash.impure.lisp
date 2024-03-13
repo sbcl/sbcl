@@ -12,7 +12,7 @@
   (DECLARE (TYPE (UNSIGNED-BYTE 32) VAL))
   (SYMBOL-MACROLET ((TAB #(0 12 11 13 0 0 12 1)))
     (THE (MOD 16)
-         (UINT32-MODULARLY
+         (UINT32-MODULARLY VAL
            (LET ((B (& (>> VAL 13) 7)))
              (LET ((A (>> (<< VAL 5) 29)))
                (^ A (AREF TAB B))))))))
@@ -631,7 +631,7 @@ After:
   ;;  (LAMBDA (VAL)
   ;;    (DECLARE (OPTIMIZE ...))
   ;;    (DEC:ARE (TYPE ...))
-  ;;    (SYMBOL-MACROLET # (THE (MOD n) (UINT32-MODULARLY forms ...))))
+  ;;    (SYMBOL-MACROLET # (THE (MOD n) (UINT32-MODULARLY VAL forms ...))))
   ;;
   (let ((tables)
         (maybe-tables (fifth lambda))
@@ -639,11 +639,17 @@ After:
         (calc))
     (when print
       (format t "~A~%" lambda))
-    (cond ((eq (car maybe-tables) 'symbol-macrolet)
-           (setq tables (cadr maybe-tables))
-           (setq calc (cdr (third (third maybe-tables)))))
-          (t
-           (setq calc (cdr (third maybe-tables)))))
+    (let ((cast (cond ((eq (car maybe-tables) 'symbol-macrolet)
+                       (setq tables (cadr maybe-tables))
+                       (third maybe-tables))
+                      (t
+                       maybe-tables))))
+      (assert (eq (car cast) 'the))
+      (assert (eq (caadr cast) 'mod))
+      (let ((expr (third cast)))
+        (assert (eq (car expr) 'sb-c::uint32-modularly))
+        (assert (eq (cadr expr) 'sb-c::val))
+        (setq calc (cddr expr))))
     (multiple-value-bind (steps n-temps)
         (sb-c:phash-renumber-temps
          (sb-c:phash-convert-to-2-operand-code calc tables))
