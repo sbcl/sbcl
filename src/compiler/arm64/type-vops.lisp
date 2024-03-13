@@ -639,6 +639,13 @@
     (inst cmp temp list-pointer-lowtag)
     (inst ccmp value null-tn :eq 4)))
 
+(define-vop (pointerp consp)
+  (:translate pointerp)
+  (:conditional :eq)
+  (:generator 3
+    (inst and temp value 3)
+    (inst cmp temp 3)))
+
 (define-vop (single-float-p)
   (:args (value :scs (any-reg descriptor-reg)))
   (:arg-refs value-ref)

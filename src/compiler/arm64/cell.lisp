@@ -222,7 +222,7 @@
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst lsr res res n-symbol-hash-discard-bits)))
 (define-vop (symbol-name-hash symbol-hash)
-  (:translate symbol-name-hash)
+  (:translate symbol-name-hash #-relocatable-static-space hash-as-if-symbol-name)
   (:generator 1 ; ASSUMPTION: little-endian
     (inst ldr (32-bit-reg res)
           (@ symbol (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)))))

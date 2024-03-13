@@ -213,3 +213,14 @@
     (inst beq value null-tn (if not-p target drop-thru))
     (test-type value temp target not-p (list-pointer-lowtag))
     DROP-THRU))
+
+#+64-bit
+(define-vop (pointerp type-predicate)
+  (:translate pointerp)
+  (:generator 3
+    (inst xori temp value 3)
+    (inst andi temp temp 3)
+    (if not-p
+        (inst bne temp zero-tn target)
+        (inst beq temp zero-tn target))
+    DROP-THRU))

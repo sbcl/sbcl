@@ -209,7 +209,7 @@
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst srli res res n-symbol-hash-discard-bits)))
 (define-vop (symbol-name-hash symbol-hash)
-  (:translate symbol-name-hash)
+  (:translate symbol-name-hash hash-as-if-symbol-name)
   (:generator 1
     (inst lwu res symbol ; little-endian
           (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag))))
