@@ -53,6 +53,12 @@
            (type (unsigned-byte 8) exponent)
            (type (unsigned-byte 23) mantissa))
   (logior (ash (cl:- sign) 31) (ash exponent 23) mantissa))
+(defun %single-sign-bit (single)
+  (cl:ldb (cl:byte 1 31) (%single-flonum-%bits single)))
+(defun %single-exponent-bits (single)
+  (cl:ldb (cl:byte 8 23) (%single-flonum-%bits single)))
+(defun %single-mantissa-bits (single)
+  (cl:ldb (cl:byte 23 0) (%single-flonum-%bits single)))
 
 (defstruct (double-float (:include float
                                    (format 'double-float)
@@ -65,6 +71,12 @@
            (type (unsigned-byte 11) exponent)
            (type (unsigned-byte 52) mantissa))
   (logior (ash (cl:- sign) 63) (ash exponent 52) mantissa))
+(defun %double-sign-bit (double)
+  (cl:ldb (cl:byte 1 63) (%double-flonum-%bits double)))
+(defun %double-exponent-bits (double)
+  (cl:ldb (cl:byte 11 52) (%double-flonum-%bits double)))
+(defun %double-mantissa-bits (double)
+  (cl:ldb (cl:byte 52 0) (%double-flonum-%bits double)))
 
 (defun %make-flonum (bits format)
   (ecase format
@@ -99,6 +111,38 @@
                                   (return (,bits-fun sign exponent %mantissa)))))))))
   (def %single-bits-from-rational %single-bits-from 8 23)
   (def %double-bits-from-rational %double-bits-from 11 52))
+
+(defun flonum-sign (flonum)
+  (let ((bit (etypecase flonum
+               (single-float (%single-sign-bit flonum))
+               (double-float (%double-sign-bit flonum)))))
+    (cl:- 1 (cl:* 2 bit))))
+(defun flonum-exponent (flonum)
+  (etypecase flonum
+    (single-float
+     (let ((exponent-bits (%single-exponent-bits flonum)))
+       (when (cl:= exponent-bits 255)
+         (error "FLONUM-EXPONENT saturated: ~S" flonum))
+       (if (cl:= exponent-bits 0) -126 (cl:- exponent-bits 127))))
+    (double-float
+     (let ((exponent-bits (%double-exponent-bits flonum)))
+       (when (cl:= exponent-bits 2047)
+         (error "FLONUM-EXPONENT saturated: ~S" flonum))
+       (if (cl:= exponent-bits 0) -1022 (cl:- exponent-bits 1023))))))
+(defun flonum-mantissa (flonum)
+  (etypecase flonum
+    (single-float
+     (let ((scale (cl:expt 2 23))
+           (exponent-bits (%single-exponent-bits flonum)))
+       (if (cl:> exponent-bits 0)
+           (cl:1+ (cl:/ (%single-mantissa-bits flonum) scale))
+           (cl:/ (%single-mantissa-bits flonum) scale))))
+    (double-float
+     (let ((scale (cl:expt 2 52))
+           (exponent-bits (%double-exponent-bits flonum)))
+       (if (cl:> exponent-bits 0)
+           (cl:1+ (cl:/ (%double-mantissa-bits flonum) scale))
+           (cl:/ (%double-mantissa-bits flonum) scale))))))
 
 (deftype real () '(or cl:rational float))
 (declaim (inline realp))

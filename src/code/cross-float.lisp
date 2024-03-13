@@ -544,14 +544,7 @@
   (if (rationalp x)
       x
       (with-memoized-math-op (rational x)
-        (multiple-value-bind (whole frac) (cl:ftruncate (realnumify x))
-          (if (cl:zerop frac)
-              (cl:rational whole)
-              ;; We'd have to have the exact same implementation of
-              ;; RATIONAL as the target will have in order to guarantee
-              ;; that compile-time use of RATIONAL is equivalent
-              ;; to runtime use. So don't do it.
-              (error "Won't do (RATIONAL ~S) due to possible precision loss" x))))))
+        (cl:* (flonum-sign x) (flonum-mantissa x) (cl:expt 2 (flonum-exponent x))))))
 
 (defun rationalize (x)
   (if (rationalp x)
