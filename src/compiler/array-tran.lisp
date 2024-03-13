@@ -206,6 +206,7 @@
   (or (let ((constant (lvar-constant array))
             min
             max
+            symbols
             union)
         (block nil
           (when constant
@@ -274,7 +275,10 @@
                                             (character
                                              (specifier-type 'character))
                                             (symbol
-                                             (specifier-type 'symbol))
+                                             (if symbols
+                                                 (add-to-xset elt symbols)
+                                                 (setf symbols (sb-kernel::!new-xset (list elt) 1)))
+                                             nil)
                                             (double-float
                                              (specifier-type 'double-float))
                                             (single-float
@@ -285,12 +289,18 @@
                                           (if union
                                               (type-union union type)
                                               type)))
-                               finally (return (if min
-                                                   (let ((int (make-numeric-type :class 'integer :low min :high max)))
-                                                     (if union
-                                                         (type-union union int)
-                                                         int))
-                                                   union))))))))))
+                               finally
+                               (when symbols
+                                (let ((symbols (make-member-type symbols nil)))
+                                  (setf union (if union
+                                                  (type-union union symbols)
+                                                  symbols))))
+                               (return (if min
+                                           (let ((int (make-numeric-type :class 'integer :low min :high max)))
+                                             (if union
+                                                 (type-union union int)
+                                                 int))
+                                           union))))))))))
       (type-array-element-type (lvar-type array))))
 
 (deftransform array-in-bounds-p ((array &rest subscripts))

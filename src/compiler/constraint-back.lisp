@@ -245,3 +245,24 @@
                       (let ((type (specifier-type `(character-set ((,low . ,high))))))
                         (conset-add-constraint-to-eql gen 'typep var type nil consequent)
                         (conset-add-constraint-to-eql gen 'typep var type t alternative))))))))))))))
+
+(defoptimizer (data-vector-ref-with-offset constraint-propagate-back)
+    ((array index offset) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
+  (case kind
+    (eq
+     (when (and (constant-lvar-p array)
+                (constant-lvar-p offset)
+                (zerop (lvar-value offset)))
+       (let ((array (lvar-value array))
+             (type (lvar-type constraint))
+             misses
+             var)
+         (when (and (typep array 'simple-vector)
+                    (setf var (ok-lvar-lambda-var index gen)))
+           (loop for i below (length array)
+                 for e = (aref array i)
+                 unless (types-equal-or-intersect (ctype-of e) type)
+                 do (push i misses))
+           (when misses
+             (conset-add-constraint-to-eql gen 'typep var (specifier-type `(member ,@misses)) t consequent))))))))
