@@ -550,9 +550,9 @@
   (if (rationalp x)
       x
       (with-memoized-math-op (rationalize x)
-        (multiple-value-bind (whole frac) (cl:ftruncate (realnumify x))
-          (if (cl:zerop frac)
-              (cl:rationalize whole)
+        (let ((rational (rational x)))
+          (if (integerp rational)
+              rational
               (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x))))))
 
 (defun coerce (object type)
