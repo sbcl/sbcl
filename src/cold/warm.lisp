@@ -116,11 +116,18 @@ sb-kernel::
                                 (let ((*read-default-float-format* (car args)))
                                   (multiple-value-list (apply fun (sb-int:ensure-list (cdr args)))))
                                 (multiple-value-list (apply fun (sb-int:ensure-list args))))))
-                (unless (equalp actual result)
-                  (#+sb-devel-xfloat cerror #+sb-devel-xfloat ""
-                   #-sb-devel-xfloat format #-sb-devel-xfloat t
-                   "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
-                   expr actual))))))))))
+                (labels ((eqal (x y) ; non-ideal name, but other names are also non-ideal
+                           (etypecase x
+                             (cons (and (consp y) (eqal (car x) (car y)) (eqal (cdr x) (cdr y))))
+                             (symbol (eql x y))
+                             (rational (eql x y))
+                             (float (eql x y))
+                             (string (string= x y)))))
+                  (unless (eqal actual result)
+                    (#+sb-devel-xfloat cerror #+sb-devel-xfloat ""
+                     #-sb-devel-xfloat format #-sb-devel-xfloat t
+                     "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
+                     expr actual)))))))))))
 
 (when (if (boundp '*compile-files-p*) *compile-files-p* t)
   (with-open-file (output "output/cold-vop-usage.txt" :if-does-not-exist nil)
