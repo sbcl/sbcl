@@ -494,15 +494,19 @@
   (let* ((save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
          (flags 0)
-         (info (lambda-var-arg-info var))
          (indirect (and (lambda-var-indirect var)
                         (not (lambda-var-explicit-value-cell var))
                         (neq (lambda-environment fun)
                              (lambda-environment (lambda-var-home var)))))
          ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
-         (large-fixnums (>= (integer-length most-positive-fixnum) 62))
-         more)
+         (large-fixnums (>= (integer-length most-positive-fixnum) 62)))
     (declare (type (and sb-xc:fixnum unsigned-byte) flags))
+    (let ((info (lambda-var-arg-info var)))
+      ;; &more vars need no name
+      (when (and info
+                 (memq (arg-info-kind info)
+                       '(:more-context :more-count)))
+        (setq minimal t)))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
       (unless (and tn (tn-offset tn))
@@ -520,16 +524,7 @@
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (when indirect
       (setq flags (logior flags compiled-debug-var-indirect-p)))
-    (when info
-      (case (arg-info-kind info)
-        (:more-context
-         (setq flags (logior flags compiled-debug-var-more-context-p)
-               more t))
-        (:more-count
-         (setq flags (logior flags compiled-debug-var-more-count-p)
-               more t))))
-    (when (and same-name-p
-               (not (or more minimal)))
+    (when (and same-name-p (not minimal))
       (setf flags (logior flags compiled-debug-var-same-name-p)))
     (when large-fixnums
       (cond (indirect
@@ -543,9 +538,7 @@
              (when save-tn
                (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))))
     (vector-push-extend flags buffer)
-    (unless (or minimal
-                same-name-p
-                more) ;; &more vars need no name
+    (unless (or minimal same-name-p)
       ;; Dumping uninterned symbols as debug var names is kinda silly.
       ;; Reconstruction of the name on fasl load produces a new gensym anyway.
       ;; So rather than waste symbol space, just dump such symbols as strings,

@@ -208,7 +208,7 @@
             (:include debug-var)
             (:constructor make-compiled-debug-var
                 (symbol id alive-p
-                 sc+offset save-sc+offset indirect-sc+offset info))
+                 sc+offset save-sc+offset indirect-sc+offset))
             (:copier nil))
   ;; storage class and offset (unexported)
   (sc+offset nil :type sb-c:sc+offset :read-only t)
@@ -216,8 +216,7 @@
   (save-sc+offset nil :type (or sb-c:sc+offset null) :read-only t)
   ;; For indirect closures the fp of the parent frame is stored in the
   ;; normal SC+OFFSETs above, and this has the offset into the frame
-  (indirect-sc+offset nil :type (or sb-c:sc+offset null) :read-only t)
-  (info nil :read-only t))
+  (indirect-sc+offset nil :type (or sb-c:sc+offset null) :read-only t))
 
 ;;;; DEBUG-FUNs
 
@@ -1618,6 +1617,13 @@ register."
     (compiled-debug-fun (compiled-debug-fun-lambda-list debug-fun))
     (bogus-debug-fun nil)))
 
+;;; Return the MORE-CONTEXT and MORE-COUNT vars of a DEBUG-FUN.
+(defun debug-fun-more-args (debug-fun)
+  (dolist (spec (debug-fun-lambda-list debug-fun) nil)
+    (when (and (listp spec)
+               (eq (first spec) :more))
+      (return (values (second spec) (third spec))))))
+
 ;;; Note: If this has to compute the lambda list, it caches it in DEBUG-FUN.
 (defun compiled-debug-fun-lambda-list (debug-fun)
   (let ((lambda-list (debug-fun-%lambda-list debug-fun)))
@@ -1928,16 +1934,11 @@ register."
           (let* ((flags (geti))
                  (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
                  (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
-                 (more-context-p (logtest sb-c::compiled-debug-var-more-context-p flags))
-                 (more-count-p (logtest sb-c::compiled-debug-var-more-count-p flags))
                  (indirect-p (logtest sb-c::compiled-debug-var-indirect-p flags))
                  (live (logtest sb-c::compiled-debug-var-environment-live
                                 flags))
                  (save (logtest sb-c::compiled-debug-var-save-loc-p flags))
-                 (symbol (cond ((or more-count-p
-                                    more-context-p
-                                    minimal)
-                                nil)
+                 (symbol (cond (minimal nil)
                                ((logtest sb-c::compiled-debug-var-same-name-p flags)
                                 prev-name)
                                (t (geti))))
@@ -1961,9 +1962,7 @@ register."
                                  live
                                  sc+offset
                                  save-sc+offset
-                                 indirect-sc+offset
-                                 (cond (more-context-p :more-context)
-                                       (more-count-p :more-count)))
+                                 indirect-sc+offset)
                                 buffer)))))))
 
 ;;;; CODE-LOCATIONs
@@ -2873,9 +2872,6 @@ register."
 (defun debug-var-validity (debug-var basic-code-location)
   (compiled-debug-var-validity debug-var basic-code-location))
 
-(defun debug-var-info (debug-var)
-  (compiled-debug-var-info debug-var))
-
 ;;; This is the method for DEBUG-VAR-VALIDITY for COMPILED-DEBUG-VARs.
 ;;; For safety, make sure basic-code-location is what we think.
 (defun compiled-debug-var-validity (debug-var basic-code-location)
@@ -3089,34 +3085,30 @@ register."
 (defun preprocess-for-eval (form loc)
   (declare (type code-location loc))
   (let ((n-frame (gensym))
-        (fun (code-location-debug-fun loc))
-        (more-context nil)
-        (more-count nil))
+        (fun (code-location-debug-fun loc)))
     (unless (debug-var-info-available fun)
       (debug-signal 'no-debug-vars :debug-fun fun))
     (collect ((binds)
               (specs))
-      (do-debug-fun-vars (var fun)
-        (let ((validity (debug-var-validity var loc)))
-          (unless (eq validity :invalid)
-            (case (debug-var-info var)
-              (:more-context
-               (setf more-context var))
-              (:more-count
-               (setf more-count var))
-              (t
-               (let* ((sym (debug-var-symbol var))
-                      (found (assoc sym (binds))))
-                 (cond ((not sym))
-                       (found
-                        (setf (second found) :ambiguous))
-                       (t
-                        (binds (list sym validity var))))))))))
-      (when (and more-context more-count)
-        (let ((more (assoc 'sb-debug::more (binds))))
-          (if more
-              (setf (second more) :ambiguous)
-              (binds (list 'sb-debug::more :more more-context more-count)))))
+      (multiple-value-bind (more-context more-count)
+          (debug-fun-more-args fun)
+        (do-debug-fun-vars (var fun)
+          (let ((validity (debug-var-validity var loc)))
+            (unless (or (eq validity :invalid)
+                        (eq var more-context)
+                        (eq var more-count))
+              (let* ((sym (debug-var-symbol var))
+                     (found (assoc sym (binds))))
+                (cond ((not sym))
+                      (found
+                       (setf (second found) :ambiguous))
+                      (t
+                       (binds (list sym validity var))))))))
+        (when (and more-context more-count)
+          (let ((more (assoc 'sb-debug::more (binds))))
+            (if more
+                (setf (second more) :ambiguous)
+                (binds (list 'sb-debug::more :more more-context more-count))))))
       (dolist (bind (binds))
         (let ((name (first bind))
               (var (third bind)))

@@ -1709,30 +1709,30 @@ forms that explicitly control this kind of evaluation.")
               (location (frame-code-location *current-frame*))
               (prefix (read-if-available nil))
               (any-p nil)
-              (any-valid-p nil)
-              (more-context nil)
-              (more-count nil))
-          (dolist (v (ambiguous-debug-vars
-                      d-fun
-                      (if prefix (string prefix) "")))
-            (setf any-p t)
-            (when (var-valid-in-frame-p v location)
-              (setf any-valid-p t)
-              (case (sb-di::debug-var-info v)
-                (:more-context
-                 (setf more-context (debug-var-value v *current-frame*)))
-                (:more-count
-                 (setf more-count (debug-var-value v *current-frame*)))
-                (t
-                 (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
-                         (debug-var-symbol v)
-                         (zerop (debug-var-id v))
-                         (debug-var-id v)
-                         (debug-var-value v *current-frame*))))))
-          (when (and more-context more-count)
-            (format *debug-io* "~S  =  ~S~%"
-                    'more
-                    (multiple-value-list (sb-c:%more-arg-values more-context 0 more-count))))
+              (any-valid-p nil))
+          (multiple-value-bind (more-context more-count)
+              (debug-fun-more-args d-fun)
+            (dolist (v (ambiguous-debug-vars
+                        d-fun
+                        (if prefix (string prefix) "")))
+              (setf any-p t)
+              (when (var-valid-in-frame-p v location)
+                (setf any-valid-p t)
+                (unless (or (eq v more-context)
+                            (eq v more-count))
+                  (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
+                          (debug-var-symbol v)
+                          (zerop (debug-var-id v))
+                          (debug-var-id v)
+                          (debug-var-value v *current-frame*)))))
+            (when (and more-context more-count)
+              (format *debug-io* "~S  =  ~S~%"
+                      'more
+                      (multiple-value-list
+                       (sb-c:%more-arg-values
+                        (debug-var-value more-context *current-frame*)
+                        0
+                        (debug-var-value more-count *current-frame*))))))
           (cond
            ((not any-p)
             (format *debug-io*
