@@ -491,15 +491,15 @@
 (defun dump-1-var (fun var tn minimal buffer &optional name same-name-p)
   (declare (type lambda-var var) (type (or tn null) tn)
            (type clambda fun))
-  (let* ((save-tn (and tn (tn-save-tn tn)))
+  (let* ((package (sb-xc:symbol-package name))
+         (package-p (and package (not (eq package *package*))))
+         (save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
          (flags 0)
          (indirect (and (lambda-var-indirect var)
                         (not (lambda-var-explicit-value-cell var))
                         (neq (lambda-environment fun)
-                             (lambda-environment (lambda-var-home var)))))
-         ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
-         (large-fixnums (>= (integer-length most-positive-fixnum) 62)))
+                             (lambda-environment (lambda-var-home var))))))
     (declare (type (and sb-xc:fixnum unsigned-byte) flags))
     (let ((info (lambda-var-arg-info var)))
       ;; &more vars need no name
@@ -507,10 +507,15 @@
                  (memq (arg-info-kind info)
                        '(:more-context :more-count)))
         (setq minimal t)))
-    (when minimal
-      (setq flags (logior flags compiled-debug-var-minimal-p))
-      (unless (and tn (tn-offset tn))
-        (setq flags (logior flags compiled-debug-var-deleted-p))))
+    (cond (minimal
+           (setq flags (logior flags compiled-debug-var-minimal-p))
+           (unless (and tn (tn-offset tn))
+             (setq flags (logior flags compiled-debug-var-deleted-p))))
+          (t
+           (unless package
+             (setq flags (logior flags compiled-debug-var-uninterned)))
+           (when package-p
+             (setq flags (logior flags compiled-debug-var-packaged)))))
     (when (and (or (eq kind :environment)
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
@@ -525,44 +530,29 @@
     (when indirect
       (setq flags (logior flags compiled-debug-var-indirect-p)))
     (when (and same-name-p (not minimal))
-      (setf flags (logior flags compiled-debug-var-same-name-p)))
-    (when large-fixnums
-      (cond (indirect
-             (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-             (when save-tn
-               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
-            (t
-             (if (and tn (tn-offset tn))
-                 (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-                 (aver minimal))
-             (when save-tn
-               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))))
+      (setq flags (logior flags compiled-debug-var-same-name-p)))
     (vector-push-extend flags buffer)
-    (unless (or minimal same-name-p)
-      ;; Dumping uninterned symbols as debug var names is kinda silly.
-      ;; Reconstruction of the name on fasl load produces a new gensym anyway.
-      ;; So rather than waste symbol space, just dump such symbols as strings,
-      ;; and PARSE-COMPILED-DEBUG-VARS can create the interned symbol.
-      ;; This reduces core size by omitting zillions of symbols whose names
-      ;; are spelled the same.
-      (vector-push-extend (if (cl:symbol-package name) name (string name)) buffer))
+    (unless minimal
+      (unless same-name-p
+        (write-var-string (symbol-name name) buffer))
+      (when package-p
+        (write-var-string (sb-xc:package-name package) buffer)))
 
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
            ;; accessed through a saved frame pointer.
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
-           (unless large-fixnums
-             (vector-push-extend (tn-sc+offset tn) buffer)
-             (when save-tn
-               (vector-push-extend (tn-sc+offset save-tn) buffer)))
-           (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
-          ((not large-fixnums)
+           (write-var-integer (tn-sc+offset tn) buffer)
+           (when save-tn
+             (write-var-integer (tn-sc+offset save-tn) buffer))
+           (write-var-integer (tn-sc+offset (leaf-info var)) buffer))
+          (t
            (if (and tn (tn-offset tn))
-               (vector-push-extend (tn-sc+offset tn) buffer)
+               (write-var-integer (tn-sc+offset tn) buffer)
                (aver minimal))
            (when save-tn
-             (vector-push-extend (tn-sc+offset save-tn) buffer)))))
+             (write-var-integer (tn-sc+offset save-tn) buffer)))))
   (values))
 
 (defun leaf-principal-name (leaf)
@@ -603,33 +593,33 @@
         (dolist (let (lambda-lets fun))
           (frob-lambda let (>= level 2)))))
 
+    (setf (fill-pointer *byte-buffer*) 0)
     (let ((sorted (sort (vars) #'string<
                         :key (lambda (x)
                                (symbol-name (car x)))))
           (prev-name nil)
           (i 0)
-          (buffer (make-array 0 :fill-pointer 0 :adjustable t))
           ;; XEPs don't have any useful variables
           (minimal (functional-kind-eq fun external)))
       (declare (type index i))
       (loop for (name var . tn) in sorted
             do
-            (dump-1-var fun var tn minimal buffer
+            (dump-1-var fun var tn minimal *byte-buffer*
                         name
                         (and prev-name (eq prev-name name)))
-            (setf prev-name name)
-            (setf (gethash var var-locs) i)
-            (incf i))
-      (compact-vector buffer))))
+             (setf prev-name name)
+             (setf (gethash var var-locs) i)
+             (incf i))
+      (compact-vector *byte-buffer*))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
 (defun compute-minimal-vars (fun)
   (declare (type clambda fun))
-  (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
-    (dolist (var (lambda-vars fun))
-      (dump-1-var fun var (leaf-info var) t buffer))
-    (compact-vector buffer)))
+  (setf (fill-pointer *byte-buffer*) 0)
+  (dolist (var (lambda-vars fun))
+    (dump-1-var fun var (leaf-info var) t *byte-buffer*))
+  (compact-vector *byte-buffer*))
 
 ;;; Return VAR's relative position in the function's variables (determined
 ;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DEBUG-INFO-VAR-DELETED.
@@ -846,6 +836,7 @@
                (or (and (not (cdr entries))
                         (sb-c::entry-info-name (car entries)))
                    (component-name component)))
+       :package (sb-xc:package-name *package*)
        :fun-map fun-map
        :contexts (compact-vector *contexts*)))))
 

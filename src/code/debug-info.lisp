@@ -13,7 +13,6 @@
 
 ;;;; flags for compiled debug variables
 
-;;; FIXME: old CMU CL representation follows:
 ;;;    Compiled debug variables are in a packed binary representation in the
 ;;; DEBUG-FUN-VARS:
 ;;;    single byte of boolean flags:
@@ -32,9 +31,8 @@
 ;;;    SC-Offset of primary location (as var-length integer)
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
-;;; FIXME: The first two are no longer used in SBCL.
-;;;(defconstant compiled-debug-var-uninterned             #b00000001)
-;;;(defconstant compiled-debug-var-packaged               #b00000010)
+(defconstant compiled-debug-var-uninterned             #b00000001)
+(defconstant compiled-debug-var-packaged               #b00000010)
 (defconstant compiled-debug-var-environment-live       #b00000100)
 (defconstant compiled-debug-var-save-loc-p             #b00001000)
 (defconstant compiled-debug-var-same-name-p            #b00010000)
@@ -102,36 +100,21 @@
   ;; figure out which DEBUG-FUN object corresponds to your FUNCTION
   ;; object, you compare the name values of each. -- WHN 2001-12-20
   (name (missing-arg) :type (or simple-string cons symbol) :read-only t)
-  ;; a description of variable locations for this function, in alphabetical
-  ;; order by name; or NIL if no information is available
-  ;; If only one variable is encoded then it's stored as is without a vector.
-  ;;
-  ;; The variable entries are alphabetically ordered. This ordering is
-  ;; used in lifetime info to refer to variables: the first entry is
-  ;; 0, the second entry is 1, etc. Variable numbers are *not* the
-  ;; byte index at which the representation of the location starts.
-  ;;
-  ;; Each entry is:
-  ;;   * a FLAGS value, which is a FIXNUM with various
-  ;;     COMPILED-DEBUG-FUN-FOO bits set
-  ;;   * the symbol which names this variable, unless debug info
-  ;;     is minimal
-  ;;   * the variable ID, when it has one
-  ;;   * SC-offset of primary location, if it has one
-  ;;   * SC-offset of save location, if it has one
-  ;; Can either be a single value or a vector for multiple values.
+  ;; a vector of the packed binary representation of variable
+  ;; locations in this function. These are in alphabetical order by
+  ;; name. This ordering is used in lifetime info to refer to
+  ;; variables: the first entry is 0, the second entry is 1,
+  ;; etc. Variable numbers are *not* the byte index at which the
+  ;; representation of the location starts. This slot may be NIL to
+  ;; save space.
+
+  ;; If only one variable is encoded then it's stored as is without a
+  ;; vector.
   (vars nil)
   ;; a vector of the packed binary representation of the
   ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
   ;; blocks were emitted. The first block is the start of the
   ;; function. This slot may be NIL to save space.
-  ;;
-  ;; FIXME: The "packed binary representation" description in the
-  ;; comment above is the same as the description of the old
-  ;; representation of VARIABLES which doesn't work properly in SBCL
-  ;; (because it doesn't transform correctly under package renaming).
-  ;; Check whether this slot's data might have the same problem that
-  ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*))
                         (simple-array (signed-byte 8) (*))
                         null))
@@ -415,6 +398,9 @@
              (:include debug-info)
              (:copier nil)
              (:pure t))
+  ;; The name of the package that DEBUG-FUN-VARS were dumped relative
+  ;; to. Locations that aren't packaged are in this package.
+  (package (missing-arg) :type simple-string)
   ;; COMPILED-DEBUG-FUNs linked through COMPILED-DEBUG-FUN-NEXT
   (fun-map (missing-arg) :type compiled-debug-fun)
   ;; Location contexts

@@ -186,8 +186,11 @@
 ;;; compiler DEBUG-FUNs.
 (defstruct (debug-var (:constructor nil)
                       (:copier nil))
-  ;; the name of the variable
-  (symbol (missing-arg) :type symbol)
+  ;; string name of the variable.
+  (name (missing-arg) :type simple-string)
+  ;; string name of package. NIL when the variable's name is
+  ;; uninterned.
+  (package nil :type (or null simple-string))
   ;; a unique integer identification relative to other variables with the same
   ;; symbol
   (id 0 :type index :read-only t)
@@ -196,8 +199,9 @@
 (defmethod print-object ((debug-var debug-var) stream)
   (print-unreadable-object (debug-var stream :type t :identity t)
     (format stream
-            "~S ~W"
-            (debug-var-symbol debug-var)
+            "~A:~A ~W"
+            (debug-var-package debug-var)
+            (debug-var-name debug-var)
             (debug-var-id debug-var))))
 
 (setf (documentation 'debug-var-id 'function)
@@ -207,7 +211,7 @@
 (defstruct (compiled-debug-var
             (:include debug-var)
             (:constructor make-compiled-debug-var
-                (symbol id alive-p
+                (name package id alive-p
                  sc+offset save-sc+offset indirect-sc+offset))
             (:copier nil))
   ;; storage class and offset (unexported)
@@ -1545,11 +1549,11 @@ register."
                       (sb-xc:package-name (sb-xc:symbol-package symbol)))))
     (delete-if (if (stringp package)
                    (lambda (var)
-                     (let ((p (debug-var-package-name var)))
+                     (let ((p (debug-var-package var)))
                        (or (not (stringp p))
                            (string/= p package))))
                    (lambda (var)
-                     (stringp (debug-var-package-name var))))
+                     (stringp (debug-var-package var))))
                vars)))
 
 ;;; Return a list of DEBUG-VARs in DEBUG-FUN whose names contain
@@ -1569,7 +1573,7 @@ register."
       (do ((i pos (1+ i)))
           ((= i len))
         (let* ((var (compact-vector-ref variables i))
-               (name (debug-var-symbol-name var))
+               (name (debug-var-name var))
                (name-len (length name)))
           (declare (simple-string name))
           (when (/= (or (string/= name-prefix-string name
@@ -1588,7 +1592,7 @@ register."
   (let ((name-len (length name)))
     (position name variables
               :test (lambda (x y)
-                      (let* ((y (debug-var-symbol-name y))
+                      (let* ((y (debug-var-name y))
                              (y-len (length y)))
                         (declare (simple-string y))
                         (and (>= y-len name-len)
@@ -1904,9 +1908,8 @@ register."
   (let* ((len (length vars))
          (width (length (format nil "~W" (1- len)))))
     (dotimes (i len)
-      (setf (compiled-debug-var-symbol (svref vars i))
-            (symbolicate! #.(find-package "SB-DEBUG") "ARG-"
-                          (format nil "~V,'0D" width i))))))
+      (setf (compiled-debug-var-name (svref vars i))
+            (format nil "ARG-~V,'0D" width i)))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector
@@ -1915,55 +1918,68 @@ register."
   (let* ((cdebug-fun (compiled-debug-fun-compiler-debug-fun
                       debug-fun))
          (packed-vars (sb-c::compiled-debug-fun-vars cdebug-fun))
-         (length (if (vectorp packed-vars)
-                     (length packed-vars)
-                     1))
+         (default-package (sb-c::compiled-debug-info-package
+                           (compiled-debug-fun-debug-info debug-fun)))
          (args-minimal (eq (sb-c::compiled-debug-fun-arguments cdebug-fun)
                            :minimal)))
-    (when packed-vars
-      (do ((i 0)
-           (id 0)
-           prev-name
-           (buffer (make-array 0 :fill-pointer 0 :adjustable t)))
-          ((>= i length)
-           (let ((result (coerce buffer 'simple-vector)))
-             (when args-minimal
-               (assign-minimal-var-names result))
-             result))
-        (flet ((geti () (prog1 (compact-vector-ref packed-vars i) (incf i))))
-          (let* ((flags (geti))
-                 (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
-                 (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
-                 (indirect-p (logtest sb-c::compiled-debug-var-indirect-p flags))
-                 (live (logtest sb-c::compiled-debug-var-environment-live
-                                flags))
-                 (save (logtest sb-c::compiled-debug-var-save-loc-p flags))
-                 (symbol (cond (minimal nil)
-                               ((logtest sb-c::compiled-debug-var-same-name-p flags)
-                                prev-name)
-                               (t (geti))))
-                 ;; Keep the condition in sync with DUMP-1-VAR
-                 (large-fixnums (>= (integer-length most-positive-fixnum) 62))
-                 (sc+offset (if deleted 0
-                                (if large-fixnums (ldb (byte 27 8) flags) (geti))))
-                 (save-sc+offset (and save
-                                      (if large-fixnums (ldb (byte 27 35) flags) (geti))))
-                 (indirect-sc+offset (and indirect-p
-                                          (geti))))
-            (aver (not (and args-minimal (not minimal))))
-            (cond ((and prev-name (string= prev-name symbol))
-                   (incf id))
-                  (t
-                   (setf id 0
-                         prev-name symbol)))
-            (vector-push-extend (make-compiled-debug-var
-                                 (if (stringp symbol) (make-symbol symbol) symbol)
-                                 id
-                                 live
-                                 sc+offset
-                                 save-sc+offset
-                                 indirect-sc+offset)
-                                buffer)))))))
+    (unless packed-vars
+      (return-from parse-compiled-debug-vars nil))
+    (when (zerop (compact-vector-length packed-vars))
+      ;; Return a simple-vector not whatever packed-vars may be.
+      (return-from parse-compiled-debug-vars '#()))
+    (let ((i 0)
+          (id 0)
+          (len (compact-vector-length packed-vars))
+          (buffer (make-array 0 :fill-pointer 0 :adjustable t))
+          prev-name)
+      (loop
+        ;; The routines in the "SB-C" package are macros that advance the
+        ;; index.
+        (let* ((flags (prog1 (compact-vector-ref packed-vars i) (incf i)))
+               (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
+               (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
+               (name (cond (minimal "")
+                           ((logtest sb-c::compiled-debug-var-same-name-p flags)
+                            prev-name)
+                           (t (sb-c::read-var-string packed-vars i))))
+               (package (cond
+                          (minimal default-package)
+                          ((logtest sb-c::compiled-debug-var-packaged
+                                    flags)
+                           (sb-c::read-var-string packed-vars i))
+                          ((logtest sb-c::compiled-debug-var-uninterned
+                                    flags)
+                           nil)
+                          (t
+                           default-package)))
+               (sc+offset
+                 (if deleted 0 (sb-c::read-var-integerf packed-vars i)))
+               (save-sc+offset
+                 (if (logtest sb-c::compiled-debug-var-save-loc-p flags)
+                     (sb-c::read-var-integerf packed-vars i)
+                     nil))
+               (indirect-sc+offset
+                 (if (logtest sb-c::compiled-debug-var-indirect-p flags)
+                     (sb-c::read-var-integerf packed-vars i)
+                     nil)))
+          (aver (not (and args-minimal (not minimal))))
+          (cond ((and prev-name (string= prev-name name))
+                 (incf id))
+                (t
+                 (setf id 0
+                       prev-name name)))
+          (vector-push-extend
+           (make-compiled-debug-var
+            name package id
+            (logtest sb-c::compiled-debug-var-environment-live flags)
+            sc+offset save-sc+offset
+            indirect-sc+offset)
+           buffer))
+        (when (>= i len) (return)))
+      (let ((result (coerce buffer 'simple-vector)))
+        (when args-minimal
+          (assign-minimal-var-names result))
+        result))))
 
 ;;;; CODE-LOCATIONs
 
@@ -2266,14 +2282,13 @@ register."
 
 ;;;; operations on debug variables
 
-(defun debug-var-symbol-name (debug-var)
-  (symbol-name (debug-var-symbol debug-var)))
-
-;;; FIXME: Make sure that this isn't called anywhere that it wouldn't
-;;; be acceptable to have NIL returned, or that it's only called on
-;;; DEBUG-VARs whose symbols have non-NIL packages.
-(defun debug-var-package-name (debug-var)
-  (sb-xc:package-name (sb-xc:symbol-package (debug-var-symbol debug-var))))
+;;; Return the symbol from interning DEBUG-VAR-NAME in the package
+;;; named by DEBUG-VAR-PACKAGE.
+(defun debug-var-symbol (debug-var)
+  (let ((package (debug-var-package debug-var)))
+    (if package
+        (intern (debug-var-name debug-var) package)
+        (make-symbol (debug-var-name debug-var)))))
 
 ;;; Return the value stored for DEBUG-VAR in frame, or if the value is
 ;;; not :VALID, then signal an INVALID-VALUE error.

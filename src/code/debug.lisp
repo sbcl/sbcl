@@ -1363,10 +1363,8 @@ forms that explicitly control this kind of evaluation.")
             (let* ((name (etypecase name
                            (symbol (symbol-name name))
                            (simple-string name)))
-                   ;; FIXME: REMOVE-IF-NOT is deprecated, use STRING/=
-                   ;; instead.
                    (exact (remove-if-not (lambda (v)
-                                           (string= (debug-var-symbol-name v)
+                                           (string= (debug-var-name v)
                                                     name))
                                          vars))
                    (vars (or exact vars)))
@@ -1387,14 +1385,14 @@ forms that explicitly control this kind of evaluation.")
                ((and (not exact)
                      (find-if-not
                       (lambda (v)
-                        (string= (debug-var-symbol-name v)
-                                 (debug-var-symbol-name (car vars))))
+                        (string= (debug-var-name v)
+                                 (debug-var-name (car vars))))
                       (cdr vars)))
                 (error "specification ambiguous:~%~{   ~A~%~}"
-                       (mapcar #'debug-var-symbol-name
+                       (mapcar #'debug-var-name
                                (delete-duplicates
                                 vars :test #'string=
-                                :key #'debug-var-symbol-name))))
+                                :key #'debug-var-name))))
                ;; All names are the same, so see whether the user
                ;; ID'ed one of them.
                (id-supplied

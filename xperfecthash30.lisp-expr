@@ -2313,5 +2313,8 @@
   (let ((b (& (>> val 17) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(154E417 61DD4A0 152F696B 15EC7A14 17D9F70F 1BB8AC21 1DBE97B4)
+ "(:NAME :SOURCE :PACKAGE :FUN-MAP :CONTEXTS :MEMO-CELL :ALLOW-OTHER-KEYS)"
+ "(  (& (^ val (>> val 16)) 7))")
 )
 ;; EOF
