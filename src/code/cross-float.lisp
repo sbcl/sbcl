@@ -612,7 +612,9 @@
 
 (defun xfloat-abs (x)
   (with-memoized-math-op (abs x)
-    (if (not (float-sign-bit-set-p x)) x (sb-xc:- x))))
+    (typecase x
+      (single-float (make-flonum (logand (flonum-%bits x) #x7fffffff) 'single-float))
+      (double-float (make-flonum (logand (flonum-%bits x) #x7fffffffffffffff) 'double-float)))))
 
 ;;; Signum should return -0 of the correct type for -0 input.
 ;;; We don't need it currently.
