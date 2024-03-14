@@ -649,12 +649,8 @@
   (validate-args number prototype)
   (with-memoized-math-op (float (cons number (if prototypep (list prototype))))
     (let* ((format
-            (if (not prototypep) 'single-float (flonum-format prototype)))
-           (host-format
-            (ecase format
-              (single-float 'cl:single-float)
-              (double-float 'cl:double-float))))
-      (make-flonum (cl:coerce (realnumify number) host-format) format))))
+             (if (not prototypep) 'single-float (flonum-format prototype))))
+      (flonum-from-rational (rational number) format))))
 
 ;;; Produce a float with the format and magnitude of FLOAT2 and sign of FLOAT1.
 (defun float-sign (float1 &optional (float2 (float 1 float1) float2p))
